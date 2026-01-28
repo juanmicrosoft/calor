@@ -39,6 +39,21 @@ public enum TokenKind
     Op,
     Ref,
 
+    // Phase 3: Type System
+    Type,
+    EndType,
+    Record,
+    EndRecord,
+    Field,
+    Match,
+    EndMatch,
+    Case,
+    Some,
+    None,
+    Ok,
+    Err,
+    Variant,
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
@@ -73,7 +88,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Ref;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Variant;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral;

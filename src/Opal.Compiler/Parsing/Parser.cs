@@ -240,6 +240,10 @@ public sealed class Parser
         {
             return ParseBindStatement();
         }
+        else if (Check(TokenKind.Match))
+        {
+            return ParseMatchStatement();
+        }
 
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
@@ -306,7 +310,14 @@ public sealed class Parser
             or TokenKind.FloatLiteral
             or TokenKind.Identifier
             or TokenKind.Op
-            or TokenKind.Ref;
+            or TokenKind.Ref
+            // Phase 3: Type System
+            or TokenKind.Some
+            or TokenKind.None
+            or TokenKind.Ok
+            or TokenKind.Err
+            or TokenKind.Match
+            or TokenKind.Record;
     }
 
     private ExpressionNode ParseExpression()
@@ -320,6 +331,13 @@ public sealed class Parser
             TokenKind.Identifier => ParseReference(),
             TokenKind.Op => ParseBinaryOperation(),
             TokenKind.Ref => ParseRefExpression(),
+            // Phase 3: Type System
+            TokenKind.Some => ParseSomeExpression(),
+            TokenKind.None => ParseNoneExpression(),
+            TokenKind.Ok => ParseOkExpression(),
+            TokenKind.Err => ParseErrExpression(),
+            TokenKind.Match => ParseMatchExpression(),
+            TokenKind.Record => ParseRecordCreation(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
         };
     }
@@ -387,6 +405,183 @@ public sealed class Parser
 
         var span = startToken.Span.Union(right.Span);
         return new BinaryOperationNode(span, op.Value, left, right);
+    }
+
+    // Phase 3: Type System Expression Parsing
+
+    private SomeExpressionNode ParseSomeExpression()
+    {
+        var startToken = Expect(TokenKind.Some);
+        var value = ParseExpression();
+        var span = startToken.Span.Union(value.Span);
+        return new SomeExpressionNode(span, value);
+    }
+
+    private NoneExpressionNode ParseNoneExpression()
+    {
+        var startToken = Expect(TokenKind.None);
+        var attrs = ParseAttributes();
+        var typeName = attrs["type"];
+        return new NoneExpressionNode(startToken.Span, typeName);
+    }
+
+    private OkExpressionNode ParseOkExpression()
+    {
+        var startToken = Expect(TokenKind.Ok);
+        var value = ParseExpression();
+        var span = startToken.Span.Union(value.Span);
+        return new OkExpressionNode(span, value);
+    }
+
+    private ErrExpressionNode ParseErrExpression()
+    {
+        var startToken = Expect(TokenKind.Err);
+        var error = ParseExpression();
+        var span = startToken.Span.Union(error.Span);
+        return new ErrExpressionNode(span, error);
+    }
+
+    private RecordCreationNode ParseRecordCreation()
+    {
+        var startToken = Expect(TokenKind.Record);
+        var attrs = ParseAttributes();
+        var typeName = GetRequiredAttribute(attrs, "type", "RECORD", startToken.Span);
+
+        var fields = new List<FieldAssignmentNode>();
+        while (Check(TokenKind.Field))
+        {
+            var fieldToken = Expect(TokenKind.Field);
+            var fieldAttrs = ParseAttributes();
+            var fieldName = GetRequiredAttribute(fieldAttrs, "name", "FIELD", fieldToken.Span);
+            var value = ParseExpression();
+            fields.Add(new FieldAssignmentNode(fieldToken.Span.Union(value.Span), fieldName, value));
+        }
+
+        var lastSpan = fields.Count > 0 ? fields[^1].Span : startToken.Span;
+        return new RecordCreationNode(startToken.Span.Union(lastSpan), typeName, fields);
+    }
+
+    private MatchExpressionNode ParseMatchExpression()
+    {
+        var startToken = Expect(TokenKind.Match);
+        var attrs = ParseAttributes();
+        var id = GetRequiredAttribute(attrs, "id", "MATCH", startToken.Span);
+
+        var target = ParseExpression();
+        var cases = ParseMatchCases();
+
+        var endToken = Expect(TokenKind.EndMatch);
+        var endAttrs = ParseAttributes();
+        var endId = GetRequiredAttribute(endAttrs, "id", "END_MATCH", endToken.Span);
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "MATCH", id, "END_MATCH", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new MatchExpressionNode(span, id, target, cases, attrs);
+    }
+
+    private MatchStatementNode ParseMatchStatement()
+    {
+        var startToken = Expect(TokenKind.Match);
+        var attrs = ParseAttributes();
+        var id = GetRequiredAttribute(attrs, "id", "MATCH", startToken.Span);
+
+        var target = ParseExpression();
+        var cases = ParseMatchCases();
+
+        var endToken = Expect(TokenKind.EndMatch);
+        var endAttrs = ParseAttributes();
+        var endId = GetRequiredAttribute(endAttrs, "id", "END_MATCH", endToken.Span);
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "MATCH", id, "END_MATCH", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new MatchStatementNode(span, id, target, cases, attrs);
+    }
+
+    private List<MatchCaseNode> ParseMatchCases()
+    {
+        var cases = new List<MatchCaseNode>();
+
+        while (Check(TokenKind.Case))
+        {
+            var caseToken = Expect(TokenKind.Case);
+            var pattern = ParsePattern();
+
+            ExpressionNode? guard = null;
+            // Guard could be indicated by an attribute or following expression
+
+            var body = new List<StatementNode>();
+            while (!IsAtEnd && !Check(TokenKind.Case) && !Check(TokenKind.EndMatch))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    body.Add(stmt);
+                }
+            }
+
+            var lastSpan = body.Count > 0 ? body[^1].Span : caseToken.Span;
+            cases.Add(new MatchCaseNode(caseToken.Span.Union(lastSpan), pattern, guard, body));
+        }
+
+        return cases;
+    }
+
+    private PatternNode ParsePattern()
+    {
+        if (Check(TokenKind.Identifier))
+        {
+            var token = Advance();
+            if (token.Text == "_")
+            {
+                return new WildcardPatternNode(token.Span);
+            }
+            return new VariablePatternNode(token.Span, token.Text);
+        }
+
+        if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) ||
+            Check(TokenKind.BoolLiteral) || Check(TokenKind.FloatLiteral))
+        {
+            var literal = ParseExpression();
+            return new LiteralPatternNode(literal.Span, literal);
+        }
+
+        if (Check(TokenKind.Some))
+        {
+            var startToken = Expect(TokenKind.Some);
+            var innerPattern = ParsePattern();
+            return new SomePatternNode(startToken.Span.Union(innerPattern.Span), innerPattern);
+        }
+
+        if (Check(TokenKind.None))
+        {
+            var token = Expect(TokenKind.None);
+            return new NonePatternNode(token.Span);
+        }
+
+        if (Check(TokenKind.Ok))
+        {
+            var startToken = Expect(TokenKind.Ok);
+            var innerPattern = ParsePattern();
+            return new OkPatternNode(startToken.Span.Union(innerPattern.Span), innerPattern);
+        }
+
+        if (Check(TokenKind.Err))
+        {
+            var startToken = Expect(TokenKind.Err);
+            var innerPattern = ParsePattern();
+            return new ErrPatternNode(startToken.Span.Union(innerPattern.Span), innerPattern);
+        }
+
+        // Default: wildcard
+        return new WildcardPatternNode(Current.Span);
     }
 
     private ForStatementNode ParseForStatement()

@@ -44,6 +44,20 @@ public sealed class Lexer
         ["BIND"] = TokenKind.Bind,
         ["OP"] = TokenKind.Op,
         ["REF"] = TokenKind.Ref,
+        // Phase 3: Type System
+        ["TYPE"] = TokenKind.Type,
+        ["END_TYPE"] = TokenKind.EndType,
+        ["RECORD"] = TokenKind.Record,
+        ["END_RECORD"] = TokenKind.EndRecord,
+        ["FIELD"] = TokenKind.Field,
+        ["MATCH"] = TokenKind.Match,
+        ["END_MATCH"] = TokenKind.EndMatch,
+        ["CASE"] = TokenKind.Case,
+        ["SOME"] = TokenKind.Some,
+        ["NONE"] = TokenKind.None,
+        ["OK"] = TokenKind.Ok,
+        ["ERR"] = TokenKind.Err,
+        ["VARIANT"] = TokenKind.Variant,
     };
 
     public Lexer(string source, DiagnosticBag diagnostics)

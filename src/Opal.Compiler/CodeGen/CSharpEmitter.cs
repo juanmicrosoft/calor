@@ -44,6 +44,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("// </auto-generated>");
         AppendLine();
         AppendLine("using System;");
+        AppendLine("using Opal.Runtime;");
         AppendLine();
 
         var namespaceName = SanitizeIdentifier(node.Name);
@@ -296,6 +297,174 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var op = node.Operator.ToCSharpOperator();
 
         return $"({left} {op} {right})";
+    }
+
+    // Phase 3: Type System
+
+    public string Visit(RecordDefinitionNode node)
+    {
+        AppendLine($"public record {SanitizeIdentifier(node.Name)}(");
+        Indent();
+
+        for (int i = 0; i < node.Fields.Count; i++)
+        {
+            var field = node.Fields[i];
+            var typeName = MapTypeName(field.TypeName);
+            var fieldName = SanitizeIdentifier(field.Name);
+            var comma = i < node.Fields.Count - 1 ? "," : "";
+            AppendLine($"{typeName} {fieldName}{comma}");
+        }
+
+        Dedent();
+        AppendLine(");");
+
+        return "";
+    }
+
+    public string Visit(UnionTypeDefinitionNode node)
+    {
+        // Generate as abstract base class with derived classes for each variant
+        var typeName = SanitizeIdentifier(node.Name);
+
+        AppendLine($"public abstract record {typeName};");
+        AppendLine();
+
+        foreach (var variant in node.Variants)
+        {
+            var variantName = SanitizeIdentifier(variant.Name);
+            if (variant.Fields.Count == 0)
+            {
+                AppendLine($"public sealed record {variantName}() : {typeName};");
+            }
+            else
+            {
+                var fields = string.Join(", ", variant.Fields.Select(f =>
+                    $"{MapTypeName(f.TypeName)} {SanitizeIdentifier(f.Name)}"));
+                AppendLine($"public sealed record {variantName}({fields}) : {typeName};");
+            }
+        }
+
+        return "";
+    }
+
+    public string Visit(RecordCreationNode node)
+    {
+        var typeName = SanitizeIdentifier(node.TypeName);
+        var fields = string.Join(", ", node.Fields.Select(f => f.Value.Accept(this)));
+        return $"new {typeName}({fields})";
+    }
+
+    public string Visit(FieldAccessNode node)
+    {
+        var target = node.Target.Accept(this);
+        var fieldName = SanitizeIdentifier(node.FieldName);
+        return $"{target}.{fieldName}";
+    }
+
+    public string Visit(SomeExpressionNode node)
+    {
+        var value = node.Value.Accept(this);
+        return $"Opal.Runtime.Option.Some({value})";
+    }
+
+    public string Visit(NoneExpressionNode node)
+    {
+        if (node.TypeName != null)
+        {
+            var typeName = MapTypeName(node.TypeName);
+            return $"Opal.Runtime.Option<{typeName}>.None()";
+        }
+        return "Opal.Runtime.Option.None<object>()";
+    }
+
+    public string Visit(OkExpressionNode node)
+    {
+        var value = node.Value.Accept(this);
+        return $"Opal.Runtime.Result.Ok<{GetInferredTypeName(node.Value)}, string>({value})";
+    }
+
+    public string Visit(ErrExpressionNode node)
+    {
+        var error = node.Error.Accept(this);
+        return $"Opal.Runtime.Result.Err<object, {GetInferredTypeName(node.Error)}>({error})";
+    }
+
+    public string Visit(MatchExpressionNode node)
+    {
+        // Generate as switch expression
+        var target = node.Target.Accept(this);
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"{target} switch {{ ");
+
+        for (int i = 0; i < node.Cases.Count; i++)
+        {
+            var matchCase = node.Cases[i];
+            var pattern = EmitPattern(matchCase.Pattern);
+            // For expression match, we'd need the body to be an expression
+            // For now, emit a placeholder
+            sb.Append($"{pattern} => default");
+            if (i < node.Cases.Count - 1) sb.Append(", ");
+        }
+
+        sb.Append(" }");
+        return sb.ToString();
+    }
+
+    public string Visit(MatchStatementNode node)
+    {
+        var target = node.Target.Accept(this);
+
+        AppendLine($"switch ({target})");
+        AppendLine("{");
+        Indent();
+
+        foreach (var matchCase in node.Cases)
+        {
+            var pattern = EmitPattern(matchCase.Pattern);
+            AppendLine($"case {pattern}:");
+            Indent();
+
+            foreach (var stmt in matchCase.Body)
+            {
+                var stmtCode = stmt.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            AppendLine("break;");
+            Dedent();
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    private string EmitPattern(PatternNode pattern)
+    {
+        return pattern switch
+        {
+            WildcardPatternNode => "_",
+            VariablePatternNode vp => $"var {SanitizeIdentifier(vp.Name)}",
+            LiteralPatternNode lp => lp.Literal.Accept(this),
+            SomePatternNode sp => $"{{ IsSome: true, Value: {EmitPattern(sp.InnerPattern)} }}",
+            NonePatternNode => "{ IsNone: true }",
+            OkPatternNode op => $"{{ IsOk: true, Value: {EmitPattern(op.InnerPattern)} }}",
+            ErrPatternNode ep => $"{{ IsErr: true, Error: {EmitPattern(ep.InnerPattern)} }}",
+            _ => "_"
+        };
+    }
+
+    private string GetInferredTypeName(ExpressionNode expr)
+    {
+        return expr switch
+        {
+            IntLiteralNode => "int",
+            FloatLiteralNode => "double",
+            BoolLiteralNode => "bool",
+            StringLiteralNode => "string",
+            _ => "object"
+        };
     }
 
     private static string MapTypeName(string opalType)

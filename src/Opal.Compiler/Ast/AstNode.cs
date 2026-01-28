@@ -39,6 +39,17 @@ public interface IAstVisitor
     void Visit(IfStatementNode node);
     void Visit(BindStatementNode node);
     void Visit(BinaryOperationNode node);
+    // Phase 3: Type System
+    void Visit(RecordDefinitionNode node);
+    void Visit(UnionTypeDefinitionNode node);
+    void Visit(RecordCreationNode node);
+    void Visit(FieldAccessNode node);
+    void Visit(SomeExpressionNode node);
+    void Visit(NoneExpressionNode node);
+    void Visit(OkExpressionNode node);
+    void Visit(ErrExpressionNode node);
+    void Visit(MatchExpressionNode node);
+    void Visit(MatchStatementNode node);
 }
 
 /// <summary>
@@ -62,6 +73,17 @@ public interface IAstVisitor<T>
     T Visit(IfStatementNode node);
     T Visit(BindStatementNode node);
     T Visit(BinaryOperationNode node);
+    // Phase 3: Type System
+    T Visit(RecordDefinitionNode node);
+    T Visit(UnionTypeDefinitionNode node);
+    T Visit(RecordCreationNode node);
+    T Visit(FieldAccessNode node);
+    T Visit(SomeExpressionNode node);
+    T Visit(NoneExpressionNode node);
+    T Visit(OkExpressionNode node);
+    T Visit(ErrExpressionNode node);
+    T Visit(MatchExpressionNode node);
+    T Visit(MatchStatementNode node);
 }
 
 /// <summary>
