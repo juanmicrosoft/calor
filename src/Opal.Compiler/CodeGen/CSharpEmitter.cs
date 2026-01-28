@@ -165,6 +165,139 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return SanitizeIdentifier(node.Name);
     }
 
+    // Phase 2: Control Flow
+
+    public string Visit(ForStatementNode node)
+    {
+        var varName = SanitizeIdentifier(node.VariableName);
+        var from = node.From.Accept(this);
+        var to = node.To.Accept(this);
+        var step = node.Step?.Accept(this) ?? "1";
+
+        // Determine loop direction based on step (simple heuristic)
+        var isPositiveStep = !step.StartsWith("-");
+        var comparison = isPositiveStep ? "<=" : ">=";
+        var increment = step == "1" ? $"{varName}++" : $"{varName} += {step}";
+
+        AppendLine($"for (var {varName} = {from}; {varName} {comparison} {to}; {increment})");
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            var stmtCode = stmt.Accept(this);
+            AppendLine(stmtCode);
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(WhileStatementNode node)
+    {
+        var condition = node.Condition.Accept(this);
+
+        AppendLine($"while ({condition})");
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            var stmtCode = stmt.Accept(this);
+            AppendLine(stmtCode);
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(IfStatementNode node)
+    {
+        var condition = node.Condition.Accept(this);
+
+        AppendLine($"if ({condition})");
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.ThenBody)
+        {
+            var stmtCode = stmt.Accept(this);
+            AppendLine(stmtCode);
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        // Emit ELSEIF clauses
+        foreach (var elseIf in node.ElseIfClauses)
+        {
+            var elseIfCondition = elseIf.Condition.Accept(this);
+            AppendLine($"else if ({elseIfCondition})");
+            AppendLine("{");
+            Indent();
+
+            foreach (var stmt in elseIf.Body)
+            {
+                var stmtCode = stmt.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            Dedent();
+            AppendLine("}");
+        }
+
+        // Emit ELSE clause
+        if (node.ElseBody != null)
+        {
+            AppendLine("else");
+            AppendLine("{");
+            Indent();
+
+            foreach (var stmt in node.ElseBody)
+            {
+                var stmtCode = stmt.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            Dedent();
+            AppendLine("}");
+        }
+
+        return "";
+    }
+
+    public string Visit(BindStatementNode node)
+    {
+        var varName = SanitizeIdentifier(node.Name);
+        var typeName = node.TypeName != null ? MapTypeName(node.TypeName) : "var";
+
+        if (node.Initializer != null)
+        {
+            var initExpr = node.Initializer.Accept(this);
+            return $"{typeName} {varName} = {initExpr};";
+        }
+
+        // No initializer - need explicit type
+        if (node.TypeName == null)
+        {
+            typeName = "int"; // Default to int
+        }
+        return $"{typeName} {varName} = default;";
+    }
+
+    public string Visit(BinaryOperationNode node)
+    {
+        var left = node.Left.Accept(this);
+        var right = node.Right.Accept(this);
+        var op = node.Operator.ToCSharpOperator();
+
+        return $"({left} {op} {right})";
+    }
+
     private static string MapTypeName(string opalType)
     {
         return opalType.ToUpperInvariant() switch

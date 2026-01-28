@@ -32,6 +32,18 @@ public sealed class Lexer
         ["END_CALL"] = TokenKind.EndCall,
         ["ARG"] = TokenKind.Arg,
         ["RETURN"] = TokenKind.Return,
+        // Phase 2: Control Flow
+        ["FOR"] = TokenKind.For,
+        ["END_FOR"] = TokenKind.EndFor,
+        ["IF"] = TokenKind.If,
+        ["END_IF"] = TokenKind.EndIf,
+        ["ELSE"] = TokenKind.Else,
+        ["ELSEIF"] = TokenKind.ElseIf,
+        ["WHILE"] = TokenKind.While,
+        ["END_WHILE"] = TokenKind.EndWhile,
+        ["BIND"] = TokenKind.Bind,
+        ["OP"] = TokenKind.Op,
+        ["REF"] = TokenKind.Ref,
     };
 
     public Lexer(string source, DiagnosticBag diagnostics)

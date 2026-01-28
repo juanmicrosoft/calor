@@ -33,6 +33,12 @@ public interface IAstVisitor
     void Visit(BoolLiteralNode node);
     void Visit(FloatLiteralNode node);
     void Visit(ReferenceNode node);
+    // Phase 2: Control Flow
+    void Visit(ForStatementNode node);
+    void Visit(WhileStatementNode node);
+    void Visit(IfStatementNode node);
+    void Visit(BindStatementNode node);
+    void Visit(BinaryOperationNode node);
 }
 
 /// <summary>
@@ -50,6 +56,12 @@ public interface IAstVisitor<T>
     T Visit(BoolLiteralNode node);
     T Visit(FloatLiteralNode node);
     T Visit(ReferenceNode node);
+    // Phase 2: Control Flow
+    T Visit(ForStatementNode node);
+    T Visit(WhileStatementNode node);
+    T Visit(IfStatementNode node);
+    T Visit(BindStatementNode node);
+    T Visit(BinaryOperationNode node);
 }
 
 /// <summary>

@@ -30,6 +30,7 @@ public static class DiagnosticCode
     public const string ExpectedKeyword = "OPAL0103";
     public const string ExpectedExpression = "OPAL0104";
     public const string ExpectedClosingTag = "OPAL0105";
+    public const string InvalidOperator = "OPAL0106";
 
     // Semantic errors (OPAL0200-0299)
     public const string UndefinedReference = "OPAL0200";
