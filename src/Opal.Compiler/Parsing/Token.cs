@@ -1,0 +1,86 @@
+namespace Opal.Compiler.Parsing;
+
+/// <summary>
+/// Token types recognized by the OPAL lexer.
+/// </summary>
+public enum TokenKind
+{
+    // Structural
+    SectionMarker,      // §
+    OpenBracket,        // [
+    CloseBracket,       // ]
+    Equals,             // =
+
+    // Keywords (recognized after §)
+    Module,
+    EndModule,
+    Func,
+    EndFunc,
+    In,
+    Out,
+    Effects,
+    Body,
+    EndBody,
+    Call,
+    EndCall,
+    Arg,
+    Return,
+
+    // Typed Literals
+    IntLiteral,         // INT:42
+    StrLiteral,         // STR:"hello"
+    BoolLiteral,        // BOOL:true
+    FloatLiteral,       // FLOAT:3.14
+
+    // Identifiers and values
+    Identifier,
+
+    // Special
+    Newline,
+    Whitespace,
+    Eof,
+    Error
+}
+
+/// <summary>
+/// Represents a single token from the OPAL source.
+/// </summary>
+public readonly struct Token : IEquatable<Token>
+{
+    public TokenKind Kind { get; }
+    public string Text { get; }
+    public TextSpan Span { get; }
+    public object? Value { get; }
+
+    public Token(TokenKind kind, string text, TextSpan span, object? value = null)
+    {
+        Kind = kind;
+        Text = text;
+        Span = span;
+        Value = value;
+    }
+
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Return;
+
+    public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
+        or TokenKind.BoolLiteral or TokenKind.FloatLiteral;
+
+    public bool IsTrivia => Kind is TokenKind.Whitespace or TokenKind.Newline;
+
+    public override string ToString()
+        => Value != null
+            ? $"{Kind}({Value}) at {Span}"
+            : $"{Kind}(\"{Text}\") at {Span}";
+
+    public bool Equals(Token other)
+        => Kind == other.Kind && Text == other.Text && Span == other.Span;
+
+    public override bool Equals(object? obj)
+        => obj is Token other && Equals(other);
+
+    public override int GetHashCode()
+        => HashCode.Combine(Kind, Text, Span);
+
+    public static bool operator ==(Token left, Token right) => left.Equals(right);
+    public static bool operator !=(Token left, Token right) => !left.Equals(right);
+}

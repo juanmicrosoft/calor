@@ -1,0 +1,7 @@
+<Project>
+  <!-- Disable Git-based targets that cause permission issues -->
+  <PropertyGroup>
+    <GitInfoReportImportance>Off</GitInfoReportImportance>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+  </PropertyGroup>
+</Project>

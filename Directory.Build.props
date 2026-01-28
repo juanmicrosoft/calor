@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <EmbedUntrackedSources>false</EmbedUntrackedSources>
+    <GenerateRepositoryUrlAttribute>false</GenerateRepositoryUrlAttribute>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <EnableSourceLink>false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>OPAL</Company>
+    <Product>OPAL Compiler</Product>
+    <Copyright>Copyright © 2024</Copyright>
+  </PropertyGroup>
+</Project>
