@@ -26,6 +26,19 @@ public enum TokenKind
     Arg,
     Return,
 
+    // Phase 2: Control Flow
+    For,
+    EndFor,
+    If,
+    EndIf,
+    Else,
+    ElseIf,
+    While,
+    EndWhile,
+    Bind,
+    Op,
+    Ref,
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
@@ -60,7 +73,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Return;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Ref;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral;

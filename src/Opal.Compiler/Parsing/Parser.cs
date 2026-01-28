@@ -224,6 +224,22 @@ public sealed class Parser
         {
             return ParseReturnStatement();
         }
+        else if (Check(TokenKind.For))
+        {
+            return ParseForStatement();
+        }
+        else if (Check(TokenKind.While))
+        {
+            return ParseWhileStatement();
+        }
+        else if (Check(TokenKind.If))
+        {
+            return ParseIfStatement();
+        }
+        else if (Check(TokenKind.Bind))
+        {
+            return ParseBindStatement();
+        }
 
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
@@ -288,7 +304,9 @@ public sealed class Parser
             or TokenKind.StrLiteral
             or TokenKind.BoolLiteral
             or TokenKind.FloatLiteral
-            or TokenKind.Identifier;
+            or TokenKind.Identifier
+            or TokenKind.Op
+            or TokenKind.Ref;
     }
 
     private ExpressionNode ParseExpression()
@@ -300,6 +318,8 @@ public sealed class Parser
             TokenKind.BoolLiteral => ParseBoolLiteral(),
             TokenKind.FloatLiteral => ParseFloatLiteral(),
             TokenKind.Identifier => ParseReference(),
+            TokenKind.Op => ParseBinaryOperation(),
+            TokenKind.Ref => ParseRefExpression(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
         };
     }
@@ -336,6 +356,229 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.Identifier);
         return new ReferenceNode(token.Span, token.Text);
+    }
+
+    private ReferenceNode ParseRefExpression()
+    {
+        var startToken = Expect(TokenKind.Ref);
+        var attrs = ParseAttributes();
+
+        var name = GetRequiredAttribute(attrs, "name", "REF", startToken.Span);
+        return new ReferenceNode(startToken.Span, name);
+    }
+
+    private BinaryOperationNode ParseBinaryOperation()
+    {
+        var startToken = Expect(TokenKind.Op);
+        var attrs = ParseAttributes();
+
+        var kindStr = GetRequiredAttribute(attrs, "kind", "OP", startToken.Span);
+        var op = BinaryOperatorExtensions.FromString(kindStr);
+
+        if (op == null)
+        {
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                $"Unknown binary operator '{kindStr}'");
+            op = BinaryOperator.Add; // Default to avoid null
+        }
+
+        var left = ParseExpression();
+        var right = ParseExpression();
+
+        var span = startToken.Span.Union(right.Span);
+        return new BinaryOperationNode(span, op.Value, left, right);
+    }
+
+    private ForStatementNode ParseForStatement()
+    {
+        var startToken = Expect(TokenKind.For);
+        var attrs = ParseAttributes();
+
+        var id = GetRequiredAttribute(attrs, "id", "FOR", startToken.Span);
+        var varName = GetRequiredAttribute(attrs, "var", "FOR", startToken.Span);
+
+        // Parse from/to/step - these can be expressions or literal values in attributes
+        ExpressionNode from;
+        ExpressionNode to;
+        ExpressionNode? step = null;
+
+        // Check if from/to are in attributes (simple case) or need to be parsed as expressions
+        var fromAttr = attrs["from"];
+        var toAttr = attrs["to"];
+        var stepAttr = attrs["step"];
+
+        if (fromAttr != null && int.TryParse(fromAttr, out var fromVal))
+        {
+            from = new IntLiteralNode(startToken.Span, fromVal);
+        }
+        else
+        {
+            from = ParseExpression();
+        }
+
+        if (toAttr != null && int.TryParse(toAttr, out var toVal))
+        {
+            to = new IntLiteralNode(startToken.Span, toVal);
+        }
+        else
+        {
+            to = ParseExpression();
+        }
+
+        if (stepAttr != null && int.TryParse(stepAttr, out var stepVal))
+        {
+            step = new IntLiteralNode(startToken.Span, stepVal);
+        }
+
+        // Parse body statements
+        var body = ParseStatementBlock(TokenKind.EndFor);
+
+        var endToken = Expect(TokenKind.EndFor);
+        var endAttrs = ParseAttributes();
+        var endId = GetRequiredAttribute(endAttrs, "id", "END_FOR", endToken.Span);
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "FOR", id, "END_FOR", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new ForStatementNode(span, id, varName, from, to, step, body, attrs);
+    }
+
+    private WhileStatementNode ParseWhileStatement()
+    {
+        var startToken = Expect(TokenKind.While);
+        var attrs = ParseAttributes();
+
+        var id = GetRequiredAttribute(attrs, "id", "WHILE", startToken.Span);
+
+        // Parse condition expression
+        var condition = ParseExpression();
+
+        // Parse body statements
+        var body = ParseStatementBlock(TokenKind.EndWhile);
+
+        var endToken = Expect(TokenKind.EndWhile);
+        var endAttrs = ParseAttributes();
+        var endId = GetRequiredAttribute(endAttrs, "id", "END_WHILE", endToken.Span);
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "WHILE", id, "END_WHILE", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new WhileStatementNode(span, id, condition, body, attrs);
+    }
+
+    private IfStatementNode ParseIfStatement()
+    {
+        var startToken = Expect(TokenKind.If);
+        var attrs = ParseAttributes();
+
+        var id = GetRequiredAttribute(attrs, "id", "IF", startToken.Span);
+
+        // Parse condition expression
+        var condition = ParseExpression();
+
+        // Parse then body
+        var thenBody = new List<StatementNode>();
+        var elseIfClauses = new List<ElseIfClauseNode>();
+        List<StatementNode>? elseBody = null;
+
+        while (!IsAtEnd && !Check(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null)
+            {
+                thenBody.Add(stmt);
+            }
+        }
+
+        // Parse ELSEIF clauses
+        while (Check(TokenKind.ElseIf))
+        {
+            var elseIfToken = Expect(TokenKind.ElseIf);
+            var elseIfCondition = ParseExpression();
+            var elseIfBody = new List<StatementNode>();
+
+            while (!IsAtEnd && !Check(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    elseIfBody.Add(stmt);
+                }
+            }
+
+            elseIfClauses.Add(new ElseIfClauseNode(elseIfToken.Span, elseIfCondition, elseIfBody));
+        }
+
+        // Parse ELSE clause
+        if (Check(TokenKind.Else))
+        {
+            Expect(TokenKind.Else);
+            elseBody = new List<StatementNode>();
+
+            while (!IsAtEnd && !Check(TokenKind.EndIf))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    elseBody.Add(stmt);
+                }
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndIf);
+        var endAttrs = ParseAttributes();
+        var endId = GetRequiredAttribute(endAttrs, "id", "END_IF", endToken.Span);
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "IF", id, "END_IF", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new IfStatementNode(span, id, condition, thenBody, elseIfClauses, elseBody, attrs);
+    }
+
+    private BindStatementNode ParseBindStatement()
+    {
+        var startToken = Expect(TokenKind.Bind);
+        var attrs = ParseAttributes();
+
+        var name = GetRequiredAttribute(attrs, "name", "BIND", startToken.Span);
+        var typeName = attrs["type"];
+        var mutableStr = attrs["mutable"];
+        var isMutable = mutableStr?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false;
+
+        // Parse optional initializer expression
+        ExpressionNode? initializer = null;
+        if (IsExpressionStart())
+        {
+            initializer = ParseExpression();
+        }
+
+        var span = initializer != null ? startToken.Span.Union(initializer.Span) : startToken.Span;
+        return new BindStatementNode(span, name, typeName, isMutable, initializer, attrs);
+    }
+
+    private List<StatementNode> ParseStatementBlock(params TokenKind[] terminators)
+    {
+        var statements = new List<StatementNode>();
+
+        while (!IsAtEnd && !terminators.Any(Check))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null)
+            {
+                statements.Add(stmt);
+            }
+        }
+
+        return statements;
     }
 
     private AttributeCollection ParseAttributes()
