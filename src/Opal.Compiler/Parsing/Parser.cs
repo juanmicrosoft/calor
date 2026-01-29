@@ -673,8 +673,6 @@ public sealed class Parser
             or TokenKind.BoolLiteral
             or TokenKind.FloatLiteral
             or TokenKind.Identifier
-            or TokenKind.Op
-            or TokenKind.Ref
             // v2 Lisp-style expression
             or TokenKind.OpenParen
             // Phase 3: Type System
@@ -717,8 +715,6 @@ public sealed class Parser
             TokenKind.BoolLiteral => ParseBoolLiteral(),
             TokenKind.FloatLiteral => ParseFloatLiteral(),
             TokenKind.Identifier => ParseReference(),
-            TokenKind.Op => ParseBinaryOperation(),
-            TokenKind.Ref => ParseRefExpression(),
             // v2 Lisp-style expression: (op args...)
             TokenKind.OpenParen => ParseLispExpression(),
             // Phase 3: Type System
@@ -955,8 +951,6 @@ public sealed class Parser
             TokenKind.FloatLiteral => ParseFloatLiteral(),
             TokenKind.Identifier => ParseBareReference(), // Bare variable reference
             TokenKind.OpenParen => ParseLispExpression(), // Nested expression
-            // Also support existing OPAL expressions inside Lisp
-            TokenKind.Ref => ParseRefExpression(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind} in Lisp expression argument")
         };
     }
@@ -1003,37 +997,6 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.Identifier);
         return new ReferenceNode(token.Span, token.Text);
-    }
-
-    private ReferenceNode ParseRefExpression()
-    {
-        var startToken = Expect(TokenKind.Ref);
-        var attrs = ParseAttributes();
-
-        var name = GetRequiredAttribute(attrs, "name", "REF", startToken.Span);
-        return new ReferenceNode(startToken.Span, name);
-    }
-
-    private BinaryOperationNode ParseBinaryOperation()
-    {
-        var startToken = Expect(TokenKind.Op);
-        var attrs = ParseAttributes();
-
-        var kindStr = GetRequiredAttribute(attrs, "kind", "OP", startToken.Span);
-        var op = BinaryOperatorExtensions.FromString(kindStr);
-
-        if (op == null)
-        {
-            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
-                $"Unknown binary operator '{kindStr}'");
-            op = BinaryOperator.Add; // Default to avoid null
-        }
-
-        var left = ParseExpression();
-        var right = ParseExpression();
-
-        var span = startToken.Span.Union(right.Span);
-        return new BinaryOperationNode(span, op.Value, left, right);
     }
 
     // Phase 3: Type System Expression Parsing

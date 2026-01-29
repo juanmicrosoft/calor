@@ -2,14 +2,10 @@
 §F[f001:IsLeapYear:pub]
   §I[i32:year]
   §O[bool]
-  §IF[if1] §OP[kind=eq] §OP[kind=mod] §REF[name=year] 400 0
-    §R true
-  §ELSEIF §OP[kind=eq] §OP[kind=mod] §REF[name=year] 100 0
-    §R false
-  §ELSEIF §OP[kind=eq] §OP[kind=mod] §REF[name=year] 4 0
-    §R true
-  §ELSE
-    §R false
+  §IF[if1] (== (% year 400) 0) → §R true
+  §EI (== (% year 100) 0) → §R false
+  §EI (== (% year 4) 0) → §R true
+  §EL → §R false
   §/I[if1]
 §/F[f001]
 §/M[m001]

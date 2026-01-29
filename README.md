@@ -29,7 +29,7 @@ Traditional languages make agents *infer* these answers through complex analysis
 | **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
 | **Everything has an ID** | `§F[f001:Main]`, `§L[l001:i:1:100:1]` | Precise references that survive refactoring |
 | **Unambiguous structure** | Matched tags `§F[]...§/F[]` | Parse without semantic analysis |
-| **Machine-readable semantics** | Operators as `§OP[kind=add]` not `+` | Symbolic manipulation without text parsing |
+| **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
 
 ## Measuring Success
 
@@ -47,27 +47,29 @@ We evaluate OPAL against C# across 7 categories designed to measure what matters
 
 ### Benchmark Results
 
-Evaluated across 20 paired OPAL/C# programs (100% compilation success for both):
+Evaluated across 20 paired OPAL/C# programs (100% compilation success for both) using V2 compact syntax:
 
 | Category | OPAL vs C# | Winner | Interpretation |
 |----------|------------|--------|----------------|
-| Comprehension | **1.34x** | OPAL | Explicit structure aids understanding |
+| Comprehension | **1.33x** | OPAL | Explicit structure aids understanding |
 | Error Detection | **1.19x** | OPAL | Contracts surface invariant violations |
 | Edit Precision | **1.15x** | OPAL | Unique IDs enable targeted changes |
 | Generation Accuracy | 0.94x | C# | Mature tooling, familiar patterns |
-| Task Completion | 0.90x | C# | Ecosystem maturity advantage |
-| Token Economics | 0.48x | C# | OPAL's explicit syntax uses more tokens |
-| Information Density | 0.14x | C# | OPAL trades density for explicitness |
+| Task Completion | 0.93x | C# | Ecosystem maturity advantage |
+| Token Economics | 0.67x | C# | OPAL's explicit syntax uses more tokens |
+| Information Density | 0.22x | C# | OPAL trades density for explicitness |
 
 **Key Finding:** OPAL excels where explicitness matters — comprehension, error detection, and edit precision. C# wins on token efficiency, reflecting a fundamental tradeoff: explicit semantics require more tokens but enable better agent reasoning.
+
+*Note: V2 syntax uses Lisp-style expressions `(+ a b)` instead of verbose `§OP[kind=add] §REF[name=a] §REF[name=b]`, improving token economics by ~40% compared to V1.*
 
 ## The Tradeoff
 
 OPAL deliberately trades token efficiency for semantic explicitness:
 
 ```
-C#:   return a + b;           // 4 tokens, implicit semantics
-OPAL: §R §OP[kind=add] §REF[name=a] §REF[name=b]  // More tokens, explicit semantics
+C#:   return a + b;    // 4 tokens, implicit semantics
+OPAL: §R (+ a b)       // Explicit Lisp-style operations
 ```
 
 This tradeoff pays off when:
@@ -85,9 +87,9 @@ This tradeoff pays off when:
 §F[f002:Square:pub]
   §I[i32:x]
   §O[i32]
-  §Q §OP[kind=gte] §REF[name=x] 0
-  §S §OP[kind=gte] §REF[name=result] 0
-  §R §OP[kind=mul] §REF[name=x] §REF[name=x]
+  §Q (>= x 0)
+  §S (>= result 0)
+  §R (* x x)
 §/F[f002]
 ```
 
@@ -123,8 +125,8 @@ public static int Square(int x)
   §I[i32:n]
   §O[void]
   §E[cw]
-  §L[for1:i:1:§REF[name=n]:1]
-    §C[Console.WriteLine] §A §REF[name=i] §/C
+  §L[for1:i:1:n:1]
+    §P i
   §/L[for1]
 §/F[f001]
 ```
@@ -132,6 +134,7 @@ public static int Square(int x)
 **What the agent knows without analysis:**
 - Iterates from 1 to n (loop bounds in syntax)
 - Side effect: `cw` (console write) — nothing else
+- `§P` is the built-in print alias for `Console.WriteLine`
 - Can calculate iteration count symbolically
 
 ## Quick Start
@@ -159,14 +162,19 @@ dotnet run --project samples/HelloWorld
 | Input | `§I[type:name]` | `§I[i32:x]` |
 | Output | `§O[type]` | `§O[i32]` |
 | Effects | `§E[codes]` | `§E[cw,fr,net]` |
-| Requires | `§Q expr` | `§Q §OP[kind=gte] §REF[name=x] 0` |
-| Ensures | `§S expr` | `§S §OP[kind=gte] §REF[name=result] 0` |
+| Requires | `§Q expr` | `§Q (>= x 0)` |
+| Ensures | `§S expr` | `§S (>= result 0)` |
 | Loop | `§L[id:var:from:to:step]` | `§L[l1:i:1:100:1]` |
+| If/ElseIf/Else | `§IF...§EI...§EL` | `§IF (> x 0) → §R x §EL → §R 0` |
 | Call | `§C[target]...§/C` | `§C[Math.Max] §A 1 §A 2 §/C` |
-| Return | `§R expr` | `§R §OP[kind=add] §REF[name=a] §REF[name=b]` |
+| Print | `§P expr` | `§P "Hello"` |
+| Return | `§R expr` | `§R (+ a b)` |
+| Operations | `(op args...)` | `(+ a b)`, `(== x 0)`, `(% n 2)` |
 | Close tag | `§/X[id]` | `§/F[f001]` |
 
 **Effect codes:** `cw` (console write), `cr` (console read), `fw` (file write), `fr` (file read), `net` (network), `db` (database)
+
+**Operators:** `+`, `-`, `*`, `/`, `%` (arithmetic), `==`, `!=`, `<`, `<=`, `>`, `>=` (comparison), `&&`, `||` (logical)
 
 ## Running the Evaluation
 

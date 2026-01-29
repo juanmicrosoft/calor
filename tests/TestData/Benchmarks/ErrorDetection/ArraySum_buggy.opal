@@ -3,9 +3,9 @@
   §I[i32[]:arr]
   §O[i32]
   §B[total] 0
-  §L[for1:i:0:§C[Array.Length] §A §REF[name=arr] §/C:1]
-    §B[total] §OP[kind=add] §REF[name=total] §C[Array.Get] §A §REF[name=arr] §A §REF[name=i] §/C
+  §L[for1:i:0:§C[Array.Length] §A arr §/C:1]
+    §B[total] (+ total §C[Array.Get] §A arr §A i §/C)
   §/L[for1]
-  §R §REF[name=total]
+  §R total
 §/F[f001]
 §/M[m001]

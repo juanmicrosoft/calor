@@ -3,11 +3,11 @@
   §I[str:a]
   §I[str:b]
   §O[str]
-  §R §OP[kind=add] §REF[name=b] §REF[name=a]
+  §R (+ b a)
 §/F[f001]
 §F[f002:Identity:pub]
   §I[str:s]
   §O[str]
-  §R §REF[name=s]
+  §R s
 §/F[f002]
 §/M[m001]

@@ -4,12 +4,12 @@
   §I[i32:b]
   §I[i32:c]
   §O[i32]
-  §R §OP[kind=add] §OP[kind=add] §REF[name=a] §REF[name=b] §REF[name=c]
+  §R (+ (+ a b) c)
 §/F[f001]
 §F[f002:SumTwo:pub]
   §I[i32:a]
   §I[i32:b]
   §O[i32]
-  §R §OP[kind=add] §REF[name=a] §REF[name=b]
+  §R (+ a b)
 §/F[f002]
 §/M[m001]

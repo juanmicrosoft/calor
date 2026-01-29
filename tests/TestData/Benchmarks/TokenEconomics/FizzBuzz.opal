@@ -3,22 +3,10 @@
   §O[void]
   §E[cw]
   §L[for1:i:1:100:1]
-    §IF[if1] §OP[kind=eq] §OP[kind=mod] §REF[name=i] 15 0
-      §C[Console.WriteLine]
-        §A "FizzBuzz"
-      §/C
-    §ELSEIF §OP[kind=eq] §OP[kind=mod] §REF[name=i] 3 0
-      §C[Console.WriteLine]
-        §A "Fizz"
-      §/C
-    §ELSEIF §OP[kind=eq] §OP[kind=mod] §REF[name=i] 5 0
-      §C[Console.WriteLine]
-        §A "Buzz"
-      §/C
-    §ELSE
-      §C[Console.WriteLine]
-        §A §REF[name=i]
-      §/C
+    §IF[if1] (== (% i 15) 0) → §P "FizzBuzz"
+    §EI (== (% i 3) 0) → §P "Fizz"
+    §EI (== (% i 5) 0) → §P "Buzz"
+    §EL → §P i
     §/I[if1]
   §/L[for1]
 §/F[f001]

@@ -5,14 +5,10 @@
   §I[i32:val2]
   §I[i32:val3]
   §O[i32]
-  §IF[if1] §OP[kind=eq] §REF[name=val1] §REF[name=target]
-    §R 0
-  §ELSEIF §OP[kind=eq] §REF[name=val2] §REF[name=target]
-    §R 1
-  §ELSEIF §OP[kind=eq] §REF[name=val3] §REF[name=target]
-    §R 2
-  §ELSE
-    §R -1
+  §IF[if1] (== val1 target) → §R 0
+  §EI (== val2 target) → §R 1
+  §EI (== val3 target) → §R 2
+  §EL → §R -1
   §/I[if1]
 §/F[f001]
 §/M[m001]

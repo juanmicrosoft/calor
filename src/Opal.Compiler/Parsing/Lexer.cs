@@ -38,13 +38,9 @@ public sealed class Lexer
         ["END_FOR"] = TokenKind.EndFor,
         ["IF"] = TokenKind.If,
         ["END_IF"] = TokenKind.EndIf,
-        ["ELSE"] = TokenKind.Else,
-        ["ELSEIF"] = TokenKind.ElseIf,
         ["WHILE"] = TokenKind.While,
         ["END_WHILE"] = TokenKind.EndWhile,
         ["BIND"] = TokenKind.Bind,
-        ["OP"] = TokenKind.Op,
-        ["REF"] = TokenKind.Ref,
         // Phase 3: Type System
         ["TYPE"] = TokenKind.Type,
         ["END_TYPE"] = TokenKind.EndType,

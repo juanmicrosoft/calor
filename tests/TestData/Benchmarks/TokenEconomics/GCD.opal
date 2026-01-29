@@ -3,10 +3,9 @@
   §I[i32:a]
   §I[i32:b]
   §O[i32]
-  §IF[if1] §OP[kind=eq] §REF[name=b] 0
-    §R §REF[name=a]
-  §ELSE
-    §R §C[GCD] §A §REF[name=b] §A §OP[kind=mod] §REF[name=a] §REF[name=b] §/C
+  §IF[if1] (== b 0) → §R a
+  §EL
+    §R §C[GCD] §A b §A (% a b) §/C
   §/I[if1]
 §/F[f001]
 §/M[m001]

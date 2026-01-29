@@ -26,7 +26,7 @@ public class ControlFlowTests
               §BODY
                 §FOR[id=for1][var=i][from=0][to=10][step=1]
                   §CALL[target=Console.WriteLine][fallible=false]
-                    §ARG §REF[name=i]
+                    §ARG i
                   §END_CALL
                 §END_FOR[id=for1]
               §END_BODY
@@ -77,7 +77,7 @@ public class ControlFlowTests
             §FUNC[id=f001][name=Main][visibility=public]
               §OUT[type=VOID]
               §BODY
-                §IF[id=if1] §OP[kind=EQ] §REF[name=x] INT:0
+                §IF[id=if1] (== x INT:0)
                   §CALL[target=Console.WriteLine][fallible=false]
                     §ARG STR:"Zero"
                   §END_CALL
@@ -112,7 +112,7 @@ public class ControlFlowTests
                   §CALL[target=Console.WriteLine][fallible=false]
                     §ARG STR:"Then"
                   §END_CALL
-                §ELSE
+                §EL
                   §CALL[target=Console.WriteLine][fallible=false]
                     §ARG STR:"Else"
                   §END_CALL
@@ -140,15 +140,15 @@ public class ControlFlowTests
             §FUNC[id=f001][name=Main][visibility=public]
               §OUT[type=VOID]
               §BODY
-                §IF[id=if1] §OP[kind=EQ] §REF[name=x] INT:1
+                §IF[id=if1] (== x INT:1)
                   §CALL[target=Console.WriteLine][fallible=false]
                     §ARG STR:"One"
                   §END_CALL
-                §ELSEIF §OP[kind=EQ] §REF[name=x] INT:2
+                §EI (== x INT:2)
                   §CALL[target=Console.WriteLine][fallible=false]
                     §ARG STR:"Two"
                   §END_CALL
-                §ELSE
+                §EL
                   §CALL[target=Console.WriteLine][fallible=false]
                     §ARG STR:"Other"
                   §END_CALL
@@ -176,9 +176,9 @@ public class ControlFlowTests
             §FUNC[id=f001][name=Main][visibility=public]
               §OUT[type=VOID]
               §BODY
-                §WHILE[id=w1] §OP[kind=LT] §REF[name=x] INT:10
+                §WHILE[id=w1] (< x INT:10)
                   §CALL[target=Console.WriteLine][fallible=false]
-                    §ARG §REF[name=x]
+                    §ARG x
                   §END_CALL
                 §END_WHILE[id=w1]
               §END_BODY
@@ -228,7 +228,7 @@ public class ControlFlowTests
               §IN[name=b][type=INT]
               §OUT[type=INT]
               §BODY
-                §RETURN §OP[kind=ADD] §REF[name=a] §REF[name=b]
+                §RETURN (+ a b)
               §END_BODY
             §END_FUNC[id=f001]
             §END_MODULE[id=m001]
@@ -255,7 +255,7 @@ public class ControlFlowTests
               §BODY
                 §FOR[id=for1][var=i][from=1][to=10][step=1]
                   §CALL[target=Console.WriteLine][fallible=false]
-                    §ARG §REF[name=i]
+                    §ARG i
                   §END_CALL
                 §END_FOR[id=for1]
               §END_BODY
@@ -282,7 +282,7 @@ public class ControlFlowTests
                   §CALL[target=Console.WriteLine][fallible=false]
                     §ARG STR:"Yes"
                   §END_CALL
-                §ELSE
+                §EL
                   §CALL[target=Console.WriteLine][fallible=false]
                     §ARG STR:"No"
                   §END_CALL
@@ -309,7 +309,7 @@ public class ControlFlowTests
               §BODY
                 §BIND[name=x][type=INT] INT:42
                 §CALL[target=Console.WriteLine][fallible=false]
-                  §ARG §REF[name=x]
+                  §ARG x
                 §END_CALL
               §END_BODY
             §END_FUNC[id=f001]
@@ -333,7 +333,7 @@ public class ControlFlowTests
               §IN[name=b][type=INT]
               §OUT[type=INT]
               §BODY
-                §RETURN §OP[kind=ADD] §REF[name=a] §REF[name=b]
+                §RETURN (+ a b)
               §END_BODY
             §END_FUNC[id=f001]
             §END_MODULE[id=m001]
@@ -354,7 +354,7 @@ public class ControlFlowTests
               §IN[name=n][type=INT]
               §OUT[type=BOOL]
               §BODY
-                §RETURN §OP[kind=EQ] §OP[kind=MOD] §REF[name=n] INT:2 INT:0
+                §RETURN (== (% n INT:2) INT:0)
               §END_BODY
             §END_FUNC[id=f001]
             §END_MODULE[id=m001]

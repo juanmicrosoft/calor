@@ -4,15 +4,12 @@
   §I[i32:min]
   §I[i32:max]
   §O[i32]
-  §Q §OP[kind=lte] §REF[name=min] §REF[name=max]
-  §S §OP[kind=gte] §REF[name=result] §REF[name=min]
-  §S §OP[kind=lte] §REF[name=result] §REF[name=max]
-  §IF[if1] §OP[kind=lt] §REF[name=value] §REF[name=min]
-    §R §REF[name=min]
-  §ELSEIF §OP[kind=gt] §REF[name=value] §REF[name=max]
-    §R §REF[name=max]
-  §ELSE
-    §R §REF[name=value]
+  §Q (<= min max)
+  §S (>= result min)
+  §S (<= result max)
+  §IF[if1] (< value min) → §R min
+  §EI (> value max) → §R max
+  §EL → §R value
   §/I[if1]
 §/F[f001]
 §/M[m001]

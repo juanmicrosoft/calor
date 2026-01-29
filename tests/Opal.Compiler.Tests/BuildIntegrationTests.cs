@@ -76,7 +76,7 @@ public class BuildIntegrationTests
   §IN[name=b][type=INT]
   §OUT[type=INT]
   §BODY
-    §RETURN §OP[kind=add] §REF[name=a] §REF[name=b]
+    §RETURN (+ a b)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]
@@ -103,7 +103,7 @@ public class BuildIntegrationTests
   §IN[name=b][type=INT]
   §OUT[type=INT]
   §BODY
-    §RETURN §OP[kind=add] §REF[name=a] §REF[name=b]
+    §RETURN (+ a b)
   §END_BODY
 §END_FUNC[id=f001]
 
@@ -112,7 +112,7 @@ public class BuildIntegrationTests
   §IN[name=b][type=INT]
   §OUT[type=INT]
   §BODY
-    §RETURN §OP[kind=sub] §REF[name=a] §REF[name=b]
+    §RETURN (- a b)
   §END_BODY
 §END_FUNC[id=f002]
 §END_MODULE[id=m001]
@@ -137,9 +137,9 @@ public class BuildIntegrationTests
   §IN[name=a][type=INT]
   §IN[name=b][type=INT]
   §OUT[type=INT]
-  §REQUIRES §OP[kind=neq] §REF[name=b] INT:0
+  §REQUIRES (!= b INT:0)
   §BODY
-    §RETURN §OP[kind=div] §REF[name=a] §REF[name=b]
+    §RETURN (/ a b)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]

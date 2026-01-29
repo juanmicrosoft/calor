@@ -72,9 +72,9 @@ public class ContractTests
 §FUNC[id=f001][name=Square][visibility=public]
   §IN[name=x][type=INT]
   §OUT[type=INT]
-  §REQUIRES §OP[kind=gte] §REF[name=x] INT:0
+  §REQUIRES (>= x INT:0)
   §BODY
-    §RETURN §OP[kind=mul] §REF[name=x] §REF[name=x]
+    §RETURN (* x x)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]
@@ -101,9 +101,9 @@ public class ContractTests
 §FUNC[id=f001][name=Square][visibility=public]
   §IN[name=x][type=INT]
   §OUT[type=INT]
-  §ENSURES §OP[kind=gte] §REF[name=result] INT:0
+  §ENSURES (>= result INT:0)
   §BODY
-    §RETURN §OP[kind=mul] §REF[name=x] §REF[name=x]
+    §RETURN (* x x)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]
@@ -131,11 +131,11 @@ public class ContractTests
   §IN[name=a][type=INT]
   §IN[name=b][type=INT]
   §OUT[type=INT]
-  §REQUIRES §OP[kind=neq] §REF[name=b] INT:0
-  §REQUIRES §OP[kind=gte] §REF[name=a] INT:0
-  §ENSURES §OP[kind=gte] §REF[name=result] INT:0
+  §REQUIRES (!= b INT:0)
+  §REQUIRES (>= a INT:0)
+  §ENSURES (>= result INT:0)
   §BODY
-    §RETURN §OP[kind=div] §REF[name=a] §REF[name=b]
+    §RETURN (/ a b)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]
@@ -158,9 +158,9 @@ public class ContractTests
 §FUNC[id=f001][name=Square][visibility=public]
   §IN[name=x][type=INT]
   §OUT[type=INT]
-  §REQUIRES[message=""x must be nonnegative""] §OP[kind=gte] §REF[name=x] INT:0
+  §REQUIRES[message=""x must be nonnegative""] (>= x INT:0)
   §BODY
-    §RETURN §OP[kind=mul] §REF[name=x] §REF[name=x]
+    §RETURN (* x x)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]
@@ -248,9 +248,9 @@ public class ContractTests
 §FUNC[id=f001][name=Square][visibility=public]
   §IN[name=x][type=INT]
   §OUT[type=INT]
-  §REQUIRES §OP[kind=gte] §REF[name=x] INT:0
+  §REQUIRES (>= x INT:0)
   §BODY
-    §RETURN §OP[kind=mul] §REF[name=x] §REF[name=x]
+    §RETURN (* x x)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]
@@ -275,9 +275,9 @@ public class ContractTests
 §FUNC[id=f001][name=Square][visibility=public]
   §IN[name=x][type=INT]
   §OUT[type=INT]
-  §ENSURES §OP[kind=gte] §REF[name=result] INT:0
+  §ENSURES (>= result INT:0)
   §BODY
-    §RETURN §OP[kind=mul] §REF[name=x] §REF[name=x]
+    §RETURN (* x x)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]
@@ -306,9 +306,9 @@ public class ContractTests
 §FUNC[id=f001][name=Square][visibility=public]
   §IN[name=x][type=INT]
   §OUT[type=INT]
-  §REQUIRES §OP[kind=gte] §REF[name=x] INT:0
+  §REQUIRES (>= x INT:0)
   §BODY
-    §RETURN §OP[kind=mul] §REF[name=x] §REF[name=x]
+    §RETURN (* x x)
   §END_BODY
 §END_FUNC[id=f001]
 §END_MODULE[id=m001]

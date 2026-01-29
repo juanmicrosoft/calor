@@ -73,8 +73,6 @@ public enum TokenKind
     While,
     EndWhile,
     Bind,
-    Op,
-    Ref,
 
     // Phase 3: Type System
     Type,

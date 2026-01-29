@@ -3,6 +3,6 @@
   §I[i32:a]
   §I[i32:b]
   §O[i32]
-  §R §OP[kind=div] §REF[name=a] §REF[name=b]
+  §R (/ a b)
 §/F[f001]
 §/M[m001]
