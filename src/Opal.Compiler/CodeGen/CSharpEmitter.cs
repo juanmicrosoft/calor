@@ -83,6 +83,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var returnType = node.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
+        var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
 
         var parameters = string.Join(", ", node.Parameters.Select(p =>
             $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
@@ -97,10 +98,60 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
-        foreach (var statement in node.Body)
+        // Emit preconditions (REQUIRES)
+        foreach (var requires in node.Preconditions)
         {
-            var stmtCode = statement.Accept(this);
-            AppendLine(stmtCode);
+            var check = Visit(requires);
+            AppendLine(check);
+        }
+
+        // If we have postconditions and a return value, we need special handling
+        if (node.Postconditions.Count > 0 && hasReturnValue)
+        {
+            AppendLine($"{mappedReturnType} __result__ = default;");
+            AppendLine();
+
+            // Emit body statements, transforming return statements
+            foreach (var statement in node.Body)
+            {
+                if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
+                {
+                    var expr = returnStmt.Expression.Accept(this);
+                    AppendLine($"__result__ = {expr};");
+                }
+                else
+                {
+                    var stmtCode = statement.Accept(this);
+                    AppendLine(stmtCode);
+                }
+            }
+
+            AppendLine();
+            // Emit postconditions (ENSURES)
+            foreach (var ensures in node.Postconditions)
+            {
+                // Replace 'result' references with '__result__'
+                var check = Visit(ensures).Replace("result", "__result__");
+                AppendLine(check);
+            }
+
+            AppendLine("return __result__;");
+        }
+        else
+        {
+            // No postconditions or void return - emit body normally
+            foreach (var statement in node.Body)
+            {
+                var stmtCode = statement.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            // Emit postconditions for void functions (they can't reference 'result')
+            foreach (var ensures in node.Postconditions)
+            {
+                var check = Visit(ensures);
+                AppendLine(check);
+            }
         }
 
         Dedent();
@@ -453,6 +504,40 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             ErrPatternNode ep => $"{{ IsErr: true, Error: {EmitPattern(ep.InnerPattern)} }}",
             _ => "_"
         };
+    }
+
+    // Phase 4: Contracts
+
+    public string Visit(RequiresNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        var message = node.Message != null
+            ? $"\"{EscapeString(node.Message)}\""
+            : $"\"Precondition failed: {EscapeString(condition)}\"";
+        return $"if (!({condition})) throw new ArgumentException({message});";
+    }
+
+    public string Visit(EnsuresNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        var message = node.Message != null
+            ? $"\"{EscapeString(node.Message)}\""
+            : $"\"Postcondition failed: {EscapeString(condition)}\"";
+        return $"if (!({condition})) throw new InvalidOperationException({message});";
+    }
+
+    public string Visit(InvariantNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        var message = node.Message != null
+            ? $"\"{EscapeString(node.Message)}\""
+            : $"\"Invariant violated: {EscapeString(condition)}\"";
+        return $"if (!({condition})) throw new InvalidOperationException({message});";
+    }
+
+    private static string EscapeString(string s)
+    {
+        return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 
     private string GetInferredTypeName(ExpressionNode expr)

@@ -50,6 +50,10 @@ public interface IAstVisitor
     void Visit(ErrExpressionNode node);
     void Visit(MatchExpressionNode node);
     void Visit(MatchStatementNode node);
+    // Phase 4: Contracts
+    void Visit(RequiresNode node);
+    void Visit(EnsuresNode node);
+    void Visit(InvariantNode node);
 }
 
 /// <summary>
@@ -84,6 +88,10 @@ public interface IAstVisitor<T>
     T Visit(ErrExpressionNode node);
     T Visit(MatchExpressionNode node);
     T Visit(MatchStatementNode node);
+    // Phase 4: Contracts
+    T Visit(RequiresNode node);
+    T Visit(EnsuresNode node);
+    T Visit(InvariantNode node);
 }
 
 /// <summary>

@@ -58,6 +58,10 @@ public sealed class Lexer
         ["OK"] = TokenKind.Ok,
         ["ERR"] = TokenKind.Err,
         ["VARIANT"] = TokenKind.Variant,
+        // Phase 4: Contracts and Effects
+        ["REQUIRES"] = TokenKind.Requires,
+        ["ENSURES"] = TokenKind.Ensures,
+        ["INVARIANT"] = TokenKind.Invariant,
     };
 
     public Lexer(string source, DiagnosticBag diagnostics)

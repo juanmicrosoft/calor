@@ -36,6 +36,17 @@ public static class DiagnosticCode
     public const string UndefinedReference = "OPAL0200";
     public const string DuplicateDefinition = "OPAL0201";
     public const string TypeMismatch = "OPAL0202";
+    public const string InvalidReference = "OPAL0203";
+
+    // Contract errors (OPAL0300-0399)
+    public const string InvalidPrecondition = "OPAL0300";
+    public const string InvalidPostcondition = "OPAL0301";
+    public const string ContractViolation = "OPAL0302";
+
+    // Effect errors (OPAL0400-0499)
+    public const string UndeclaredEffect = "OPAL0400";
+    public const string UnusedEffectDeclaration = "OPAL0401";
+    public const string EffectMismatch = "OPAL0402";
 }
 
 /// <summary>

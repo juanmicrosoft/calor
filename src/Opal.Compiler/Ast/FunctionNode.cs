@@ -56,6 +56,8 @@ public sealed class FunctionNode : AstNode
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
     public EffectsNode? Effects { get; }
+    public IReadOnlyList<RequiresNode> Preconditions { get; }
+    public IReadOnlyList<EnsuresNode> Postconditions { get; }
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
 
@@ -69,6 +71,23 @@ public sealed class FunctionNode : AstNode
         EffectsNode? effects,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
+        : this(span, id, name, visibility, parameters, output, effects,
+               Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(), body, attributes)
+    {
+    }
+
+    public FunctionNode(
+        TextSpan span,
+        string id,
+        string name,
+        Visibility visibility,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        EffectsNode? effects,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -77,9 +96,16 @@ public sealed class FunctionNode : AstNode
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;
         Effects = effects;
+        Preconditions = preconditions ?? throw new ArgumentNullException(nameof(preconditions));
+        Postconditions = postconditions ?? throw new ArgumentNullException(nameof(postconditions));
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
+
+    /// <summary>
+    /// Returns true if this function has any contracts (preconditions or postconditions).
+    /// </summary>
+    public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);

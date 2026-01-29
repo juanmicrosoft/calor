@@ -116,6 +116,8 @@ public sealed class Parser
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
         EffectsNode? effects = null;
+        var preconditions = new List<RequiresNode>();
+        var postconditions = new List<EnsuresNode>();
         var body = new List<StatementNode>();
 
         // Parse optional sections before BODY
@@ -132,6 +134,14 @@ public sealed class Parser
             else if (Check(TokenKind.Effects))
             {
                 effects = ParseEffects();
+            }
+            else if (Check(TokenKind.Requires))
+            {
+                preconditions.Add(ParseRequires());
+            }
+            else if (Check(TokenKind.Ensures))
+            {
+                postconditions.Add(ParseEnsures());
             }
             else
             {
@@ -156,7 +166,8 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new FunctionNode(span, id, name, visibility, parameters, output, effects, body, attrs);
+        return new FunctionNode(span, id, name, visibility, parameters, output, effects,
+            preconditions, postconditions, body, attrs);
     }
 
     private ParameterNode ParseParameter()
@@ -192,6 +203,30 @@ public sealed class Parser
         }
 
         return new EffectsNode(startToken.Span, effects);
+    }
+
+    private RequiresNode ParseRequires()
+    {
+        var startToken = Expect(TokenKind.Requires);
+        var attrs = ParseAttributes();
+        var message = attrs["message"];
+
+        var condition = ParseExpression();
+
+        var span = startToken.Span.Union(condition.Span);
+        return new RequiresNode(span, condition, message, attrs);
+    }
+
+    private EnsuresNode ParseEnsures()
+    {
+        var startToken = Expect(TokenKind.Ensures);
+        var attrs = ParseAttributes();
+        var message = attrs["message"];
+
+        var condition = ParseExpression();
+
+        var span = startToken.Span.Union(condition.Span);
+        return new EnsuresNode(span, condition, message, attrs);
     }
 
     private List<StatementNode> ParseBody()

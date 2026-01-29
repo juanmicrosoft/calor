@@ -54,6 +54,11 @@ public enum TokenKind
     Err,
     Variant,
 
+    // Phase 4: Contracts and Effects
+    Requires,
+    Ensures,
+    Invariant,
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
@@ -88,7 +93,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Variant;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Invariant;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral;
