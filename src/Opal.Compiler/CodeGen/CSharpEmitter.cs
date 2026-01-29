@@ -10,6 +10,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 {
     private readonly StringBuilder _builder = new();
     private int _indentLevel;
+    private string? _currentClassName;
 
     public string Emit(ModuleNode module)
     {
@@ -43,8 +44,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("// Do not modify this file directly.");
         AppendLine("// </auto-generated>");
         AppendLine();
+
+        // Always include System and Opal.Runtime
+        var emittedUsings = new HashSet<string>(StringComparer.Ordinal) { "System", "Opal.Runtime" };
         AppendLine("using System;");
         AppendLine("using Opal.Runtime;");
+
+        // Emit user-defined using directives
+        foreach (var usingDirective in node.Usings)
+        {
+            var usingCode = Visit(usingDirective);
+            if (!string.IsNullOrEmpty(usingCode))
+            {
+                // Track to avoid duplicates
+                if (!emittedUsings.Contains(usingDirective.Namespace))
+                {
+                    AppendLine(usingCode);
+                    emittedUsings.Add(usingDirective.Namespace);
+                }
+            }
+        }
         AppendLine();
 
         var namespaceName = SanitizeIdentifier(node.Name);
@@ -52,23 +71,57 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
-        AppendLine($"public static class {namespaceName}Module");
-        AppendLine("{");
-        Indent();
-
-        foreach (var function in node.Functions)
+        // Emit interfaces
+        foreach (var iface in node.Interfaces)
         {
-            Visit(function);
+            Visit(iface);
             AppendLine();
+        }
+
+        // Emit classes
+        foreach (var cls in node.Classes)
+        {
+            Visit(cls);
+            AppendLine();
+        }
+
+        // Emit module-level functions in a static class
+        if (node.Functions.Count > 0)
+        {
+            AppendLine($"public static class {namespaceName}Module");
+            AppendLine("{");
+            Indent();
+
+            foreach (var function in node.Functions)
+            {
+                Visit(function);
+                AppendLine();
+            }
+
+            Dedent();
+            AppendLine("}");
         }
 
         Dedent();
         AppendLine("}");
 
-        Dedent();
-        AppendLine("}");
-
         return _builder.ToString();
+    }
+
+    public string Visit(UsingDirectiveNode node)
+    {
+        if (node.IsStatic)
+        {
+            return $"using static {node.Namespace};";
+        }
+        else if (node.Alias != null)
+        {
+            return $"using {node.Alias} = {node.Namespace};";
+        }
+        else
+        {
+            return $"using {node.Namespace};";
+        }
     }
 
     public string Visit(FunctionNode node)
@@ -90,11 +143,34 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var methodName = SanitizeIdentifier(node.Name);
 
+        // Build type parameters if present
+        var typeParams = "";
+        var whereClause = "";
+        if (node.TypeParameters.Count > 0)
+        {
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+
+            // Build where clauses
+            var whereClauses = new List<string>();
+            foreach (var tp in node.TypeParameters)
+            {
+                if (tp.Constraints.Count > 0)
+                {
+                    var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
+                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                }
+            }
+            if (whereClauses.Count > 0)
+            {
+                whereClause = " " + string.Join(" ", whereClauses);
+            }
+        }
+
         // Check if this is the entry point
         var isMain = node.Name.Equals("Main", StringComparison.OrdinalIgnoreCase);
         var staticKeyword = isMain ? "static " : "static ";
 
-        AppendLine($"{visibility} {staticKeyword}{mappedReturnType} {methodName}({parameters})");
+        AppendLine($"{visibility} {staticKeyword}{mappedReturnType} {methodName}{typeParams}({parameters}){whereClause}");
         AppendLine("{");
         Indent();
 
@@ -451,9 +527,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             var matchCase = node.Cases[i];
             var pattern = EmitPattern(matchCase.Pattern);
-            // For expression match, we'd need the body to be an expression
-            // For now, emit a placeholder
-            sb.Append($"{pattern} => default");
+            // For expression match, the body should yield a value
+            // Take the last statement if it's a return, otherwise default
+            var body = "default";
+            if (matchCase.Body.Count > 0)
+            {
+                var lastStmt = matchCase.Body[^1];
+                if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
+                {
+                    body = ret.Expression.Accept(this);
+                }
+            }
+            sb.Append($"{pattern} => {body}");
             if (i < node.Cases.Count - 1) sb.Append(", ");
         }
 
@@ -506,6 +591,30 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
     }
 
+    public string Visit(MatchCaseNode node)
+    {
+        var pattern = EmitPattern(node.Pattern);
+        // For match statement context, case is emitted as part of switch
+        return pattern;
+    }
+
+    public string Visit(WildcardPatternNode node) => "_";
+
+    public string Visit(VariablePatternNode node) => $"var {SanitizeIdentifier(node.Name)}";
+
+    public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
+
+    public string Visit(SomePatternNode node)
+        => $"{{ IsSome: true, Value: {node.InnerPattern.Accept(this)} }}";
+
+    public string Visit(NonePatternNode node) => "{ IsNone: true }";
+
+    public string Visit(OkPatternNode node)
+        => $"{{ IsOk: true, Value: {node.InnerPattern.Accept(this)} }}";
+
+    public string Visit(ErrPatternNode node)
+        => $"{{ IsErr: true, Error: {node.InnerPattern.Accept(this)} }}";
+
     // Phase 4: Contracts
 
     public string Visit(RequiresNode node)
@@ -538,6 +647,885 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private static string EscapeString(string s)
     {
         return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+
+    // Phase 6: Arrays and Collections
+
+    public string Visit(ArrayCreationNode node)
+    {
+        var elementType = MapTypeName(node.ElementType);
+        var varName = SanitizeIdentifier(node.Name);
+
+        if (node.Size != null)
+        {
+            // Sized array: int[] arr = new int[10];
+            var size = node.Size.Accept(this);
+            return $"{elementType}[] {varName} = new {elementType}[{size}];";
+        }
+        else if (node.Initializer.Count > 0)
+        {
+            // Initialized array: int[] arr = { 1, 2, 3 };
+            var elements = string.Join(", ", node.Initializer.Select(e => e.Accept(this)));
+            return $"{elementType}[] {varName} = {{ {elements} }};";
+        }
+        else
+        {
+            // Empty array
+            return $"{elementType}[] {varName} = Array.Empty<{elementType}>();";
+        }
+    }
+
+    public string Visit(ArrayAccessNode node)
+    {
+        var array = node.Array.Accept(this);
+        var index = node.Index.Accept(this);
+        return $"{array}[{index}]";
+    }
+
+    public string Visit(ArrayLengthNode node)
+    {
+        var array = node.Array.Accept(this);
+        return $"{array}.Length";
+    }
+
+    public string Visit(ForeachStatementNode node)
+    {
+        var varType = MapTypeName(node.VariableType);
+        var varName = SanitizeIdentifier(node.VariableName);
+        var collection = node.Collection.Accept(this);
+
+        AppendLine($"foreach ({varType} {varName} in {collection})");
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            var stmtCode = stmt.Accept(this);
+            AppendLine(stmtCode);
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    // Phase 7: Generics
+
+    public string Visit(TypeParameterNode node)
+    {
+        // Type parameters are handled in function/method signature emission
+        return node.Name;
+    }
+
+    public string Visit(TypeConstraintNode node)
+    {
+        return EmitConstraint(node);
+    }
+
+    public string Visit(GenericTypeNode node)
+    {
+        var typeName = MapTypeName(node.TypeName);
+        if (node.TypeArguments.Count == 0)
+        {
+            return typeName;
+        }
+
+        var typeArgs = string.Join(", ", node.TypeArguments.Select(MapTypeName));
+        return $"{typeName}<{typeArgs}>";
+    }
+
+    private string EmitConstraint(TypeConstraintNode constraint)
+    {
+        return constraint.Kind switch
+        {
+            TypeConstraintKind.Class => "class",
+            TypeConstraintKind.Struct => "struct",
+            TypeConstraintKind.New => "new()",
+            TypeConstraintKind.Interface => constraint.TypeName ?? "object",
+            TypeConstraintKind.BaseClass => constraint.TypeName ?? "object",
+            TypeConstraintKind.TypeName => MapTypeName(constraint.TypeName ?? "object"),
+            _ => "object"
+        };
+    }
+
+    // Phase 8: Classes, Interfaces, Inheritance
+
+    public string Visit(InterfaceDefinitionNode node)
+    {
+        var name = SanitizeIdentifier(node.Name);
+        var baseList = node.BaseInterfaces.Count > 0
+            ? " : " + string.Join(", ", node.BaseInterfaces.Select(SanitizeIdentifier))
+            : "";
+
+        AppendLine($"public interface {name}{baseList}");
+        AppendLine("{");
+        Indent();
+
+        foreach (var method in node.Methods)
+        {
+            Visit(method);
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(MethodSignatureNode node)
+    {
+        var returnType = node.Output?.TypeName ?? "void";
+        var mappedReturnType = MapTypeName(returnType);
+        var methodName = SanitizeIdentifier(node.Name);
+
+        var typeParams = "";
+        if (node.TypeParameters.Count > 0)
+        {
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+        }
+
+        var parameters = string.Join(", ", node.Parameters.Select(p =>
+            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+
+        AppendLine($"{mappedReturnType} {methodName}{typeParams}({parameters});");
+
+        return "";
+    }
+
+    public string Visit(ClassDefinitionNode node)
+    {
+        var name = SanitizeIdentifier(node.Name);
+
+        var modifiers = "public";
+        if (node.IsAbstract) modifiers += " abstract";
+        if (node.IsSealed) modifiers += " sealed";
+
+        // Build type parameters
+        var typeParams = "";
+        var whereClause = "";
+        if (node.TypeParameters.Count > 0)
+        {
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+
+            var whereClauses = new List<string>();
+            foreach (var tp in node.TypeParameters)
+            {
+                if (tp.Constraints.Count > 0)
+                {
+                    var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
+                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                }
+            }
+            if (whereClauses.Count > 0)
+            {
+                whereClause = " " + string.Join(" ", whereClauses);
+            }
+        }
+
+        // Build inheritance list
+        var baseList = new List<string>();
+        if (!string.IsNullOrEmpty(node.BaseClass))
+        {
+            baseList.Add(SanitizeIdentifier(node.BaseClass));
+        }
+        baseList.AddRange(node.ImplementedInterfaces.Select(SanitizeIdentifier));
+        var inheritance = baseList.Count > 0 ? " : " + string.Join(", ", baseList) : "";
+
+        AppendLine($"{modifiers} class {name}{typeParams}{inheritance}{whereClause}");
+        AppendLine("{");
+        Indent();
+
+        // Set current class name for constructor emission
+        _currentClassName = name;
+
+        // Emit fields
+        foreach (var field in node.Fields)
+        {
+            Visit(field);
+        }
+
+        // Emit properties
+        foreach (var prop in node.Properties)
+        {
+            Visit(prop);
+            AppendLine();
+        }
+
+        // Emit constructors
+        foreach (var ctor in node.Constructors)
+        {
+            Visit(ctor);
+            AppendLine();
+        }
+
+        // Emit methods
+        foreach (var method in node.Methods)
+        {
+            Visit(method);
+            AppendLine();
+        }
+
+        _currentClassName = null;
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(ClassFieldNode node)
+    {
+        var visibility = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            _ => "private"
+        };
+
+        var typeName = MapTypeName(node.TypeName);
+        var fieldName = SanitizeIdentifier(node.Name);
+
+        if (node.DefaultValue != null)
+        {
+            var defaultVal = node.DefaultValue.Accept(this);
+            AppendLine($"{visibility} {typeName} {fieldName} = {defaultVal};");
+        }
+        else
+        {
+            AppendLine($"{visibility} {typeName} {fieldName};");
+        }
+
+        return "";
+    }
+
+    public string Visit(MethodNode node)
+    {
+        var visibility = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            _ => "private"
+        };
+
+        var modifiers = new List<string> { visibility };
+        if (node.IsStatic) modifiers.Add("static");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        else if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsSealed && node.IsOverride) modifiers.Add("sealed");
+
+        var returnType = node.Output?.TypeName ?? "void";
+        var mappedReturnType = MapTypeName(returnType);
+        var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+        var methodName = SanitizeIdentifier(node.Name);
+
+        // Build type parameters
+        var typeParams = "";
+        var whereClause = "";
+        if (node.TypeParameters.Count > 0)
+        {
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+
+            var whereClauses = new List<string>();
+            foreach (var tp in node.TypeParameters)
+            {
+                if (tp.Constraints.Count > 0)
+                {
+                    var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
+                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                }
+            }
+            if (whereClauses.Count > 0)
+            {
+                whereClause = " " + string.Join(" ", whereClauses);
+            }
+        }
+
+        var parameters = string.Join(", ", node.Parameters.Select(p =>
+            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+
+        // Abstract methods have no body
+        if (node.IsAbstract)
+        {
+            AppendLine($"{string.Join(" ", modifiers)} {mappedReturnType} {methodName}{typeParams}({parameters}){whereClause};");
+            return "";
+        }
+
+        AppendLine($"{string.Join(" ", modifiers)} {mappedReturnType} {methodName}{typeParams}({parameters}){whereClause}");
+        AppendLine("{");
+        Indent();
+
+        // Emit preconditions
+        foreach (var requires in node.Preconditions)
+        {
+            var check = Visit(requires);
+            AppendLine(check);
+        }
+
+        // Handle postconditions similar to FunctionNode
+        if (node.Postconditions.Count > 0 && hasReturnValue)
+        {
+            AppendLine($"{mappedReturnType} __result__ = default;");
+            AppendLine();
+
+            foreach (var statement in node.Body)
+            {
+                if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
+                {
+                    var expr = returnStmt.Expression.Accept(this);
+                    AppendLine($"__result__ = {expr};");
+                }
+                else
+                {
+                    var stmtCode = statement.Accept(this);
+                    AppendLine(stmtCode);
+                }
+            }
+
+            AppendLine();
+            foreach (var ensures in node.Postconditions)
+            {
+                var check = Visit(ensures).Replace("result", "__result__");
+                AppendLine(check);
+            }
+
+            AppendLine("return __result__;");
+        }
+        else
+        {
+            foreach (var statement in node.Body)
+            {
+                var stmtCode = statement.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            foreach (var ensures in node.Postconditions)
+            {
+                var check = Visit(ensures);
+                AppendLine(check);
+            }
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(NewExpressionNode node)
+    {
+        var typeName = SanitizeIdentifier(node.TypeName);
+        if (node.TypeArguments.Count > 0)
+        {
+            typeName += "<" + string.Join(", ", node.TypeArguments.Select(MapTypeName)) + ">";
+        }
+
+        var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
+        return $"new {typeName}({args})";
+    }
+
+    public string Visit(ThisExpressionNode node)
+    {
+        return "this";
+    }
+
+    public string Visit(BaseExpressionNode node)
+    {
+        return "base";
+    }
+
+    // Phase 9: Properties and Constructors
+
+    public string Visit(PropertyNode node)
+    {
+        var visibility = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            _ => "public"
+        };
+
+        var typeName = MapTypeName(node.TypeName);
+        var propName = SanitizeIdentifier(node.Name);
+
+        // Auto-property with default value
+        if (node.IsAutoProperty)
+        {
+            if (node.DefaultValue != null)
+            {
+                var defaultVal = node.DefaultValue.Accept(this);
+                AppendLine($"{visibility} {typeName} {propName} {{ get; set; }} = {defaultVal};");
+            }
+            else
+            {
+                AppendLine($"{visibility} {typeName} {propName} {{ get; set; }}");
+            }
+            return "";
+        }
+
+        // Property with accessors
+        AppendLine($"{visibility} {typeName} {propName}");
+        AppendLine("{");
+        Indent();
+
+        if (node.Getter != null)
+        {
+            Visit(node.Getter);
+        }
+
+        if (node.Setter != null)
+        {
+            Visit(node.Setter);
+        }
+
+        if (node.Initer != null)
+        {
+            Visit(node.Initer);
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(PropertyAccessorNode node)
+    {
+        var accessorKeyword = node.Kind switch
+        {
+            PropertyAccessorNode.AccessorKind.Get => "get",
+            PropertyAccessorNode.AccessorKind.Set => "set",
+            PropertyAccessorNode.AccessorKind.Init => "init",
+            _ => "get"
+        };
+
+        var visibilityPrefix = node.Visibility switch
+        {
+            Visibility.Private => "private ",
+            Visibility.Internal => "internal ",
+            Visibility.Protected => "protected ",
+            _ => ""
+        };
+
+        if (node.IsAutoImplemented)
+        {
+            AppendLine($"{visibilityPrefix}{accessorKeyword};");
+        }
+        else
+        {
+            AppendLine($"{visibilityPrefix}{accessorKeyword}");
+            AppendLine("{");
+            Indent();
+
+            foreach (var pre in node.Preconditions)
+            {
+                AppendLine(Visit(pre));
+            }
+
+            foreach (var stmt in node.Body)
+            {
+                AppendLine(stmt.Accept(this));
+            }
+
+            Dedent();
+            AppendLine("}");
+        }
+
+        return "";
+    }
+
+    public string Visit(ConstructorNode node)
+    {
+        var visibility = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            _ => "public"
+        };
+
+        // Constructor name is the class name
+        var ctorName = _currentClassName ?? "UnknownClass";
+        var parameters = string.Join(", ", node.Parameters.Select(p =>
+            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+
+        var initializerStr = "";
+        if (node.Initializer != null)
+        {
+            var initArgs = string.Join(", ", node.Initializer.Arguments.Select(a => a.Accept(this)));
+            initializerStr = node.Initializer.IsBaseCall ? $" : base({initArgs})" : $" : this({initArgs})";
+        }
+
+        AppendLine($"{visibility} {ctorName}({parameters}){initializerStr}");
+        AppendLine("{");
+        Indent();
+
+        foreach (var pre in node.Preconditions)
+        {
+            AppendLine(Visit(pre));
+        }
+
+        foreach (var stmt in node.Body)
+        {
+            AppendLine(stmt.Accept(this));
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(ConstructorInitializerNode node)
+    {
+        var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
+        return node.IsBaseCall ? $"base({args})" : $"this({args})";
+    }
+
+    public string Visit(AssignmentStatementNode node)
+    {
+        var target = node.Target.Accept(this);
+        var value = node.Value.Accept(this);
+        return $"{target} = {value};";
+    }
+
+    // Phase 10: Try/Catch/Finally
+
+    public string Visit(TryStatementNode node)
+    {
+        AppendLine("try");
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.TryBody)
+        {
+            AppendLine(stmt.Accept(this));
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        foreach (var catchClause in node.CatchClauses)
+        {
+            Visit(catchClause);
+        }
+
+        if (node.FinallyBody != null)
+        {
+            AppendLine("finally");
+            AppendLine("{");
+            Indent();
+
+            foreach (var stmt in node.FinallyBody)
+            {
+                AppendLine(stmt.Accept(this));
+            }
+
+            Dedent();
+            AppendLine("}");
+        }
+
+        return "";
+    }
+
+    public string Visit(CatchClauseNode node)
+    {
+        var catchPart = "catch";
+        if (node.ExceptionType != null)
+        {
+            var exType = SanitizeIdentifier(node.ExceptionType);
+            if (node.VariableName != null)
+            {
+                var varName = SanitizeIdentifier(node.VariableName);
+                catchPart = $"catch ({exType} {varName})";
+            }
+            else
+            {
+                catchPart = $"catch ({exType})";
+            }
+        }
+
+        if (node.Filter != null)
+        {
+            var filter = node.Filter.Accept(this);
+            catchPart += $" when ({filter})";
+        }
+
+        AppendLine(catchPart);
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            AppendLine(stmt.Accept(this));
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(ThrowStatementNode node)
+    {
+        if (node.Exception != null)
+        {
+            var exception = node.Exception.Accept(this);
+            return $"throw {exception};";
+        }
+        return "throw;";
+    }
+
+    public string Visit(RethrowStatementNode node)
+    {
+        return "throw;";
+    }
+
+    // Phase 11: Lambdas, Delegates, Events
+
+    public string Visit(LambdaParameterNode node)
+    {
+        if (node.TypeName != null)
+        {
+            return $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}";
+        }
+        return SanitizeIdentifier(node.Name);
+    }
+
+    public string Visit(LambdaExpressionNode node)
+    {
+        var async = node.IsAsync ? "async " : "";
+        var parameters = node.Parameters.Count switch
+        {
+            0 => "()",
+            1 when node.Parameters[0].TypeName == null => SanitizeIdentifier(node.Parameters[0].Name),
+            _ => "(" + string.Join(", ", node.Parameters.Select(p => Visit(p))) + ")"
+        };
+
+        if (node.IsExpressionLambda && node.ExpressionBody != null)
+        {
+            var body = node.ExpressionBody.Accept(this);
+            return $"{async}{parameters} => {body}";
+        }
+        else if (node.StatementBody != null && node.StatementBody.Count > 0)
+        {
+            var sb = new StringBuilder();
+            sb.Append($"{async}{parameters} => {{\n");
+            foreach (var stmt in node.StatementBody)
+            {
+                sb.Append($"    {stmt.Accept(this)}\n");
+            }
+            sb.Append("}");
+            return sb.ToString();
+        }
+
+        return $"{async}{parameters} => default";
+    }
+
+    public string Visit(DelegateDefinitionNode node)
+    {
+        var name = SanitizeIdentifier(node.Name);
+        var returnType = node.Output?.TypeName ?? "void";
+        var mappedReturnType = MapTypeName(returnType);
+        var parameters = string.Join(", ", node.Parameters.Select(p =>
+            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+
+        AppendLine($"public delegate {mappedReturnType} {name}({parameters});");
+        return "";
+    }
+
+    public string Visit(EventDefinitionNode node)
+    {
+        var visibility = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            _ => "public"
+        };
+
+        var eventName = SanitizeIdentifier(node.Name);
+        var delegateType = SanitizeIdentifier(node.DelegateType);
+
+        AppendLine($"{visibility} event {delegateType} {eventName};");
+        return "";
+    }
+
+    public string Visit(EventSubscribeNode node)
+    {
+        var @event = node.Event.Accept(this);
+        var handler = node.Handler.Accept(this);
+        return $"{@event} += {handler};";
+    }
+
+    public string Visit(EventUnsubscribeNode node)
+    {
+        var @event = node.Event.Accept(this);
+        var handler = node.Handler.Accept(this);
+        return $"{@event} -= {handler};";
+    }
+
+    // Phase 12: Async/Await
+
+    public string Visit(AwaitExpressionNode node)
+    {
+        var awaited = node.Awaited.Accept(this);
+
+        // Handle ConfigureAwait if specified
+        if (node.ConfigureAwait.HasValue)
+        {
+            var configValue = node.ConfigureAwait.Value ? "true" : "false";
+            return $"await {awaited}.ConfigureAwait({configValue})";
+        }
+
+        return $"await {awaited}";
+    }
+
+    // Phase 9: String Interpolation and Modern Operators
+
+    public string Visit(InterpolatedStringNode node)
+    {
+        var sb = new StringBuilder();
+        sb.Append("$\"");
+
+        foreach (var part in node.Parts)
+        {
+            if (part is InterpolatedStringTextNode textPart)
+            {
+                // Escape quotes and braces in literal text
+                var escaped = textPart.Text
+                    .Replace("\\", "\\\\")
+                    .Replace("\"", "\\\"")
+                    .Replace("{", "{{")
+                    .Replace("}", "}}");
+                sb.Append(escaped);
+            }
+            else if (part is InterpolatedStringExpressionNode exprPart)
+            {
+                sb.Append("{");
+                sb.Append(exprPart.Expression.Accept(this));
+                sb.Append("}");
+            }
+        }
+
+        sb.Append("\"");
+        return sb.ToString();
+    }
+
+    public string Visit(InterpolatedStringTextNode node)
+    {
+        // This is typically only called standalone, not as part of interpolation
+        return node.Text;
+    }
+
+    public string Visit(InterpolatedStringExpressionNode node)
+    {
+        // This is typically only called standalone, not as part of interpolation
+        return node.Expression.Accept(this);
+    }
+
+    public string Visit(NullCoalesceNode node)
+    {
+        var left = node.Left.Accept(this);
+        var right = node.Right.Accept(this);
+        return $"{left} ?? {right}";
+    }
+
+    public string Visit(NullConditionalNode node)
+    {
+        var target = node.Target.Accept(this);
+        return $"{target}?.{SanitizeIdentifier(node.MemberName)}";
+    }
+
+    public string Visit(RangeExpressionNode node)
+    {
+        var start = node.Start?.Accept(this) ?? "";
+        var end = node.End?.Accept(this) ?? "";
+        return $"{start}..{end}";
+    }
+
+    public string Visit(IndexFromEndNode node)
+    {
+        var offset = node.Offset.Accept(this);
+        return $"^{offset}";
+    }
+
+    // Phase 10: Advanced Patterns
+
+    public string Visit(WithExpressionNode node)
+    {
+        var target = node.Target.Accept(this);
+        var assignments = string.Join(", ", node.Assignments.Select(a =>
+            $"{SanitizeIdentifier(a.PropertyName)} = {a.Value.Accept(this)}"));
+        return $"{target} with {{ {assignments} }}";
+    }
+
+    public string Visit(WithPropertyAssignmentNode node)
+    {
+        var value = node.Value.Accept(this);
+        return $"{SanitizeIdentifier(node.PropertyName)} = {value}";
+    }
+
+    public string Visit(PositionalPatternNode node)
+    {
+        var patterns = string.Join(", ", node.Patterns.Select(p => p.Accept(this)));
+        return $"{SanitizeIdentifier(node.TypeName)}({patterns})";
+    }
+
+    public string Visit(PropertyPatternNode node)
+    {
+        var matches = string.Join(", ", node.Matches.Select(m => m.Accept(this)));
+        var typePart = string.IsNullOrEmpty(node.TypeName) ? "" : SanitizeIdentifier(node.TypeName) + " ";
+        return $"{typePart}{{ {matches} }}";
+    }
+
+    public string Visit(PropertyMatchNode node)
+    {
+        var pattern = node.Pattern.Accept(this);
+        return $"{SanitizeIdentifier(node.PropertyName)}: {pattern}";
+    }
+
+    public string Visit(RelationalPatternNode node)
+    {
+        var value = node.Value.Accept(this);
+        var op = node.Operator.ToLowerInvariant() switch
+        {
+            "lt" => "<",
+            "lte" => "<=",
+            "gt" => ">",
+            "gte" => ">=",
+            "eq" => "",
+            _ => node.Operator
+        };
+        return string.IsNullOrEmpty(op) ? value : $"{op} {value}";
+    }
+
+    public string Visit(ListPatternNode node)
+    {
+        var parts = new List<string>();
+        foreach (var pattern in node.Patterns)
+        {
+            parts.Add(pattern.Accept(this));
+        }
+        if (node.SlicePattern != null)
+        {
+            parts.Add($"..{node.SlicePattern.Accept(this)}");
+        }
+        return $"[{string.Join(", ", parts)}]";
+    }
+
+    public string Visit(VarPatternNode node)
+    {
+        return $"var {SanitizeIdentifier(node.Name)}";
+    }
+
+    public string Visit(ConstantPatternNode node)
+    {
+        return node.Value.Accept(this);
     }
 
     private string GetInferredTypeName(ExpressionNode expr)

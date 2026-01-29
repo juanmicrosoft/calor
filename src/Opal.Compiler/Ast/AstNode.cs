@@ -50,10 +50,76 @@ public interface IAstVisitor
     void Visit(ErrExpressionNode node);
     void Visit(MatchExpressionNode node);
     void Visit(MatchStatementNode node);
+    void Visit(MatchCaseNode node);
+    void Visit(WildcardPatternNode node);
+    void Visit(VariablePatternNode node);
+    void Visit(LiteralPatternNode node);
+    void Visit(SomePatternNode node);
+    void Visit(NonePatternNode node);
+    void Visit(OkPatternNode node);
+    void Visit(ErrPatternNode node);
     // Phase 4: Contracts
     void Visit(RequiresNode node);
     void Visit(EnsuresNode node);
     void Visit(InvariantNode node);
+    // Phase 5: Using Statements
+    void Visit(UsingDirectiveNode node);
+    // Phase 6: Arrays and Collections
+    void Visit(ArrayCreationNode node);
+    void Visit(ArrayAccessNode node);
+    void Visit(ArrayLengthNode node);
+    void Visit(ForeachStatementNode node);
+    // Phase 7: Generics
+    void Visit(TypeParameterNode node);
+    void Visit(TypeConstraintNode node);
+    void Visit(GenericTypeNode node);
+    // Phase 8: Classes, Interfaces, Inheritance
+    void Visit(InterfaceDefinitionNode node);
+    void Visit(MethodSignatureNode node);
+    void Visit(ClassDefinitionNode node);
+    void Visit(ClassFieldNode node);
+    void Visit(MethodNode node);
+    void Visit(NewExpressionNode node);
+    void Visit(ThisExpressionNode node);
+    void Visit(BaseExpressionNode node);
+    // Phase 9: Properties and Constructors
+    void Visit(PropertyNode node);
+    void Visit(PropertyAccessorNode node);
+    void Visit(ConstructorNode node);
+    void Visit(ConstructorInitializerNode node);
+    void Visit(AssignmentStatementNode node);
+    // Phase 10: Try/Catch/Finally
+    void Visit(TryStatementNode node);
+    void Visit(CatchClauseNode node);
+    void Visit(ThrowStatementNode node);
+    void Visit(RethrowStatementNode node);
+    // Phase 11: Lambdas, Delegates, Events
+    void Visit(LambdaParameterNode node);
+    void Visit(LambdaExpressionNode node);
+    void Visit(DelegateDefinitionNode node);
+    void Visit(EventDefinitionNode node);
+    void Visit(EventSubscribeNode node);
+    void Visit(EventUnsubscribeNode node);
+    // Phase 12: Async/Await
+    void Visit(AwaitExpressionNode node);
+    // Phase 9: String Interpolation and Modern Operators
+    void Visit(InterpolatedStringNode node);
+    void Visit(InterpolatedStringTextNode node);
+    void Visit(InterpolatedStringExpressionNode node);
+    void Visit(NullCoalesceNode node);
+    void Visit(NullConditionalNode node);
+    void Visit(RangeExpressionNode node);
+    void Visit(IndexFromEndNode node);
+    // Phase 10: Advanced Patterns
+    void Visit(WithExpressionNode node);
+    void Visit(WithPropertyAssignmentNode node);
+    void Visit(PositionalPatternNode node);
+    void Visit(PropertyPatternNode node);
+    void Visit(PropertyMatchNode node);
+    void Visit(RelationalPatternNode node);
+    void Visit(ListPatternNode node);
+    void Visit(VarPatternNode node);
+    void Visit(ConstantPatternNode node);
 }
 
 /// <summary>
@@ -88,10 +154,76 @@ public interface IAstVisitor<T>
     T Visit(ErrExpressionNode node);
     T Visit(MatchExpressionNode node);
     T Visit(MatchStatementNode node);
+    T Visit(MatchCaseNode node);
+    T Visit(WildcardPatternNode node);
+    T Visit(VariablePatternNode node);
+    T Visit(LiteralPatternNode node);
+    T Visit(SomePatternNode node);
+    T Visit(NonePatternNode node);
+    T Visit(OkPatternNode node);
+    T Visit(ErrPatternNode node);
     // Phase 4: Contracts
     T Visit(RequiresNode node);
     T Visit(EnsuresNode node);
     T Visit(InvariantNode node);
+    // Phase 5: Using Statements
+    T Visit(UsingDirectiveNode node);
+    // Phase 6: Arrays and Collections
+    T Visit(ArrayCreationNode node);
+    T Visit(ArrayAccessNode node);
+    T Visit(ArrayLengthNode node);
+    T Visit(ForeachStatementNode node);
+    // Phase 7: Generics
+    T Visit(TypeParameterNode node);
+    T Visit(TypeConstraintNode node);
+    T Visit(GenericTypeNode node);
+    // Phase 8: Classes, Interfaces, Inheritance
+    T Visit(InterfaceDefinitionNode node);
+    T Visit(MethodSignatureNode node);
+    T Visit(ClassDefinitionNode node);
+    T Visit(ClassFieldNode node);
+    T Visit(MethodNode node);
+    T Visit(NewExpressionNode node);
+    T Visit(ThisExpressionNode node);
+    T Visit(BaseExpressionNode node);
+    // Phase 9: Properties and Constructors
+    T Visit(PropertyNode node);
+    T Visit(PropertyAccessorNode node);
+    T Visit(ConstructorNode node);
+    T Visit(ConstructorInitializerNode node);
+    T Visit(AssignmentStatementNode node);
+    // Phase 10: Try/Catch/Finally
+    T Visit(TryStatementNode node);
+    T Visit(CatchClauseNode node);
+    T Visit(ThrowStatementNode node);
+    T Visit(RethrowStatementNode node);
+    // Phase 11: Lambdas, Delegates, Events
+    T Visit(LambdaParameterNode node);
+    T Visit(LambdaExpressionNode node);
+    T Visit(DelegateDefinitionNode node);
+    T Visit(EventDefinitionNode node);
+    T Visit(EventSubscribeNode node);
+    T Visit(EventUnsubscribeNode node);
+    // Phase 12: Async/Await
+    T Visit(AwaitExpressionNode node);
+    // Phase 9: String Interpolation and Modern Operators
+    T Visit(InterpolatedStringNode node);
+    T Visit(InterpolatedStringTextNode node);
+    T Visit(InterpolatedStringExpressionNode node);
+    T Visit(NullCoalesceNode node);
+    T Visit(NullConditionalNode node);
+    T Visit(RangeExpressionNode node);
+    T Visit(IndexFromEndNode node);
+    // Phase 10: Advanced Patterns
+    T Visit(WithExpressionNode node);
+    T Visit(WithPropertyAssignmentNode node);
+    T Visit(PositionalPatternNode node);
+    T Visit(PropertyPatternNode node);
+    T Visit(PropertyMatchNode node);
+    T Visit(RelationalPatternNode node);
+    T Visit(ListPatternNode node);
+    T Visit(VarPatternNode node);
+    T Visit(ConstantPatternNode node);
 }
 
 /// <summary>

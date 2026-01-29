@@ -85,17 +85,32 @@ public sealed class Parser
             moduleName = "";
         }
 
+        var usings = new List<UsingDirectiveNode>();
+        var interfaces = new List<InterfaceDefinitionNode>();
+        var classes = new List<ClassDefinitionNode>();
         var functions = new List<FunctionNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndModule))
         {
-            if (Check(TokenKind.Func))
+            if (Check(TokenKind.Using))
+            {
+                usings.Add(ParseUsingDirective());
+            }
+            else if (Check(TokenKind.Interface))
+            {
+                interfaces.Add(ParseInterfaceDefinition());
+            }
+            else if (Check(TokenKind.Class))
+            {
+                classes.Add(ParseClassDefinition());
+            }
+            else if (Check(TokenKind.Func))
             {
                 functions.Add(ParseFunction());
             }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "FUNC or END_MODULE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, FUNC, or END_MODULE", Current.Kind);
                 Advance();
             }
         }
@@ -111,7 +126,59 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ModuleNode(span, id, moduleName, functions, attrs);
+        return new ModuleNode(span, id, moduleName, usings, interfaces, classes, functions, attrs);
+    }
+
+    /// <summary>
+    /// Parses a using directive.
+    /// §U[System.Collections.Generic]            // using System.Collections.Generic;
+    /// §U[Gen:System.Collections.Generic]        // using Gen = System.Collections.Generic;
+    /// §U[static:System.Math]                    // using static System.Math;
+    /// </summary>
+    private UsingDirectiveNode ParseUsingDirective()
+    {
+        var startToken = Expect(TokenKind.Using);
+        var attrs = ParseAttributes();
+
+        // Interpret using attributes
+        // v2 positional formats:
+        // [namespace]                   -> using namespace;
+        // [alias:namespace]             -> using alias = namespace;
+        // [static:namespace]            -> using static namespace;
+        var pos0 = attrs["_pos0"] ?? "";
+        var pos1 = attrs["_pos1"];
+
+        string @namespace;
+        string? alias = null;
+        bool isStatic = false;
+
+        if (pos1 != null)
+        {
+            // Two-part format: [prefix:namespace]
+            if (pos0.Equals("static", StringComparison.OrdinalIgnoreCase))
+            {
+                isStatic = true;
+                @namespace = pos1;
+            }
+            else
+            {
+                // Alias format: [alias:namespace]
+                alias = pos0;
+                @namespace = pos1;
+            }
+        }
+        else
+        {
+            // Single-part format: [namespace]
+            @namespace = pos0;
+        }
+
+        if (string.IsNullOrEmpty(@namespace))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "USING", "namespace");
+        }
+
+        return new UsingDirectiveNode(startToken.Span, @namespace, alias, isStatic);
     }
 
     private FunctionNode ParseFunction()
@@ -133,6 +200,7 @@ public sealed class Parser
         }
         var visibility = ParseVisibility(visibilityStr);
 
+        var typeParameters = new List<TypeParameterNode>();
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
         EffectsNode? effects = null;
@@ -143,7 +211,16 @@ public sealed class Parser
         // Parse optional sections before BODY
         while (!IsAtEnd && !Check(TokenKind.Body) && !Check(TokenKind.EndFunc))
         {
-            if (Check(TokenKind.In))
+            if (Check(TokenKind.TypeParam))
+            {
+                typeParameters.Add(ParseTypeParameter());
+            }
+            else if (Check(TokenKind.Where))
+            {
+                // WHERE clauses add constraints to existing type parameters
+                ParseWhereClause(typeParameters);
+            }
+            else if (Check(TokenKind.In))
             {
                 parameters.Add(ParseParameter());
             }
@@ -192,7 +269,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new FunctionNode(span, id, funcName, visibility, parameters, output, effects,
+        return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs);
     }
 
@@ -343,6 +420,34 @@ public sealed class Parser
         {
             return ParseMatchStatement();
         }
+        else if (Check(TokenKind.Foreach))
+        {
+            return ParseForeachStatement();
+        }
+        else if (Check(TokenKind.Assign))
+        {
+            return ParseAssignmentStatement();
+        }
+        else if (Check(TokenKind.Try))
+        {
+            return ParseTryStatement();
+        }
+        else if (Check(TokenKind.Throw))
+        {
+            return ParseThrowStatement();
+        }
+        else if (Check(TokenKind.Rethrow))
+        {
+            return ParseRethrowStatement();
+        }
+        else if (Check(TokenKind.Subscribe))
+        {
+            return ParseEventSubscribe();
+        }
+        else if (Check(TokenKind.Unsubscribe))
+        {
+            return ParseEventUnsubscribe();
+        }
 
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
@@ -419,7 +524,29 @@ public sealed class Parser
             or TokenKind.Ok
             or TokenKind.Err
             or TokenKind.Match
-            or TokenKind.Record;
+            or TokenKind.Record
+            // Phase 6: Arrays
+            or TokenKind.Array
+            or TokenKind.Index
+            or TokenKind.Length
+            // Phase 7: Generics
+            or TokenKind.Generic
+            // Phase 8: Classes
+            or TokenKind.New
+            or TokenKind.This
+            or TokenKind.Base
+            // Phase 11: Lambdas
+            or TokenKind.Lambda
+            // Phase 12: Async/Await
+            or TokenKind.Await
+            // Phase 9: String Interpolation and Modern Operators
+            or TokenKind.Interpolate
+            or TokenKind.NullCoalesce
+            or TokenKind.NullConditional
+            or TokenKind.RangeOp
+            or TokenKind.IndexEnd
+            // Phase 10: Advanced Patterns
+            or TokenKind.With;
     }
 
     private ExpressionNode ParseExpression()
@@ -440,6 +567,28 @@ public sealed class Parser
             TokenKind.Err => ParseErrExpression(),
             TokenKind.Match => ParseMatchExpression(),
             TokenKind.Record => ParseRecordCreation(),
+            // Phase 6: Arrays
+            TokenKind.Array => ParseArrayCreation(),
+            TokenKind.Index => ParseArrayAccess(),
+            TokenKind.Length => ParseArrayLength(),
+            // Phase 7: Generics
+            TokenKind.Generic => ParseGenericType(),
+            // Phase 8: Classes
+            TokenKind.New => ParseNewExpression(),
+            TokenKind.This => ParseThisExpression(),
+            TokenKind.Base => ParseBaseExpression(),
+            // Phase 11: Lambdas
+            TokenKind.Lambda => ParseLambdaExpression(),
+            // Phase 12: Async/Await
+            TokenKind.Await => ParseAwaitExpression(),
+            // Phase 9: String Interpolation and Modern Operators
+            TokenKind.Interpolate => ParseInterpolatedString(),
+            TokenKind.NullCoalesce => ParseNullCoalesce(),
+            TokenKind.NullConditional => ParseNullConditional(),
+            TokenKind.RangeOp => ParseRangeExpression(),
+            TokenKind.IndexEnd => ParseIndexFromEnd(),
+            // Phase 10: Advanced Patterns
+            TokenKind.With => ParseWithExpression(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
         };
     }
@@ -1068,5 +1217,1475 @@ public sealed class Parser
             "private" => Visibility.Private,
             _ => Visibility.Private
         };
+    }
+
+    // Phase 6: Arrays and Collections
+
+    /// <summary>
+    /// Parses array creation.
+    /// §ARR[arr1:i32:10]                         // int[] arr1 = new int[10]; (sized)
+    /// §ARR[arr2:i32] §A 1 §A 2 §A 3 §/ARR[arr2] // int[] arr2 = { 1, 2, 3 }; (initialized)
+    /// </summary>
+    private ArrayCreationNode ParseArrayCreation()
+    {
+        var startToken = Expect(TokenKind.Array);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:type:size?] or just [id:type] for initialized arrays
+        var id = attrs["_pos0"] ?? "";
+        var elementType = attrs["_pos1"] ?? "i32";
+        var sizeStr = attrs["_pos2"];
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ARR", "id");
+        }
+
+        ExpressionNode? size = null;
+        var initializer = new List<ExpressionNode>();
+
+        // If size is specified in attributes, use it
+        if (!string.IsNullOrEmpty(sizeStr) && int.TryParse(sizeStr, out var sizeVal))
+        {
+            size = new IntLiteralNode(startToken.Span, sizeVal);
+        }
+        else
+        {
+            // Check for initializer elements (§A expressions until §/ARR)
+            while (!IsAtEnd && !Check(TokenKind.EndArray) && Check(TokenKind.Arg))
+            {
+                initializer.Add(ParseArgument());
+            }
+        }
+
+        var endSpan = startToken.Span;
+        // Check for optional end tag (required for initialized arrays)
+        if (Check(TokenKind.EndArray))
+        {
+            var endToken = Expect(TokenKind.EndArray);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (endId != id)
+            {
+                _diagnostics.ReportMismatchedId(endToken.Span, "ARR", id, "END_ARR", endId);
+            }
+            endSpan = endToken.Span;
+        }
+
+        var span = startToken.Span.Union(endSpan);
+        return new ArrayCreationNode(span, id, id, elementType, size, initializer, attrs);
+    }
+
+    /// <summary>
+    /// Parses array element access.
+    /// §IDX §REF[name=arr] 0                     // arr[0]
+    /// </summary>
+    private ArrayAccessNode ParseArrayAccess()
+    {
+        var startToken = Expect(TokenKind.Index);
+
+        var array = ParseExpression();
+        var index = ParseExpression();
+
+        var span = startToken.Span.Union(index.Span);
+        return new ArrayAccessNode(span, array, index);
+    }
+
+    /// <summary>
+    /// Parses array length access.
+    /// §LEN §REF[name=arr]                       // arr.Length
+    /// </summary>
+    private ArrayLengthNode ParseArrayLength()
+    {
+        var startToken = Expect(TokenKind.Length);
+
+        var array = ParseExpression();
+
+        var span = startToken.Span.Union(array.Span);
+        return new ArrayLengthNode(span, array);
+    }
+
+    /// <summary>
+    /// Parses foreach statement.
+    /// §EACH[each1:item:i32] §REF[name=arr]      // foreach (int item in arr)
+    ///   ...
+    /// §/EACH[each1]
+    /// </summary>
+    private ForeachStatementNode ParseForeachStatement()
+    {
+        var startToken = Expect(TokenKind.Foreach);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:variable:type]
+        var id = attrs["_pos0"] ?? "";
+        var variableName = attrs["_pos1"] ?? "item";
+        var variableType = attrs["_pos2"] ?? "var";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EACH", "id");
+        }
+
+        // Parse collection expression
+        var collection = ParseExpression();
+
+        // Parse body statements
+        var body = ParseStatementBlock(TokenKind.EndForeach);
+
+        var endToken = Expect(TokenKind.EndForeach);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "EACH", id, "END_EACH", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new ForeachStatementNode(span, id, variableName, variableType, collection, body, attrs);
+    }
+
+    // Phase 7: Generics
+
+    /// <summary>
+    /// Parses a type parameter declaration.
+    /// §TP[T]                                    // type parameter T
+    /// </summary>
+    private TypeParameterNode ParseTypeParameter()
+    {
+        var startToken = Expect(TokenKind.TypeParam);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [name]
+        var name = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(name))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "TP", "name");
+        }
+
+        // Constraints are added later via WHERE clauses
+        return new TypeParameterNode(startToken.Span, name, Array.Empty<TypeConstraintNode>());
+    }
+
+    /// <summary>
+    /// Parses a WHERE clause and adds constraints to the appropriate type parameter.
+    /// §WHERE[T:IComparable]                     // where T : IComparable
+    /// §WHERE[T:class]                           // where T : class
+    /// §WHERE[T:struct]                          // where T : struct
+    /// §WHERE[T:new]                             // where T : new()
+    /// </summary>
+    private void ParseWhereClause(List<TypeParameterNode> typeParameters)
+    {
+        var startToken = Expect(TokenKind.Where);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [typeParam:constraint]
+        var typeParamName = attrs["_pos0"] ?? "";
+        var constraintStr = attrs["_pos1"] ?? "";
+
+        if (string.IsNullOrEmpty(typeParamName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "WHERE", "type parameter name");
+            return;
+        }
+
+        // Find the type parameter to add the constraint to
+        var typeParamIndex = typeParameters.FindIndex(tp => tp.Name == typeParamName);
+        if (typeParamIndex < 0)
+        {
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+                $"Type parameter '{typeParamName}' not found");
+            return;
+        }
+
+        // Parse the constraint
+        var (kind, typeName) = constraintStr.ToLowerInvariant() switch
+        {
+            "class" => (TypeConstraintKind.Class, (string?)null),
+            "struct" => (TypeConstraintKind.Struct, (string?)null),
+            "new" => (TypeConstraintKind.New, (string?)null),
+            _ => (TypeConstraintKind.TypeName, constraintStr)
+        };
+
+        var constraint = new TypeConstraintNode(startToken.Span, kind, typeName);
+
+        // Replace the type parameter with one that includes the new constraint
+        var oldTypeParam = typeParameters[typeParamIndex];
+        var newConstraints = oldTypeParam.Constraints.ToList();
+        newConstraints.Add(constraint);
+        typeParameters[typeParamIndex] = new TypeParameterNode(oldTypeParam.Span, oldTypeParam.Name, newConstraints);
+    }
+
+    /// <summary>
+    /// Parses a generic type instantiation.
+    /// §G[List:i32]                              // List&lt;int&gt;
+    /// §G[Dictionary:string:i32]                 // Dictionary&lt;string, int&gt;
+    /// </summary>
+    private GenericTypeNode ParseGenericType()
+    {
+        var startToken = Expect(TokenKind.Generic);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [typeName:typeArg1:typeArg2:...]
+        var typeName = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(typeName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "G", "type name");
+        }
+
+        // Collect type arguments from remaining positional attributes
+        var typeArgs = new List<string>();
+        var posCount = attrs["_posCount"];
+        if (int.TryParse(posCount, out var count))
+        {
+            for (int i = 1; i < count; i++)
+            {
+                var typeArg = attrs[$"_pos{i}"];
+                if (!string.IsNullOrEmpty(typeArg))
+                {
+                    typeArgs.Add(typeArg);
+                }
+            }
+        }
+
+        return new GenericTypeNode(startToken.Span, typeName, typeArgs);
+    }
+
+    // Phase 8: Classes, Interfaces, Inheritance
+
+    /// <summary>
+    /// Parses an interface definition.
+    /// §IFACE[i001:IShape]
+    ///   §METHOD[m001:Area] §O[f64] §E[] §/METHOD[m001]
+    /// §/IFACE[i001]
+    /// </summary>
+    private InterfaceDefinitionNode ParseInterfaceDefinition()
+    {
+        var startToken = Expect(TokenKind.Interface);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:name]
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IFACE", "id");
+        }
+        if (string.IsNullOrEmpty(name))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IFACE", "name");
+        }
+
+        var baseInterfaces = new List<string>();
+        var methods = new List<MethodSignatureNode>();
+
+        while (!IsAtEnd && !Check(TokenKind.EndInterface))
+        {
+            if (Check(TokenKind.Extends))
+            {
+                Expect(TokenKind.Extends);
+                var extAttrs = ParseAttributes();
+                var baseIface = extAttrs["_pos0"] ?? "";
+                if (!string.IsNullOrEmpty(baseIface))
+                {
+                    baseInterfaces.Add(baseIface);
+                }
+            }
+            else if (Check(TokenKind.Method))
+            {
+                methods.Add(ParseMethodSignature());
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "EXT, METHOD, or END_IFACE", Current.Kind);
+                Advance();
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndInterface);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "IFACE", id, "END_IFACE", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new InterfaceDefinitionNode(span, id, name, baseInterfaces, methods, attrs);
+    }
+
+    /// <summary>
+    /// Parses a method signature (for interfaces).
+    /// §METHOD[m001:Area] §O[f64] §E[] §/METHOD[m001]
+    /// </summary>
+    private MethodSignatureNode ParseMethodSignature()
+    {
+        var startToken = Expect(TokenKind.Method);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:name]
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "METHOD", "id");
+        }
+
+        var typeParameters = new List<TypeParameterNode>();
+        var parameters = new List<ParameterNode>();
+        OutputNode? output = null;
+        EffectsNode? effects = null;
+
+        // Parse signature elements until END_METHOD
+        while (!IsAtEnd && !Check(TokenKind.EndMethod))
+        {
+            if (Check(TokenKind.TypeParam))
+            {
+                typeParameters.Add(ParseTypeParameter());
+            }
+            else if (Check(TokenKind.Where))
+            {
+                ParseWhereClause(typeParameters);
+            }
+            else if (Check(TokenKind.In))
+            {
+                parameters.Add(ParseParameter());
+            }
+            else if (Check(TokenKind.Out))
+            {
+                output = ParseOutput();
+            }
+            else if (Check(TokenKind.Effects))
+            {
+                effects = ParseEffects();
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndMethod);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "METHOD", id, "END_METHOD", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, attrs);
+    }
+
+    /// <summary>
+    /// Parses a class definition.
+    /// §CLASS[c001:Shape:abs]
+    ///   §IMPL[IShape]
+    ///   §FLD[string:Name:pri]
+    ///   §METHOD[m001:Area:pub:abs] §O[f64] §E[] §/METHOD[m001]
+    /// §/CLASS[c001]
+    /// </summary>
+    private ClassDefinitionNode ParseClassDefinition()
+    {
+        var startToken = Expect(TokenKind.Class);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:name:modifiers?]
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+        var modifiers = attrs["_pos2"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CLASS", "id");
+        }
+        if (string.IsNullOrEmpty(name))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CLASS", "name");
+        }
+
+        var isAbstract = modifiers.Contains("abs", StringComparison.OrdinalIgnoreCase);
+        var isSealed = modifiers.Contains("seal", StringComparison.OrdinalIgnoreCase);
+
+        string? baseClass = null;
+        var implementedInterfaces = new List<string>();
+        var typeParameters = new List<TypeParameterNode>();
+        var fields = new List<ClassFieldNode>();
+        var properties = new List<PropertyNode>();
+        var constructors = new List<ConstructorNode>();
+        var methods = new List<MethodNode>();
+
+        while (!IsAtEnd && !Check(TokenKind.EndClass))
+        {
+            if (Check(TokenKind.TypeParam))
+            {
+                typeParameters.Add(ParseTypeParameter());
+            }
+            else if (Check(TokenKind.Where))
+            {
+                ParseWhereClause(typeParameters);
+            }
+            else if (Check(TokenKind.Extends))
+            {
+                Expect(TokenKind.Extends);
+                var extAttrs = ParseAttributes();
+                baseClass = extAttrs["_pos0"] ?? "";
+            }
+            else if (Check(TokenKind.Implements))
+            {
+                Expect(TokenKind.Implements);
+                var implAttrs = ParseAttributes();
+                var iface = implAttrs["_pos0"] ?? "";
+                if (!string.IsNullOrEmpty(iface))
+                {
+                    implementedInterfaces.Add(iface);
+                }
+            }
+            else if (Check(TokenKind.FieldDef))
+            {
+                fields.Add(ParseClassField());
+            }
+            else if (Check(TokenKind.Property))
+            {
+                properties.Add(ParseProperty());
+            }
+            else if (Check(TokenKind.Constructor))
+            {
+                constructors.Add(ParseConstructor());
+            }
+            else if (Check(TokenKind.Method))
+            {
+                methods.Add(ParseMethodDefinition());
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, METHOD, or END_CLASS", Current.Kind);
+                Advance();
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndClass);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "CLASS", id, "END_CLASS", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, baseClass,
+            implementedInterfaces, typeParameters, fields, properties, constructors, methods, attrs);
+    }
+
+    /// <summary>
+    /// Parses a class field.
+    /// §FLD[string:Name:pri]
+    /// </summary>
+    private ClassFieldNode ParseClassField()
+    {
+        var startToken = Expect(TokenKind.FieldDef);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [type:name:visibility?]
+        var typeName = attrs["_pos0"] ?? "object";
+        var name = attrs["_pos1"] ?? "";
+        var visStr = attrs["_pos2"] ?? "private";
+
+        if (string.IsNullOrEmpty(name))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FLD", "name");
+        }
+
+        var visibility = ParseVisibility(visStr);
+
+        // Check for optional default value
+        ExpressionNode? defaultValue = null;
+        if (IsExpressionStart())
+        {
+            defaultValue = ParseExpression();
+        }
+
+        var span = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
+        return new ClassFieldNode(span, name, typeName, visibility, defaultValue, attrs);
+    }
+
+    /// <summary>
+    /// Parses a method definition (with body).
+    /// §METHOD[m001:Area:pub:over]
+    ///   §O[f64] §E[]
+    ///   §R §OP[kind=mul] 3.14159 §REF[name=Radius] §REF[name=Radius]
+    /// §/METHOD[m001]
+    /// </summary>
+    private MethodNode ParseMethodDefinition()
+    {
+        var startToken = Expect(TokenKind.Method);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:name:visibility?:modifiers?]
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+        var visStr = attrs["_pos2"] ?? "private";
+        var modStr = attrs["_pos3"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "METHOD", "id");
+        }
+
+        var visibility = ParseVisibility(visStr);
+        var modifiers = ParseMethodModifiers(modStr);
+
+        var typeParameters = new List<TypeParameterNode>();
+        var parameters = new List<ParameterNode>();
+        OutputNode? output = null;
+        EffectsNode? effects = null;
+        var preconditions = new List<RequiresNode>();
+        var postconditions = new List<EnsuresNode>();
+        var body = new List<StatementNode>();
+
+        // Parse signature and body until END_METHOD
+        while (!IsAtEnd && !Check(TokenKind.EndMethod))
+        {
+            if (Check(TokenKind.TypeParam))
+            {
+                typeParameters.Add(ParseTypeParameter());
+            }
+            else if (Check(TokenKind.Where))
+            {
+                ParseWhereClause(typeParameters);
+            }
+            else if (Check(TokenKind.In))
+            {
+                parameters.Add(ParseParameter());
+            }
+            else if (Check(TokenKind.Out))
+            {
+                output = ParseOutput();
+            }
+            else if (Check(TokenKind.Effects))
+            {
+                effects = ParseEffects();
+            }
+            else if (Check(TokenKind.Requires))
+            {
+                preconditions.Add(ParseRequires());
+            }
+            else if (Check(TokenKind.Ensures))
+            {
+                postconditions.Add(ParseEnsures());
+            }
+            else
+            {
+                // Must be body statements
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    body.Add(stmt);
+                }
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndMethod);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "METHOD", id, "END_METHOD", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
+            output, effects, preconditions, postconditions, body, attrs);
+    }
+
+    private static MethodModifiers ParseMethodModifiers(string modStr)
+    {
+        var mods = MethodModifiers.None;
+        if (modStr.Contains("virt", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Virtual;
+        if (modStr.Contains("over", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Override;
+        if (modStr.Contains("abs", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Abstract;
+        if (modStr.Contains("seal", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Sealed;
+        if (modStr.Contains("stat", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Static;
+        return mods;
+    }
+
+    /// <summary>
+    /// Parses a new expression.
+    /// §NEW[Circle] §A "MyCircle" §A 5.0 §/NEW
+    /// </summary>
+    private NewExpressionNode ParseNewExpression()
+    {
+        var startToken = Expect(TokenKind.New);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [typeName:typeArg1:typeArg2:...]
+        var typeName = attrs["_pos0"] ?? "object";
+
+        // Collect type arguments
+        var typeArgs = new List<string>();
+        var posCount = attrs["_posCount"];
+        if (int.TryParse(posCount, out var count))
+        {
+            for (int i = 1; i < count; i++)
+            {
+                var typeArg = attrs[$"_pos{i}"];
+                if (!string.IsNullOrEmpty(typeArg))
+                {
+                    typeArgs.Add(typeArg);
+                }
+            }
+        }
+
+        // Parse arguments
+        var arguments = new List<ExpressionNode>();
+        while (Check(TokenKind.Arg))
+        {
+            arguments.Add(ParseArgument());
+        }
+
+        // Check for optional end tag
+        var endSpan = startToken.Span;
+        if (Check(TokenKind.Identifier) && Current.Text == "/NEW")
+        {
+            endSpan = Advance().Span;
+        }
+
+        var span = arguments.Count > 0 ? startToken.Span.Union(arguments[^1].Span) : startToken.Span;
+        return new NewExpressionNode(span, typeName, typeArgs, arguments);
+    }
+
+    /// <summary>
+    /// Parses a 'this' expression.
+    /// §THIS
+    /// </summary>
+    private ThisExpressionNode ParseThisExpression()
+    {
+        var token = Expect(TokenKind.This);
+        return new ThisExpressionNode(token.Span);
+    }
+
+    /// <summary>
+    /// Parses a 'base' expression.
+    /// §BASE
+    /// </summary>
+    private BaseExpressionNode ParseBaseExpression()
+    {
+        var token = Expect(TokenKind.Base);
+        return new BaseExpressionNode(token.Span);
+    }
+
+    // Phase 9: Properties and Constructors
+
+    /// <summary>
+    /// Parses a property definition.
+    /// §PROP[p001:Name:string:pub]
+    ///   §GET
+    ///   §SET[pri]
+    /// §/PROP[p001]
+    /// </summary>
+    private PropertyNode ParseProperty()
+    {
+        var startToken = Expect(TokenKind.Property);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:name:type:visibility?]
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+        var typeName = attrs["_pos2"] ?? "object";
+        var visStr = attrs["_pos3"] ?? "public";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PROP", "id");
+        }
+
+        var visibility = ParseVisibility(visStr);
+
+        PropertyAccessorNode? getter = null;
+        PropertyAccessorNode? setter = null;
+        PropertyAccessorNode? initer = null;
+        ExpressionNode? defaultValue = null;
+
+        while (!IsAtEnd && !Check(TokenKind.EndProperty))
+        {
+            if (Check(TokenKind.Get))
+            {
+                getter = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Get);
+            }
+            else if (Check(TokenKind.Set))
+            {
+                setter = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Set);
+            }
+            else if (Check(TokenKind.Init))
+            {
+                initer = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Init);
+            }
+            else if (IsExpressionStart())
+            {
+                // Default value
+                defaultValue = ParseExpression();
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndProperty);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "PROP", id, "END_PROP", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new PropertyNode(span, id, name, typeName, visibility, getter, setter, initer, defaultValue, attrs);
+    }
+
+    /// <summary>
+    /// Parses a property accessor.
+    /// §GET
+    /// §SET[pri]
+    /// </summary>
+    private PropertyAccessorNode ParsePropertyAccessor(PropertyAccessorNode.AccessorKind kind)
+    {
+        Token startToken;
+        if (kind == PropertyAccessorNode.AccessorKind.Get)
+        {
+            startToken = Expect(TokenKind.Get);
+        }
+        else if (kind == PropertyAccessorNode.AccessorKind.Set)
+        {
+            startToken = Expect(TokenKind.Set);
+        }
+        else
+        {
+            startToken = Expect(TokenKind.Init);
+        }
+
+        var attrs = ParseAttributes();
+        var visStr = attrs["_pos0"];
+        var visibility = visStr != null ? ParseVisibility(visStr) : (Visibility?)null;
+
+        var preconditions = new List<RequiresNode>();
+        var body = new List<StatementNode>();
+
+        // Parse optional preconditions and body (for non-auto properties)
+        while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
+               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty))
+        {
+            if (Check(TokenKind.Requires))
+            {
+                preconditions.Add(ParseRequires());
+            }
+            else
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    body.Add(stmt);
+                }
+            }
+        }
+
+        return new PropertyAccessorNode(startToken.Span, kind, visibility, preconditions, body, attrs);
+    }
+
+    /// <summary>
+    /// Parses a constructor.
+    /// §CTOR[ctor1:pub]
+    ///   §I[string:name]
+    ///   §Q §OP[kind=gt] §REF[name=radius] 0
+    ///   §BASE §A §REF[name=name] §/BASE
+    ///   §ASSIGN §REF[name=Radius] §REF[name=radius]
+    /// §/CTOR[ctor1]
+    /// </summary>
+    private ConstructorNode ParseConstructor()
+    {
+        var startToken = Expect(TokenKind.Constructor);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:visibility?]
+        var id = attrs["_pos0"] ?? "";
+        var visStr = attrs["_pos1"] ?? "public";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CTOR", "id");
+        }
+
+        var visibility = ParseVisibility(visStr);
+
+        var parameters = new List<ParameterNode>();
+        var preconditions = new List<RequiresNode>();
+        ConstructorInitializerNode? initializer = null;
+        var body = new List<StatementNode>();
+
+        while (!IsAtEnd && !Check(TokenKind.EndConstructor))
+        {
+            if (Check(TokenKind.In))
+            {
+                parameters.Add(ParseParameter());
+            }
+            else if (Check(TokenKind.Requires))
+            {
+                preconditions.Add(ParseRequires());
+            }
+            else if (Check(TokenKind.Base))
+            {
+                initializer = ParseConstructorInitializer(isBase: true);
+            }
+            else if (Check(TokenKind.This))
+            {
+                initializer = ParseConstructorInitializer(isBase: false);
+            }
+            else
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    body.Add(stmt);
+                }
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndConstructor);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "CTOR", id, "END_CTOR", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs);
+    }
+
+    /// <summary>
+    /// Parses a constructor initializer (: base(...) or : this(...)).
+    /// </summary>
+    private ConstructorInitializerNode ParseConstructorInitializer(bool isBase)
+    {
+        var startToken = isBase ? Expect(TokenKind.Base) : Expect(TokenKind.This);
+
+        var arguments = new List<ExpressionNode>();
+
+        // Parse arguments until we encounter something that's not an ARG
+        while (Check(TokenKind.Arg))
+        {
+            arguments.Add(ParseArgument());
+        }
+
+        return new ConstructorInitializerNode(startToken.Span, isBase, arguments);
+    }
+
+    /// <summary>
+    /// Parses an assignment statement.
+    /// §ASSIGN §REF[name=Radius] §REF[name=radius]
+    /// </summary>
+    private AssignmentStatementNode ParseAssignmentStatement()
+    {
+        var startToken = Expect(TokenKind.Assign);
+
+        var target = ParseExpression();
+        var value = ParseExpression();
+
+        var span = startToken.Span.Union(value.Span);
+        return new AssignmentStatementNode(span, target, value);
+    }
+
+    // Phase 10: Try/Catch/Finally
+
+    /// <summary>
+    /// Parses a try/catch/finally statement.
+    /// §TRY[try1]
+    ///   ...
+    /// §CATCH[IOException:ex]
+    ///   ...
+    /// §FINALLY
+    ///   ...
+    /// §/TRY[try1]
+    /// </summary>
+    private TryStatementNode ParseTryStatement()
+    {
+        var startToken = Expect(TokenKind.Try);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id]
+        var id = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "TRY", "id");
+        }
+
+        // Parse try body
+        var tryBody = new List<StatementNode>();
+        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !Check(TokenKind.EndTry))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null)
+            {
+                tryBody.Add(stmt);
+            }
+        }
+
+        // Parse catch clauses
+        var catchClauses = new List<CatchClauseNode>();
+        while (Check(TokenKind.Catch))
+        {
+            catchClauses.Add(ParseCatchClause());
+        }
+
+        // Parse optional finally
+        List<StatementNode>? finallyBody = null;
+        if (Check(TokenKind.Finally))
+        {
+            Expect(TokenKind.Finally);
+            finallyBody = new List<StatementNode>();
+            while (!IsAtEnd && !Check(TokenKind.EndTry))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    finallyBody.Add(stmt);
+                }
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndTry);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "TRY", id, "END_TRY", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new TryStatementNode(span, id, tryBody, catchClauses, finallyBody, attrs);
+    }
+
+    /// <summary>
+    /// Parses a catch clause.
+    /// §CATCH[IOException:ex]
+    /// §CATCH
+    /// </summary>
+    private CatchClauseNode ParseCatchClause()
+    {
+        var startToken = Expect(TokenKind.Catch);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [exceptionType:variableName?] or empty for catch-all
+        var exceptionType = attrs["_pos0"];
+        var variableName = attrs["_pos1"];
+
+        // Check for when filter
+        ExpressionNode? filter = null;
+        if (Check(TokenKind.When))
+        {
+            Expect(TokenKind.When);
+            filter = ParseExpression();
+        }
+
+        // Parse catch body
+        var body = new List<StatementNode>();
+        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !Check(TokenKind.EndTry))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null)
+            {
+                body.Add(stmt);
+            }
+        }
+
+        var span = body.Count > 0 ? startToken.Span.Union(body[^1].Span) : startToken.Span;
+        return new CatchClauseNode(span, exceptionType, variableName, filter, body, attrs);
+    }
+
+    /// <summary>
+    /// Parses a throw statement.
+    /// §THROW §NEW[ArgumentException] §A "Invalid" §/NEW
+    /// </summary>
+    private ThrowStatementNode ParseThrowStatement()
+    {
+        var startToken = Expect(TokenKind.Throw);
+
+        ExpressionNode? exception = null;
+        if (IsExpressionStart())
+        {
+            exception = ParseExpression();
+        }
+
+        var span = exception != null ? startToken.Span.Union(exception.Span) : startToken.Span;
+        return new ThrowStatementNode(span, exception);
+    }
+
+    /// <summary>
+    /// Parses a rethrow statement.
+    /// §RETHROW
+    /// </summary>
+    private RethrowStatementNode ParseRethrowStatement()
+    {
+        var token = Expect(TokenKind.Rethrow);
+        return new RethrowStatementNode(token.Span);
+    }
+
+    // Phase 11: Lambdas, Delegates, Events
+
+    /// <summary>
+    /// Parses a lambda expression.
+    /// §LAM[lam1:x:i32] §OP[kind=mul] §REF[name=x] 2 §/LAM[lam1]
+    /// </summary>
+    private LambdaExpressionNode ParseLambdaExpression()
+    {
+        var startToken = Expect(TokenKind.Lambda);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id:param1:type1:param2:type2:...] or [id:async:param1:type1:...]
+        var id = attrs["_pos0"] ?? "";
+        var isAsync = false;
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "LAM", "id");
+        }
+
+        // Parse parameters from attributes
+        var parameters = new List<LambdaParameterNode>();
+        var posCount = attrs["_posCount"];
+        if (int.TryParse(posCount, out var count))
+        {
+            int i = 1;
+            // Check for async modifier
+            var firstPos = attrs["_pos1"];
+            if (firstPos?.Equals("async", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                isAsync = true;
+                i = 2;
+            }
+
+            // Parse parameter pairs: name:type
+            while (i < count)
+            {
+                var paramName = attrs[$"_pos{i}"];
+                var paramType = attrs[$"_pos{i + 1}"];
+
+                if (!string.IsNullOrEmpty(paramName))
+                {
+                    parameters.Add(new LambdaParameterNode(startToken.Span, paramName, paramType));
+                }
+                i += 2;
+            }
+        }
+
+        // Parse optional effects
+        EffectsNode? effects = null;
+        if (Check(TokenKind.Effects))
+        {
+            effects = ParseEffects();
+        }
+
+        // Parse body - either expression or statements
+        ExpressionNode? expressionBody = null;
+        List<StatementNode>? statementBody = null;
+
+        if (IsExpressionStart() && !Check(TokenKind.EndLambda))
+        {
+            expressionBody = ParseExpression();
+        }
+
+        // Check if there are more statements after the expression
+        while (!IsAtEnd && !Check(TokenKind.EndLambda))
+        {
+            if (statementBody == null)
+            {
+                statementBody = new List<StatementNode>();
+            }
+            var stmt = ParseStatement();
+            if (stmt != null)
+            {
+                statementBody.Add(stmt);
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndLambda);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "LAM", id, "END_LAM", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new LambdaExpressionNode(span, id, parameters, effects, isAsync, expressionBody, statementBody, attrs);
+    }
+
+    /// <summary>
+    /// Parses an event subscribe statement.
+    /// §SUB §REF[name=button.Click] §REF[name=handler]
+    /// </summary>
+    private EventSubscribeNode ParseEventSubscribe()
+    {
+        var startToken = Expect(TokenKind.Subscribe);
+
+        var @event = ParseExpression();
+        var handler = ParseExpression();
+
+        var span = startToken.Span.Union(handler.Span);
+        return new EventSubscribeNode(span, @event, handler);
+    }
+
+    /// <summary>
+    /// Parses an event unsubscribe statement.
+    /// §UNSUB §REF[name=button.Click] §REF[name=handler]
+    /// </summary>
+    private EventUnsubscribeNode ParseEventUnsubscribe()
+    {
+        var startToken = Expect(TokenKind.Unsubscribe);
+
+        var @event = ParseExpression();
+        var handler = ParseExpression();
+
+        var span = startToken.Span.Union(handler.Span);
+        return new EventUnsubscribeNode(span, @event, handler);
+    }
+
+    // Phase 12: Async/Await
+
+    /// <summary>
+    /// Parses an await expression.
+    /// §AWAIT §C[client.GetStringAsync] §A §REF[name=url] §/C
+    /// §AWAIT[false] §C[reader.ReadAsync] §/C   // ConfigureAwait(false)
+    /// </summary>
+    private AwaitExpressionNode ParseAwaitExpression()
+    {
+        var startToken = Expect(TokenKind.Await);
+        var attrs = ParseAttributes();
+
+        // Check for ConfigureAwait attribute: §AWAIT[false] or §AWAIT[true]
+        bool? configureAwait = null;
+        var configValue = attrs["_pos0"];
+        if (!string.IsNullOrEmpty(configValue))
+        {
+            if (configValue.Equals("false", StringComparison.OrdinalIgnoreCase))
+            {
+                configureAwait = false;
+            }
+            else if (configValue.Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                configureAwait = true;
+            }
+        }
+
+        // Parse the awaited expression
+        var awaited = ParseExpression();
+
+        var span = startToken.Span.Union(awaited.Span);
+        return new AwaitExpressionNode(span, awaited, configureAwait);
+    }
+
+    // Phase 9: String Interpolation and Modern Operators
+
+    /// <summary>
+    /// Parses an interpolated string.
+    /// §INTERP["Hello, " §EXP §REF[name=name] "!"] §/INTERP
+    /// </summary>
+    private InterpolatedStringNode ParseInterpolatedString()
+    {
+        var startToken = Expect(TokenKind.Interpolate);
+        var attrs = ParseAttributes();
+
+        var parts = new List<InterpolatedStringPartNode>();
+
+        // Parse parts until we hit the end tag
+        while (!IsAtEnd && !Check(TokenKind.EndInterpolate))
+        {
+            if (Check(TokenKind.StrLiteral))
+            {
+                var strToken = Expect(TokenKind.StrLiteral);
+                var text = strToken.Value as string ?? "";
+                parts.Add(new InterpolatedStringTextNode(strToken.Span, text));
+            }
+            else if (Check(TokenKind.Expression))
+            {
+                Advance(); // consume §EXP
+                var expr = ParseExpression();
+                parts.Add(new InterpolatedStringExpressionNode(expr.Span, expr));
+            }
+            else
+            {
+                // Try to parse any other expression
+                var expr = ParseExpression();
+                parts.Add(new InterpolatedStringExpressionNode(expr.Span, expr));
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndInterpolate);
+        var span = startToken.Span.Union(endToken.Span);
+        return new InterpolatedStringNode(span, parts);
+    }
+
+    /// <summary>
+    /// Parses a null-coalescing expression.
+    /// §?? §REF[name=value] "default"
+    /// </summary>
+    private NullCoalesceNode ParseNullCoalesce()
+    {
+        var startToken = Expect(TokenKind.NullCoalesce);
+
+        var left = ParseExpression();
+        var right = ParseExpression();
+
+        var span = startToken.Span.Union(right.Span);
+        return new NullCoalesceNode(span, left, right);
+    }
+
+    /// <summary>
+    /// Parses a null-conditional access expression.
+    /// §?. §REF[name=person] Name
+    /// </summary>
+    private NullConditionalNode ParseNullConditional()
+    {
+        var startToken = Expect(TokenKind.NullConditional);
+
+        var target = ParseExpression();
+
+        // Parse the member name (identifier)
+        var memberToken = Expect(TokenKind.Identifier);
+        var memberName = memberToken.Text;
+
+        var span = startToken.Span.Union(memberToken.Span);
+        return new NullConditionalNode(span, target, memberName);
+    }
+
+    /// <summary>
+    /// Parses a range expression.
+    /// §RANGE 1 5
+    /// §RANGE §^ 1   (open start to ^1)
+    /// </summary>
+    private RangeExpressionNode ParseRangeExpression()
+    {
+        var startToken = Expect(TokenKind.RangeOp);
+
+        ExpressionNode? start = null;
+        ExpressionNode? end = null;
+
+        // Parse start if present
+        if (IsExpressionStart())
+        {
+            start = ParseExpression();
+        }
+
+        // Parse end if present
+        if (IsExpressionStart())
+        {
+            end = ParseExpression();
+        }
+
+        var span = end != null ? startToken.Span.Union(end.Span)
+                 : start != null ? startToken.Span.Union(start.Span)
+                 : startToken.Span;
+        return new RangeExpressionNode(span, start, end);
+    }
+
+    /// <summary>
+    /// Parses an index-from-end expression.
+    /// §^ 1
+    /// </summary>
+    private IndexFromEndNode ParseIndexFromEnd()
+    {
+        var startToken = Expect(TokenKind.IndexEnd);
+
+        var offset = ParseExpression();
+
+        var span = startToken.Span.Union(offset.Span);
+        return new IndexFromEndNode(span, offset);
+    }
+
+    // Phase 10: Advanced Patterns
+
+    /// <summary>
+    /// Parses a with-expression for non-destructive mutation.
+    /// §WITH §REF[name=person]
+    ///   §SET[Name] "New Name"
+    /// §/WITH
+    /// </summary>
+    private WithExpressionNode ParseWithExpression()
+    {
+        var startToken = Expect(TokenKind.With);
+
+        // Parse the target expression
+        var target = ParseExpression();
+
+        // Parse property assignments
+        var assignments = new List<WithPropertyAssignmentNode>();
+        while (!IsAtEnd && !Check(TokenKind.EndWith))
+        {
+            if (Check(TokenKind.Set))
+            {
+                var setToken = Expect(TokenKind.Set);
+                var setAttrs = ParseAttributes();
+                var propName = setAttrs["_pos0"] ?? "";
+                var value = ParseExpression();
+                var assignSpan = setToken.Span.Union(value.Span);
+                assignments.Add(new WithPropertyAssignmentNode(assignSpan, propName, value));
+            }
+            else
+            {
+                // Skip unknown tokens
+                Advance();
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndWith);
+        var span = startToken.Span.Union(endToken.Span);
+        return new WithExpressionNode(span, target, assignments);
+    }
+
+    /// <summary>
+    /// Parses a positional pattern.
+    /// §PPOS[Point] §VAR[x] §VAR[y]
+    /// </summary>
+    private PositionalPatternNode ParsePositionalPattern()
+    {
+        var startToken = Expect(TokenKind.PositionalPattern);
+        var attrs = ParseAttributes();
+        var typeName = attrs["_pos0"] ?? "";
+
+        var patterns = new List<PatternNode>();
+        while (!IsAtEnd && IsPatternStart())
+        {
+            patterns.Add(ParsePattern());
+        }
+
+        var span = patterns.Count > 0
+            ? startToken.Span.Union(patterns[^1].Span)
+            : startToken.Span;
+        return new PositionalPatternNode(span, typeName, patterns);
+    }
+
+    /// <summary>
+    /// Parses a property pattern.
+    /// §PPROP[Person] §PMATCH[Age] §PREL[gte] 18
+    /// </summary>
+    private PropertyPatternNode ParsePropertyPattern()
+    {
+        var startToken = Expect(TokenKind.PropertyPattern);
+        var attrs = ParseAttributes();
+        var typeName = attrs["_pos0"];
+
+        var matches = new List<PropertyMatchNode>();
+        while (!IsAtEnd && Check(TokenKind.PropertyMatch))
+        {
+            var matchToken = Expect(TokenKind.PropertyMatch);
+            var matchAttrs = ParseAttributes();
+            var propName = matchAttrs["_pos0"] ?? "";
+            var pattern = ParsePattern();
+            var matchSpan = matchToken.Span.Union(pattern.Span);
+            matches.Add(new PropertyMatchNode(matchSpan, propName, pattern));
+        }
+
+        var span = matches.Count > 0
+            ? startToken.Span.Union(matches[^1].Span)
+            : startToken.Span;
+        return new PropertyPatternNode(span, typeName, matches);
+    }
+
+    /// <summary>
+    /// Parses a relational pattern.
+    /// §PREL[gte] 18
+    /// </summary>
+    private RelationalPatternNode ParseRelationalPattern()
+    {
+        var startToken = Expect(TokenKind.RelationalPattern);
+        var attrs = ParseAttributes();
+        var op = attrs["_pos0"] ?? "eq";
+
+        var value = ParseExpression();
+
+        var span = startToken.Span.Union(value.Span);
+        return new RelationalPatternNode(span, op, value);
+    }
+
+    /// <summary>
+    /// Parses a list pattern.
+    /// §PLIST §VAR[first] §REST[rest]
+    /// </summary>
+    private ListPatternNode ParseListPattern()
+    {
+        var startToken = Expect(TokenKind.ListPattern);
+
+        var patterns = new List<PatternNode>();
+        VarPatternNode? slicePattern = null;
+
+        while (!IsAtEnd && (IsPatternStart() || Check(TokenKind.Rest)))
+        {
+            if (Check(TokenKind.Rest))
+            {
+                var restToken = Expect(TokenKind.Rest);
+                var restAttrs = ParseAttributes();
+                var restName = restAttrs["_pos0"] ?? "_";
+                slicePattern = new VarPatternNode(restToken.Span, restName);
+            }
+            else
+            {
+                patterns.Add(ParsePattern());
+            }
+        }
+
+        var span = slicePattern != null
+            ? startToken.Span.Union(slicePattern.Span)
+            : patterns.Count > 0
+                ? startToken.Span.Union(patterns[^1].Span)
+                : startToken.Span;
+        return new ListPatternNode(span, patterns, slicePattern);
+    }
+
+    /// <summary>
+    /// Parses a var pattern.
+    /// §VAR[x]
+    /// </summary>
+    private VarPatternNode ParseVarPattern()
+    {
+        var token = Expect(TokenKind.Var);
+        var attrs = ParseAttributes();
+        var name = attrs["_pos0"] ?? "_";
+        return new VarPatternNode(token.Span, name);
+    }
+
+    /// <summary>
+    /// Parses a constant pattern (literal value).
+    /// </summary>
+    private ConstantPatternNode ParseConstantPattern()
+    {
+        var expr = ParseExpression();
+        return new ConstantPatternNode(expr.Span, expr);
+    }
+
+    /// <summary>
+    /// Checks if the current token starts a pattern.
+    /// </summary>
+    private bool IsPatternStart()
+    {
+        return Current.Kind is TokenKind.PositionalPattern
+            or TokenKind.PropertyPattern
+            or TokenKind.ListPattern
+            or TokenKind.Var
+            or TokenKind.RelationalPattern
+            || IsExpressionStart();
     }
 }

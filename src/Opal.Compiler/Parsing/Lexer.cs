@@ -63,6 +63,82 @@ public sealed class Lexer
         ["REQUIRES"] = TokenKind.Requires,
         ["ENSURES"] = TokenKind.Ensures,
         ["INVARIANT"] = TokenKind.Invariant,
+        // Phase 5: Using Statements
+        ["USING"] = TokenKind.Using,
+        // Phase 6: Arrays and Collections
+        ["ARR"] = TokenKind.Array,
+        ["END_ARR"] = TokenKind.EndArray,
+        ["IDX"] = TokenKind.Index,
+        ["LEN"] = TokenKind.Length,
+        ["EACH"] = TokenKind.Foreach,
+        ["END_EACH"] = TokenKind.EndForeach,
+        // Phase 7: Generics
+        ["TP"] = TokenKind.TypeParam,
+        ["WHERE"] = TokenKind.Where,
+        ["G"] = TokenKind.Generic,
+        // Phase 8: Classes, Interfaces, Inheritance
+        ["CLASS"] = TokenKind.Class,
+        ["END_CLASS"] = TokenKind.EndClass,
+        ["IFACE"] = TokenKind.Interface,
+        ["END_IFACE"] = TokenKind.EndInterface,
+        ["IMPL"] = TokenKind.Implements,
+        ["EXT"] = TokenKind.Extends,
+        ["METHOD"] = TokenKind.Method,
+        ["END_METHOD"] = TokenKind.EndMethod,
+        ["VIRTUAL"] = TokenKind.Virtual,
+        ["OVERRIDE"] = TokenKind.Override,
+        ["ABSTRACT"] = TokenKind.Abstract,
+        ["SEALED"] = TokenKind.Sealed,
+        ["THIS"] = TokenKind.This,
+        ["BASE"] = TokenKind.Base,
+        ["NEW"] = TokenKind.New,
+        ["FLD"] = TokenKind.FieldDef,
+        // Phase 9: Properties and Constructors
+        ["PROP"] = TokenKind.Property,
+        ["END_PROP"] = TokenKind.EndProperty,
+        ["GET"] = TokenKind.Get,
+        ["SET"] = TokenKind.Set,
+        ["INIT"] = TokenKind.Init,
+        ["CTOR"] = TokenKind.Constructor,
+        ["END_CTOR"] = TokenKind.EndConstructor,
+        ["ASSIGN"] = TokenKind.Assign,
+        // Phase 10: Try/Catch/Finally
+        ["TRY"] = TokenKind.Try,
+        ["END_TRY"] = TokenKind.EndTry,
+        ["CATCH"] = TokenKind.Catch,
+        ["FINALLY"] = TokenKind.Finally,
+        ["THROW"] = TokenKind.Throw,
+        ["RETHROW"] = TokenKind.Rethrow,
+        ["WHEN"] = TokenKind.When,
+        // Phase 11: Lambdas, Delegates, Events
+        ["LAM"] = TokenKind.Lambda,
+        ["END_LAM"] = TokenKind.EndLambda,
+        ["DEL"] = TokenKind.Delegate,
+        ["END_DEL"] = TokenKind.EndDelegate,
+        ["EVT"] = TokenKind.Event,
+        ["SUB"] = TokenKind.Subscribe,
+        ["UNSUB"] = TokenKind.Unsubscribe,
+        // Phase 12: Async/Await
+        ["ASYNC"] = TokenKind.Async,
+        ["AWAIT"] = TokenKind.Await,
+        // Phase 9: String Interpolation and Modern Operators
+        ["INTERP"] = TokenKind.Interpolate,
+        ["/INTERP"] = TokenKind.EndInterpolate,
+        ["??"] = TokenKind.NullCoalesce,
+        ["?."] = TokenKind.NullConditional,
+        ["RANGE"] = TokenKind.RangeOp,
+        ["^"] = TokenKind.IndexEnd,
+        ["EXP"] = TokenKind.Expression,
+        // Phase 10: Advanced Patterns
+        ["WITH"] = TokenKind.With,
+        ["/WITH"] = TokenKind.EndWith,
+        ["PPOS"] = TokenKind.PositionalPattern,
+        ["PPROP"] = TokenKind.PropertyPattern,
+        ["PMATCH"] = TokenKind.PropertyMatch,
+        ["PREL"] = TokenKind.RelationalPattern,
+        ["PLIST"] = TokenKind.ListPattern,
+        ["VAR"] = TokenKind.Var,
+        ["REST"] = TokenKind.Rest,
 
         // v2 single-letter keywords (compact syntax)
         ["M"] = TokenKind.Module,           // §M = §MODULE
@@ -82,6 +158,22 @@ public sealed class Lexer
         ["T"] = TokenKind.Type,             // §T = §TYPE
         ["D"] = TokenKind.Record,           // §D = §RECORD (Data)
         ["V"] = TokenKind.Variant,          // §V = §VARIANT
+        ["U"] = TokenKind.Using,            // §U = §USING
+        // Phase 6: v2 closing tags for arrays
+        ["/ARR"] = TokenKind.EndArray,      // §/ARR = §END_ARR
+        ["/EACH"] = TokenKind.EndForeach,   // §/EACH = §END_EACH
+        // Phase 8: v2 closing tags for classes
+        ["/CLASS"] = TokenKind.EndClass,    // §/CLASS = §END_CLASS
+        ["/IFACE"] = TokenKind.EndInterface, // §/IFACE = §END_IFACE
+        ["/METHOD"] = TokenKind.EndMethod,  // §/METHOD = §END_METHOD
+        // Phase 9: v2 closing tags for properties/constructors
+        ["/PROP"] = TokenKind.EndProperty,  // §/PROP = §END_PROP
+        ["/CTOR"] = TokenKind.EndConstructor, // §/CTOR = §END_CTOR
+        // Phase 10: v2 closing tags for try/catch
+        ["/TRY"] = TokenKind.EndTry,        // §/TRY = §END_TRY
+        // Phase 11: v2 closing tags for lambdas/delegates
+        ["/LAM"] = TokenKind.EndLambda,     // §/LAM = §END_LAM
+        ["/DEL"] = TokenKind.EndDelegate,   // §/DEL = §END_DEL
 
         // v2 closing tags (§/X pattern)
         ["/M"] = TokenKind.EndModule,       // §/M = §END_MODULE

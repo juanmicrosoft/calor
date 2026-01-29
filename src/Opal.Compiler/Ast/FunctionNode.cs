@@ -8,6 +8,7 @@ namespace Opal.Compiler.Ast;
 public enum Visibility
 {
     Private,
+    Protected,
     Internal,
     Public
 }
@@ -53,6 +54,7 @@ public sealed class FunctionNode : AstNode
     public string Id { get; }
     public string Name { get; }
     public Visibility Visibility { get; }
+    public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
     public EffectsNode? Effects { get; }
@@ -71,7 +73,7 @@ public sealed class FunctionNode : AstNode
         EffectsNode? effects,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
-        : this(span, id, name, visibility, parameters, output, effects,
+        : this(span, id, name, visibility, Array.Empty<TypeParameterNode>(), parameters, output, effects,
                Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(), body, attributes)
     {
     }
@@ -88,11 +90,30 @@ public sealed class FunctionNode : AstNode
         IReadOnlyList<EnsuresNode> postconditions,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
+        : this(span, id, name, visibility, Array.Empty<TypeParameterNode>(), parameters, output, effects,
+               preconditions, postconditions, body, attributes)
+    {
+    }
+
+    public FunctionNode(
+        TextSpan span,
+        string id,
+        string name,
+        Visibility visibility,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        EffectsNode? effects,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Visibility = visibility;
+        TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;
         Effects = effects;
@@ -106,6 +127,11 @@ public sealed class FunctionNode : AstNode
     /// Returns true if this function has any contracts (preconditions or postconditions).
     /// </summary>
     public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
+
+    /// <summary>
+    /// Returns true if this function is generic (has type parameters).
+    /// </summary>
+    public bool IsGeneric => TypeParameters.Count > 0;
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);

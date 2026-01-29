@@ -66,6 +66,94 @@ public enum TokenKind
     Ensures,
     Invariant,
 
+    // Phase 5: Using Statements (.NET Interop)
+    Using,
+
+    // Phase 6: Arrays and Collections
+    Array,
+    EndArray,
+    Index,
+    Length,
+    Foreach,
+    EndForeach,
+
+    // Phase 7: Generics
+    TypeParam,
+    Where,
+    Generic,
+
+    // Phase 8: Classes, Interfaces, Inheritance
+    Class,
+    EndClass,
+    Interface,
+    EndInterface,
+    Implements,
+    Extends,
+    Method,
+    EndMethod,
+    Virtual,
+    Override,
+    Abstract,
+    Sealed,
+    This,
+    Base,
+    New,
+    FieldDef,
+
+    // Phase 9: Properties and Constructors
+    Property,
+    EndProperty,
+    Get,
+    Set,
+    Init,
+    Constructor,
+    EndConstructor,
+    BaseCall,
+    EndBaseCall,
+    Assign,
+
+    // Phase 10: Try/Catch/Finally
+    Try,
+    EndTry,
+    Catch,
+    Finally,
+    Throw,
+    Rethrow,
+    When,
+
+    // Phase 11: Lambdas, Delegates, Events
+    Lambda,
+    EndLambda,
+    Delegate,
+    EndDelegate,
+    Event,
+    Subscribe,
+    Unsubscribe,
+
+    // Phase 12: Async/Await
+    Async,
+    Await,
+
+    // Phase 9: String Interpolation and Modern Operators
+    Interpolate,
+    EndInterpolate,
+    NullCoalesce,
+    NullConditional,
+    RangeOp,
+    IndexEnd,
+    Expression,
+
+    // Phase 10: Advanced Patterns
+    With,
+    EndWith,
+    PositionalPattern,
+    PropertyPattern,
+    PropertyMatch,
+    RelationalPattern,
+    ListPattern,
+    Var,
+    Rest,
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
@@ -100,7 +188,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Invariant;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Rest;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral;
