@@ -1469,8 +1469,11 @@ public sealed class Parser
     {
         var attrs = new AttributeCollection();
 
-        while (Match(TokenKind.OpenBracket))
+        // Parse structural brackets only - stop if we see [@...] which is a C# attribute
+        while (Check(TokenKind.OpenBracket) && Peek(1).Kind != TokenKind.At)
         {
+            Advance(); // consume [
+
             // Check for v2 positional format vs v1 named format
             // v1: [name=value] - has Identifier followed by Equals
             // v2: [value1:value2] or [value] - no Equals, colon-separated
@@ -1615,6 +1618,168 @@ public sealed class Parser
     private bool MatchColon()
     {
         if (Check(TokenKind.Colon))
+        {
+            Advance();
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Parses C#-style attributes in the format [@AttributeName] or [@AttributeName(args)].
+    /// These appear after the structural brackets: §CLASS[id:name][@Route("api")][@ApiController]
+    /// </summary>
+    private IReadOnlyList<OpalAttributeNode> ParseCSharpAttributes()
+    {
+        var attributes = new List<OpalAttributeNode>();
+
+        // Keep parsing while we see [@
+        while (Check(TokenKind.OpenBracket) && Peek(1).Kind == TokenKind.At)
+        {
+            var startToken = Advance(); // consume [
+            Advance(); // consume @
+
+            // Parse attribute name
+            if (!Check(TokenKind.Identifier))
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "attribute name", Current.Kind);
+                // Try to recover by finding the closing bracket
+                while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+                {
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBracket))
+                {
+                    Advance();
+                }
+                continue;
+            }
+
+            var nameToken = Advance();
+            var name = nameToken.Text;
+
+            // Handle qualified names like System.ComponentModel.Description
+            while (Current.Text == ".")
+            {
+                Advance(); // consume .
+                if (Check(TokenKind.Identifier))
+                {
+                    name += "." + Advance().Text;
+                }
+            }
+
+            var arguments = new List<OpalAttributeArgument>();
+
+            // Check for arguments: [@Attr(args)]
+            if (Check(TokenKind.OpenParen))
+            {
+                Advance(); // consume (
+                arguments = ParseCSharpAttributeArguments();
+                Expect(TokenKind.CloseParen);
+            }
+
+            Expect(TokenKind.CloseBracket);
+
+            var span = startToken.Span.Union(Current.Span);
+            attributes.Add(new OpalAttributeNode(span, name, arguments));
+        }
+
+        return attributes;
+    }
+
+    /// <summary>
+    /// Parses the arguments inside a C# attribute: (arg1, "arg2", Name=value)
+    /// </summary>
+    private List<OpalAttributeArgument> ParseCSharpAttributeArguments()
+    {
+        var args = new List<OpalAttributeArgument>();
+
+        if (Check(TokenKind.CloseParen))
+        {
+            return args;
+        }
+
+        do
+        {
+            // Check for named argument: Name=value
+            if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals)
+            {
+                var nameToken = Advance();
+                Advance(); // consume =
+                var value = ParseCSharpAttributeValue();
+                args.Add(new OpalAttributeArgument(nameToken.Text, value));
+            }
+            else
+            {
+                // Positional argument
+                var value = ParseCSharpAttributeValue();
+                args.Add(new OpalAttributeArgument(value));
+            }
+        }
+        while (MatchComma());
+
+        return args;
+    }
+
+    /// <summary>
+    /// Parses a single value in a C# attribute argument.
+    /// </summary>
+    private object ParseCSharpAttributeValue()
+    {
+        if (Check(TokenKind.StrLiteral))
+        {
+            return Advance().Value as string ?? "";
+        }
+        if (Check(TokenKind.IntLiteral))
+        {
+            return Advance().Value ?? 0;
+        }
+        if (Check(TokenKind.FloatLiteral))
+        {
+            return Advance().Value ?? 0.0;
+        }
+        if (Check(TokenKind.BoolLiteral))
+        {
+            return Advance().Value ?? false;
+        }
+        if (Check(TokenKind.Identifier))
+        {
+            var text = Advance().Text;
+
+            // Handle typeof(TypeName)
+            if (text == "typeof" && Check(TokenKind.OpenParen))
+            {
+                Advance(); // consume (
+                var typeName = "";
+                while (!IsAtEnd && !Check(TokenKind.CloseParen))
+                {
+                    typeName += Advance().Text;
+                }
+                Expect(TokenKind.CloseParen);
+                return new TypeOfReference(typeName);
+            }
+
+            // Handle qualified names like System.String or enum values like AccessLevel.Admin
+            while (Current.Text == ".")
+            {
+                text += Advance().Text; // consume .
+                if (Check(TokenKind.Identifier))
+                {
+                    text += Advance().Text;
+                }
+            }
+
+            return text;
+        }
+
+        // Unrecognized value - return empty string
+        _diagnostics.ReportUnexpectedToken(Current.Span, "attribute value", Current.Kind);
+        return "";
+    }
+
+    private bool MatchComma()
+    {
+        if (Check(TokenKind.Comma))
         {
             Advance();
             return true;
@@ -1891,6 +2056,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Interface);
         var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
 
         // v2 positional: [id:name]
         var id = attrs["_pos0"] ?? "";
@@ -1941,17 +2107,18 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new InterfaceDefinitionNode(span, id, name, baseInterfaces, methods, attrs);
+        return new InterfaceDefinitionNode(span, id, name, baseInterfaces, methods, attrs, csharpAttrs);
     }
 
     /// <summary>
     /// Parses a method signature (for interfaces).
-    /// §METHOD[m001:Area] §O[f64] §E[] §/METHOD[m001]
+    /// §METHOD[m001:Area][@Obsolete] §O[f64] §E[] §/METHOD[m001]
     /// </summary>
     private MethodSignatureNode ParseMethodSignature()
     {
         var startToken = Expect(TokenKind.Method);
         var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
 
         // v2 positional: [id:name]
         var id = attrs["_pos0"] ?? "";
@@ -2006,7 +2173,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, attrs);
+        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, attrs, csharpAttrs);
     }
 
     /// <summary>
@@ -2021,6 +2188,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Class);
         var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
 
         // v2 positional: [id:name:modifiers?]
         var id = attrs["_pos0"] ?? "";
@@ -2107,17 +2275,18 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, baseClass,
-            implementedInterfaces, typeParameters, fields, properties, constructors, methods, attrs);
+            implementedInterfaces, typeParameters, fields, properties, constructors, methods, attrs, csharpAttrs);
     }
 
     /// <summary>
     /// Parses a class field.
-    /// §FLD[string:Name:pri]
+    /// §FLD[string:Name:pri][@JsonIgnore]
     /// </summary>
     private ClassFieldNode ParseClassField()
     {
         var startToken = Expect(TokenKind.FieldDef);
         var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
 
         // v2 positional: [type:name:visibility?]
         var typeName = attrs["_pos0"] ?? "object";
@@ -2139,12 +2308,12 @@ public sealed class Parser
         }
 
         var span = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
-        return new ClassFieldNode(span, name, typeName, visibility, defaultValue, attrs);
+        return new ClassFieldNode(span, name, typeName, visibility, defaultValue, attrs, csharpAttrs);
     }
 
     /// <summary>
     /// Parses a method definition (with body).
-    /// §METHOD[m001:Area:pub:over]
+    /// §METHOD[m001:Area:pub:over][@HttpPost][@Authorize]
     ///   §O[f64] §E[]
     ///   §R §OP[kind=mul] 3.14159 §REF[name=Radius] §REF[name=Radius]
     /// §/METHOD[m001]
@@ -2153,6 +2322,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Method);
         var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
 
         // v2 positional: [id:name:visibility?:modifiers?]
         var id = attrs["_pos0"] ?? "";
@@ -2229,7 +2399,7 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
-            output, effects, preconditions, postconditions, body, attrs);
+            output, effects, preconditions, postconditions, body, attrs, csharpAttrs);
     }
 
     private static MethodModifiers ParseMethodModifiers(string modStr)
@@ -2312,7 +2482,7 @@ public sealed class Parser
 
     /// <summary>
     /// Parses a property definition.
-    /// §PROP[p001:Name:string:pub]
+    /// §PROP[p001:Name:string:pub][@JsonProperty("name")]
     ///   §GET
     ///   §SET[pri]
     /// §/PROP[p001]
@@ -2321,6 +2491,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Property);
         var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
 
         // v2 positional: [id:name:type:visibility?]
         var id = attrs["_pos0"] ?? "";
@@ -2375,7 +2546,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new PropertyNode(span, id, name, typeName, visibility, getter, setter, initer, defaultValue, attrs);
+        return new PropertyNode(span, id, name, typeName, visibility, getter, setter, initer, defaultValue, attrs, csharpAttrs);
     }
 
     /// <summary>
@@ -2440,6 +2611,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Constructor);
         var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
 
         // v2 positional: [id:visibility?]
         var id = attrs["_pos0"] ?? "";
@@ -2495,7 +2667,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs);
+        return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs);
     }
 
     /// <summary>

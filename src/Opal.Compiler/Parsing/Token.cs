@@ -20,6 +20,8 @@ public enum TokenKind
     OpenParen,          // (
     CloseParen,         // )
     Arrow,              // → or ->
+    At,                 // @ (for C#-style attributes)
+    Comma,              // , (for attribute arguments)
 
     // v2 operator symbols (for Lisp-style expressions)
     Plus,               // +

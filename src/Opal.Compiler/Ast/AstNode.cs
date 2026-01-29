@@ -145,6 +145,8 @@ public interface IAstVisitor
     void Visit(LockNode node);
     void Visit(AuthorNode node);
     void Visit(TaskRefNode node);
+    // C# Attribute Support
+    void Visit(OpalAttributeNode node);
 }
 
 /// <summary>
@@ -274,6 +276,8 @@ public interface IAstVisitor<T>
     T Visit(LockNode node);
     T Visit(AuthorNode node);
     T Visit(TaskRefNode node);
+    // C# Attribute Support
+    T Visit(OpalAttributeNode node);
 }
 
 /// <summary>

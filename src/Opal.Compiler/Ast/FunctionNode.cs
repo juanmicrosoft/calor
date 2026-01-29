@@ -230,16 +230,32 @@ public sealed class ParameterNode : AstNode
     public string TypeName { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@FromBody], [@Required]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public ParameterNode(
         TextSpan span,
         string name,
         string typeName,
         AttributeCollection attributes)
+        : this(span, name, typeName, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public ParameterNode(
+        TextSpan span,
+        string name,
+        string typeName,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

@@ -34,6 +34,11 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
     /// </summary>
     public IReadOnlyList<string> BaseInterfaces { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@Obsolete], [@ComVisible]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public InterfaceDefinitionNode(
         TextSpan span,
         string id,
@@ -41,10 +46,23 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<string> baseInterfaces,
         IReadOnlyList<MethodSignatureNode> methods,
         AttributeCollection attributes)
+        : this(span, id, name, baseInterfaces, methods, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public InterfaceDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        IReadOnlyList<string> baseInterfaces,
+        IReadOnlyList<MethodSignatureNode> methods,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span, id, name, attributes)
     {
         BaseInterfaces = baseInterfaces ?? throw new ArgumentNullException(nameof(baseInterfaces));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -65,6 +83,11 @@ public sealed class MethodSignatureNode : AstNode
     public EffectsNode? Effects { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@Obsolete]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public MethodSignatureNode(
         TextSpan span,
         string id,
@@ -74,6 +97,20 @@ public sealed class MethodSignatureNode : AstNode
         OutputNode? output,
         EffectsNode? effects,
         AttributeCollection attributes)
+        : this(span, id, name, typeParameters, parameters, output, effects, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public MethodSignatureNode(
+        TextSpan span,
+        string id,
+        string name,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        EffectsNode? effects,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -83,6 +120,7 @@ public sealed class MethodSignatureNode : AstNode
         Output = output;
         Effects = effects;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -144,6 +182,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// </summary>
     public IReadOnlyList<MethodNode> Methods { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@Route("api/[controller]")], [@ApiController]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public ClassDefinitionNode(
         TextSpan span,
         string id,
@@ -157,7 +200,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodNode> methods,
         AttributeCollection attributes)
         : this(span, id, name, isAbstract, isSealed, baseClass, implementedInterfaces,
-               typeParameters, fields, Array.Empty<PropertyNode>(), Array.Empty<ConstructorNode>(), methods, attributes)
+               typeParameters, fields, Array.Empty<PropertyNode>(), Array.Empty<ConstructorNode>(), methods, attributes, Array.Empty<OpalAttributeNode>())
     {
     }
 
@@ -175,6 +218,26 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<ConstructorNode> constructors,
         IReadOnlyList<MethodNode> methods,
         AttributeCollection attributes)
+        : this(span, id, name, isAbstract, isSealed, baseClass, implementedInterfaces,
+               typeParameters, fields, properties, constructors, methods, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public ClassDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        bool isAbstract,
+        bool isSealed,
+        string? baseClass,
+        IReadOnlyList<string> implementedInterfaces,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ClassFieldNode> fields,
+        IReadOnlyList<PropertyNode> properties,
+        IReadOnlyList<ConstructorNode> constructors,
+        IReadOnlyList<MethodNode> methods,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
@@ -186,6 +249,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         Properties = properties ?? throw new ArgumentNullException(nameof(properties));
         Constructors = constructors ?? throw new ArgumentNullException(nameof(constructors));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -204,6 +268,11 @@ public sealed class ClassFieldNode : AstNode
     public ExpressionNode? DefaultValue { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@JsonIgnore], [@NonSerialized]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public ClassFieldNode(
         TextSpan span,
         string name,
@@ -211,6 +280,18 @@ public sealed class ClassFieldNode : AstNode
         Visibility visibility,
         ExpressionNode? defaultValue,
         AttributeCollection attributes)
+        : this(span, name, typeName, visibility, defaultValue, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public ClassFieldNode(
+        TextSpan span,
+        string name,
+        string typeName,
+        Visibility visibility,
+        ExpressionNode? defaultValue,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -218,6 +299,7 @@ public sealed class ClassFieldNode : AstNode
         Visibility = visibility;
         DefaultValue = defaultValue;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -246,6 +328,11 @@ public sealed class MethodNode : AstNode
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@HttpPost], [@Authorize], [@Route("api/users")]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public MethodNode(
         TextSpan span,
         string id,
@@ -260,6 +347,26 @@ public sealed class MethodNode : AstNode
         IReadOnlyList<EnsuresNode> postconditions,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
+        : this(span, id, name, visibility, modifiers, typeParameters, parameters, output, effects,
+               preconditions, postconditions, body, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public MethodNode(
+        TextSpan span,
+        string id,
+        string name,
+        Visibility visibility,
+        MethodModifiers modifiers,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        EffectsNode? effects,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -274,6 +381,7 @@ public sealed class MethodNode : AstNode
         Postconditions = postconditions ?? throw new ArgumentNullException(nameof(postconditions));
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public bool IsVirtual => (Modifiers & MethodModifiers.Virtual) != 0;

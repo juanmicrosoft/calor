@@ -324,6 +324,8 @@ public sealed class Lexer
             '~' => ScanSingle(TokenKind.Tilde),
             '#' => ScanSingle(TokenKind.Hash),
             '?' => ScanSingle(TokenKind.Question),
+            '@' => ScanSingle(TokenKind.At),
+            ',' => ScanSingle(TokenKind.Comma),
             '"' => ScanStringLiteral(),
             '\r' or '\n' => ScanNewline(),
             ' ' or '\t' => ScanWhitespace(),

@@ -128,6 +128,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var baseInterfaces = node.BaseList?.Types
             .Select(t => t.Type.ToString())
             .ToList() ?? new List<string>();
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         var methods = new List<MethodSignatureNode>();
         foreach (var member in node.Members)
@@ -144,7 +145,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             name,
             baseInterfaces,
             methods,
-            new AttributeCollection());
+            new AttributeCollection(),
+            csharpAttrs);
 
         _interfaces.Add(interfaceNode);
         _context.Stats.InterfacesConverted++;
@@ -196,6 +198,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var name = node.Identifier.Text;
         var isAbstract = node.Modifiers.Any(SyntaxKind.AbstractKeyword);
         var isSealed = node.Modifiers.Any(SyntaxKind.SealedKeyword);
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         string? baseClass = null;
         var interfaces = new List<string>();
@@ -263,7 +266,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             properties,
             constructors,
             methods,
-            new AttributeCollection());
+            new AttributeCollection(),
+            csharpAttrs);
     }
 
     private ClassDefinitionNode ConvertRecord(RecordDeclarationSyntax node)
@@ -393,6 +397,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var parameters = ConvertParameters(node.ParameterList);
         var returnType = TypeMapper.CSharpToOpal(node.ReturnType.ToString());
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         return new MethodSignatureNode(
             GetTextSpan(node),
@@ -402,7 +407,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             parameters,
             output,
             effects: null,
-            new AttributeCollection());
+            new AttributeCollection(),
+            csharpAttrs);
     }
 
     private MethodNode ConvertMethod(MethodDeclarationSyntax node)
@@ -419,6 +425,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var returnType = TypeMapper.CSharpToOpal(node.ReturnType.ToString());
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
         var body = ConvertMethodBody(node.Body, node.ExpressionBody);
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         _context.Stats.MethodsConverted++;
         _context.IncrementConverted();
@@ -437,7 +444,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
-            new AttributeCollection());
+            new AttributeCollection(),
+            csharpAttrs);
     }
 
     private ConstructorNode ConvertConstructor(ConstructorDeclarationSyntax node)
@@ -448,6 +456,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var visibility = GetVisibility(node.Modifiers);
         var parameters = ConvertParameters(node.ParameterList);
         var body = node.Body != null ? ConvertBlock(node.Body) : new List<StatementNode>();
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         ConstructorInitializerNode? initializer = null;
         if (node.Initializer != null)
@@ -473,7 +482,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             preconditions: Array.Empty<RequiresNode>(),
             initializer,
             body,
-            new AttributeCollection());
+            new AttributeCollection(),
+            csharpAttrs);
     }
 
     private IReadOnlyList<ClassFieldNode> ConvertFields(FieldDeclarationSyntax node)
@@ -483,6 +493,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var fields = new List<ClassFieldNode>();
         var visibility = GetVisibility(node.Modifiers);
         var typeName = TypeMapper.CSharpToOpal(node.Declaration.Type.ToString());
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         foreach (var variable in node.Declaration.Variables)
         {
@@ -496,7 +507,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 typeName,
                 visibility,
                 defaultValue,
-                new AttributeCollection()));
+                new AttributeCollection(),
+                csharpAttrs));
 
             _context.Stats.FieldsConverted++;
             _context.IncrementConverted();
@@ -512,6 +524,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var name = node.Identifier.Text;
         var typeName = TypeMapper.CSharpToOpal(node.Type.ToString());
         var visibility = GetVisibility(node.Modifiers);
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         PropertyAccessorNode? getter = null;
         PropertyAccessorNode? setter = null;
@@ -527,6 +540,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var accessorVisibility = accessor.Modifiers.Any()
                     ? GetVisibility(accessor.Modifiers)
                     : visibility;
+                var accessorAttrs = ConvertAttributes(accessor.AttributeLists);
 
                 if (accessor.Keyword.IsKind(SyntaxKind.GetKeyword))
                 {
@@ -536,7 +550,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         accessorVisibility,
                         preconditions: Array.Empty<RequiresNode>(),
                         body: ConvertAccessorBody(accessor),
-                        new AttributeCollection());
+                        new AttributeCollection(),
+                        accessorAttrs);
                 }
                 else if (accessor.Keyword.IsKind(SyntaxKind.SetKeyword))
                 {
@@ -546,7 +561,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         accessorVisibility,
                         preconditions: Array.Empty<RequiresNode>(),
                         body: ConvertAccessorBody(accessor),
-                        new AttributeCollection());
+                        new AttributeCollection(),
+                        accessorAttrs);
                 }
                 else if (accessor.Keyword.IsKind(SyntaxKind.InitKeyword))
                 {
@@ -556,7 +572,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         accessorVisibility,
                         preconditions: Array.Empty<RequiresNode>(),
                         body: ConvertAccessorBody(accessor),
-                        new AttributeCollection());
+                        new AttributeCollection(),
+                        accessorAttrs);
                 }
             }
         }
@@ -595,7 +612,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             setter,
             initer,
             defaultValue,
-            new AttributeCollection());
+            new AttributeCollection(),
+            csharpAttrs);
     }
 
     private IReadOnlyList<StatementNode> ConvertAccessorBody(AccessorDeclarationSyntax accessor)
@@ -1366,5 +1384,59 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             node.Span.Length,
             lineSpan.StartLinePosition.Line + 1,
             lineSpan.StartLinePosition.Character + 1);
+    }
+
+    /// <summary>
+    /// Converts C# attributes to OPAL attributes.
+    /// </summary>
+    private IReadOnlyList<OpalAttributeNode> ConvertAttributes(SyntaxList<AttributeListSyntax> attributeLists)
+    {
+        var result = new List<OpalAttributeNode>();
+
+        foreach (var attrList in attributeLists)
+        {
+            foreach (var attr in attrList.Attributes)
+            {
+                var name = attr.Name.ToString();
+                var args = new List<OpalAttributeArgument>();
+
+                if (attr.ArgumentList != null)
+                {
+                    foreach (var arg in attr.ArgumentList.Arguments)
+                    {
+                        var argName = arg.NameEquals?.Name.ToString();
+                        var value = ConvertAttributeValue(arg.Expression);
+
+                        if (argName != null)
+                        {
+                            args.Add(new OpalAttributeArgument(argName, value));
+                        }
+                        else
+                        {
+                            args.Add(new OpalAttributeArgument(value));
+                        }
+                    }
+                }
+
+                result.Add(new OpalAttributeNode(GetTextSpan(attr), name, args));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Converts an attribute argument expression to an object value.
+    /// </summary>
+    private object ConvertAttributeValue(ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            LiteralExpressionSyntax literal => literal.Token.Value ?? literal.Token.Text,
+            TypeOfExpressionSyntax typeOf => new TypeOfReference(typeOf.Type.ToString()),
+            MemberAccessExpressionSyntax memberAccess => memberAccess.ToString(),
+            IdentifierNameSyntax identifier => identifier.Identifier.Text,
+            _ => expression.ToString()
+        };
     }
 }

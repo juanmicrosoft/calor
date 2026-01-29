@@ -873,6 +873,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(InterfaceDefinitionNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
         var name = SanitizeIdentifier(node.Name);
         var baseList = node.BaseInterfaces.Count > 0
             ? " : " + string.Join(", ", node.BaseInterfaces.Select(SanitizeIdentifier))
@@ -895,6 +897,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(MethodSignatureNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
         var returnType = node.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
         var methodName = SanitizeIdentifier(node.Name);
@@ -915,6 +919,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ClassDefinitionNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
         var name = SanitizeIdentifier(node.Name);
 
         var modifiers = "public";
@@ -996,6 +1002,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ClassFieldNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
@@ -1022,6 +1030,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(MethodNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
@@ -1161,6 +1171,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(PropertyNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
@@ -1260,6 +1272,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ConstructorNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
@@ -1989,5 +2003,38 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             => "@" + result,
             _ => result
         };
+    }
+
+    /// <summary>
+    /// Emits C#-style attributes.
+    /// </summary>
+    private void EmitCSharpAttributes(IReadOnlyList<OpalAttributeNode> attributes)
+    {
+        foreach (var attr in attributes)
+        {
+            AppendLine(Visit(attr));
+        }
+    }
+
+    public string Visit(OpalAttributeNode node)
+    {
+        if (node.Arguments.Count == 0)
+        {
+            return $"[{node.Name}]";
+        }
+
+        var args = string.Join(", ", node.Arguments.Select(FormatCSharpAttributeArgument));
+        return $"[{node.Name}({args})]";
+    }
+
+    private static string FormatCSharpAttributeArgument(OpalAttributeArgument arg)
+    {
+        var value = arg.GetFormattedValue();
+
+        if (arg.IsNamed)
+        {
+            return $"{arg.Name} = {value}";
+        }
+        return value;
     }
 }

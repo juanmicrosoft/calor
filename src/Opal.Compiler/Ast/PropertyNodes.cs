@@ -22,6 +22,11 @@ public sealed class PropertyNode : AstNode
     public ExpressionNode? DefaultValue { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@JsonProperty("name")], [@Required]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public PropertyNode(
         TextSpan span,
         string id,
@@ -33,6 +38,22 @@ public sealed class PropertyNode : AstNode
         PropertyAccessorNode? initer,
         ExpressionNode? defaultValue,
         AttributeCollection attributes)
+        : this(span, id, name, typeName, visibility, getter, setter, initer, defaultValue, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public PropertyNode(
+        TextSpan span,
+        string id,
+        string name,
+        string typeName,
+        Visibility visibility,
+        PropertyAccessorNode? getter,
+        PropertyAccessorNode? setter,
+        PropertyAccessorNode? initer,
+        ExpressionNode? defaultValue,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -44,6 +65,7 @@ public sealed class PropertyNode : AstNode
         Initer = initer;
         DefaultValue = defaultValue;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public bool IsAutoProperty => Getter == null && Setter == null && Initer == null;
@@ -67,6 +89,11 @@ public sealed class PropertyAccessorNode : AstNode
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@MethodImpl(MethodImplOptions.AggressiveInlining)]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public PropertyAccessorNode(
         TextSpan span,
         AccessorKind kind,
@@ -74,6 +101,18 @@ public sealed class PropertyAccessorNode : AstNode
         IReadOnlyList<RequiresNode> preconditions,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
+        : this(span, kind, visibility, preconditions, body, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public PropertyAccessorNode(
+        TextSpan span,
+        AccessorKind kind,
+        Visibility? visibility,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span)
     {
         Kind = kind;
@@ -81,6 +120,7 @@ public sealed class PropertyAccessorNode : AstNode
         Preconditions = preconditions ?? throw new ArgumentNullException(nameof(preconditions));
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public bool IsAutoImplemented => Body.Count == 0;
@@ -108,6 +148,11 @@ public sealed class ConstructorNode : AstNode
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@Obsolete], [@JsonConstructor]).
+    /// </summary>
+    public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
+
     public ConstructorNode(
         TextSpan span,
         string id,
@@ -117,6 +162,20 @@ public sealed class ConstructorNode : AstNode
         ConstructorInitializerNode? initializer,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
+        : this(span, id, visibility, parameters, preconditions, initializer, body, attributes, Array.Empty<OpalAttributeNode>())
+    {
+    }
+
+    public ConstructorNode(
+        TextSpan span,
+        string id,
+        Visibility visibility,
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<RequiresNode> preconditions,
+        ConstructorInitializerNode? initializer,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -126,6 +185,7 @@ public sealed class ConstructorNode : AstNode
         Initializer = initializer;
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
