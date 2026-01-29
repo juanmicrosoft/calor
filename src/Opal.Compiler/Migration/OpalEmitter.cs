@@ -697,7 +697,7 @@ public sealed class OpalEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/WHILE[{node.Id}]");
+        AppendLine($"§/WH[{node.Id}]");
         return "";
     }
 

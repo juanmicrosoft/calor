@@ -141,7 +141,6 @@ public sealed class Lexer
 
         // Extended Features Phase 1: Quick Wins
         ["EX"] = TokenKind.Example,             // §EX - Inline examples/tests
-        ["EXAMPLE"] = TokenKind.Example,        // §EXAMPLE - Full syntax
         ["TODO"] = TokenKind.Todo,              // §TODO - Structured todo items
         ["FIXME"] = TokenKind.Fixme,            // §FIXME - Bug markers
         ["HACK"] = TokenKind.Hack,              // §HACK - Workaround markers
@@ -232,7 +231,6 @@ public sealed class Lexer
         ["EL"] = TokenKind.Else,            // §EL = §ELSE
         ["WH"] = TokenKind.While,           // §WH = §WHILE
         ["/WH"] = TokenKind.EndWhile,       // §/WH = §END_WHILE
-        ["/WHILE"] = TokenKind.EndWhile,    // §/WHILE = §END_WHILE
         ["SW"] = TokenKind.Match,           // §SW = §SWITCH/MATCH
         ["/SW"] = TokenKind.EndMatch,       // §/SW = §END_SWITCH/MATCH
 
