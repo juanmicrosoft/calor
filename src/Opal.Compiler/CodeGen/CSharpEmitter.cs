@@ -421,9 +421,29 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var left = node.Left.Accept(this);
         var right = node.Right.Accept(this);
-        var op = node.Operator.ToCSharpOperator();
 
+        // Special handling for Power operator (use Math.Pow)
+        if (node.Operator == BinaryOperator.Power)
+        {
+            return $"Math.Pow({left}, {right})";
+        }
+
+        var op = node.Operator.ToCSharpOperator();
         return $"({left} {op} {right})";
+    }
+
+    public string Visit(UnaryOperationNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        var op = node.Operator.ToCSharpOperator();
+        return $"({op}{operand})";
+    }
+
+    public string Visit(PrintStatementNode node)
+    {
+        var expr = node.Expression.Accept(this);
+        var method = node.IsWriteLine ? "Console.WriteLine" : "Console.Write";
+        return $"{method}({expr});";
     }
 
     // Phase 3: Type System

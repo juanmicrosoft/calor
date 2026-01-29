@@ -56,3 +56,23 @@ public sealed class ReturnStatementNode : StatementNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents a print statement (§P shorthand for Console.WriteLine).
+/// §P expression
+/// </summary>
+public sealed class PrintStatementNode : StatementNode
+{
+    public ExpressionNode Expression { get; }
+    public bool IsWriteLine { get; }  // true for §P (WriteLine), false for §Pf (Write)
+
+    public PrintStatementNode(TextSpan span, ExpressionNode expression, bool isWriteLine = true)
+        : base(span)
+    {
+        Expression = expression ?? throw new ArgumentNullException(nameof(expression));
+        IsWriteLine = isWriteLine;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

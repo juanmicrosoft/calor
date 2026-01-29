@@ -448,10 +448,35 @@ public sealed class Parser
         {
             return ParseEventUnsubscribe();
         }
+        // v2: Print aliases
+        else if (Check(TokenKind.Print))
+        {
+            return ParsePrintStatement(isWriteLine: true);
+        }
+        else if (Check(TokenKind.PrintF))
+        {
+            return ParsePrintStatement(isWriteLine: false);
+        }
 
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
         return null;
+    }
+
+    /// <summary>
+    /// Parses §P or §Pf print statements.
+    /// §P expression  -> Console.WriteLine(expression)
+    /// §Pf expression -> Console.Write(expression)
+    /// </summary>
+    private PrintStatementNode ParsePrintStatement(bool isWriteLine)
+    {
+        var startToken = Advance(); // consume §P or §Pf
+
+        // Parse the expression to print
+        var expression = ParseExpression();
+
+        var span = startToken.Span.Union(expression.Span);
+        return new PrintStatementNode(span, expression, isWriteLine);
     }
 
     private CallStatementNode ParseCallStatement()
@@ -468,6 +493,17 @@ public sealed class Parser
 
         var arguments = new List<ExpressionNode>();
 
+        // v2: Support implicit closing - if a single expression follows without §A, treat it as the argument
+        // §C[Console.WriteLine] "Hello" is equivalent to §C[Console.WriteLine] §A "Hello" §/C
+        if (IsExpressionStart() && !Check(TokenKind.Arg))
+        {
+            // Single expression argument without §A prefix - implicit closing
+            arguments.Add(ParseExpression());
+            var span = startToken.Span.Union(arguments[0].Span);
+            return new CallStatementNode(span, target, fallible, arguments, attrs);
+        }
+
+        // Standard v1 format with explicit §A and §/C
         while (!IsAtEnd && !Check(TokenKind.EndCall))
         {
             if (Check(TokenKind.Arg))
@@ -481,9 +517,9 @@ public sealed class Parser
         }
 
         var endToken = Expect(TokenKind.EndCall);
-        var span = startToken.Span.Union(endToken.Span);
+        var span2 = startToken.Span.Union(endToken.Span);
 
-        return new CallStatementNode(span, target, fallible, arguments, attrs);
+        return new CallStatementNode(span2, target, fallible, arguments, attrs);
     }
 
     private ExpressionNode ParseArgument()
@@ -518,6 +554,8 @@ public sealed class Parser
             or TokenKind.Identifier
             or TokenKind.Op
             or TokenKind.Ref
+            // v2 Lisp-style expression
+            or TokenKind.OpenParen
             // Phase 3: Type System
             or TokenKind.Some
             or TokenKind.None
@@ -560,6 +598,8 @@ public sealed class Parser
             TokenKind.Identifier => ParseReference(),
             TokenKind.Op => ParseBinaryOperation(),
             TokenKind.Ref => ParseRefExpression(),
+            // v2 Lisp-style expression: (op args...)
+            TokenKind.OpenParen => ParseLispExpression(),
             // Phase 3: Type System
             TokenKind.Some => ParseSomeExpression(),
             TokenKind.None => ParseNoneExpression(),
@@ -591,6 +631,223 @@ public sealed class Parser
             TokenKind.With => ParseWithExpression(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
         };
+    }
+
+    /// <summary>
+    /// Parses a Lisp-style prefix expression: (op arg1 arg2 ...)
+    /// Examples: (+ 1 2), (== x 0), (% i 15), (! flag), (- x)
+    /// </summary>
+    private ExpressionNode ParseLispExpression()
+    {
+        var startToken = Expect(TokenKind.OpenParen);
+
+        // Get the operator
+        var (opKind, opText) = ParseLispOperator();
+
+        // Parse arguments until we hit CloseParen
+        var args = new List<ExpressionNode>();
+        while (!Check(TokenKind.CloseParen) && !IsAtEnd)
+        {
+            args.Add(ParseLispArgument());
+        }
+
+        var endToken = Expect(TokenKind.CloseParen);
+        var span = startToken.Span.Union(endToken.Span);
+
+        // Determine if this is unary or binary based on argument count and operator
+        if (args.Count == 1 && IsUnaryOperator(opKind))
+        {
+            var unaryOp = GetUnaryOperator(opKind, opText);
+            if (unaryOp.HasValue)
+            {
+                return new UnaryOperationNode(span, unaryOp.Value, args[0]);
+            }
+        }
+
+        if (args.Count >= 2)
+        {
+            var binaryOp = BinaryOperatorExtensions.FromString(opText);
+            if (binaryOp.HasValue)
+            {
+                // For more than 2 arguments, chain them: (+ a b c) => ((a + b) + c)
+                var result = args[0];
+                for (int i = 1; i < args.Count; i++)
+                {
+                    result = new BinaryOperationNode(span, binaryOp.Value, result, args[i]);
+                }
+                return result;
+            }
+        }
+
+        // Fallback: if single argument and can be binary op with implicit self
+        if (args.Count == 1)
+        {
+            var binaryOp = BinaryOperatorExtensions.FromString(opText);
+            if (binaryOp.HasValue)
+            {
+                // This is likely an error - binary op with only one argument
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"Binary operator '{opText}' requires at least two operands");
+                return args[0];
+            }
+        }
+
+        // If we have exactly 2 args, try to interpret as binary
+        if (args.Count == 2)
+        {
+            var binaryOp = BinaryOperatorExtensions.FromString(opText);
+            if (binaryOp.HasValue)
+            {
+                return new BinaryOperationNode(span, binaryOp.Value, args[0], args[1]);
+            }
+        }
+
+        // Unknown operator
+        _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+            $"Unknown operator '{opText}' in Lisp expression");
+        return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
+    }
+
+    private (TokenKind kind, string text) ParseLispOperator()
+    {
+        var token = Current;
+        var text = token.Text;
+
+        switch (token.Kind)
+        {
+            case TokenKind.Plus:
+                Advance();
+                return (TokenKind.Plus, "+");
+            case TokenKind.Minus:
+                Advance();
+                return (TokenKind.Minus, "-");
+            case TokenKind.Star:
+                Advance();
+                return (TokenKind.Star, "*");
+            case TokenKind.StarStar:
+                Advance();
+                return (TokenKind.StarStar, "**");
+            case TokenKind.Slash:
+                Advance();
+                return (TokenKind.Slash, "/");
+            case TokenKind.Percent:
+                Advance();
+                return (TokenKind.Percent, "%");
+            case TokenKind.EqualEqual:
+                Advance();
+                return (TokenKind.EqualEqual, "==");
+            case TokenKind.BangEqual:
+                Advance();
+                return (TokenKind.BangEqual, "!=");
+            case TokenKind.Less:
+                Advance();
+                return (TokenKind.Less, "<");
+            case TokenKind.LessEqual:
+                Advance();
+                return (TokenKind.LessEqual, "<=");
+            case TokenKind.Greater:
+                Advance();
+                return (TokenKind.Greater, ">");
+            case TokenKind.GreaterEqual:
+                Advance();
+                return (TokenKind.GreaterEqual, ">=");
+            case TokenKind.AmpAmp:
+                Advance();
+                return (TokenKind.AmpAmp, "&&");
+            case TokenKind.PipePipe:
+                Advance();
+                return (TokenKind.PipePipe, "||");
+            case TokenKind.Amp:
+                Advance();
+                return (TokenKind.Amp, "&");
+            case TokenKind.Pipe:
+                Advance();
+                return (TokenKind.Pipe, "|");
+            case TokenKind.Caret:
+                Advance();
+                return (TokenKind.Caret, "^");
+            case TokenKind.LessLess:
+                Advance();
+                return (TokenKind.LessLess, "<<");
+            case TokenKind.GreaterGreater:
+                Advance();
+                return (TokenKind.GreaterGreater, ">>");
+            case TokenKind.Exclamation:
+                Advance();
+                return (TokenKind.Exclamation, "!");
+            case TokenKind.Tilde:
+                Advance();
+                return (TokenKind.Tilde, "~");
+            case TokenKind.Identifier:
+                // Support word operators like "and", "or", "not", "mod"
+                Advance();
+                return (TokenKind.Identifier, text.ToLowerInvariant() switch
+                {
+                    "and" => "&&",
+                    "or" => "||",
+                    "not" => "!",
+                    "mod" => "%",
+                    "eq" => "==",
+                    "ne" or "neq" => "!=",
+                    "lt" => "<",
+                    "le" or "lte" => "<=",
+                    "gt" => ">",
+                    "ge" or "gte" => ">=",
+                    _ => text
+                });
+            default:
+                _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
+                    $"Expected operator in Lisp expression, found '{token.Text}'");
+                Advance();
+                return (token.Kind, text);
+        }
+    }
+
+    private bool IsUnaryOperator(TokenKind kind)
+    {
+        return kind is TokenKind.Exclamation or TokenKind.Tilde or TokenKind.Minus
+            or TokenKind.Identifier; // for 'not'
+    }
+
+    private UnaryOperator? GetUnaryOperator(TokenKind kind, string text)
+    {
+        return text switch
+        {
+            "!" or "not" => UnaryOperator.Not,
+            "~" => UnaryOperator.BitwiseNot,
+            "-" => UnaryOperator.Negate,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Parses an argument inside a Lisp expression.
+    /// Can be a literal, identifier (bare variable), or nested Lisp expression.
+    /// </summary>
+    private ExpressionNode ParseLispArgument()
+    {
+        return Current.Kind switch
+        {
+            TokenKind.IntLiteral => ParseIntLiteral(),
+            TokenKind.StrLiteral => ParseStringLiteral(),
+            TokenKind.BoolLiteral => ParseBoolLiteral(),
+            TokenKind.FloatLiteral => ParseFloatLiteral(),
+            TokenKind.Identifier => ParseBareReference(), // Bare variable reference
+            TokenKind.OpenParen => ParseLispExpression(), // Nested expression
+            // Also support existing OPAL expressions inside Lisp
+            TokenKind.Ref => ParseRefExpression(),
+            _ => throw new InvalidOperationException($"Unexpected token {Current.Kind} in Lisp expression argument")
+        };
+    }
+
+    /// <summary>
+    /// Parses a bare identifier as a variable reference (used in Lisp expressions).
+    /// Reserved words like true/false are handled as literals by the lexer.
+    /// </summary>
+    private ReferenceNode ParseBareReference()
+    {
+        var token = Expect(TokenKind.Identifier);
+        return new ReferenceNode(token.Span, token.Text);
     }
 
     private IntLiteralNode ParseIntLiteral()
@@ -942,6 +1199,90 @@ public sealed class Parser
         var elseIfClauses = new List<ElseIfClauseNode>();
         List<StatementNode>? elseBody = null;
 
+        // v2: Check for arrow syntax: §IF[id] condition → statement
+        if (Check(TokenKind.Arrow))
+        {
+            Advance(); // consume arrow
+            var singleStmt = ParseStatement();
+            if (singleStmt != null)
+            {
+                thenBody.Add(singleStmt);
+            }
+
+            // Parse optional §EI (else if) and §EL (else) with arrow syntax
+            while (Check(TokenKind.ElseIf))
+            {
+                var elseIfToken = Expect(TokenKind.ElseIf);
+                var elseIfCondition = ParseExpression();
+                var elseIfBody = new List<StatementNode>();
+
+                if (Check(TokenKind.Arrow))
+                {
+                    Advance(); // consume arrow
+                    var elseIfStmt = ParseStatement();
+                    if (elseIfStmt != null)
+                    {
+                        elseIfBody.Add(elseIfStmt);
+                    }
+                }
+                else
+                {
+                    // Multi-statement body (until next clause or end)
+                    while (!IsAtEnd && !Check(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+                    {
+                        var stmt = ParseStatement();
+                        if (stmt != null)
+                        {
+                            elseIfBody.Add(stmt);
+                        }
+                    }
+                }
+
+                elseIfClauses.Add(new ElseIfClauseNode(elseIfToken.Span, elseIfCondition, elseIfBody));
+            }
+
+            // Parse optional §EL (else) with arrow syntax
+            if (Check(TokenKind.Else))
+            {
+                Expect(TokenKind.Else);
+                elseBody = new List<StatementNode>();
+
+                if (Check(TokenKind.Arrow))
+                {
+                    Advance(); // consume arrow
+                    var elseStmt = ParseStatement();
+                    if (elseStmt != null)
+                    {
+                        elseBody.Add(elseStmt);
+                    }
+                }
+                else
+                {
+                    while (!IsAtEnd && !Check(TokenKind.EndIf))
+                    {
+                        var stmt = ParseStatement();
+                        if (stmt != null)
+                        {
+                            elseBody.Add(stmt);
+                        }
+                    }
+                }
+            }
+
+            var endToken = Expect(TokenKind.EndIf);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
+
+            if (endId != id)
+            {
+                _diagnostics.ReportMismatchedId(endToken.Span, "IF", id, "END_IF", endId);
+            }
+
+            var span = startToken.Span.Union(endToken.Span);
+            return new IfStatementNode(span, id, condition, thenBody, elseIfClauses, elseBody, attrs);
+        }
+
+        // Standard multi-statement body
         while (!IsAtEnd && !Check(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
         {
             var stmt = ParseStatement();
@@ -986,18 +1327,18 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndIf);
-        var endAttrs = ParseAttributes();
+        var endToken2 = Expect(TokenKind.EndIf);
+        var endAttrs2 = ParseAttributes();
         // v2 positional: [id]
-        var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
+        var endId2 = endAttrs2["_pos0"] ?? endAttrs2["id"] ?? "";
 
-        if (endId != id)
+        if (endId2 != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "IF", id, "END_IF", endId);
+            _diagnostics.ReportMismatchedId(endToken2.Span, "IF", id, "END_IF", endId2);
         }
 
-        var span = startToken.Span.Union(endToken.Span);
-        return new IfStatementNode(span, id, condition, thenBody, elseIfClauses, elseBody, attrs);
+        var span2 = startToken.Span.Union(endToken2.Span);
+        return new IfStatementNode(span2, id, condition, thenBody, elseIfClauses, elseBody, attrs);
     }
 
     private BindStatementNode ParseBindStatement()

@@ -196,6 +196,7 @@ public enum BinaryOperator
     Multiply,   // *
     Divide,     // /
     Modulo,     // %
+    Power,      // **
 
     // Comparison
     Equal,          // ==
@@ -208,6 +209,13 @@ public enum BinaryOperator
     // Logical
     And,    // &&
     Or,     // ||
+
+    // Bitwise
+    BitwiseAnd,     // &
+    BitwiseOr,      // |
+    BitwiseXor,     // ^
+    LeftShift,      // <<
+    RightShift,     // >>
 }
 
 /// <summary>
@@ -224,6 +232,7 @@ public static class BinaryOperatorExtensions
             "MUL" or "MULTIPLY" or "*" => BinaryOperator.Multiply,
             "DIV" or "DIVIDE" or "/" => BinaryOperator.Divide,
             "MOD" or "MODULO" or "%" => BinaryOperator.Modulo,
+            "POW" or "POWER" or "**" => BinaryOperator.Power,
             "EQ" or "EQUAL" or "==" => BinaryOperator.Equal,
             "NEQ" or "NOTEQUAL" or "NE" or "!=" => BinaryOperator.NotEqual,
             "LT" or "LESSTHAN" or "<" => BinaryOperator.LessThan,
@@ -232,6 +241,11 @@ public static class BinaryOperatorExtensions
             "GTE" or "GE" or "GREATEROREQUAL" or ">=" => BinaryOperator.GreaterOrEqual,
             "AND" or "&&" => BinaryOperator.And,
             "OR" or "||" => BinaryOperator.Or,
+            "BAND" or "BITWISEAND" or "&" => BinaryOperator.BitwiseAnd,
+            "BOR" or "BITWISEOR" or "|" => BinaryOperator.BitwiseOr,
+            "BXOR" or "BITWISEXOR" or "^" => BinaryOperator.BitwiseXor,
+            "SHL" or "LEFTSHIFT" or "<<" => BinaryOperator.LeftShift,
+            "SHR" or "RIGHTSHIFT" or ">>" => BinaryOperator.RightShift,
             _ => null
         };
     }
@@ -245,6 +259,7 @@ public static class BinaryOperatorExtensions
             BinaryOperator.Multiply => "*",
             BinaryOperator.Divide => "/",
             BinaryOperator.Modulo => "%",
+            BinaryOperator.Power => "**", // Will need Math.Pow in emitter
             BinaryOperator.Equal => "==",
             BinaryOperator.NotEqual => "!=",
             BinaryOperator.LessThan => "<",
@@ -253,6 +268,11 @@ public static class BinaryOperatorExtensions
             BinaryOperator.GreaterOrEqual => ">=",
             BinaryOperator.And => "&&",
             BinaryOperator.Or => "||",
+            BinaryOperator.BitwiseAnd => "&",
+            BinaryOperator.BitwiseOr => "|",
+            BinaryOperator.BitwiseXor => "^",
+            BinaryOperator.LeftShift => "<<",
+            BinaryOperator.RightShift => ">>",
             _ => throw new ArgumentOutOfRangeException(nameof(op))
         };
     }

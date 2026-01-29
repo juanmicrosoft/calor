@@ -17,6 +17,36 @@ public enum TokenKind
     Tilde,              // ~
     Hash,               // #
     Question,           // ?
+    OpenParen,          // (
+    CloseParen,         // )
+    Arrow,              // → or ->
+
+    // v2 operator symbols (for Lisp-style expressions)
+    Plus,               // +
+    Minus,              // -
+    Star,               // *
+    Slash,              // /
+    Percent,            // %
+    EqualEqual,         // ==
+    BangEqual,          // !=
+    Less,               // <
+    LessEqual,          // <=
+    Greater,            // >
+    GreaterEqual,       // >=
+    AmpAmp,             // &&
+    PipePipe,           // ||
+    Amp,                // &
+    Pipe,               // |
+    Caret,              // ^
+    LessLess,           // <<
+    GreaterGreater,     // >>
+    StarStar,           // **
+
+    // v2 built-in aliases
+    Print,              // §P = Console.WriteLine
+    PrintF,             // §Pf = Console.Write
+    ReadLine,           // §G = Console.ReadLine (renamed from Get to avoid conflict)
+    DebugPrint,         // §D = Debug.WriteLine (renamed from Debug to avoid potential conflicts)
 
     // Keywords (recognized after §)
     Module,

@@ -190,4 +190,134 @@ public class EndToEndTests
         Assert.False(result.HasErrors);
         Assert.Contains("internal static void Helper()", result.GeneratedCode);
     }
+
+    [Fact]
+    public void Compile_V2LispExpressions_GeneratesCorrectCode()
+    {
+        // Test: (== (% i 15) 0) should generate ((i % 15) == 0)
+        var source = """
+            §M[m001:Test]
+            §F[f001:Check:pub]
+              §I[i32:i]
+              §O[BOOL]
+              §BODY
+                §RETURN (== (% i 15) 0)
+              §END_BODY
+            §/F[f001]
+            §/M[m001]
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("((i % 15) == 0)", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void Compile_V2PrintAlias_GeneratesConsoleWriteLine()
+    {
+        var source = """
+            §M[m001:Test]
+            §F[f001:Main:pub]
+              §O[void]
+              §BODY
+                §P "Hello v2!"
+              §END_BODY
+            §/F[f001]
+            §/M[m001]
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("Console.WriteLine(\"Hello v2!\")", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void Compile_V2ImplicitClosing_GeneratesCorrectCall()
+    {
+        var source = """
+            §M[m001:Test]
+            §F[f001:Main:pub]
+              §O[void]
+              §BODY
+                §C[Console.WriteLine] "Implicit close"
+              §END_BODY
+            §/F[f001]
+            §/M[m001]
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("Console.WriteLine(\"Implicit close\")", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void Compile_V2UnaryNot_GeneratesCorrectCode()
+    {
+        var source = """
+            §M[m001:Test]
+            §F[f001:Negate:pub]
+              §I[BOOL:flag]
+              §O[BOOL]
+              §BODY
+                §RETURN (! flag)
+              §END_BODY
+            §/F[f001]
+            §/M[m001]
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("(!flag)", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void Compile_V2PrintWithLispExpression_GeneratesCorrectCode()
+    {
+        var source = """
+            §M[m001:Test]
+            §F[f001:Main:pub]
+              §I[i32:x]
+              §O[void]
+              §BODY
+                §P (+ x 10)
+              §END_BODY
+            §/F[f001]
+            §/M[m001]
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("Console.WriteLine((x + 10))", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void Compile_V2ChainedOperators_GeneratesCorrectCode()
+    {
+        // (+ a b c) should generate ((a + b) + c)
+        var source = """
+            §M[m001:Test]
+            §F[f001:Sum3:pub]
+              §I[i32:a]
+              §I[i32:b]
+              §I[i32:c]
+              §O[i32]
+              §BODY
+                §RETURN (+ a b c)
+              §END_BODY
+            §/F[f001]
+            §/M[m001]
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        // The generated code should chain additions
+        Assert.Contains("a + b", result.GeneratedCode);
+        Assert.Contains("+ c", result.GeneratedCode);
+    }
 }

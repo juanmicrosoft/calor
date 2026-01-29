@@ -93,3 +93,60 @@ public sealed class ReferenceNode : ExpressionNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents a unary operation (prefix operators like !, ~, -).
+/// </summary>
+public sealed class UnaryOperationNode : ExpressionNode
+{
+    public UnaryOperator Operator { get; }
+    public ExpressionNode Operand { get; }
+
+    public UnaryOperationNode(TextSpan span, UnaryOperator op, ExpressionNode operand)
+        : base(span)
+    {
+        Operator = op;
+        Operand = operand ?? throw new ArgumentNullException(nameof(operand));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Unary operators supported by OPAL.
+/// </summary>
+public enum UnaryOperator
+{
+    Negate,         // - (unary minus)
+    Not,            // ! (logical not)
+    BitwiseNot,     // ~ (bitwise not)
+}
+
+/// <summary>
+/// Helper methods for UnaryOperator.
+/// </summary>
+public static class UnaryOperatorExtensions
+{
+    public static UnaryOperator? FromString(string? value)
+    {
+        return value?.ToUpperInvariant() switch
+        {
+            "NEG" or "NEGATE" or "-" => UnaryOperator.Negate,
+            "NOT" or "!" => UnaryOperator.Not,
+            "BNOT" or "BITWISENOT" or "~" => UnaryOperator.BitwiseNot,
+            _ => null
+        };
+    }
+
+    public static string ToCSharpOperator(this UnaryOperator op)
+    {
+        return op switch
+        {
+            UnaryOperator.Negate => "-",
+            UnaryOperator.Not => "!",
+            UnaryOperator.BitwiseNot => "~",
+            _ => throw new ArgumentOutOfRangeException(nameof(op))
+        };
+    }
+}

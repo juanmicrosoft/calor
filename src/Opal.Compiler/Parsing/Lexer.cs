@@ -184,6 +184,20 @@ public sealed class Lexer
         ["/W"] = TokenKind.EndMatch,        // §/W = §END_MATCH
         ["/T"] = TokenKind.EndType,         // §/T = §END_TYPE
         ["/D"] = TokenKind.EndRecord,       // §/D = §END_RECORD
+
+        // v2 expression enhancements: short control flow keywords
+        ["IF"] = TokenKind.If,              // §IF = explicit if
+        ["EI"] = TokenKind.ElseIf,          // §EI = §ELSEIF
+        ["EL"] = TokenKind.Else,            // §EL = §ELSE
+        ["WH"] = TokenKind.While,           // §WH = §WHILE
+        ["/WH"] = TokenKind.EndWhile,       // §/WH = §END_WHILE
+        ["SW"] = TokenKind.Match,           // §SW = §SWITCH/MATCH
+        ["/SW"] = TokenKind.EndMatch,       // §/SW = §END_SWITCH/MATCH
+
+        // v2 built-in aliases for common operations
+        ["P"] = TokenKind.Print,            // §P = Console.WriteLine
+        ["Pf"] = TokenKind.PrintF,          // §Pf = Console.Write
+        ["G"] = TokenKind.Get,              // §G = Console.ReadLine
     };
 
     public Lexer(string source, DiagnosticBag diagnostics)
@@ -264,19 +278,167 @@ public sealed class Lexer
             '§' => ScanSectionMarker(),
             '[' => ScanSingle(TokenKind.OpenBracket),
             ']' => ScanSingle(TokenKind.CloseBracket),
-            '=' => ScanSingle(TokenKind.Equals),
+            '(' => ScanSingle(TokenKind.OpenParen),
+            ')' => ScanSingle(TokenKind.CloseParen),
+            '=' => ScanEqualsOrOperator(),
             ':' => ScanColonOrTypedLiteral(),
-            '!' => ScanSingle(TokenKind.Exclamation),
+            '!' => ScanBangOrOperator(),
             '~' => ScanSingle(TokenKind.Tilde),
             '#' => ScanSingle(TokenKind.Hash),
             '?' => ScanSingle(TokenKind.Question),
             '"' => ScanStringLiteral(),
             '\r' or '\n' => ScanNewline(),
             ' ' or '\t' => ScanWhitespace(),
+            // v2 Lisp-style operator symbols
+            '+' => ScanSingle(TokenKind.Plus),
+            '*' => ScanStarOrOperator(),
+            '/' => ScanSingle(TokenKind.Slash),
+            '%' => ScanSingle(TokenKind.Percent),
+            '<' => ScanLessOrOperator(),
+            '>' => ScanGreaterOrOperator(),
+            '&' => ScanAmpOrOperator(),
+            '|' => ScanPipeOrOperator(),
+            '^' => ScanSingle(TokenKind.Caret),
+            // Arrow: → or ->
+            '→' => ScanSingle(TokenKind.Arrow),
+            '-' => ScanMinusOrArrowOrNumber(),
+            '`' => ScanBacktickIdentifier(),
             _ when char.IsLetter(Current) || Current == '_' => ScanIdentifierOrTypedLiteral(),
-            _ when char.IsDigit(Current) || (Current == '-' && char.IsDigit(Lookahead)) => ScanNumber(),
+            _ when char.IsDigit(Current) => ScanNumber(),
             _ => ScanError()
         };
+    }
+
+    private Token ScanEqualsOrOperator()
+    {
+        Advance(); // consume '='
+        if (Current == '=')
+        {
+            Advance(); // consume second '='
+            return MakeToken(TokenKind.EqualEqual);
+        }
+        return MakeToken(TokenKind.Equals);
+    }
+
+    private Token ScanBangOrOperator()
+    {
+        Advance(); // consume '!'
+        if (Current == '=')
+        {
+            Advance(); // consume '='
+            return MakeToken(TokenKind.BangEqual);
+        }
+        return MakeToken(TokenKind.Exclamation);
+    }
+
+    private Token ScanStarOrOperator()
+    {
+        Advance(); // consume '*'
+        if (Current == '*')
+        {
+            Advance(); // consume second '*'
+            return MakeToken(TokenKind.StarStar);
+        }
+        return MakeToken(TokenKind.Star);
+    }
+
+    private Token ScanLessOrOperator()
+    {
+        Advance(); // consume '<'
+        if (Current == '=')
+        {
+            Advance(); // consume '='
+            return MakeToken(TokenKind.LessEqual);
+        }
+        if (Current == '<')
+        {
+            Advance(); // consume second '<'
+            return MakeToken(TokenKind.LessLess);
+        }
+        return MakeToken(TokenKind.Less);
+    }
+
+    private Token ScanGreaterOrOperator()
+    {
+        Advance(); // consume '>'
+        if (Current == '=')
+        {
+            Advance(); // consume '='
+            return MakeToken(TokenKind.GreaterEqual);
+        }
+        if (Current == '>')
+        {
+            Advance(); // consume second '>'
+            return MakeToken(TokenKind.GreaterGreater);
+        }
+        return MakeToken(TokenKind.Greater);
+    }
+
+    private Token ScanAmpOrOperator()
+    {
+        Advance(); // consume '&'
+        if (Current == '&')
+        {
+            Advance(); // consume second '&'
+            return MakeToken(TokenKind.AmpAmp);
+        }
+        return MakeToken(TokenKind.Amp);
+    }
+
+    private Token ScanPipeOrOperator()
+    {
+        Advance(); // consume '|'
+        if (Current == '|')
+        {
+            Advance(); // consume second '|'
+            return MakeToken(TokenKind.PipePipe);
+        }
+        return MakeToken(TokenKind.Pipe);
+    }
+
+    private Token ScanMinusOrArrowOrNumber()
+    {
+        // Check for -> arrow
+        if (Lookahead == '>')
+        {
+            Advance(); // consume '-'
+            Advance(); // consume '>'
+            return MakeToken(TokenKind.Arrow);
+        }
+        // Check for negative number
+        if (char.IsDigit(Lookahead))
+        {
+            return ScanNumber();
+        }
+        // Otherwise it's just minus operator
+        Advance();
+        return MakeToken(TokenKind.Minus);
+    }
+
+    private Token ScanBacktickIdentifier()
+    {
+        Advance(); // consume opening backtick
+
+        var sb = new System.Text.StringBuilder();
+        while (!IsAtEnd && Current != '`')
+        {
+            if (Current == '\n')
+            {
+                _diagnostics.ReportUnterminatedString(CurrentSpan());
+                return MakeToken(TokenKind.Error);
+            }
+            sb.Append(Current);
+            Advance();
+        }
+
+        if (IsAtEnd)
+        {
+            _diagnostics.ReportUnterminatedString(CurrentSpan());
+            return MakeToken(TokenKind.Error);
+        }
+
+        Advance(); // consume closing backtick
+        return new Token(TokenKind.Identifier, sb.ToString(), CurrentSpan(), sb.ToString());
     }
 
     private Token ScanSingle(TokenKind kind)
@@ -348,17 +510,40 @@ public sealed class Lexer
 
         var text = CurrentText();
 
-        // Check for typed literals
+        // Check for typed literals (INT:42, STR:"hello", BOOL:true, FLOAT:3.14)
+        // Only treat as typed literal if the following value looks like a valid literal
         if (Current == ':')
         {
-            return text.ToUpperInvariant() switch
+            var upperText = text.ToUpperInvariant();
+            var lookahead = Peek(1);
+
+            // INT:digits or INT:-digits
+            if (upperText == "INT" && (char.IsDigit(lookahead) || lookahead == '-'))
             {
-                "INT" => ScanTypedIntLiteral(),
-                "STR" => ScanTypedStringLiteral(),
-                "BOOL" => ScanTypedBoolLiteral(),
-                "FLOAT" => ScanTypedFloatLiteral(),
-                _ => MakeToken(TokenKind.Identifier)
-            };
+                return ScanTypedIntLiteral();
+            }
+            // STR:"string"
+            if (upperText == "STR" && lookahead == '"')
+            {
+                return ScanTypedStringLiteral();
+            }
+            // BOOL:true or BOOL:false
+            if (upperText == "BOOL" && (lookahead == 't' || lookahead == 'f'))
+            {
+                // Extra check: make sure it's actually "true" or "false", not an identifier
+                var remaining = _source[(_position + 1)..];
+                if (remaining.StartsWith("true") || remaining.StartsWith("false"))
+                {
+                    return ScanTypedBoolLiteral();
+                }
+            }
+            // FLOAT:digits or FLOAT:-digits or FLOAT:.digits
+            if (upperText == "FLOAT" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
+            {
+                return ScanTypedFloatLiteral();
+            }
+
+            // Not a typed literal - return as identifier (colon is a separate token)
         }
 
         // v2: Support bare boolean literals
