@@ -106,6 +106,24 @@ Multi-line form:
 §/C
 ```
 
+## C# Attributes
+
+Attributes attach inline after structural brackets:
+
+```
+[@AttributeName]              No arguments
+[@Route("api/test")]          Positional argument
+[@JsonProperty(Name="id")]    Named argument
+```
+
+Example with class and method:
+```
+§CLASS[c001:TestController:ControllerBase][@Route("api/[controller]")][@ApiController]
+  §METHOD[m001:Get:pub][@HttpGet]
+  §/METHOD[m001]
+§/CLASS[c001]
+```
+
 ## Template: FizzBuzz
 
 ```opal

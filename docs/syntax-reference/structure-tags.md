@@ -202,6 +202,57 @@ Every structural element must be closed with a matching tag.
 
 ---
 
+## C# Attributes
+
+C# attributes are preserved during conversion using inline bracket syntax `[@Attribute]`.
+
+### Syntax
+
+```
+§CLASS[id:name][@AttributeName]
+§CLASS[id:name][@AttributeName(args)]
+§METHOD[id:name:vis][@Attr1][@Attr2]
+```
+
+### Examples
+
+**Class with routing attributes (ASP.NET Core):**
+```
+§CLASS[c001:JoinController:ControllerBase][@Route("api/[controller]")][@ApiController]
+  §METHOD[m001:Post:pub][@HttpPost]
+  §/METHOD[m001]
+§/CLASS[c001]
+```
+
+**Property with validation:**
+```
+§PROP[p001:Email:str:pub][@Required][@EmailAddress]
+  §GET
+  §SET
+§/PROP[p001]
+```
+
+### Attribute Arguments
+
+| Style | Syntax | Example |
+|:------|:-------|:--------|
+| No args | `[@Name]` | `[@ApiController]` |
+| Positional | `[@Name(value)]` | `[@Route("api/test")]` |
+| Named | `[@Name(Key="value")]` | `[@JsonProperty(PropertyName="id")]` |
+| Mixed | `[@Name(pos, Key=val)]` | `[@Range(1, 100, ErrorMessage="Invalid")]` |
+
+### Supported Elements
+
+Attributes can be attached to:
+- Classes: `§CLASS[...][@attr]`
+- Interfaces: `§IFACE[...][@attr]`
+- Methods: `§METHOD[...][@attr]`
+- Properties: `§PROP[...][@attr]`
+- Fields: `§FLD[...][@attr]`
+- Parameters: `§I[type:name][@attr]`
+
+---
+
 ## Why Explicit Closing Tags?
 
 1. **Unambiguous parsing** - No brace-counting needed

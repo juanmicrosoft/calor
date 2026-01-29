@@ -137,6 +137,40 @@ Debug.Assert(result >= 0);
 §S (>= result 0)
 ```
 
+## C# Attribute Conversion
+
+Attributes are preserved using inline bracket syntax `[@Attribute]`:
+
+### Class Attributes
+```csharp
+[Route("api/[controller]")]
+[ApiController]
+public class TestController : ControllerBase { }
+```
+```opal
+§CLASS[c001:TestController:ControllerBase][@Route("api/[controller]")][@ApiController]
+§/CLASS[c001]
+```
+
+### Method Attributes
+```csharp
+[HttpPost]
+[Authorize]
+public void Post() { }
+```
+```opal
+§METHOD[m001:Post:pub][@HttpPost][@Authorize]
+§/METHOD[m001]
+```
+
+### Attribute Arguments
+| C# | OPAL |
+|---|---|
+| `[Required]` | `[@Required]` |
+| `[Route("api")]` | `[@Route("api")]` |
+| `[JsonProperty(PropertyName="id")]` | `[@JsonProperty(PropertyName="id")]` |
+| `[Range(1, 100)]` | `[@Range(1, 100)]` |
+
 ## Supported Features
 
 - Static methods
@@ -145,16 +179,15 @@ Debug.Assert(result >= 0);
 - Console I/O
 - Arithmetic/comparison operators
 - Simple contracts
+- C# attributes (on classes, methods, properties, fields, parameters)
 
 ## Not Yet Supported
 
-- Classes/objects
 - Async/await
 - LINQ
 - Generics
 - Events/delegates
 - Exception handling (try/catch)
-- Properties
 - Collections (List, Dictionary)
 
 ## Conversion Example
