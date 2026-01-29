@@ -140,16 +140,26 @@ public static int Square(int x)
 ## Quick Start
 
 ```bash
-# Clone and build
+# Install the compiler
+dotnet tool install -g opalc
+
+# Initialize for Claude Code (optional)
+opalc init --ai claude
+
+# Compile OPAL to C#
+opalc --input program.opal --output program.g.cs
+```
+
+### Building from Source
+
+```bash
 git clone https://github.com/juanmicrosoft/opal.git
 cd opal && dotnet build
 
-# Compile OPAL to C#
+# Run the sample
 dotnet run --project src/Opal.Compiler -- \
   --input samples/HelloWorld/hello.opal \
   --output samples/HelloWorld/hello.g.cs
-
-# Run the generated program
 dotnet run --project samples/HelloWorld
 ```
 

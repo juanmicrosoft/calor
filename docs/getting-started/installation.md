@@ -11,30 +11,9 @@ This guide covers installing the OPAL compiler and setting up your development e
 
 ---
 
-## Quick Install
-
-The fastest way to get started with OPAL is using our initialization scripts, which install the compiler globally and set up Claude Code integration.
-
-**macOS/Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.ps1 | iex
-```
-
-The init script will:
-- Install `opalc` as a global dotnet tool
-- Set up Claude Code skills for `/opal` and `/opal-convert` commands
-- Create a sample OPAL project
-
----
-
 ## Global Tool Install
 
-If you prefer to install just the compiler without the full setup:
+Install the OPAL compiler as a global .NET tool:
 
 ```bash
 dotnet tool install -g opalc
@@ -56,17 +35,18 @@ dotnet tool update -g opalc
 
 ## Claude Code Integration
 
-OPAL includes skills for Claude Code that help you write and convert OPAL code.
-
-### Installing Skills
-
-The init scripts automatically install these skills to `.claude/skills/`. To install them manually:
+OPAL includes built-in support for Claude Code. Initialize your project with:
 
 ```bash
-mkdir -p .claude/skills
-curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/.claude/skills/opal.md -o .claude/skills/opal.md
-curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/.claude/skills/opal-convert.md -o .claude/skills/opal-convert.md
+opalc init --ai claude
 ```
+
+This creates:
+- `.claude/skills/opal.md` - Skill for writing OPAL code
+- `.claude/skills/opal-convert.md` - Skill for converting C# to OPAL
+- `CLAUDE.md` - Project documentation for Claude
+
+You can run `opalc init --ai claude` again to update the OPAL section in CLAUDE.md without losing your custom content.
 
 ### Available Commands
 

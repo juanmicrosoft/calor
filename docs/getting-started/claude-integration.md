@@ -11,15 +11,26 @@ OPAL is designed specifically for AI coding agents. This guide explains how to u
 
 ---
 
+## Quick Setup
+
+Initialize your project for Claude Code with a single command:
+
+```bash
+opalc init --ai claude
+```
+
+This creates:
+- `.claude/skills/opal.md` - Teaches Claude OPAL syntax
+- `.claude/skills/opal-convert.md` - Teaches Claude C# to OPAL conversion
+- `CLAUDE.md` - Project documentation with OPAL reference
+
+You can run this command again anytime to update the OPAL documentation section in CLAUDE.md without losing your custom content.
+
+---
+
 ## The `/opal` Skill
 
-The OPAL repository includes a Claude Code skill that teaches Claude how to write OPAL code:
-
-```
-.claude/skills/opal.md
-```
-
-When working with Claude Code in the OPAL repository, you can use the `/opal` command to activate OPAL-aware code generation.
+When working with Claude Code in an OPAL-initialized project, use the `/opal` command to activate OPAL-aware code generation.
 
 ---
 
