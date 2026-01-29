@@ -16,6 +16,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<InterfaceDefinitionNode> _interfaces = new();
     private readonly List<ClassDefinitionNode> _classes = new();
     private readonly List<FunctionNode> _functions = new();
+    private readonly List<StatementNode> _topLevelStatements = new();
+
+    /// <summary>
+    /// Gets the top-level statements collected during conversion (C# 9+ feature).
+    /// </summary>
+    public IReadOnlyList<StatementNode> TopLevelStatements => _topLevelStatements;
 
     public RoslynSyntaxVisitor(ConversionContext context) : base(SyntaxWalkerDepth.Node)
     {
@@ -31,11 +37,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _interfaces.Clear();
         _classes.Clear();
         _functions.Clear();
+        _topLevelStatements.Clear();
 
         // Visit all nodes
         Visit(root);
 
         var moduleId = _context.GenerateId("m");
+
+        // If there are top-level statements (C# 9+ feature), wrap them in a synthetic main function
+        var functions = _functions.ToList();
+        if (_topLevelStatements.Count > 0)
+        {
+            var mainFunction = new FunctionNode(
+                span: GetTextSpan(root),
+                id: "main",
+                name: "Main",
+                visibility: Visibility.Public,
+                parameters: new List<ParameterNode>(),
+                output: null, // void return type
+                effects: null,
+                body: _topLevelStatements,
+                attributes: new AttributeCollection());
+
+            functions.Add(mainFunction);
+            _context.Stats.MethodsConverted++;
+        }
 
         return new ModuleNode(
             GetTextSpan(root),
@@ -44,7 +70,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _usings,
             _interfaces,
             _classes,
-            _functions,
+            functions,
             new AttributeCollection());
     }
 
@@ -78,6 +104,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.EnterNamespace(node.Name.ToString());
         base.VisitFileScopedNamespaceDeclaration(node);
         _context.ExitNamespace();
+    }
+
+    public override void VisitGlobalStatement(GlobalStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("top-level-statement");
+        var statement = ConvertStatement(node.Statement);
+        if (statement != null)
+        {
+            _topLevelStatements.Add(statement);
+            _context.IncrementConverted();
+        }
+        // Don't call base - we've fully handled this node
     }
 
     public override void VisitInterfaceDeclaration(InterfaceDeclarationSyntax node)
