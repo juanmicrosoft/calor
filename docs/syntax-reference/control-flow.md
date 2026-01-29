@@ -101,6 +101,51 @@ OPAL provides loops and conditionals with explicit structure.
 §/WH[while1]
 ```
 
+### Do-While Loop Syntax
+
+```
+§DO[id]
+  // body (executes at least once)
+§/DO[id] condition
+```
+
+| Part | Description |
+|:-----|:------------|
+| `id` | Unique loop identifier |
+| `condition` | Boolean expression evaluated after each iteration |
+
+The condition is placed at the end to match the semantics: the body always executes at least once, then the condition is checked.
+
+### Do-While Loop Examples
+
+**Execute at least once:**
+```
+§B[i] 0
+§DO[do1]
+  §P i
+  §ASSIGN i (+ i 1)
+§/DO[do1] (< i 5)
+```
+
+**Menu loop (always show menu first):**
+```
+§B[choice] 0
+§DO[do1]
+  §P "1. Option A"
+  §P "2. Option B"
+  §P "3. Exit"
+  §B[choice] §C[ReadChoice] §/C
+§/DO[do1] (!= choice 3)
+```
+
+**Retry until success:**
+```
+§B[success] false
+§DO[do1]
+  §B[success] §C[TryOperation] §/C
+§/DO[do1] (! success)
+```
+
 ---
 
 ## Conditionals

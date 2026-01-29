@@ -25,6 +25,7 @@ Complete reference for OPAL syntax. Always use V2+ syntax (Lisp-style expression
 | Ensures | `§S expr` | `§S (>= result 0)` |
 | For Loop | `§L[id:var:from:to:step]` | `§L[l1:i:1:100:1]` |
 | While Loop | `§WH[id] condition` | `§WH[w1] (> i 0)` |
+| Do-While Loop | `§DO[id]...§/DO[id] cond` | `§DO[d1]...§/DO[d1] (< i 10)` |
 | If/ElseIf/Else | `§IF...§EI...§EL` | `§IF (> x 0) → §R x §EL → §R 0` |
 | Call | `§C[target]...§/C` | `§C[Math.Max] §A 1 §A 2 §/C` |
 | C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
@@ -83,7 +84,7 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
 |:--------|:-----------|:--------|
 | Modules | `m001`, `m002` | `§M[m001:Calculator]` |
 | Functions | `f001`, `f002` | `§F[f001:Add:pub]` |
-| Loops | `for1`, `while1` | `§L[for1:i:1:10:1]` |
+| Loops | `for1`, `while1`, `do1` | `§L[for1:i:1:10:1]` |
 | Conditionals | `if1`, `if2` | `§IF[if1] condition` |
 
 ---

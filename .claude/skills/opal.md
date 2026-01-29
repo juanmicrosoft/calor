@@ -68,6 +68,13 @@ T!E                   Result<T,E> (fallible)
 §/WH[id]
 ```
 
+### Do-While Loop
+```
+§DO[id]
+  ...body (executes at least once)...
+§/DO[id] condition
+```
+
 ### Conditionals (v2 arrow syntax)
 ```
 §IF[id] condition → action
@@ -168,5 +175,5 @@ Example with class and method:
 
 - Modules: `m001`, `m002`
 - Functions: `f001`, `f002`
-- Loops: `for1`, `while1`
+- Loops: `for1`, `while1`, `do1`
 - Conditionals: `if1`, `if2`
