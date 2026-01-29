@@ -1,0 +1,284 @@
+{
+  "version": "1.0",
+  "description": "OPAL vs C# evaluation benchmarks for AI coding agent effectiveness",
+  "benchmarks": [
+    {
+      "id": "001",
+      "name": "HelloWorld",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/HelloWorld.opal",
+      "csharpFile": "TokenEconomics/HelloWorld.cs",
+      "level": 1,
+      "features": ["module", "function", "console_write", "effects"],
+      "notes": "Simple hello world program - baseline comparison",
+      "expectedAdvantage": 1.8
+    },
+    {
+      "id": "002",
+      "name": "Calculator",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/Calculator.opal",
+      "csharpFile": "TokenEconomics/Calculator.cs",
+      "level": 2,
+      "features": ["module", "function", "parameters", "return_type", "arithmetic"],
+      "notes": "Basic arithmetic operations with multiple functions"
+    },
+    {
+      "id": "003",
+      "name": "FizzBuzz",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/FizzBuzz.opal",
+      "csharpFile": "TokenEconomics/FizzBuzz.cs",
+      "level": 2,
+      "features": ["module", "function", "conditional", "loop", "modulo"],
+      "notes": "Classic FizzBuzz implementation"
+    },
+    {
+      "id": "004",
+      "name": "Factorial",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/Factorial.opal",
+      "csharpFile": "TokenEconomics/Factorial.cs",
+      "level": 2,
+      "features": ["module", "function", "recursion", "conditional"],
+      "notes": "Recursive factorial calculation"
+    },
+    {
+      "id": "005",
+      "name": "Fibonacci",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/Fibonacci.opal",
+      "csharpFile": "TokenEconomics/Fibonacci.cs",
+      "level": 2,
+      "features": ["module", "function", "recursion", "conditional"],
+      "notes": "Fibonacci sequence generator"
+    },
+    {
+      "id": "006",
+      "name": "ContractedDivide",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/ContractedDivide.opal",
+      "csharpFile": "TokenEconomics/ContractedDivide.cs",
+      "level": 3,
+      "features": ["module", "function", "contracts", "requires", "ensures"],
+      "notes": "Division with contract-based validation"
+    },
+    {
+      "id": "007",
+      "name": "StringUtils",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/StringUtils.opal",
+      "csharpFile": "TokenEconomics/StringUtils.cs",
+      "level": 2,
+      "features": ["module", "function", "string_operations", "multiple_methods"],
+      "notes": "String utility functions"
+    },
+    {
+      "id": "008",
+      "name": "MathOperations",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/MathOperations.opal",
+      "csharpFile": "TokenEconomics/MathOperations.cs",
+      "level": 3,
+      "features": ["module", "function", "contracts", "effects", "pure"],
+      "notes": "Math operations with purity effects"
+    },
+    {
+      "id": "009",
+      "name": "ArraySum",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/ArraySum.opal",
+      "csharpFile": "TokenEconomics/ArraySum.cs",
+      "level": 2,
+      "features": ["module", "function", "array", "loop"],
+      "notes": "Array summation"
+    },
+    {
+      "id": "010",
+      "name": "MaxValue",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/MaxValue.opal",
+      "csharpFile": "TokenEconomics/MaxValue.cs",
+      "level": 2,
+      "features": ["module", "function", "array", "loop", "conditional"],
+      "notes": "Find maximum value in array"
+    },
+    {
+      "id": "011",
+      "name": "IsPrime",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/IsPrime.opal",
+      "csharpFile": "TokenEconomics/IsPrime.cs",
+      "level": 3,
+      "features": ["module", "function", "loop", "conditional", "contracts"],
+      "notes": "Prime number checker"
+    },
+    {
+      "id": "012",
+      "name": "BinarySearch",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/BinarySearch.opal",
+      "csharpFile": "TokenEconomics/BinarySearch.cs",
+      "level": 3,
+      "features": ["module", "function", "array", "loop", "algorithm"],
+      "notes": "Binary search implementation"
+    },
+    {
+      "id": "013",
+      "name": "TemperatureConverter",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/TemperatureConverter.opal",
+      "csharpFile": "TokenEconomics/TemperatureConverter.cs",
+      "level": 1,
+      "features": ["module", "function", "arithmetic", "multiple_methods"],
+      "notes": "Temperature unit conversions"
+    },
+    {
+      "id": "014",
+      "name": "LeapYear",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/LeapYear.opal",
+      "csharpFile": "TokenEconomics/LeapYear.cs",
+      "level": 2,
+      "features": ["module", "function", "conditional", "boolean"],
+      "notes": "Leap year checker"
+    },
+    {
+      "id": "015",
+      "name": "GCD",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/GCD.opal",
+      "csharpFile": "TokenEconomics/GCD.cs",
+      "level": 2,
+      "features": ["module", "function", "recursion", "algorithm"],
+      "notes": "Greatest common divisor (Euclidean algorithm)"
+    },
+    {
+      "id": "016",
+      "name": "ReverseString",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/ReverseString.opal",
+      "csharpFile": "TokenEconomics/ReverseString.cs",
+      "level": 2,
+      "features": ["module", "function", "string_operations", "loop"],
+      "notes": "String reversal"
+    },
+    {
+      "id": "017",
+      "name": "CountVowels",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/CountVowels.opal",
+      "csharpFile": "TokenEconomics/CountVowels.cs",
+      "level": 2,
+      "features": ["module", "function", "string_operations", "loop", "conditional"],
+      "notes": "Count vowels in string"
+    },
+    {
+      "id": "018",
+      "name": "Palindrome",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/Palindrome.opal",
+      "csharpFile": "TokenEconomics/Palindrome.cs",
+      "level": 2,
+      "features": ["module", "function", "string_operations", "loop", "boolean"],
+      "notes": "Palindrome checker"
+    },
+    {
+      "id": "019",
+      "name": "Power",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/Power.opal",
+      "csharpFile": "TokenEconomics/Power.cs",
+      "level": 2,
+      "features": ["module", "function", "recursion", "contracts"],
+      "notes": "Power function with contracts"
+    },
+    {
+      "id": "020",
+      "name": "Clamp",
+      "category": "TokenEconomics",
+      "opalFile": "TokenEconomics/Clamp.opal",
+      "csharpFile": "TokenEconomics/Clamp.cs",
+      "level": 2,
+      "features": ["module", "function", "conditional", "contracts", "ensures"],
+      "notes": "Value clamping with postconditions"
+    }
+  ],
+  "comprehensionQuestions": {
+    "003": [
+      {
+        "id": "q1",
+        "question": "What does this function return for input 15?",
+        "answer": "FizzBuzz",
+        "category": "behavior",
+        "difficulty": 1
+      },
+      {
+        "id": "q2",
+        "question": "What are the loop bounds?",
+        "answer": "1 to n inclusive",
+        "category": "structure",
+        "difficulty": 1
+      },
+      {
+        "id": "q3",
+        "question": "In what order are divisibility checks performed?",
+        "answer": "First checks if divisible by both 3 and 5, then by 3 alone, then by 5 alone",
+        "category": "semantics",
+        "difficulty": 2
+      }
+    ],
+    "006": [
+      {
+        "id": "q1",
+        "question": "What precondition must be satisfied to call Divide?",
+        "answer": "The divisor (b) must not be zero",
+        "category": "contracts",
+        "difficulty": 1
+      },
+      {
+        "id": "q2",
+        "question": "What does the ensures clause guarantee?",
+        "answer": "The result equals the quotient of a divided by b",
+        "category": "contracts",
+        "difficulty": 2
+      }
+    ]
+  },
+  "editTasks": [
+    {
+      "id": "edit001",
+      "description": "Add validation to reject negative numbers in Calculator.Add",
+      "opalBefore": "TokenEconomics/Calculator.opal",
+      "opalAfter": "EditPrecision/Calculator_validated.opal",
+      "csharpBefore": "TokenEconomics/Calculator.cs",
+      "csharpAfter": "EditPrecision/Calculator_validated.cs",
+      "category": "add_validation",
+      "level": 2
+    }
+  ],
+  "bugScenarios": [
+    {
+      "id": "bug001",
+      "description": "Off-by-one error in loop bounds",
+      "category": "bounds_check",
+      "opalBuggy": "ErrorDetection/ArraySum_buggy.opal",
+      "opalFixed": "TokenEconomics/ArraySum.opal",
+      "csharpBuggy": "ErrorDetection/ArraySum_buggy.cs",
+      "csharpFixed": "TokenEconomics/ArraySum.cs",
+      "expectedError": "Array index out of bounds",
+      "level": 2
+    },
+    {
+      "id": "bug002",
+      "description": "Division by zero possible",
+      "category": "contract_violation",
+      "opalBuggy": "ErrorDetection/Divide_buggy.opal",
+      "opalFixed": "TokenEconomics/ContractedDivide.opal",
+      "csharpBuggy": "ErrorDetection/Divide_buggy.cs",
+      "csharpFixed": "TokenEconomics/ContractedDivide.cs",
+      "expectedError": "Division by zero",
+      "level": 2
+    }
+  ]
+}
