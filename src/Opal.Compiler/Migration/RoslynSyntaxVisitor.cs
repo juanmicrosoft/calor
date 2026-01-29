@@ -686,16 +686,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             BlockSyntax blockStmt => ConvertBlockAsStatement(blockStmt),
             SwitchStatementSyntax switchStmt => ConvertSwitchStatement(switchStmt),
             BreakStatementSyntax => null, // Break is handled within loops
-            ContinueStatementSyntax => null, // Continue is handled within loops
+            ContinueStatementSyntax continueStmt => HandleUnsupportedStatement(continueStmt, "continue statements"),
             _ => HandleUnsupportedStatement(statement)
         };
     }
 
     private StatementNode? HandleUnsupportedStatement(StatementSyntax statement)
     {
+        return HandleUnsupportedStatement(statement, $"statement type: {statement.Kind()}");
+    }
+
+    private StatementNode? HandleUnsupportedStatement(StatementSyntax statement, string description)
+    {
         var lineSpan = statement.GetLocation().GetLineSpan();
         _context.AddWarning(
-            $"Unsupported statement type: {statement.Kind()}",
+            $"Unsupported {description}",
             line: lineSpan.StartLinePosition.Line + 1,
             column: lineSpan.StartLinePosition.Character + 1);
         _context.IncrementSkipped();
@@ -1126,11 +1131,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(a => ConvertExpression(a.Expression))
             .ToList();
 
-        // Return as a field access with call semantics
-        return new FieldAccessNode(
-            GetTextSpan(invocation),
-            new ReferenceNode(TextSpan.Empty, target),
-            $"({string.Join(", ", args.Select(a => a.ToString()))})");
+        return new CallExpressionNode(GetTextSpan(invocation), target, args);
     }
 
     private ExpressionNode ConvertMemberAccessExpression(MemberAccessExpressionSyntax memberAccess)
