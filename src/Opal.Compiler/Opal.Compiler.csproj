@@ -4,7 +4,21 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>opalc</AssemblyName>
     <RootNamespace>Opal.Compiler</RootNamespace>
+
+    <!-- dotnet global tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>opalc</ToolCommandName>
+    <PackageId>opalc</PackageId>
+    <Version>0.1.0</Version>
+    <Description>OPAL compiler - Optimized Programming for Agent Logic</Description>
+    <PackageProjectUrl>https://github.com/juanmicrosoft/opal-2</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
