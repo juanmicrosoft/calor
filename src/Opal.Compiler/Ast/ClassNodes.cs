@@ -193,6 +193,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public IReadOnlyList<MethodNode> Methods { get; }
 
     /// <summary>
+    /// Events defined in this class.
+    /// </summary>
+    public IReadOnlyList<EventDefinitionNode> Events { get; }
+
+    /// <summary>
     /// C#-style attributes (e.g., [@Route("api/[controller]")], [@ApiController]).
     /// </summary>
     public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
@@ -210,7 +215,8 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodNode> methods,
         AttributeCollection attributes)
         : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
-               typeParameters, fields, Array.Empty<PropertyNode>(), Array.Empty<ConstructorNode>(), methods, attributes, Array.Empty<OpalAttributeNode>())
+               typeParameters, fields, Array.Empty<PropertyNode>(), Array.Empty<ConstructorNode>(), methods,
+               Array.Empty<EventDefinitionNode>(), attributes, Array.Empty<OpalAttributeNode>())
     {
     }
 
@@ -229,7 +235,8 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodNode> methods,
         AttributeCollection attributes)
         : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
-               typeParameters, fields, properties, constructors, methods, attributes, Array.Empty<OpalAttributeNode>())
+               typeParameters, fields, properties, constructors, methods,
+               Array.Empty<EventDefinitionNode>(), attributes, Array.Empty<OpalAttributeNode>())
     {
     }
 
@@ -249,7 +256,8 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         AttributeCollection attributes,
         IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
-               typeParameters, fields, properties, constructors, methods, attributes, csharpAttributes)
+               typeParameters, fields, properties, constructors, methods,
+               Array.Empty<EventDefinitionNode>(), attributes, csharpAttributes)
     {
     }
 
@@ -270,6 +278,30 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodNode> methods,
         AttributeCollection attributes,
         IReadOnlyList<OpalAttributeNode> csharpAttributes)
+        : this(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass, implementedInterfaces,
+               typeParameters, fields, properties, constructors, methods,
+               Array.Empty<EventDefinitionNode>(), attributes, csharpAttributes)
+    {
+    }
+
+    public ClassDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        bool isAbstract,
+        bool isSealed,
+        bool isPartial,
+        bool isStatic,
+        string? baseClass,
+        IReadOnlyList<string> implementedInterfaces,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ClassFieldNode> fields,
+        IReadOnlyList<PropertyNode> properties,
+        IReadOnlyList<ConstructorNode> constructors,
+        IReadOnlyList<MethodNode> methods,
+        IReadOnlyList<EventDefinitionNode> events,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
@@ -283,6 +315,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         Properties = properties ?? throw new ArgumentNullException(nameof(properties));
         Constructors = constructors ?? throw new ArgumentNullException(nameof(constructors));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
+        Events = events ?? Array.Empty<EventDefinitionNode>();
         CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 

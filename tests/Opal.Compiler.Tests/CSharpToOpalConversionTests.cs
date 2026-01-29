@@ -790,6 +790,279 @@ public class CSharpToOpalConversionTests
 
     #endregion
 
+    #region Event Definition Tests
+
+    [Fact]
+    public void Convert_EventFieldDeclaration_PreservesInClass()
+    {
+        var csharpSource = """
+            public class EventSource
+            {
+                public event EventHandler? OnCompleted;
+                public event EventHandler<string>? OnMessage;
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Single(result.Ast.Classes);
+
+        var cls = result.Ast.Classes[0];
+        Assert.Equal(2, cls.Events.Count);
+        Assert.Contains(cls.Events, e => e.Name == "OnCompleted");
+        Assert.Contains(cls.Events, e => e.Name == "OnMessage");
+        Assert.Contains("event-definition", result.Context.UsedFeatures);
+    }
+
+    [Fact]
+    public void Convert_EventFieldDeclaration_EmittedCorrectly()
+    {
+        var csharpSource = """
+            public class MyService
+            {
+                public event EventHandler<string>? SpeakRequest;
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        Assert.Contains("§EVENT", result.OpalSource);
+        Assert.Contains("SpeakRequest", result.OpalSource);
+    }
+
+    #endregion
+
+    #region Compound Assignment Tests
+
+    [Fact]
+    public void Convert_CompoundAddAssignment_CreatesCompoundNode()
+    {
+        var csharpSource = """
+            public class Counter
+            {
+                private int _count;
+
+                public void Add(int value)
+                {
+                    _count += value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        Assert.Contains("compound-assignment", result.Context.UsedFeatures);
+        // Should emit as §SET _count = (+ _count value)
+        Assert.Contains("§SET", result.OpalSource);
+        Assert.Contains("(+", result.OpalSource);
+    }
+
+    [Fact]
+    public void Convert_CompoundSubtractAssignment_CreatesCompoundNode()
+    {
+        var csharpSource = """
+            public class Counter
+            {
+                private int _count;
+
+                public void Subtract(int value)
+                {
+                    _count -= value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        Assert.Contains("compound-assignment", result.Context.UsedFeatures);
+        Assert.Contains("(-", result.OpalSource);
+    }
+
+    [Fact]
+    public void Convert_CompoundMultiplyAssignment_CreatesCompoundNode()
+    {
+        var csharpSource = """
+            public class Calculator
+            {
+                private double _value;
+
+                public void Multiply(double factor)
+                {
+                    _value *= factor;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        Assert.Contains("compound-assignment", result.Context.UsedFeatures);
+        Assert.Contains("(*", result.OpalSource);
+    }
+
+    [Fact]
+    public void Convert_CompoundDivideAssignment_CreatesCompoundNode()
+    {
+        var csharpSource = """
+            public class Calculator
+            {
+                private double _value;
+
+                public void Divide(double divisor)
+                {
+                    _value /= divisor;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        Assert.Contains("compound-assignment", result.Context.UsedFeatures);
+        Assert.Contains("(/", result.OpalSource);
+    }
+
+    #endregion
+
+    #region Using Statement Tests
+
+    [Fact]
+    public void Convert_UsingStatement_CreatesUsingNode()
+    {
+        var csharpSource = """
+            public class FileReader
+            {
+                public string Read(string path)
+                {
+                    using (var reader = new StreamReader(path))
+                    {
+                        return reader.ReadToEnd();
+                    }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        Assert.Contains("§USING", result.OpalSource);
+        Assert.Contains("§/USING", result.OpalSource);
+        Assert.Contains("using-statement", result.Context.UsedFeatures);
+    }
+
+    [Fact]
+    public void Convert_UsingStatementWithType_PreservesType()
+    {
+        var csharpSource = """
+            public class FileWriter
+            {
+                public void Write(string path, string content)
+                {
+                    using (StreamWriter writer = new StreamWriter(path))
+                    {
+                        writer.Write(content);
+                    }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        Assert.Contains("§USING", result.OpalSource);
+        Assert.Contains("writer", result.OpalSource);
+    }
+
+    [Fact]
+    public void Convert_UsingStatementNested_HandlesBoth()
+    {
+        var csharpSource = """
+            public class FileCopier
+            {
+                public void Copy(string source, string dest)
+                {
+                    using (var reader = new StreamReader(source))
+                    {
+                        using (var writer = new StreamWriter(dest))
+                        {
+                            writer.Write(reader.ReadToEnd());
+                        }
+                    }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        // Should have two using statements
+        var usingCount = result.OpalSource.Split("§USING[").Length - 1;
+        Assert.Equal(2, usingCount);
+    }
+
+    #endregion
+
+    #region Null-Conditional Operator Tests
+
+    [Fact]
+    public void Convert_NullConditionalMemberAccess_NoDoubleDot()
+    {
+        var csharpSource = """
+            public class StatusChecker
+            {
+                public string? GetStatus(object? obj)
+                {
+                    return obj?.ToString();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        // Should NOT contain double dot (?.. or ..)
+        Assert.DoesNotContain("?..", result.OpalSource);
+        Assert.DoesNotContain("..", result.OpalSource.Replace("...", "")); // Ignore spread operator
+        Assert.Contains("null-conditional", result.Context.UsedFeatures);
+    }
+
+    [Fact]
+    public void Convert_NullConditionalPropertyAccess_CorrectSyntax()
+    {
+        var csharpSource = """
+            public class Checker
+            {
+                public int? GetLength(string? text)
+                {
+                    return text?.Length;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.OpalSource);
+        Assert.Contains("?.Length", result.OpalSource);
+        Assert.DoesNotContain("?..Length", result.OpalSource);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static string GetErrorMessage(ConversionResult result)

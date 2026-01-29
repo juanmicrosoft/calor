@@ -177,6 +177,14 @@ public sealed class OpalEmitter : IAstVisitor<string>
         if (node.Fields.Count > 0)
             AppendLine();
 
+        // Emit events
+        foreach (var evt in node.Events)
+        {
+            Visit(evt);
+        }
+        if (node.Events.Count > 0)
+            AppendLine();
+
         // Emit properties
         foreach (var prop in node.Properties)
         {
@@ -538,6 +546,47 @@ public sealed class OpalEmitter : IAstVisitor<string>
         var target = node.Target.Accept(this);
         var value = node.Value.Accept(this);
         AppendLine($"§SET {target} = {value}");
+        return "";
+    }
+
+    public string Visit(CompoundAssignmentStatementNode node)
+    {
+        var target = node.Target.Accept(this);
+        var value = node.Value.Accept(this);
+        var opSymbol = node.Operator switch
+        {
+            CompoundAssignmentOperator.Add => "+",
+            CompoundAssignmentOperator.Subtract => "-",
+            CompoundAssignmentOperator.Multiply => "*",
+            CompoundAssignmentOperator.Divide => "/",
+            CompoundAssignmentOperator.Modulo => "%",
+            CompoundAssignmentOperator.BitwiseAnd => "&",
+            CompoundAssignmentOperator.BitwiseOr => "|",
+            CompoundAssignmentOperator.BitwiseXor => "^",
+            CompoundAssignmentOperator.LeftShift => "<<",
+            CompoundAssignmentOperator.RightShift => ">>",
+            _ => "+"
+        };
+        AppendLine($"§SET {target} = ({opSymbol} {target} {value})");
+        return "";
+    }
+
+    public string Visit(UsingStatementNode node)
+    {
+        var typePart = node.VariableType != null ? TypeMapper.CSharpToOpal(node.VariableType) + ":" : "";
+        var namePart = node.VariableName ?? "_";
+        var resource = node.Resource.Accept(this);
+
+        AppendLine($"§USING[{typePart}{namePart}] = {resource}");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            stmt.Accept(this);
+        }
+
+        Dedent();
+        AppendLine("§/USING");
         return "";
     }
 

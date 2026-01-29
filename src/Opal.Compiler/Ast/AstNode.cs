@@ -94,6 +94,8 @@ public interface IAstVisitor
     void Visit(ConstructorNode node);
     void Visit(ConstructorInitializerNode node);
     void Visit(AssignmentStatementNode node);
+    void Visit(CompoundAssignmentStatementNode node);
+    void Visit(UsingStatementNode node);
     // Phase 10: Try/Catch/Finally
     void Visit(TryStatementNode node);
     void Visit(CatchClauseNode node);
@@ -228,6 +230,8 @@ public interface IAstVisitor<T>
     T Visit(ConstructorNode node);
     T Visit(ConstructorInitializerNode node);
     T Visit(AssignmentStatementNode node);
+    T Visit(CompoundAssignmentStatementNode node);
+    T Visit(UsingStatementNode node);
     // Phase 10: Try/Catch/Finally
     T Visit(TryStatementNode node);
     T Visit(CatchClauseNode node);

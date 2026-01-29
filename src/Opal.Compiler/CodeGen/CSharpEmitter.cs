@@ -1343,6 +1343,48 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return $"{target} = {value};";
     }
 
+    public string Visit(CompoundAssignmentStatementNode node)
+    {
+        var target = node.Target.Accept(this);
+        var value = node.Value.Accept(this);
+        var op = node.Operator switch
+        {
+            CompoundAssignmentOperator.Add => "+=",
+            CompoundAssignmentOperator.Subtract => "-=",
+            CompoundAssignmentOperator.Multiply => "*=",
+            CompoundAssignmentOperator.Divide => "/=",
+            CompoundAssignmentOperator.Modulo => "%=",
+            CompoundAssignmentOperator.BitwiseAnd => "&=",
+            CompoundAssignmentOperator.BitwiseOr => "|=",
+            CompoundAssignmentOperator.BitwiseXor => "^=",
+            CompoundAssignmentOperator.LeftShift => "<<=",
+            CompoundAssignmentOperator.RightShift => ">>=",
+            _ => "+="
+        };
+        return $"{target} {op} {value};";
+    }
+
+    public string Visit(UsingStatementNode node)
+    {
+        var typePart = node.VariableType != null ? MapTypeName(node.VariableType) : "var";
+        var namePart = node.VariableName != null ? SanitizeIdentifier(node.VariableName) : "_";
+        var resource = node.Resource.Accept(this);
+
+        AppendLine($"using ({typePart} {namePart} = {resource})");
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            AppendLine(stmt.Accept(this));
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
     // Phase 10: Try/Catch/Finally
 
     public string Visit(TryStatementNode node)
