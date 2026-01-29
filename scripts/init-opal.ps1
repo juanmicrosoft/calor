@@ -1,11 +1,11 @@
 # OPAL Initialization Script for Windows
-# Usage: irm https://raw.githubusercontent.com/juanmicrosoft/opal-2/main/scripts/init-opal.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
 $Version = "0.1.0"
-$RepoUrl = "https://github.com/juanmicrosoft/opal-2"
-$RawUrl = "https://raw.githubusercontent.com/juanmicrosoft/opal-2/main"
+$RepoUrl = "https://github.com/juanmicrosoft/opal"
+$RawUrl = "https://raw.githubusercontent.com/juanmicrosoft/opal/main"
 
 function Write-Banner {
     Write-Host @"
@@ -114,7 +114,7 @@ function Install-FromSource {
             Write-Warn "Could not clone from GitHub. This is expected if the repo is not public yet."
             Write-Warn "You can manually install opalc by running:"
             Write-Host "  git clone $RepoUrl"
-            Write-Host "  cd opal-2"
+            Write-Host "  cd opal"
             Write-Host "  dotnet pack src\Opal.Compiler\Opal.Compiler.csproj -c Release -o .\nupkg"
             Write-Host "  dotnet tool install -g --add-source .\nupkg opalc"
             return

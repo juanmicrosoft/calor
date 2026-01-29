@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # OPAL Initialization Script
-# Usage: curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal-2/main/scripts/init-opal.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.sh | bash
 
 VERSION="0.1.0"
-REPO_URL="https://github.com/juanmicrosoft/opal-2"
-RAW_URL="https://raw.githubusercontent.com/juanmicrosoft/opal-2/main"
+REPO_URL="https://github.com/juanmicrosoft/opal"
+RAW_URL="https://raw.githubusercontent.com/juanmicrosoft/opal/main"
 
 # Colors (with fallback for non-interactive terminals)
 if [[ -t 1 ]]; then
@@ -135,7 +135,7 @@ install_from_source() {
         warn "Could not clone from GitHub. This is expected if the repo is not public yet."
         warn "You can manually install opalc by running:"
         echo "  git clone $REPO_URL"
-        echo "  cd opal-2"
+        echo "  cd opal"
         echo "  dotnet pack src/Opal.Compiler/Opal.Compiler.csproj -c Release -o ./nupkg"
         echo "  dotnet tool install -g --add-source ./nupkg opalc"
         rm -rf "$temp_dir"
