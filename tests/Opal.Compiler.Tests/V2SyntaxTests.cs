@@ -201,6 +201,24 @@ public class V2SyntaxTests
         Assert.Equal(TokenKind.EndMatch, tokens[0].Kind);
     }
 
+    [Fact]
+    public void Lexer_RecognizesDoKeyword()
+    {
+        var tokens = Tokenize("§DO");
+
+        Assert.Equal(2, tokens.Count);
+        Assert.Equal(TokenKind.Do, tokens[0].Kind);
+    }
+
+    [Fact]
+    public void Lexer_RecognizesEndDoKeyword()
+    {
+        var tokens = Tokenize("§/DO");
+
+        Assert.Equal(2, tokens.Count);
+        Assert.Equal(TokenKind.EndDo, tokens[0].Kind);
+    }
+
     #endregion
 
     #region Mixed V1 and V2

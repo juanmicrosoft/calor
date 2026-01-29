@@ -365,4 +365,81 @@ public class ControlFlowTests
         Assert.False(result.HasErrors);
         Assert.Contains("return ((n % 2) == 0);", result.GeneratedCode);
     }
+
+    [Fact]
+    public void Parse_DoWhileLoop_ReturnsDoWhileStatementNode()
+    {
+        var source = """
+            §MODULE[id=m001][name=Test]
+            §FUNC[id=f001][name=Main][visibility=public]
+              §OUT[type=VOID]
+              §BODY
+                §DO[id=do1]
+                  §CALL[target=Console.WriteLine][fallible=false]
+                    §ARG x
+                  §END_CALL
+                §END_DO[id=do1] (< x INT:10)
+              §END_BODY
+            §END_FUNC[id=f001]
+            §END_MODULE[id=m001]
+            """;
+
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        var doStmt = module.Functions[0].Body[0] as DoWhileStatementNode;
+        Assert.NotNull(doStmt);
+        Assert.Equal("do1", doStmt.Id);
+        Assert.Single(doStmt.Body);
+        Assert.NotNull(doStmt.Condition);
+    }
+
+    [Fact]
+    public void Parse_DoWhileLoop_MismatchedId_ReportsError()
+    {
+        var source = """
+            §MODULE[id=m001][name=Test]
+            §FUNC[id=f001][name=Main][visibility=public]
+              §BODY
+                §DO[id=do1]
+                §END_DO[id=do999] (< x INT:10)
+              §END_BODY
+            §END_FUNC[id=f001]
+            §END_MODULE[id=m001]
+            """;
+
+        var module = Parse(source, out var diagnostics);
+
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.MismatchedId &&
+            d.Message.Contains("do1") &&
+            d.Message.Contains("do999"));
+    }
+
+    [Fact]
+    public void Compile_DoWhileLoop_GeneratesValidCSharp()
+    {
+        var source = """
+            §MODULE[id=m001][name=Test]
+            §FUNC[id=f001][name=Main][visibility=public]
+              §OUT[type=VOID]
+              §BODY
+                §BIND[name=i][type=INT] INT:0
+                §DO[id=do1]
+                  §CALL[target=Console.WriteLine][fallible=false]
+                    §ARG i
+                  §END_CALL
+                §END_DO[id=do1] (< i INT:10)
+              §END_BODY
+            §END_FUNC[id=f001]
+            §END_MODULE[id=m001]
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors);
+        Assert.Contains("do", result.GeneratedCode);
+        Assert.Contains("while ((i < 10));", result.GeneratedCode);
+    }
 }

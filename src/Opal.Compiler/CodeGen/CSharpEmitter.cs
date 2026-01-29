@@ -443,6 +443,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(DoWhileStatementNode node)
+    {
+        var condition = node.Condition.Accept(this);
+
+        AppendLine("do");
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            var stmtCode = stmt.Accept(this);
+            AppendLine(stmtCode);
+        }
+
+        Dedent();
+        AppendLine($"}} while ({condition});");
+
+        return "";
+    }
+
     public string Visit(IfStatementNode node)
     {
         var condition = node.Condition.Accept(this);
@@ -544,6 +564,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var expr = node.Expression.Accept(this);
         var method = node.IsWriteLine ? "Console.WriteLine" : "Console.Write";
         return $"{method}({expr});";
+    }
+
+    public string Visit(ContinueStatementNode node)
+    {
+        return "continue;";
+    }
+
+    public string Visit(BreakStatementNode node)
+    {
+        return "break;";
     }
 
     // Phase 3: Type System
@@ -1331,6 +1361,48 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var target = node.Target.Accept(this);
         var value = node.Value.Accept(this);
         return $"{target} = {value};";
+    }
+
+    public string Visit(CompoundAssignmentStatementNode node)
+    {
+        var target = node.Target.Accept(this);
+        var value = node.Value.Accept(this);
+        var op = node.Operator switch
+        {
+            CompoundAssignmentOperator.Add => "+=",
+            CompoundAssignmentOperator.Subtract => "-=",
+            CompoundAssignmentOperator.Multiply => "*=",
+            CompoundAssignmentOperator.Divide => "/=",
+            CompoundAssignmentOperator.Modulo => "%=",
+            CompoundAssignmentOperator.BitwiseAnd => "&=",
+            CompoundAssignmentOperator.BitwiseOr => "|=",
+            CompoundAssignmentOperator.BitwiseXor => "^=",
+            CompoundAssignmentOperator.LeftShift => "<<=",
+            CompoundAssignmentOperator.RightShift => ">>=",
+            _ => "+="
+        };
+        return $"{target} {op} {value};";
+    }
+
+    public string Visit(UsingStatementNode node)
+    {
+        var typePart = node.VariableType != null ? MapTypeName(node.VariableType) : "var";
+        var namePart = node.VariableName != null ? SanitizeIdentifier(node.VariableName) : "_";
+        var resource = node.Resource.Accept(this);
+
+        AppendLine($"using ({typePart} {namePart} = {resource})");
+        AppendLine("{");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            AppendLine(stmt.Accept(this));
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
     }
 
     // Phase 10: Try/Catch/Finally

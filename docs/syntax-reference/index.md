@@ -23,7 +23,8 @@ Complete reference for OPAL syntax. Always use V2+ syntax (Lisp-style expression
 | Effects | `§E[codes]` | `§E[cw,fr,net]` |
 | Requires | `§Q expr` | `§Q (>= x 0)` |
 | Ensures | `§S expr` | `§S (>= result 0)` |
-| Loop | `§L[id:var:from:to:step]` | `§L[l1:i:1:100:1]` |
+| For Loop | `§L[id:var:from:to:step]` | `§L[l1:i:1:100:1]` |
+| While Loop | `§WH[id] condition` | `§WH[w1] (> i 0)` |
 | If/ElseIf/Else | `§IF...§EI...§EL` | `§IF (> x 0) → §R x §EL → §R 0` |
 | Call | `§C[target]...§/C` | `§C[Math.Max] §A 1 §A 2 §/C` |
 | C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |

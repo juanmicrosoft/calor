@@ -198,7 +198,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var name = node.Identifier.Text;
         var isAbstract = node.Modifiers.Any(SyntaxKind.AbstractKeyword);
         var isSealed = node.Modifiers.Any(SyntaxKind.SealedKeyword);
+        var isPartial = node.Modifiers.Any(SyntaxKind.PartialKeyword);
+        var isStatic = node.Modifiers.Any(SyntaxKind.StaticKeyword);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
+
+        if (isPartial) _context.RecordFeatureUsage("partial-class");
+        if (isStatic) _context.RecordFeatureUsage("static-class");
 
         string? baseClass = null;
         var interfaces = new List<string>();
@@ -233,6 +238,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
+        var events = new List<EventDefinitionNode>();
 
         foreach (var member in node.Members)
         {
@@ -250,6 +256,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case MethodDeclarationSyntax methodSyntax:
                     methods.Add(ConvertMethod(methodSyntax));
                     break;
+                case EventFieldDeclarationSyntax eventSyntax:
+                    events.AddRange(ConvertEventFields(eventSyntax));
+                    break;
             }
         }
 
@@ -259,6 +268,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             name,
             isAbstract,
             isSealed,
+            isPartial,
+            isStatic,
             baseClass,
             interfaces,
             typeParameters,
@@ -266,6 +277,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             properties,
             constructors,
             methods,
+            events,
             new AttributeCollection(),
             csharpAttrs);
     }
@@ -517,6 +529,33 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return fields;
     }
 
+    private IReadOnlyList<EventDefinitionNode> ConvertEventFields(EventFieldDeclarationSyntax node)
+    {
+        _context.RecordFeatureUsage("event-definition");
+
+        var events = new List<EventDefinitionNode>();
+        var visibility = GetVisibility(node.Modifiers);
+        var delegateType = TypeMapper.CSharpToOpal(node.Declaration.Type.ToString());
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
+
+        foreach (var variable in node.Declaration.Variables)
+        {
+            var id = _context.GenerateId("evt");
+
+            events.Add(new EventDefinitionNode(
+                GetTextSpan(variable),
+                id,
+                variable.Identifier.Text,
+                visibility,
+                delegateType,
+                new AttributeCollection()));
+
+            _context.IncrementConverted();
+        }
+
+        return events;
+    }
+
     private PropertyNode ConvertProperty(PropertyDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("property");
@@ -681,12 +720,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ForStatementSyntax forStmt => ConvertForStatement(forStmt),
             ForEachStatementSyntax forEachStmt => ConvertForEachStatement(forEachStmt),
             WhileStatementSyntax whileStmt => ConvertWhileStatement(whileStmt),
+            DoStatementSyntax doStmt => ConvertDoWhileStatement(doStmt),
             TryStatementSyntax tryStmt => ConvertTryStatement(tryStmt),
             ThrowStatementSyntax throwStmt => ConvertThrowStatement(throwStmt),
             BlockSyntax blockStmt => ConvertBlockAsStatement(blockStmt),
             SwitchStatementSyntax switchStmt => ConvertSwitchStatement(switchStmt),
-            BreakStatementSyntax => null, // Break is handled within loops
-            ContinueStatementSyntax continueStmt => HandleUnsupportedStatement(continueStmt, "continue statements"),
+            BreakStatementSyntax breakStmt => ConvertBreakStatement(breakStmt),
+            ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
+            UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
             _ => HandleUnsupportedStatement(statement)
         };
     }
@@ -714,6 +755,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new ReturnStatementNode(GetTextSpan(node), expr);
     }
 
+    private ContinueStatementNode ConvertContinueStatement(ContinueStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("continue");
+        _context.IncrementConverted();
+        return new ContinueStatementNode(GetTextSpan(node));
+    }
+
+    private BreakStatementNode ConvertBreakStatement(BreakStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("break");
+        _context.IncrementConverted();
+        return new BreakStatementNode(GetTextSpan(node));
+    }
+
     private StatementNode ConvertExpressionStatement(ExpressionStatementSyntax node)
     {
         var expr = node.Expression;
@@ -722,10 +777,161 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Handle assignment expressions
         if (expr is AssignmentExpressionSyntax assignment)
         {
+            // Check if this looks like an event subscription vs compound assignment
+            // Event handlers typically use method references or lambdas, while compound
+            // assignments use numeric/value expressions
+            var rightIsHandler = assignment.Right is IdentifierNameSyntax ||
+                                 assignment.Right is MemberAccessExpressionSyntax ||
+                                 assignment.Right is LambdaExpressionSyntax;
+
+            // Handle event subscription (+=) - only for event-like patterns
+            if (assignment.IsKind(SyntaxKind.AddAssignmentExpression))
+            {
+                if (rightIsHandler && LooksLikeEventTarget(assignment.Left))
+                {
+                    _context.RecordFeatureUsage("event-subscribe");
+                    return new EventSubscribeNode(
+                        GetTextSpan(node),
+                        ConvertExpression(assignment.Left),
+                        ConvertExpression(assignment.Right));
+                }
+                else
+                {
+                    // Compound assignment (+=)
+                    _context.RecordFeatureUsage("compound-assignment");
+                    return new CompoundAssignmentStatementNode(
+                        GetTextSpan(node),
+                        ConvertExpression(assignment.Left),
+                        CompoundAssignmentOperator.Add,
+                        ConvertExpression(assignment.Right));
+                }
+            }
+
+            // Handle event unsubscription (-=) - only for event-like patterns
+            if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression))
+            {
+                if (rightIsHandler && LooksLikeEventTarget(assignment.Left))
+                {
+                    _context.RecordFeatureUsage("event-unsubscribe");
+                    return new EventUnsubscribeNode(
+                        GetTextSpan(node),
+                        ConvertExpression(assignment.Left),
+                        ConvertExpression(assignment.Right));
+                }
+                else
+                {
+                    // Compound assignment (-=)
+                    _context.RecordFeatureUsage("compound-assignment");
+                    return new CompoundAssignmentStatementNode(
+                        GetTextSpan(node),
+                        ConvertExpression(assignment.Left),
+                        CompoundAssignmentOperator.Subtract,
+                        ConvertExpression(assignment.Right));
+                }
+            }
+
+            // Handle other compound assignments (*=, /=, %=, etc.)
+            if (assignment.IsKind(SyntaxKind.MultiplyAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("compound-assignment");
+                return new CompoundAssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    CompoundAssignmentOperator.Multiply,
+                    ConvertExpression(assignment.Right));
+            }
+
+            if (assignment.IsKind(SyntaxKind.DivideAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("compound-assignment");
+                return new CompoundAssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    CompoundAssignmentOperator.Divide,
+                    ConvertExpression(assignment.Right));
+            }
+
+            if (assignment.IsKind(SyntaxKind.ModuloAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("compound-assignment");
+                return new CompoundAssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    CompoundAssignmentOperator.Modulo,
+                    ConvertExpression(assignment.Right));
+            }
+
+            if (assignment.IsKind(SyntaxKind.AndAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("compound-assignment");
+                return new CompoundAssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    CompoundAssignmentOperator.BitwiseAnd,
+                    ConvertExpression(assignment.Right));
+            }
+
+            if (assignment.IsKind(SyntaxKind.OrAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("compound-assignment");
+                return new CompoundAssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    CompoundAssignmentOperator.BitwiseOr,
+                    ConvertExpression(assignment.Right));
+            }
+
+            if (assignment.IsKind(SyntaxKind.ExclusiveOrAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("compound-assignment");
+                return new CompoundAssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    CompoundAssignmentOperator.BitwiseXor,
+                    ConvertExpression(assignment.Right));
+            }
+
+            if (assignment.IsKind(SyntaxKind.LeftShiftAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("compound-assignment");
+                return new CompoundAssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    CompoundAssignmentOperator.LeftShift,
+                    ConvertExpression(assignment.Right));
+            }
+
+            if (assignment.IsKind(SyntaxKind.RightShiftAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("compound-assignment");
+                return new CompoundAssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    CompoundAssignmentOperator.RightShift,
+                    ConvertExpression(assignment.Right));
+            }
+
             return new AssignmentStatementNode(
                 GetTextSpan(node),
                 ConvertExpression(assignment.Left),
                 ConvertExpression(assignment.Right));
+        }
+
+        // Handle await expressions - create a bind statement with _ as the variable to discard result
+        if (expr is AwaitExpressionSyntax awaitExpr)
+        {
+            _context.RecordFeatureUsage("async-await");
+            var awaited = ConvertExpression(awaitExpr.Expression);
+            var awaitNode = new AwaitExpressionNode(GetTextSpan(node), awaited, null);
+
+            // Create a bind statement with discard pattern for await statements without assignment
+            return new BindStatementNode(
+                GetTextSpan(node),
+                "_",
+                null, // no type
+                false, // not mutable
+                awaitNode,
+                new AttributeCollection());
         }
 
         // Handle invocation expressions (method calls)
@@ -951,6 +1157,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection());
     }
 
+    private DoWhileStatementNode ConvertDoWhileStatement(DoStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("do-while");
+        _context.IncrementConverted();
+
+        var id = _context.GenerateId("do");
+        var condition = ConvertExpression(node.Condition);
+        var body = node.Statement is BlockSyntax block
+            ? ConvertBlock(block)
+            : new List<StatementNode> { ConvertStatement(node.Statement)! };
+
+        return new DoWhileStatementNode(
+            GetTextSpan(node),
+            id,
+            body,
+            condition,
+            new AttributeCollection());
+    }
+
     private TryStatementNode ConvertTryStatement(TryStatementSyntax node)
     {
         _context.RecordFeatureUsage("try-catch");
@@ -986,6 +1211,57 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             filter,
             body,
             new AttributeCollection());
+    }
+
+    private UsingStatementNode ConvertUsingStatement(UsingStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("using-statement");
+        _context.IncrementConverted();
+
+        string? variableName = null;
+        string? variableType = null;
+        ExpressionNode resource;
+
+        // Handle using with declaration: using (var reader = new StreamReader(...))
+        if (node.Declaration != null)
+        {
+            variableType = node.Declaration.Type.IsVar
+                ? null
+                : TypeMapper.CSharpToOpal(node.Declaration.Type.ToString());
+
+            if (node.Declaration.Variables.Count > 0)
+            {
+                var variable = node.Declaration.Variables[0];
+                variableName = variable.Identifier.Text;
+                resource = variable.Initializer != null
+                    ? ConvertExpression(variable.Initializer.Value)
+                    : new ReferenceNode(GetTextSpan(variable), variableName);
+            }
+            else
+            {
+                resource = new ReferenceNode(GetTextSpan(node), "unknown");
+            }
+        }
+        // Handle using with expression: using (expression)
+        else if (node.Expression != null)
+        {
+            resource = ConvertExpression(node.Expression);
+        }
+        else
+        {
+            resource = new ReferenceNode(GetTextSpan(node), "unknown");
+        }
+
+        var body = node.Statement is BlockSyntax block
+            ? ConvertBlock(block)
+            : new List<StatementNode> { ConvertStatement(node.Statement)! };
+
+        return new UsingStatementNode(
+            GetTextSpan(node),
+            variableName,
+            variableType,
+            resource,
+            body);
     }
 
     private ThrowStatementNode ConvertThrowStatement(ThrowStatementSyntax node)
@@ -1159,7 +1435,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(a => ConvertExpression(a.Expression))
             .ToList() ?? new List<ExpressionNode>();
 
-        return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args);
+        // Handle object initializer
+        var initializers = new List<ObjectInitializerAssignment>();
+        if (objCreation.Initializer != null)
+        {
+            _context.RecordFeatureUsage("object-initializer");
+            foreach (var expr in objCreation.Initializer.Expressions)
+            {
+                if (expr is AssignmentExpressionSyntax assignment)
+                {
+                    var propName = assignment.Left.ToString();
+                    var value = ConvertExpression(assignment.Right);
+                    initializers.Add(new ObjectInitializerAssignment(propName, value));
+                }
+            }
+        }
+
+        return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers);
     }
 
     private ExpressionNode ConvertConditionalExpression(ConditionalExpressionSyntax conditional)
@@ -1317,7 +1609,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("null-conditional");
 
         var target = ConvertExpression(condAccess.Expression);
+
+        // WhenNotNull is a MemberBindingExpression which starts with '.' (e.g., ".Status")
+        // We need to strip the leading dot since the emitter adds its own "?."
         var memberName = condAccess.WhenNotNull.ToString();
+        if (memberName.StartsWith("."))
+        {
+            memberName = memberName.Substring(1);
+        }
 
         return new NullConditionalNode(GetTextSpan(condAccess), target, memberName);
     }
@@ -1385,6 +1684,39 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             node.Span.Length,
             lineSpan.StartLinePosition.Line + 1,
             lineSpan.StartLinePosition.Character + 1);
+    }
+
+    /// <summary>
+    /// Heuristic to determine if an expression looks like an event target.
+    /// Event targets are typically member accesses ending with an event-like name
+    /// (often capitalized, like Click, Changed, etc.) rather than simple fields.
+    /// </summary>
+    private static bool LooksLikeEventTarget(ExpressionSyntax expr)
+    {
+        // Simple heuristic: if it's a member access and the member name looks like an event
+        // (PascalCase, often ending in common event suffixes), treat it as an event
+        if (expr is MemberAccessExpressionSyntax memberAccess)
+        {
+            var memberName = memberAccess.Name.Identifier.Text;
+            // Common event naming patterns - PascalCase names are often events
+            // This is a heuristic; we don't have type information in this phase
+            return char.IsUpper(memberName.FirstOrDefault()) &&
+                   (memberName.EndsWith("Changed") ||
+                    memberName.EndsWith("Click") ||
+                    memberName.EndsWith("Event") ||
+                    memberName.EndsWith("Handler") ||
+                    memberName.EndsWith("Completed") ||
+                    memberName.EndsWith("Started") ||
+                    memberName.EndsWith("Finished") ||
+                    memberName.EndsWith("Raised") ||
+                    memberName.EndsWith("Occurred") ||
+                    memberName.EndsWith("Triggered") ||
+                    memberName.EndsWith("Request") ||
+                    memberName.EndsWith("Response") ||
+                    memberName.Contains("Event"));
+        }
+
+        return false;
     }
 
     /// <summary>

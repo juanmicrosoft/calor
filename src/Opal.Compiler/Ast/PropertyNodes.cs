@@ -68,7 +68,13 @@ public sealed class PropertyNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
-    public bool IsAutoProperty => Getter == null && Setter == null && Initer == null;
+    /// <summary>
+    /// True if this is an auto-implemented property (all accessors have empty bodies).
+    /// </summary>
+    public bool IsAutoProperty =>
+        (Getter == null || Getter.IsAutoImplemented) &&
+        (Setter == null || Setter.IsAutoImplemented) &&
+        (Initer == null || Initer.IsAutoImplemented);
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
@@ -229,6 +235,80 @@ public sealed class AssignmentStatementNode : StatementNode
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
         Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Compound assignment operator kind (+= -= *= /= etc.)
+/// </summary>
+public enum CompoundAssignmentOperator
+{
+    Add,       // +=
+    Subtract,  // -=
+    Multiply,  // *=
+    Divide,    // /=
+    Modulo,    // %=
+    BitwiseAnd, // &=
+    BitwiseOr,  // |=
+    BitwiseXor, // ^=
+    LeftShift,  // <<=
+    RightShift  // >>=
+}
+
+/// <summary>
+/// Represents a compound assignment statement (+=, -=, *=, /=, etc.)
+/// §SET target = (+ target value) for +=
+/// </summary>
+public sealed class CompoundAssignmentStatementNode : StatementNode
+{
+    public ExpressionNode Target { get; }
+    public CompoundAssignmentOperator Operator { get; }
+    public ExpressionNode Value { get; }
+
+    public CompoundAssignmentStatementNode(
+        TextSpan span,
+        ExpressionNode target,
+        CompoundAssignmentOperator op,
+        ExpressionNode value)
+        : base(span)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Operator = op;
+        Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents a using statement for IDisposable resources.
+/// §USING[type:name] = expr
+///   ...body...
+/// §/USING
+/// </summary>
+public sealed class UsingStatementNode : StatementNode
+{
+    public string? VariableName { get; }
+    public string? VariableType { get; }
+    public ExpressionNode Resource { get; }
+    public IReadOnlyList<StatementNode> Body { get; }
+
+    public UsingStatementNode(
+        TextSpan span,
+        string? variableName,
+        string? variableType,
+        ExpressionNode resource,
+        IReadOnlyList<StatementNode> body)
+        : base(span)
+    {
+        VariableName = variableName;
+        VariableType = variableType;
+        Resource = resource ?? throw new ArgumentNullException(nameof(resource));
+        Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

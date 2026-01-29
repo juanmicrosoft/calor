@@ -43,6 +43,7 @@ public enum TokenKind
     LessLess,           // <<
     GreaterGreater,     // >>
     StarStar,           // **
+    Dot,                // .
 
     // v2 built-in aliases
     Print,              // §P = Console.WriteLine
@@ -74,6 +75,10 @@ public enum TokenKind
     ElseIf,
     While,
     EndWhile,
+    Do,
+    EndDo,
+    Break,
+    Continue,
     Bind,
 
     // Phase 3: Type System
@@ -141,6 +146,7 @@ public enum TokenKind
     BaseCall,
     EndBaseCall,
     Assign,
+    Default,
 
     // Phase 10: Try/Catch/Finally
     Try,

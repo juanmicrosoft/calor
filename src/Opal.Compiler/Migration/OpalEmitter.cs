@@ -147,6 +147,8 @@ public sealed class OpalEmitter : IAstVisitor<string>
         var modifiers = new List<string>();
         if (node.IsAbstract) modifiers.Add("abs");
         if (node.IsSealed) modifiers.Add("sealed");
+        if (node.IsPartial) modifiers.Add("partial");
+        if (node.IsStatic) modifiers.Add("static");
 
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
         var baseStr = node.BaseClass != null ? $":{node.BaseClass}" : "";
@@ -173,6 +175,14 @@ public sealed class OpalEmitter : IAstVisitor<string>
             Visit(field);
         }
         if (node.Fields.Count > 0)
+            AppendLine();
+
+        // Emit events
+        foreach (var evt in node.Events)
+        {
+            Visit(evt);
+        }
+        if (node.Events.Count > 0)
             AppendLine();
 
         // Emit properties
@@ -220,38 +230,35 @@ public sealed class OpalEmitter : IAstVisitor<string>
         var visibility = GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.CSharpToOpal(node.TypeName);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
+        var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
 
-        if (node.IsAutoProperty)
+        // Always emit full property syntax with body and closing tag
+        // Parser expects: §PROP[id:name:type:vis] §GET §SET §/PROP[id]
+        AppendLine($"§PROP[{node.Id}:{node.Name}:{typeName}:{visibility}]{attrs}");
+        Indent();
+
+        if (node.Getter != null)
         {
-            var accessors = "";
-            if (node.Getter != null) accessors += "get";
-            if (node.Setter != null) accessors += accessors.Length > 0 ? ",set" : "set";
-            if (node.Initer != null) accessors += accessors.Length > 0 ? ",init" : "init";
-
-            var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
-            AppendLine($"§PROP[{node.Id}:{node.Name}:{typeName}:{visibility}:{accessors}]{attrs}{defaultVal}");
+            Visit(node.Getter);
         }
-        else
+        if (node.Setter != null)
         {
-            AppendLine($"§PROP[{node.Id}:{node.Name}:{typeName}:{visibility}]{attrs}");
-            Indent();
-
-            if (node.Getter != null)
-            {
-                Visit(node.Getter);
-            }
-            if (node.Setter != null)
-            {
-                Visit(node.Setter);
-            }
-            if (node.Initer != null)
-            {
-                Visit(node.Initer);
-            }
-
-            Dedent();
-            AppendLine($"§/PROP[{node.Id}]");
+            Visit(node.Setter);
         }
+        if (node.Initer != null)
+        {
+            Visit(node.Initer);
+        }
+
+        // Emit default value if present (as direct expression, parser handles it)
+        if (node.DefaultValue != null)
+        {
+            var defaultExpr = node.DefaultValue.Accept(this);
+            AppendLine($"= {defaultExpr}");
+        }
+
+        Dedent();
+        AppendLine($"§/PROP[{node.Id}]");
 
         return "";
     }
@@ -266,13 +273,18 @@ public sealed class OpalEmitter : IAstVisitor<string>
             _ => "GET"
         };
 
+        // Add visibility if different from property visibility
+        var visStr = node.Visibility.HasValue ? $"[{GetVisibilityShorthand(node.Visibility.Value)}]" : "";
+
         if (node.IsAutoImplemented)
         {
-            AppendLine($"§{keyword}[]");
+            // Auto-implemented: just §GET or §GET[pri] for restricted visibility
+            AppendLine($"§{keyword}{visStr}");
         }
         else
         {
-            AppendLine($"§{keyword}");
+            // Full body: §GET ... §/GET
+            AppendLine($"§{keyword}{visStr}");
             Indent();
             foreach (var stmt in node.Body)
             {
@@ -288,33 +300,47 @@ public sealed class OpalEmitter : IAstVisitor<string>
     public string Visit(ConstructorNode node)
     {
         var visibility = GetVisibilityShorthand(node.Visibility);
-        var paramList = string.Join(",", node.Parameters.Select(p =>
-            $"{TypeMapper.CSharpToOpal(p.TypeName)}:{p.Name}"));
-
-        var initStr = "";
-        if (node.Initializer != null)
-        {
-            var initType = node.Initializer.IsBaseCall ? "base" : "this";
-            var initArgs = string.Join(",", node.Initializer.Arguments.Select(a => a.Accept(this)));
-            initStr = $" → {initType}({initArgs})";
-        }
-
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
-        AppendLine($"§CTOR[{visibility}]{attrs} ({paramList}){initStr}");
+
+        // Parser expects: §CTOR[id:visibility] with §I[type:name] for params
+        AppendLine($"§CTOR[{node.Id}:{visibility}]{attrs}");
         Indent();
 
+        // Emit parameters as separate §I[type:name] lines
+        foreach (var param in node.Parameters)
+        {
+            var paramType = TypeMapper.CSharpToOpal(param.TypeName);
+            AppendLine($"§I[{paramType}:{param.Name}]");
+        }
+
+        // Emit preconditions
         foreach (var pre in node.Preconditions)
         {
             Visit(pre);
         }
 
+        // Emit constructor initializer (base/this call)
+        if (node.Initializer != null)
+        {
+            var initKeyword = node.Initializer.IsBaseCall ? "§BASE" : "§THIS";
+            AppendLine(initKeyword);
+            Indent();
+            foreach (var arg in node.Initializer.Arguments)
+            {
+                AppendLine($"§A {arg.Accept(this)}");
+            }
+            Dedent();
+            AppendLine(node.Initializer.IsBaseCall ? "§/BASE" : "§/THIS");
+        }
+
+        // Emit body statements
         foreach (var stmt in node.Body)
         {
             stmt.Accept(this);
         }
 
         Dedent();
-        AppendLine($"§/CTOR");
+        AppendLine($"§/CTOR[{node.Id}]");
 
         return "";
     }
@@ -486,9 +512,10 @@ public sealed class OpalEmitter : IAstVisitor<string>
 
     public string Visit(CallStatementNode node)
     {
-        var args = string.Join(" ", node.Arguments.Select(a => a.Accept(this)));
-        var argsStr = args.Length > 0 ? $" {args}" : "";
-        AppendLine($"§C[{node.Target}]{argsStr}");
+        // Arguments need §A prefix and call needs §/C closing tag
+        var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
+        var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
+        AppendLine($"§C[{node.Target}]{argsStr} §/C");
         return "";
     }
 
@@ -500,11 +527,24 @@ public sealed class OpalEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(ContinueStatementNode node)
+    {
+        AppendLine("§CONTINUE");
+        return "";
+    }
+
+    public string Visit(BreakStatementNode node)
+    {
+        AppendLine("§BREAK");
+        return "";
+    }
+
     public string Visit(BindStatementNode node)
     {
         var typePart = node.TypeName != null ? $"{TypeMapper.CSharpToOpal(node.TypeName)}:" : "";
         var mutPart = node.IsMutable ? "" : ":const";
-        var initPart = node.Initializer != null ? $" = {node.Initializer.Accept(this)}" : "";
+        // Parser expects: §B[type:name] expression (no = sign)
+        var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
 
         AppendLine($"§B[{typePart}{node.Name}{mutPart}]{initPart}");
         return "";
@@ -514,9 +554,69 @@ public sealed class OpalEmitter : IAstVisitor<string>
     {
         var target = node.Target.Accept(this);
         var value = node.Value.Accept(this);
-        AppendLine($"§SET {target} = {value}");
+        // Parser expects: §ASSIGN <target> <value>
+        AppendLine($"§ASSIGN {target} {value}");
         return "";
     }
+
+    public string Visit(CompoundAssignmentStatementNode node)
+    {
+        var target = node.Target.Accept(this);
+        var value = node.Value.Accept(this);
+        var opSymbol = node.Operator switch
+        {
+            CompoundAssignmentOperator.Add => "+",
+            CompoundAssignmentOperator.Subtract => "-",
+            CompoundAssignmentOperator.Multiply => "*",
+            CompoundAssignmentOperator.Divide => "/",
+            CompoundAssignmentOperator.Modulo => "%",
+            CompoundAssignmentOperator.BitwiseAnd => "&",
+            CompoundAssignmentOperator.BitwiseOr => "|",
+            CompoundAssignmentOperator.BitwiseXor => "^",
+            CompoundAssignmentOperator.LeftShift => "<<",
+            CompoundAssignmentOperator.RightShift => ">>",
+            _ => "+"
+        };
+        // Parser expects: §ASSIGN <target> <value>
+        AppendLine($"§ASSIGN {target} ({opSymbol} {target} {value})");
+        return "";
+    }
+
+    public string Visit(UsingStatementNode node)
+    {
+        // The parser doesn't support §USING statements, so emit as try/finally
+        // which is semantically equivalent (how C# compiles using statements)
+        var typePart = node.VariableType != null ? TypeMapper.CSharpToOpal(node.VariableType) + ":" : "";
+        var namePart = node.VariableName ?? "_using_resource";
+        var resource = node.Resource.Accept(this);
+        var tryId = $"using_{_usingCounter++}";
+
+        // Bind the resource variable
+        AppendLine($"§B[{typePart}{namePart}] {resource}");
+
+        // Wrap body in try/finally to ensure disposal
+        AppendLine($"§TRY[{tryId}]");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            stmt.Accept(this);
+        }
+
+        Dedent();
+        AppendLine("§FINALLY");
+        Indent();
+        // Dispose the resource if not null
+        AppendLine($"§IF[{tryId}_dispose] (!= {namePart} null)");
+        Indent();
+        AppendLine($"§C[{namePart}.Dispose] §/C");
+        Dedent();
+        AppendLine($"§/I[{tryId}_dispose]");
+        Dedent();
+        AppendLine($"§/TRY[{tryId}]");
+        return "";
+    }
+    private int _usingCounter = 0;
 
     public string Visit(IfStatementNode node)
     {
@@ -536,7 +636,7 @@ public sealed class OpalEmitter : IAstVisitor<string>
         foreach (var elseIf in node.ElseIfClauses)
         {
             var elseIfCondition = elseIf.Condition.Accept(this);
-            AppendLine($"§ELIF {elseIfCondition}");
+            AppendLine($"§EI {elseIfCondition}");
             Indent();
 
             foreach (var stmt in elseIf.Body)
@@ -550,7 +650,7 @@ public sealed class OpalEmitter : IAstVisitor<string>
         // Else clause
         if (node.ElseBody != null)
         {
-            AppendLine("§ELSE");
+            AppendLine("§EL");
             Indent();
 
             foreach (var stmt in node.ElseBody)
@@ -561,7 +661,7 @@ public sealed class OpalEmitter : IAstVisitor<string>
             Dedent();
         }
 
-        AppendLine($"§/IF[{node.Id}]");
+        AppendLine($"§/I[{node.Id}]");
         return "";
     }
 
@@ -597,16 +697,15 @@ public sealed class OpalEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/WHILE[{node.Id}]");
+        AppendLine($"§/WH[{node.Id}]");
         return "";
     }
 
-    public string Visit(ForeachStatementNode node)
+    public string Visit(DoWhileStatementNode node)
     {
-        var collection = node.Collection.Accept(this);
-        var varType = TypeMapper.CSharpToOpal(node.VariableType);
+        var condition = node.Condition.Accept(this);
 
-        AppendLine($"§EACH[{varType}:{node.VariableName}] {collection}");
+        AppendLine($"§DO[{node.Id}]");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -615,13 +714,31 @@ public sealed class OpalEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine("§/EACH");
+        AppendLine($"§/DO[{node.Id}] {condition}");
+        return "";
+    }
+
+    public string Visit(ForeachStatementNode node)
+    {
+        var collection = node.Collection.Accept(this);
+        var varType = TypeMapper.CSharpToOpal(node.VariableType);
+
+        AppendLine($"§EACH[{node.Id}:{varType}:{node.VariableName}] {collection}");
+        Indent();
+
+        foreach (var stmt in node.Body)
+        {
+            stmt.Accept(this);
+        }
+
+        Dedent();
+        AppendLine($"§/EACH[{node.Id}]");
         return "";
     }
 
     public string Visit(TryStatementNode node)
     {
-        AppendLine("§TRY");
+        AppendLine($"§TRY[{node.Id}]");
         Indent();
 
         foreach (var stmt in node.TryBody)
@@ -649,7 +766,7 @@ public sealed class OpalEmitter : IAstVisitor<string>
             Dedent();
         }
 
-        AppendLine("§/TRY");
+        AppendLine($"§/TRY[{node.Id}]");
         return "";
     }
 
@@ -791,10 +908,19 @@ public sealed class OpalEmitter : IAstVisitor<string>
         var typeArgs = node.TypeArguments.Count > 0
             ? $"<{string.Join(",", node.TypeArguments)}>"
             : "";
-        var args = string.Join(" ", node.Arguments.Select(a => a.Accept(this)));
-        var argsStr = args.Length > 0 ? $" {args}" : "";
+        // Arguments need §A prefix for parser to recognize them
+        var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
+        var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
-        return $"§NEW[{node.TypeName}{typeArgs}]{argsStr}";
+        // Handle object initializers
+        var initStr = "";
+        if (node.Initializers.Count > 0)
+        {
+            var inits = node.Initializers.Select(i => $"{i.PropertyName}: {i.Value.Accept(this)}");
+            initStr = $" {{ {string.Join(", ", inits)} }}";
+        }
+
+        return $"§NEW[{node.TypeName}{typeArgs}]{argsStr}{initStr}";
     }
 
     public string Visit(CallExpressionNode node)
@@ -1081,8 +1207,10 @@ public sealed class OpalEmitter : IAstVisitor<string>
 
     public string Visit(EventDefinitionNode node)
     {
+        // Events are emitted as fields since the parser doesn't support §EVT in class bodies
         var visibility = GetVisibilityShorthand(node.Visibility);
-        AppendLine($"§EVENT[{node.DelegateType}:{node.Name}:{visibility}]");
+        var delegateType = TypeMapper.CSharpToOpal(node.DelegateType);
+        AppendLine($"§FLD[{delegateType}:{node.Name}:{visibility}]");
         return "";
     }
 
@@ -1090,14 +1218,16 @@ public sealed class OpalEmitter : IAstVisitor<string>
     {
         var evt = node.Event.Accept(this);
         var handler = node.Handler.Accept(this);
-        return $"{evt} += {handler}";
+        AppendLine($"§SUB {evt} += {handler}");
+        return "";
     }
 
     public string Visit(EventUnsubscribeNode node)
     {
         var evt = node.Event.Accept(this);
         var handler = node.Handler.Accept(this);
-        return $"{evt} -= {handler}";
+        AppendLine($"§UNSUB {evt} -= {handler}");
+        return "";
     }
 
     // Modern operator nodes

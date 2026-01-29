@@ -529,6 +529,10 @@ public sealed class Parser
         {
             return ParseWhileStatement();
         }
+        else if (Check(TokenKind.Do))
+        {
+            return ParseDoWhileStatement();
+        }
         else if (Check(TokenKind.If))
         {
             return ParseIfStatement();
@@ -568,6 +572,14 @@ public sealed class Parser
         else if (Check(TokenKind.Unsubscribe))
         {
             return ParseEventUnsubscribe();
+        }
+        else if (Check(TokenKind.Break))
+        {
+            return ParseBreakStatement();
+        }
+        else if (Check(TokenKind.Continue))
+        {
+            return ParseContinueStatement();
         }
         // v2: Print aliases
         else if (Check(TokenKind.Print))
@@ -692,6 +704,7 @@ public sealed class Parser
             or TokenKind.New
             or TokenKind.This
             or TokenKind.Base
+            or TokenKind.Call  // Call expressions (§C[...])
             // Phase 11: Lambdas
             or TokenKind.Lambda
             // Phase 12: Async/Await
@@ -715,8 +728,8 @@ public sealed class Parser
             TokenKind.BoolLiteral => ParseBoolLiteral(),
             TokenKind.FloatLiteral => ParseFloatLiteral(),
             TokenKind.Identifier => ParseReference(),
-            // v2 Lisp-style expression: (op args...)
-            TokenKind.OpenParen => ParseLispExpression(),
+            // v2 Lisp-style expression: (op args...) or inline lambda: () → body
+            TokenKind.OpenParen => ParseParenExpressionOrInlineLambda(),
             // Phase 3: Type System
             TokenKind.Some => ParseSomeExpression(),
             TokenKind.None => ParseNoneExpression(),
@@ -734,6 +747,7 @@ public sealed class Parser
             TokenKind.New => ParseNewExpression(),
             TokenKind.This => ParseThisExpression(),
             TokenKind.Base => ParseBaseExpression(),
+            TokenKind.Call => ParseCallExpression(),
             // Phase 11: Lambdas
             TokenKind.Lambda => ParseLambdaExpression(),
             // Phase 12: Async/Await
@@ -748,6 +762,91 @@ public sealed class Parser
             TokenKind.With => ParseWithExpression(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
         };
+    }
+
+    /// <summary>
+    /// Parses either a Lisp-style expression or an inline lambda.
+    /// - Inline lambda: () → body or (param) → body
+    /// - Lisp expression: (op args...)
+    /// </summary>
+    private ExpressionNode ParseParenExpressionOrInlineLambda()
+    {
+        // Look ahead to determine if this is an inline lambda: () → or (params) →
+        // We need to see if after the closing paren there's an arrow
+        var savedPosition = _position;
+        var startToken = Expect(TokenKind.OpenParen);
+
+        // Check for empty parens followed by arrow: () →
+        if (Check(TokenKind.CloseParen))
+        {
+            Advance(); // consume )
+            if (Check(TokenKind.Arrow))
+            {
+                // This is an inline lambda with no parameters
+                Advance(); // consume →
+                var body = ParseExpression();
+                var span = startToken.Span.Union(body.Span);
+                return new LambdaExpressionNode(
+                    span,
+                    "inline",
+                    new List<LambdaParameterNode>(),
+                    null, // effects
+                    false, // not async
+                    body, // expressionBody
+                    null, // statementBody
+                    new AttributeCollection());
+            }
+            // Not a lambda, restore and parse as Lisp (though empty Lisp is likely an error)
+            _position = savedPosition;
+            return ParseLispExpression();
+        }
+
+        // Check for single parameter: (param) → or (type:param) →
+        if (Check(TokenKind.Identifier))
+        {
+            var firstToken = Advance();
+            var paramName = firstToken.Text;
+            string? paramType = null;
+
+            // Check for typed parameter: type:name
+            if (Check(TokenKind.Colon))
+            {
+                Advance(); // consume :
+                paramType = paramName;
+                paramName = Expect(TokenKind.Identifier).Text;
+            }
+
+            if (Check(TokenKind.CloseParen))
+            {
+                Advance(); // consume )
+                if (Check(TokenKind.Arrow))
+                {
+                    // This is an inline lambda with one parameter
+                    Advance(); // consume →
+                    var body = ParseExpression();
+                    var span = startToken.Span.Union(body.Span);
+                    var param = new LambdaParameterNode(firstToken.Span, paramName, paramType);
+                    return new LambdaExpressionNode(
+                        span,
+                        "inline",
+                        new List<LambdaParameterNode> { param },
+                        null, // effects
+                        false, // not async
+                        body, // expressionBody
+                        null, // statementBody
+                        new AttributeCollection());
+                }
+            }
+            // Not a lambda, restore and parse as Lisp
+            _position = savedPosition;
+        }
+        else
+        {
+            // Not an identifier, restore position (we already consumed the open paren)
+            _position = savedPosition;
+        }
+
+        return ParseLispExpression();
     }
 
     /// <summary>
@@ -940,10 +1039,11 @@ public sealed class Parser
     /// <summary>
     /// Parses an argument inside a Lisp expression.
     /// Can be a literal, identifier (bare variable), or nested Lisp expression.
+    /// Supports trailing member access (e.g., §C[...] §/C.Length)
     /// </summary>
     private ExpressionNode ParseLispArgument()
     {
-        return Current.Kind switch
+        ExpressionNode expr = Current.Kind switch
         {
             TokenKind.IntLiteral => ParseIntLiteral(),
             TokenKind.StrLiteral => ParseStringLiteral(),
@@ -951,8 +1051,30 @@ public sealed class Parser
             TokenKind.FloatLiteral => ParseFloatLiteral(),
             TokenKind.Identifier => ParseBareReference(), // Bare variable reference
             TokenKind.OpenParen => ParseLispExpression(), // Nested expression
+            TokenKind.Call => ParseCallExpression(), // Call expression inside Lisp
+            TokenKind.New => ParseNewExpression(), // New expression inside Lisp
+            TokenKind.Await => ParseAwaitExpression(), // Await expression inside Lisp
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind} in Lisp expression argument")
         };
+
+        // Handle trailing member access (e.g., §C[...] §/C.Length or run?.Status)
+        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
+        {
+            var isNullConditional = Check(TokenKind.NullConditional);
+            Advance(); // consume '.' or '?.'
+            var memberToken = Expect(TokenKind.Identifier);
+            var span = expr.Span.Union(memberToken.Span);
+            if (isNullConditional)
+            {
+                expr = new NullConditionalNode(span, expr, memberToken.Text);
+            }
+            else
+            {
+                expr = new FieldAccessNode(span, expr, memberToken.Text);
+            }
+        }
+
+        return expr;
     }
 
     /// <summary>
@@ -993,10 +1115,29 @@ public sealed class Parser
         return new FloatLiteralNode(token.Span, value);
     }
 
-    private ReferenceNode ParseReference()
+    private ExpressionNode ParseReference()
     {
         var token = Expect(TokenKind.Identifier);
-        return new ReferenceNode(token.Span, token.Text);
+        ExpressionNode expr = new ReferenceNode(token.Span, token.Text);
+
+        // Handle trailing member access (e.g., _startOptions?.Agenda or obj.Property)
+        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
+        {
+            var isNullConditional = Check(TokenKind.NullConditional);
+            Advance(); // consume '.' or '?.'
+            var memberToken = Expect(TokenKind.Identifier);
+            var span = expr.Span.Union(memberToken.Span);
+            if (isNullConditional)
+            {
+                expr = new NullConditionalNode(span, expr, memberToken.Text);
+            }
+            else
+            {
+                expr = new FieldAccessNode(span, expr, memberToken.Text);
+            }
+        }
+
+        return expr;
     }
 
     // Phase 3: Type System Expression Parsing
@@ -1242,7 +1383,12 @@ public sealed class Parser
         var startToken = Expect(TokenKind.While);
         var attrs = ParseAttributes();
 
-        var id = GetRequiredAttribute(attrs, "id", "WHILE", startToken.Span);
+        // v2 positional: [id] or v1 named: [id=...]
+        var id = attrs["_pos0"] ?? attrs["id"] ?? "";
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "WHILE", "id");
+        }
 
         // Parse condition expression
         var condition = ParseExpression();
@@ -1252,7 +1398,8 @@ public sealed class Parser
 
         var endToken = Expect(TokenKind.EndWhile);
         var endAttrs = ParseAttributes();
-        var endId = GetRequiredAttribute(endAttrs, "id", "END_WHILE", endToken.Span);
+        // v2 positional: [id] or v1 named: [id=...]
+        var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
         if (endId != id)
         {
@@ -1261,6 +1408,38 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new WhileStatementNode(span, id, condition, body, attrs);
+    }
+
+    private DoWhileStatementNode ParseDoWhileStatement()
+    {
+        var startToken = Expect(TokenKind.Do);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [id] or v1 named: [id=...]
+        var id = attrs["_pos0"] ?? attrs["id"] ?? "";
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DO", "id");
+        }
+
+        // Parse body statements
+        var body = ParseStatementBlock(TokenKind.EndDo);
+
+        var endToken = Expect(TokenKind.EndDo);
+        var endAttrs = ParseAttributes();
+        // v2 positional: [id] or v1 named: [id=...]
+        var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "DO", id, "END_DO", endId);
+        }
+
+        // Parse condition expression (comes after §/DO[id])
+        var condition = ParseExpression();
+
+        var span = startToken.Span.Union(Current.Span);
+        return new DoWhileStatementNode(span, id, body, condition, attrs);
     }
 
     private IfStatementNode ParseIfStatement()
@@ -1575,6 +1754,55 @@ public sealed class Parser
         if (Check(TokenKind.Identifier))
         {
             sb.Append(Advance().Text);
+
+            // Handle generic types like ILogger<MeetingModeratorService> or List<string>
+            if (Check(TokenKind.Less))
+            {
+                sb.Append('<');
+                Advance(); // consume <
+
+                // Parse generic type arguments (may be nested)
+                var depth = 1;
+                while (!IsAtEnd && depth > 0)
+                {
+                    if (Check(TokenKind.Less))
+                    {
+                        sb.Append('<');
+                        depth++;
+                        Advance();
+                    }
+                    else if (Check(TokenKind.Greater))
+                    {
+                        sb.Append('>');
+                        depth--;
+                        Advance();
+                    }
+                    else if (Check(TokenKind.Identifier))
+                    {
+                        sb.Append(Advance().Text);
+                    }
+                    else if (Check(TokenKind.Comma))
+                    {
+                        sb.Append(',');
+                        Advance();
+                    }
+                    else if (Check(TokenKind.Question))
+                    {
+                        sb.Append('?');
+                        Advance();
+                    }
+                    else if (Current.Text == ".")
+                    {
+                        sb.Append('.');
+                        Advance();
+                    }
+                    else
+                    {
+                        // Unknown token in generic, stop parsing
+                        break;
+                    }
+                }
+            }
 
             // Handle compound identifiers like Console.WriteLine
             while (Current.Text == ".")
@@ -2300,9 +2528,14 @@ public sealed class Parser
 
         var visibility = ParseVisibility(visStr);
 
-        // Check for optional default value
+        // Check for optional default value (can be prefixed with = or just a direct expression)
         ExpressionNode? defaultValue = null;
-        if (IsExpressionStart())
+        if (Check(TokenKind.Equals))
+        {
+            Advance(); // consume =
+            defaultValue = ParseExpression();
+        }
+        else if (IsExpressionStart())
         {
             defaultValue = ParseExpression();
         }
@@ -2478,6 +2711,43 @@ public sealed class Parser
         return new BaseExpressionNode(token.Span);
     }
 
+    /// <summary>
+    /// Parses a call expression.
+    /// §C[target] §A arg1 §A arg2 §/C
+    /// </summary>
+    private CallExpressionNode ParseCallExpression()
+    {
+        var startToken = Expect(TokenKind.Call);
+        var attrs = ParseAttributes();
+
+        // v2 positional: [target]
+        var target = attrs["_pos0"] ?? "";
+
+        var arguments = new List<ExpressionNode>();
+
+        // Parse arguments until we hit EndCall
+        while (!IsAtEnd && !Check(TokenKind.EndCall))
+        {
+            if (Check(TokenKind.Arg))
+            {
+                arguments.Add(ParseArgument());
+            }
+            else if (IsExpressionStart())
+            {
+                // Single expression argument without §A prefix
+                arguments.Add(ParseExpression());
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndCall);
+        var span = startToken.Span.Union(endToken.Span);
+        return new CallExpressionNode(span, target, arguments);
+    }
+
     // Phase 9: Properties and Constructors
 
     /// <summary>
@@ -2525,9 +2795,15 @@ public sealed class Parser
             {
                 initer = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Init);
             }
+            else if (Check(TokenKind.Equals))
+            {
+                // Default value prefixed with =
+                Advance(); // consume =
+                defaultValue = ParseExpression();
+            }
             else if (IsExpressionStart())
             {
-                // Default value
+                // Default value without = prefix
                 defaultValue = ParseExpression();
             }
             else
@@ -2578,8 +2854,9 @@ public sealed class Parser
         var body = new List<StatementNode>();
 
         // Parse optional preconditions and body (for non-auto properties)
+        // Also stop at Equals for property default values
         while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
-               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty))
+               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.Equals))
         {
             if (Check(TokenKind.Requires))
             {
@@ -2838,6 +3115,26 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.Rethrow);
         return new RethrowStatementNode(token.Span);
+    }
+
+    /// <summary>
+    /// Parses a break statement.
+    /// §BREAK
+    /// </summary>
+    private BreakStatementNode ParseBreakStatement()
+    {
+        var token = Expect(TokenKind.Break);
+        return new BreakStatementNode(token.Span);
+    }
+
+    /// <summary>
+    /// Parses a continue statement.
+    /// §CONTINUE
+    /// </summary>
+    private ContinueStatementNode ParseContinueStatement()
+    {
+        var token = Expect(TokenKind.Continue);
+        return new ContinueStatementNode(token.Span);
     }
 
     // Phase 11: Lambdas, Delegates, Events

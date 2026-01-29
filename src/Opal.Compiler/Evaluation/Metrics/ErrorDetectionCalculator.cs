@@ -61,11 +61,9 @@ public class ErrorDetectionCalculator : IMetricCalculator
         var assertCount = CountOccurrences(source, "§ASSERT");
         score += Math.Min(0.1, assertCount * 0.05);
 
-        // Null checks in contracts
-        if (source.Contains("!= null") || source.Contains("!= §NULL"))
-        {
-            score += 0.05;
-        }
+        // Null checks - OPAL uses prefix notation: (!= var null) or (== var null)
+        var nullChecks = CountOccurrences(source, " null)") + CountOccurrences(source, " null]");
+        score += Math.Min(0.15, nullChecks * 0.03);
 
         return Math.Min(1.0, score);
     }

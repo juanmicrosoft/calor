@@ -70,6 +70,35 @@ public sealed class WhileStatementNode : StatementNode
 }
 
 /// <summary>
+/// Represents a DO-WHILE loop (body executes at least once).
+/// §DO[id=xxx]...§/DO[id=xxx] condition
+/// </summary>
+public sealed class DoWhileStatementNode : StatementNode
+{
+    public string Id { get; }
+    public IReadOnlyList<StatementNode> Body { get; }
+    public ExpressionNode Condition { get; }
+    public AttributeCollection Attributes { get; }
+
+    public DoWhileStatementNode(
+        TextSpan span,
+        string id,
+        IReadOnlyList<StatementNode> body,
+        ExpressionNode condition,
+        AttributeCollection attributes)
+        : base(span)
+    {
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        Body = body ?? throw new ArgumentNullException(nameof(body));
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents an IF statement with optional ELSEIF and ELSE branches.
 /// §IF[id=xxx]
 /// </summary>
@@ -221,6 +250,30 @@ public enum BinaryOperator
 /// <summary>
 /// Helper methods for BinaryOperator.
 /// </summary>
+/// <summary>
+/// Represents a continue statement to skip to next iteration of a loop.
+/// §CONTINUE
+/// </summary>
+public sealed class ContinueStatementNode : StatementNode
+{
+    public ContinueStatementNode(TextSpan span) : base(span) { }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents a break statement to exit a loop.
+/// §BREAK
+/// </summary>
+public sealed class BreakStatementNode : StatementNode
+{
+    public BreakStatementNode(TextSpan span) : base(span) { }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
 public static class BinaryOperatorExtensions
 {
     public static BinaryOperator? FromString(string? value)

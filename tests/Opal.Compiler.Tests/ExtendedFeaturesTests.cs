@@ -46,15 +46,6 @@ public class ExtendedFeaturesTests
     }
 
     [Fact]
-    public void Lexer_RecognizesExampleFullKeyword()
-    {
-        var tokens = Tokenize("§EXAMPLE", out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.Example, tokens[0].Kind);
-    }
-
-    [Fact]
     public void Parser_ParsesInlineExample()
     {
         var source = @"

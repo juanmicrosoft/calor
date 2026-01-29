@@ -148,6 +148,16 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public bool IsSealed { get; }
 
     /// <summary>
+    /// True if this is a partial class.
+    /// </summary>
+    public bool IsPartial { get; }
+
+    /// <summary>
+    /// True if this is a static class.
+    /// </summary>
+    public bool IsStatic { get; }
+
+    /// <summary>
     /// The base class (if any).
     /// </summary>
     public string? BaseClass { get; }
@@ -183,6 +193,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public IReadOnlyList<MethodNode> Methods { get; }
 
     /// <summary>
+    /// Events defined in this class.
+    /// </summary>
+    public IReadOnlyList<EventDefinitionNode> Events { get; }
+
+    /// <summary>
     /// C#-style attributes (e.g., [@Route("api/[controller]")], [@ApiController]).
     /// </summary>
     public IReadOnlyList<OpalAttributeNode> CSharpAttributes { get; }
@@ -199,8 +214,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<ClassFieldNode> fields,
         IReadOnlyList<MethodNode> methods,
         AttributeCollection attributes)
-        : this(span, id, name, isAbstract, isSealed, baseClass, implementedInterfaces,
-               typeParameters, fields, Array.Empty<PropertyNode>(), Array.Empty<ConstructorNode>(), methods, attributes, Array.Empty<OpalAttributeNode>())
+        : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
+               typeParameters, fields, Array.Empty<PropertyNode>(), Array.Empty<ConstructorNode>(), methods,
+               Array.Empty<EventDefinitionNode>(), attributes, Array.Empty<OpalAttributeNode>())
     {
     }
 
@@ -218,8 +234,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<ConstructorNode> constructors,
         IReadOnlyList<MethodNode> methods,
         AttributeCollection attributes)
-        : this(span, id, name, isAbstract, isSealed, baseClass, implementedInterfaces,
-               typeParameters, fields, properties, constructors, methods, attributes, Array.Empty<OpalAttributeNode>())
+        : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
+               typeParameters, fields, properties, constructors, methods,
+               Array.Empty<EventDefinitionNode>(), attributes, Array.Empty<OpalAttributeNode>())
     {
     }
 
@@ -238,10 +255,59 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodNode> methods,
         AttributeCollection attributes,
         IReadOnlyList<OpalAttributeNode> csharpAttributes)
+        : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
+               typeParameters, fields, properties, constructors, methods,
+               Array.Empty<EventDefinitionNode>(), attributes, csharpAttributes)
+    {
+    }
+
+    public ClassDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        bool isAbstract,
+        bool isSealed,
+        bool isPartial,
+        bool isStatic,
+        string? baseClass,
+        IReadOnlyList<string> implementedInterfaces,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ClassFieldNode> fields,
+        IReadOnlyList<PropertyNode> properties,
+        IReadOnlyList<ConstructorNode> constructors,
+        IReadOnlyList<MethodNode> methods,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
+        : this(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass, implementedInterfaces,
+               typeParameters, fields, properties, constructors, methods,
+               Array.Empty<EventDefinitionNode>(), attributes, csharpAttributes)
+    {
+    }
+
+    public ClassDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        bool isAbstract,
+        bool isSealed,
+        bool isPartial,
+        bool isStatic,
+        string? baseClass,
+        IReadOnlyList<string> implementedInterfaces,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ClassFieldNode> fields,
+        IReadOnlyList<PropertyNode> properties,
+        IReadOnlyList<ConstructorNode> constructors,
+        IReadOnlyList<MethodNode> methods,
+        IReadOnlyList<EventDefinitionNode> events,
+        AttributeCollection attributes,
+        IReadOnlyList<OpalAttributeNode> csharpAttributes)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
         IsSealed = isSealed;
+        IsPartial = isPartial;
+        IsStatic = isStatic;
         BaseClass = baseClass;
         ImplementedInterfaces = implementedInterfaces ?? throw new ArgumentNullException(nameof(implementedInterfaces));
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
@@ -249,6 +315,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         Properties = properties ?? throw new ArgumentNullException(nameof(properties));
         Constructors = constructors ?? throw new ArgumentNullException(nameof(constructors));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
+        Events = events ?? Array.Empty<EventDefinitionNode>();
         CSharpAttributes = csharpAttributes ?? Array.Empty<OpalAttributeNode>();
     }
 
@@ -398,6 +465,7 @@ public sealed class MethodNode : AstNode
 /// <summary>
 /// Represents a 'new' expression.
 /// §NEW[Circle] §A "MyCircle" §A 5.0 §/NEW
+/// Or with object initializer: §NEW[Person] { Name: "John", Age: 30 }
 /// </summary>
 public sealed class NewExpressionNode : ExpressionNode
 {
@@ -405,20 +473,51 @@ public sealed class NewExpressionNode : ExpressionNode
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
 
+    /// <summary>
+    /// Object initializer property assignments (e.g., new Person { Name = "John", Age = 30 }).
+    /// </summary>
+    public IReadOnlyList<ObjectInitializerAssignment> Initializers { get; }
+
     public NewExpressionNode(
         TextSpan span,
         string typeName,
         IReadOnlyList<string> typeArguments,
         IReadOnlyList<ExpressionNode> arguments)
+        : this(span, typeName, typeArguments, arguments, Array.Empty<ObjectInitializerAssignment>())
+    {
+    }
+
+    public NewExpressionNode(
+        TextSpan span,
+        string typeName,
+        IReadOnlyList<string> typeArguments,
+        IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<ObjectInitializerAssignment> initializers)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         TypeArguments = typeArguments ?? throw new ArgumentNullException(nameof(typeArguments));
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        Initializers = initializers ?? Array.Empty<ObjectInitializerAssignment>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents a property assignment in an object initializer.
+/// </summary>
+public sealed class ObjectInitializerAssignment
+{
+    public string PropertyName { get; }
+    public ExpressionNode Value { get; }
+
+    public ObjectInitializerAssignment(string propertyName, ExpressionNode value)
+    {
+        PropertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
+        Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
 }
 
 /// <summary>

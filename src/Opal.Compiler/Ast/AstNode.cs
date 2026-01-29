@@ -36,10 +36,13 @@ public interface IAstVisitor
     // Phase 2: Control Flow
     void Visit(ForStatementNode node);
     void Visit(WhileStatementNode node);
+    void Visit(DoWhileStatementNode node);
     void Visit(IfStatementNode node);
     void Visit(BindStatementNode node);
     void Visit(BinaryOperationNode node);
     void Visit(UnaryOperationNode node);
+    void Visit(ContinueStatementNode node);
+    void Visit(BreakStatementNode node);
     // v2 built-in operations
     void Visit(PrintStatementNode node);
     // Phase 3: Type System
@@ -92,6 +95,8 @@ public interface IAstVisitor
     void Visit(ConstructorNode node);
     void Visit(ConstructorInitializerNode node);
     void Visit(AssignmentStatementNode node);
+    void Visit(CompoundAssignmentStatementNode node);
+    void Visit(UsingStatementNode node);
     // Phase 10: Try/Catch/Finally
     void Visit(TryStatementNode node);
     void Visit(CatchClauseNode node);
@@ -168,10 +173,13 @@ public interface IAstVisitor<T>
     // Phase 2: Control Flow
     T Visit(ForStatementNode node);
     T Visit(WhileStatementNode node);
+    T Visit(DoWhileStatementNode node);
     T Visit(IfStatementNode node);
     T Visit(BindStatementNode node);
     T Visit(BinaryOperationNode node);
     T Visit(UnaryOperationNode node);
+    T Visit(ContinueStatementNode node);
+    T Visit(BreakStatementNode node);
     // v2 built-in operations
     T Visit(PrintStatementNode node);
     // Phase 3: Type System
@@ -224,6 +232,8 @@ public interface IAstVisitor<T>
     T Visit(ConstructorNode node);
     T Visit(ConstructorInitializerNode node);
     T Visit(AssignmentStatementNode node);
+    T Visit(CompoundAssignmentStatementNode node);
+    T Visit(UsingStatementNode node);
     // Phase 10: Try/Catch/Finally
     T Visit(TryStatementNode node);
     T Visit(CatchClauseNode node);
