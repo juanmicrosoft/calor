@@ -33,42 +33,41 @@ your_code.opal → OPAL Compiler → your_code.g.cs → .NET Build → executabl
 ## Prerequisites
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
-- Git (for cloning the repository)
 - A terminal or command prompt
 
 ---
 
 ## Quick Start
 
+Get up and running with OPAL in one command:
+
+**macOS/Linux:**
 ```bash
-# Clone and build
-git clone https://github.com/juanmicrosoft/opal.git
-cd opal && dotnet build
-
-# Compile OPAL to C#
-dotnet run --project src/Opal.Compiler -- \
-  --input samples/HelloWorld/hello.opal \
-  --output samples/HelloWorld/hello.g.cs
-
-# Run the generated program
-dotnet run --project samples/HelloWorld
+curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.sh | bash
 ```
 
-Output:
-```
-Hello from OPAL!
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.ps1 | iex
 ```
 
 ---
 
-## Sample Files
+## What You Get
 
-The repository includes sample programs:
+The init script sets up everything you need:
 
-| Sample | Description |
-|:-------|:------------|
-| `samples/HelloWorld/` | Basic "Hello World" example |
-| `tests/E2E/scenarios/` | End-to-end test programs |
+| Component | Description |
+|:----------|:------------|
+| `opalc` global tool | Compile OPAL to C# from anywhere: `opalc --input file.opal --output file.g.cs` |
+| Claude Code skills | Use `/opal` to write OPAL code and `/opal-convert` to convert C# to OPAL |
+| Sample project | A ready-to-run OPAL project to explore |
+
+---
+
+## Manual Installation
+
+For alternative installation methods (global tool only, manual Claude skills setup, or building from source), see the [Installation](/opal/getting-started/installation/) page.
 
 ---
 
