@@ -1,19 +1,17 @@
-using System.Text.RegularExpressions;
 using Opal.Compiler.Evaluation.Core;
 
 namespace Opal.Compiler.Evaluation.Metrics;
 
 /// <summary>
 /// Category 7: Task Completion Calculator
-/// Measures end-to-end success rate considering structural validity, semantic completeness,
-/// and information density. Uses fair structural checks that don't penalize OPAL for
-/// parser strictness on valid converted code.
+/// Measures end-to-end success rate considering context efficiency.
+/// OPAL's compactness should enable better task completion within context limits.
 /// </summary>
 public class TaskCompletionCalculator : IMetricCalculator
 {
     public string Category => "TaskCompletion";
 
-    public string Description => "Measures structural validity, semantic completeness, and information density";
+    public string Description => "Measures end-to-end completeness and context efficiency";
 
     public Task<MetricResult> CalculateAsync(EvaluationContext context)
     {
@@ -22,12 +20,10 @@ public class TaskCompletionCalculator : IMetricCalculator
 
         var details = new Dictionary<string, object>
         {
-            ["opalStructuralValidity"] = CalculateStructuralValidity(context.OpalSource, isOpal: true, context.OpalCompilation.Success),
-            ["csharpStructuralValidity"] = CalculateStructuralValidity(context.CSharpSource, isOpal: false, context.CSharpCompilation.Success),
-            ["opalSemanticCompleteness"] = CalculateSemanticCompleteness(context.OpalSource, isOpal: true),
-            ["csharpSemanticCompleteness"] = CalculateSemanticCompleteness(context.CSharpSource, isOpal: false),
-            ["opalInformationDensity"] = CalculateInformationDensity(context.OpalSource, isOpal: true),
-            ["csharpInformationDensity"] = CalculateInformationDensity(context.CSharpSource, isOpal: false),
+            ["opalCompleteness"] = CalculateCompleteness(context.OpalSource, context.OpalCompilation.Success),
+            ["csharpCompleteness"] = CalculateCompleteness(context.CSharpSource, context.CSharpCompilation.Success),
+            ["opalContextEfficiency"] = CalculateContextEfficiency(context.OpalSource),
+            ["csharpContextEfficiency"] = CalculateContextEfficiency(context.CSharpSource),
             ["opalCompilationSuccess"] = context.OpalCompilation.Success,
             ["csharpCompilationSuccess"] = context.CSharpCompilation.Success
         };
@@ -43,20 +39,26 @@ public class TaskCompletionCalculator : IMetricCalculator
     private static double CalculateOpalTaskCompletion(EvaluationContext context)
     {
         var score = 0.0;
-        var source = context.OpalSource;
 
-        // Structural validity (40%) - balanced tags, not full parse
-        // This is fair for converted OPAL that may have valid structure but strict parser failures
-        var validity = CalculateStructuralValidity(source, isOpal: true, context.OpalCompilation.Success);
-        score += validity * 0.4;
+        // Compilation success is primary indicator
+        if (context.OpalCompilation.Success)
+        {
+            score += 0.4;
+        }
+        else
+        {
+            // Partial credit for partial success
+            var errorCount = context.OpalCompilation.Errors.Count;
+            score += Math.Max(0, 0.2 - (errorCount * 0.02));
+        }
 
-        // Semantic completeness (30%) - has required constructs
-        var completeness = CalculateSemanticCompleteness(source, isOpal: true);
+        // Completeness score
+        var completeness = CalculateCompleteness(context.OpalSource, context.OpalCompilation.Success);
         score += completeness * 0.3;
 
-        // Information density (30%) - semantic content per token
-        var density = CalculateInformationDensity(source, isOpal: true);
-        score += density * 0.3;
+        // Context efficiency (compact code can fit more in context)
+        var efficiency = CalculateContextEfficiency(context.OpalSource);
+        score += efficiency * 0.3;
 
         return Math.Min(1.0, score);
     }
@@ -64,175 +66,93 @@ public class TaskCompletionCalculator : IMetricCalculator
     private static double CalculateCSharpTaskCompletion(EvaluationContext context)
     {
         var score = 0.0;
-        var source = context.CSharpSource;
 
-        // Structural validity (40%) - uses Roslyn parse success
-        var validity = CalculateStructuralValidity(source, isOpal: false, context.CSharpCompilation.Success);
-        score += validity * 0.4;
+        // Compilation success is primary indicator
+        if (context.CSharpCompilation.Success)
+        {
+            score += 0.4;
+        }
+        else
+        {
+            // Partial credit for partial success
+            var errorCount = context.CSharpCompilation.Errors.Count;
+            score += Math.Max(0, 0.2 - (errorCount * 0.02));
+        }
 
-        // Semantic completeness (30%) - has required constructs
-        var completeness = CalculateSemanticCompleteness(source, isOpal: false);
+        // Completeness score
+        var completeness = CalculateCompleteness(context.CSharpSource, context.CSharpCompilation.Success);
         score += completeness * 0.3;
 
-        // Information density (30%) - semantic content per token
-        var density = CalculateInformationDensity(source, isOpal: false);
-        score += density * 0.3;
+        // Context efficiency
+        var efficiency = CalculateContextEfficiency(context.CSharpSource);
+        score += efficiency * 0.3;
 
         return Math.Min(1.0, score);
     }
 
-    /// <summary>
-    /// Calculate structural validity without requiring full parser success.
-    /// For OPAL: Check that tags are balanced (§M/§/M, §F/§/F, etc.)
-    /// For C#: Use Roslyn parse success
-    /// </summary>
-    private static double CalculateStructuralValidity(string source, bool isOpal, bool compilationSuccess)
-    {
-        if (string.IsNullOrWhiteSpace(source))
-            return 0;
-
-        if (isOpal)
-        {
-            // Check balanced OPAL tags - this is fair for converted code
-            // that may be structurally sound but fail strict parsing
-            var opens = CountPattern(source, @"§[A-Z]+\[");
-            var closes = CountPattern(source, @"§/[A-Z]+");
-
-            // Also check for balanced brackets and parens
-            var openBrackets = source.Count(c => c == '[');
-            var closeBrackets = source.Count(c => c == ']');
-            var bracketsBalanced = Math.Abs(openBrackets - closeBrackets) <= 2;
-
-            var openParens = source.Count(c => c == '(');
-            var closeParens = source.Count(c => c == ')');
-            var parensBalanced = Math.Abs(openParens - closeParens) <= 2;
-
-            // Give full credit if tags are balanced and brackets/parens are close
-            if (opens > 0 && Math.Abs(opens - closes) <= 1 && bracketsBalanced && parensBalanced)
-                return 1.0;
-
-            // Partial credit for mostly balanced structure
-            if (opens > 0 && Math.Abs(opens - closes) <= 3)
-                return 0.7;
-
-            // Some credit if there's meaningful content
-            if (opens > 0)
-                return 0.5;
-
-            return 0.3;
-        }
-        else
-        {
-            // C# uses Roslyn success - straightforward
-            return compilationSuccess ? 1.0 : 0.3;
-        }
-    }
-
-    /// <summary>
-    /// Calculate semantic completeness by checking for required language constructs.
-    /// </summary>
-    private static double CalculateSemanticCompleteness(string source, bool isOpal)
+    private static double CalculateCompleteness(string source, bool compilationSuccess)
     {
         if (string.IsNullOrWhiteSpace(source))
             return 0;
 
         var score = 0.0;
 
-        if (isOpal)
-        {
-            // Check for module/namespace declaration
-            if (source.Contains("§M[") || source.Contains("§MODULE"))
-                score += 0.2;
+        // Has content
+        if (source.Length > 10)
+            score += 0.2;
 
-            // Check for function/method declaration
-            if (source.Contains("§F[") || source.Contains("§METHOD") || source.Contains("§FUNC"))
-                score += 0.2;
+        // Balanced braces indicate structural completeness
+        var openBraces = source.Count(c => c == '{');
+        var closeBraces = source.Count(c => c == '}');
+        if (openBraces == closeBraces && openBraces > 0)
+            score += 0.2;
 
-            // Check for input parameters
-            if (source.Contains("§I[") || source.Contains("§IN") || source.Contains("§PARAM"))
-                score += 0.2;
+        // Balanced parentheses
+        var openParens = source.Count(c => c == '(');
+        var closeParens = source.Count(c => c == ')');
+        if (openParens == closeParens && openParens > 0)
+            score += 0.2;
 
-            // Check for output/return type
-            if (source.Contains("§O[") || source.Contains("§OUT") || source.Contains("§RET"))
-                score += 0.2;
+        // Has at least one complete statement
+        if (source.Contains(";") || source.Contains("}"))
+            score += 0.2;
 
-            // Check for return statements or assignments
-            if (source.Contains("§R ") || source.Contains("§RETURN") || source.Contains("§= ") || source.Contains("§SET"))
-                score += 0.2;
-        }
-        else
-        {
-            // Check for namespace declaration
-            if (source.Contains("namespace "))
-                score += 0.2;
-
-            // Check for class/struct/interface declaration
-            if (source.Contains("class ") || source.Contains("struct ") || source.Contains("interface "))
-                score += 0.2;
-
-            // Check for method declarations (access modifier + return type + name + parens)
-            if (Regex.IsMatch(source, @"\b(public|private|protected|internal)\s+\w+\s+\w+\s*\("))
-                score += 0.2;
-
-            // Check for return statements
-            if (source.Contains("return "))
-                score += 0.2;
-
-            // Check for complete method bodies
-            if (source.Contains("{") && source.Contains("}"))
-                score += 0.2;
-        }
+        // Compilation success indicates full completeness
+        if (compilationSuccess)
+            score += 0.2;
 
         return Math.Min(1.0, score);
     }
 
-    /// <summary>
-    /// Calculate information density - semantic content per token.
-    /// Higher ratio = more information per token = better for LLM context limits.
-    /// </summary>
-    private static double CalculateInformationDensity(string source, bool isOpal)
+    private static double CalculateContextEfficiency(string source)
     {
         if (string.IsNullOrWhiteSpace(source))
             return 0;
 
+        // Calculate information density relative to size
         var tokens = TokenizeSource(source).Count;
-        if (tokens == 0)
+        var lines = source.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+
+        if (tokens == 0 || lines == 0)
             return 0;
 
-        // Count semantic elements
-        int semanticElements;
-        if (isOpal)
+        // Tokens per line (higher is more efficient)
+        var tokensPerLine = (double)tokens / lines;
+
+        // Normalize to 0-1 (assuming 5-20 tokens per line is normal range)
+        var efficiency = Math.Min(1.0, tokensPerLine / 15.0);
+
+        // Penalty for excessive whitespace/comments ratio
+        var whitespaceCount = source.Count(char.IsWhiteSpace);
+        var whitespaceRatio = (double)whitespaceCount / source.Length;
+
+        // Good code has 20-40% whitespace
+        if (whitespaceRatio > 0.5)
         {
-            // Count OPAL tags (§M[, §F[, §I[, §O[, §R, §=, etc.)
-            semanticElements = CountPattern(source, @"§[A-Z]+[\[\s]");
-        }
-        else
-        {
-            // Count C# keywords that define structure
-            semanticElements = CountPattern(source, @"\b(class|struct|interface|enum|namespace|void|public|private|protected|internal|static|async|return|if|else|for|foreach|while|try|catch|throw|new|using)\b");
+            efficiency *= (1.0 - (whitespaceRatio - 0.5));
         }
 
-        // Semantic elements per 100 tokens (normalized)
-        var density = (semanticElements * 100.0) / tokens;
-
-        // 10 elements per 100 tokens = max score (1.0)
-        // This rewards code that packs more meaning into fewer tokens
-        return Math.Min(1.0, density / 10.0);
-    }
-
-    /// <summary>
-    /// Count regex pattern matches in source.
-    /// </summary>
-    private static int CountPattern(string source, string pattern)
-    {
-        try
-        {
-            return Regex.Matches(source, pattern).Count;
-        }
-        catch
-        {
-            return 0;
-        }
+        return efficiency;
     }
 
     private static List<string> TokenizeSource(string source)
