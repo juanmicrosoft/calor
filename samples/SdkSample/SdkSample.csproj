@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- OPAL SDK configuration -->
+    <OpalTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\Opal.Tasks\bin\Debug\net8.0\Opal.Tasks.dll</OpalTasksAssembly>
+    <OpalOutputDirectory>$(MSBuildThisFileDirectory)obj\opal\</OpalOutputDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Opal.Runtime\Opal.Runtime.csproj" />
+  </ItemGroup>
+
+  <!-- Include OPAL files -->
+  <ItemGroup>
+    <OpalCompile Include="**\*.opal" />
+  </ItemGroup>
+
+  <!-- Import OPAL compilation targets -->
+  <Import Project="..\..\src\Opal.Sdk\Sdk\Sdk.targets" />
+
+</Project>

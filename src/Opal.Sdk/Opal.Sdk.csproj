@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Opal.Sdk</RootNamespace>
+
+    <!-- Package settings -->
+    <IsPackable>true</IsPackable>
+    <PackageId>Opal.Sdk</PackageId>
+    <PackageType>MSBuildSdk</PackageType>
+    <Description>MSBuild SDK for building OPAL projects</Description>
+
+    <!-- Suppress NU5128 warning about dependency groups -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+
+    <!-- Don't produce a DLL - this is just an SDK package -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+
+    <!-- Include content files in package -->
+    <ContentTargetFolders>content</ContentTargetFolders>
+  </PropertyGroup>
+
+  <!-- Reference Opal.Tasks to get its output -->
+  <ItemGroup>
+    <ProjectReference Include="..\Opal.Tasks\Opal.Tasks.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Include SDK files in the package -->
+  <ItemGroup>
+    <None Include="Sdk\Sdk.props" Pack="true" PackagePath="Sdk" />
+    <None Include="Sdk\Sdk.targets" Pack="true" PackagePath="Sdk" />
+  </ItemGroup>
+
+  <!-- Include task assemblies in the package -->
+  <Target Name="IncludeTaskAssemblies" BeforeTargets="GenerateNuspec">
+    <ItemGroup>
+      <None Include="..\Opal.Tasks\bin\$(Configuration)\net8.0\*.dll" Pack="true" PackagePath="tasks\net8.0" />
+    </ItemGroup>
+  </Target>
+
+</Project>

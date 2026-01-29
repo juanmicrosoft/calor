@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Import the Opal.Tasks assembly -->
+  <PropertyGroup>
+    <OpalTasksAssembly Condition="'$(OpalTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net8.0\Opal.Tasks.dll</OpalTasksAssembly>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Opal.Tasks.CompileOpal" AssemblyFile="$(OpalTasksAssembly)" />
+
+  <!-- Target to compile OPAL files and add them to compilation -->
+  <Target Name="CompileOpalFiles"
+          BeforeTargets="BeforeCompile"
+          Inputs="@(OpalCompile)"
+          Outputs="@(OpalCompile->'$(OpalOutputDirectory)%(Filename).g.cs')"
+          Condition="'@(OpalCompile)' != ''">
+
+    <Message Text="Compiling OPAL files..." Importance="high" />
+
+    <!-- Ensure output directory exists -->
+    <MakeDir Directories="$(OpalOutputDirectory)" />
+
+    <!-- Compile OPAL files -->
+    <CompileOpal
+        SourceFiles="@(OpalCompile)"
+        OutputDirectory="$(OpalOutputDirectory)"
+        Verbose="$(OpalVerbose)">
+      <Output TaskParameter="GeneratedFiles" ItemName="OpalGeneratedFiles" />
+    </CompileOpal>
+
+    <ItemGroup>
+      <FileWrites Include="@(OpalGeneratedFiles)" />
+    </ItemGroup>
+
+    <Message Text="Generated @(OpalGeneratedFiles->Count()) C# files from OPAL" Importance="high" />
+  </Target>
+
+  <!-- Add generated files to Compile before CoreCompile -->
+  <Target Name="AddOpalGeneratedFilesToCompile"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="CompileOpalFiles"
+          Condition="'@(OpalCompile)' != ''">
+    <ItemGroup>
+      <Compile Include="$(OpalOutputDirectory)*.g.cs" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Clean target to remove generated files -->
+  <Target Name="CleanOpalFiles" BeforeTargets="Clean">
+    <RemoveDir Directories="$(OpalOutputDirectory)" />
+  </Target>
+
+</Project>
