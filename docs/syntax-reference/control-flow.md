@@ -66,6 +66,41 @@ OPAL provides loops and conditionals with explicit structure.
 §/L[for1]
 ```
 
+### While Loop Syntax
+
+```
+§WH[id] condition
+  // body
+§/WH[id]
+```
+
+| Part | Description |
+|:-----|:------------|
+| `id` | Unique loop identifier |
+| `condition` | Boolean expression evaluated before each iteration |
+
+### While Loop Examples
+
+**Simple countdown:**
+```
+§B[i] 10
+§WH[while1] (> i 0)
+  §P i
+  §ASSIGN i (- i 1)
+§/WH[while1]
+```
+
+**Read until done:**
+```
+§B[running] true
+§WH[while1] running
+  §B[input] §C[Console.ReadLine] §/C
+  §IF[if1] (== input "quit")
+    §ASSIGN running false
+  §/I[if1]
+§/WH[while1]
+```
+
 ---
 
 ## Conditionals

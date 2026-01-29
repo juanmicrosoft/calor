@@ -196,7 +196,8 @@ Every structural element must be closed with a matching tag.
 |:--------|:--------|:--------|
 | `§M[id:name]` | `§/M[id]` | Module |
 | `§F[id:name:vis]` | `§/F[id]` | Function |
-| `§L[id:var:from:to:step]` | `§/L[id]` | Loop |
+| `§L[id:var:from:to:step]` | `§/L[id]` | For loop |
+| `§WH[id] cond` | `§/WH[id]` | While loop |
 | `§IF[id] cond` | `§/I[id]` | Conditional |
 | `§C[target]` | `§/C` | Call (no ID needed) |
 

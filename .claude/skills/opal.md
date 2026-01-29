@@ -54,11 +54,18 @@ T!E                   Result<T,E> (fallible)
 
 ## Control Flow
 
-### Loop
+### For Loop
 ```
 §L[id:var:from:to:step]
   ...body...
 §/L[id]
+```
+
+### While Loop
+```
+§WH[id] condition
+  ...body...
+§/WH[id]
 ```
 
 ### Conditionals (v2 arrow syntax)
