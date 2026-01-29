@@ -1,0 +1,47 @@
+name: Publish to NuGet
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (leave empty to use project version)'
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/Opal.Compiler/Opal.Compiler.csproj
+
+      - name: Build
+        run: dotnet build src/Opal.Compiler/Opal.Compiler.csproj -c Release --no-restore
+
+      - name: Pack
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            dotnet pack src/Opal.Compiler/Opal.Compiler.csproj -c Release --no-build -o ./nupkg /p:Version=${{ github.event.inputs.version }}
+          else
+            dotnet pack src/Opal.Compiler/Opal.Compiler.csproj -c Release --no-build -o ./nupkg
+          fi
+
+      - name: Push to NuGet
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package
+          path: ./nupkg/*.nupkg
