@@ -858,8 +858,8 @@ public class CSharpToOpalConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
         Assert.Contains("compound-assignment", result.Context.UsedFeatures);
-        // Should emit as §SET _count = (+ _count value)
-        Assert.Contains("§SET", result.OpalSource);
+        // Should emit as §ASSIGN _count (+ _count value)
+        Assert.Contains("§ASSIGN", result.OpalSource);
         Assert.Contains("(+", result.OpalSource);
     }
 
@@ -956,8 +956,10 @@ public class CSharpToOpalConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
-        Assert.Contains("§USING", result.OpalSource);
-        Assert.Contains("§/USING", result.OpalSource);
+        // Using statements are converted to try/finally for disposal
+        Assert.Contains("§TRY[", result.OpalSource);
+        Assert.Contains("§FINALLY", result.OpalSource);
+        Assert.Contains("Dispose", result.OpalSource);
         Assert.Contains("using-statement", result.Context.UsedFeatures);
     }
 
@@ -981,7 +983,8 @@ public class CSharpToOpalConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
-        Assert.Contains("§USING", result.OpalSource);
+        // Using statements are converted to try/finally
+        Assert.Contains("§TRY[", result.OpalSource);
         Assert.Contains("writer", result.OpalSource);
     }
 
@@ -1008,9 +1011,9 @@ public class CSharpToOpalConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
-        // Should have two using statements
-        var usingCount = result.OpalSource.Split("§USING[").Length - 1;
-        Assert.Equal(2, usingCount);
+        // Should have two try/finally blocks (one per using)
+        var tryCount = result.OpalSource.Split("§TRY[using_").Length - 1;
+        Assert.Equal(2, tryCount);
     }
 
     #endregion
