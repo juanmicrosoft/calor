@@ -1,6 +1,6 @@
 # /opal - Write OPAL Code
 
-OPAL (Optimized Programming for Agent Logic) compiles to C# via .NET.
+OPAL (Optimized Programming for Agent Language) compiles to C# via .NET.
 
 **IMPORTANT: Always use v2+ syntax when writing OPAL code:**
 - Use Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`

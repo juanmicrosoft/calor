@@ -1,7 +1,7 @@
 <!-- BEGIN OPALC SECTION - DO NOT EDIT -->
 ## OPAL Project
 
-This project uses OPAL (Optimized Programming for Agent Logic), a domain-specific language that compiles to C#.
+This project uses OPAL (Optimized Programming for Agent Language), a domain-specific language that compiles to C#.
 
 ### Quick Reference
 

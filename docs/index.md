@@ -2,14 +2,14 @@
 layout: default
 title: Home
 nav_order: 1
-description: "OPAL - Optimized Programming for Agent Logic"
+description: "OPAL - Optimized Programming for Agent Language"
 permalink: /
 ---
 
 # OPAL
 {: .fs-9 }
 
-Optimized Programming for Agent Logic
+Optimized Programming for Agent Language
 {: .fs-6 .fw-300 }
 
 A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.

@@ -10,7 +10,7 @@
     <ToolCommandName>opalc</ToolCommandName>
     <PackageId>opalc</PackageId>
     <Version>0.1.2</Version>
-    <Description>OPAL compiler - Optimized Programming for Agent Logic</Description>
+    <Description>OPAL compiler - Optimized Programming for Agent Language</Description>
     <PackageProjectUrl>https://github.com/juanmicrosoft/opal-2</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
