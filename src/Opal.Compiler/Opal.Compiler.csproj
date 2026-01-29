@@ -33,4 +33,13 @@
     <PackageReference Include="DiffPlex" Version="1.7.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Skills\*.md">
+      <LogicalName>Opal.Compiler.Resources.Skills.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Templates\*.template">
+      <LogicalName>Opal.Compiler.Resources.Templates.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

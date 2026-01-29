@@ -33,10 +33,11 @@ public class Program
         // Legacy compile handler (when --input is provided)
         rootCommand.SetHandler(CompileAsync, inputOption, outputOption, verboseOption);
 
-        // Add subcommands for migration
+        // Add subcommands
         rootCommand.AddCommand(ConvertCommand.Create());
         rootCommand.AddCommand(MigrateCommand.Create());
         rootCommand.AddCommand(BenchmarkCommand.Create());
+        rootCommand.AddCommand(InitCommand.Create());
 
         return await rootCommand.InvokeAsync(args);
     }
@@ -55,6 +56,7 @@ public class Program
                 Console.WriteLine("  opalc convert <file>                           Convert between C# and OPAL");
                 Console.WriteLine("  opalc migrate <project>                        Migrate entire project");
                 Console.WriteLine("  opalc benchmark [options]                      Compare token economics");
+                Console.WriteLine("  opalc init --ai <agent>                        Initialize for AI coding agents");
                 Console.WriteLine();
                 Console.WriteLine("Run 'opalc --help' for more information.");
                 return;
