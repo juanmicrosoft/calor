@@ -422,6 +422,26 @@ public sealed class NewExpressionNode : ExpressionNode
 }
 
 /// <summary>
+/// Represents a method/function call expression.
+/// §C[target] §A arg1 §A arg2 §/C
+/// </summary>
+public sealed class CallExpressionNode : ExpressionNode
+{
+    public string Target { get; }
+    public IReadOnlyList<ExpressionNode> Arguments { get; }
+
+    public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments)
+        : base(span)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a 'this' expression.
 /// §THIS
 /// </summary>

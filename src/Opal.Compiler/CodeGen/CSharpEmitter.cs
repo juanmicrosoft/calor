@@ -1157,6 +1157,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return $"new {typeName}({args})";
     }
 
+    public string Visit(CallExpressionNode node)
+    {
+        var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
+        return $"{node.Target}({args})";
+    }
+
     public string Visit(ThisExpressionNode node)
     {
         return "this";

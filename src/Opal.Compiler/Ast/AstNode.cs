@@ -83,6 +83,7 @@ public interface IAstVisitor
     void Visit(ClassFieldNode node);
     void Visit(MethodNode node);
     void Visit(NewExpressionNode node);
+    void Visit(CallExpressionNode node);
     void Visit(ThisExpressionNode node);
     void Visit(BaseExpressionNode node);
     // Phase 9: Properties and Constructors
@@ -214,6 +215,7 @@ public interface IAstVisitor<T>
     T Visit(ClassFieldNode node);
     T Visit(MethodNode node);
     T Visit(NewExpressionNode node);
+    T Visit(CallExpressionNode node);
     T Visit(ThisExpressionNode node);
     T Visit(BaseExpressionNode node);
     // Phase 9: Properties and Constructors

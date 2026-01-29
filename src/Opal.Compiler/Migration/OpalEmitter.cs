@@ -229,11 +229,11 @@ public sealed class OpalEmitter : IAstVisitor<string>
             if (node.Initer != null) accessors += accessors.Length > 0 ? ",init" : "init";
 
             var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
-            AppendLine($"§PROP[{typeName}:{node.Name}:{visibility}:{accessors}]{attrs}{defaultVal}");
+            AppendLine($"§PROP[{node.Id}:{node.Name}:{typeName}:{visibility}:{accessors}]{attrs}{defaultVal}");
         }
         else
         {
-            AppendLine($"§PROP[{typeName}:{node.Name}:{visibility}]{attrs}");
+            AppendLine($"§PROP[{node.Id}:{node.Name}:{typeName}:{visibility}]{attrs}");
             Indent();
 
             if (node.Getter != null)
@@ -250,7 +250,7 @@ public sealed class OpalEmitter : IAstVisitor<string>
             }
 
             Dedent();
-            AppendLine($"§/PROP");
+            AppendLine($"§/PROP[{node.Id}]");
         }
 
         return "";
@@ -753,31 +753,31 @@ public sealed class OpalEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
-        return $"§REF[name={node.Name}]";
+        return node.Name;
     }
 
     public string Visit(BinaryOperationNode node)
     {
         var left = node.Left.Accept(this);
         var right = node.Right.Accept(this);
-        var opKind = GetOpalOperatorKind(node.Operator);
+        var opSymbol = GetOpalOperatorSymbol(node.Operator);
 
         // Use Lisp-style prefix notation: (op left right)
-        return $"§OP[kind={opKind}] {left} {right}";
+        return $"({opSymbol} {left} {right})";
     }
 
     public string Visit(UnaryOperationNode node)
     {
         var operand = node.Operand.Accept(this);
-        var opKind = node.Operator switch
+        var opSymbol = node.Operator switch
         {
-            UnaryOperator.Negate => "neg",
-            UnaryOperator.Not => "not",
-            UnaryOperator.BitwiseNot => "bnot",
-            _ => "neg"
+            UnaryOperator.Negate => "-",
+            UnaryOperator.Not => "!",
+            UnaryOperator.BitwiseNot => "~",
+            _ => "-"
         };
 
-        return $"§UOP[kind={opKind}] {operand}";
+        return $"({opSymbol} {operand})";
     }
 
     public string Visit(FieldAccessNode node)
@@ -795,6 +795,15 @@ public sealed class OpalEmitter : IAstVisitor<string>
         var argsStr = args.Length > 0 ? $" {args}" : "";
 
         return $"§NEW[{node.TypeName}{typeArgs}]{argsStr}";
+    }
+
+    public string Visit(CallExpressionNode node)
+    {
+        if (node.Arguments.Count == 0)
+            return $"§C[{node.Target}] §/C";
+
+        var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
+        return $"§C[{node.Target}] {string.Join(" ", args)} §/C";
     }
 
     public string Visit(ThisExpressionNode node)
@@ -1273,6 +1282,30 @@ public sealed class OpalEmitter : IAstVisitor<string>
             _ => "priv"
         };
     }
+
+    private static string GetOpalOperatorSymbol(BinaryOperator op) => op switch
+    {
+        BinaryOperator.Add => "+",
+        BinaryOperator.Subtract => "-",
+        BinaryOperator.Multiply => "*",
+        BinaryOperator.Divide => "/",
+        BinaryOperator.Modulo => "%",
+        BinaryOperator.Power => "**",
+        BinaryOperator.Equal => "==",
+        BinaryOperator.NotEqual => "!=",
+        BinaryOperator.LessThan => "<",
+        BinaryOperator.LessOrEqual => "<=",
+        BinaryOperator.GreaterThan => ">",
+        BinaryOperator.GreaterOrEqual => ">=",
+        BinaryOperator.And => "&&",
+        BinaryOperator.Or => "||",
+        BinaryOperator.BitwiseAnd => "&",
+        BinaryOperator.BitwiseOr => "|",
+        BinaryOperator.BitwiseXor => "^",
+        BinaryOperator.LeftShift => "<<",
+        BinaryOperator.RightShift => ">>",
+        _ => "+"
+    };
 
     private static string GetOpalOperatorKind(BinaryOperator op)
     {
