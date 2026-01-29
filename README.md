@@ -198,5 +198,4 @@ dotnet run --project samples/HelloWorld
 - [x] Type system (Option, Result)
 - [x] Contracts (requires, ensures)
 - [x] MSBuild SDK integration
-- [ ] LSP/IDE integration
 - [ ] Direct IL emission
