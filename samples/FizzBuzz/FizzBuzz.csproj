@@ -8,4 +8,8 @@
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../src/Opal.Runtime/Opal.Runtime.csproj" />
+  </ItemGroup>
+
 </Project>

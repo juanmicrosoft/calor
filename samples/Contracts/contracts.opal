@@ -1,63 +1,57 @@
-§MODULE[id=m001][name=Contracts]
+§M[m001:Contracts]
 
-§FUNC[id=f001][name=Main][visibility=public]
-  §OUT[type=VOID]
-  §EFFECTS[io=console_write]
-  §BODY
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"=== OPAL Contracts Demo ==="
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
+§F[f001:Main:pub]
+  §O[void]
+  §E[cw]
+  §C[Console.WriteLine]
+    §A "=== OPAL Contracts Demo ==="
+  §/C
+  §C[Console.WriteLine]
+    §A ""
+  §/C
 
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"Testing Square(5) - has REQUIRES x >= 0 and ENSURES result >= 0"
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"  If precondition fails, throws ArgumentException"
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"  If postcondition fails, throws InvalidOperationException"
-    §END_CALL
+  §C[Console.WriteLine]
+    §A "Testing Square(5) - has REQUIRES x >= 0 and ENSURES result >= 0"
+  §/C
+  §C[Console.WriteLine]
+    §A "  If precondition fails, throws ArgumentException"
+  §/C
+  §C[Console.WriteLine]
+    §A "  If postcondition fails, throws InvalidOperationException"
+  §/C
 
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"Testing Divide(10, 2) - has REQUIRES b != 0 with custom message"
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"  Custom message: divisor must not be zero"
-    §END_CALL
+  §C[Console.WriteLine]
+    §A ""
+  §/C
+  §C[Console.WriteLine]
+    §A "Testing Divide(10, 2) - has REQUIRES b != 0 with custom message"
+  §/C
+  §C[Console.WriteLine]
+    §A "  Custom message: divisor must not be zero"
+  §/C
 
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"Contracts are enforced at runtime with clear error messages."
-    §END_CALL
-  §END_BODY
-§END_FUNC[id=f001]
+  §C[Console.WriteLine]
+    §A ""
+  §/C
+  §C[Console.WriteLine]
+    §A "Contracts are enforced at runtime with clear error messages."
+  §/C
+§/F[f001]
 
-§FUNC[id=f002][name=Square][visibility=public]
-  §IN[name=x][type=INT]
-  §OUT[type=INT]
-  §REQUIRES §OP[kind=gte] §REF[name=x] INT:0
-  §ENSURES §OP[kind=gte] §REF[name=result] INT:0
-  §BODY
-    §RETURN §OP[kind=mul] §REF[name=x] §REF[name=x]
-  §END_BODY
-§END_FUNC[id=f002]
+§F[f002:Square:pub]
+  §I[i32:x]
+  §O[i32]
+  §Q §OP[kind=gte] §REF[name=x] 0
+  §S §OP[kind=gte] §REF[name=result] 0
+  §R §OP[kind=mul] §REF[name=x] §REF[name=x]
+§/F[f002]
 
-§FUNC[id=f003][name=Divide][visibility=public]
-  §IN[name=a][type=INT]
-  §IN[name=b][type=INT]
-  §OUT[type=INT]
-  §REQUIRES[message="divisor must not be zero"] §OP[kind=neq] §REF[name=b] INT:0
-  §BODY
-    §RETURN §OP[kind=div] §REF[name=a] §REF[name=b]
-  §END_BODY
-§END_FUNC[id=f003]
+§F[f003:Divide:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §Q[message="divisor must not be zero"] §OP[kind=neq] §REF[name=b] 0
+  §R §OP[kind=div] §REF[name=a] §REF[name=b]
+§/F[f003]
 
-§END_MODULE[id=m001]
+§/M[m001]

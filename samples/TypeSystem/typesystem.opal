@@ -1,89 +1,79 @@
-§MODULE[id=m001][name=TypeSystem]
+§M[m001:TypeSystem]
 
-§FUNC[id=f001][name=Main][visibility=public]
-  §OUT[type=VOID]
-  §EFFECTS[io=console_write]
-  §BODY
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"=== OPAL Type System Demo ==="
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"Testing Option.Some(42)..."
-    §END_CALL
-    §CALL[target=TestSome][fallible=false]
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"Testing Option.None()..."
-    §END_CALL
-    §CALL[target=TestNone][fallible=false]
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"Testing Result.Ok(100)..."
-    §END_CALL
-    §CALL[target=TestOk][fallible=false]
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"Testing Result.Err(error)..."
-    §END_CALL
-    §CALL[target=TestErr][fallible=false]
-    §END_CALL
-  §END_BODY
-§END_FUNC[id=f001]
+§F[f001:Main:pub]
+  §O[void]
+  §E[cw]
+  §C[Console.WriteLine]
+    §A "=== OPAL Type System Demo ==="
+  §/C
+  §C[Console.WriteLine]
+    §A ""
+  §/C
+  §C[Console.WriteLine]
+    §A "Testing Option.Some(42)..."
+  §/C
+  §C[TestSome]
+  §/C
+  §C[Console.WriteLine]
+    §A ""
+  §/C
+  §C[Console.WriteLine]
+    §A "Testing Option.None()..."
+  §/C
+  §C[TestNone]
+  §/C
+  §C[Console.WriteLine]
+    §A ""
+  §/C
+  §C[Console.WriteLine]
+    §A "Testing Result.Ok(100)..."
+  §/C
+  §C[TestOk]
+  §/C
+  §C[Console.WriteLine]
+    §A ""
+  §/C
+  §C[Console.WriteLine]
+    §A "Testing Result.Err(error)..."
+  §/C
+  §C[TestErr]
+  §/C
+§/F[f001]
 
-§FUNC[id=f002][name=TestSome][visibility=private]
-  §OUT[type=VOID]
-  §EFFECTS[io=console_write]
-  §BODY
-    §BIND[name=opt] §SOME INT:42
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"  Created Some(42)"
-    §END_CALL
-  §END_BODY
-§END_FUNC[id=f002]
+§F[f002:TestSome:pri]
+  §O[void]
+  §E[cw]
+  §B[opt] §SOME 42
+  §C[Console.WriteLine]
+    §A "  Created Some(42)"
+  §/C
+§/F[f002]
 
-§FUNC[id=f003][name=TestNone][visibility=private]
-  §OUT[type=VOID]
-  §EFFECTS[io=console_write]
-  §BODY
-    §BIND[name=opt] §NONE[type=INT]
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"  Created None"
-    §END_CALL
-  §END_BODY
-§END_FUNC[id=f003]
+§F[f003:TestNone:pri]
+  §O[void]
+  §E[cw]
+  §B[opt] §NONE[type=INT]
+  §C[Console.WriteLine]
+    §A "  Created None"
+  §/C
+§/F[f003]
 
-§FUNC[id=f004][name=TestOk][visibility=private]
-  §OUT[type=VOID]
-  §EFFECTS[io=console_write]
-  §BODY
-    §BIND[name=result] §OK INT:100
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"  Created Ok(100)"
-    §END_CALL
-  §END_BODY
-§END_FUNC[id=f004]
+§F[f004:TestOk:pri]
+  §O[void]
+  §E[cw]
+  §B[result] §OK 100
+  §C[Console.WriteLine]
+    §A "  Created Ok(100)"
+  §/C
+§/F[f004]
 
-§FUNC[id=f005][name=TestErr][visibility=private]
-  §OUT[type=VOID]
-  §EFFECTS[io=console_write]
-  §BODY
-    §BIND[name=result] §ERR STR:"Something went wrong"
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"  Created Err(Something went wrong)"
-    §END_CALL
-  §END_BODY
-§END_FUNC[id=f005]
+§F[f005:TestErr:pri]
+  §O[void]
+  §E[cw]
+  §B[result] §ERR "Something went wrong"
+  §C[Console.WriteLine]
+    §A "  Created Err(Something went wrong)"
+  §/C
+§/F[f005]
 
-§END_MODULE[id=m001]
+§/M[m001]

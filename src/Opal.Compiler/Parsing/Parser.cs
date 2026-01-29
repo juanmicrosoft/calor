@@ -72,8 +72,18 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Module);
         var attrs = ParseAttributes();
 
-        var id = GetRequiredAttribute(attrs, "id", "MODULE", startToken.Span);
-        var name = GetRequiredAttribute(attrs, "name", "MODULE", startToken.Span);
+        // Support both v1 [id=x][name=y] and v2 [x:y] formats
+        var (id, moduleName) = V2AttributeHelper.InterpretModuleAttributes(attrs);
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MODULE", "id");
+            id = "";
+        }
+        if (string.IsNullOrEmpty(moduleName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MODULE", "name");
+            moduleName = "";
+        }
 
         var functions = new List<FunctionNode>();
 
@@ -92,7 +102,7 @@ public sealed class Parser
 
         var endToken = Expect(TokenKind.EndModule);
         var endAttrs = ParseAttributes();
-        var endId = GetRequiredAttribute(endAttrs, "id", "END_MODULE", endToken.Span);
+        var endId = V2AttributeHelper.InterpretEndModuleAttributes(endAttrs);
 
         // Validate ID matching
         if (endId != id)
@@ -101,7 +111,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ModuleNode(span, id, name, functions, attrs);
+        return new ModuleNode(span, id, moduleName, functions, attrs);
     }
 
     private FunctionNode ParseFunction()
@@ -109,9 +119,19 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Func);
         var attrs = ParseAttributes();
 
-        var id = GetRequiredAttribute(attrs, "id", "FUNC", startToken.Span);
-        var name = GetRequiredAttribute(attrs, "name", "FUNC", startToken.Span);
-        var visibility = ParseVisibility(attrs["visibility"]);
+        // Support both v1 and v2 formats
+        var (id, funcName, visibilityStr) = V2AttributeHelper.InterpretFuncAttributes(attrs);
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FUNC", "id");
+            id = "";
+        }
+        if (string.IsNullOrEmpty(funcName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FUNC", "name");
+            funcName = "";
+        }
+        var visibility = ParseVisibility(visibilityStr);
 
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
@@ -149,15 +169,21 @@ public sealed class Parser
             }
         }
 
-        // Parse BODY
+        // Parse BODY - either explicit (v1) or implicit (v2)
         if (Check(TokenKind.Body))
         {
+            // v1: Explicit §BODY ... §END_BODY
             body = ParseBody();
+        }
+        else if (!Check(TokenKind.EndFunc))
+        {
+            // v2: Implicit body - parse statements until §/F or §END_FUNC
+            body = ParseImplicitBody();
         }
 
         var endToken = Expect(TokenKind.EndFunc);
         var endAttrs = ParseAttributes();
-        var endId = GetRequiredAttribute(endAttrs, "id", "END_FUNC", endToken.Span);
+        var endId = V2AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
         // Validate ID matching
         if (endId != id)
@@ -166,7 +192,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new FunctionNode(span, id, name, visibility, parameters, output, effects,
+        return new FunctionNode(span, id, funcName, visibility, parameters, output, effects,
             preconditions, postconditions, body, attrs);
     }
 
@@ -175,10 +201,26 @@ public sealed class Parser
         var startToken = Expect(TokenKind.In);
         var attrs = ParseAttributes();
 
-        var name = GetRequiredAttribute(attrs, "name", "IN", startToken.Span);
-        var typeName = GetRequiredAttribute(attrs, "type", "IN", startToken.Span);
+        // Support both v1 and v2 formats
+        var (typeName, paramName, semantic) = V2AttributeHelper.InterpretInputAttributes(attrs);
+        if (string.IsNullOrEmpty(paramName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IN", "name");
+            paramName = "";
+        }
+        if (string.IsNullOrEmpty(typeName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IN", "type");
+            typeName = "";
+        }
 
-        return new ParameterNode(startToken.Span, name, typeName, attrs);
+        // Add semantic to attrs if present
+        if (!string.IsNullOrEmpty(semantic))
+        {
+            attrs.Add("semantic", semantic);
+        }
+
+        return new ParameterNode(startToken.Span, paramName, typeName, attrs);
     }
 
     private OutputNode ParseOutput()
@@ -186,7 +228,13 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Out);
         var attrs = ParseAttributes();
 
-        var typeName = GetRequiredAttribute(attrs, "type", "OUT", startToken.Span);
+        // Support both v1 and v2 formats
+        var typeName = V2AttributeHelper.InterpretOutputAttributes(attrs);
+        if (string.IsNullOrEmpty(typeName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "OUT", "type");
+            typeName = "";
+        }
 
         return new OutputNode(startToken.Span, typeName);
     }
@@ -196,11 +244,8 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Effects);
         var attrs = ParseAttributes();
 
-        var effects = new Dictionary<string, string>();
-        foreach (var kvp in attrs.All())
-        {
-            effects[kvp.Key] = kvp.Value;
-        }
+        // Support both v1 and v2 formats
+        var effects = V2AttributeHelper.InterpretEffectsAttributes(attrs);
 
         return new EffectsNode(startToken.Span, effects);
     }
@@ -249,6 +294,25 @@ public sealed class Parser
         return statements;
     }
 
+    /// <summary>
+    /// Parses an implicit body (v2 syntax) - statements until END_FUNC/§/F
+    /// </summary>
+    private List<StatementNode> ParseImplicitBody()
+    {
+        var statements = new List<StatementNode>();
+
+        while (!IsAtEnd && !Check(TokenKind.EndFunc))
+        {
+            var statement = ParseStatement();
+            if (statement != null)
+            {
+                statements.Add(statement);
+            }
+        }
+
+        return statements;
+    }
+
     private StatementNode? ParseStatement()
     {
         if (Check(TokenKind.Call))
@@ -290,9 +354,12 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Call);
         var attrs = ParseAttributes();
 
-        var target = GetRequiredAttribute(attrs, "target", "CALL", startToken.Span);
-        var fallibleStr = attrs["fallible"];
-        var fallible = fallibleStr?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false;
+        // Use V2AttributeHelper which handles both v1 [target=...] and v2 [target] formats
+        var (target, fallible) = V2AttributeHelper.InterpretCallAttributes(attrs);
+        if (string.IsNullOrEmpty(target))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CALL", "target");
+        }
 
         var arguments = new List<ExpressionNode>();
 
@@ -624,20 +691,23 @@ public sealed class Parser
         var startToken = Expect(TokenKind.For);
         var attrs = ParseAttributes();
 
-        var id = GetRequiredAttribute(attrs, "id", "FOR", startToken.Span);
-        var varName = GetRequiredAttribute(attrs, "var", "FOR", startToken.Span);
+        // Use V2AttributeHelper which handles both v1 and v2 positional [id:var:from:to:step] formats
+        var (id, varName, fromStr, toStr, stepStr) = V2AttributeHelper.InterpretForAttributes(attrs);
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FOR", "id");
+        }
+        if (string.IsNullOrEmpty(varName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FOR", "var");
+        }
 
         // Parse from/to/step - these can be expressions or literal values in attributes
         ExpressionNode from;
         ExpressionNode to;
         ExpressionNode? step = null;
 
-        // Check if from/to are in attributes (simple case) or need to be parsed as expressions
-        var fromAttr = attrs["from"];
-        var toAttr = attrs["to"];
-        var stepAttr = attrs["step"];
-
-        if (fromAttr != null && int.TryParse(fromAttr, out var fromVal))
+        if (!string.IsNullOrEmpty(fromStr) && int.TryParse(fromStr, out var fromVal))
         {
             from = new IntLiteralNode(startToken.Span, fromVal);
         }
@@ -646,7 +716,7 @@ public sealed class Parser
             from = ParseExpression();
         }
 
-        if (toAttr != null && int.TryParse(toAttr, out var toVal))
+        if (!string.IsNullOrEmpty(toStr) && int.TryParse(toStr, out var toVal))
         {
             to = new IntLiteralNode(startToken.Span, toVal);
         }
@@ -655,7 +725,7 @@ public sealed class Parser
             to = ParseExpression();
         }
 
-        if (stepAttr != null && int.TryParse(stepAttr, out var stepVal))
+        if (!string.IsNullOrEmpty(stepStr) && int.TryParse(stepStr, out var stepVal))
         {
             step = new IntLiteralNode(startToken.Span, stepVal);
         }
@@ -665,7 +735,8 @@ public sealed class Parser
 
         var endToken = Expect(TokenKind.EndFor);
         var endAttrs = ParseAttributes();
-        var endId = GetRequiredAttribute(endAttrs, "id", "END_FOR", endToken.Span);
+        // v2 positional: [id]
+        var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
         if (endId != id)
         {
@@ -707,7 +778,12 @@ public sealed class Parser
         var startToken = Expect(TokenKind.If);
         var attrs = ParseAttributes();
 
-        var id = GetRequiredAttribute(attrs, "id", "IF", startToken.Span);
+        // Use V2AttributeHelper which handles both v1 [id=...] and v2 [id] formats
+        var id = V2AttributeHelper.InterpretIfAttributes(attrs);
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IF", "id");
+        }
 
         // Parse condition expression
         var condition = ParseExpression();
@@ -763,7 +839,8 @@ public sealed class Parser
 
         var endToken = Expect(TokenKind.EndIf);
         var endAttrs = ParseAttributes();
-        var endId = GetRequiredAttribute(endAttrs, "id", "END_IF", endToken.Span);
+        // v2 positional: [id]
+        var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
         if (endId != id)
         {
@@ -779,10 +856,13 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Bind);
         var attrs = ParseAttributes();
 
-        var name = GetRequiredAttribute(attrs, "name", "BIND", startToken.Span);
+        // Use V2AttributeHelper which handles both v1 [name=...] and v2 [name] or [~name] formats
+        var (name, isMutable) = V2AttributeHelper.InterpretBindAttributes(attrs);
+        if (string.IsNullOrEmpty(name))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "BIND", "name");
+        }
         var typeName = attrs["type"];
-        var mutableStr = attrs["mutable"];
-        var isMutable = mutableStr?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false;
 
         // Parse optional initializer expression
         ExpressionNode? initializer = null;
@@ -817,37 +897,155 @@ public sealed class Parser
 
         while (Match(TokenKind.OpenBracket))
         {
-            var nameToken = Expect(TokenKind.Identifier);
-            Expect(TokenKind.Equals);
+            // Check for v2 positional format vs v1 named format
+            // v1: [name=value] - has Identifier followed by Equals
+            // v2: [value1:value2] or [value] - no Equals, colon-separated
 
-            string value;
-            if (Check(TokenKind.Identifier))
+            if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals)
             {
-                value = Advance().Text;
-            }
-            else if (Check(TokenKind.StrLiteral))
-            {
-                value = Advance().Value as string ?? "";
-            }
-            else if (Check(TokenKind.IntLiteral))
-            {
-                value = Advance().Value?.ToString() ?? "";
-            }
-            else if (Check(TokenKind.BoolLiteral))
-            {
-                value = Advance().Value?.ToString()?.ToLowerInvariant() ?? "";
+                // v1 format: [name=value]
+                ParseV1Attribute(attrs);
             }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "attribute value", Current.Kind);
-                value = "";
+                // v2 format: [value1:value2:...] or [value]
+                ParseV2PositionalAttributes(attrs);
             }
 
             Expect(TokenKind.CloseBracket);
-            attrs.Add(nameToken.Text, value);
         }
 
         return attrs;
+    }
+
+    private void ParseV1Attribute(AttributeCollection attrs)
+    {
+        var nameToken = Advance(); // consume identifier
+        Expect(TokenKind.Equals);
+
+        string value;
+        if (Check(TokenKind.Identifier))
+        {
+            value = Advance().Text;
+        }
+        else if (Check(TokenKind.StrLiteral))
+        {
+            value = Advance().Value as string ?? "";
+        }
+        else if (Check(TokenKind.IntLiteral))
+        {
+            value = Advance().Value?.ToString() ?? "";
+        }
+        else if (Check(TokenKind.BoolLiteral))
+        {
+            value = Advance().Value?.ToString()?.ToLowerInvariant() ?? "";
+        }
+        else
+        {
+            _diagnostics.ReportUnexpectedToken(Current.Span, "attribute value", Current.Kind);
+            value = "";
+        }
+
+        attrs.Add(nameToken.Text, value);
+    }
+
+    private void ParseV2PositionalAttributes(AttributeCollection attrs)
+    {
+        // Parse colon-separated values: [value1:value2:value3]
+        // Store them as _pos0, _pos1, _pos2, etc. for later interpretation
+        var values = new List<string>();
+        var position = 0;
+
+        do
+        {
+            var value = ParseV2Value();
+            values.Add(value);
+            attrs.Add($"_pos{position}", value);
+            position++;
+        }
+        while (MatchColon());
+
+        // Also store the raw positional count
+        attrs.Add("_posCount", position.ToString());
+    }
+
+    private string ParseV2Value()
+    {
+        var sb = new System.Text.StringBuilder();
+
+        // Handle ~ prefix for mutability
+        if (Check(TokenKind.Tilde))
+        {
+            sb.Append('~');
+            Advance();
+        }
+
+        // Handle # prefix for semantic shortcodes
+        if (Check(TokenKind.Hash))
+        {
+            sb.Append('#');
+            Advance();
+        }
+
+        // Handle ? prefix for Option types
+        if (Check(TokenKind.Question))
+        {
+            sb.Append('?');
+            Advance();
+        }
+
+        // Parse the main value (identifier, literal, or compound identifier)
+        if (Check(TokenKind.Identifier))
+        {
+            sb.Append(Advance().Text);
+
+            // Handle compound identifiers like Console.WriteLine
+            while (Current.Text == ".")
+            {
+                sb.Append(Advance().Text); // consume '.'
+                if (Check(TokenKind.Identifier))
+                {
+                    sb.Append(Advance().Text);
+                }
+            }
+        }
+        else if (Check(TokenKind.StrLiteral))
+        {
+            sb.Append(Advance().Value as string ?? "");
+        }
+        else if (Check(TokenKind.IntLiteral))
+        {
+            sb.Append(Advance().Value?.ToString() ?? "");
+        }
+        else if (Check(TokenKind.BoolLiteral))
+        {
+            sb.Append(Advance().Value?.ToString()?.ToLowerInvariant() ?? "");
+        }
+
+        // Handle ! suffix for fallibility or Result types (T!E)
+        if (Check(TokenKind.Exclamation))
+        {
+            sb.Append('!');
+            Advance();
+
+            // Check for error type after ! (for Result types)
+            if (Check(TokenKind.Identifier))
+            {
+                sb.Append(Advance().Text);
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private bool MatchColon()
+    {
+        if (Check(TokenKind.Colon))
+        {
+            Advance();
+            return true;
+        }
+        return false;
     }
 
     private string GetRequiredAttribute(AttributeCollection attrs, string name, string tagName, TextSpan span)

@@ -1,28 +1,26 @@
-§MODULE[id=m001][name=SdkSample]
+§M[m001:SdkSample]
 
-§FUNC[id=f001][name=Main][visibility=public]
-  §OUT[type=VOID]
-  §EFFECTS[io=console_write]
-  §BODY
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"=== OPAL SDK Sample ==="
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"This project was built using the OPAL MSBuild SDK!"
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"The .opal files are automatically compiled to C# during build."
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:""
-    §END_CALL
-    §CALL[target=Console.WriteLine][fallible=false]
-      §ARG STR:"Build command: dotnet build SdkSample.csproj"
-    §END_CALL
-  §END_BODY
-§END_FUNC[id=f001]
+§F[f001:Main:pub]
+  §O[void]
+  §E[cw]
+  §C[Console.WriteLine]
+    §A "=== OPAL SDK Sample ==="
+  §/C
+  §C[Console.WriteLine]
+    §A ""
+  §/C
+  §C[Console.WriteLine]
+    §A "This project was built using the OPAL MSBuild SDK!"
+  §/C
+  §C[Console.WriteLine]
+    §A "The .opal files are automatically compiled to C# during build."
+  §/C
+  §C[Console.WriteLine]
+    §A ""
+  §/C
+  §C[Console.WriteLine]
+    §A "Build command: dotnet build SdkSample.csproj"
+  §/C
+§/F[f001]
 
-§END_MODULE[id=m001]
+§/M[m001]

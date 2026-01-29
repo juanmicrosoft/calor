@@ -11,6 +11,13 @@ public enum TokenKind
     CloseBracket,       // ]
     Equals,             // =
 
+    // v2 syntax tokens
+    Colon,              // :
+    Exclamation,        // !
+    Tilde,              // ~
+    Hash,               // #
+    Question,           // ?
+
     // Keywords (recognized after §)
     Module,
     EndModule,

@@ -4,6 +4,7 @@
 // </auto-generated>
 
 using System;
+using Opal.Runtime;
 
 namespace Hello
 {

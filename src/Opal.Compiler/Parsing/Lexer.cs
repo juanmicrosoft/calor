@@ -19,6 +19,7 @@ public sealed class Lexer
 
     private static readonly Dictionary<string, TokenKind> Keywords = new(StringComparer.Ordinal)
     {
+        // v1 verbose keywords
         ["MODULE"] = TokenKind.Module,
         ["END_MODULE"] = TokenKind.EndModule,
         ["FUNC"] = TokenKind.Func,
@@ -62,6 +63,35 @@ public sealed class Lexer
         ["REQUIRES"] = TokenKind.Requires,
         ["ENSURES"] = TokenKind.Ensures,
         ["INVARIANT"] = TokenKind.Invariant,
+
+        // v2 single-letter keywords (compact syntax)
+        ["M"] = TokenKind.Module,           // §M = §MODULE
+        ["F"] = TokenKind.Func,             // §F = §FUNC
+        ["C"] = TokenKind.Call,             // §C = §CALL
+        ["B"] = TokenKind.Bind,             // §B = §BIND
+        ["R"] = TokenKind.Return,           // §R = §RETURN
+        ["I"] = TokenKind.In,               // §I = §IN (input parameter)
+        ["O"] = TokenKind.Out,              // §O = §OUT
+        ["A"] = TokenKind.Arg,              // §A = §ARG
+        ["E"] = TokenKind.Effects,          // §E = §EFFECTS (also used for else in context)
+        ["L"] = TokenKind.For,              // §L = §LOOP (maps to FOR)
+        ["W"] = TokenKind.Match,            // §W = §MATCH (sWitch)
+        ["K"] = TokenKind.Case,             // §K = §CASE
+        ["Q"] = TokenKind.Requires,         // §Q = §REQUIRES (preCondition)
+        ["S"] = TokenKind.Ensures,          // §S = §ENSURES (poStcondition)
+        ["T"] = TokenKind.Type,             // §T = §TYPE
+        ["D"] = TokenKind.Record,           // §D = §RECORD (Data)
+        ["V"] = TokenKind.Variant,          // §V = §VARIANT
+
+        // v2 closing tags (§/X pattern)
+        ["/M"] = TokenKind.EndModule,       // §/M = §END_MODULE
+        ["/F"] = TokenKind.EndFunc,         // §/F = §END_FUNC
+        ["/C"] = TokenKind.EndCall,         // §/C = §END_CALL
+        ["/I"] = TokenKind.EndIf,           // §/I = §END_IF
+        ["/L"] = TokenKind.EndFor,          // §/L = §END_LOOP
+        ["/W"] = TokenKind.EndMatch,        // §/W = §END_MATCH
+        ["/T"] = TokenKind.EndType,         // §/T = §END_TYPE
+        ["/D"] = TokenKind.EndRecord,       // §/D = §END_RECORD
     };
 
     public Lexer(string source, DiagnosticBag diagnostics)
@@ -143,6 +173,11 @@ public sealed class Lexer
             '[' => ScanSingle(TokenKind.OpenBracket),
             ']' => ScanSingle(TokenKind.CloseBracket),
             '=' => ScanSingle(TokenKind.Equals),
+            ':' => ScanColonOrTypedLiteral(),
+            '!' => ScanSingle(TokenKind.Exclamation),
+            '~' => ScanSingle(TokenKind.Tilde),
+            '#' => ScanSingle(TokenKind.Hash),
+            '?' => ScanSingle(TokenKind.Question),
             '"' => ScanStringLiteral(),
             '\r' or '\n' => ScanNewline(),
             ' ' or '\t' => ScanWhitespace(),
@@ -158,9 +193,40 @@ public sealed class Lexer
         return MakeToken(kind);
     }
 
+    private Token ScanColonOrTypedLiteral()
+    {
+        // Standalone colon (v2 syntax for positional attributes)
+        Advance();
+        return MakeToken(TokenKind.Colon);
+    }
+
     private Token ScanSectionMarker()
     {
         Advance(); // consume §
+
+        // Check for v2 closing tag pattern: §/X
+        if (Current == '/')
+        {
+            Advance(); // consume '/'
+
+            // Read the closing tag letter(s)
+            while (char.IsLetterOrDigit(Current) || Current == '_')
+            {
+                Advance();
+            }
+
+            var text = CurrentText();
+            var keyword = text.Length > 2 ? text[1..] : ""; // includes the /
+
+            if (Keywords.TryGetValue(keyword, out var kind))
+            {
+                return MakeToken(kind);
+            }
+
+            // Unknown closing tag
+            _diagnostics.ReportUnexpectedCharacter(CurrentSpan(), '/');
+            return MakeToken(TokenKind.Error);
+        }
 
         // Read the keyword that follows
         while (char.IsLetterOrDigit(Current) || Current == '_')
@@ -168,12 +234,12 @@ public sealed class Lexer
             Advance();
         }
 
-        var text = CurrentText();
-        var keyword = text.Length > 1 ? text[1..] : "";
+        var fullText = CurrentText();
+        var fullKeyword = fullText.Length > 1 ? fullText[1..] : "";
 
-        if (Keywords.TryGetValue(keyword, out var kind))
+        if (Keywords.TryGetValue(fullKeyword, out var keywordKind))
         {
-            return MakeToken(kind);
+            return MakeToken(keywordKind);
         }
 
         // Unknown section keyword - report error but return as identifier
@@ -201,6 +267,16 @@ public sealed class Lexer
                 "FLOAT" => ScanTypedFloatLiteral(),
                 _ => MakeToken(TokenKind.Identifier)
             };
+        }
+
+        // v2: Support bare boolean literals
+        if (text == "true")
+        {
+            return MakeToken(TokenKind.BoolLiteral, true);
+        }
+        if (text == "false")
+        {
+            return MakeToken(TokenKind.BoolLiteral, false);
         }
 
         return MakeToken(TokenKind.Identifier);
