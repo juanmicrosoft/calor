@@ -1,0 +1,10 @@
+§M[m001:SafeMath]
+§F[f001:Divide:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §Q[message="divisor must not be zero"] §OP[kind=neq] §REF[name=b] 0
+  §S §OP[kind=eq] §REF[name=result] §OP[kind=div] §REF[name=a] §REF[name=b]
+  §R §OP[kind=div] §REF[name=a] §REF[name=b]
+§/F[f001]
+§/M[m001]

@@ -1,0 +1,32 @@
+§M[m001:MathOps]
+§F[f001:Abs:pub]
+  §I[i32:x]
+  §O[i32]
+  §S §OP[kind=gte] §REF[name=result] 0
+  §IF[if1] §OP[kind=lt] §REF[name=x] 0
+    §R §OP[kind=sub] 0 §REF[name=x]
+  §ELSE
+    §R §REF[name=x]
+  §/I[if1]
+§/F[f001]
+§F[f002:Min:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §IF[if1] §OP[kind=lt] §REF[name=a] §REF[name=b]
+    §R §REF[name=a]
+  §ELSE
+    §R §REF[name=b]
+  §/I[if1]
+§/F[f002]
+§F[f003:Max:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §IF[if1] §OP[kind=gt] §REF[name=a] §REF[name=b]
+    §R §REF[name=a]
+  §ELSE
+    §R §REF[name=b]
+  §/I[if1]
+§/F[f003]
+§/M[m001]

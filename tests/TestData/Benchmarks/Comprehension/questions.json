@@ -1,0 +1,121 @@
+{
+  "version": "1.0",
+  "description": "Comprehension questions for OPAL vs C# evaluation",
+  "questionSets": [
+    {
+      "fileId": "003",
+      "fileName": "FizzBuzz",
+      "questions": [
+        {
+          "id": "fizzbuzz_q1",
+          "question": "What does this function return for input 15?",
+          "answer": "FizzBuzz",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "fizzbuzz_q2",
+          "question": "What are the loop bounds?",
+          "answer": "1 to n inclusive",
+          "category": "structure",
+          "difficulty": 1
+        },
+        {
+          "id": "fizzbuzz_q3",
+          "question": "In what order are divisibility checks performed?",
+          "answer": "First checks if divisible by both 3 and 5 (15), then by 3 alone, then by 5 alone",
+          "category": "semantics",
+          "difficulty": 2
+        },
+        {
+          "id": "fizzbuzz_q4",
+          "question": "What happens for input 7?",
+          "answer": "Returns the string representation of 7",
+          "category": "behavior",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "006",
+      "fileName": "ContractedDivide",
+      "questions": [
+        {
+          "id": "divide_q1",
+          "question": "What precondition must be satisfied to call Divide?",
+          "answer": "The divisor (b) must not be zero",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "divide_q2",
+          "question": "What does the ensures clause guarantee?",
+          "answer": "The result equals the quotient of a divided by b",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "divide_q3",
+          "question": "What effect annotation does this function have?",
+          "answer": "Pure - it has no side effects",
+          "category": "effects",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "011",
+      "fileName": "IsPrime",
+      "questions": [
+        {
+          "id": "prime_q1",
+          "question": "What does the function return for input 1?",
+          "answer": "false",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "prime_q2",
+          "question": "Why does the loop increment by 2?",
+          "answer": "Because even numbers (except 2) cannot be prime, so only odd divisors need to be checked",
+          "category": "algorithm",
+          "difficulty": 2
+        },
+        {
+          "id": "prime_q3",
+          "question": "What is the precondition for calling IsPrime?",
+          "answer": "The input n must be greater than 0",
+          "category": "contracts",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "020",
+      "fileName": "Clamp",
+      "questions": [
+        {
+          "id": "clamp_q1",
+          "question": "What does Clamp(5, 1, 10) return?",
+          "answer": "5 (unchanged, since it's within the range)",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "clamp_q2",
+          "question": "What are the two postconditions (ensures clauses)?",
+          "answer": "The result is >= min and <= max",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "clamp_q3",
+          "question": "What is the precondition for the min and max parameters?",
+          "answer": "min must be less than or equal to max",
+          "category": "contracts",
+          "difficulty": 1
+        }
+      ]
+    }
+  ]
+}
