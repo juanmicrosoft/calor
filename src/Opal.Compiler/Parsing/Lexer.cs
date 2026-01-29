@@ -140,6 +140,48 @@ public sealed class Lexer
         ["VAR"] = TokenKind.Var,
         ["REST"] = TokenKind.Rest,
 
+        // Extended Features Phase 1: Quick Wins
+        ["EX"] = TokenKind.Example,             // §EX - Inline examples/tests
+        ["EXAMPLE"] = TokenKind.Example,        // §EXAMPLE - Full syntax
+        ["TODO"] = TokenKind.Todo,              // §TODO - Structured todo items
+        ["FIXME"] = TokenKind.Fixme,            // §FIXME - Bug markers
+        ["HACK"] = TokenKind.Hack,              // §HACK - Workaround markers
+
+        // Extended Features Phase 2: Core Features
+        ["USES"] = TokenKind.Uses,              // §USES - Dependency declarations
+        ["/USES"] = TokenKind.EndUses,          // §/USES
+        ["USEDBY"] = TokenKind.UsedBy,          // §USEDBY - Reverse dependency tracking
+        ["/USEDBY"] = TokenKind.EndUsedBy,      // §/USEDBY
+        ["ASSUME"] = TokenKind.Assume,          // §ASSUME - Assumptions
+
+        // Extended Features Phase 3: Enhanced Contracts
+        ["COMPLEXITY"] = TokenKind.Complexity,  // §COMPLEXITY - Performance contracts
+        ["SINCE"] = TokenKind.Since,            // §SINCE - API versioning
+        ["DEPRECATED"] = TokenKind.Deprecated,  // §DEPRECATED - Deprecation markers
+        ["BREAKING"] = TokenKind.Breaking,      // §BREAKING - Breaking change markers
+        ["EXPERIMENTAL"] = TokenKind.Experimental, // §EXPERIMENTAL - Experimental feature markers
+        ["STABLE"] = TokenKind.Stable,          // §STABLE - Stability markers
+
+        // Extended Features Phase 4: Future Extensions
+        ["DECISION"] = TokenKind.Decision,      // §DECISION - Decision records
+        ["/DECISION"] = TokenKind.EndDecision,  // §/DECISION
+        ["CHOSEN"] = TokenKind.Chosen,          // §CHOSEN - Chosen option in decision
+        ["REJECTED"] = TokenKind.Rejected,      // §REJECTED - Rejected option in decision
+        ["REASON"] = TokenKind.Reason,          // §REASON - Reason for decision
+        ["CONTEXT"] = TokenKind.Context,        // §CONTEXT - Context markers
+        ["/CONTEXT"] = TokenKind.EndContext,    // §/CONTEXT
+        ["VISIBLE"] = TokenKind.Visible,        // §VISIBLE - Visible files in context
+        ["/VISIBLE"] = TokenKind.EndVisible,    // §/VISIBLE
+        ["HIDDEN"] = TokenKind.HiddenSection,   // §HIDDEN - Hidden files in context
+        ["/HIDDEN"] = TokenKind.EndHidden,      // §/HIDDEN
+        ["FOCUS"] = TokenKind.Focus,            // §FOCUS - Focus target
+        ["FILE"] = TokenKind.FileRef,           // §FILE - File reference
+        ["PROPERTY"] = TokenKind.PropertyTest,  // §PROPERTY - Property-based testing
+        ["LOCK"] = TokenKind.Lock,              // §LOCK - Multi-agent locking
+        ["AUTHOR"] = TokenKind.AgentAuthor,     // §AUTHOR - Agent authorship tracking
+        ["TASK"] = TokenKind.TaskRef,           // §TASK - Task reference
+        ["DATE"] = TokenKind.DateMarker,        // §DATE - Date marker
+
         // v2 single-letter keywords (compact syntax)
         ["M"] = TokenKind.Module,           // §M = §MODULE
         ["F"] = TokenKind.Func,             // §F = §FUNC

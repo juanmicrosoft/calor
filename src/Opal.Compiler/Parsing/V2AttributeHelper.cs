@@ -388,4 +388,474 @@ public static class V2AttributeHelper
             _ => shortcode[1..] // Remove # and use as-is
         };
     }
+
+    #region Extended Features - Phase 1: Quick Wins
+
+    /// <summary>
+    /// Interprets attributes for EXAMPLE/§EX: [id:msg:"message"]
+    /// </summary>
+    public static (string? Id, string? Message) InterpretExampleAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Id = attrs["id"];
+        if (!string.IsNullOrEmpty(v1Id))
+        {
+            return (v1Id, attrs["msg"] ?? attrs["message"]);
+        }
+
+        // v2 positional format: [id:msg:"message"] or [id] or empty
+        var id = attrs["_pos0"];
+        var msg = attrs["_pos1"];
+
+        // Handle msg: prefix
+        if (!string.IsNullOrEmpty(msg) && msg.StartsWith("msg:"))
+        {
+            msg = msg[4..];
+        }
+
+        return (id, msg);
+    }
+
+    /// <summary>
+    /// Interprets attributes for TODO/FIXME/HACK: [id:category:priority]
+    /// </summary>
+    public static (string? Id, string? Category, IssuePriority Priority) InterpretIssueAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Id = attrs["id"];
+        if (!string.IsNullOrEmpty(v1Id))
+        {
+            var v1Priority = ParseIssuePriority(attrs["priority"]);
+            return (v1Id, attrs["category"], v1Priority);
+        }
+
+        // v2 positional format: [id:category:priority] or [id:category] or [id]
+        var id = attrs["_pos0"];
+        var category = attrs["_pos1"];
+        var priority = ParseIssuePriority(attrs["_pos2"]);
+
+        return (id, category, priority);
+    }
+
+    /// <summary>
+    /// Parses issue priority from string.
+    /// </summary>
+    public static IssuePriority ParseIssuePriority(string? priorityStr)
+    {
+        return priorityStr?.ToLowerInvariant() switch
+        {
+            "low" => IssuePriority.Low,
+            "medium" or "med" => IssuePriority.Medium,
+            "high" => IssuePriority.High,
+            "critical" or "crit" => IssuePriority.Critical,
+            _ => IssuePriority.Medium
+        };
+    }
+
+    #endregion
+
+    #region Extended Features - Phase 2: Core Features
+
+    /// <summary>
+    /// Interprets attributes for USES/USEDBY: [dep1, dep2, dep3]
+    /// Returns list of dependency targets.
+    /// </summary>
+    public static IReadOnlyList<string> InterpretDependencyListAttributes(AttributeCollection attrs)
+    {
+        var dependencies = new List<string>();
+
+        // Collect all positional attributes
+        for (int i = 0; ; i++)
+        {
+            var dep = attrs[$"_pos{i}"];
+            if (string.IsNullOrEmpty(dep)) break;
+            dependencies.Add(dep);
+        }
+
+        return dependencies;
+    }
+
+    /// <summary>
+    /// Interprets attributes for ASSUME: [category]
+    /// </summary>
+    public static AssumptionCategory? InterpretAssumeAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Cat = attrs["category"];
+        if (!string.IsNullOrEmpty(v1Cat))
+        {
+            return ParseAssumptionCategory(v1Cat);
+        }
+
+        // v2 positional format: [category]
+        var category = attrs["_pos0"];
+        return ParseAssumptionCategory(category);
+    }
+
+    /// <summary>
+    /// Parses assumption category from string.
+    /// </summary>
+    public static AssumptionCategory? ParseAssumptionCategory(string? categoryStr)
+    {
+        return categoryStr?.ToLowerInvariant() switch
+        {
+            "env" or "environment" => AssumptionCategory.Env,
+            "auth" or "authentication" => AssumptionCategory.Auth,
+            "data" => AssumptionCategory.Data,
+            "timing" or "time" => AssumptionCategory.Timing,
+            "resource" or "res" => AssumptionCategory.Resource,
+            _ => null
+        };
+    }
+
+    #endregion
+
+    #region Extended Features - Phase 3: Enhanced Contracts
+
+    /// <summary>
+    /// Interprets attributes for COMPLEXITY: [time:O(n)][space:O(1)] or [worst:time:O(n)]
+    /// </summary>
+    public static (ComplexityClass? Time, ComplexityClass? Space, bool IsWorstCase, string? Custom) InterpretComplexityAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Time = attrs["time"];
+        if (!string.IsNullOrEmpty(v1Time))
+        {
+            var time = ParseComplexityClass(v1Time);
+            var space = ParseComplexityClass(attrs["space"]);
+            var worst = attrs["worst"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false;
+            return (time, space, worst, attrs["custom"]);
+        }
+
+        // v2 format: [time:O(n)][space:O(1)] or [worst:time:O(n)]
+        // Check for positional attributes
+        ComplexityClass? timeComplexity = null;
+        ComplexityClass? spaceComplexity = null;
+        bool isWorstCase = false;
+        string? custom = null;
+
+        for (int i = 0; ; i++)
+        {
+            var val = attrs[$"_pos{i}"];
+            if (string.IsNullOrEmpty(val)) break;
+
+            if (val.StartsWith("worst:", StringComparison.OrdinalIgnoreCase))
+            {
+                isWorstCase = true;
+                val = val[6..];
+            }
+
+            if (val.StartsWith("time:", StringComparison.OrdinalIgnoreCase))
+            {
+                timeComplexity = ParseComplexityClass(val[5..]);
+            }
+            else if (val.StartsWith("space:", StringComparison.OrdinalIgnoreCase))
+            {
+                spaceComplexity = ParseComplexityClass(val[6..]);
+            }
+            else
+            {
+                // Check if it's a complexity class without prefix (assume time)
+                var parsed = ParseComplexityClass(val);
+                if (parsed != null)
+                {
+                    if (timeComplexity == null)
+                        timeComplexity = parsed;
+                    else if (spaceComplexity == null)
+                        spaceComplexity = parsed;
+                }
+                else
+                {
+                    custom = val;
+                }
+            }
+        }
+
+        return (timeComplexity, spaceComplexity, isWorstCase, custom);
+    }
+
+    /// <summary>
+    /// Parses complexity class from string like "O(n)", "O(1)", "O(n log n)".
+    /// </summary>
+    public static ComplexityClass? ParseComplexityClass(string? complexityStr)
+    {
+        if (string.IsNullOrEmpty(complexityStr))
+            return null;
+
+        var normalized = complexityStr.Replace(" ", "").ToLowerInvariant();
+        return normalized switch
+        {
+            "o(1)" => ComplexityClass.O1,
+            "o(logn)" or "o(log(n))" => ComplexityClass.OLogN,
+            "o(n)" => ComplexityClass.ON,
+            "o(nlogn)" or "o(n*logn)" or "o(nlog(n))" => ComplexityClass.ONLogN,
+            "o(n^2)" or "o(n2)" => ComplexityClass.ON2,
+            "o(n^3)" or "o(n3)" => ComplexityClass.ON3,
+            "o(2^n)" or "o(2n)" => ComplexityClass.O2N,
+            "o(n!)" => ComplexityClass.ONFact,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Interprets attributes for SINCE: [version]
+    /// </summary>
+    public static string InterpretSinceAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Version = attrs["version"];
+        if (!string.IsNullOrEmpty(v1Version))
+        {
+            return v1Version;
+        }
+
+        // v2 positional format: [version]
+        return attrs["_pos0"] ?? "";
+    }
+
+    /// <summary>
+    /// Interprets attributes for DEPRECATED: [since:version][use:replacement][reason:"reason"]
+    /// </summary>
+    public static (string Since, string? Replacement, string? Reason, string? RemovedIn) InterpretDeprecatedAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Since = attrs["since"];
+        if (!string.IsNullOrEmpty(v1Since))
+        {
+            return (v1Since, attrs["use"] ?? attrs["replacement"], attrs["reason"], attrs["removed"]);
+        }
+
+        // v2 format: parse key:value pairs from positional attributes
+        string since = "";
+        string? replacement = null;
+        string? reason = null;
+        string? removedIn = null;
+
+        for (int i = 0; ; i++)
+        {
+            var val = attrs[$"_pos{i}"];
+            if (string.IsNullOrEmpty(val)) break;
+
+            if (val.StartsWith("since:", StringComparison.OrdinalIgnoreCase))
+                since = val[6..];
+            else if (val.StartsWith("use:", StringComparison.OrdinalIgnoreCase))
+                replacement = val[4..];
+            else if (val.StartsWith("reason:", StringComparison.OrdinalIgnoreCase))
+                reason = val[7..].Trim('"');
+            else if (val.StartsWith("removed:", StringComparison.OrdinalIgnoreCase))
+                removedIn = val[8..];
+            else if (i == 0 && !val.Contains(':'))
+                since = val; // First positional without prefix is version
+        }
+
+        return (since, replacement, reason, removedIn);
+    }
+
+    /// <summary>
+    /// Interprets attributes for BREAKING: [version]
+    /// </summary>
+    public static string InterpretBreakingAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Version = attrs["version"];
+        if (!string.IsNullOrEmpty(v1Version))
+        {
+            return v1Version;
+        }
+
+        // v2 positional format: [version]
+        return attrs["_pos0"] ?? "";
+    }
+
+    #endregion
+
+    #region Extended Features - Phase 4: Future Extensions
+
+    /// <summary>
+    /// Interprets attributes for DECISION: [id]
+    /// </summary>
+    public static string InterpretDecisionAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Id = attrs["id"];
+        if (!string.IsNullOrEmpty(v1Id))
+        {
+            return v1Id;
+        }
+
+        // v2 positional format: [id]
+        return attrs["_pos0"] ?? "";
+    }
+
+    /// <summary>
+    /// Interprets attributes for CONTEXT: [partial] or empty
+    /// </summary>
+    public static bool InterpretContextAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Partial = attrs["partial"];
+        if (!string.IsNullOrEmpty(v1Partial))
+        {
+            return v1Partial.Equals("true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // v2 positional format: [partial] means partial=true
+        var pos0 = attrs["_pos0"];
+        return pos0?.Equals("partial", StringComparison.OrdinalIgnoreCase) ?? false;
+    }
+
+    /// <summary>
+    /// Interprets attributes for FILE: [path]
+    /// </summary>
+    public static string InterpretFileRefAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Path = attrs["path"];
+        if (!string.IsNullOrEmpty(v1Path))
+        {
+            return v1Path;
+        }
+
+        // v2 positional format: [path]
+        return attrs["_pos0"] ?? "";
+    }
+
+    /// <summary>
+    /// Interprets attributes for FOCUS: [target]
+    /// </summary>
+    public static string InterpretFocusAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Target = attrs["target"];
+        if (!string.IsNullOrEmpty(v1Target))
+        {
+            return v1Target;
+        }
+
+        // v2 positional format: [target]
+        return attrs["_pos0"] ?? "";
+    }
+
+    /// <summary>
+    /// Interprets attributes for LOCK: [agent:id][expires:datetime]
+    /// </summary>
+    public static (string AgentId, DateTime? Acquired, DateTime? Expires) InterpretLockAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Agent = attrs["agent"];
+        if (!string.IsNullOrEmpty(v1Agent))
+        {
+            return (v1Agent, TryParseDateTime(attrs["acquired"]), TryParseDateTime(attrs["expires"]));
+        }
+
+        // v2 format: parse key:value pairs from positional attributes
+        string agentId = "";
+        DateTime? acquired = null;
+        DateTime? expires = null;
+
+        for (int i = 0; ; i++)
+        {
+            var val = attrs[$"_pos{i}"];
+            if (string.IsNullOrEmpty(val)) break;
+
+            if (val.StartsWith("agent:", StringComparison.OrdinalIgnoreCase))
+                agentId = val[6..];
+            else if (val.StartsWith("acquired:", StringComparison.OrdinalIgnoreCase))
+                acquired = TryParseDateTime(val[9..]);
+            else if (val.StartsWith("expires:", StringComparison.OrdinalIgnoreCase))
+                expires = TryParseDateTime(val[8..]);
+        }
+
+        return (agentId, acquired, expires);
+    }
+
+    /// <summary>
+    /// Interprets attributes for AUTHOR: [agent:id][date:date][task:taskId]
+    /// </summary>
+    public static (string AgentId, DateOnly Date, string? TaskId) InterpretAuthorAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Agent = attrs["agent"];
+        if (!string.IsNullOrEmpty(v1Agent))
+        {
+            var v1Date = TryParseDateOnly(attrs["date"]) ?? DateOnly.FromDateTime(DateTime.Now);
+            return (v1Agent, v1Date, attrs["task"]);
+        }
+
+        // v2 format: parse key:value pairs from positional attributes
+        string agentId = "";
+        DateOnly date = DateOnly.FromDateTime(DateTime.Now);
+        string? taskId = null;
+
+        for (int i = 0; ; i++)
+        {
+            var val = attrs[$"_pos{i}"];
+            if (string.IsNullOrEmpty(val)) break;
+
+            if (val.StartsWith("agent:", StringComparison.OrdinalIgnoreCase))
+                agentId = val[6..];
+            else if (val.StartsWith("date:", StringComparison.OrdinalIgnoreCase))
+                date = TryParseDateOnly(val[5..]) ?? date;
+            else if (val.StartsWith("task:", StringComparison.OrdinalIgnoreCase))
+                taskId = val[5..];
+        }
+
+        return (agentId, date, taskId);
+    }
+
+    /// <summary>
+    /// Interprets attributes for TASK: [taskId]
+    /// </summary>
+    public static string InterpretTaskRefAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Task = attrs["task"] ?? attrs["id"];
+        if (!string.IsNullOrEmpty(v1Task))
+        {
+            return v1Task;
+        }
+
+        // v2 positional format: [taskId]
+        return attrs["_pos0"] ?? "";
+    }
+
+    /// <summary>
+    /// Interprets attributes for DATE: [date]
+    /// </summary>
+    public static DateOnly? InterpretDateAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Date = attrs["date"];
+        if (!string.IsNullOrEmpty(v1Date))
+        {
+            return TryParseDateOnly(v1Date);
+        }
+
+        // v2 positional format: date value directly
+        return TryParseDateOnly(attrs["_pos0"]);
+    }
+
+    private static DateTime? TryParseDateTime(string? dateTimeStr)
+    {
+        if (string.IsNullOrEmpty(dateTimeStr))
+            return null;
+
+        if (DateTime.TryParse(dateTimeStr, out var result))
+            return result;
+
+        return null;
+    }
+
+    private static DateOnly? TryParseDateOnly(string? dateStr)
+    {
+        if (string.IsNullOrEmpty(dateStr))
+            return null;
+
+        if (DateOnly.TryParse(dateStr, out var result))
+            return result;
+
+        return null;
+    }
+
+    #endregion
 }

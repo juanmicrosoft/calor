@@ -123,6 +123,28 @@ public interface IAstVisitor
     void Visit(ListPatternNode node);
     void Visit(VarPatternNode node);
     void Visit(ConstantPatternNode node);
+    // Extended Features Phase 1: Quick Wins
+    void Visit(ExampleNode node);
+    void Visit(IssueNode node);
+    // Extended Features Phase 2: Core Features
+    void Visit(DependencyNode node);
+    void Visit(UsesNode node);
+    void Visit(UsedByNode node);
+    void Visit(AssumeNode node);
+    // Extended Features Phase 3: Enhanced Contracts
+    void Visit(ComplexityNode node);
+    void Visit(SinceNode node);
+    void Visit(DeprecatedNode node);
+    void Visit(BreakingChangeNode node);
+    // Extended Features Phase 4: Future Extensions
+    void Visit(DecisionNode node);
+    void Visit(RejectedOptionNode node);
+    void Visit(ContextNode node);
+    void Visit(FileRefNode node);
+    void Visit(PropertyTestNode node);
+    void Visit(LockNode node);
+    void Visit(AuthorNode node);
+    void Visit(TaskRefNode node);
 }
 
 /// <summary>
@@ -230,6 +252,28 @@ public interface IAstVisitor<T>
     T Visit(ListPatternNode node);
     T Visit(VarPatternNode node);
     T Visit(ConstantPatternNode node);
+    // Extended Features Phase 1: Quick Wins
+    T Visit(ExampleNode node);
+    T Visit(IssueNode node);
+    // Extended Features Phase 2: Core Features
+    T Visit(DependencyNode node);
+    T Visit(UsesNode node);
+    T Visit(UsedByNode node);
+    T Visit(AssumeNode node);
+    // Extended Features Phase 3: Enhanced Contracts
+    T Visit(ComplexityNode node);
+    T Visit(SinceNode node);
+    T Visit(DeprecatedNode node);
+    T Visit(BreakingChangeNode node);
+    // Extended Features Phase 4: Future Extensions
+    T Visit(DecisionNode node);
+    T Visit(RejectedOptionNode node);
+    T Visit(ContextNode node);
+    T Visit(FileRefNode node);
+    T Visit(PropertyTestNode node);
+    T Visit(LockNode node);
+    T Visit(AuthorNode node);
+    T Visit(TaskRefNode node);
 }
 
 /// <summary>

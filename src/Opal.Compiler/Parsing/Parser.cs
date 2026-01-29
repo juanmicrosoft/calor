@@ -90,6 +90,13 @@ public sealed class Parser
         var classes = new List<ClassDefinitionNode>();
         var functions = new List<FunctionNode>();
 
+        // Extended Features: Module-level metadata
+        var issues = new List<IssueNode>();
+        var assumptions = new List<AssumeNode>();
+        var invariants = new List<InvariantNode>();
+        var decisions = new List<DecisionNode>();
+        ContextNode? context = null;
+
         while (!IsAtEnd && !Check(TokenKind.EndModule))
         {
             if (Check(TokenKind.Using))
@@ -107,6 +114,41 @@ public sealed class Parser
             else if (Check(TokenKind.Func))
             {
                 functions.Add(ParseFunction());
+            }
+            // Extended Features: Module-level metadata
+            else if (Check(TokenKind.Todo))
+            {
+                issues.Add(ParseTodoIssue());
+            }
+            else if (Check(TokenKind.Fixme))
+            {
+                issues.Add(ParseFixmeIssue());
+            }
+            else if (Check(TokenKind.Hack))
+            {
+                issues.Add(ParseHackIssue());
+            }
+            else if (Check(TokenKind.Assume))
+            {
+                assumptions.Add(ParseAssume());
+            }
+            else if (Check(TokenKind.Invariant))
+            {
+                // Use existing ParseInvariant if available, otherwise parse inline
+                var invStartToken = Expect(TokenKind.Invariant);
+                var invAttrs = ParseAttributes();
+                var message = invAttrs["message"];
+                var condition = ParseExpression();
+                var invSpan = invStartToken.Span.Union(condition.Span);
+                invariants.Add(new InvariantNode(invSpan, condition, message, invAttrs));
+            }
+            else if (Check(TokenKind.Decision))
+            {
+                decisions.Add(ParseDecision());
+            }
+            else if (Check(TokenKind.Context))
+            {
+                context = ParseContext();
             }
             else
             {
@@ -126,7 +168,8 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ModuleNode(span, id, moduleName, usings, interfaces, classes, functions, attrs);
+        return new ModuleNode(span, id, moduleName, usings, interfaces, classes, functions, attrs,
+            issues, assumptions, invariants, decisions, context);
     }
 
     /// <summary>
@@ -208,6 +251,21 @@ public sealed class Parser
         var postconditions = new List<EnsuresNode>();
         var body = new List<StatementNode>();
 
+        // Extended Features: Function-level metadata
+        var examples = new List<ExampleNode>();
+        var issues = new List<IssueNode>();
+        UsesNode? uses = null;
+        UsedByNode? usedBy = null;
+        var assumptions = new List<AssumeNode>();
+        ComplexityNode? complexity = null;
+        SinceNode? since = null;
+        DeprecatedNode? deprecated = null;
+        var breakingChanges = new List<BreakingChangeNode>();
+        var properties = new List<PropertyTestNode>();
+        LockNode? lockNode = null;
+        AuthorNode? author = null;
+        TaskRefNode? taskRef = null;
+
         // Parse optional sections before BODY
         while (!IsAtEnd && !Check(TokenKind.Body) && !Check(TokenKind.EndFunc))
         {
@@ -240,6 +298,67 @@ public sealed class Parser
             {
                 postconditions.Add(ParseEnsures());
             }
+            // Extended Features: Function-level metadata
+            else if (Check(TokenKind.Example))
+            {
+                examples.Add(ParseExample());
+            }
+            else if (Check(TokenKind.Todo))
+            {
+                issues.Add(ParseTodoIssue());
+            }
+            else if (Check(TokenKind.Fixme))
+            {
+                issues.Add(ParseFixmeIssue());
+            }
+            else if (Check(TokenKind.Hack))
+            {
+                issues.Add(ParseHackIssue());
+            }
+            else if (Check(TokenKind.Uses))
+            {
+                uses = ParseUses();
+            }
+            else if (Check(TokenKind.UsedBy))
+            {
+                usedBy = ParseUsedBy();
+            }
+            else if (Check(TokenKind.Assume))
+            {
+                assumptions.Add(ParseAssume());
+            }
+            else if (Check(TokenKind.Complexity))
+            {
+                complexity = ParseComplexity();
+            }
+            else if (Check(TokenKind.Since))
+            {
+                since = ParseSince();
+            }
+            else if (Check(TokenKind.Deprecated))
+            {
+                deprecated = ParseDeprecated();
+            }
+            else if (Check(TokenKind.Breaking))
+            {
+                breakingChanges.Add(ParseBreaking());
+            }
+            else if (Check(TokenKind.PropertyTest))
+            {
+                properties.Add(ParsePropertyTest());
+            }
+            else if (Check(TokenKind.Lock))
+            {
+                lockNode = ParseLock();
+            }
+            else if (Check(TokenKind.AgentAuthor))
+            {
+                author = ParseAuthor();
+            }
+            else if (Check(TokenKind.TaskRef))
+            {
+                taskRef = ParseTaskRef();
+            }
             else
             {
                 break;
@@ -270,7 +389,9 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
-            preconditions, postconditions, body, attrs);
+            preconditions, postconditions, body, attrs,
+            examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
+            properties, lockNode, author, taskRef);
     }
 
     private ParameterNode ParseParameter()
@@ -3029,4 +3150,647 @@ public sealed class Parser
             or TokenKind.RelationalPattern
             || IsExpressionStart();
     }
+
+    #region Extended Features Parsing
+
+    /// <summary>
+    /// Parses an inline example/test.
+    /// §EX (Add 2 3) → 5
+    /// §EX[ex001:msg:"edge case"] (Add 0 0) → 0
+    /// </summary>
+    private ExampleNode ParseExample()
+    {
+        var startToken = Expect(TokenKind.Example);
+        var attrs = ParseAttributes();
+        var (id, message) = V2AttributeHelper.InterpretExampleAttributes(attrs);
+
+        var expression = ParseExpression();
+        Expect(TokenKind.Arrow);
+        var expected = ParseExpression();
+
+        var span = startToken.Span.Union(expected.Span);
+        return new ExampleNode(span, id, expression, expected, message, attrs);
+    }
+
+    /// <summary>
+    /// Parses a TODO issue marker.
+    /// §TODO[t001:perf:high] "Optimize for large n"
+    /// </summary>
+    private IssueNode ParseTodoIssue()
+    {
+        return ParseIssue(IssueKind.Todo, TokenKind.Todo);
+    }
+
+    /// <summary>
+    /// Parses a FIXME issue marker.
+    /// §FIXME[x001:bug:critical] "Integer overflow"
+    /// </summary>
+    private IssueNode ParseFixmeIssue()
+    {
+        return ParseIssue(IssueKind.Fixme, TokenKind.Fixme);
+    }
+
+    /// <summary>
+    /// Parses a HACK issue marker.
+    /// §HACK[h001] "Workaround for API bug"
+    /// </summary>
+    private IssueNode ParseHackIssue()
+    {
+        return ParseIssue(IssueKind.Hack, TokenKind.Hack);
+    }
+
+    private IssueNode ParseIssue(IssueKind kind, TokenKind tokenKind)
+    {
+        var startToken = Expect(tokenKind);
+        var attrs = ParseAttributes();
+        var (id, category, priority) = V2AttributeHelper.InterpretIssueAttributes(attrs);
+
+        // Expect a string description
+        string description = "";
+        if (Check(TokenKind.StrLiteral))
+        {
+            var strToken = Advance();
+            description = (string)strToken.Value!;
+        }
+        else
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, kind.ToString().ToUpperInvariant(), "description");
+        }
+
+        return new IssueNode(startToken.Span, kind, id, category, priority, description, attrs);
+    }
+
+    /// <summary>
+    /// Parses a USES dependency declaration.
+    /// §USES[ValidateOrder, CalculateTotal, SaveOrder]
+    /// </summary>
+    private UsesNode ParseUses()
+    {
+        var startToken = Expect(TokenKind.Uses);
+        var attrs = ParseAttributes();
+        var targets = V2AttributeHelper.InterpretDependencyListAttributes(attrs);
+
+        var dependencies = new List<DependencyNode>();
+        foreach (var target in targets)
+        {
+            var isOptional = target.EndsWith('?');
+            var actualTarget = isOptional ? target[..^1] : target;
+
+            // Check for version constraint: target@1.0.0
+            string? version = null;
+            var atIndex = actualTarget.IndexOf('@');
+            if (atIndex > 0)
+            {
+                version = actualTarget[(atIndex + 1)..];
+                actualTarget = actualTarget[..atIndex];
+            }
+
+            dependencies.Add(new DependencyNode(startToken.Span, actualTarget, version, isOptional, new AttributeCollection()));
+        }
+
+        return new UsesNode(startToken.Span, dependencies, attrs);
+    }
+
+    /// <summary>
+    /// Parses a USEDBY reverse dependency declaration.
+    /// §USEDBY[OrderController.Submit, BatchProcessor.Run]
+    /// </summary>
+    private UsedByNode ParseUsedBy()
+    {
+        var startToken = Expect(TokenKind.UsedBy);
+        var attrs = ParseAttributes();
+        var targets = V2AttributeHelper.InterpretDependencyListAttributes(attrs);
+
+        var dependents = new List<DependencyNode>();
+        bool hasUnknownCallers = false;
+
+        foreach (var target in targets)
+        {
+            if (target == "*" || target.Equals("external", StringComparison.OrdinalIgnoreCase))
+            {
+                hasUnknownCallers = true;
+                continue;
+            }
+
+            var isOptional = target.EndsWith('?');
+            var actualTarget = isOptional ? target[..^1] : target;
+
+            dependents.Add(new DependencyNode(startToken.Span, actualTarget, null, isOptional, new AttributeCollection()));
+        }
+
+        return new UsedByNode(startToken.Span, dependents, hasUnknownCallers, attrs);
+    }
+
+    /// <summary>
+    /// Parses an ASSUME assumption declaration.
+    /// §ASSUME[env] "Database connection pool initialized"
+    /// </summary>
+    private AssumeNode ParseAssume()
+    {
+        var startToken = Expect(TokenKind.Assume);
+        var attrs = ParseAttributes();
+        var category = V2AttributeHelper.InterpretAssumeAttributes(attrs);
+
+        // Expect a string description
+        string description = "";
+        if (Check(TokenKind.StrLiteral))
+        {
+            var strToken = Advance();
+            description = (string)strToken.Value!;
+        }
+        else
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ASSUME", "description");
+        }
+
+        return new AssumeNode(startToken.Span, category, description, attrs);
+    }
+
+    /// <summary>
+    /// Parses a COMPLEXITY performance contract.
+    /// §COMPLEXITY[time:O(n)][space:O(1)]
+    /// §COMPLEXITY[worst:time:O(n)][worst:space:O(n)]
+    /// </summary>
+    private ComplexityNode ParseComplexity()
+    {
+        var startToken = Expect(TokenKind.Complexity);
+        var attrs = ParseAttributes();
+        var (time, space, isWorstCase, custom) = V2AttributeHelper.InterpretComplexityAttributes(attrs);
+
+        return new ComplexityNode(startToken.Span, time, space, isWorstCase, custom, attrs);
+    }
+
+    /// <summary>
+    /// Parses a SINCE versioning marker.
+    /// §SINCE[1.0.0]
+    /// </summary>
+    private SinceNode ParseSince()
+    {
+        var startToken = Expect(TokenKind.Since);
+        var attrs = ParseAttributes();
+        var version = V2AttributeHelper.InterpretSinceAttributes(attrs);
+
+        if (string.IsNullOrEmpty(version))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "SINCE", "version");
+            version = "0.0.0";
+        }
+
+        return new SinceNode(startToken.Span, version, attrs);
+    }
+
+    /// <summary>
+    /// Parses a DEPRECATED marker.
+    /// §DEPRECATED[since:1.5.0][use:NewMethod][reason:"Performance issues"]
+    /// </summary>
+    private DeprecatedNode ParseDeprecated()
+    {
+        var startToken = Expect(TokenKind.Deprecated);
+        var attrs = ParseAttributes();
+        var (since, replacement, reason, removedIn) = V2AttributeHelper.InterpretDeprecatedAttributes(attrs);
+
+        if (string.IsNullOrEmpty(since))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DEPRECATED", "since");
+            since = "0.0.0";
+        }
+
+        return new DeprecatedNode(startToken.Span, since, replacement, reason, removedIn, attrs);
+    }
+
+    /// <summary>
+    /// Parses a BREAKING change marker.
+    /// §BREAKING[1.7.0] "Added required 'options' parameter"
+    /// </summary>
+    private BreakingChangeNode ParseBreaking()
+    {
+        var startToken = Expect(TokenKind.Breaking);
+        var attrs = ParseAttributes();
+        var version = V2AttributeHelper.InterpretBreakingAttributes(attrs);
+
+        if (string.IsNullOrEmpty(version))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "BREAKING", "version");
+            version = "0.0.0";
+        }
+
+        // Expect a string description
+        string description = "";
+        if (Check(TokenKind.StrLiteral))
+        {
+            var strToken = Advance();
+            description = (string)strToken.Value!;
+        }
+        else
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "BREAKING", "description");
+        }
+
+        return new BreakingChangeNode(startToken.Span, version, description, attrs);
+    }
+
+    /// <summary>
+    /// Parses a DECISION record.
+    /// §DECISION[d001] "Algorithm selection"
+    ///   §CHOSEN "QuickSort"
+    ///   §REASON "Best average-case performance"
+    ///   §REJECTED "MergeSort"
+    ///     §REASON "Requires O(n) extra space"
+    ///   §CONTEXT "Typical input: 1000-10000 items"
+    ///   §DATE 2024-01-15
+    ///   §AUTHOR "perf-team"
+    /// §/DECISION[d001]
+    /// </summary>
+    private DecisionNode ParseDecision()
+    {
+        var startToken = Expect(TokenKind.Decision);
+        var attrs = ParseAttributes();
+        var id = V2AttributeHelper.InterpretDecisionAttributes(attrs);
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DECISION", "id");
+            id = "unknown";
+        }
+
+        // Parse title (string literal)
+        string title = "";
+        if (Check(TokenKind.StrLiteral))
+        {
+            var strToken = Advance();
+            title = (string)strToken.Value!;
+        }
+
+        string chosenOption = "";
+        var chosenReasons = new List<string>();
+        var rejectedOptions = new List<RejectedOptionNode>();
+        string? context = null;
+        DateOnly? date = null;
+        string? author = null;
+
+        // Parse decision content
+        while (!IsAtEnd && !Check(TokenKind.EndDecision))
+        {
+            if (Check(TokenKind.Chosen))
+            {
+                Advance();
+                if (Check(TokenKind.StrLiteral))
+                {
+                    var strToken = Advance();
+                    chosenOption = (string)strToken.Value!;
+                }
+            }
+            else if (Check(TokenKind.Reason) && string.IsNullOrEmpty(chosenOption) == false && rejectedOptions.Count == 0)
+            {
+                // This REASON belongs to CHOSEN
+                Advance();
+                if (Check(TokenKind.StrLiteral))
+                {
+                    var strToken = Advance();
+                    chosenReasons.Add((string)strToken.Value!);
+                }
+            }
+            else if (Check(TokenKind.Rejected))
+            {
+                rejectedOptions.Add(ParseRejectedOption());
+            }
+            else if (Check(TokenKind.Context))
+            {
+                Advance();
+                if (Check(TokenKind.StrLiteral))
+                {
+                    var strToken = Advance();
+                    context = (string)strToken.Value!;
+                }
+            }
+            else if (Check(TokenKind.DateMarker))
+            {
+                Advance();
+                var dateAttrs = ParseAttributes();
+                date = V2AttributeHelper.InterpretDateAttributes(dateAttrs);
+                // Also check for bare date literal
+                if (date == null && Check(TokenKind.Identifier))
+                {
+                    var dateStr = Advance().Text;
+                    if (DateOnly.TryParse(dateStr, out var parsedDate))
+                    {
+                        date = parsedDate;
+                    }
+                }
+            }
+            else if (Check(TokenKind.AgentAuthor))
+            {
+                Advance();
+                if (Check(TokenKind.StrLiteral))
+                {
+                    var strToken = Advance();
+                    author = (string)strToken.Value!;
+                }
+            }
+            else if (Check(TokenKind.Reason))
+            {
+                // Orphan REASON - skip
+                Advance();
+                if (Check(TokenKind.StrLiteral)) Advance();
+            }
+            else
+            {
+                // Unknown token - skip
+                Advance();
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndDecision);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "DECISION", id, "END_DECISION", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new DecisionNode(span, id, title, chosenOption, chosenReasons, rejectedOptions, context, date, author, attrs);
+    }
+
+    private RejectedOptionNode ParseRejectedOption()
+    {
+        var startToken = Expect(TokenKind.Rejected);
+        string name = "";
+        if (Check(TokenKind.StrLiteral))
+        {
+            var strToken = Advance();
+            name = (string)strToken.Value!;
+        }
+
+        var reasons = new List<string>();
+        while (Check(TokenKind.Reason))
+        {
+            Advance();
+            if (Check(TokenKind.StrLiteral))
+            {
+                var strToken = Advance();
+                reasons.Add((string)strToken.Value!);
+            }
+        }
+
+        return new RejectedOptionNode(startToken.Span, name, reasons, new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Parses a CONTEXT partial view marker.
+    /// §CONTEXT[partial]
+    ///   §VISIBLE
+    ///     §FILE[OrderService.opal]
+    ///   §/VISIBLE
+    ///   §HIDDEN
+    ///     §FILE[PaymentService.opal] "Not loaded - external"
+    ///   §/HIDDEN
+    ///   §FOCUS[OrderService.ProcessOrder]
+    /// §/CONTEXT
+    /// </summary>
+    private ContextNode ParseContext()
+    {
+        var startToken = Expect(TokenKind.Context);
+        var attrs = ParseAttributes();
+        var isPartial = V2AttributeHelper.InterpretContextAttributes(attrs);
+
+        var visibleFiles = new List<FileRefNode>();
+        var hiddenFiles = new List<FileRefNode>();
+        string? focusTarget = null;
+
+        while (!IsAtEnd && !Check(TokenKind.EndContext))
+        {
+            if (Check(TokenKind.Visible))
+            {
+                Advance();
+                while (!IsAtEnd && !Check(TokenKind.EndVisible))
+                {
+                    if (Check(TokenKind.FileRef))
+                    {
+                        visibleFiles.Add(ParseFileRef());
+                    }
+                    else
+                    {
+                        Advance();
+                    }
+                }
+                if (Check(TokenKind.EndVisible)) Advance();
+            }
+            else if (Check(TokenKind.HiddenSection))
+            {
+                Advance();
+                while (!IsAtEnd && !Check(TokenKind.EndHidden))
+                {
+                    if (Check(TokenKind.FileRef))
+                    {
+                        hiddenFiles.Add(ParseFileRef());
+                    }
+                    else
+                    {
+                        Advance();
+                    }
+                }
+                if (Check(TokenKind.EndHidden)) Advance();
+            }
+            else if (Check(TokenKind.Focus))
+            {
+                Advance();
+                var focusAttrs = ParseAttributes();
+                focusTarget = V2AttributeHelper.InterpretFocusAttributes(focusAttrs);
+            }
+            else if (Check(TokenKind.FileRef))
+            {
+                // Standalone FILE goes to visible by default
+                visibleFiles.Add(ParseFileRef());
+            }
+            else
+            {
+                Advance();
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndContext);
+        var span = startToken.Span.Union(endToken.Span);
+        return new ContextNode(span, isPartial, visibleFiles, hiddenFiles, focusTarget, attrs);
+    }
+
+    private FileRefNode ParseFileRef()
+    {
+        var startToken = Expect(TokenKind.FileRef);
+        var attrs = ParseAttributes();
+        var filePath = V2AttributeHelper.InterpretFileRefAttributes(attrs);
+
+        string? description = null;
+        if (Check(TokenKind.StrLiteral))
+        {
+            var strToken = Advance();
+            description = (string)strToken.Value!;
+        }
+
+        return new FileRefNode(startToken.Span, filePath, description, attrs);
+    }
+
+    /// <summary>
+    /// Parses a PROPERTY (property-based testing) declaration.
+    /// §PROPERTY ∀arr: (== (Reverse (Reverse arr)) arr)
+    /// </summary>
+    private PropertyTestNode ParsePropertyTest()
+    {
+        var startToken = Expect(TokenKind.PropertyTest);
+        var attrs = ParseAttributes();
+
+        var quantifiers = new List<string>();
+
+        // Check for universal quantifier ∀ or "forall" keyword
+        if (Check(TokenKind.Identifier))
+        {
+            var quantifierText = Current.Text;
+            if (quantifierText.StartsWith("∀") || quantifierText.Equals("forall", StringComparison.OrdinalIgnoreCase))
+            {
+                Advance();
+                // Parse variable names: ∀x,y,z:
+                if (quantifierText.StartsWith("∀") && quantifierText.Length > 1)
+                {
+                    // ∀x format - variable is part of the token
+                    var varPart = quantifierText[1..];
+                    if (varPart.EndsWith(':'))
+                        varPart = varPart[..^1];
+                    foreach (var v in varPart.Split(','))
+                    {
+                        if (!string.IsNullOrWhiteSpace(v))
+                            quantifiers.Add(v.Trim());
+                    }
+                }
+                else
+                {
+                    // Separate variable list
+                    while (Check(TokenKind.Identifier))
+                    {
+                        var varName = Advance().Text;
+                        if (varName.EndsWith(':'))
+                            varName = varName[..^1];
+                        foreach (var v in varName.Split(','))
+                        {
+                            if (!string.IsNullOrWhiteSpace(v))
+                                quantifiers.Add(v.Trim());
+                        }
+                        // Skip colon if present
+                        if (Check(TokenKind.Colon))
+                        {
+                            Advance();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        var predicate = ParseExpression();
+        var span = startToken.Span.Union(predicate.Span);
+        return new PropertyTestNode(span, quantifiers, predicate, attrs);
+    }
+
+    /// <summary>
+    /// Parses a LOCK multi-agent locking declaration.
+    /// §LOCK[agent:agent-123][expires:2024-01-15T11:00:00Z]
+    /// </summary>
+    private LockNode ParseLock()
+    {
+        var startToken = Expect(TokenKind.Lock);
+        var attrs = ParseAttributes();
+        var (agentId, acquired, expires) = V2AttributeHelper.InterpretLockAttributes(attrs);
+
+        if (string.IsNullOrEmpty(agentId))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "LOCK", "agent");
+            agentId = "unknown";
+        }
+
+        return new LockNode(startToken.Span, agentId, acquired, expires, attrs);
+    }
+
+    /// <summary>
+    /// Parses an AUTHOR agent authorship tracking declaration.
+    /// §AUTHOR[agent:agent-456][date:2024-01-10][task:PROJ-789]
+    /// </summary>
+    private AuthorNode ParseAuthor()
+    {
+        var startToken = Expect(TokenKind.AgentAuthor);
+        var attrs = ParseAttributes();
+        var (agentId, date, taskId) = V2AttributeHelper.InterpretAuthorAttributes(attrs);
+
+        if (string.IsNullOrEmpty(agentId))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "AUTHOR", "agent");
+            agentId = "unknown";
+        }
+
+        return new AuthorNode(startToken.Span, agentId, date, taskId, attrs);
+    }
+
+    /// <summary>
+    /// Parses a TASK reference.
+    /// §TASK[PROJ-789] "Implement validation"
+    /// </summary>
+    private TaskRefNode ParseTaskRef()
+    {
+        var startToken = Expect(TokenKind.TaskRef);
+        var attrs = ParseAttributes();
+        var taskId = V2AttributeHelper.InterpretTaskRefAttributes(attrs);
+
+        if (string.IsNullOrEmpty(taskId))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "TASK", "id");
+            taskId = "unknown";
+        }
+
+        // Expect a string description
+        string description = "";
+        if (Check(TokenKind.StrLiteral))
+        {
+            var strToken = Advance();
+            description = (string)strToken.Value!;
+        }
+
+        return new TaskRefNode(startToken.Span, taskId, description, attrs);
+    }
+
+    /// <summary>
+    /// Checks if the current token starts an extended metadata declaration.
+    /// </summary>
+    private bool IsExtendedMetadataStart()
+    {
+        return Current.Kind is TokenKind.Example
+            or TokenKind.Todo
+            or TokenKind.Fixme
+            or TokenKind.Hack
+            or TokenKind.Uses
+            or TokenKind.UsedBy
+            or TokenKind.Assume
+            or TokenKind.Complexity
+            or TokenKind.Since
+            or TokenKind.Deprecated
+            or TokenKind.Breaking
+            or TokenKind.PropertyTest
+            or TokenKind.Lock
+            or TokenKind.AgentAuthor
+            or TokenKind.TaskRef;
+    }
+
+    /// <summary>
+    /// Checks if the current token starts a module-level extended metadata declaration.
+    /// </summary>
+    private bool IsModuleLevelExtendedMetadataStart()
+    {
+        return Current.Kind is TokenKind.Todo
+            or TokenKind.Fixme
+            or TokenKind.Hack
+            or TokenKind.Assume
+            or TokenKind.Invariant
+            or TokenKind.Decision
+            or TokenKind.Context;
+    }
+
+    #endregion
 }

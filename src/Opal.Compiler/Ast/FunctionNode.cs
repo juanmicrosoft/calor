@@ -63,6 +63,28 @@ public sealed class FunctionNode : AstNode
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
 
+    // Extended Features: Inline Examples/Tests
+    public IReadOnlyList<ExampleNode> Examples { get; }
+    // Extended Features: Structured Issues
+    public IReadOnlyList<IssueNode> Issues { get; }
+    // Extended Features: Dependencies
+    public UsesNode? Uses { get; }
+    public UsedByNode? UsedBy { get; }
+    // Extended Features: Assumptions
+    public IReadOnlyList<AssumeNode> Assumptions { get; }
+    // Extended Features: Complexity
+    public ComplexityNode? Complexity { get; }
+    // Extended Features: Versioning
+    public SinceNode? Since { get; }
+    public DeprecatedNode? Deprecated { get; }
+    public IReadOnlyList<BreakingChangeNode> BreakingChanges { get; }
+    // Extended Features: Property-based Testing
+    public IReadOnlyList<PropertyTestNode> Properties { get; }
+    // Extended Features: Multi-agent Collaboration
+    public LockNode? Lock { get; }
+    public AuthorNode? Author { get; }
+    public TaskRefNode? TaskRef { get; }
+
     public FunctionNode(
         TextSpan span,
         string id,
@@ -74,7 +96,10 @@ public sealed class FunctionNode : AstNode
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
         : this(span, id, name, visibility, Array.Empty<TypeParameterNode>(), parameters, output, effects,
-               Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(), body, attributes)
+               Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(), body, attributes,
+               Array.Empty<ExampleNode>(), Array.Empty<IssueNode>(), null, null,
+               Array.Empty<AssumeNode>(), null, null, null, Array.Empty<BreakingChangeNode>(),
+               Array.Empty<PropertyTestNode>(), null, null, null)
     {
     }
 
@@ -91,7 +116,10 @@ public sealed class FunctionNode : AstNode
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
         : this(span, id, name, visibility, Array.Empty<TypeParameterNode>(), parameters, output, effects,
-               preconditions, postconditions, body, attributes)
+               preconditions, postconditions, body, attributes,
+               Array.Empty<ExampleNode>(), Array.Empty<IssueNode>(), null, null,
+               Array.Empty<AssumeNode>(), null, null, null, Array.Empty<BreakingChangeNode>(),
+               Array.Empty<PropertyTestNode>(), null, null, null)
     {
     }
 
@@ -108,6 +136,40 @@ public sealed class FunctionNode : AstNode
         IReadOnlyList<EnsuresNode> postconditions,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
+        : this(span, id, name, visibility, typeParameters, parameters, output, effects,
+               preconditions, postconditions, body, attributes,
+               Array.Empty<ExampleNode>(), Array.Empty<IssueNode>(), null, null,
+               Array.Empty<AssumeNode>(), null, null, null, Array.Empty<BreakingChangeNode>(),
+               Array.Empty<PropertyTestNode>(), null, null, null)
+    {
+    }
+
+    public FunctionNode(
+        TextSpan span,
+        string id,
+        string name,
+        Visibility visibility,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        EffectsNode? effects,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes,
+        IReadOnlyList<ExampleNode> examples,
+        IReadOnlyList<IssueNode> issues,
+        UsesNode? uses,
+        UsedByNode? usedBy,
+        IReadOnlyList<AssumeNode> assumptions,
+        ComplexityNode? complexity,
+        SinceNode? since,
+        DeprecatedNode? deprecated,
+        IReadOnlyList<BreakingChangeNode> breakingChanges,
+        IReadOnlyList<PropertyTestNode> properties,
+        LockNode? lockNode,
+        AuthorNode? author,
+        TaskRefNode? taskRef)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -121,6 +183,19 @@ public sealed class FunctionNode : AstNode
         Postconditions = postconditions ?? throw new ArgumentNullException(nameof(postconditions));
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        Examples = examples ?? throw new ArgumentNullException(nameof(examples));
+        Issues = issues ?? throw new ArgumentNullException(nameof(issues));
+        Uses = uses;
+        UsedBy = usedBy;
+        Assumptions = assumptions ?? throw new ArgumentNullException(nameof(assumptions));
+        Complexity = complexity;
+        Since = since;
+        Deprecated = deprecated;
+        BreakingChanges = breakingChanges ?? throw new ArgumentNullException(nameof(breakingChanges));
+        Properties = properties ?? throw new ArgumentNullException(nameof(properties));
+        Lock = lockNode;
+        Author = author;
+        TaskRef = taskRef;
     }
 
     /// <summary>
@@ -132,6 +207,14 @@ public sealed class FunctionNode : AstNode
     /// Returns true if this function is generic (has type parameters).
     /// </summary>
     public bool IsGeneric => TypeParameters.Count > 0;
+
+    /// <summary>
+    /// Returns true if this function has extended metadata (examples, issues, dependencies, etc.).
+    /// </summary>
+    public bool HasExtendedMetadata => Examples.Count > 0 || Issues.Count > 0 || Uses != null ||
+        UsedBy != null || Assumptions.Count > 0 || Complexity != null || Since != null ||
+        Deprecated != null || BreakingChanges.Count > 0 || Properties.Count > 0 ||
+        Lock != null || Author != null || TaskRef != null;
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);

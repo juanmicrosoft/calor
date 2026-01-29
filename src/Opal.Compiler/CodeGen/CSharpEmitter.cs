@@ -67,9 +67,51 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine();
 
         var namespaceName = SanitizeIdentifier(node.Name);
+
+        // Emit module-level extended metadata as file-level comments
+        if (node.Context != null)
+        {
+            var contextComment = Visit(node.Context);
+            foreach (var line in contextComment.Split('\n'))
+            {
+                AppendLine(line);
+            }
+            AppendLine();
+        }
+        foreach (var decision in node.Decisions)
+        {
+            var decisionComment = Visit(decision);
+            foreach (var line in decisionComment.Split('\n'))
+            {
+                AppendLine(line);
+            }
+            AppendLine();
+        }
+
         AppendLine($"namespace {namespaceName}");
         AppendLine("{");
         Indent();
+
+        // Emit module-level issues as comments
+        foreach (var issue in node.Issues)
+        {
+            AppendLine(Visit(issue));
+        }
+        // Emit module-level assumptions
+        foreach (var assume in node.Assumptions)
+        {
+            AppendLine(Visit(assume));
+        }
+        // Emit module-level invariants as comments
+        foreach (var invariant in node.Invariants)
+        {
+            var invCode = Visit(invariant);
+            AppendLine($"// INVARIANT: {invCode}");
+        }
+        if (node.Issues.Count > 0 || node.Assumptions.Count > 0 || node.Invariants.Count > 0)
+        {
+            AppendLine();
+        }
 
         // Emit interfaces
         foreach (var iface in node.Interfaces)
@@ -126,6 +168,58 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(FunctionNode node)
     {
+        // Emit extended metadata as documentation comments
+        foreach (var issue in node.Issues)
+        {
+            AppendLine(Visit(issue));
+        }
+        if (node.Uses != null)
+        {
+            AppendLine(Visit(node.Uses));
+        }
+        if (node.UsedBy != null)
+        {
+            AppendLine(Visit(node.UsedBy));
+        }
+        foreach (var assume in node.Assumptions)
+        {
+            AppendLine(Visit(assume));
+        }
+        if (node.Complexity != null)
+        {
+            AppendLine(Visit(node.Complexity));
+        }
+        if (node.Since != null)
+        {
+            AppendLine(Visit(node.Since));
+        }
+        foreach (var breaking in node.BreakingChanges)
+        {
+            AppendLine(Visit(breaking));
+        }
+        foreach (var prop in node.Properties)
+        {
+            AppendLine(Visit(prop));
+        }
+        if (node.Lock != null)
+        {
+            AppendLine(Visit(node.Lock));
+        }
+        if (node.Author != null)
+        {
+            AppendLine(Visit(node.Author));
+        }
+        if (node.TaskRef != null)
+        {
+            AppendLine(Visit(node.TaskRef));
+        }
+
+        // Emit [Obsolete] attribute if deprecated
+        if (node.Deprecated != null)
+        {
+            AppendLine(Visit(node.Deprecated));
+        }
+
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
@@ -173,6 +267,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine($"{visibility} {staticKeyword}{mappedReturnType} {methodName}{typeParams}({parameters}){whereClause}");
         AppendLine("{");
         Indent();
+
+        // Emit inline examples as Debug.Assert
+        foreach (var example in node.Examples)
+        {
+            AppendLine(Visit(example));
+        }
 
         // Emit preconditions (REQUIRES)
         foreach (var requires in node.Preconditions)
@@ -666,7 +766,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private static string EscapeString(string s)
     {
-        return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
     }
 
     // Phase 6: Arrays and Collections
@@ -1547,6 +1647,279 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         return node.Value.Accept(this);
     }
+
+    #region Extended Features Visit Methods
+
+    /// <summary>
+    /// Emits Debug.Assert for an inline example/test.
+    /// </summary>
+    public string Visit(ExampleNode node)
+    {
+        var expr = node.Expression.Accept(this);
+        var expected = node.Expected.Accept(this);
+        var message = node.Message ?? $"Example {node.Id ?? ""}";
+        return $"System.Diagnostics.Debug.Assert(object.Equals({expr}, {expected}), \"{EscapeString(message)}\");";
+    }
+
+    /// <summary>
+    /// Emits a structured comment for issues (TODO, FIXME, HACK).
+    /// </summary>
+    public string Visit(IssueNode node)
+    {
+        var idPart = node.Id != null ? $"[{node.Id}]" : "";
+        var categoryPart = node.Category != null ? $"({node.Category})" : "";
+        var priorityPart = node.Priority != IssuePriority.Medium ? $" [{node.Priority}]" : "";
+        return $"// {node.Kind.ToString().ToUpperInvariant()}{idPart}{categoryPart}{priorityPart}: {node.Description}";
+    }
+
+    /// <summary>
+    /// Emits nothing for dependency nodes (used as part of Uses/UsedBy).
+    /// </summary>
+    public string Visit(DependencyNode node)
+    {
+        var versionPart = node.Version != null ? $"@{node.Version}" : "";
+        var optionalPart = node.IsOptional ? "?" : "";
+        return $"{node.Target}{versionPart}{optionalPart}";
+    }
+
+    /// <summary>
+    /// Emits a comment for USES declarations.
+    /// </summary>
+    public string Visit(UsesNode node)
+    {
+        if (node.Dependencies.Count == 0)
+            return "";
+
+        var deps = string.Join(", ", node.Dependencies.Select(d => d.Accept(this)));
+        return $"// USES: {deps}";
+    }
+
+    /// <summary>
+    /// Emits a comment for USEDBY declarations.
+    /// </summary>
+    public string Visit(UsedByNode node)
+    {
+        if (node.Dependents.Count == 0 && !node.HasUnknownCallers)
+            return "";
+
+        var deps = string.Join(", ", node.Dependents.Select(d => d.Accept(this)));
+        var unknownPart = node.HasUnknownCallers ? (deps.Length > 0 ? ", [external]" : "[external]") : "";
+        return $"// USEDBY: {deps}{unknownPart}";
+    }
+
+    /// <summary>
+    /// Emits a comment for ASSUME declarations.
+    /// </summary>
+    public string Visit(AssumeNode node)
+    {
+        var categoryPart = node.Category.HasValue ? $"[{node.Category.Value.ToString().ToLowerInvariant()}]" : "";
+        return $"// ASSUME{categoryPart}: {node.Description}";
+    }
+
+    /// <summary>
+    /// Emits a comment for COMPLEXITY declarations.
+    /// </summary>
+    public string Visit(ComplexityNode node)
+    {
+        var parts = new List<string>();
+        var prefix = node.IsWorstCase ? "Worst-case " : "";
+
+        if (node.TimeComplexity.HasValue)
+            parts.Add($"time: {FormatComplexity(node.TimeComplexity.Value)}");
+        if (node.SpaceComplexity.HasValue)
+            parts.Add($"space: {FormatComplexity(node.SpaceComplexity.Value)}");
+        if (node.CustomExpression != null)
+            parts.Add(node.CustomExpression);
+
+        if (parts.Count == 0)
+            return "";
+
+        return $"// COMPLEXITY: {prefix}{string.Join(", ", parts)}";
+    }
+
+    private static string FormatComplexity(ComplexityClass c)
+    {
+        return c switch
+        {
+            ComplexityClass.O1 => "O(1)",
+            ComplexityClass.OLogN => "O(log n)",
+            ComplexityClass.ON => "O(n)",
+            ComplexityClass.ONLogN => "O(n log n)",
+            ComplexityClass.ON2 => "O(n²)",
+            ComplexityClass.ON3 => "O(n³)",
+            ComplexityClass.O2N => "O(2ⁿ)",
+            ComplexityClass.ONFact => "O(n!)",
+            _ => c.ToString()
+        };
+    }
+
+    /// <summary>
+    /// Emits a comment for SINCE declarations.
+    /// </summary>
+    public string Visit(SinceNode node)
+    {
+        return $"// SINCE: {node.Version}";
+    }
+
+    /// <summary>
+    /// Emits an [Obsolete] attribute for DEPRECATED declarations.
+    /// </summary>
+    public string Visit(DeprecatedNode node)
+    {
+        var parts = new List<string>();
+        parts.Add($"Deprecated since {node.SinceVersion}");
+
+        if (node.Replacement != null)
+            parts.Add($"Use {node.Replacement} instead");
+        if (node.Reason != null)
+            parts.Add(node.Reason);
+        if (node.RemovedInVersion != null)
+            parts.Add($"Will be removed in {node.RemovedInVersion}");
+
+        var message = string.Join(". ", parts);
+        return $"[System.Obsolete(\"{EscapeString(message)}\")]";
+    }
+
+    /// <summary>
+    /// Emits a comment for BREAKING declarations.
+    /// </summary>
+    public string Visit(BreakingChangeNode node)
+    {
+        return $"// BREAKING CHANGE ({node.Version}): {node.Description}";
+    }
+
+    /// <summary>
+    /// Emits documentation comment for a DECISION record.
+    /// </summary>
+    public string Visit(DecisionNode node)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"// DECISION[{node.Id}]: {node.Title}");
+        sb.AppendLine($"// Chosen: {node.ChosenOption}");
+        foreach (var reason in node.ChosenReasons)
+        {
+            sb.AppendLine($"//   Reason: {reason}");
+        }
+        foreach (var rejected in node.RejectedOptions)
+        {
+            var rejectedText = Visit(rejected);
+            foreach (var line in rejectedText.Split('\n'))
+            {
+                sb.AppendLine(line);
+            }
+        }
+        if (node.Context != null)
+            sb.AppendLine($"// Context: {node.Context}");
+        if (node.Date.HasValue)
+            sb.AppendLine($"// Date: {node.Date.Value:yyyy-MM-dd}");
+        if (node.Author != null)
+            sb.AppendLine($"// Author: {node.Author}");
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Emits documentation for a rejected option in a decision record.
+    /// </summary>
+    public string Visit(RejectedOptionNode node)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"// Rejected: {node.Name}");
+        foreach (var reason in node.Reasons)
+        {
+            sb.AppendLine($"//   Reason: {reason}");
+        }
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Emits a comment for CONTEXT partial view markers.
+    /// </summary>
+    public string Visit(ContextNode node)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"// CONTEXT{(node.IsPartial ? " (partial)" : "")}");
+
+        if (node.VisibleFiles.Count > 0)
+        {
+            sb.AppendLine("// Visible:");
+            foreach (var file in node.VisibleFiles)
+            {
+                sb.AppendLine($"//   - {file.FilePath}{(file.Description != null ? $" ({file.Description})" : "")}");
+            }
+        }
+
+        if (node.HiddenFiles.Count > 0)
+        {
+            sb.AppendLine("// Hidden:");
+            foreach (var file in node.HiddenFiles)
+            {
+                sb.AppendLine($"//   - {file.FilePath}{(file.Description != null ? $" ({file.Description})" : "")}");
+            }
+        }
+
+        if (node.FocusTarget != null)
+            sb.AppendLine($"// Focus: {node.FocusTarget}");
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Emits a comment for FILE references.
+    /// </summary>
+    public string Visit(FileRefNode node)
+    {
+        var descPart = node.Description != null ? $" ({node.Description})" : "";
+        return $"// FILE: {node.FilePath}{descPart}";
+    }
+
+    /// <summary>
+    /// Emits a property-based test method stub.
+    /// </summary>
+    public string Visit(PropertyTestNode node)
+    {
+        var quantifiers = node.Quantifiers.Count > 0
+            ? $"∀{string.Join(",", node.Quantifiers)}: "
+            : "";
+        var predicate = node.Predicate.Accept(this);
+        return $"// PROPERTY: {quantifiers}{predicate}";
+    }
+
+    /// <summary>
+    /// Emits a comment for LOCK declarations.
+    /// </summary>
+    public string Visit(LockNode node)
+    {
+        var parts = new List<string> { $"agent={node.AgentId}" };
+        if (node.Acquired.HasValue)
+            parts.Add($"acquired={node.Acquired.Value:O}");
+        if (node.Expires.HasValue)
+            parts.Add($"expires={node.Expires.Value:O}");
+
+        return $"// LOCK: {string.Join(", ", parts)}";
+    }
+
+    /// <summary>
+    /// Emits a comment for AUTHOR declarations.
+    /// </summary>
+    public string Visit(AuthorNode node)
+    {
+        var parts = new List<string> { $"agent={node.AgentId}", $"date={node.Date:yyyy-MM-dd}" };
+        if (node.TaskId != null)
+            parts.Add($"task={node.TaskId}");
+
+        return $"// AUTHOR: {string.Join(", ", parts)}";
+    }
+
+    /// <summary>
+    /// Emits a comment for TASK references.
+    /// </summary>
+    public string Visit(TaskRefNode node)
+    {
+        return $"// TASK[{node.TaskId}]: {node.Description}";
+    }
+
+    #endregion
 
     private string GetInferredTypeName(ExpressionNode expr)
     {
