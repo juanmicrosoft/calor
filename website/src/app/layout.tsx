@@ -1,0 +1,59 @@
+import type { Metadata } from 'next';
+import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
+import './globals.css';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: 'OPAL - Optimized Programming for Agent Language',
+    template: '%s | OPAL',
+  },
+  description:
+    'A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.',
+  keywords: ['OPAL', 'programming language', 'AI', 'coding agents', 'compiler', '.NET', 'C#'],
+  authors: [{ name: 'OPAL Team' }],
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://juanmicrosoft.github.io/opal',
+    siteName: 'OPAL',
+    title: 'OPAL - Optimized Programming for Agent Language',
+    description:
+      'A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'OPAL - Optimized Programming for Agent Language',
+    description:
+      'A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.',
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+        <div className="relative flex min-h-screen flex-col">
+          <Header />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </div>
+      </body>
+    </html>
+  );
+}

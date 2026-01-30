@@ -1,0 +1,198 @@
+---
+title: "Types"
+section: "syntax-reference"
+order: 2
+---
+
+# Types
+
+OPAL has a simple type system with primitives, optionals, and results.
+
+---
+
+## Primitive Types
+
+| OPAL | Description | C# | Range |
+|:-----|:------------|:---|:------|
+| `i32` | 32-bit signed integer | `int` | -2^31 to 2^31-1 |
+| `i64` | 64-bit signed integer | `long` | -2^63 to 2^63-1 |
+| `f32` | 32-bit floating point | `float` | +/-3.4 x 10^38 |
+| `f64` | 64-bit floating point | `double` | +/-1.8 x 10^308 |
+| `str` | String | `string` | UTF-16 text |
+| `bool` | Boolean | `bool` | `true` or `false` |
+| `void` | No value | `void` | (return type only) |
+
+---
+
+## Usage in Declarations
+
+### Input Parameters
+
+```
+§I[i32:count]       // int count
+§I[str:name]        // string name
+§I[f64:price]       // double price
+§I[bool:active]     // bool active
+```
+
+### Output Types
+
+```
+§O[i32]             // returns int
+§O[str]             // returns string
+§O[void]            // returns nothing
+```
+
+---
+
+## Option Type (`?T`)
+
+Options represent values that may be absent.
+
+### Syntax
+
+```
+?T                  // Option of T (may be null)
+```
+
+### Examples
+
+```
+§F[f001:Find:pub]
+  §I[str:key]
+  §O[?str]              // might return a string, might return nothing
+  // ...
+§/F[f001]
+
+§F[f002:Process:pub]
+  §I[?i32:maybeValue]   // accepts null
+  §O[void]
+  // ...
+§/F[f002]
+```
+
+### Creating Option Values
+
+```
+§SOME value         // Some(value) - has a value
+§NONE[type=T]       // None of type T - no value
+```
+
+### Example
+
+```
+§F[f001:FindUser:pub]
+  §I[i32:id]
+  §O[?User]
+  §IF[if1] (== id 0)
+    §R §NONE[type=User]
+  §EL
+    §R §SOME user
+  §/I[if1]
+§/F[f001]
+```
+
+---
+
+## Result Type (`T!E`)
+
+Results represent computations that may fail.
+
+### Syntax
+
+```
+T!E                 // Result: either T (success) or E (error)
+```
+
+### Examples
+
+```
+§F[f001:Divide:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32!str]           // returns int on success, string error on failure
+  §IF[if1] (== b 0)
+    §R §ERR "Division by zero"
+  §EL
+    §R §OK (/ a b)
+  §/I[if1]
+§/F[f001]
+```
+
+### Creating Result Values
+
+```
+§OK value           // Ok(value) - success
+§ERR "message"      // Err(message) - failure
+```
+
+### Common Patterns
+
+**Parse integer:**
+```
+§F[f001:ParseInt:pub]
+  §I[str:text]
+  §O[i32!str]
+  // ...implementation
+§/F[f001]
+```
+
+**File read:**
+```
+§F[f001:ReadFile:pub]
+  §I[str:path]
+  §O[str!str]
+  §E[fr]
+  // ...implementation
+§/F[f001]
+```
+
+---
+
+## Type Annotations in Contracts
+
+Types matter in contracts for proper comparisons:
+
+```
+§F[f001:Clamp:pub]
+  §I[i32:value]
+  §I[i32:min]
+  §I[i32:max]
+  §O[i32]
+  §Q (<= min max)           // Requires: min <= max
+  §S (>= result min)        // Ensures: result >= min
+  §S (<= result max)        // Ensures: result <= max
+  // ...
+§/F[f001]
+```
+
+---
+
+## Type Compatibility
+
+| Operation | Valid Types |
+|:----------|:------------|
+| Arithmetic (`+`, `-`, `*`, `/`) | Numeric (`i32`, `i64`, `f32`, `f64`) |
+| Modulo (`%`) | Integer (`i32`, `i64`) |
+| Comparison (`<`, `>`, etc.) | Numeric, `str` |
+| Equality (`==`, `!=`) | Any matching types |
+| Logical (`&&`, `\|\|`) | `bool` |
+
+---
+
+## Literals
+
+| Type | Literal Examples |
+|:-----|:-----------------|
+| `i32` | `42`, `-17`, `0` |
+| `i64` | `42L`, `-17L` |
+| `f32` | `3.14f` |
+| `f64` | `3.14`, `2.718` |
+| `str` | `"hello"`, `"world"` |
+| `bool` | `true`, `false` |
+
+---
+
+## Next
+
+- [Expressions](/syntax-reference/expressions/) - Operators and expressions

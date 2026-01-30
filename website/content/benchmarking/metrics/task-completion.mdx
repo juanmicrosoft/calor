@@ -1,0 +1,258 @@
+---
+title: "Task Completion"
+section: "benchmarking"
+order: 7
+---
+
+# Task Completion Metric
+
+**Category:** Task Completion
+**Result:** C# wins (0.93x)
+**What it measures:** End-to-end task success rates
+
+---
+
+## Overview
+
+The Task Completion metric measures how successfully AI agents can complete full programming tasks, from understanding requirements to producing working code.
+
+---
+
+## Why It Matters
+
+Real-world agent tasks involve:
+- Understanding requirements
+- Generating code
+- Compiling successfully
+- Producing correct output
+- Doing so efficiently (context window usage)
+
+This metric captures end-to-end success, not just individual capabilities.
+
+---
+
+## How It's Measured
+
+### Completion Potential Score
+
+| Factor | OPAL | C# |
+|:-------|:-----|:---|
+| Token efficiency | Variable | Typically better |
+| Compilation success | +0.20 | +0.20 |
+| Complete structure | +0.05 to +0.10 | +0.05 to +0.15 |
+| Has contracts | +0.05 | N/A |
+
+Base score: 0.50 for both
+
+### Token Efficiency Bonus
+
+| Token Count | OPAL Bonus | C# Bonus |
+|:------------|:-----------|:---------|
+| < 50 | +0.15 | N/A |
+| < 100 | +0.10 | +0.10 |
+| < 200 | +0.05 | +0.05 |
+
+C# cap: 0.95 (slight penalty for verbosity overhead)
+
+---
+
+## Task Verification
+
+For each task, the framework verifies:
+
+```csharp
+// Check required patterns are present
+foreach (var pattern in task.RequiredPatterns)
+{
+    if (!Regex.IsMatch(output, pattern))
+        return false;
+}
+
+// Check forbidden patterns are absent
+foreach (var pattern in task.ForbiddenPatterns)
+{
+    if (Regex.IsMatch(output, pattern))
+        return false;
+}
+
+// Verify compilation if required
+if (task.RequiresCompilation)
+{
+    return compilation.Success;
+}
+```
+
+---
+
+## Efficiency Calculation
+
+```
+Efficiency = (Success ? 1.0 : 0.0) / TokensUsed × 1000
+```
+
+Higher efficiency = more success per token.
+
+---
+
+## Why C# Wins
+
+### 1. Ecosystem Maturity
+
+C# has:
+- Extensive documentation
+- Large code corpus for training
+- Well-understood patterns
+- Rich tooling support
+
+### 2. Token Efficiency
+
+For the same logic, C# typically uses fewer tokens:
+
+| Task | OPAL Tokens | C# Tokens | Ratio |
+|:-----|:------------|:----------|:------|
+| Hello World | ~25 | ~15 | 1.67x |
+| FizzBuzz | ~80 | ~50 | 1.60x |
+| Calculator | ~120 | ~75 | 1.60x |
+
+More tokens = more context window usage = less room for task context.
+
+### 3. Error Recovery
+
+When things go wrong, C# errors are:
+- More familiar to LLMs
+- Easier to diagnose
+- Faster to fix
+
+---
+
+## Task Categories
+
+### Simple Tasks (OPAL competitive)
+
+- Hello World
+- Basic arithmetic
+- Simple loops
+
+Both languages perform similarly on trivial tasks.
+
+### Medium Tasks (C# slightly ahead)
+
+- FizzBuzz
+- Function with contracts
+- File I/O
+
+C#'s familiarity advantage appears.
+
+### Complex Tasks (C# advantage grows)
+
+- Multi-function programs
+- Error handling
+- Data structures
+
+C#'s ecosystem and training data advantage becomes significant.
+
+---
+
+## Example Task
+
+### Task Definition
+
+```csharp
+var task = new TaskDefinition
+{
+    Id = "fizzbuzz",
+    Category = "loops",
+    Description = "Print FizzBuzz for 1-100",
+    Prompt = "Write FizzBuzz from 1 to 100",
+    RequiredPatterns = new List<string>
+    {
+        @"1.*100",           // Loop range
+        @"[Ff]izz",          // Contains Fizz
+        @"[Bb]uzz",          // Contains Buzz
+    },
+    RequiresCompilation = true,
+    MaxTokenBudget = 500
+};
+```
+
+### OPAL Solution
+
+```
+§M[m001:FizzBuzz]
+§F[f001:Main:pub]
+  §O[void]
+  §E[cw]
+  §L[for1:i:1:100:1]
+    §IF[if1] (== (% i 15) 0) → §P "FizzBuzz"
+    §EI (== (% i 3) 0) → §P "Fizz"
+    §EI (== (% i 5) 0) → §P "Buzz"
+    §EL → §P i
+    §/I[if1]
+  §/L[for1]
+§/F[f001]
+§/M[m001]
+```
+- Tokens: ~80
+- Compiles: Yes
+- Success: Yes
+- Efficiency: 1.0 / 80 x 1000 = **12.5**
+
+### C# Solution
+
+```csharp
+for (int i = 1; i <= 100; i++)
+{
+    if (i % 15 == 0) Console.WriteLine("FizzBuzz");
+    else if (i % 3 == 0) Console.WriteLine("Fizz");
+    else if (i % 5 == 0) Console.WriteLine("Buzz");
+    else Console.WriteLine(i);
+}
+```
+- Tokens: ~50
+- Compiles: Yes
+- Success: Yes
+- Efficiency: 1.0 / 50 x 1000 = **20.0**
+
+C# is 1.6x more token-efficient for this task.
+
+---
+
+## Context Window Impact
+
+Given a typical 8K context window:
+
+| Metric | OPAL | C# |
+|:-------|:-----|:---|
+| Avg tokens per program | ~100 | ~60 |
+| Programs fitting in context | ~80 | ~130 |
+| % of context for code | Higher | Lower |
+| Room for instructions | Lower | Higher |
+
+---
+
+## Interpretation
+
+The 0.93x ratio indicates C# has a meaningful advantage in task completion.
+
+This is primarily due to:
+1. **Token efficiency** - More room in context window
+2. **Training data** - LLMs know C# patterns better
+3. **Error recovery** - C# errors are easier to fix
+
+However, the gap is modest, and OPAL's advantages in comprehension and precision may offset this in specific scenarios.
+
+---
+
+## When OPAL Catches Up
+
+OPAL may perform better when:
+- Tasks require understanding existing OPAL code
+- Contract verification is part of the task
+- Precise edits are needed
+- Comprehension quality matters more than speed
+
+---
+
+## Next
+
+- [Token Economics](/benchmarking/metrics/token-economics/) - Token count comparison

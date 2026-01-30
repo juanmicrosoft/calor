@@ -1,0 +1,224 @@
+---
+title: "Methodology"
+section: "benchmarking"
+order: 1
+---
+
+# Methodology
+
+How the OPAL evaluation framework measures language effectiveness for AI agents.
+
+---
+
+## Evaluation Approach
+
+The framework compares OPAL and C# implementations of the same programs across multiple dimensions. It doesn't use LLM-based evaluation (which would introduce variance) but instead uses deterministic static analysis.
+
+---
+
+## Test Corpus
+
+### Paired Programs
+
+Each benchmark consists of:
+- An OPAL implementation
+- A semantically equivalent C# implementation
+- Metadata about expected behavior
+
+### Current Corpus
+
+20 paired programs covering:
+- Hello World (basic I/O)
+- FizzBuzz (loops and conditionals)
+- Mathematical functions (contracts)
+- Data processing (effects)
+- Error handling (Option/Result types)
+
+### Requirements
+
+Both implementations must:
+1. Compile successfully
+2. Produce identical output
+3. Have the same logical structure
+
+---
+
+## Metric Calculation
+
+### Comprehension
+
+**Measures:** How easily an agent can understand code structure.
+
+**OPAL factors:**
+- Module declarations (`§M[`)
+- Function declarations (`§F[`)
+- Input/output annotations (`§I[`, `§O[`)
+- Effect declarations (`§E[`)
+- Contracts (`§Q`, `§S`)
+- Closing tags (`§/`)
+
+**C# factors:**
+- Namespace declarations
+- Class declarations
+- Documentation comments (`///`)
+- Type annotations
+- Contract patterns (Code Contracts, Debug.Assert)
+
+**Scoring:** Weighted sum of factors present, normalized to 0-1.
+
+---
+
+### Error Detection
+
+**Measures:** Ability to detect bugs through explicit contracts.
+
+**OPAL factors:**
+- Preconditions (`§Q`)
+- Postconditions (`§S`)
+- Invariants (`§INV`)
+- Effect declarations
+- Typed inputs/outputs
+
+**C# factors:**
+- `Debug.Assert` statements
+- `Contract.Requires` / `Contract.Ensures`
+- Null checks
+- Exception handling
+
+**Scoring:** Weighted sum based on contract coverage.
+
+---
+
+### Edit Precision
+
+**Measures:** Ability to target specific code elements.
+
+**OPAL factors:**
+- Unique module IDs
+- Unique function IDs
+- Unique loop/conditional IDs
+- Closing tag presence
+
+**C# factors:**
+- Namespace presence
+- Class presence
+- Method count
+- Brace nesting depth (penalty)
+
+**Scoring:** Higher score for more unique identifiers, lower for ambiguous structure.
+
+---
+
+### Generation Accuracy
+
+**Measures:** Ability to generate valid code.
+
+**Factors:**
+- Compilation success (50%)
+- Structural completeness (30%)
+- Error count (20%)
+
+**Structural completeness:**
+- OPAL: Module, functions, bodies present
+- C#: Namespace, class, methods present
+
+---
+
+### Task Completion
+
+**Measures:** End-to-end task success potential.
+
+**Factors:**
+- Token efficiency (context window usage)
+- Compilation success
+- Structural completeness
+- Contract presence
+
+**Scoring:** Combines efficiency and correctness factors.
+
+---
+
+### Token Economics
+
+**Measures:** Tokens required to represent equivalent logic.
+
+**Method:**
+1. Simple tokenization (split on whitespace and punctuation)
+2. Character count (excluding whitespace)
+3. Line count
+4. Composite ratio
+
+**Interpretation:** Lower is better (less context window usage).
+
+---
+
+### Information Density
+
+**Measures:** Semantic content per token.
+
+**Semantic elements counted:**
+- OPAL: Modules, functions, variables, type annotations, contracts, effects, control flow, expressions
+- C#: Namespaces, classes, methods, variables, type annotations, control flow, expressions
+
+**Density:** Total semantic elements / token count
+
+**Interpretation:** Higher is better (more meaning per token).
+
+---
+
+## Running the Evaluation
+
+```bash
+# Run with JSON output
+dotnet run --project tests/Opal.Evaluation -- --output report.json
+
+# Run with Markdown output
+dotnet run --project tests/Opal.Evaluation -- --output report.md --format markdown
+
+# Run specific metrics
+dotnet run --project tests/Opal.Evaluation -- \
+  --metrics Comprehension,TokenEconomics \
+  --output partial.json
+```
+
+---
+
+## Interpreting Results
+
+### Winner Determination
+
+For each metric:
+- **Higher is better** (Comprehension, Error Detection, etc.): OPAL wins if ratio > 1.0
+- **Lower is better** (Token Economics): C# wins if ratio < 1.0
+
+### The Tradeoff
+
+Results consistently show:
+- OPAL wins on **comprehension** metrics (structure, contracts, effects)
+- C# wins on **efficiency** metrics (tokens, density)
+
+This isn't a flaw—it's the designed tradeoff of explicit semantics.
+
+---
+
+## Limitations
+
+1. **No LLM evaluation:** We don't test with actual AI agents (yet)
+2. **Small corpus:** 20 programs may not represent all use cases
+3. **Structural metrics:** Comprehension is measured structurally, not semantically
+4. **C# baseline:** Other languages might perform differently
+
+---
+
+## Future Work
+
+- Expand test corpus
+- Add LLM-based evaluation (with controlled prompts)
+- Compare against more languages
+- Add runtime behavior metrics
+
+---
+
+## Next
+
+- [Results](/benchmarking/results/) - Detailed results table

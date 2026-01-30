@@ -1,0 +1,189 @@
+---
+title: "Comprehension"
+section: "benchmarking"
+order: 3
+---
+
+# Comprehension Metric
+
+**Category:** Comprehension
+**Result:** OPAL wins (1.33x)
+**What it measures:** Structural clarity and semantic extractability
+
+---
+
+## Overview
+
+The Comprehension metric measures how easily an AI agent can understand code structure and extract semantic information without deep analysis.
+
+---
+
+## Why It Matters
+
+When an AI agent reads code, it needs to answer:
+- What are the function boundaries?
+- What are the inputs and outputs?
+- What side effects are possible?
+- What constraints must hold?
+
+Traditional languages require parsing and inference. OPAL makes these explicit.
+
+---
+
+## How It's Measured
+
+### OPAL Clarity Factors
+
+| Factor | Points | Check |
+|:-------|:-------|:------|
+| Module declaration | 0.15 | Contains `§M[` |
+| Function declaration | 0.15 | Contains `§F[` |
+| Input parameters | 0.10 | Contains `§I[` |
+| Output type | 0.10 | Contains `§O[` |
+| Return statement | 0.10 | Contains `§R` |
+| Effect declaration | 0.15 | Contains `§E[` |
+| Requires contract | 0.15 | Contains `§Q` |
+| Ensures contract | 0.10 | Contains `§S` |
+| Function closing tag | 0.05 | Contains `§/F[` |
+| Module closing tag | 0.05 | Contains `§/M[` |
+
+### C# Clarity Factors
+
+| Factor | Points | Check |
+|:-------|:-------|:------|
+| Namespace | 0.15 | Contains `namespace` |
+| Class | 0.10 | Contains `class` |
+| Public modifier | 0.05 | Contains `public` |
+| Private modifier | 0.05 | Contains `private` |
+| Return statement | 0.10 | Contains `return` |
+| XML documentation | 0.20 | Contains `///` |
+| Comments | 0.05 | Contains `//` |
+| Type annotations | 0.10 | Contains `int `, `string `, etc. |
+| Code Contracts | 0.15 | Contains `Contract.` or `Debug.Assert` |
+
+---
+
+## Example Comparison
+
+### OPAL (High Clarity)
+
+```
+§M[m001:Calculator]
+§F[f001:Divide:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §Q (!= b 0)
+  §S (>= result 0)
+  §R (/ a b)
+§/F[f001]
+§/M[m001]
+```
+
+**Score calculation:**
+- `§M[`: +0.15
+- `§F[`: +0.15
+- `§I[`: +0.10
+- `§O[`: +0.10
+- `§R`: +0.10
+- `§Q`: +0.15
+- `§S`: +0.10
+- `§/F[`: +0.05
+- `§/M[`: +0.05
+
+**Total: 0.95**
+
+### C# (Lower Clarity)
+
+```csharp
+namespace Calculator
+{
+    public static class Program
+    {
+        public static int Divide(int a, int b)
+        {
+            if (b == 0) throw new ArgumentException();
+            var result = a / b;
+            Debug.Assert(result >= 0);
+            return result;
+        }
+    }
+}
+```
+
+**Score calculation:**
+- `namespace`: +0.15
+- `class`: +0.10
+- `public`: +0.05
+- `return`: +0.10
+- `int `: +0.10
+- `Debug.Assert`: +0.15
+
+**Total: 0.65**
+
+**Ratio: 0.95 / 0.65 = 1.46x** (OPAL wins)
+
+---
+
+## What Agents Can Extract
+
+### From OPAL (Direct Extraction)
+
+| Information | Extraction Method |
+|:------------|:------------------|
+| Function name | Parse `§F[id:name:vis]` |
+| Function ID | Parse `§F[id:name:vis]` |
+| Inputs | Find all `§I[type:name]` |
+| Output type | Parse `§O[type]` |
+| Side effects | Parse `§E[codes]` |
+| Preconditions | Find all `§Q condition` |
+| Postconditions | Find all `§S condition` |
+| Scope boundaries | Match `§F[id]` with `§/F[id]` |
+
+### From C# (Requires Inference)
+
+| Information | Extraction Method |
+|:------------|:------------------|
+| Function name | Parse method declaration |
+| Inputs | Parse parameter list |
+| Output type | Parse return type |
+| Side effects | Analyze all statements for I/O |
+| Preconditions | Find throw statements, Debug.Assert |
+| Postconditions | Find assertions near return |
+| Scope boundaries | Count and match braces |
+
+---
+
+## Real-World Impact
+
+### Agent Task: "What are the constraints on the Divide function?"
+
+**From OPAL:**
+```
+Preconditions: b != 0
+Postconditions: result >= 0
+```
+Direct extraction from `§Q` and `§S`.
+
+**From C#:**
+```
+Must analyze:
+1. Exception throws (if (b == 0) throw...)
+2. Debug.Assert calls
+3. Comments (if any)
+4. Infer from implementation
+```
+
+---
+
+## Interpretation
+
+The 1.33x advantage indicates that OPAL's explicit structure provides ~33% more structural clarity signals than equivalent C# code.
+
+This doesn't mean C# is hard to understand—it means OPAL makes structure *more explicit*, which benefits automated analysis.
+
+---
+
+## Next
+
+- [Error Detection](/benchmarking/metrics/error-detection/) - How contracts help find bugs
