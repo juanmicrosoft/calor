@@ -200,6 +200,15 @@ test_github_project() {
         {} \;
     find "$project_dir" -name "*.csproj.bak" -delete 2>/dev/null || true
 
+    # Remove Polyfill package references (uses C# 13 extension blocks that don't compile)
+    # Also remove project references to Analyzer projects that depend on Polyfill
+    step "Removing Polyfill dependencies (C# 13 incompatibility)..."
+    find "$project_dir" -name "*.csproj" -exec sed -i.bak \
+        -e '/<PackageReference Include="Polyfill"/d' \
+        -e '/<ProjectReference.*Analyzer.*\.csproj/d' \
+        {} \;
+    find "$project_dir" -name "*.csproj.bak" -delete 2>/dev/null || true
+
     # Step 2: Analyze to find conversion candidates
     step "Analyzing project for OPAL conversion candidates (threshold: $MIN_SCORE)..."
     local candidate_count
