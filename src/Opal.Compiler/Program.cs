@@ -115,6 +115,13 @@ public class Program
             var outputPath = output?.FullName
                 ?? Path.ChangeExtension(input.FullName, ".g.cs");
 
+            // Ensure output directory exists
+            var outputDir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+            {
+                Directory.CreateDirectory(outputDir);
+            }
+
             await File.WriteAllTextAsync(outputPath, result.GeneratedCode);
 
             if (verbose)
