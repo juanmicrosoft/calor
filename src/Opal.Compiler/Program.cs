@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Opal.Compiler.Analysis;
 using Opal.Compiler.Ast;
 using Opal.Compiler.CodeGen;
 using Opal.Compiler.Commands;
@@ -23,26 +24,38 @@ public class Program
             aliases: ["--verbose", "-v"],
             description: "Enable verbose output");
 
+        var strictApiOption = new Option<bool>(
+            aliases: ["--strict-api"],
+            description: "Enable strict API mode: requires §BREAKING markers for public API changes");
+
+        var requireDocsOption = new Option<bool>(
+            aliases: ["--require-docs"],
+            description: "Require documentation on public functions and types");
+
         var rootCommand = new RootCommand("OPAL Compiler - Compiles OPAL source to C# and migrates between languages")
         {
             inputOption,
             outputOption,
-            verboseOption
+            verboseOption,
+            strictApiOption,
+            requireDocsOption
         };
 
         // Legacy compile handler (when --input is provided)
-        rootCommand.SetHandler(CompileAsync, inputOption, outputOption, verboseOption);
+        rootCommand.SetHandler(CompileAsync, inputOption, outputOption, verboseOption, strictApiOption, requireDocsOption);
 
         // Add subcommands
         rootCommand.AddCommand(ConvertCommand.Create());
         rootCommand.AddCommand(MigrateCommand.Create());
         rootCommand.AddCommand(BenchmarkCommand.Create());
         rootCommand.AddCommand(InitCommand.Create());
+        rootCommand.AddCommand(FormatCommand.Create());
+        rootCommand.AddCommand(DiagnoseCommand.Create());
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose)
+    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs)
     {
         try
         {
@@ -57,6 +70,11 @@ public class Program
                 Console.WriteLine("  opalc migrate <project>                        Migrate entire project");
                 Console.WriteLine("  opalc benchmark [options]                      Compare token economics");
                 Console.WriteLine("  opalc init --ai <agent>                        Initialize for AI coding agents");
+                Console.WriteLine("  opalc format <files>                           Format OPAL source files");
+                Console.WriteLine();
+                Console.WriteLine("Strictness options:");
+                Console.WriteLine("  --strict-api    Require §BREAKING markers for public API changes");
+                Console.WriteLine("  --require-docs  Require documentation on public functions");
                 Console.WriteLine();
                 Console.WriteLine("Run 'opalc --help' for more information.");
                 return;
@@ -75,7 +93,13 @@ public class Program
             }
 
             var source = await File.ReadAllTextAsync(input.FullName);
-            var result = Compile(source, input.FullName, verbose);
+            var options = new CompilationOptions
+            {
+                Verbose = verbose,
+                StrictApi = strictApi,
+                RequireDocs = requireDocs
+            };
+            var result = Compile(source, input.FullName, options);
 
             if (result.HasErrors)
             {
@@ -107,7 +131,18 @@ public class Program
         }
     }
 
+    /// <summary>
+    /// Compile OPAL source with default options.
+    /// </summary>
     public static CompilationResult Compile(string source, string? filePath = null, bool verbose = false)
+    {
+        return Compile(source, filePath, new CompilationOptions { Verbose = verbose });
+    }
+
+    /// <summary>
+    /// Compile OPAL source with full options.
+    /// </summary>
+    public static CompilationResult Compile(string source, string? filePath, CompilationOptions options)
     {
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath(filePath);
@@ -116,7 +151,7 @@ public class Program
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAll();
 
-        if (verbose)
+        if (options.Verbose)
         {
             Console.WriteLine($"Lexer produced {tokens.Count} tokens");
         }
@@ -130,7 +165,7 @@ public class Program
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
 
-        if (verbose)
+        if (options.Verbose)
         {
             Console.WriteLine("Parsing completed successfully");
         }
@@ -140,17 +175,59 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        // Pattern exhaustiveness checking
+        var patternChecker = new PatternChecker(diagnostics);
+        patternChecker.Check(ast);
+
+        // API strictness checking
+        if (options.StrictApi || options.RequireDocs)
+        {
+            var apiOptions = new ApiStrictnessOptions
+            {
+                StrictApi = options.StrictApi,
+                RequireDocs = options.RequireDocs
+            };
+            var apiChecker = new ApiStrictnessChecker(diagnostics, apiOptions);
+            apiChecker.Check(ast);
+
+            if (options.Verbose)
+            {
+                Console.WriteLine("API strictness checking completed");
+            }
+        }
+
         // Code generation
         var emitter = new CSharpEmitter();
         var generatedCode = emitter.Emit(ast);
 
-        if (verbose)
+        if (options.Verbose)
         {
             Console.WriteLine("Code generation completed successfully");
         }
 
         return new CompilationResult(diagnostics, ast, generatedCode);
     }
+}
+
+/// <summary>
+/// Options for compilation.
+/// </summary>
+public sealed class CompilationOptions
+{
+    /// <summary>
+    /// Enable verbose output.
+    /// </summary>
+    public bool Verbose { get; init; }
+
+    /// <summary>
+    /// Enable strict API mode: requires §BREAKING markers for public API changes.
+    /// </summary>
+    public bool StrictApi { get; init; }
+
+    /// <summary>
+    /// Require documentation on public functions and types.
+    /// </summary>
+    public bool RequireDocs { get; init; }
 }
 
 public sealed class CompilationResult
