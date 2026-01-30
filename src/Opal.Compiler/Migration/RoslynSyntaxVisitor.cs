@@ -233,7 +233,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
@@ -287,7 +287,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("r");
         var name = node.Identifier.Text;
 
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
@@ -356,7 +356,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("s");
         var name = node.Identifier.Text;
 
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
@@ -405,7 +405,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var id = _context.GenerateId("m");
         var name = node.Identifier.Text;
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var parameters = ConvertParameters(node.ParameterList);
         var returnType = TypeMapper.CSharpToOpal(node.ReturnType.ToString());
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
@@ -432,7 +432,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var name = node.Identifier.Text;
         var visibility = GetVisibility(node.Modifiers);
         var modifiers = GetMethodModifiers(node.Modifiers);
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var parameters = ConvertParameters(node.ParameterList);
         var returnType = TypeMapper.CSharpToOpal(node.ReturnType.ToString());
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
@@ -1682,19 +1682,74 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new NullConditionalNode(GetTextSpan(condAccess), target, memberName);
     }
 
-    private IReadOnlyList<TypeParameterNode> ConvertTypeParameters(TypeParameterListSyntax? typeParamList)
+    private IReadOnlyList<TypeParameterNode> ConvertTypeParameters(
+        TypeParameterListSyntax? typeParamList,
+        SyntaxList<TypeParameterConstraintClauseSyntax>? constraintClauses = null)
     {
         if (typeParamList == null)
             return Array.Empty<TypeParameterNode>();
 
         _context.RecordFeatureUsage("generics");
 
+        // Build a map of type parameter name -> constraints
+        var constraintMap = new Dictionary<string, List<TypeConstraintNode>>();
+        if (constraintClauses.HasValue)
+        {
+            foreach (var clause in constraintClauses.Value)
+            {
+                var paramName = clause.Name.Identifier.Text;
+                var constraints = new List<TypeConstraintNode>();
+
+                foreach (var constraint in clause.Constraints)
+                {
+                    var constraintNode = ConvertTypeConstraint(constraint);
+                    if (constraintNode != null)
+                    {
+                        constraints.Add(constraintNode);
+                    }
+                }
+
+                if (constraints.Count > 0)
+                {
+                    constraintMap[paramName] = constraints;
+                    _context.RecordFeatureUsage("generic-constraints");
+                }
+            }
+        }
+
         return typeParamList.Parameters
             .Select(p => new TypeParameterNode(
                 GetTextSpan(p),
                 p.Identifier.Text,
-                Array.Empty<TypeConstraintNode>()))
+                constraintMap.TryGetValue(p.Identifier.Text, out var constraints)
+                    ? constraints
+                    : Array.Empty<TypeConstraintNode>()))
             .ToList();
+    }
+
+    private TypeConstraintNode? ConvertTypeConstraint(TypeParameterConstraintSyntax constraint)
+    {
+        var span = GetTextSpan(constraint);
+
+        return constraint switch
+        {
+            ClassOrStructConstraintSyntax classOrStruct =>
+                classOrStruct.ClassOrStructKeyword.IsKind(SyntaxKind.ClassKeyword)
+                    ? new TypeConstraintNode(span, TypeConstraintKind.Class)
+                    : new TypeConstraintNode(span, TypeConstraintKind.Struct),
+
+            ConstructorConstraintSyntax =>
+                new TypeConstraintNode(span, TypeConstraintKind.New),
+
+            TypeConstraintSyntax typeConstraint =>
+                new TypeConstraintNode(span, TypeConstraintKind.TypeName, typeConstraint.Type.ToString()),
+
+            DefaultConstraintSyntax =>
+                // 'default' constraint (C# 9+) - no direct OPAL equivalent, skip
+                null,
+
+            _ => null
+        };
     }
 
     private IReadOnlyList<ParameterNode> ConvertParameters(ParameterListSyntax paramList)

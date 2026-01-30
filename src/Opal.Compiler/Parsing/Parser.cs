@@ -2504,7 +2504,7 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Where);
         var attrs = ParseAttributes();
 
-        // v2 positional: [typeParam:constraint]
+        // v2 positional: {typeParam:constraint1,constraint2,...}
         var typeParamName = attrs["_pos0"] ?? "";
         var constraintStr = attrs["_pos1"] ?? "";
 
@@ -2523,21 +2523,27 @@ public sealed class Parser
             return;
         }
 
-        // Parse the constraint
-        var (kind, typeName) = constraintStr.ToLowerInvariant() switch
+        // Parse multiple constraints (comma-separated)
+        var constraintParts = constraintStr.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        var newConstraints = typeParameters[typeParamIndex].Constraints.ToList();
+
+        foreach (var part in constraintParts)
         {
-            "class" => (TypeConstraintKind.Class, (string?)null),
-            "struct" => (TypeConstraintKind.Struct, (string?)null),
-            "new" => (TypeConstraintKind.New, (string?)null),
-            _ => (TypeConstraintKind.TypeName, constraintStr)
-        };
+            var trimmedPart = part.Trim();
+            var (kind, typeName) = trimmedPart.ToLowerInvariant() switch
+            {
+                "class" => (TypeConstraintKind.Class, (string?)null),
+                "struct" => (TypeConstraintKind.Struct, (string?)null),
+                "new" => (TypeConstraintKind.New, (string?)null),
+                _ => (TypeConstraintKind.TypeName, trimmedPart)
+            };
 
-        var constraint = new TypeConstraintNode(startToken.Span, kind, typeName);
+            var constraint = new TypeConstraintNode(startToken.Span, kind, typeName);
+            newConstraints.Add(constraint);
+        }
 
-        // Replace the type parameter with one that includes the new constraint
+        // Replace the type parameter with one that includes the new constraints
         var oldTypeParam = typeParameters[typeParamIndex];
-        var newConstraints = oldTypeParam.Constraints.ToList();
-        newConstraints.Add(constraint);
         typeParameters[typeParamIndex] = new TypeParameterNode(oldTypeParam.Span, oldTypeParam.Name, newConstraints);
     }
 
@@ -2743,6 +2749,28 @@ public sealed class Parser
         string? baseClass = null;
         var implementedInterfaces = new List<string>();
         var typeParameters = new List<TypeParameterNode>();
+
+        // Extract type parameters from class name if present (e.g., Repository<T> or Cache<TKey,TValue>)
+        var typeParamStart = name.IndexOf('<');
+        if (typeParamStart >= 0)
+        {
+            var typeParamEnd = name.LastIndexOf('>');
+            if (typeParamEnd > typeParamStart)
+            {
+                var typeParamStr = name.Substring(typeParamStart + 1, typeParamEnd - typeParamStart - 1);
+                name = name.Substring(0, typeParamStart);
+
+                // Parse type parameter names (comma-separated)
+                foreach (var tpName in typeParamStr.Split(','))
+                {
+                    var trimmedName = tpName.Trim();
+                    if (!string.IsNullOrEmpty(trimmedName))
+                    {
+                        typeParameters.Add(new TypeParameterNode(startToken.Span, trimmedName, Array.Empty<TypeConstraintNode>()));
+                    }
+                }
+            }
+        }
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
@@ -2877,6 +2905,28 @@ public sealed class Parser
         var modifiers = ParseMethodModifiers(modStr);
 
         var typeParameters = new List<TypeParameterNode>();
+
+        // Extract type parameters from method name if present (e.g., Create<T>)
+        var typeParamStart = name.IndexOf('<');
+        if (typeParamStart >= 0)
+        {
+            var typeParamEnd = name.LastIndexOf('>');
+            if (typeParamEnd > typeParamStart)
+            {
+                var typeParamStr = name.Substring(typeParamStart + 1, typeParamEnd - typeParamStart - 1);
+                name = name.Substring(0, typeParamStart);
+
+                foreach (var tpName in typeParamStr.Split(','))
+                {
+                    var trimmedName = tpName.Trim();
+                    if (!string.IsNullOrEmpty(trimmedName))
+                    {
+                        typeParameters.Add(new TypeParameterNode(startToken.Span, trimmedName, Array.Empty<TypeConstraintNode>()));
+                    }
+                }
+            }
+        }
+
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
         EffectsNode? effects = null;

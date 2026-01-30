@@ -161,12 +161,15 @@ public sealed class OpalEmitter : IAstVisitor<string>
         AppendLine($"§CLASS{{{node.Id}:{node.Name}{typeParams}{baseStr}{modStr}}}{attrs}");
         Indent();
 
+        // Emit type parameter constraints
+        EmitTypeParameterConstraints(node.TypeParameters);
+
         // Emit implemented interfaces
         foreach (var iface in node.ImplementedInterfaces)
         {
             AppendLine($"§IMPL{{{iface}}}");
         }
-        if (node.ImplementedInterfaces.Count > 0)
+        if (node.ImplementedInterfaces.Count > 0 || node.TypeParameters.Any(tp => tp.Constraints.Count > 0))
             AppendLine();
 
         // Emit fields
@@ -375,6 +378,9 @@ public sealed class OpalEmitter : IAstVisitor<string>
         AppendLine($"§METHOD{{{node.Id}:{node.Name}{typeParams}:{visibility}{modStr}}}{attrs}");
         Indent();
 
+        // Emit type parameter constraints
+        EmitTypeParameterConstraints(node.TypeParameters);
+
         // Parameters
         foreach (var param in node.Parameters)
         {
@@ -426,6 +432,9 @@ public sealed class OpalEmitter : IAstVisitor<string>
 
         AppendLine($"§F{{{node.Id}:{node.Name}{typeParams}:{visibility}}}");
         Indent();
+
+        // Emit type parameter constraints
+        EmitTypeParameterConstraints(node.TypeParameters);
 
         // Parameters
         foreach (var param in node.Parameters)
@@ -1211,7 +1220,36 @@ public sealed class OpalEmitter : IAstVisitor<string>
 
     // Generic type nodes
     public string Visit(TypeParameterNode node) => node.Name;
-    public string Visit(TypeConstraintNode node) => node.TypeName ?? "";
+
+    public string Visit(TypeConstraintNode node)
+    {
+        return node.Kind switch
+        {
+            TypeConstraintKind.Class => "class",
+            TypeConstraintKind.Struct => "struct",
+            TypeConstraintKind.New => "new",
+            TypeConstraintKind.Interface => node.TypeName ?? "",
+            TypeConstraintKind.BaseClass => node.TypeName ?? "",
+            TypeConstraintKind.TypeName => node.TypeName ?? "",
+            _ => node.TypeName ?? ""
+        };
+    }
+
+    /// <summary>
+    /// Emits §WHERE clauses for type parameters with constraints.
+    /// </summary>
+    private void EmitTypeParameterConstraints(IReadOnlyList<TypeParameterNode> typeParameters)
+    {
+        foreach (var tp in typeParameters)
+        {
+            if (tp.Constraints.Count > 0)
+            {
+                var constraints = string.Join(",", tp.Constraints.Select(c => Visit(c)));
+                AppendLine($"§WHERE{{{tp.Name}:{constraints}}}");
+            }
+        }
+    }
+
     public string Visit(GenericTypeNode node)
     {
         if (node.TypeArguments.Count == 0)
