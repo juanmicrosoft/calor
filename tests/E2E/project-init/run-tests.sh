@@ -270,6 +270,14 @@ test_github_project() {
 
     while IFS= read -r rel_path; do
         local full_path="$src_dir/$rel_path"
+
+        # Skip files in GeneratedCode or Generated directories
+        # These are auto-generated partial types that break when we convert their counterparts
+        if [[ "$rel_path" == *"/GeneratedCode/"* ]] || [[ "$rel_path" == *"/Generated/"* ]]; then
+            detail "⊘ Skipped (generated): $rel_path"
+            continue
+        fi
+
         if [[ -f "$full_path" ]]; then
             if convert_file "$full_path"; then
                 ((converted++)) || true
@@ -815,11 +823,10 @@ main() {
                 "https://github.com/ardalis/GuardClauses.git" \
                 "src/GuardClauses"
 
-            # 7. UnitsNet - Unit conversion, math-heavy pure functions
-            test_github_project \
-                "unitsnet" \
-                "https://github.com/angularsen/UnitsNet.git" \
-                "UnitsNet"
+            # Note: UnitsNet removed from Tier 1 - it uses heavy code generation
+            # with partial types that break when we convert the non-generated partials.
+            # The GeneratedCode/Quantities/*.g.cs files define partial structs with
+            # operators that expect exact type signatures from the CustomCode counterparts.
         fi
 
         # =====================================================================
