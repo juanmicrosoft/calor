@@ -1,0 +1,191 @@
+---
+title: "Tradeoffs"
+section: "philosophy"
+order: 2
+---
+
+# The Tradeoffs
+
+OPAL deliberately trades certain qualities for others. Understanding these tradeoffs helps you decide when OPAL is the right tool.
+
+---
+
+## The Core Tradeoff
+
+OPAL trades **token efficiency** for **semantic explicitness**.
+
+```
+// C#: 4 tokens, implicit semantics
+return a + b;
+
+// OPAL: Explicit Lisp-style operations
+§R (+ a b)
+```
+
+This is a fundamental design choice, not a flaw to be fixed.
+
+---
+
+## What OPAL Optimizes For
+
+| Quality | OPAL Approach | Result |
+|:--------|:--------------|:-------|
+| **Comprehension** | Explicit structure and contracts | 1.33x better than C# |
+| **Error Detection** | First-class preconditions/postconditions | 1.19x better than C# |
+| **Edit Precision** | Unique IDs for every element | 1.15x better than C# |
+| **Parseability** | Matched tags, prefix notation | Trivial to parse |
+| **Verifiability** | Contracts in syntax, not comments | Machine-checkable specs |
+
+---
+
+## What OPAL Trades Away
+
+| Quality | Impact | Mitigation |
+|:--------|:-------|:-----------|
+| **Token Efficiency** | 0.67x vs C# | V2 syntax improved 40% over V1 |
+| **Information Density** | 0.22x vs C# | Acceptable for agent workflows |
+| **Human Readability** | Unfamiliar syntax | Not the target audience |
+| **Ecosystem** | No libraries | Compiles to C#, interop possible |
+| **Tooling** | No IDE support yet | On the roadmap |
+
+---
+
+## When the Tradeoff Pays Off
+
+OPAL's tradeoff pays off when:
+
+### 1. Agents Need to Reason About Behavior
+
+```
+§F[f001:TransferFunds:pub]
+  §I[Account:from]
+  §I[Account:to]
+  §I[i32:amount]
+  §O[bool]
+  §E[db]
+  §Q (> amount 0)
+  §Q (>= from.balance amount)
+  §S (== from.balance (- old_from_balance amount))
+  §S (== to.balance (+ old_to_balance amount))
+  // ...
+§/F[f001]
+```
+
+An agent can reason about this function's behavior without reading the implementation:
+- It modifies database state
+- Amount must be positive
+- Source must have sufficient balance
+- Balance transfer is atomic (from decreases, to increases by same amount)
+
+### 2. Agents Need to Detect Contract Violations
+
+```
+§F[f001:CalculateDiscount:pub]
+  §I[f64:price]
+  §I[f64:discount_percent]
+  §O[f64]
+  §Q (>= price 0)
+  §Q (>= discount_percent 0)
+  §Q (<= discount_percent 100)
+  §S (>= result 0)
+  §S (<= result price)
+  §R (* price (- 1 (/ discount_percent 100)))
+§/F[f001]
+```
+
+An agent can immediately verify:
+- Any call with `discount_percent > 100` violates preconditions
+- If result is negative, postcondition is violated
+- The contracts document edge cases explicitly
+
+### 3. Agents Need to Make Precise Edits
+
+```
+// Instruction: "Change the loop in f001 to iterate from 0 instead of 1"
+
+// Before
+§L[for1:i:1:100:1]
+
+// After - target is unambiguous
+§L[for1:i:0:100:1]
+```
+
+No ambiguity about which loop to modify. No risk of changing the wrong one.
+
+---
+
+## When Traditional Languages Win
+
+Use C#/Python/etc when:
+
+### 1. Token Budget is Critical
+
+If you're operating at the edge of context window limits, C#'s compactness wins:
+
+| Code | OPAL Tokens | C# Tokens |
+|:-----|:------------|:----------|
+| Hello World | ~25 | ~15 |
+| FizzBuzz | ~80 | ~50 |
+| Simple CRUD | ~200 | ~130 |
+
+### 2. Human Developers Are Primary Readers
+
+OPAL's syntax is optimized for machine parsing:
+
+```
+// Familiar to humans
+if (x > 0) return x;
+
+// Less familiar
+§IF[if1] (> x 0) → §R x §/I[if1]
+```
+
+### 3. You Need Library Ecosystem
+
+OPAL compiles to C#, so interop is possible, but native library support doesn't exist.
+
+---
+
+## The V2 Syntax Improvement
+
+V1 syntax was extremely verbose:
+
+```
+// V1 (legacy - do not use)
+§OP[kind=add]
+  §REF[name=a]
+  §REF[name=b]
+§/OP
+```
+
+V2 uses Lisp-style expressions:
+
+```
+// V2 (current)
+(+ a b)
+```
+
+This improved token economics by ~40% while maintaining parseability.
+
+---
+
+## Measuring the Tradeoff
+
+Our evaluation framework measures both sides:
+
+| Metric | Measures | OPAL Result |
+|:-------|:---------|:------------|
+| Token Economics | Cost of explicitness | 0.67x (C# wins) |
+| Information Density | Semantic content per token | 0.22x (C# wins) |
+| Comprehension | Benefit of explicitness | 1.33x (OPAL wins) |
+| Error Detection | Contract effectiveness | 1.19x (OPAL wins) |
+| Edit Precision | ID-based targeting | 1.15x (OPAL wins) |
+
+The question isn't "which is better" but "which matters more for your use case."
+
+---
+
+## Next
+
+- [Benchmarking Overview](/benchmarking/) - How we measure these tradeoffs
+- [Results](/benchmarking/results/) - Detailed evaluation data

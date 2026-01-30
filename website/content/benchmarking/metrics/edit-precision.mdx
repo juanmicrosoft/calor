@@ -1,0 +1,298 @@
+---
+title: "Edit Precision"
+section: "benchmarking"
+order: 5
+---
+
+# Edit Precision Metric
+
+**Category:** Edit Precision
+**Result:** OPAL wins (1.15x)
+**What it measures:** Targeting accuracy and change isolation
+
+---
+
+## Overview
+
+The Edit Precision metric measures how accurately an AI agent can target and modify specific code elements without unintended changes.
+
+---
+
+## Why It Matters
+
+When an agent needs to modify code, it must:
+- Identify the exact element to change
+- Make the change without affecting other code
+- Verify the modification is complete
+
+Unique identifiers enable precise targeting that survives refactoring.
+
+---
+
+## How It's Measured
+
+### OPAL Targeting Factors
+
+| Factor | Points | Rationale |
+|:-------|:-------|:----------|
+| Has unique module IDs | 0.15 | Modules can be targeted by ID |
+| Has unique function IDs | 0.20 | Functions can be targeted by ID |
+| Has unique variable IDs | 0.10 | Variables can be targeted by ID |
+| Has closing tags | 0.05 | Scope boundaries are explicit |
+| Module ID count | Variable | More IDs = better targeting |
+| Function ID count | Variable | More IDs = better targeting |
+
+Base score: 0.50
+
+### C# Targeting Factors
+
+| Factor | Points | Rationale |
+|:-------|:-------|:----------|
+| Has namespace | 0.10 | Namespace provides some targeting |
+| Has class | 0.10 | Class provides some targeting |
+| Method count | 0.15 | Methods can be targeted by name |
+| Brace depth penalty | -0.05 | Deep nesting reduces precision |
+
+Base score: 0.50, cap at 0.85
+
+---
+
+## The ID Advantage
+
+### OPAL: Unambiguous Targeting
+
+```
+§L[for1:i:1:100:1]
+  §IF[if1] (> i 50)
+    §P i
+  §/I[if1]
+§/L[for1]
+
+§L[for2:j:1:50:1]
+  §IF[if2] (< j 25)
+    §P j
+  §/I[if2]
+§/L[for2]
+```
+
+**Agent instruction:** "Change `for1` to start at 0"
+
+**Result:** Unambiguous. Only `for1` is affected.
+
+### C#: Ambiguous Targeting
+
+```csharp
+for (int i = 1; i <= 100; i++)
+{
+    if (i > 50)
+    {
+        Console.WriteLine(i);
+    }
+}
+
+for (int j = 1; j <= 50; j++)
+{
+    if (j < 25)
+    {
+        Console.WriteLine(j);
+    }
+}
+```
+
+**Agent instruction:** "Change the first for loop to start at 0"
+
+**Ambiguity risks:**
+- Which is "first"? (depends on reading order)
+- What if code is reordered?
+- What if another loop is added above?
+
+---
+
+## Edit Efficiency Measurement
+
+When comparing before/after edits:
+
+```
+Efficiency = 1 - (ModifiedLines / TotalLines)
+```
+
+Higher efficiency means more precise, targeted changes.
+
+### Example Edit
+
+**Task:** Change loop iteration count from 100 to 200
+
+**OPAL edit:**
+```diff
+- §L[for1:i:1:100:1]
++ §L[for1:i:1:200:1]
+```
+- Modified lines: 1
+- Total lines: 10
+- Efficiency: 1 - (1/10) = **0.90**
+
+**C# edit:**
+```diff
+- for (int i = 1; i <= 100; i++)
++ for (int i = 1; i <= 200; i++)
+```
+- Modified lines: 1
+- Total lines: 10
+- Efficiency: 1 - (1/10) = **0.90**
+
+Similar for simple edits, but OPAL's ID provides certainty about which loop.
+
+---
+
+## Structural Targeting
+
+### OPAL: ID-Based
+
+```
+"Delete function f002"     → Find §F[f002...§/F[f002], remove
+"Rename function f001"     → Update §F[f001:NewName:vis]
+"Move loop for1"           → Cut §L[for1]...§/L[for1], paste
+"Add contract to f003"     → Insert §Q after §O in §F[f003]
+```
+
+### C#: Pattern-Based
+
+```
+"Delete function Foo"      → Find method named Foo (hope no overloads)
+"Rename function Bar"      → Find/replace all occurrences (careful with strings!)
+"Move the loop"            → Identify by context, match braces
+"Add assertion to Baz"     → Find method, locate correct position
+```
+
+---
+
+## Diff Analysis
+
+The metric uses DiffPlex to compare edit precision:
+
+```csharp
+var diff = diffBuilder.BuildDiffModel(before, after);
+var inserted = diff.Lines.Count(l => l.Type == ChangeType.Inserted);
+var deleted = diff.Lines.Count(l => l.Type == ChangeType.Deleted);
+var modified = inserted + deleted;
+```
+
+Lower `modified / total` ratio = higher precision.
+
+---
+
+## Real-World Scenarios
+
+### Scenario 1: Rename a Function
+
+**OPAL:**
+1. Find `§F[f001:OldName:pub]`
+2. Replace with `§F[f001:NewName:pub]`
+3. ID `f001` unchanged, all references still valid
+
+**C#:**
+1. Find method `OldName`
+2. Replace declaration
+3. Find all call sites (hope no false positives)
+4. Update each call site
+
+### Scenario 2: Change Loop Bounds
+
+**OPAL:**
+```
+// Instruction: "In for1, change start from 1 to 0"
+§L[for1:i:1:100:1] → §L[for1:i:0:100:1]
+```
+
+**C#:**
+```
+// Instruction: "In the loop, change start from 1 to 0"
+// Which loop? Context-dependent.
+```
+
+### Scenario 3: Add Contract
+
+**OPAL:**
+```
+// Instruction: "Add precondition x >= 0 to f001"
+// Insert after §O line in §F[f001]:
+§Q (>= x 0)
+```
+
+**C#:**
+```
+// Instruction: "Add validation that x >= 0"
+// Where? Beginning of method? How to express?
+```
+
+---
+
+## Scoring Example
+
+### OPAL Code
+
+```
+§M[m001:Calculator]
+§F[f001:Add:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §R (+ a b)
+§/F[f001]
+§F[f002:Multiply:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §R (* a b)
+§/F[f002]
+§/M[m001]
+```
+
+**Score:**
+- Base: 0.50
+- Module IDs: +0.15
+- Function IDs (2): +0.20
+- Closing tags: +0.05
+
+**Total: 0.90**
+
+### C# Equivalent
+
+```csharp
+namespace Calculator
+{
+    public static class Program
+    {
+        public static int Add(int a, int b) => a + b;
+        public static int Multiply(int a, int b) => a * b;
+    }
+}
+```
+
+**Score:**
+- Base: 0.50
+- Namespace: +0.10
+- Class: +0.10
+- Methods (2): +0.15
+- Brace depth (2): -0.05
+
+**Total: 0.80**
+
+**Ratio: 0.90 / 0.80 = 1.125x** (OPAL slightly better)
+
+---
+
+## Interpretation
+
+The 1.15x advantage indicates that OPAL's unique IDs provide meaningfully better targeting precision.
+
+The advantage is most significant when:
+- Multiple similar elements exist (multiple loops, conditionals)
+- Code structure changes during refactoring
+- Precise scope identification is required
+
+---
+
+## Next
+
+- [Generation Accuracy](/benchmarking/metrics/generation-accuracy/) - Code generation correctness

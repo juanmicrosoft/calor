@@ -1,0 +1,237 @@
+---
+title: "Generation Accuracy"
+section: "benchmarking"
+order: 6
+---
+
+# Generation Accuracy Metric
+
+**Category:** Generation Accuracy
+**Result:** C# wins (0.94x)
+**What it measures:** Compilation success and structural correctness
+
+---
+
+## Overview
+
+The Generation Accuracy metric measures how correctly AI agents can generate valid code in each language.
+
+---
+
+## Why It Matters
+
+When an agent generates code, it must:
+- Produce syntactically valid code
+- Create structurally complete programs
+- Avoid compilation errors
+
+Languages with familiar patterns and extensive training data have an advantage.
+
+---
+
+## How It's Measured
+
+### Composite Score
+
+```
+Score = (CompilationSuccess × 0.5) + (StructureScore × 0.3) + (NoErrors × 0.2)
+```
+
+| Component | Weight | Description |
+|:----------|:-------|:------------|
+| Compilation Success | 50% | Does the code compile? (1.0 or 0.0) |
+| Structure Score | 30% | Are all structural elements present? |
+| No Errors | 20% | Zero compilation errors? (1.0 or 0.0) |
+
+---
+
+## Structure Score Calculation
+
+### OPAL Structure Score
+
+| Element | Points | Check |
+|:--------|:-------|:------|
+| Module name | 0.20 | Module has a name |
+| Has functions | 0.30 | At least one function |
+| Function name | 0.10 | Functions have names |
+| Function output | 0.10 | Functions have output types |
+| Function body | 0.10 | Functions have bodies |
+
+### C# Structure Score
+
+| Element | Points | Check |
+|:--------|:-------|:------|
+| Has usings | 0.10 | Using statements present |
+| Has namespace | 0.30 | Namespace declaration present |
+| Has class | 0.30 | Class declaration present |
+| Has method | 0.30 | Method declaration present |
+
+---
+
+## Why C# Wins
+
+### 1. Training Data Advantage
+
+LLMs have seen vastly more C# code than OPAL code. This creates:
+- Better pattern recognition
+- Fewer syntax errors
+- More accurate boilerplate generation
+
+### 2. Familiar Patterns
+
+```csharp
+// C#: Very common pattern, well-learned
+public static int Add(int a, int b)
+{
+    return a + b;
+}
+```
+
+```
+// OPAL: Novel syntax, less exposure
+§F[f001:Add:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §R (+ a b)
+§/F[f001]
+```
+
+### 3. Error Recovery
+
+C# errors often have clear fixes:
+- Missing semicolon → add semicolon
+- Missing brace → add brace
+- Wrong type → cast or convert
+
+OPAL errors may be less familiar:
+- Missing `§/F[id]` → requires understanding closing tag rules
+- Wrong ID in closing tag → requires ID matching understanding
+
+---
+
+## Example Comparison
+
+### Agent Task: "Write a function that adds two integers"
+
+**C# generation (typical):**
+```csharp
+public static int Add(int a, int b)
+{
+    return a + b;
+}
+```
+- Compiles: Yes
+- Structure: Complete
+- Errors: 0
+- Score: 1.0
+
+**OPAL generation (typical):**
+```
+§F[f001:Add:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §R (+ a b)
+§/F[f001]
+```
+- Compiles: Yes
+- Structure: Complete
+- Errors: 0
+- Score: 1.0
+
+**OPAL generation (common error):**
+```
+§F[f001:Add:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §R (+ a b)
+§/F[f002]              // Wrong ID!
+```
+- Compiles: No
+- Error: Mismatched closing tag
+- Score: 0.0
+
+---
+
+## Error Patterns
+
+### Common OPAL Errors
+
+| Error | Cause | Example |
+|:------|:------|:--------|
+| Mismatched IDs | Wrong ID in closing tag | `§F[f001]...§/F[f002]` |
+| Missing closing tag | Forgot to close structure | `§L[for1]...` (no `§/L`) |
+| Wrong tag type | Confused closing tag | `§F[f001]...§/M[f001]` |
+| Missing module wrapper | No `§M[]...§/M[]` | Function outside module |
+
+### Common C# Errors
+
+| Error | Cause | Example |
+|:------|:------|:--------|
+| Missing semicolon | Forgot line terminator | `return x` |
+| Missing brace | Unbalanced braces | `if (x) { return y;` |
+| Type mismatch | Wrong return type | `string` method returning `int` |
+| Missing using | Forgot namespace import | Using `Console` without `System` |
+
+---
+
+## Mitigation Strategies
+
+### For OPAL
+
+1. **Template-based generation:** Start with valid templates
+2. **ID tracking:** Maintain list of open IDs, ensure matching closes
+3. **Validation pass:** Check structure before outputting
+
+### For C#
+
+1. **Standard patterns:** Use well-established code patterns
+2. **Roslyn validation:** Parse generated code before output
+3. **Error correction:** Attempt to fix common errors
+
+---
+
+## Detailed Metrics
+
+The framework provides detailed breakdowns:
+
+```csharp
+results.Add(MetricResult.CreateHigherIsBetter(
+    Category,
+    "CompilationSuccess",
+    opalCompilation.Success ? 1.0 : 0.0,
+    csharpCompilation.Success ? 1.0 : 0.0));
+
+results.Add(MetricResult.CreateLowerIsBetter(
+    Category,
+    "ErrorCount",
+    opalCompilation.Errors.Count,
+    csharpCompilation.Errors.Count));
+
+results.Add(MetricResult.CreateHigherIsBetter(
+    Category,
+    "StructureCompleteness",
+    CalculateOpalStructureScore(opalCompilation),
+    CalculateCSharpStructureScore(csharpCompilation)));
+```
+
+---
+
+## Interpretation
+
+The 0.94x ratio indicates C# has a small advantage in generation accuracy.
+
+This is expected because:
+- C# has more training data exposure
+- C# patterns are more familiar to LLMs
+- C# tooling provides better error feedback
+
+The gap is relatively small, suggesting OPAL's explicit structure helps offset the novelty disadvantage.
+
+---
+
+## Next
+
+- [Task Completion](/benchmarking/metrics/task-completion/) - End-to-end success rates
