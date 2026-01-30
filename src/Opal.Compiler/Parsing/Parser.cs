@@ -784,16 +784,16 @@ public sealed class Parser
             {
                 // This is an inline lambda with no parameters
                 Advance(); // consume →
-                var body = ParseExpression();
-                var span = startToken.Span.Union(body.Span);
+                var (exprBody, stmtBody, endSpan) = ParseLambdaBody();
+                var span = startToken.Span.Union(endSpan);
                 return new LambdaExpressionNode(
                     span,
                     "inline",
                     new List<LambdaParameterNode>(),
                     null, // effects
                     false, // not async
-                    body, // expressionBody
-                    null, // statementBody
+                    exprBody, // expressionBody
+                    stmtBody, // statementBody
                     new AttributeCollection());
             }
             // Not a lambda, restore and parse as Lisp (though empty Lisp is likely an error)
@@ -823,8 +823,8 @@ public sealed class Parser
                 {
                     // This is an inline lambda with one parameter
                     Advance(); // consume →
-                    var body = ParseExpression();
-                    var span = startToken.Span.Union(body.Span);
+                    var (exprBody, stmtBody, endSpan) = ParseLambdaBody();
+                    var span = startToken.Span.Union(endSpan);
                     var param = new LambdaParameterNode(firstToken.Span, paramName, paramType);
                     return new LambdaExpressionNode(
                         span,
@@ -832,8 +832,8 @@ public sealed class Parser
                         new List<LambdaParameterNode> { param },
                         null, // effects
                         false, // not async
-                        body, // expressionBody
-                        null, // statementBody
+                        exprBody, // expressionBody
+                        stmtBody, // statementBody
                         new AttributeCollection());
                 }
             }
@@ -847,6 +847,40 @@ public sealed class Parser
         }
 
         return ParseLispExpression();
+    }
+
+    /// <summary>
+    /// Parses a lambda body after the arrow (→).
+    /// Can be either an expression or a statement block.
+    /// Returns (expressionBody, statementBody, endSpan).
+    /// </summary>
+    private (ExpressionNode?, IReadOnlyList<StatementNode>?, TextSpan) ParseLambdaBody()
+    {
+        // Check for statement block: { ... }
+        if (Check(TokenKind.OpenBrace))
+        {
+            var statements = new List<StatementNode>();
+            Advance(); // consume {
+
+            // Parse statements until closing brace
+            while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    statements.Add(stmt);
+                }
+            }
+
+            var endToken = Expect(TokenKind.CloseBrace);
+            return (null, statements, endToken.Span);
+        }
+        else
+        {
+            // Expression body
+            var body = ParseExpression();
+            return (body, null, body.Span);
+        }
     }
 
     /// <summary>

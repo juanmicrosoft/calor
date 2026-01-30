@@ -9,7 +9,7 @@ namespace Opal.Compiler.Migration;
 /// </summary>
 public sealed class OpalEmitter : IAstVisitor<string>
 {
-    private readonly StringBuilder _builder = new();
+    private StringBuilder _builder = new();
     private int _indentLevel;
     private readonly ConversionContext? _context;
 
@@ -46,6 +46,33 @@ public sealed class OpalEmitter : IAstVisitor<string>
 
     private void Indent() => _indentLevel++;
     private void Dedent() => _indentLevel--;
+
+    /// <summary>
+    /// Captures statement output to a separate string instead of the main builder.
+    /// Used for lambda statement bodies where we need to embed statements inline.
+    /// </summary>
+    private string CaptureStatementOutput(StatementNode stmt)
+    {
+        // Save current builder state
+        var savedBuilder = _builder;
+        var savedIndent = _indentLevel;
+
+        // Create temporary builder
+        _builder = new StringBuilder();
+        _indentLevel = 0;
+
+        // Visit the statement (this will append to the temp builder)
+        stmt.Accept(this);
+
+        // Capture result
+        var result = _builder.ToString().TrimEnd('\r', '\n');
+
+        // Restore original builder
+        _builder = savedBuilder;
+        _indentLevel = savedIndent;
+
+        return result;
+    }
 
     public string Visit(ModuleNode node)
     {
@@ -1059,9 +1086,43 @@ public sealed class OpalEmitter : IAstVisitor<string>
             var body = node.ExpressionBody.Accept(this);
             return $"{asyncPart}({paramList}) → {body}";
         }
+        else if (node.StatementBody != null && node.StatementBody.Count > 0)
+        {
+            // Emit statement lambda with block syntax
+            // Use CaptureStatementOutput to avoid appending to main builder
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"{asyncPart}({paramList}) → {{");
+
+            // For short lambdas (1-2 statements), emit inline
+            if (node.StatementBody.Count <= 2)
+            {
+                var stmts = node.StatementBody.Select(s => CaptureStatementOutput(s).Trim()).ToList();
+                sb.Append(" ");
+                sb.Append(string.Join(" ", stmts));
+                sb.Append(" }");
+            }
+            else
+            {
+                // For longer lambdas, emit multi-line
+                sb.AppendLine();
+                var indent = "  ";
+                foreach (var stmt in node.StatementBody)
+                {
+                    var stmtStr = CaptureStatementOutput(stmt);
+                    if (!string.IsNullOrWhiteSpace(stmtStr))
+                    {
+                        sb.Append(indent);
+                        sb.AppendLine(stmtStr.Trim());
+                    }
+                }
+                sb.Append("}");
+            }
+            return sb.ToString();
+        }
         else
         {
-            return $"{asyncPart}({paramList}) → {{ ... }}";
+            // Empty lambda
+            return $"{asyncPart}({paramList}) → {{ }}";
         }
     }
 
