@@ -327,6 +327,8 @@ public sealed class Lexer
             '§' => ScanSectionMarker(),
             '[' => ScanSingle(TokenKind.OpenBracket),
             ']' => ScanSingle(TokenKind.CloseBracket),
+            '{' => ScanSingle(TokenKind.OpenBrace),
+            '}' => ScanSingle(TokenKind.CloseBrace),
             '(' => ScanSingle(TokenKind.OpenParen),
             ')' => ScanSingle(TokenKind.CloseParen),
             '=' => ScanEqualsOrOperator(),

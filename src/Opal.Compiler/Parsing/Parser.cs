@@ -1657,27 +1657,28 @@ public sealed class Parser
     {
         var attrs = new AttributeCollection();
 
-        // Parse structural brackets only - stop if we see [@...] which is a C# attribute
-        while (Check(TokenKind.OpenBracket) && Peek(1).Kind != TokenKind.At)
+        // Parse structural braces {} for tag attributes
+        // Note: [] is now reserved for array types to align with LLM training
+        while (Check(TokenKind.OpenBrace))
         {
-            Advance(); // consume [
+            Advance(); // consume {
 
             // Check for v2 positional format vs v1 named format
-            // v1: [name=value] - has Identifier followed by Equals
-            // v2: [value1:value2] or [value] - no Equals, colon-separated
+            // v1: {name=value} - has Identifier followed by Equals
+            // v2: {value1:value2} or {value} - no Equals, colon-separated
 
             if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals)
             {
-                // v1 format: [name=value]
+                // v1 format: {name=value}
                 ParseV1Attribute(attrs);
             }
             else
             {
-                // v2 format: [value1:value2:...] or [value]
+                // v2 format: {value1:value2:...} or {value}
                 ParseV2PositionalAttributes(attrs);
             }
 
-            Expect(TokenKind.CloseBracket);
+            Expect(TokenKind.CloseBrace);
         }
 
         return attrs;
@@ -1757,6 +1758,70 @@ public sealed class Parser
         {
             sb.Append('?');
             Advance();
+        }
+
+        // Handle array types like [u8], [[i32]], [str]
+        if (Check(TokenKind.OpenBracket))
+        {
+            var depth = 0;
+            while (Check(TokenKind.OpenBracket))
+            {
+                sb.Append('[');
+                Advance();
+                depth++;
+            }
+
+            // Parse the element type
+            if (Check(TokenKind.Identifier))
+            {
+                sb.Append(Advance().Text);
+
+                // Handle generic element types like [List<int>]
+                if (Check(TokenKind.Less))
+                {
+                    sb.Append('<');
+                    Advance();
+                    var genericDepth = 1;
+                    while (!IsAtEnd && genericDepth > 0)
+                    {
+                        if (Check(TokenKind.Less))
+                        {
+                            sb.Append('<');
+                            genericDepth++;
+                            Advance();
+                        }
+                        else if (Check(TokenKind.Greater))
+                        {
+                            sb.Append('>');
+                            genericDepth--;
+                            Advance();
+                        }
+                        else if (Check(TokenKind.Identifier))
+                        {
+                            sb.Append(Advance().Text);
+                        }
+                        else if (Check(TokenKind.Comma))
+                        {
+                            sb.Append(',');
+                            Advance();
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Close the array brackets
+            while (depth > 0 && Check(TokenKind.CloseBracket))
+            {
+                sb.Append(']');
+                Advance();
+                depth--;
+            }
+
+            return sb.ToString();
         }
 
         // Parse the main value (identifier, literal, or compound identifier)

@@ -7,8 +7,10 @@ public enum TokenKind
 {
     // Structural
     SectionMarker,      // §
-    OpenBracket,        // [
-    CloseBracket,       // ]
+    OpenBracket,        // [  (used for array types)
+    CloseBracket,       // ]  (used for array types)
+    OpenBrace,          // {  (used for tag attributes)
+    CloseBrace,         // }  (used for tag attributes)
     Equals,             // =
 
     // v2 syntax tokens
