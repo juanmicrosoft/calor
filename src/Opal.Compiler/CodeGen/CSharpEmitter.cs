@@ -398,6 +398,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
+        // Handle member access like "args.Length" - preserve the dot notation
+        if (node.Name.Contains('.'))
+        {
+            var parts = node.Name.Split('.');
+            var sanitizedParts = parts.Select(SanitizeIdentifier);
+            return string.Join(".", sanitizedParts);
+        }
         return SanitizeIdentifier(node.Name);
     }
 
