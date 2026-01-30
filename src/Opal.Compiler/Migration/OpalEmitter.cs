@@ -811,8 +811,9 @@ public sealed class OpalEmitter : IAstVisitor<string>
     public string Visit(MatchStatementNode node)
     {
         var target = node.Target.Accept(this);
+        var id = string.IsNullOrEmpty(node.Id) ? $"sw{_switchCounter++}" : node.Id;
 
-        AppendLine($"§MATCH {target}");
+        AppendLine($"§MATCH[{id}] {target}");
         Indent();
 
         foreach (var matchCase in node.Cases)
@@ -821,9 +822,10 @@ public sealed class OpalEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine("§/MATCH");
+        AppendLine($"§/MATCH[{id}]");
         return "";
     }
+    private int _switchCounter = 0;
 
     public string Visit(MatchCaseNode node)
     {
@@ -866,6 +868,14 @@ public sealed class OpalEmitter : IAstVisitor<string>
     public string Visit(BoolLiteralNode node)
     {
         return node.Value ? "true" : "false";
+    }
+
+    public string Visit(ConditionalExpressionNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        var whenTrue = node.WhenTrue.Accept(this);
+        var whenFalse = node.WhenFalse.Accept(this);
+        return $"(? {condition} {whenTrue} {whenFalse})";
     }
 
     public string Visit(ReferenceNode node)

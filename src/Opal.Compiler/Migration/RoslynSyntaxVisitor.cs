@@ -1337,6 +1337,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.Text),
             BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
             PrefixUnaryExpressionSyntax prefix => ConvertPrefixUnaryExpression(prefix),
+            PostfixUnaryExpressionSyntax postfix => ConvertPostfixUnaryExpression(postfix),
             ParenthesizedExpressionSyntax paren => ConvertExpression(paren.Expression),
             InvocationExpressionSyntax invocation => ConvertInvocationExpression(invocation),
             MemberAccessExpressionSyntax memberAccess => ConvertMemberAccessExpression(memberAccess),
@@ -1400,6 +1401,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new UnaryOperationNode(GetTextSpan(prefix), unaryOp, operand);
     }
 
+    private ExpressionNode ConvertPostfixUnaryExpression(PostfixUnaryExpressionSyntax postfix)
+    {
+        var operand = ConvertExpression(postfix.Operand);
+
+        // Handle null-forgiving operator (!) - just return the operand since OPAL doesn't have this concept
+        if (postfix.OperatorToken.IsKind(SyntaxKind.ExclamationToken))
+        {
+            return operand;
+        }
+
+        // For other postfix operators (++, --), fall back to string representation
+        // These are typically used in statements, not expressions
+        return new ReferenceNode(GetTextSpan(postfix), postfix.ToString());
+    }
+
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
     {
         var target = invocation.Expression.ToString();
@@ -1456,32 +1472,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertConditionalExpression(ConditionalExpressionSyntax conditional)
     {
-        // Ternary is converted to if-then-else expression using Match
+        // Ternary is converted to a conditional expression: (? cond then else)
         var condition = ConvertExpression(conditional.Condition);
         var whenTrue = ConvertExpression(conditional.WhenTrue);
         var whenFalse = ConvertExpression(conditional.WhenFalse);
 
-        var id = _context.GenerateId("cond");
-
-        // Create a match expression
-        var trueBranch = new MatchCaseNode(
-            GetTextSpan(conditional.WhenTrue),
-            new LiteralPatternNode(TextSpan.Empty, new BoolLiteralNode(TextSpan.Empty, true)),
-            guard: null,
-            new List<StatementNode> { new ReturnStatementNode(TextSpan.Empty, whenTrue) });
-
-        var falseBranch = new MatchCaseNode(
-            GetTextSpan(conditional.WhenFalse),
-            new WildcardPatternNode(TextSpan.Empty),
-            guard: null,
-            new List<StatementNode> { new ReturnStatementNode(TextSpan.Empty, whenFalse) });
-
-        return new MatchExpressionNode(
+        return new ConditionalExpressionNode(
             GetTextSpan(conditional),
-            id,
             condition,
-            new List<MatchCaseNode> { trueBranch, falseBranch },
-            new AttributeCollection());
+            whenTrue,
+            whenFalse);
     }
 
     private ArrayCreationNode ConvertArrayCreation(ArrayCreationExpressionSyntax arrayCreation)

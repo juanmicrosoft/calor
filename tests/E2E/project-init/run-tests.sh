@@ -182,6 +182,12 @@ test_github_project() {
         rm "$project_dir/global.json"
     fi
 
+    # Remove version.json to disable Nerdbank.GitVersioning (doesn't work with shallow clones)
+    if [[ -f "$project_dir/version.json" ]]; then
+        step "Removing version.json (Nerdbank.GitVersioning conflicts with shallow clones)..."
+        rm "$project_dir/version.json"
+    fi
+
     # Patch target frameworks to net8.0 if they target newer versions
     step "Patching target frameworks to net8.0..."
     find "$project_dir" -name "*.csproj" -exec sed -i.bak \

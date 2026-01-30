@@ -383,6 +383,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return node.Value ? "true" : "false";
     }
 
+    public string Visit(ConditionalExpressionNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        var whenTrue = node.WhenTrue.Accept(this);
+        var whenFalse = node.WhenFalse.Accept(this);
+        return $"({condition} ? {whenTrue} : {whenFalse})";
+    }
+
     public string Visit(FloatLiteralNode node)
     {
         return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);

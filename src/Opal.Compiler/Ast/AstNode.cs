@@ -31,6 +31,7 @@ public interface IAstVisitor
     void Visit(IntLiteralNode node);
     void Visit(StringLiteralNode node);
     void Visit(BoolLiteralNode node);
+    void Visit(ConditionalExpressionNode node);
     void Visit(FloatLiteralNode node);
     void Visit(ReferenceNode node);
     // Phase 2: Control Flow
@@ -168,6 +169,7 @@ public interface IAstVisitor<T>
     T Visit(IntLiteralNode node);
     T Visit(StringLiteralNode node);
     T Visit(BoolLiteralNode node);
+    T Visit(ConditionalExpressionNode node);
     T Visit(FloatLiteralNode node);
     T Visit(ReferenceNode node);
     // Phase 2: Control Flow

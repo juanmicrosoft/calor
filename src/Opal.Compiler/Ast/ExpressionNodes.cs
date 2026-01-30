@@ -62,6 +62,28 @@ public sealed class BoolLiteralNode : ExpressionNode
 }
 
 /// <summary>
+/// Represents a conditional (ternary) expression.
+/// (? condition thenExpr elseExpr)
+/// </summary>
+public sealed class ConditionalExpressionNode : ExpressionNode
+{
+    public ExpressionNode Condition { get; }
+    public ExpressionNode WhenTrue { get; }
+    public ExpressionNode WhenFalse { get; }
+
+    public ConditionalExpressionNode(TextSpan span, ExpressionNode condition, ExpressionNode whenTrue, ExpressionNode whenFalse)
+        : base(span)
+    {
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        WhenTrue = whenTrue ?? throw new ArgumentNullException(nameof(whenTrue));
+        WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a floating-point literal.
 /// FLOAT:3.14
 /// </summary>

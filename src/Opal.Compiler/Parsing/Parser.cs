@@ -870,6 +870,12 @@ public sealed class Parser
         var endToken = Expect(TokenKind.CloseParen);
         var span = startToken.Span.Union(endToken.Span);
 
+        // Handle ternary conditional: (? cond then else)
+        if (opText == "?" && args.Count == 3)
+        {
+            return new ConditionalExpressionNode(span, args[0], args[1], args[2]);
+        }
+
         // Determine if this is unary or binary based on argument count and operator
         if (args.Count == 1 && IsUnaryOperator(opKind))
         {
@@ -994,6 +1000,9 @@ public sealed class Parser
             case TokenKind.Tilde:
                 Advance();
                 return (TokenKind.Tilde, "~");
+            case TokenKind.Question:
+                Advance();
+                return (TokenKind.Question, "?");
             case TokenKind.Identifier:
                 // Support word operators like "and", "or", "not", "mod"
                 Advance();
@@ -2692,23 +2701,71 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a 'this' expression.
-    /// §THIS
+    /// Parses a 'this' expression with optional member access.
+    /// §THIS or §THIS.property
     /// </summary>
-    private ThisExpressionNode ParseThisExpression()
+    private ExpressionNode ParseThisExpression()
     {
         var token = Expect(TokenKind.This);
-        return new ThisExpressionNode(token.Span);
+        ExpressionNode expr = new ThisExpressionNode(token.Span);
+
+        // Handle trailing member access (e.g., §THIS.property or §THIS?.property)
+        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
+        {
+            var isNullConditional = Check(TokenKind.NullConditional);
+            Advance(); // consume '.' or '?.'
+            if (!Check(TokenKind.Identifier))
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "member name", Current.Kind);
+                break;
+            }
+            var memberToken = Advance();
+            var span = expr.Span.Union(memberToken.Span);
+            if (isNullConditional)
+            {
+                expr = new NullConditionalNode(span, expr, memberToken.Text);
+            }
+            else
+            {
+                expr = new FieldAccessNode(span, expr, memberToken.Text);
+            }
+        }
+
+        return expr;
     }
 
     /// <summary>
-    /// Parses a 'base' expression.
-    /// §BASE
+    /// Parses a 'base' expression with optional member access.
+    /// §BASE or §BASE.property
     /// </summary>
-    private BaseExpressionNode ParseBaseExpression()
+    private ExpressionNode ParseBaseExpression()
     {
         var token = Expect(TokenKind.Base);
-        return new BaseExpressionNode(token.Span);
+        ExpressionNode expr = new BaseExpressionNode(token.Span);
+
+        // Handle trailing member access (e.g., §BASE.method)
+        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
+        {
+            var isNullConditional = Check(TokenKind.NullConditional);
+            Advance(); // consume '.' or '?.'
+            if (!Check(TokenKind.Identifier))
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "member name", Current.Kind);
+                break;
+            }
+            var memberToken = Advance();
+            var span = expr.Span.Union(memberToken.Span);
+            if (isNullConditional)
+            {
+                expr = new NullConditionalNode(span, expr, memberToken.Text);
+            }
+            else
+            {
+                expr = new FieldAccessNode(span, expr, memberToken.Text);
+            }
+        }
+
+        return expr;
     }
 
     /// <summary>
@@ -2853,10 +2910,19 @@ public sealed class Parser
         var preconditions = new List<RequiresNode>();
         var body = new List<StatementNode>();
 
+        // Determine the end token for this accessor
+        var endTokenKind = kind switch
+        {
+            PropertyAccessorNode.AccessorKind.Get => TokenKind.EndGet,
+            PropertyAccessorNode.AccessorKind.Set => TokenKind.EndSet,
+            _ => TokenKind.EndProperty // Init doesn't have its own end token
+        };
+
         // Parse optional preconditions and body (for non-auto properties)
-        // Also stop at Equals for property default values
+        // Also stop at Equals for property default values, next accessor, or end tokens
         while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
-               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.Equals))
+               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.Equals) &&
+               !Check(TokenKind.EndGet) && !Check(TokenKind.EndSet))
         {
             if (Check(TokenKind.Requires))
             {
@@ -2870,6 +2936,12 @@ public sealed class Parser
                     body.Add(stmt);
                 }
             }
+        }
+
+        // Consume the closing token if present (§/GET or §/SET)
+        if (Check(endTokenKind))
+        {
+            Advance();
         }
 
         return new PropertyAccessorNode(startToken.Span, kind, visibility, preconditions, body, attrs);
@@ -2960,6 +3032,13 @@ public sealed class Parser
         while (Check(TokenKind.Arg))
         {
             arguments.Add(ParseArgument());
+        }
+
+        // Consume the closing token (§/BASE or §/THIS)
+        var endTokenKind = isBase ? TokenKind.EndBase : TokenKind.EndThis;
+        if (Check(endTokenKind))
+        {
+            Advance();
         }
 
         return new ConstructorInitializerNode(startToken.Span, isBase, arguments);
