@@ -76,3 +76,4 @@ For alternative installation methods (global tool only, manual Claude skills set
 - [Installation](/opal/getting-started/installation/) - Detailed setup instructions
 - [Hello World](/opal/getting-started/hello-world/) - Understand the hello world program
 - [Syntax Reference](/opal/syntax-reference/) - Complete language reference
+- [CLI Reference](/opal/cli/) - All `opalc` commands including migration analysis

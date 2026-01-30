@@ -111,6 +111,31 @@ dotnet run --project samples/HelloWorld
 
 ---
 
+## Migration Analysis
+
+Have an existing C# codebase? Use `opalc analyze` to find files that would benefit most from OPAL:
+
+```bash
+# Score C# files for migration potential
+opalc analyze ./src
+
+# Output:
+# === OPAL Migration Analysis ===
+# Analyzed: 42 files
+# Average Score: 34.2/100
+#
+# Priority Breakdown:
+#   Critical (76-100): 2 files
+#   High (51-75):      8 files
+#   ...
+```
+
+The analyzer scores files based on patterns like null handling, error handling, and argument validation that map to OPAL features.
+
+[Learn more about analyze](/opal/cli/analyze/){: .btn .btn-outline }
+
+---
+
 ## Project Status
 
 - [x] Core compiler (lexer, parser, C# code generation)
