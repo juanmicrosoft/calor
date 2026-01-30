@@ -51,6 +51,7 @@ public class Program
         rootCommand.AddCommand(InitCommand.Create());
         rootCommand.AddCommand(FormatCommand.Create());
         rootCommand.AddCommand(DiagnoseCommand.Create());
+        rootCommand.AddCommand(AnalyzeCommand.Create());
 
         return await rootCommand.InvokeAsync(args);
     }
@@ -68,6 +69,7 @@ public class Program
                 Console.WriteLine("  opalc --input <file.opal> [--output <file.cs>]  Compile OPAL to C#");
                 Console.WriteLine("  opalc convert <file>                           Convert between C# and OPAL");
                 Console.WriteLine("  opalc migrate <project>                        Migrate entire project");
+                Console.WriteLine("  opalc analyze <directory>                      Analyze C# for migration potential");
                 Console.WriteLine("  opalc benchmark [options]                      Compare token economics");
                 Console.WriteLine("  opalc init --ai <agent>                        Initialize for AI coding agents");
                 Console.WriteLine("  opalc format <files>                           Format OPAL source files");
