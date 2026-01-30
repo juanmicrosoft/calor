@@ -49,14 +49,14 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesInlineExample()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:Add:pub]
-  §I[i32:a] §I[i32:b]
-  §O[i32]
+§M{m001:Test}
+§F{f001:Add:pub}
+  §I{i32:a} §I{i32:b}
+  §O{i32}
   §EX (+ 2 3) → 5
   §R (+ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -72,14 +72,14 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesExampleWithId()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:Add:pub]
-  §I[i32:a] §I[i32:b]
-  §O[i32]
-  §EX[ex001] (+ 2 3) → 5
+§M{m001:Test}
+§F{f001:Add:pub}
+  §I{i32:a} §I{i32:b}
+  §O{i32}
+  §EX{ex001} (+ 2 3) → 5
   §R (+ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -93,14 +93,14 @@ public class ExtendedFeaturesTests
     public void Emitter_EmitsExampleAsDebugAssert()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:Add:pub]
-  §I[i32:a] §I[i32:b]
-  §O[i32]
+§M{m001:Test}
+§F{f001:Add:pub}
+  §I{i32:a} §I{i32:b}
+  §O{i32}
   §EX (+ 2 3) → 5
   §R (+ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -145,13 +145,13 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesTodoIssue()
     {
         var source = @"
-§M[m001:Test]
-§TODO[t001:perf:high] ""Optimize for large n""
-§F[f001:Calc:pub]
-  §O[i32]
+§M{m001:Test}
+§TODO{t001:perf:high} ""Optimize for large n""
+§F{f001:Calc:pub}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -170,13 +170,13 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesFunctionLevelFixme()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:Calc:pub]
-  §FIXME[x001:bug:critical] ""Integer overflow""
-  §O[i32]
+§M{m001:Test}
+§F{f001:Calc:pub}
+  §FIXME{x001:bug:critical} ""Integer overflow""
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -193,13 +193,13 @@ public class ExtendedFeaturesTests
     public void Emitter_EmitsIssueAsComment()
     {
         var source = @"
-§M[m001:Test]
-§TODO[t001:perf:high] ""Optimize for large n""
-§F[f001:Calc:pub]
-  §O[i32]
+§M{m001:Test}
+§TODO{t001:perf:high} ""Optimize for large n""
+§F{f001:Calc:pub}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -235,13 +235,13 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesUsesDeclaration()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:ProcessOrder:pub]
-  §USES[ValidateOrder]
-  §O[i32]
+§M{m001:Test}
+§F{f001:ProcessOrder:pub}
+  §USES{ValidateOrder}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -257,13 +257,13 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesUsedByDeclaration()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:ProcessOrder:pub]
-  §USEDBY[OrderController]
-  §O[i32]
+§M{m001:Test}
+§F{f001:ProcessOrder:pub}
+  §USEDBY{OrderController}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -278,14 +278,14 @@ public class ExtendedFeaturesTests
     public void Emitter_EmitsDependenciesAsComments()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:ProcessOrder:pub]
-  §USES[ValidateOrder]
-  §USEDBY[OrderController]
-  §O[i32]
+§M{m001:Test}
+§F{f001:ProcessOrder:pub}
+  §USES{ValidateOrder}
+  §USEDBY{OrderController}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -314,14 +314,14 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesAssumeDeclaration()
     {
         var source = @"
-§M[m001:Test]
-§ASSUME[env] ""Database connection pool initialized""
-§F[f001:GetOrder:pub]
-  §ASSUME[data] ""orderId exists in database""
-  §O[i32]
+§M{m001:Test}
+§ASSUME{env} ""Database connection pool initialized""
+§F{f001:GetOrder:pub}
+  §ASSUME{data} ""orderId exists in database""
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -353,13 +353,13 @@ public class ExtendedFeaturesTests
     {
         // Use quoted values for complex syntax
         var source = @"
-§M[m001:Test]
-§F[f001:BinarySearch:pub]
-  §COMPLEXITY[time=""O(logn)""][space=""O(1)""]
-  §O[i32]
+§M{m001:Test}
+§F{f001:BinarySearch:pub}
+  §COMPLEXITY{time=""O(logn)""}{space=""O(1)""}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -375,13 +375,13 @@ public class ExtendedFeaturesTests
     public void Emitter_EmitsComplexityAsComment()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:BinarySearch:pub]
-  §COMPLEXITY[time=""O(n)""]
-  §O[i32]
+§M{m001:Test}
+§F{f001:BinarySearch:pub}
+  §COMPLEXITY{time=""O(n)""}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -419,13 +419,13 @@ public class ExtendedFeaturesTests
     {
         // Use quoted values for version
         var source = @"
-§M[m001:Test]
-§F[f001:NewMethod:pub]
-  §SINCE[version=""1.5.0""]
-  §O[i32]
+§M{m001:Test}
+§F{f001:NewMethod:pub}
+  §SINCE{version=""1.5.0""}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -441,13 +441,13 @@ public class ExtendedFeaturesTests
     {
         // Use quoted values for version
         var source = @"
-§M[m001:Test]
-§F[f001:OldMethod:pub]
-  §DEPRECATED[since=""1.5.0""][use=NewMethod]
-  §O[i32]
+§M{m001:Test}
+§F{f001:OldMethod:pub}
+  §DEPRECATED{since=""1.5.0""}{use=NewMethod}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -463,13 +463,13 @@ public class ExtendedFeaturesTests
     public void Emitter_EmitsDeprecatedAsObsoleteAttribute()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:OldMethod:pub]
-  §DEPRECATED[since=""1.5.0""][use=NewMethod]
-  §O[i32]
+§M{m001:Test}
+§F{f001:OldMethod:pub}
+  §DEPRECATED{since=""1.5.0""}{use=NewMethod}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -502,19 +502,19 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesDecisionRecord()
     {
         var source = @"
-§M[m001:Test]
-§DECISION[d001] ""Algorithm selection""
+§M{m001:Test}
+§DECISION{d001} ""Algorithm selection""
   §CHOSEN ""QuickSort""
   §REASON ""Best average-case performance""
   §REJECTED ""MergeSort""
     §REASON ""Requires O(n) extra space""
   §CONTEXT ""Typical input: 1000-10000 items""
-§/DECISION[d001]
-§F[f001:Sort:pub]
-  §O[i32]
+§/DECISION{d001}
+§F{f001:Sort:pub}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -551,18 +551,18 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesContextMarker()
     {
         var source = @"
-§M[m001:Test]
-§CONTEXT[partial]
+§M{m001:Test}
+§CONTEXT{partial}
   §VISIBLE
-    §FILE[OrderService.opal]
+    §FILE{OrderService.opal}
   §/VISIBLE
-  §FOCUS[OrderService.ProcessOrder]
+  §FOCUS{OrderService.ProcessOrder}
 §/CONTEXT
-§F[f001:Process:pub]
-  §O[i32]
+§F{f001:Process:pub}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -592,13 +592,13 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesPropertyDeclaration()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:Reverse:pub]
+§M{m001:Test}
+§F{f001:Reverse:pub}
   §PROPERTY (== 1 1)
-  §O[i32]
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -629,13 +629,13 @@ public class ExtendedFeaturesTests
     {
         // Use v1 format with = signs
         var source = @"
-§M[m001:Test]
-§F[f001:SharedFunc:pub]
-  §LOCK[agent=agent123]
-  §O[i32]
+§M{m001:Test}
+§F{f001:SharedFunc:pub}
+  §LOCK{agent=agent123}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -651,13 +651,13 @@ public class ExtendedFeaturesTests
     {
         // Use v1 format with = signs
         var source = @"
-§M[m001:Test]
-§F[f001:SharedFunc:pub]
-  §AUTHOR[agent=agent456][task=PROJ789]
-  §O[i32]
+§M{m001:Test}
+§F{f001:SharedFunc:pub}
+  §AUTHOR{agent=agent456}{task=PROJ789}
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -673,13 +673,13 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesTaskRefDeclaration()
     {
         var source = @"
-§M[m001:Test]
-§F[f001:SharedFunc:pub]
-  §TASK[PROJ789] ""Implement validation""
-  §O[i32]
+§M{m001:Test}
+§F{f001:SharedFunc:pub}
+  §TASK{PROJ789} ""Implement validation""
+  §O{i32}
   §R 42
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -699,29 +699,29 @@ public class ExtendedFeaturesTests
     public void Parser_ParsesComprehensiveExample()
     {
         var source = @"
-§M[m001:Demo]
-§TODO[t001:docs:medium] ""Add examples""
+§M{m001:Demo}
+§TODO{t001:docs:medium} ""Add examples""
 
-§F[f001:Add:pub]
-  §SINCE[version=""1.0.0""]
-  §COMPLEXITY[time=""O(1)""][space=""O(1)""]
-  §USES[ValidateInput]
-  §ASSUME[data] ""Inputs are within i32 range""
-  §I[i32:a] §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §SINCE{version=""1.0.0""}
+  §COMPLEXITY{time=""O(1)""}{space=""O(1)""}
+  §USES{ValidateInput}
+  §ASSUME{data} ""Inputs are within i32 range""
+  §I{i32:a} §I{i32:b}
+  §O{i32}
   §EX (+ 2 3) → 5
   §EX (+ 0 0) → 0
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 
-§F[f002:OldAdd:pub]
-  §SINCE[version=""0.5.0""]
-  §DEPRECATED[since=""1.0.0""][use=Add]
-  §I[i32:x] §I[i32:y]
-  §O[i32]
+§F{f002:OldAdd:pub}
+  §SINCE{version=""0.5.0""}
+  §DEPRECATED{since=""1.0.0""}{use=Add}
+  §I{i32:x} §I{i32:y}
+  §O{i32}
   §R (+ x y)
-§/F[f002]
-§/M[m001]
+§/F{f002}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -747,25 +747,25 @@ public class ExtendedFeaturesTests
     public void Emitter_GeneratesValidCSharpWithExtendedFeatures()
     {
         var source = @"
-§M[m001:Demo]
-§TODO[t001:docs:medium] ""Add examples""
+§M{m001:Demo}
+§TODO{t001:docs:medium} ""Add examples""
 
-§F[f001:Add:pub]
-  §SINCE[version=""1.0.0""]
-  §COMPLEXITY[time=""O(1)""]
-  §I[i32:a] §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §SINCE{version=""1.0.0""}
+  §COMPLEXITY{time=""O(1)""}
+  §I{i32:a} §I{i32:b}
+  §O{i32}
   §EX (+ 2 3) → 5
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 
-§F[f002:OldAdd:pub]
-  §DEPRECATED[since=""1.0.0""][use=Add]
-  §I[i32:x] §I[i32:y]
-  §O[i32]
+§F{f002:OldAdd:pub}
+  §DEPRECATED{since=""1.0.0""}{use=Add}
+  §I{i32:x} §I{i32:y}
+  §O{i32}
   §R (+ x y)
-§/F[f002]
-§/M[m001]
+§/F{f002}
+§/M{m001}
 ";
 
         var module = Parse(source, out var diagnostics);

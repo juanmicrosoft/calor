@@ -68,16 +68,16 @@ public class ContractTests
     public void Parser_ParsesRequiresContract()
     {
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Square][visibility=public]
-  §IN[name=x][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Square}{visibility=public}
+  §IN{name=x}{type=INT}
+  §OUT{type=INT}
   §REQUIRES (>= x INT:0)
   §BODY
     §RETURN (* x x)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -97,16 +97,16 @@ public class ContractTests
     public void Parser_ParsesEnsuresContract()
     {
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Square][visibility=public]
-  §IN[name=x][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Square}{visibility=public}
+  §IN{name=x}{type=INT}
+  §OUT{type=INT}
   §ENSURES (>= result INT:0)
   §BODY
     §RETURN (* x x)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -126,19 +126,19 @@ public class ContractTests
     public void Parser_ParsesMultipleContracts()
     {
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Divide][visibility=public]
-  §IN[name=a][type=INT]
-  §IN[name=b][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Divide}{visibility=public}
+  §IN{name=a}{type=INT}
+  §IN{name=b}{type=INT}
+  §OUT{type=INT}
   §REQUIRES (!= b INT:0)
   §REQUIRES (>= a INT:0)
   §ENSURES (>= result INT:0)
   §BODY
     §RETURN (/ a b)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -154,16 +154,16 @@ public class ContractTests
     public void Parser_ParsesContractWithMessage()
     {
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Square][visibility=public]
-  §IN[name=x][type=INT]
-  §OUT[type=INT]
-  §REQUIRES[message=""x must be nonnegative""] (>= x INT:0)
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Square}{visibility=public}
+  §IN{name=x}{type=INT}
+  §OUT{type=INT}
+  §REQUIRES{message=""x must be nonnegative""} (>= x INT:0)
   §BODY
     §RETURN (* x x)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -244,16 +244,16 @@ public class ContractTests
     public void Emitter_EmitsFunctionWithPrecondition()
     {
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Square][visibility=public]
-  §IN[name=x][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Square}{visibility=public}
+  §IN{name=x}{type=INT}
+  §OUT{type=INT}
   §REQUIRES (>= x INT:0)
   §BODY
     §RETURN (* x x)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -271,16 +271,16 @@ public class ContractTests
     public void Emitter_EmitsFunctionWithPostcondition()
     {
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Square][visibility=public]
-  §IN[name=x][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Square}{visibility=public}
+  §IN{name=x}{type=INT}
+  §OUT{type=INT}
   §ENSURES (>= result INT:0)
   §BODY
     §RETURN (* x x)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -302,16 +302,16 @@ public class ContractTests
     public void ContractVerifier_AcceptsValidPrecondition()
     {
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Square][visibility=public]
-  §IN[name=x][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Square}{visibility=public}
+  §IN{name=x}{type=INT}
+  §OUT{type=INT}
   §REQUIRES (>= x INT:0)
   §BODY
     §RETURN (* x x)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var parseDiags);

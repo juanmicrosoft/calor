@@ -20,8 +20,8 @@ public class ParserTests
     public void Parse_MinimalModule_ReturnsModuleNode()
     {
         var source = """
-            §MODULE[id=m001][name=Test]
-            §END_MODULE[id=m001]
+            §MODULE{id=m001}{name=Test}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -36,13 +36,13 @@ public class ParserTests
     public void Parse_ModuleWithFunction_ReturnsFunctionNode()
     {
         var source = """
-            §MODULE[id=m001][name=Test]
-            §FUNC[id=f001][name=MyFunc][visibility=public]
-              §OUT[type=VOID]
+            §MODULE{id=m001}{name=Test}
+            §FUNC{id=f001}{name=MyFunc}{visibility=public}
+              §OUT{type=VOID}
               §BODY
               §END_BODY
-            §END_FUNC[id=f001]
-            §END_MODULE[id=m001]
+            §END_FUNC{id=f001}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -60,15 +60,15 @@ public class ParserTests
     public void Parse_FunctionWithParameters_ReturnsParameterNodes()
     {
         var source = """
-            §MODULE[id=m001][name=Test]
-            §FUNC[id=f001][name=Add][visibility=public]
-              §IN[name=a][type=INT]
-              §IN[name=b][type=INT]
-              §OUT[type=INT]
+            §MODULE{id=m001}{name=Test}
+            §FUNC{id=f001}{name=Add}{visibility=public}
+              §IN{name=a}{type=INT}
+              §IN{name=b}{type=INT}
+              §OUT{type=INT}
               §BODY
               §END_BODY
-            §END_FUNC[id=f001]
-            §END_MODULE[id=m001]
+            §END_FUNC{id=f001}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -85,16 +85,16 @@ public class ParserTests
     public void Parse_FunctionWithCallStatement_ReturnsCallNode()
     {
         var source = """
-            §MODULE[id=m001][name=Test]
-            §FUNC[id=f001][name=Main][visibility=public]
-              §OUT[type=VOID]
+            §MODULE{id=m001}{name=Test}
+            §FUNC{id=f001}{name=Main}{visibility=public}
+              §OUT{type=VOID}
               §BODY
-                §CALL[target=Console.WriteLine][fallible=false]
+                §CALL{target=Console.WriteLine}{fallible=false}
                   §ARG STR:"Hello"
                 §END_CALL
               §END_BODY
-            §END_FUNC[id=f001]
-            §END_MODULE[id=m001]
+            §END_FUNC{id=f001}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -118,14 +118,14 @@ public class ParserTests
     public void Parse_FunctionWithEffects_ReturnsEffectsNode()
     {
         var source = """
-            §MODULE[id=m001][name=Test]
-            §FUNC[id=f001][name=Main][visibility=public]
-              §OUT[type=VOID]
-              §EFFECTS[io=console_write]
+            §MODULE{id=m001}{name=Test}
+            §FUNC{id=f001}{name=Main}{visibility=public}
+              §OUT{type=VOID}
+              §EFFECTS{io=console_write}
               §BODY
               §END_BODY
-            §END_FUNC[id=f001]
-            §END_MODULE[id=m001]
+            §END_FUNC{id=f001}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -140,8 +140,8 @@ public class ParserTests
     public void Parse_MismatchedModuleId_ReportsError()
     {
         var source = """
-            §MODULE[id=m001][name=Test]
-            §END_MODULE[id=m002]
+            §MODULE{id=m001}{name=Test}
+            §END_MODULE{id=m002}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -155,12 +155,12 @@ public class ParserTests
     public void Parse_MismatchedFuncId_ReportsError()
     {
         var source = """
-            §MODULE[id=m001][name=Test]
-            §FUNC[id=f001][name=Main][visibility=public]
+            §MODULE{id=m001}{name=Test}
+            §FUNC{id=f001}{name=Main}{visibility=public}
               §BODY
               §END_BODY
-            §END_FUNC[id=f999]
-            §END_MODULE[id=m001]
+            §END_FUNC{id=f999}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -176,8 +176,8 @@ public class ParserTests
     public void Parse_MissingRequiredAttribute_ReportsError()
     {
         var source = """
-            §MODULE[id=m001]
-            §END_MODULE[id=m001]
+            §MODULE{id=m001}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -190,14 +190,14 @@ public class ParserTests
     public void Parse_ReturnStatement_ReturnsReturnNode()
     {
         var source = """
-            §MODULE[id=m001][name=Test]
-            §FUNC[id=f001][name=GetValue][visibility=public]
-              §OUT[type=INT]
+            §MODULE{id=m001}{name=Test}
+            §FUNC{id=f001}{name=GetValue}{visibility=public}
+              §OUT{type=INT}
               §BODY
                 §RETURN INT:42
               §END_BODY
-            §END_FUNC[id=f001]
-            §END_MODULE[id=m001]
+            §END_FUNC{id=f001}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -219,17 +219,17 @@ public class ParserTests
     public void Parse_HelloWorldProgram_Succeeds()
     {
         var source = """
-            §MODULE[id=m001][name=Hello]
-            §FUNC[id=f001][name=Main][visibility=public]
-              §OUT[type=VOID]
-              §EFFECTS[io=console_write]
+            §MODULE{id=m001}{name=Hello}
+            §FUNC{id=f001}{name=Main}{visibility=public}
+              §OUT{type=VOID}
+              §EFFECTS{io=console_write}
               §BODY
-                §CALL[target=Console.WriteLine][fallible=false]
+                §CALL{target=Console.WriteLine}{fallible=false}
                   §ARG STR:"Hello from OPAL!"
                 §END_CALL
               §END_BODY
-            §END_FUNC[id=f001]
-            §END_MODULE[id=m001]
+            §END_FUNC{id=f001}
+            §END_MODULE{id=m001}
             """;
 
         var module = Parse(source, out var diagnostics);

@@ -1796,6 +1796,13 @@ public sealed class Parser
                             genericDepth--;
                             Advance();
                         }
+                        else if (Check(TokenKind.GreaterGreater))
+                        {
+                            // Handle >> from nested generics like [List<Task<int>>]
+                            sb.Append(">>");
+                            genericDepth -= 2;
+                            Advance();
+                        }
                         else if (Check(TokenKind.Identifier))
                         {
                             sb.Append(Advance().Text);
@@ -1851,6 +1858,13 @@ public sealed class Parser
                         depth--;
                         Advance();
                     }
+                    else if (Check(TokenKind.GreaterGreater))
+                    {
+                        // Handle >> from nested generics like Task<List<int>>
+                        sb.Append(">>");
+                        depth -= 2;
+                        Advance();
+                    }
                     else if (Check(TokenKind.Identifier))
                     {
                         sb.Append(Advance().Text);
@@ -1886,6 +1900,15 @@ public sealed class Parser
                 {
                     sb.Append(Advance().Text);
                 }
+            }
+
+            // Handle comma-separated values like partial,static for modifiers
+            // Only consume comma if followed by an identifier (not a colon or close brace)
+            while (Check(TokenKind.Comma) && Peek(1).Kind == TokenKind.Identifier)
+            {
+                sb.Append(',');
+                Advance(); // consume comma
+                sb.Append(Advance().Text); // consume identifier
             }
         }
         else if (Check(TokenKind.StrLiteral))

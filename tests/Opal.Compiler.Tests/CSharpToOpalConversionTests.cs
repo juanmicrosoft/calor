@@ -452,7 +452,7 @@ public class CSharpToOpalConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
-        Assert.Contains("§NEW[Person]", result.OpalSource);
+        Assert.Contains("§NEW{Person}", result.OpalSource);
         Assert.Contains("Name:", result.OpalSource);
         Assert.Contains("Age:", result.OpalSource);
         Assert.Contains("City:", result.OpalSource);
@@ -470,7 +470,7 @@ public class CSharpToOpalConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
-        Assert.Contains("§NEW[Settings]", result.OpalSource);
+        Assert.Contains("§NEW{Settings}", result.OpalSource);
         Assert.Contains("Timeout:", result.OpalSource);
         Assert.Contains("Enabled:", result.OpalSource);
     }
@@ -958,7 +958,7 @@ public class CSharpToOpalConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
         // Using statements are converted to try/finally for disposal
-        Assert.Contains("§TRY[", result.OpalSource);
+        Assert.Contains("§TRY{", result.OpalSource);
         Assert.Contains("§FINALLY", result.OpalSource);
         Assert.Contains("Dispose", result.OpalSource);
         Assert.Contains("using-statement", result.Context.UsedFeatures);
@@ -985,7 +985,7 @@ public class CSharpToOpalConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
         // Using statements are converted to try/finally
-        Assert.Contains("§TRY[", result.OpalSource);
+        Assert.Contains("§TRY{", result.OpalSource);
         Assert.Contains("writer", result.OpalSource);
     }
 
@@ -1013,7 +1013,7 @@ public class CSharpToOpalConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.OpalSource);
         // Should have two try/finally blocks (one per using)
-        var tryCount = result.OpalSource.Split("§TRY[using_").Length - 1;
+        var tryCount = result.OpalSource.Split("§TRY{using_").Length - 1;
         Assert.Equal(2, tryCount);
     }
 

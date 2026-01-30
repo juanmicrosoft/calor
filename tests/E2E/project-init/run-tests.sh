@@ -376,16 +376,14 @@ test_basic_console_app() {
 
     step "Creating test.opal file..."
     cat > test.opal << 'OPAL_EOF'
-§M[m001:TestModule]
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §BODY
-    §RETURN (+ a b)
-  §END_BODY
-§/F[f001]
-§/M[m001]
+§M{m001:TestModule}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§/M{m001}
 OPAL_EOF
 
     cat > Program.cs << 'CS_EOF'

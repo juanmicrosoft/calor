@@ -1352,6 +1352,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
             ConditionalAccessExpressionSyntax condAccess => ConvertConditionalAccess(condAccess),
             CastExpressionSyntax cast => ConvertExpression(cast.Expression), // Just use inner expression
+            IsPatternExpressionSyntax isPattern => ConvertIsPatternExpression(isPattern),
+            CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
+            ImplicitObjectCreationExpressionSyntax implicitNew => ConvertImplicitObjectCreation(implicitNew),
             _ => new ReferenceNode(GetTextSpan(expression), expression.ToString())
         };
     }
@@ -1390,6 +1393,64 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var binaryOp = BinaryOperatorExtensions.FromString(op) ?? BinaryOperator.Add;
 
         return new BinaryOperationNode(GetTextSpan(binary), binaryOp, left, right);
+    }
+
+    private ExpressionNode ConvertIsPatternExpression(IsPatternExpressionSyntax isPattern)
+    {
+        // Convert "x is null" to "(== x null)"
+        // Convert "x is not null" to "(!= x null)"
+        var left = ConvertExpression(isPattern.Expression);
+
+        return isPattern.Pattern switch
+        {
+            ConstantPatternSyntax constant =>
+                // "x is null" or "x is value"
+                new BinaryOperationNode(
+                    GetTextSpan(isPattern),
+                    BinaryOperator.Equal,
+                    left,
+                    ConvertExpression(constant.Expression)),
+            UnaryPatternSyntax { OperatorToken.Text: "not", Pattern: ConstantPatternSyntax notConstant } =>
+                // "x is not null" or "x is not value"
+                new BinaryOperationNode(
+                    GetTextSpan(isPattern),
+                    BinaryOperator.NotEqual,
+                    left,
+                    ConvertExpression(notConstant.Expression)),
+            TypePatternSyntax typePattern =>
+                // "x is SomeType" - convert to type check reference
+                new ReferenceNode(GetTextSpan(isPattern), $"({left} is {typePattern.Type})"),
+            _ =>
+                // For other patterns, fall back to string representation
+                new ReferenceNode(GetTextSpan(isPattern), isPattern.ToString())
+        };
+    }
+
+    private ExpressionNode ConvertCollectionExpression(CollectionExpressionSyntax collection)
+    {
+        // Convert C# 12 collection expressions: [] or [1, 2, 3]
+        // Empty collection: output as reference to "default" which works for most cases
+        if (collection.Elements.Count == 0)
+        {
+            return new ReferenceNode(GetTextSpan(collection), "default");
+        }
+
+        // Non-empty collection: fall back to string representation
+        // OPAL doesn't have a direct equivalent to C# collection expressions
+        return new ReferenceNode(GetTextSpan(collection), collection.ToString());
+    }
+
+    private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew)
+    {
+        // Convert target-typed new: new() or new(args)
+        // Use "default" for parameterless, otherwise use a reference node
+        if (implicitNew.ArgumentList == null || implicitNew.ArgumentList.Arguments.Count == 0)
+        {
+            return new ReferenceNode(GetTextSpan(implicitNew), "default");
+        }
+
+        // Fall back to string representation for complex cases
+        return new ReferenceNode(GetTextSpan(implicitNew), implicitNew.ToString());
     }
 
     private UnaryOperationNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)

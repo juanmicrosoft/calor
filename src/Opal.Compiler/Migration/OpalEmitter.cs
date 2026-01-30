@@ -1510,7 +1510,7 @@ public sealed class OpalEmitter : IAstVisitor<string>
     {
         if (node.Arguments.Count == 0)
         {
-            return $"[@{node.Name}}}";
+            return $"[@{node.Name}]";
         }
 
         var args = string.Join(", ", node.Arguments.Select(FormatAttributeArgument));
