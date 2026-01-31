@@ -730,6 +730,8 @@ public sealed class Parser
             TokenKind.Identifier => ParseReference(),
             // v2 Lisp-style expression: (op args...) or inline lambda: () → body
             TokenKind.OpenParen => ParseParenExpressionOrInlineLambda(),
+            // Collection/array initializer: {elem1, elem2, ...}
+            TokenKind.OpenBrace => ParseCollectionInitializer(),
             // Phase 3: Type System
             TokenKind.Some => ParseSomeExpression(),
             TokenKind.None => ParseNoneExpression(),
@@ -765,6 +767,46 @@ public sealed class Parser
     }
 
     /// <summary>
+    /// Parses a collection/array initializer: {elem1, elem2, ...}
+    /// </summary>
+    private ExpressionNode ParseCollectionInitializer()
+    {
+        var startToken = Expect(TokenKind.OpenBrace);
+        var elements = new List<ExpressionNode>();
+
+        // Parse elements until closing brace
+        while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+        {
+            var element = ParseExpression();
+            elements.Add(element);
+
+            // Elements are separated by commas
+            if (Check(TokenKind.Comma))
+            {
+                Advance();
+            }
+            else if (!Check(TokenKind.CloseBrace))
+            {
+                // If there's no comma and no closing brace, something's wrong
+                break;
+            }
+        }
+
+        var endToken = Expect(TokenKind.CloseBrace);
+        var span = startToken.Span.Union(endToken.Span);
+
+        // Create an ArrayCreationNode with inferred type
+        return new ArrayCreationNode(
+            span,
+            "arr_init",
+            "arr_init",
+            "any", // Type will be inferred by context
+            null,  // No explicit size
+            elements,
+            new AttributeCollection());
+    }
+
+    /// <summary>
     /// Parses either a Lisp-style expression or an inline lambda.
     /// - Inline lambda: () → body or (param) → body
     /// - Lisp expression: (op args...)
@@ -784,16 +826,16 @@ public sealed class Parser
             {
                 // This is an inline lambda with no parameters
                 Advance(); // consume →
-                var body = ParseExpression();
-                var span = startToken.Span.Union(body.Span);
+                var (exprBody, stmtBody, endSpan) = ParseLambdaBody();
+                var span = startToken.Span.Union(endSpan);
                 return new LambdaExpressionNode(
                     span,
                     "inline",
                     new List<LambdaParameterNode>(),
                     null, // effects
                     false, // not async
-                    body, // expressionBody
-                    null, // statementBody
+                    exprBody, // expressionBody
+                    stmtBody, // statementBody
                     new AttributeCollection());
             }
             // Not a lambda, restore and parse as Lisp (though empty Lisp is likely an error)
@@ -823,8 +865,8 @@ public sealed class Parser
                 {
                     // This is an inline lambda with one parameter
                     Advance(); // consume →
-                    var body = ParseExpression();
-                    var span = startToken.Span.Union(body.Span);
+                    var (exprBody, stmtBody, endSpan) = ParseLambdaBody();
+                    var span = startToken.Span.Union(endSpan);
                     var param = new LambdaParameterNode(firstToken.Span, paramName, paramType);
                     return new LambdaExpressionNode(
                         span,
@@ -832,8 +874,8 @@ public sealed class Parser
                         new List<LambdaParameterNode> { param },
                         null, // effects
                         false, // not async
-                        body, // expressionBody
-                        null, // statementBody
+                        exprBody, // expressionBody
+                        stmtBody, // statementBody
                         new AttributeCollection());
                 }
             }
@@ -847,6 +889,40 @@ public sealed class Parser
         }
 
         return ParseLispExpression();
+    }
+
+    /// <summary>
+    /// Parses a lambda body after the arrow (→).
+    /// Can be either an expression or a statement block.
+    /// Returns (expressionBody, statementBody, endSpan).
+    /// </summary>
+    private (ExpressionNode?, IReadOnlyList<StatementNode>?, TextSpan) ParseLambdaBody()
+    {
+        // Check for statement block: { ... }
+        if (Check(TokenKind.OpenBrace))
+        {
+            var statements = new List<StatementNode>();
+            Advance(); // consume {
+
+            // Parse statements until closing brace
+            while (!IsAtEnd && !Check(TokenKind.CloseBrace))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    statements.Add(stmt);
+                }
+            }
+
+            var endToken = Expect(TokenKind.CloseBrace);
+            return (null, statements, endToken.Span);
+        }
+        else
+        {
+            // Expression body
+            var body = ParseExpression();
+            return (body, null, body.Span);
+        }
     }
 
     /// <summary>
@@ -869,6 +945,12 @@ public sealed class Parser
 
         var endToken = Expect(TokenKind.CloseParen);
         var span = startToken.Span.Union(endToken.Span);
+
+        // Handle ternary conditional: (? cond then else)
+        if (opText == "?" && args.Count == 3)
+        {
+            return new ConditionalExpressionNode(span, args[0], args[1], args[2]);
+        }
 
         // Determine if this is unary or binary based on argument count and operator
         if (args.Count == 1 && IsUnaryOperator(opKind))
@@ -994,6 +1076,9 @@ public sealed class Parser
             case TokenKind.Tilde:
                 Advance();
                 return (TokenKind.Tilde, "~");
+            case TokenKind.Question:
+                Advance();
+                return (TokenKind.Question, "?");
             case TokenKind.Identifier:
                 // Support word operators like "and", "or", "not", "mod"
                 Advance();
@@ -1040,6 +1125,7 @@ public sealed class Parser
     /// Parses an argument inside a Lisp expression.
     /// Can be a literal, identifier (bare variable), or nested Lisp expression.
     /// Supports trailing member access (e.g., §C[...] §/C.Length)
+    /// Also handles 'is' pattern expressions: expr is Type [variable]
     /// </summary>
     private ExpressionNode ParseLispArgument()
     {
@@ -1058,23 +1144,141 @@ public sealed class Parser
         };
 
         // Handle trailing member access (e.g., §C[...] §/C.Length or run?.Status)
-        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
+        // and array access (e.g., array{index})
+        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional) || Check(TokenKind.OpenBrace))
         {
-            var isNullConditional = Check(TokenKind.NullConditional);
-            Advance(); // consume '.' or '?.'
-            var memberToken = Expect(TokenKind.Identifier);
-            var span = expr.Span.Union(memberToken.Span);
-            if (isNullConditional)
+            if (Check(TokenKind.OpenBrace))
             {
-                expr = new NullConditionalNode(span, expr, memberToken.Text);
+                // Array access: array{index}
+                Advance(); // consume '{'
+                var indexExpr = ParseExpression();
+                var endToken = Expect(TokenKind.CloseBrace);
+                var span = expr.Span.Union(endToken.Span);
+                expr = new ArrayAccessNode(span, expr, indexExpr);
             }
             else
             {
-                expr = new FieldAccessNode(span, expr, memberToken.Text);
+                var isNullConditional = Check(TokenKind.NullConditional);
+                Advance(); // consume '.' or '?.'
+                var memberToken = Expect(TokenKind.Identifier);
+                var span = expr.Span.Union(memberToken.Span);
+                if (isNullConditional)
+                {
+                    expr = new NullConditionalNode(span, expr, memberToken.Text);
+                }
+                else
+                {
+                    expr = new FieldAccessNode(span, expr, memberToken.Text);
+                }
             }
         }
 
+        // Handle 'is' pattern expression: expr is Type [variable]
+        // This handles C# pattern matching like "other is UnitSystem otherUnitSystem"
+        if (Check(TokenKind.Identifier) && Current.Text == "is")
+        {
+            expr = ParseIsPatternExpression(expr);
+        }
+
         return expr;
+    }
+
+    /// <summary>
+    /// Parses an 'is' pattern expression: expr is Type [variable]
+    /// The expr has already been parsed, we're at the 'is' keyword.
+    /// Returns a ReferenceNode with the full pattern expression.
+    /// </summary>
+    private ExpressionNode ParseIsPatternExpression(ExpressionNode left)
+    {
+        var startSpan = left.Span;
+        Advance(); // consume 'is'
+
+        // Parse the type name (possibly qualified: Namespace.Type or generic: Type<T>)
+        var typeBuilder = new System.Text.StringBuilder();
+        if (!Check(TokenKind.Identifier))
+        {
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                $"Expected type name after 'is', found '{Current.Text}'");
+            return left;
+        }
+
+        var typeToken = Current;
+        typeBuilder.Append(Current.Text);
+        Advance();
+
+        // Handle qualified names (Namespace.Type) and generic types (Type<T>)
+        while (Check(TokenKind.Dot) || Check(TokenKind.Less))
+        {
+            if (Check(TokenKind.Dot))
+            {
+                typeBuilder.Append('.');
+                Advance();
+                if (Check(TokenKind.Identifier))
+                {
+                    typeBuilder.Append(Current.Text);
+                    Advance();
+                }
+            }
+            else if (Check(TokenKind.Less))
+            {
+                // Parse generic type arguments: Type<T, U>
+                typeBuilder.Append('<');
+                Advance();
+                int depth = 1;
+                while (depth > 0 && !IsAtEnd)
+                {
+                    if (Check(TokenKind.Less))
+                        depth++;
+                    else if (Check(TokenKind.Greater))
+                        depth--;
+                    typeBuilder.Append(Current.Text);
+                    Advance();
+                }
+            }
+        }
+
+        var typeName = typeBuilder.ToString();
+        string? variableName = null;
+
+        // Check for optional variable declaration: is Type variableName
+        // Only consume if it's an identifier and not the start of another expression or close paren
+        if (Check(TokenKind.Identifier) && !IsLispOperatorStart(Current.Text))
+        {
+            variableName = Current.Text;
+            Advance();
+        }
+
+        // Build the full expression as a reference node
+        var leftStr = GetExpressionString(left);
+        var fullExpr = variableName != null
+            ? $"{leftStr} is {typeName} {variableName}"
+            : $"{leftStr} is {typeName}";
+
+        var endSpan = Peek(-1).Span;
+        return new ReferenceNode(startSpan.Union(endSpan), fullExpr);
+    }
+
+    /// <summary>
+    /// Checks if the identifier could be a Lisp operator (to avoid consuming it as a variable name).
+    /// </summary>
+    private bool IsLispOperatorStart(string text)
+    {
+        // Common Lisp operators that might appear after an 'is' pattern
+        return text is "and" or "or" or "not";
+    }
+
+    /// <summary>
+    /// Gets the string representation of an expression for use in pattern expressions.
+    /// </summary>
+    private string GetExpressionString(ExpressionNode expr)
+    {
+        return expr switch
+        {
+            ReferenceNode r => r.Name,
+            FieldAccessNode f => $"{GetExpressionString(f.Target)}.{f.FieldName}",
+            NullConditionalNode n => $"{GetExpressionString(n.Target)}?.{n.MemberName}",
+            _ => expr.ToString() ?? ""
+        };
     }
 
     /// <summary>
@@ -1198,14 +1402,19 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Match);
         var attrs = ParseAttributes();
-        var id = GetRequiredAttribute(attrs, "id", "MATCH", startToken.Span);
+        var id = V2AttributeHelper.InterpretMatchAttributes(attrs);
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MATCH", "id");
+            id = "";
+        }
 
         var target = ParseExpression();
         var cases = ParseMatchCases();
 
         var endToken = Expect(TokenKind.EndMatch);
         var endAttrs = ParseAttributes();
-        var endId = GetRequiredAttribute(endAttrs, "id", "END_MATCH", endToken.Span);
+        var endId = V2AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
         if (endId != id)
         {
@@ -1216,18 +1425,27 @@ public sealed class Parser
         return new MatchExpressionNode(span, id, target, cases, attrs);
     }
 
-    private MatchStatementNode ParseMatchStatement()
+    private StatementNode ParseMatchStatement()
     {
         var startToken = Expect(TokenKind.Match);
         var attrs = ParseAttributes();
-        var id = GetRequiredAttribute(attrs, "id", "MATCH", startToken.Span);
+        var id = V2AttributeHelper.InterpretMatchAttributes(attrs);
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MATCH", "id");
+            id = "";
+        }
+
+        // Check if this is a match expression (indicated by :expr in second positional attribute)
+        // In v2 syntax, {match003:expr} parses as _pos0="match003", _pos1="expr"
+        var isExpression = attrs["_pos1"] == "expr";
 
         var target = ParseExpression();
         var cases = ParseMatchCases();
 
         var endToken = Expect(TokenKind.EndMatch);
         var endAttrs = ParseAttributes();
-        var endId = GetRequiredAttribute(endAttrs, "id", "END_MATCH", endToken.Span);
+        var endId = V2AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
         if (endId != id)
         {
@@ -1235,6 +1453,14 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
+
+        // Return MatchExpressionNode wrapped in ReturnStatementNode if :expr was present
+        if (isExpression)
+        {
+            var matchExpr = new MatchExpressionNode(span, id, target, cases, attrs);
+            return new ReturnStatementNode(span, matchExpr);
+        }
+
         return new MatchStatementNode(span, id, target, cases, attrs);
     }
 
@@ -1247,8 +1473,13 @@ public sealed class Parser
             var caseToken = Expect(TokenKind.Case);
             var pattern = ParsePattern();
 
+            // Check for guard clause: §WHEN expression
             ExpressionNode? guard = null;
-            // Guard could be indicated by an attribute or following expression
+            if (Check(TokenKind.When))
+            {
+                Expect(TokenKind.When);
+                guard = ParseExpression();
+            }
 
             var body = new List<StatementNode>();
             while (!IsAtEnd && !Check(TokenKind.Case) && !Check(TokenKind.EndMatch))
@@ -1269,9 +1500,42 @@ public sealed class Parser
 
     private PatternNode ParsePattern()
     {
+        // Handle relational patterns: gte, lte, gt, lt followed by a value
         if (Check(TokenKind.Identifier))
         {
-            var token = Advance();
+            var token = Current;
+            var op = token.Text switch
+            {
+                "gte" => ">=",
+                "lte" => "<=",
+                "gt" => ">",
+                "lt" => "<",
+                _ => null
+            };
+
+            if (op != null)
+            {
+                Advance(); // consume the operator keyword
+                var operand = ParseExpression();
+                return new RelationalPatternNode(token.Span.Union(operand.Span), op, operand);
+            }
+
+            // Handle var pattern: var name
+            if (token.Text == "var" && Peek(1).Kind == TokenKind.Identifier)
+            {
+                Advance(); // consume 'var'
+                var nameToken = Advance(); // consume name
+                return new VarPatternNode(token.Span.Union(nameToken.Span), nameToken.Text);
+            }
+
+            // Handle null pattern
+            if (token.Text == "null")
+            {
+                Advance();
+                return new ConstantPatternNode(token.Span, new ReferenceNode(token.Span, "null"));
+            }
+
+            Advance();
             if (token.Text == "_")
             {
                 return new WildcardPatternNode(token.Span);
@@ -1648,27 +1912,28 @@ public sealed class Parser
     {
         var attrs = new AttributeCollection();
 
-        // Parse structural brackets only - stop if we see [@...] which is a C# attribute
-        while (Check(TokenKind.OpenBracket) && Peek(1).Kind != TokenKind.At)
+        // Parse structural braces {} for tag attributes
+        // Note: [] is now reserved for array types to align with LLM training
+        while (Check(TokenKind.OpenBrace))
         {
-            Advance(); // consume [
+            Advance(); // consume {
 
             // Check for v2 positional format vs v1 named format
-            // v1: [name=value] - has Identifier followed by Equals
-            // v2: [value1:value2] or [value] - no Equals, colon-separated
+            // v1: {name=value} - has Identifier followed by Equals
+            // v2: {value1:value2} or {value} - no Equals, colon-separated
 
             if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals)
             {
-                // v1 format: [name=value]
+                // v1 format: {name=value}
                 ParseV1Attribute(attrs);
             }
             else
             {
-                // v2 format: [value1:value2:...] or [value]
+                // v2 format: {value1:value2:...} or {value}
                 ParseV2PositionalAttributes(attrs);
             }
 
-            Expect(TokenKind.CloseBracket);
+            Expect(TokenKind.CloseBrace);
         }
 
         return attrs;
@@ -1707,7 +1972,7 @@ public sealed class Parser
 
     private void ParseV2PositionalAttributes(AttributeCollection attrs)
     {
-        // Parse colon-separated values: [value1:value2:value3]
+        // Parse colon-separated values: {value1:value2:value3}
         // Store them as _pos0, _pos1, _pos2, etc. for later interpretation
         var values = new List<string>();
         var position = 0;
@@ -1723,6 +1988,31 @@ public sealed class Parser
 
         // Also store the raw positional count
         attrs.Add("_posCount", position.ToString());
+    }
+
+    /// <summary>
+    /// Checks if current position has an escaped brace (\{ or \}).
+    /// If so, returns the brace character and advances past both tokens.
+    /// </summary>
+    private char? TryParseEscapedBrace()
+    {
+        if (Check(TokenKind.Backslash))
+        {
+            var next = Peek(1).Kind;
+            if (next == TokenKind.OpenBrace)
+            {
+                Advance(); // consume backslash
+                Advance(); // consume {
+                return '{';
+            }
+            if (next == TokenKind.CloseBrace)
+            {
+                Advance(); // consume backslash
+                Advance(); // consume }
+                return '}';
+            }
+        }
+        return null;
     }
 
     private string ParseV2Value()
@@ -1750,6 +2040,77 @@ public sealed class Parser
             Advance();
         }
 
+        // Handle array types like [u8], [[i32]], [str]
+        if (Check(TokenKind.OpenBracket))
+        {
+            var depth = 0;
+            while (Check(TokenKind.OpenBracket))
+            {
+                sb.Append('[');
+                Advance();
+                depth++;
+            }
+
+            // Parse the element type
+            if (Check(TokenKind.Identifier))
+            {
+                sb.Append(Advance().Text);
+
+                // Handle generic element types like [List<int>]
+                if (Check(TokenKind.Less))
+                {
+                    sb.Append('<');
+                    Advance();
+                    var genericDepth = 1;
+                    while (!IsAtEnd && genericDepth > 0)
+                    {
+                        if (Check(TokenKind.Less))
+                        {
+                            sb.Append('<');
+                            genericDepth++;
+                            Advance();
+                        }
+                        else if (Check(TokenKind.Greater))
+                        {
+                            sb.Append('>');
+                            genericDepth--;
+                            Advance();
+                        }
+                        else if (Check(TokenKind.GreaterGreater))
+                        {
+                            // Handle >> from nested generics like [List<Task<int>>]
+                            sb.Append(">>");
+                            genericDepth -= 2;
+                            Advance();
+                        }
+                        else if (Check(TokenKind.Identifier))
+                        {
+                            sb.Append(Advance().Text);
+                        }
+                        else if (Check(TokenKind.Comma))
+                        {
+                            sb.Append(',');
+                            Advance();
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Close the array brackets
+            while (depth > 0 && Check(TokenKind.CloseBracket))
+            {
+                sb.Append(']');
+                Advance();
+                depth--;
+            }
+
+            return sb.ToString();
+        }
+
         // Parse the main value (identifier, literal, or compound identifier)
         if (Check(TokenKind.Identifier))
         {
@@ -1775,6 +2136,13 @@ public sealed class Parser
                     {
                         sb.Append('>');
                         depth--;
+                        Advance();
+                    }
+                    else if (Check(TokenKind.GreaterGreater))
+                    {
+                        // Handle >> from nested generics like Task<List<int>>
+                        sb.Append(">>");
+                        depth -= 2;
                         Advance();
                     }
                     else if (Check(TokenKind.Identifier))
@@ -1813,6 +2181,15 @@ public sealed class Parser
                     sb.Append(Advance().Text);
                 }
             }
+
+            // Handle comma-separated values like partial,static for modifiers
+            // Only consume comma if followed by an identifier (not a colon or close brace)
+            while (Check(TokenKind.Comma) && Peek(1).Kind == TokenKind.Identifier)
+            {
+                sb.Append(',');
+                Advance(); // consume comma
+                sb.Append(Advance().Text); // consume identifier
+            }
         }
         else if (Check(TokenKind.StrLiteral))
         {
@@ -1837,6 +2214,73 @@ public sealed class Parser
             if (Check(TokenKind.Identifier))
             {
                 sb.Append(Advance().Text);
+            }
+        }
+
+        // Handle complex expressions that may contain escaped braces and other tokens
+        // Continue parsing until we hit a colon (separator) or unescaped close brace (end of attributes)
+        while (!IsAtEnd && !Check(TokenKind.Colon) && !Check(TokenKind.CloseBrace))
+        {
+            // Handle escaped braces: \{ and \}
+            var escapedBrace = TryParseEscapedBrace();
+            if (escapedBrace.HasValue)
+            {
+                sb.Append(escapedBrace.Value);
+                continue;
+            }
+
+            // Handle common expression tokens
+            if (Check(TokenKind.Identifier))
+            {
+                sb.Append(Advance().Text);
+            }
+            else if (Current.Text == ".")
+            {
+                sb.Append('.');
+                Advance();
+            }
+            else if (Check(TokenKind.OpenParen))
+            {
+                sb.Append('(');
+                Advance();
+            }
+            else if (Check(TokenKind.CloseParen))
+            {
+                sb.Append(')');
+                Advance();
+            }
+            else if (Check(TokenKind.Comma))
+            {
+                // Only consume comma if not followed by close brace (end of args)
+                if (Peek(1).Kind == TokenKind.CloseBrace)
+                    break;
+                sb.Append(',');
+                Advance();
+            }
+            else if (Check(TokenKind.Less))
+            {
+                sb.Append('<');
+                Advance();
+            }
+            else if (Check(TokenKind.Greater))
+            {
+                sb.Append('>');
+                Advance();
+            }
+            else if (Check(TokenKind.IntLiteral))
+            {
+                sb.Append(Advance().Value?.ToString() ?? "");
+            }
+            else if (Check(TokenKind.StrLiteral))
+            {
+                sb.Append('"');
+                sb.Append(Advance().Value as string ?? "");
+                sb.Append('"');
+            }
+            else
+            {
+                // Unknown token, stop parsing this value
+                break;
             }
         }
 
@@ -2030,9 +2474,9 @@ public sealed class Parser
     {
         return value?.ToLowerInvariant() switch
         {
-            "public" => Visibility.Public,
-            "internal" => Visibility.Internal,
-            "private" => Visibility.Private,
+            "public" or "pub" => Visibility.Public,
+            "internal" or "int" => Visibility.Internal,
+            "private" or "priv" => Visibility.Private,
             _ => Visibility.Private
         };
     }
@@ -2199,7 +2643,7 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Where);
         var attrs = ParseAttributes();
 
-        // v2 positional: [typeParam:constraint]
+        // v2 positional: {typeParam:constraint1,constraint2,...}
         var typeParamName = attrs["_pos0"] ?? "";
         var constraintStr = attrs["_pos1"] ?? "";
 
@@ -2218,21 +2662,27 @@ public sealed class Parser
             return;
         }
 
-        // Parse the constraint
-        var (kind, typeName) = constraintStr.ToLowerInvariant() switch
+        // Parse multiple constraints (comma-separated)
+        var constraintParts = constraintStr.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        var newConstraints = typeParameters[typeParamIndex].Constraints.ToList();
+
+        foreach (var part in constraintParts)
         {
-            "class" => (TypeConstraintKind.Class, (string?)null),
-            "struct" => (TypeConstraintKind.Struct, (string?)null),
-            "new" => (TypeConstraintKind.New, (string?)null),
-            _ => (TypeConstraintKind.TypeName, constraintStr)
-        };
+            var trimmedPart = part.Trim();
+            var (kind, typeName) = trimmedPart.ToLowerInvariant() switch
+            {
+                "class" => (TypeConstraintKind.Class, (string?)null),
+                "struct" => (TypeConstraintKind.Struct, (string?)null),
+                "new" => (TypeConstraintKind.New, (string?)null),
+                _ => (TypeConstraintKind.TypeName, trimmedPart)
+            };
 
-        var constraint = new TypeConstraintNode(startToken.Span, kind, typeName);
+            var constraint = new TypeConstraintNode(startToken.Span, kind, typeName);
+            newConstraints.Add(constraint);
+        }
 
-        // Replace the type parameter with one that includes the new constraint
+        // Replace the type parameter with one that includes the new constraints
         var oldTypeParam = typeParameters[typeParamIndex];
-        var newConstraints = oldTypeParam.Constraints.ToList();
-        newConstraints.Add(constraint);
         typeParameters[typeParamIndex] = new TypeParameterNode(oldTypeParam.Span, oldTypeParam.Name, newConstraints);
     }
 
@@ -2438,6 +2888,28 @@ public sealed class Parser
         string? baseClass = null;
         var implementedInterfaces = new List<string>();
         var typeParameters = new List<TypeParameterNode>();
+
+        // Extract type parameters from class name if present (e.g., Repository<T> or Cache<TKey,TValue>)
+        var typeParamStart = name.IndexOf('<');
+        if (typeParamStart >= 0)
+        {
+            var typeParamEnd = name.LastIndexOf('>');
+            if (typeParamEnd > typeParamStart)
+            {
+                var typeParamStr = name.Substring(typeParamStart + 1, typeParamEnd - typeParamStart - 1);
+                name = name.Substring(0, typeParamStart);
+
+                // Parse type parameter names (comma-separated)
+                foreach (var tpName in typeParamStr.Split(','))
+                {
+                    var trimmedName = tpName.Trim();
+                    if (!string.IsNullOrEmpty(trimmedName))
+                    {
+                        typeParameters.Add(new TypeParameterNode(startToken.Span, trimmedName, Array.Empty<TypeConstraintNode>()));
+                    }
+                }
+            }
+        }
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
@@ -2572,6 +3044,28 @@ public sealed class Parser
         var modifiers = ParseMethodModifiers(modStr);
 
         var typeParameters = new List<TypeParameterNode>();
+
+        // Extract type parameters from method name if present (e.g., Create<T>)
+        var typeParamStart = name.IndexOf('<');
+        if (typeParamStart >= 0)
+        {
+            var typeParamEnd = name.LastIndexOf('>');
+            if (typeParamEnd > typeParamStart)
+            {
+                var typeParamStr = name.Substring(typeParamStart + 1, typeParamEnd - typeParamStart - 1);
+                name = name.Substring(0, typeParamStart);
+
+                foreach (var tpName in typeParamStr.Split(','))
+                {
+                    var trimmedName = tpName.Trim();
+                    if (!string.IsNullOrEmpty(trimmedName))
+                    {
+                        typeParameters.Add(new TypeParameterNode(startToken.Span, trimmedName, Array.Empty<TypeConstraintNode>()));
+                    }
+                }
+            }
+        }
+
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
         EffectsNode? effects = null;
@@ -2692,23 +3186,71 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a 'this' expression.
-    /// §THIS
+    /// Parses a 'this' expression with optional member access.
+    /// §THIS or §THIS.property
     /// </summary>
-    private ThisExpressionNode ParseThisExpression()
+    private ExpressionNode ParseThisExpression()
     {
         var token = Expect(TokenKind.This);
-        return new ThisExpressionNode(token.Span);
+        ExpressionNode expr = new ThisExpressionNode(token.Span);
+
+        // Handle trailing member access (e.g., §THIS.property or §THIS?.property)
+        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
+        {
+            var isNullConditional = Check(TokenKind.NullConditional);
+            Advance(); // consume '.' or '?.'
+            if (!Check(TokenKind.Identifier))
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "member name", Current.Kind);
+                break;
+            }
+            var memberToken = Advance();
+            var span = expr.Span.Union(memberToken.Span);
+            if (isNullConditional)
+            {
+                expr = new NullConditionalNode(span, expr, memberToken.Text);
+            }
+            else
+            {
+                expr = new FieldAccessNode(span, expr, memberToken.Text);
+            }
+        }
+
+        return expr;
     }
 
     /// <summary>
-    /// Parses a 'base' expression.
-    /// §BASE
+    /// Parses a 'base' expression with optional member access.
+    /// §BASE or §BASE.property
     /// </summary>
-    private BaseExpressionNode ParseBaseExpression()
+    private ExpressionNode ParseBaseExpression()
     {
         var token = Expect(TokenKind.Base);
-        return new BaseExpressionNode(token.Span);
+        ExpressionNode expr = new BaseExpressionNode(token.Span);
+
+        // Handle trailing member access (e.g., §BASE.method)
+        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
+        {
+            var isNullConditional = Check(TokenKind.NullConditional);
+            Advance(); // consume '.' or '?.'
+            if (!Check(TokenKind.Identifier))
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "member name", Current.Kind);
+                break;
+            }
+            var memberToken = Advance();
+            var span = expr.Span.Union(memberToken.Span);
+            if (isNullConditional)
+            {
+                expr = new NullConditionalNode(span, expr, memberToken.Text);
+            }
+            else
+            {
+                expr = new FieldAccessNode(span, expr, memberToken.Text);
+            }
+        }
+
+        return expr;
     }
 
     /// <summary>
@@ -2853,10 +3395,19 @@ public sealed class Parser
         var preconditions = new List<RequiresNode>();
         var body = new List<StatementNode>();
 
+        // Determine the end token for this accessor
+        var endTokenKind = kind switch
+        {
+            PropertyAccessorNode.AccessorKind.Get => TokenKind.EndGet,
+            PropertyAccessorNode.AccessorKind.Set => TokenKind.EndSet,
+            _ => TokenKind.EndProperty // Init doesn't have its own end token
+        };
+
         // Parse optional preconditions and body (for non-auto properties)
-        // Also stop at Equals for property default values
+        // Also stop at Equals for property default values, next accessor, or end tokens
         while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
-               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.Equals))
+               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.Equals) &&
+               !Check(TokenKind.EndGet) && !Check(TokenKind.EndSet))
         {
             if (Check(TokenKind.Requires))
             {
@@ -2870,6 +3421,12 @@ public sealed class Parser
                     body.Add(stmt);
                 }
             }
+        }
+
+        // Consume the closing token if present (§/GET or §/SET)
+        if (Check(endTokenKind))
+        {
+            Advance();
         }
 
         return new PropertyAccessorNode(startToken.Span, kind, visibility, preconditions, body, attrs);
@@ -2960,6 +3517,13 @@ public sealed class Parser
         while (Check(TokenKind.Arg))
         {
             arguments.Add(ParseArgument());
+        }
+
+        // Consume the closing token (§/BASE or §/THIS)
+        var endTokenKind = isBase ? TokenKind.EndBase : TokenKind.EndThis;
+        if (Check(endTokenKind))
+        {
+            Advance();
         }
 
         return new ConstructorInitializerNode(startToken.Span, isBase, arguments);

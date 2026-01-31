@@ -90,14 +90,18 @@ public sealed class Lexer
         ["ABSTRACT"] = TokenKind.Abstract,
         ["SEALED"] = TokenKind.Sealed,
         ["THIS"] = TokenKind.This,
+        ["/THIS"] = TokenKind.EndThis,
         ["BASE"] = TokenKind.Base,
+        ["/BASE"] = TokenKind.EndBase,
         ["NEW"] = TokenKind.New,
         ["FLD"] = TokenKind.FieldDef,
         // Phase 9: Properties and Constructors
         ["PROP"] = TokenKind.Property,
         ["END_PROP"] = TokenKind.EndProperty,
         ["GET"] = TokenKind.Get,
+        ["/GET"] = TokenKind.EndGet,
         ["SET"] = TokenKind.Set,
+        ["/SET"] = TokenKind.EndSet,
         ["INIT"] = TokenKind.Init,
         ["CTOR"] = TokenKind.Constructor,
         ["END_CTOR"] = TokenKind.EndConstructor,
@@ -224,6 +228,7 @@ public sealed class Lexer
         ["/I"] = TokenKind.EndIf,           // §/I = §END_IF
         ["/L"] = TokenKind.EndFor,          // §/L = §END_LOOP
         ["/W"] = TokenKind.EndMatch,        // §/W = §END_MATCH
+        ["/MATCH"] = TokenKind.EndMatch,    // §/MATCH = §END_MATCH
         ["/T"] = TokenKind.EndType,         // §/T = §END_TYPE
         ["/D"] = TokenKind.EndRecord,       // §/D = §END_RECORD
 
@@ -322,6 +327,8 @@ public sealed class Lexer
             '§' => ScanSectionMarker(),
             '[' => ScanSingle(TokenKind.OpenBracket),
             ']' => ScanSingle(TokenKind.CloseBracket),
+            '{' => ScanSingle(TokenKind.OpenBrace),
+            '}' => ScanSingle(TokenKind.CloseBrace),
             '(' => ScanSingle(TokenKind.OpenParen),
             ')' => ScanSingle(TokenKind.CloseParen),
             '=' => ScanEqualsOrOperator(),
@@ -339,6 +346,7 @@ public sealed class Lexer
             '+' => ScanSingle(TokenKind.Plus),
             '*' => ScanStarOrOperator(),
             '/' => ScanSingle(TokenKind.Slash),
+            '\\' => ScanSingle(TokenKind.Backslash),
             '%' => ScanSingle(TokenKind.Percent),
             '<' => ScanLessOrOperator(),
             '>' => ScanGreaterOrOperator(),

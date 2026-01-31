@@ -366,10 +366,10 @@ public class AttributeConversionTests
     public void Parser_ParsesClassWithAttributes()
     {
         var opalSource = """
-            §M[m001:TestModule]
-              §CLASS[c001:TestController:ControllerBase][@Route("api/test")][@ApiController]
-              §/CLASS[c001]
-            §/M[m001]
+            §M{m001:TestModule}
+              §CLASS{c001:TestController:ControllerBase}[@Route("api/test")][@ApiController]
+              §/CLASS{c001}
+            §/M{m001}
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -393,13 +393,13 @@ public class AttributeConversionTests
     public void Parser_ParsesMethodWithAttributes()
     {
         var opalSource = """
-            §M[m001:TestModule]
-              §CLASS[c001:TestController:ControllerBase]
-                §METHOD[m001:Post:pub][@HttpPost]
-                  §O[void]
-                §/METHOD[m001]
-              §/CLASS[c001]
-            §/M[m001]
+            §M{m001:TestModule}
+              §CLASS{c001:TestController:ControllerBase}
+                §METHOD{m001:Post:pub}[@HttpPost]
+                  §O{void}
+                §/METHOD{m001}
+              §/CLASS{c001}
+            §/M{m001}
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -424,14 +424,14 @@ public class AttributeConversionTests
     public void Parser_ParsesAttributeWithArgs()
     {
         var opalSource = """
-            §M[m001:TestModule]
-              §CLASS[c001:TestModel]
-                §PROP[p001:Value:int:pub][@Range(1, 100, ErrorMessage="Invalid")]
+            §M{m001:TestModule}
+              §CLASS{c001:TestModel}
+                §PROP{p001:Value:int:pub}[@Range(1, 100, ErrorMessage="Invalid")]
                   §GET
                   §SET
-                §/PROP[p001]
-              §/CLASS[c001]
-            §/M[m001]
+                §/PROP{p001}
+              §/CLASS{c001}
+            §/M{m001}
             """;
 
         var diagnostics = new DiagnosticBag();

@@ -7,8 +7,10 @@ public enum TokenKind
 {
     // Structural
     SectionMarker,      // §
-    OpenBracket,        // [
-    CloseBracket,       // ]
+    OpenBracket,        // [  (used for array types)
+    CloseBracket,       // ]  (used for array types)
+    OpenBrace,          // {  (used for tag attributes)
+    CloseBrace,         // }  (used for tag attributes)
     Equals,             // =
 
     // v2 syntax tokens
@@ -28,6 +30,7 @@ public enum TokenKind
     Minus,              // -
     Star,               // *
     Slash,              // /
+    Backslash,          // \
     Percent,            // %
     EqualEqual,         // ==
     BangEqual,          // !=
@@ -131,7 +134,9 @@ public enum TokenKind
     Abstract,
     Sealed,
     This,
+    EndThis,
     Base,
+    EndBase,
     New,
     FieldDef,
 
@@ -139,7 +144,9 @@ public enum TokenKind
     Property,
     EndProperty,
     Get,
+    EndGet,
     Set,
+    EndSet,
     Init,
     Constructor,
     EndConstructor,

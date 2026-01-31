@@ -217,6 +217,38 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
+    /// Interprets attributes for MATCH/§MATCH: {id}
+    /// </summary>
+    public static string InterpretMatchAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Id = attrs["id"];
+        if (!string.IsNullOrEmpty(v1Id))
+        {
+            return v1Id;
+        }
+
+        // v2 positional format: {id}
+        return attrs["_pos0"] ?? "";
+    }
+
+    /// <summary>
+    /// Interprets attributes for END_MATCH/§/MATCH: {id}
+    /// </summary>
+    public static string InterpretEndMatchAttributes(AttributeCollection attrs)
+    {
+        // Check for v1 format first
+        var v1Id = attrs["id"];
+        if (!string.IsNullOrEmpty(v1Id))
+        {
+            return v1Id;
+        }
+
+        // v2 positional format: {id}
+        return attrs["_pos0"] ?? "";
+    }
+
+    /// <summary>
     /// Interprets attributes for REQUIRES/§Q: [message]
     /// </summary>
     public static string? InterpretRequiresAttributes(AttributeCollection attrs)
@@ -310,7 +342,7 @@ public static class V2AttributeHelper
             "void" => "VOID",
             "never" => "NEVER",
             "char" => "CHAR",
-            _ => compactType.ToUpperInvariant() // Pass through unknown types
+            _ => compactType // Pass through unknown types preserving original casing
         };
     }
 

@@ -79,6 +79,17 @@ public enum MigrationPriority
 }
 
 /// <summary>
+/// Represents a C# construct that the OPAL converter doesn't yet support.
+/// </summary>
+public sealed class UnsupportedConstruct
+{
+    public required string Name { get; init; }
+    public required string Description { get; init; }
+    public int Count { get; init; }
+    public List<string> Examples { get; init; } = new();
+}
+
+/// <summary>
 /// Migration analysis score for a single file.
 /// </summary>
 public sealed class FileMigrationScore
@@ -93,6 +104,17 @@ public sealed class FileMigrationScore
     public int TypeCount { get; init; }
     public bool WasSkipped { get; init; }
     public string? SkipReason { get; init; }
+
+    /// <summary>
+    /// C# constructs found in this file that aren't yet supported by the OPAL converter.
+    /// Files with unsupported constructs receive a significant score penalty.
+    /// </summary>
+    public List<UnsupportedConstruct> UnsupportedConstructs { get; init; } = new();
+
+    /// <summary>
+    /// True if the file contains constructs that can't yet be converted to OPAL.
+    /// </summary>
+    public bool HasUnsupportedConstructs => UnsupportedConstructs.Count > 0;
 
     public static MigrationPriority GetPriority(double score) => score switch
     {

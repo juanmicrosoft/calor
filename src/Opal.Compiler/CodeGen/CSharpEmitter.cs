@@ -1,5 +1,6 @@
 using System.Text;
 using Opal.Compiler.Ast;
+using Opal.Compiler.Migration;
 
 namespace Opal.Compiler.CodeGen;
 
@@ -367,20 +368,48 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(StringLiteralNode node)
     {
+        // Check if this is an interpolated string (contains ${...})
+        if (node.Value.Contains("${"))
+        {
+            // Convert OPAL interpolation ${expr} to C# interpolation {expr}
+            var converted = System.Text.RegularExpressions.Regex.Replace(
+                node.Value,
+                @"\$\{([^}]+)\}",
+                "{$1}");
+
+            // Escape for C# string literal (but not the interpolation braces)
+            var escaped = converted
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
+
+            return $"$\"{escaped}\"";
+        }
+
         // Escape the string for C#
-        var escaped = node.Value
+        var escapedValue = node.Value
             .Replace("\\", "\\\\")
             .Replace("\"", "\\\"")
             .Replace("\n", "\\n")
             .Replace("\r", "\\r")
             .Replace("\t", "\\t");
 
-        return $"\"{escaped}\"";
+        return $"\"{escapedValue}\"";
     }
 
     public string Visit(BoolLiteralNode node)
     {
         return node.Value ? "true" : "false";
+    }
+
+    public string Visit(ConditionalExpressionNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        var whenTrue = node.WhenTrue.Accept(this);
+        var whenFalse = node.WhenFalse.Accept(this);
+        return $"({condition} ? {whenTrue} : {whenFalse})";
     }
 
     public string Visit(FloatLiteralNode node)
@@ -390,6 +419,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
+        // Handle 'is' pattern expressions like "other is UnitSystem otherUnitSystem"
+        // These should be emitted as-is without sanitization
+        if (node.Name.Contains(" is "))
+        {
+            return node.Name;
+        }
+
+        // Handle C# keywords that are used as literals (not identifiers)
+        if (node.Name is "null" or "true" or "false")
+        {
+            return node.Name;
+        }
+
+        // Handle member access like "args.Length" - preserve the dot notation
+        if (node.Name.Contains('.'))
+        {
+            var parts = node.Name.Split('.');
+            var sanitizedParts = parts.Select(SanitizeIdentifier);
+            return string.Join(".", sanitizedParts);
+        }
         return SanitizeIdentifier(node.Name);
     }
 
@@ -677,6 +726,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             var matchCase = node.Cases[i];
             var pattern = EmitPattern(matchCase.Pattern);
+
+            // Emit guard clause if present
+            var guard = matchCase.Guard != null ? $" when {matchCase.Guard.Accept(this)}" : "";
+
             // For expression match, the body should yield a value
             // Take the last statement if it's a return, otherwise default
             var body = "default";
@@ -688,7 +741,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     body = ret.Expression.Accept(this);
                 }
             }
-            sb.Append($"{pattern} => {body}");
+            sb.Append($"{pattern}{guard} => {body}");
             if (i < node.Cases.Count - 1) sb.Append(", ");
         }
 
@@ -732,11 +785,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             WildcardPatternNode => "_",
             VariablePatternNode vp => $"var {SanitizeIdentifier(vp.Name)}",
+            VarPatternNode varP => $"var {SanitizeIdentifier(varP.Name)}",
             LiteralPatternNode lp => lp.Literal.Accept(this),
+            RelationalPatternNode rp => Visit(rp),
+            PropertyPatternNode pp => Visit(pp),
+            PositionalPatternNode pos => Visit(pos),
+            ConstantPatternNode cp => cp.Value.Accept(this),
             SomePatternNode sp => $"{{ IsSome: true, Value: {EmitPattern(sp.InnerPattern)} }}",
             NonePatternNode => "{ IsNone: true }",
             OkPatternNode op => $"{{ IsOk: true, Value: {EmitPattern(op.InnerPattern)} }}",
             ErrPatternNode ep => $"{{ IsErr: true, Error: {EmitPattern(ep.InnerPattern)} }}",
+            ListPatternNode lp => Visit(lp),
             _ => "_"
         };
     }
@@ -1189,8 +1248,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(CallExpressionNode node)
     {
+        // Unescape braces that were escaped for OPAL syntax: \{ -> { and \} -> }
+        var target = UnescapeBraces(node.Target);
         var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
-        return $"{node.Target}({args})";
+        return $"{target}({args})";
+    }
+
+    /// <summary>
+    /// Unescapes braces that were escaped for OPAL syntax.
+    /// \{ becomes { and \} becomes }
+    /// </summary>
+    private static string UnescapeBraces(string input)
+    {
+        if (!input.Contains('\\'))
+            return input;
+
+        return input.Replace("\\{", "{").Replace("\\}", "}");
     }
 
     public string Visit(ThisExpressionNode node)
@@ -2027,20 +2100,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private static string MapTypeName(string opalType)
     {
-        return opalType.ToUpperInvariant() switch
-        {
-            "VOID" => "void",
-            "INT" => "int",
-            "INT32" => "int",
-            "INT64" => "long",
-            "FLOAT" => "double",
-            "FLOAT32" => "float",
-            "FLOAT64" => "double",
-            "BOOL" => "bool",
-            "STRING" => "string",
-            "STR" => "string",
-            _ => opalType
-        };
+        // Use the centralized TypeMapper for bidirectional type mapping
+        return TypeMapper.OpalToCSharp(opalType);
     }
 
     private static string SanitizeIdentifier(string name)

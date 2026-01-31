@@ -102,9 +102,29 @@ public sealed class MigrationAnalyzer
         // Calculate dimension scores
         var dimensions = CalculateDimensionScores(visitor, source);
 
+        // Build list of unsupported constructs
+        var unsupportedConstructs = BuildUnsupportedConstructsList(visitor);
+
         // Calculate total weighted score
         var totalScore = dimensions.Values.Sum(d => d.WeightedScore);
         totalScore = Math.Min(100, totalScore); // Cap at 100
+
+        // Apply severe penalty for unsupported constructs
+        // Files with unsupported constructs are not viable for conversion
+        if (unsupportedConstructs.Count > 0)
+        {
+            var totalUnsupported = unsupportedConstructs.Sum(c => c.Count);
+
+            // Strategy: Each unsupported construct type reduces score by 50%
+            // Multiple construct types compound the reduction
+            // E.g., 2 types = 75% reduction, 3 types = 87.5% reduction
+            var penaltyMultiplier = Math.Pow(0.5, unsupportedConstructs.Count);
+
+            // Also apply per-instance penalty (5 points each)
+            var instancePenalty = totalUnsupported * 5;
+
+            totalScore = Math.Max(0, (totalScore * penaltyMultiplier) - instancePenalty);
+        }
 
         return new FileMigrationScore
         {
@@ -116,8 +136,183 @@ public sealed class MigrationAnalyzer
             LineCount = source.Split('\n').Length,
             MethodCount = visitor.MethodCount,
             TypeCount = visitor.TypeCount,
+            UnsupportedConstructs = unsupportedConstructs,
             WasSkipped = false
         };
+    }
+
+    private static List<UnsupportedConstruct> BuildUnsupportedConstructsList(MigrationAnalysisVisitor visitor)
+    {
+        var result = new List<UnsupportedConstruct>();
+
+        // Switch expressions are now supported - no longer tracking as unsupported
+
+        if (visitor.RelationalPatternCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "RelationalPattern",
+                Description = "Relational patterns (is > x, is < x) not yet supported",
+                Count = visitor.RelationalPatternCount,
+                Examples = visitor.RelationalPatternExamples
+            });
+        }
+
+        if (visitor.CompoundPatternCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "CompoundPattern",
+                Description = "Compound patterns (and/or) not yet supported",
+                Count = visitor.CompoundPatternCount,
+                Examples = visitor.CompoundPatternExamples
+            });
+        }
+
+        if (visitor.RangeExpressionCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "RangeExpression",
+                Description = "Range expressions (0..5, ..5, 5..) not yet supported",
+                Count = visitor.RangeExpressionCount,
+                Examples = visitor.RangeExpressionExamples
+            });
+        }
+
+        if (visitor.IndexExpressionCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "IndexFromEnd",
+                Description = "Index from end expressions (^1) not yet supported",
+                Count = visitor.IndexExpressionCount,
+                Examples = visitor.IndexExpressionExamples
+            });
+        }
+
+        if (visitor.ImplicitObjectCreationCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "ImplicitObjectCreation",
+                Description = "Target-typed new expressions (new(...)) not yet supported",
+                Count = visitor.ImplicitObjectCreationCount,
+                Examples = visitor.ImplicitObjectCreationExamples
+            });
+        }
+
+        if (visitor.ConditionalAccessMethodCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "ConditionalAccessMethod",
+                Description = "Null-conditional method calls (?.Method()) not yet supported",
+                Count = visitor.ConditionalAccessMethodCount,
+                Examples = visitor.ConditionalAccessMethodExamples
+            });
+        }
+
+        if (visitor.NamedArgumentCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "NamedArgument",
+                Description = "Named arguments (param: value) not yet supported",
+                Count = visitor.NamedArgumentCount,
+                Examples = visitor.NamedArgumentExamples
+            });
+        }
+
+        if (visitor.PrimaryConstructorCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "PrimaryConstructor",
+                Description = "Primary constructors (class Foo(int x)) not yet supported",
+                Count = visitor.PrimaryConstructorCount,
+                Examples = visitor.PrimaryConstructorExamples
+            });
+        }
+
+        if (visitor.OutRefParameterCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "OutRefParameter",
+                Description = "out/ref parameters not yet supported",
+                Count = visitor.OutRefParameterCount,
+                Examples = visitor.OutRefParameterExamples
+            });
+        }
+
+        if (visitor.VarDeclarationInArgumentCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "VarDeclarationInArgument",
+                Description = "Inline variable declarations (out var x) not yet supported",
+                Count = visitor.VarDeclarationInArgumentCount,
+                Examples = visitor.VarDeclarationInArgumentExamples
+            });
+        }
+
+        if (visitor.DeclarationPatternCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "DeclarationPattern",
+                Description = "Declaration patterns (is Type varName) not yet supported",
+                Count = visitor.DeclarationPatternCount,
+                Examples = visitor.DeclarationPatternExamples
+            });
+        }
+
+        if (visitor.NestedGenericTypeCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "NestedGenericType",
+                Description = "Nested generic types (Expression<Func<T, U>>) not yet supported",
+                Count = visitor.NestedGenericTypeCount,
+                Examples = visitor.NestedGenericTypeExamples
+            });
+        }
+
+        if (visitor.LambdaExpressionCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "LambdaExpression",
+                Description = "Lambda expressions (x => ...) not yet supported",
+                Count = visitor.LambdaExpressionCount,
+                Examples = visitor.LambdaExpressionExamples
+            });
+        }
+
+        if (visitor.ThrowExpressionCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "ThrowExpression",
+                Description = "Throw expressions (?? throw new ...) not yet supported",
+                Count = visitor.ThrowExpressionCount,
+                Examples = visitor.ThrowExpressionExamples
+            });
+        }
+
+        if (visitor.GenericTypeConstraintCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "GenericTypeConstraint",
+                Description = "Generic type constraints (where T : class) not yet supported",
+                Count = visitor.GenericTypeConstraintCount,
+                Examples = visitor.GenericTypeConstraintExamples
+            });
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -323,6 +518,55 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     public int ApiComplexityPatterns { get; private set; }
     public List<string> ApiComplexityExamples { get; } = new();
 
+    // Unsupported C# constructs (converter limitations)
+    public int SwitchExpressionCount { get; private set; }
+    public List<string> SwitchExpressionExamples { get; } = new();
+
+    public int RelationalPatternCount { get; private set; }
+    public List<string> RelationalPatternExamples { get; } = new();
+
+    public int CompoundPatternCount { get; private set; }
+    public List<string> CompoundPatternExamples { get; } = new();
+
+    public int RangeExpressionCount { get; private set; }
+    public List<string> RangeExpressionExamples { get; } = new();
+
+    public int IndexExpressionCount { get; private set; }
+    public List<string> IndexExpressionExamples { get; } = new();
+
+    public int ImplicitObjectCreationCount { get; private set; }
+    public List<string> ImplicitObjectCreationExamples { get; } = new();
+
+    public int ConditionalAccessMethodCount { get; private set; }
+    public List<string> ConditionalAccessMethodExamples { get; } = new();
+
+    public int NamedArgumentCount { get; private set; }
+    public List<string> NamedArgumentExamples { get; } = new();
+
+    public int PrimaryConstructorCount { get; private set; }
+    public List<string> PrimaryConstructorExamples { get; } = new();
+
+    public int OutRefParameterCount { get; private set; }
+    public List<string> OutRefParameterExamples { get; } = new();
+
+    public int VarDeclarationInArgumentCount { get; private set; }
+    public List<string> VarDeclarationInArgumentExamples { get; } = new();
+
+    public int DeclarationPatternCount { get; private set; }
+    public List<string> DeclarationPatternExamples { get; } = new();
+
+    public int NestedGenericTypeCount { get; private set; }
+    public List<string> NestedGenericTypeExamples { get; } = new();
+
+    public int LambdaExpressionCount { get; private set; }
+    public List<string> LambdaExpressionExamples { get; } = new();
+
+    public int ThrowExpressionCount { get; private set; }
+    public List<string> ThrowExpressionExamples { get; } = new();
+
+    public int GenericTypeConstraintCount { get; private set; }
+    public List<string> GenericTypeConstraintExamples { get; } = new();
+
     private static readonly HashSet<string> ArgumentExceptionTypes = new(StringComparer.Ordinal)
     {
         "ArgumentNullException",
@@ -365,13 +609,6 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         MethodCount++;
         CheckPublicMember(node.Modifiers, node.Identifier.Text, node);
         base.VisitMethodDeclaration(node);
-    }
-
-    public override void VisitClassDeclaration(ClassDeclarationSyntax node)
-    {
-        TypeCount++;
-        CheckPublicMember(node.Modifiers, node.Identifier.Text, node);
-        base.VisitClassDeclaration(node);
     }
 
     public override void VisitInterfaceDeclaration(InterfaceDeclarationSyntax node)
@@ -423,7 +660,21 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     {
         ErrorHandlingPatterns++;
         AddExample(ErrorHandlingExamples, "throw expression");
+
+        // Track as unsupported (throw as expression, not statement)
+        ThrowExpressionCount++;
+        AddExample(ThrowExpressionExamples, "?? throw new ...");
+
         base.VisitThrowExpression(node);
+    }
+
+    // Track generic type constraints: where T : struct, Enum
+    public override void VisitTypeParameterConstraintClause(TypeParameterConstraintClauseSyntax node)
+    {
+        GenericTypeConstraintCount++;
+        var constraints = string.Join(", ", node.Constraints.Select(c => c.ToString()));
+        AddExample(GenericTypeConstraintExamples, $"where {node.Name}: {constraints}");
+        base.VisitTypeParameterConstraintClause(node);
     }
 
     // Contract patterns: Validation if statements at method start
@@ -507,13 +758,6 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         base.VisitBinaryExpression(node);
     }
 
-    public override void VisitConditionalAccessExpression(ConditionalAccessExpressionSyntax node)
-    {
-        NullSafetyPatterns++;
-        AddExample(NullSafetyExamples, "?. operator");
-        base.VisitConditionalAccessExpression(node);
-    }
-
     public override void VisitIsPatternExpression(IsPatternExpressionSyntax node)
     {
         // Check for "is null" or "is not null"
@@ -552,7 +796,180 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     {
         PatternMatchPatterns++;
         AddExample(PatternMatchExamples, $"switch expression ({node.Arms.Count} arms)");
+
+        // Switch expressions are now supported by the OPAL converter
+        // Keeping SwitchExpressionCount for informational purposes only (not used for penalty)
+        SwitchExpressionCount++;
+        AddExample(SwitchExpressionExamples, $"switch expression with {node.Arms.Count} arms");
+
         base.VisitSwitchExpression(node);
+    }
+
+    // Track relational patterns: is > x, is < x, is >= x, is <= x
+    public override void VisitRelationalPattern(RelationalPatternSyntax node)
+    {
+        RelationalPatternCount++;
+        var op = node.OperatorToken.Text;
+        var expr = node.Expression.ToString();
+        AddExample(RelationalPatternExamples, $"is {op} {expr}");
+        base.VisitRelationalPattern(node);
+    }
+
+    // Track compound patterns: pattern and pattern, pattern or pattern
+    public override void VisitBinaryPattern(BinaryPatternSyntax node)
+    {
+        CompoundPatternCount++;
+        var keyword = node.OperatorToken.Text; // "and" or "or"
+        AddExample(CompoundPatternExamples, $"{keyword} pattern");
+        base.VisitBinaryPattern(node);
+    }
+
+    // Track range expressions: 0..5, ..5, 5..
+    public override void VisitRangeExpression(RangeExpressionSyntax node)
+    {
+        RangeExpressionCount++;
+        AddExample(RangeExpressionExamples, $"range: {node}");
+        base.VisitRangeExpression(node);
+    }
+
+    // Track index from end expressions: ^1
+    public override void VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
+    {
+        if (node.IsKind(SyntaxKind.IndexExpression))
+        {
+            IndexExpressionCount++;
+            AddExample(IndexExpressionExamples, $"index: {node}");
+        }
+        base.VisitPrefixUnaryExpression(node);
+    }
+
+    // Track implicit object creation (target-typed new): new("arg")
+    public override void VisitImplicitObjectCreationExpression(ImplicitObjectCreationExpressionSyntax node)
+    {
+        ImplicitObjectCreationCount++;
+        var preview = node.ToString();
+        if (preview.Length > 40) preview = preview.Substring(0, 40) + "...";
+        AddExample(ImplicitObjectCreationExamples, $"new(...): {preview}");
+        base.VisitImplicitObjectCreationExpression(node);
+    }
+
+    // Track conditional access method calls: obj?.Method()
+    public override void VisitConditionalAccessExpression(ConditionalAccessExpressionSyntax node)
+    {
+        NullSafetyPatterns++;
+        AddExample(NullSafetyExamples, "?. operator");
+
+        // Also check if this is a method invocation (which converter doesn't handle well)
+        if (node.WhenNotNull is InvocationExpressionSyntax ||
+            (node.WhenNotNull is MemberBindingExpressionSyntax binding &&
+             node.Parent is InvocationExpressionSyntax))
+        {
+            ConditionalAccessMethodCount++;
+            var preview = node.ToString();
+            if (preview.Length > 40) preview = preview.Substring(0, 40) + "...";
+            AddExample(ConditionalAccessMethodExamples, $"?.Method(): {preview}");
+        }
+
+        base.VisitConditionalAccessExpression(node);
+    }
+
+    // Track named arguments: Method(paramName: value)
+    public override void VisitArgument(ArgumentSyntax node)
+    {
+        if (node.NameColon != null)
+        {
+            NamedArgumentCount++;
+            AddExample(NamedArgumentExamples, $"{node.NameColon.Name}: ...");
+        }
+
+        // Track out var, ref var declarations in arguments
+        if (node.Expression is DeclarationExpressionSyntax decl)
+        {
+            VarDeclarationInArgumentCount++;
+            AddExample(VarDeclarationInArgumentExamples, $"out var {decl.Designation}");
+        }
+
+        base.VisitArgument(node);
+    }
+
+    // Track primary constructors: class Foo(int x) { }
+    public override void VisitClassDeclaration(ClassDeclarationSyntax node)
+    {
+        TypeCount++;
+        CheckPublicMember(node.Modifiers, node.Identifier.Text, node);
+
+        if (node.ParameterList != null && node.ParameterList.Parameters.Count > 0)
+        {
+            PrimaryConstructorCount++;
+            var paramList = string.Join(", ", node.ParameterList.Parameters.Select(p => p.Type?.ToString() ?? "var"));
+            AddExample(PrimaryConstructorExamples, $"class {node.Identifier.Text}({paramList})");
+        }
+
+        base.VisitClassDeclaration(node);
+    }
+
+    // Track ref/out parameters in method declarations
+    public override void VisitParameter(ParameterSyntax node)
+    {
+        foreach (var modifier in node.Modifiers)
+        {
+            if (modifier.IsKind(SyntaxKind.OutKeyword) || modifier.IsKind(SyntaxKind.RefKeyword))
+            {
+                OutRefParameterCount++;
+                AddExample(OutRefParameterExamples, $"{modifier.Text} {node.Type} {node.Identifier}");
+                break;
+            }
+        }
+
+        // Track nested generic types in parameters (like Expression<Func<T, U>>)
+        if (node.Type is GenericNameSyntax genericName)
+        {
+            if (HasNestedGenericTypes(genericName))
+            {
+                NestedGenericTypeCount++;
+                var typeName = genericName.ToString();
+                if (typeName.Length > 50) typeName = typeName.Substring(0, 50) + "...";
+                AddExample(NestedGenericTypeExamples, typeName);
+            }
+        }
+
+        base.VisitParameter(node);
+    }
+
+    // Track declaration patterns: if (obj is Type varName)
+    public override void VisitDeclarationPattern(DeclarationPatternSyntax node)
+    {
+        DeclarationPatternCount++;
+        AddExample(DeclarationPatternExamples, $"is {node.Type} {node.Designation}");
+        base.VisitDeclarationPattern(node);
+    }
+
+    // Track lambda expressions
+    public override void VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node)
+    {
+        LambdaExpressionCount++;
+        AddExample(LambdaExpressionExamples, $"{node.Parameter} => ...");
+        base.VisitSimpleLambdaExpression(node);
+    }
+
+    public override void VisitParenthesizedLambdaExpression(ParenthesizedLambdaExpressionSyntax node)
+    {
+        LambdaExpressionCount++;
+        var paramList = string.Join(", ", node.ParameterList.Parameters.Select(p => p.ToString()));
+        AddExample(LambdaExpressionExamples, $"({paramList}) => ...");
+        base.VisitParenthesizedLambdaExpression(node);
+    }
+
+    private static bool HasNestedGenericTypes(GenericNameSyntax genericName)
+    {
+        foreach (var arg in genericName.TypeArgumentList.Arguments)
+        {
+            if (arg is GenericNameSyntax)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void CheckPublicMember(SyntaxTokenList modifiers, string name, SyntaxNode node)

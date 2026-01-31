@@ -1,82 +1,82 @@
-§M[m001:SkillSyntax]
+§M{m001:SkillSyntax}
 
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §C[Console.WriteLine]
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
     §A "=== OPAL Skill Syntax Validation ==="
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A ""
   §/C
-  §C[TestArithmetic]
+  §C{TestArithmetic}
   §/C
-  §C[TestComparison]
+  §C{TestComparison}
   §/C
-  §C[TestControlFlow]
+  §C{TestControlFlow}
   §/C
-§/F[f001]
+§/F{f001}
 
-§F[f002:TestArithmetic:pri]
-  §O[void]
-  §E[cw]
-  §C[Console.WriteLine]
+§F{f002:TestArithmetic:pri}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
     §A "Testing arithmetic operators..."
   §/C
-§/F[f002]
+§/F{f002}
 
-§F[f003:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §R §OP[kind=add] §REF[name=a] §REF[name=b]
-§/F[f003]
+§F{f003:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f003}
 
-§F[f004:Subtract:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §R §OP[kind=sub] §REF[name=a] §REF[name=b]
-§/F[f004]
+§F{f004:Subtract:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (- a b)
+§/F{f004}
 
-§F[f005:Multiply:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §R §OP[kind=mul] §REF[name=a] §REF[name=b]
-§/F[f005]
+§F{f005:Multiply:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (* a b)
+§/F{f005}
 
-§F[f006:TestComparison:pri]
-  §O[void]
-  §E[cw]
-  §C[Console.WriteLine]
+§F{f006:TestComparison:pri}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
     §A "Testing comparison operators..."
   §/C
-§/F[f006]
+§/F{f006}
 
-§F[f007:IsPositive:pub]
-  §I[i32:x]
-  §O[bool]
-  §R §OP[kind=gt] §REF[name=x] 0
-§/F[f007]
+§F{f007:IsPositive:pub}
+  §I{i32:x}
+  §O{bool}
+  §R (> x 0)
+§/F{f007}
 
-§F[f008:IsZero:pub]
-  §I[i32:x]
-  §O[bool]
-  §R §OP[kind=eq] §REF[name=x] 0
-§/F[f008]
+§F{f008:IsZero:pub}
+  §I{i32:x}
+  §O{bool}
+  §R (== x 0)
+§/F{f008}
 
-§F[f009:TestControlFlow:pri]
-  §O[void]
-  §E[cw]
-  §C[Console.WriteLine]
+§F{f009:TestControlFlow:pri}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
     §A "Testing control flow..."
   §/C
-  §L[for1:i:1:5:1]
-    §C[Console.WriteLine]
-      §A §REF[name=i]
+  §L{for1:i:1:5:1}
+    §C{Console.WriteLine}
+      §A i
     §/C
-  §/L[for1]
-§/F[f009]
+  §/L{for1}
+§/F{f009}
 
-§/M[m001]
+§/M{m001}

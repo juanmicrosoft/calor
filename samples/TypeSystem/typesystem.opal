@@ -1,79 +1,79 @@
-§M[m001:TypeSystem]
+§M{m001:TypeSystem}
 
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §C[Console.WriteLine]
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
     §A "=== OPAL Type System Demo ==="
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A ""
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A "Testing Option.Some(42)..."
   §/C
-  §C[TestSome]
+  §C{TestSome}
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A ""
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A "Testing Option.None()..."
   §/C
-  §C[TestNone]
+  §C{TestNone}
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A ""
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A "Testing Result.Ok(100)..."
   §/C
-  §C[TestOk]
+  §C{TestOk}
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A ""
   §/C
-  §C[Console.WriteLine]
+  §C{Console.WriteLine}
     §A "Testing Result.Err(error)..."
   §/C
-  §C[TestErr]
+  §C{TestErr}
   §/C
-§/F[f001]
+§/F{f001}
 
-§F[f002:TestSome:pri]
-  §O[void]
-  §E[cw]
-  §B[opt] §SOME 42
-  §C[Console.WriteLine]
+§F{f002:TestSome:pri}
+  §O{void}
+  §E{cw}
+  §B{opt} §SOME 42
+  §C{Console.WriteLine}
     §A "  Created Some(42)"
   §/C
-§/F[f002]
+§/F{f002}
 
-§F[f003:TestNone:pri]
-  §O[void]
-  §E[cw]
-  §B[opt] §NONE[type=INT]
-  §C[Console.WriteLine]
+§F{f003:TestNone:pri}
+  §O{void}
+  §E{cw}
+  §B{opt} §NONE{type=INT}
+  §C{Console.WriteLine}
     §A "  Created None"
   §/C
-§/F[f003]
+§/F{f003}
 
-§F[f004:TestOk:pri]
-  §O[void]
-  §E[cw]
-  §B[result] §OK 100
-  §C[Console.WriteLine]
+§F{f004:TestOk:pri}
+  §O{void}
+  §E{cw}
+  §B{result} §OK 100
+  §C{Console.WriteLine}
     §A "  Created Ok(100)"
   §/C
-§/F[f004]
+§/F{f004}
 
-§F[f005:TestErr:pri]
-  §O[void]
-  §E[cw]
-  §B[result] §ERR "Something went wrong"
-  §C[Console.WriteLine]
+§F{f005:TestErr:pri}
+  §O{void}
+  §E{cw}
+  §B{result} §ERR "Something went wrong"
+  §C{Console.WriteLine}
     §A "  Created Err(Something went wrong)"
   §/C
-§/F[f005]
+§/F{f005}
 
-§/M[m001]
+§/M{m001}

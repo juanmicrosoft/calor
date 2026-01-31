@@ -16,13 +16,13 @@ Let's walk through a complete OPAL program to understand the syntax.
 Here's the simplest OPAL program:
 
 ```
-§M[m001:Hello]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
+§M{m001:Hello}
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
   §P "Hello from OPAL!"
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 ---
@@ -32,7 +32,7 @@ Here's the simplest OPAL program:
 ### Module Declaration
 
 ```
-§M[m001:Hello]
+§M{m001:Hello}
 ```
 
 | Part | Meaning |
@@ -44,7 +44,7 @@ Here's the simplest OPAL program:
 ### Function Declaration
 
 ```
-§F[f001:Main:pub]
+§F{f001:Main:pub}
 ```
 
 | Part | Meaning |
@@ -57,7 +57,7 @@ Here's the simplest OPAL program:
 ### Output Type
 
 ```
-  §O[void]
+  §O{void}
 ```
 
 | Part | Meaning |
@@ -68,7 +68,7 @@ Here's the simplest OPAL program:
 ### Effects Declaration
 
 ```
-  §E[cw]
+  §E{cw}
 ```
 
 | Part | Meaning |
@@ -92,8 +92,8 @@ This declares that the function writes to console. If you forget this, the compi
 ### Closing Tags
 
 ```
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 Every `§F` must have a matching `§/F` with the same ID. Same for modules.
@@ -147,42 +147,42 @@ namespace Hello
 ### With Input Parameters
 
 ```
-§M[m001:Greeter]
-§F[f001:Greet:pub]
-  §I[str:name]
-  §O[void]
-  §E[cw]
+§M{m001:Greeter}
+§F{f001:Greet:pub}
+  §I{str:name}
+  §O{void}
+  §E{cw}
   §P name
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 ### With Return Value
 
 ```
-§M[m001:Math]
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§M{m001:Math}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 ### With Contracts
 
 ```
-§M[m001:SafeMath]
-§F[f001:Divide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§M{m001:SafeMath}
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §Q (!= b 0)           // Requires: b is not zero
   §S (>= result 0)      // Ensures: result is non-negative (for positive inputs)
   §R (/ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 ---
@@ -191,14 +191,14 @@ namespace Hello
 
 | Concept | OPAL | C# Equivalent |
 |:--------|:-----|:--------------|
-| Module | `§M[id:Name]` | `namespace Name` |
-| Function | `§F[id:Name:vis]` | `public static void Name()` |
-| Input | `§I[type:name]` | Parameter |
-| Output | `§O[type]` | Return type |
-| Effects | `§E[codes]` | (No equivalent - implicit) |
+| Module | `§M{id:Name}` | `namespace Name` |
+| Function | `§F{id:Name:vis}` | `public static void Name()` |
+| Input | `§I{type:name}` | Parameter |
+| Output | `§O{type}` | Return type |
+| Effects | `§E{codes}` | (No equivalent - implicit) |
 | Print | `§P expr` | `Console.WriteLine(expr)` |
 | Return | `§R expr` | `return expr` |
-| Close | `§/X[id]` | `}` |
+| Close | `§/X{id}` | `}` |
 
 ---
 

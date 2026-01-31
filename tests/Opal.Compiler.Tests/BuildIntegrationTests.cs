@@ -15,16 +15,16 @@ public class BuildIntegrationTests
         {
             var sourceFile = Path.Combine(tempDir, "test.opal");
             var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Hello][visibility=public]
-  §OUT[type=VOID]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Hello}{visibility=public}
+  §OUT{type=VOID}
   §BODY
-    §CALL[target=Console.WriteLine][fallible=false]
+    §CALL{target=Console.WriteLine}{fallible=false}
       §ARG STR:""Hello from test!""
     §END_CALL
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
             File.WriteAllText(sourceFile, source);
 
@@ -48,14 +48,14 @@ public class BuildIntegrationTests
     {
         // Arrange - Invalid OPAL source
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=Hello][visibility=public]
-  §OUT[type=VOID]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=Hello}{visibility=public}
+  §OUT{type=VOID}
   §BODY
     §INVALID_SYNTAX
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         // Act
@@ -70,16 +70,16 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§MODULE[id=m001][name=Calculator]
-§FUNC[id=f001][name=Add][visibility=public]
-  §IN[name=a][type=INT]
-  §IN[name=b][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Calculator}
+§FUNC{id=f001}{name=Add}{visibility=public}
+  §IN{name=a}{type=INT}
+  §IN{name=b}{type=INT}
+  §OUT{type=INT}
   §BODY
     §RETURN (+ a b)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         // Act
@@ -97,25 +97,25 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§MODULE[id=m001][name=Math]
-§FUNC[id=f001][name=Add][visibility=public]
-  §IN[name=a][type=INT]
-  §IN[name=b][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Math}
+§FUNC{id=f001}{name=Add}{visibility=public}
+  §IN{name=a}{type=INT}
+  §IN{name=b}{type=INT}
+  §OUT{type=INT}
   §BODY
     §RETURN (+ a b)
   §END_BODY
-§END_FUNC[id=f001]
+§END_FUNC{id=f001}
 
-§FUNC[id=f002][name=Subtract][visibility=public]
-  §IN[name=a][type=INT]
-  §IN[name=b][type=INT]
-  §OUT[type=INT]
+§FUNC{id=f002}{name=Subtract}{visibility=public}
+  §IN{name=a}{type=INT}
+  §IN{name=b}{type=INT}
+  §OUT{type=INT}
   §BODY
     §RETURN (- a b)
   §END_BODY
-§END_FUNC[id=f002]
-§END_MODULE[id=m001]
+§END_FUNC{id=f002}
+§END_MODULE{id=m001}
 ";
 
         // Act
@@ -132,17 +132,17 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§MODULE[id=m001][name=Safe]
-§FUNC[id=f001][name=Divide][visibility=public]
-  §IN[name=a][type=INT]
-  §IN[name=b][type=INT]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Safe}
+§FUNC{id=f001}{name=Divide}{visibility=public}
+  §IN{name=a}{type=INT}
+  §IN{name=b}{type=INT}
+  §OUT{type=INT}
   §REQUIRES (!= b INT:0)
   §BODY
     §RETURN (/ a b)
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         // Act

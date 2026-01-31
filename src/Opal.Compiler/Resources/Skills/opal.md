@@ -4,28 +4,40 @@ OPAL (Optimized Programming for Agent Language) compiles to C# via .NET.
 
 **IMPORTANT: Always use v2+ syntax when writing OPAL code:**
 - Use Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
-- Use arrow syntax for conditionals: `§IF[id] condition → action`
+- Use arrow syntax for conditionals: `§IF{id} condition → action`
 - Use `§P` for print, `§B` for bindings, `§R` for return
 - Do NOT use the legacy v1 syntax with `§OP[kind=...]` or `§REF[name=...]`
 
 ## Structure Tags
 
 ```
-§M[id:Name]           Module (namespace)
-§F[id:Name:vis]       Function (pub|pri)
-§I[type:name]         Input parameter
-§O[type]              Output/return type
-§E[effects]           Side effects: cw,cr,fw,fr,net,db
-§/M[id] §/F[id]       Close tags (ID must match)
+§M{id:Name}           Module (namespace)
+§F{id:Name:vis}       Function (pub|pri)
+§I{type:name}         Input parameter
+§O{type}              Output/return type
+§E{effects}           Side effects: cw,cr,fw,fr,net,db
+§/M{id} §/F{id}       Close tags (ID must match)
 ```
 
 ## Types
 
 ```
 i32, i64, f32, f64    Numbers
+u8, u16, u32, u64     Unsigned integers
 str, bool, void       String, boolean, unit
 ?T                    Option<T> (nullable)
 T!E                   Result<T,E> (fallible)
+[T]                   Array of T (e.g., [u8], [i32], [str])
+[[T]]                 Nested array (e.g., [[i32]] for int[][])
+```
+
+### Array Type Examples
+
+```
+[u8]                  byte[]
+[i32]                 int[]
+[str]                 string[]
+[[i32]]               int[][] (jagged array)
 ```
 
 ## Lisp-Style Expressions (v2+)
@@ -47,7 +59,7 @@ T!E                   Result<T,E> (fallible)
 ## Statements
 
 ```
-§B[name] expr         Bind variable
+§B{name} expr         Bind variable
 §R expr               Return value
 §P expr               Print (shorthand for Console.WriteLine)
 ```
@@ -56,49 +68,49 @@ T!E                   Result<T,E> (fallible)
 
 ### For Loop
 ```
-§L[id:var:from:to:step]
+§L{id:var:from:to:step}
   ...body...
-§/L[id]
+§/L{id}
 ```
 
 ### While Loop
 ```
-§WH[id] condition
+§WH{id} condition
   ...body...
-§/WH[id]
+§/WH{id}
 ```
 
 ### Do-While Loop
 ```
-§DO[id]
+§DO{id}
   ...body (executes at least once)...
-§/DO[id] condition
+§/DO{id} condition
 ```
 
 ### Conditionals (v2 arrow syntax)
 ```
-§IF[id] condition → action
+§IF{id} condition → action
 §EI condition → action        ElseIf
 §EL → action                  Else
-§/I[id]
+§/I{id}
 ```
 
 Multi-line form:
 ```
-§IF[id] condition
+§IF{id} condition
   ...body...
 §EI condition
   ...body...
 §EL
   ...body...
-§/I[id]
+§/I{id}
 ```
 
 ## Contracts
 
 ```
 §Q condition                  Requires (precondition)
-§Q[message="err"] condition   With custom error
+§Q{message="err"} condition   With custom error
 §S condition                  Ensures (postcondition)
 ```
 
@@ -106,7 +118,7 @@ Multi-line form:
 
 ```
 §SOME value           Some(value)
-§NONE[type=T]         None of type T
+§NONE{type=T}         None of type T
 §OK value             Ok(value)
 §ERR "message"        Err(message)
 ```
@@ -114,7 +126,7 @@ Multi-line form:
 ## Calls
 
 ```
-§C[Target]
+§C{Target}
   §A arg1
   §A arg2
 §/C
@@ -122,7 +134,7 @@ Multi-line form:
 
 ## C# Attributes
 
-Attributes attach inline after structural brackets:
+Attributes attach inline after structural braces using `[@...]` syntax:
 
 ```
 [@AttributeName]              No arguments
@@ -132,48 +144,87 @@ Attributes attach inline after structural brackets:
 
 Example with class and method:
 ```
-§CLASS[c001:TestController:ControllerBase][@Route("api/[controller]")][@ApiController]
-  §METHOD[m001:Get:pub][@HttpGet]
-  §/METHOD[m001]
-§/CLASS[c001]
+§CLASS{c001:TestController:ControllerBase}[@Route("api/[controller]")][@ApiController]
+  §METHOD{m001:Get:pub}[@HttpGet]
+  §/METHOD{m001}
+§/CLASS{c001}
+```
+
+## Fields and Properties
+
+```
+§FLD{[u8]:_buffer:priv}       Private byte[] field
+§FLD{i32:_count:priv}         Private int field
+
+§PROP{p001:Buffer:[u8]:pub}   Public byte[] property
+  §GET{pub}
+    §R _buffer
+  §/GET
+§/PROP{p001}
 ```
 
 ## Template: FizzBuzz
 
 ```opal
-§M[m001:FizzBuzz]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §L[for1:i:1:100:1]
-    §IF[if1] (== (% i 15) 0) → §P "FizzBuzz"
+§M{m001:FizzBuzz}
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §L{for1:i:1:100:1}
+    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
     §EI (== (% i 3) 0) → §P "Fizz"
     §EI (== (% i 5) 0) → §P "Buzz"
     §EL → §P i
-    §/I[if1]
-  §/L[for1]
-§/F[f001]
-§/M[m001]
+    §/I{if1}
+  §/L{for1}
+§/F{f001}
+§/M{m001}
 ```
 
 ## Template: Function with Contracts
 
 ```opal
-§M[m001:Math]
-§F[f001:SafeDivide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§M{m001:Math}
+§F{f001:SafeDivide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §Q (!= b 0)
   §S (>= result 0)
   §R (/ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
+```
+
+## Template: Class with Array Fields
+
+```opal
+§M{m001:DataProcessor}
+§CLASS{c001:DataProcessor}
+  §FLD{[u8]:_buffer:priv}
+  §FLD{[i32]:_indices:priv}
+
+  §PROP{p001:Buffer:[u8]:pub}
+    §GET{pub}
+      §R _buffer
+    §/GET
+  §/PROP{p001}
+
+  §METHOD{m001:ProcessData:pub}
+    §I{[str]:args}
+    §O{i32}
+    §R args.Length
+  §/METHOD{m001}
+§/CLASS{c001}
+§/M{m001}
 ```
 
 ## ID Conventions
 
 - Modules: `m001`, `m002`
 - Functions: `f001`, `f002`
+- Classes: `c001`, `c002`
+- Properties: `p001`, `p002`
+- Methods: `m001`, `m002`
 - Loops: `for1`, `while1`, `do1`
 - Conditionals: `if1`, `if2`

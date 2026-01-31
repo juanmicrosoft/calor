@@ -18,17 +18,17 @@ Modules are like C# namespaces. They group related functions.
 ### Syntax
 
 ```
-§M[id:name]
+§M{id:name}
   // contents
-§/M[id]
+§/M{id}
 ```
 
 ### Example
 
 ```
-§M[m001:Calculator]
+§M{m001:Calculator}
   // functions go here
-§/M[m001]
+§/M{m001}
 ```
 
 ### Rules
@@ -46,14 +46,14 @@ Functions are the primary code containers.
 ### Syntax
 
 ```
-§F[id:name:visibility]
-  §I[type:param]       // inputs (0 or more)
-  §O[type]             // output (required)
-  §E[effects]          // effects (optional)
+§F{id:name:visibility}
+  §I{type:param}       // inputs (0 or more)
+  §O{type}             // output (required)
+  §E{effects}          // effects (optional)
   §Q condition         // preconditions (0 or more)
   §S condition         // postconditions (0 or more)
   // body
-§/F[id]
+§/F{id}
 ```
 
 ### Visibility
@@ -67,34 +67,34 @@ Functions are the primary code containers.
 
 **Simple function:**
 ```
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 ```
 
 **Function with effects:**
 ```
-§F[f001:PrintSum:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[void]
-  §E[cw]
+§F{f001:PrintSum:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{void}
+  §E{cw}
   §P (+ a b)
-§/F[f001]
+§/F{f001}
 ```
 
 **Function with contracts:**
 ```
-§F[f001:Divide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §Q (!= b 0)
   §R (/ a b)
-§/F[f001]
+§/F{f001}
 ```
 
 ---
@@ -106,28 +106,30 @@ Input parameters define function arguments.
 ### Syntax
 
 ```
-§I[type:name]
+§I{type:name}
 ```
 
 ### Examples
 
 ```
-§I[i32:x]           // int x
-§I[str:name]        // string name
-§I[bool:flag]       // bool flag
-§I[?i32:maybeVal]   // int? maybeVal (nullable)
+§I{i32:x}           // int x
+§I{str:name}        // string name
+§I{bool:flag}       // bool flag
+§I{?i32:maybeVal}   // int? maybeVal (nullable)
+§I{[u8]:data}       // byte[] data
+§I{[str]:args}      // string[] args
 ```
 
 ### Multiple Parameters
 
 ```
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §I[i32:c]
-  §O[i32]
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §I{i32:c}
+  §O{i32}
   §R (+ (+ a b) c)
-§/F[f001]
+§/F{f001}
 ```
 
 ---
@@ -139,17 +141,57 @@ Every function must declare its output type.
 ### Syntax
 
 ```
-§O[type]
+§O{type}
 ```
 
 ### Examples
 
 ```
-§O[void]     // returns nothing
-§O[i32]      // returns int
-§O[str]      // returns string
-§O[?i32]     // returns nullable int
-§O[i32!str]  // returns Result<int, string>
+§O{void}     // returns nothing
+§O{i32}      // returns int
+§O{str}      // returns string
+§O{?i32}     // returns nullable int
+§O{i32!str}  // returns Result<int, string>
+§O{[u8]}     // returns byte[]
+§O{[str]}    // returns string[]
+```
+
+---
+
+## Array Types
+
+OPAL uses bracket notation `[T]` for array types, which aligns with common programming language conventions.
+
+### Syntax
+
+```
+[elementType]         // Single-dimensional array
+[[elementType]]       // Jagged array (array of arrays)
+```
+
+### Examples
+
+| OPAL Type | C# Equivalent |
+|:----------|:--------------|
+| `[u8]` | `byte[]` |
+| `[i32]` | `int[]` |
+| `[str]` | `string[]` |
+| `[bool]` | `bool[]` |
+| `[[i32]]` | `int[][]` |
+
+### Usage in Fields and Methods
+
+```
+§CLASS{c001:DataProcessor}
+  §FLD{[u8]:_buffer:priv}       // private byte[] _buffer
+  §FLD{[i32]:_indices:priv}     // private int[] _indices
+
+  §METHOD{m001:ProcessData:pub}
+    §I{[str]:args}              // string[] args parameter
+    §O{i32}
+    §R args.Length
+  §/METHOD{m001}
+§/CLASS{c001}
 ```
 
 ---
@@ -160,32 +202,32 @@ Every structural element must be closed with a matching tag.
 
 ### Rules
 
-1. Opening `§X[id:...]` must have closing `§/X[id]`
+1. Opening `§X{id:...}` must have closing `§/X{id}`
 2. IDs must match exactly
 3. Nesting must be proper (no overlapping scopes)
 
 ### Correct Nesting
 
 ```
-§M[m001:Example]
-  §F[f001:Main:pub]
-    §L[for1:i:1:10:1]
-      §IF[if1] (> i 5)
+§M{m001:Example}
+  §F{f001:Main:pub}
+    §L{for1:i:1:10:1}
+      §IF{if1} (> i 5)
         §P i
-      §/I[if1]
-    §/L[for1]
-  §/F[f001]
-§/M[m001]
+      §/I{if1}
+    §/L{for1}
+  §/F{f001}
+§/M{m001}
 ```
 
 ### Incorrect (Overlapping)
 
 ```
 // WRONG: if1 closed after for1
-§L[for1:i:1:10:1]
-  §IF[if1] (> i 5)
-§/L[for1]
-  §/I[if1]     // Error: if1 overlaps for1
+§L{for1:i:1:10:1}
+  §IF{if1} (> i 5)
+§/L{for1}
+  §/I{if1}     // Error: if1 overlaps for1
 ```
 
 ---
@@ -194,13 +236,13 @@ Every structural element must be closed with a matching tag.
 
 | Opening | Closing | Purpose |
 |:--------|:--------|:--------|
-| `§M[id:name]` | `§/M[id]` | Module |
-| `§F[id:name:vis]` | `§/F[id]` | Function |
-| `§L[id:var:from:to:step]` | `§/L[id]` | For loop |
-| `§WH[id] cond` | `§/WH[id]` | While loop |
-| `§DO[id]` | `§/DO[id] cond` | Do-while loop |
-| `§IF[id] cond` | `§/I[id]` | Conditional |
-| `§C[target]` | `§/C` | Call (no ID needed) |
+| `§M{id:name}` | `§/M{id}` | Module |
+| `§F{id:name:vis}` | `§/F{id}` | Function |
+| `§L{id:var:from:to:step}` | `§/L{id}` | For loop |
+| `§WH{id} cond` | `§/WH{id}` | While loop |
+| `§DO{id}` | `§/DO{id} cond` | Do-while loop |
+| `§IF{id} cond` | `§/I{id}` | Conditional |
+| `§C{target}` | `§/C` | Call (no ID needed) |
 
 ---
 
@@ -211,27 +253,27 @@ C# attributes are preserved during conversion using inline bracket syntax `[@Att
 ### Syntax
 
 ```
-§CLASS[id:name][@AttributeName]
-§CLASS[id:name][@AttributeName(args)]
-§METHOD[id:name:vis][@Attr1][@Attr2]
+§CLASS{id:name}[@AttributeName]
+§CLASS{id:name}[@AttributeName(args)]
+§METHOD{id:name:vis}[@Attr1][@Attr2]
 ```
 
 ### Examples
 
 **Class with routing attributes (ASP.NET Core):**
 ```
-§CLASS[c001:JoinController:ControllerBase][@Route("api/[controller]")][@ApiController]
-  §METHOD[m001:Post:pub][@HttpPost]
-  §/METHOD[m001]
-§/CLASS[c001]
+§CLASS{c001:JoinController:ControllerBase}[@Route("api/[controller]")][@ApiController]
+  §METHOD{m001:Post:pub}[@HttpPost]
+  §/METHOD{m001}
+§/CLASS{c001}
 ```
 
 **Property with validation:**
 ```
-§PROP[p001:Email:str:pub][@Required][@EmailAddress]
+§PROP{p001:Email:str:pub}[@Required][@EmailAddress]
   §GET
   §SET
-§/PROP[p001]
+§/PROP{p001}
 ```
 
 ### Attribute Arguments
@@ -246,12 +288,12 @@ C# attributes are preserved during conversion using inline bracket syntax `[@Att
 ### Supported Elements
 
 Attributes can be attached to:
-- Classes: `§CLASS[...][@attr]`
-- Interfaces: `§IFACE[...][@attr]`
-- Methods: `§METHOD[...][@attr]`
-- Properties: `§PROP[...][@attr]`
-- Fields: `§FLD[...][@attr]`
-- Parameters: `§I[type:name][@attr]`
+- Classes: `§CLASS{...}[@attr]`
+- Interfaces: `§IFACE{...}[@attr]`
+- Methods: `§METHOD{...}[@attr]`
+- Properties: `§PROP{...}[@attr]`
+- Fields: `§FLD{...}[@attr]`
+- Parameters: `§I{type:name}[@attr]`
 
 ---
 

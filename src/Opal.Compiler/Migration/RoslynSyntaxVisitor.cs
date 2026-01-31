@@ -233,7 +233,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
@@ -287,7 +287,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("r");
         var name = node.Identifier.Text;
 
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
@@ -356,7 +356,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("s");
         var name = node.Identifier.Text;
 
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
@@ -405,7 +405,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var id = _context.GenerateId("m");
         var name = node.Identifier.Text;
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var parameters = ConvertParameters(node.ParameterList);
         var returnType = TypeMapper.CSharpToOpal(node.ReturnType.ToString());
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
@@ -432,7 +432,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var name = node.Identifier.Text;
         var visibility = GetVisibility(node.Modifiers);
         var modifiers = GetMethodModifiers(node.Modifiers);
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var parameters = ConvertParameters(node.ParameterList);
         var returnType = TypeMapper.CSharpToOpal(node.ReturnType.ToString());
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
@@ -1327,6 +1327,158 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new MatchStatementNode(GetTextSpan(node), id, target, cases, new AttributeCollection());
     }
 
+    private MatchExpressionNode ConvertSwitchExpression(SwitchExpressionSyntax node)
+    {
+        _context.RecordFeatureUsage("switch-expression");
+        _context.IncrementConverted();
+
+        var id = _context.GenerateId("match");
+        var target = ConvertExpression(node.GoverningExpression);
+        var cases = new List<MatchCaseNode>();
+
+        foreach (var arm in node.Arms)
+        {
+            var pattern = ConvertPattern(arm.Pattern);
+            ExpressionNode? guard = arm.WhenClause != null
+                ? ConvertExpression(arm.WhenClause.Condition)
+                : null;
+
+            var body = new List<StatementNode>
+            {
+                new ReturnStatementNode(GetTextSpan(arm.Expression), ConvertExpression(arm.Expression))
+            };
+
+            cases.Add(new MatchCaseNode(GetTextSpan(arm), pattern, guard, body));
+        }
+
+        return new MatchExpressionNode(GetTextSpan(node), id, target, cases, new AttributeCollection());
+    }
+
+    private PatternNode ConvertPattern(PatternSyntax pattern)
+    {
+        var span = GetTextSpan(pattern);
+
+        return pattern switch
+        {
+            // Discard pattern: _
+            DiscardPatternSyntax => new WildcardPatternNode(span),
+
+            // Constant pattern: 1, "hello", null
+            ConstantPatternSyntax constant => new LiteralPatternNode(span, ConvertExpression(constant.Expression)),
+
+            // Var pattern: var x
+            VarPatternSyntax varPattern when varPattern.Designation is SingleVariableDesignationSyntax single =>
+                new VarPatternNode(span, single.Identifier.Text),
+
+            // Declaration pattern: string s, Type name
+            DeclarationPatternSyntax declPattern when declPattern.Designation is SingleVariableDesignationSyntax singleDecl =>
+                new VarPatternNode(span, singleDecl.Identifier.Text),
+
+            // Relational pattern: > 0, < 100, >= 10, <= 50
+            RelationalPatternSyntax relPattern => ConvertRelationalPattern(relPattern),
+
+            // Type pattern: string, int (without variable)
+            TypePatternSyntax typePattern =>
+                new LiteralPatternNode(span, new ReferenceNode(span, typePattern.Type.ToString())),
+
+            // Property pattern: { Length: > 5 }
+            RecursivePatternSyntax recursivePattern => ConvertRecursivePattern(recursivePattern),
+
+            // Binary patterns: and, or (emit as raw text for now)
+            BinaryPatternSyntax binaryPattern =>
+                HandleUnsupportedPattern(binaryPattern, "binary pattern (and/or)"),
+
+            // Unary pattern: not null
+            UnaryPatternSyntax unaryPattern =>
+                HandleUnsupportedPattern(unaryPattern, "unary pattern (not)"),
+
+            // Parenthesized pattern: (pattern)
+            ParenthesizedPatternSyntax parenPattern => ConvertPattern(parenPattern.Pattern),
+
+            // Default fallback: emit as raw text
+            _ => new LiteralPatternNode(span, new ReferenceNode(span, pattern.ToString()))
+        };
+    }
+
+    private RelationalPatternNode ConvertRelationalPattern(RelationalPatternSyntax relPattern)
+    {
+        var span = GetTextSpan(relPattern);
+        var value = ConvertExpression(relPattern.Expression);
+
+        // Convert C# operator token to OPAL operator string
+        var opString = relPattern.OperatorToken.Kind() switch
+        {
+            SyntaxKind.LessThanToken => "lt",
+            SyntaxKind.LessThanEqualsToken => "lte",
+            SyntaxKind.GreaterThanToken => "gt",
+            SyntaxKind.GreaterThanEqualsToken => "gte",
+            _ => relPattern.OperatorToken.Text
+        };
+
+        return new RelationalPatternNode(span, opString, value);
+    }
+
+    private PatternNode ConvertRecursivePattern(RecursivePatternSyntax pattern)
+    {
+        var span = GetTextSpan(pattern);
+
+        // Handle property pattern: { Length: > 5 }
+        if (pattern.PropertyPatternClause != null)
+        {
+            var typeName = pattern.Type?.ToString();
+            var matches = new List<PropertyMatchNode>();
+
+            foreach (var subpattern in pattern.PropertyPatternClause.Subpatterns)
+            {
+                if (subpattern.NameColon != null)
+                {
+                    var propName = subpattern.NameColon.Name.Identifier.Text;
+                    var propPattern = ConvertPattern(subpattern.Pattern);
+                    matches.Add(new PropertyMatchNode(GetTextSpan(subpattern), propName, propPattern));
+                }
+            }
+
+            return new PropertyPatternNode(span, typeName, matches);
+        }
+
+        // Handle positional pattern: Point(x, y)
+        if (pattern.PositionalPatternClause != null)
+        {
+            var typeName = pattern.Type?.ToString() ?? "";
+            var patterns = pattern.PositionalPatternClause.Subpatterns
+                .Select(sp => ConvertPattern(sp.Pattern))
+                .ToList();
+
+            return new PositionalPatternNode(span, typeName, patterns);
+        }
+
+        // Fallback: type pattern with no destructuring
+        if (pattern.Type != null)
+        {
+            var designation = pattern.Designation as SingleVariableDesignationSyntax;
+            if (designation != null)
+            {
+                return new VarPatternNode(span, designation.Identifier.Text);
+            }
+            return new LiteralPatternNode(span, new ReferenceNode(span, pattern.Type.ToString()));
+        }
+
+        return new LiteralPatternNode(span, new ReferenceNode(span, pattern.ToString()));
+    }
+
+    private PatternNode HandleUnsupportedPattern(PatternSyntax pattern, string description)
+    {
+        var span = GetTextSpan(pattern);
+        var lineSpan = pattern.GetLocation().GetLineSpan();
+        _context.AddWarning(
+            $"Partial support for {description}: may not round-trip exactly",
+            line: lineSpan.StartLinePosition.Line + 1,
+            column: lineSpan.StartLinePosition.Character + 1);
+
+        // Emit as a literal pattern containing the raw text
+        return new LiteralPatternNode(span, new ReferenceNode(span, pattern.ToString()));
+    }
+
     private ExpressionNode ConvertExpression(ExpressionSyntax expression)
     {
         _context.Stats.ExpressionsConverted++;
@@ -1337,6 +1489,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.Text),
             BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
             PrefixUnaryExpressionSyntax prefix => ConvertPrefixUnaryExpression(prefix),
+            PostfixUnaryExpressionSyntax postfix => ConvertPostfixUnaryExpression(postfix),
             ParenthesizedExpressionSyntax paren => ConvertExpression(paren.Expression),
             InvocationExpressionSyntax invocation => ConvertInvocationExpression(invocation),
             MemberAccessExpressionSyntax memberAccess => ConvertMemberAccessExpression(memberAccess),
@@ -1351,6 +1504,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
             ConditionalAccessExpressionSyntax condAccess => ConvertConditionalAccess(condAccess),
             CastExpressionSyntax cast => ConvertExpression(cast.Expression), // Just use inner expression
+            IsPatternExpressionSyntax isPattern => ConvertIsPatternExpression(isPattern),
+            CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
+            ImplicitObjectCreationExpressionSyntax implicitNew => ConvertImplicitObjectCreation(implicitNew),
+            SwitchExpressionSyntax switchExpr => ConvertSwitchExpression(switchExpr),
             _ => new ReferenceNode(GetTextSpan(expression), expression.ToString())
         };
     }
@@ -1391,6 +1548,119 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new BinaryOperationNode(GetTextSpan(binary), binaryOp, left, right);
     }
 
+    private ExpressionNode ConvertIsPatternExpression(IsPatternExpressionSyntax isPattern)
+    {
+        // Convert "x is null" to "(== x null)"
+        // Convert "x is not null" to "(!= x null)"
+        var left = ConvertExpression(isPattern.Expression);
+
+        return isPattern.Pattern switch
+        {
+            ConstantPatternSyntax constant =>
+                // "x is null" or "x is value"
+                new BinaryOperationNode(
+                    GetTextSpan(isPattern),
+                    BinaryOperator.Equal,
+                    left,
+                    ConvertExpression(constant.Expression)),
+            UnaryPatternSyntax { OperatorToken.Text: "not", Pattern: ConstantPatternSyntax notConstant } =>
+                // "x is not null" or "x is not value"
+                new BinaryOperationNode(
+                    GetTextSpan(isPattern),
+                    BinaryOperator.NotEqual,
+                    left,
+                    ConvertExpression(notConstant.Expression)),
+            TypePatternSyntax typePattern =>
+                // "x is SomeType" - convert to type check reference
+                new ReferenceNode(GetTextSpan(isPattern), $"({left} is {typePattern.Type})"),
+            _ =>
+                // For other patterns, fall back to string representation
+                new ReferenceNode(GetTextSpan(isPattern), isPattern.ToString())
+        };
+    }
+
+    private ExpressionNode ConvertCollectionExpression(CollectionExpressionSyntax collection)
+    {
+        // Convert C# 12 collection expressions: [] or [1, 2, 3]
+        // Empty collection: output as reference to "default" which works for most cases
+        if (collection.Elements.Count == 0)
+        {
+            return new ReferenceNode(GetTextSpan(collection), "default");
+        }
+
+        // Convert collection expression to ArrayCreationNode
+        // This allows proper round-tripping through OPAL
+        var id = _context.GenerateId("arr");
+        var name = _context.GenerateId("arr");
+
+        var initializer = new List<ExpressionNode>();
+        string? elementType = null;
+
+        foreach (var element in collection.Elements)
+        {
+            if (element is ExpressionElementSyntax exprElement)
+            {
+                var converted = ConvertExpression(exprElement.Expression);
+                initializer.Add(converted);
+
+                // Try to infer element type from first element
+                if (elementType == null)
+                {
+                    elementType = InferTypeFromExpression(exprElement.Expression);
+                }
+            }
+            else if (element is SpreadElementSyntax spread)
+            {
+                // Spread elements like ..otherArray - fall back to string representation
+                return new ReferenceNode(GetTextSpan(collection), collection.ToString());
+            }
+        }
+
+        // Default to "any" if we can't infer the type
+        elementType ??= "any";
+
+        return new ArrayCreationNode(
+            GetTextSpan(collection),
+            id,
+            name,
+            elementType,
+            null, // no explicit size
+            initializer,
+            new AttributeCollection());
+    }
+
+    private string? InferTypeFromExpression(ExpressionSyntax expr)
+    {
+        return expr switch
+        {
+            LiteralExpressionSyntax literal => literal.Kind() switch
+            {
+                SyntaxKind.StringLiteralExpression => "str",
+                SyntaxKind.NumericLiteralExpression when literal.Token.Value is int => "i32",
+                SyntaxKind.NumericLiteralExpression when literal.Token.Value is long => "i64",
+                SyntaxKind.NumericLiteralExpression when literal.Token.Value is float => "f32",
+                SyntaxKind.NumericLiteralExpression when literal.Token.Value is double => "f64",
+                SyntaxKind.TrueLiteralExpression or SyntaxKind.FalseLiteralExpression => "bool",
+                SyntaxKind.CharacterLiteralExpression => "char",
+                _ => null
+            },
+            _ => null
+        };
+    }
+
+    private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew)
+    {
+        // Convert target-typed new: new() or new(args)
+        // Use "default" for parameterless, otherwise use a reference node
+        if (implicitNew.ArgumentList == null || implicitNew.ArgumentList.Arguments.Count == 0)
+        {
+            return new ReferenceNode(GetTextSpan(implicitNew), "default");
+        }
+
+        // Fall back to string representation for complex cases
+        return new ReferenceNode(GetTextSpan(implicitNew), implicitNew.ToString());
+    }
+
     private UnaryOperationNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)
     {
         var operand = ConvertExpression(prefix.Operand);
@@ -1398,6 +1668,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var unaryOp = UnaryOperatorExtensions.FromString(op) ?? UnaryOperator.Negate;
 
         return new UnaryOperationNode(GetTextSpan(prefix), unaryOp, operand);
+    }
+
+    private ExpressionNode ConvertPostfixUnaryExpression(PostfixUnaryExpressionSyntax postfix)
+    {
+        var operand = ConvertExpression(postfix.Operand);
+
+        // Handle null-forgiving operator (!) - just return the operand since OPAL doesn't have this concept
+        if (postfix.OperatorToken.IsKind(SyntaxKind.ExclamationToken))
+        {
+            return operand;
+        }
+
+        // For other postfix operators (++, --), fall back to string representation
+        // These are typically used in statements, not expressions
+        return new ReferenceNode(GetTextSpan(postfix), postfix.ToString());
     }
 
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
@@ -1456,32 +1741,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertConditionalExpression(ConditionalExpressionSyntax conditional)
     {
-        // Ternary is converted to if-then-else expression using Match
+        // Ternary is converted to a conditional expression: (? cond then else)
         var condition = ConvertExpression(conditional.Condition);
         var whenTrue = ConvertExpression(conditional.WhenTrue);
         var whenFalse = ConvertExpression(conditional.WhenFalse);
 
-        var id = _context.GenerateId("cond");
-
-        // Create a match expression
-        var trueBranch = new MatchCaseNode(
-            GetTextSpan(conditional.WhenTrue),
-            new LiteralPatternNode(TextSpan.Empty, new BoolLiteralNode(TextSpan.Empty, true)),
-            guard: null,
-            new List<StatementNode> { new ReturnStatementNode(TextSpan.Empty, whenTrue) });
-
-        var falseBranch = new MatchCaseNode(
-            GetTextSpan(conditional.WhenFalse),
-            new WildcardPatternNode(TextSpan.Empty),
-            guard: null,
-            new List<StatementNode> { new ReturnStatementNode(TextSpan.Empty, whenFalse) });
-
-        return new MatchExpressionNode(
+        return new ConditionalExpressionNode(
             GetTextSpan(conditional),
-            id,
             condition,
-            new List<MatchCaseNode> { trueBranch, falseBranch },
-            new AttributeCollection());
+            whenTrue,
+            whenFalse);
     }
 
     private ArrayCreationNode ConvertArrayCreation(ArrayCreationExpressionSyntax arrayCreation)
@@ -1621,19 +1890,74 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new NullConditionalNode(GetTextSpan(condAccess), target, memberName);
     }
 
-    private IReadOnlyList<TypeParameterNode> ConvertTypeParameters(TypeParameterListSyntax? typeParamList)
+    private IReadOnlyList<TypeParameterNode> ConvertTypeParameters(
+        TypeParameterListSyntax? typeParamList,
+        SyntaxList<TypeParameterConstraintClauseSyntax>? constraintClauses = null)
     {
         if (typeParamList == null)
             return Array.Empty<TypeParameterNode>();
 
         _context.RecordFeatureUsage("generics");
 
+        // Build a map of type parameter name -> constraints
+        var constraintMap = new Dictionary<string, List<TypeConstraintNode>>();
+        if (constraintClauses.HasValue)
+        {
+            foreach (var clause in constraintClauses.Value)
+            {
+                var paramName = clause.Name.Identifier.Text;
+                var constraints = new List<TypeConstraintNode>();
+
+                foreach (var constraint in clause.Constraints)
+                {
+                    var constraintNode = ConvertTypeConstraint(constraint);
+                    if (constraintNode != null)
+                    {
+                        constraints.Add(constraintNode);
+                    }
+                }
+
+                if (constraints.Count > 0)
+                {
+                    constraintMap[paramName] = constraints;
+                    _context.RecordFeatureUsage("generic-constraints");
+                }
+            }
+        }
+
         return typeParamList.Parameters
             .Select(p => new TypeParameterNode(
                 GetTextSpan(p),
                 p.Identifier.Text,
-                Array.Empty<TypeConstraintNode>()))
+                constraintMap.TryGetValue(p.Identifier.Text, out var constraints)
+                    ? constraints
+                    : Array.Empty<TypeConstraintNode>()))
             .ToList();
+    }
+
+    private TypeConstraintNode? ConvertTypeConstraint(TypeParameterConstraintSyntax constraint)
+    {
+        var span = GetTextSpan(constraint);
+
+        return constraint switch
+        {
+            ClassOrStructConstraintSyntax classOrStruct =>
+                classOrStruct.ClassOrStructKeyword.IsKind(SyntaxKind.ClassKeyword)
+                    ? new TypeConstraintNode(span, TypeConstraintKind.Class)
+                    : new TypeConstraintNode(span, TypeConstraintKind.Struct),
+
+            ConstructorConstraintSyntax =>
+                new TypeConstraintNode(span, TypeConstraintKind.New),
+
+            TypeConstraintSyntax typeConstraint =>
+                new TypeConstraintNode(span, TypeConstraintKind.TypeName, typeConstraint.Type.ToString()),
+
+            DefaultConstraintSyntax =>
+                // 'default' constraint (C# 9+) - no direct OPAL equivalent, skip
+                null,
+
+            _ => null
+        };
     }
 
     private IReadOnlyList<ParameterNode> ConvertParameters(ParameterListSyntax paramList)

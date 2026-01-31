@@ -22,12 +22,12 @@ In traditional code, you must read the entire implementation to know if a functi
 OPAL requires explicit declaration:
 
 ```
-§F[f001:SaveUser:pub]
-  §I[User:user]
-  §O[bool]
-  §E[db,net]              // Declares: database and network operations
+§F{f001:SaveUser:pub}
+  §I{User:user}
+  §O{bool}
+  §E{db,net}              // Declares: database and network operations
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 Now an agent knows immediately what side effects to expect.
@@ -37,21 +37,21 @@ Now an agent knows immediately what side effects to expect.
 ## Effect Syntax
 
 ```
-§E[code1,code2,...]
-§E[]                      // No effects (pure function)
+§E{code1,code2,...}
+§E{}                      // No effects (pure function)
 ```
 
 Place the effect declaration after the output type:
 
 ```
-§F[id:name:vis]
-  §I[...]
-  §O[...]
-  §E[effects]             // Here
+§F{id:name:vis}
+  §I{...}
+  §O{...}
+  §E{effects}             // Here
   §Q ...
   §S ...
   // body
-§/F[id]
+§/F{id}
 ```
 
 ---
@@ -74,81 +74,81 @@ Place the effect declaration after the output type:
 ### Pure Function (No Effects)
 
 ```
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   // No §E means pure - no side effects
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 ```
 
 Or explicitly:
 
 ```
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §E[]                    // Explicitly no effects
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §E{}                    // Explicitly no effects
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 ```
 
 ### Console Output
 
 ```
-§F[f001:Greet:pub]
-  §I[str:name]
-  §O[void]
-  §E[cw]                  // Console write
+§F{f001:Greet:pub}
+  §I{str:name}
+  §O{void}
+  §E{cw}                  // Console write
   §P name
-§/F[f001]
+§/F{f001}
 ```
 
 ### File Operations
 
 ```
-§F[f001:CopyFile:pub]
-  §I[str:source]
-  §I[str:dest]
-  §O[bool]
-  §E[fr,fw]               // File read and write
+§F{f001:CopyFile:pub}
+  §I{str:source}
+  §I{str:dest}
+  §O{bool}
+  §E{fr,fw}               // File read and write
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ### Network Call
 
 ```
-§F[f001:FetchData:pub]
-  §I[str:url]
-  §O[str!str]
-  §E[net]                 // Network operations
+§F{f001:FetchData:pub}
+  §I{str:url}
+  §O{str!str}
+  §E{net}                 // Network operations
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ### Database with Logging
 
 ```
-§F[f001:CreateUser:pub]
-  §I[User:user]
-  §O[i32]
-  §E[db,cw]               // Database and console (for logging)
+§F{f001:CreateUser:pub}
+  §I{User:user}
+  §O{i32}
+  §E{db,cw}               // Database and console (for logging)
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ### Multiple Effects
 
 ```
-§F[f001:ProcessOrder:pub]
-  §I[Order:order]
-  §O[bool]
-  §E[db,net,fw,cw]        // Database, network, file write, console write
+§F{f001:ProcessOrder:pub}
+  §I{Order:order}
+  §O{bool}
+  §E{db,net,fw,cw}        // Database, network, file write, console write
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ---
@@ -159,33 +159,33 @@ Or explicitly:
 
 ```
 // Read-only file operation
-§F[f001:LoadConfig:pub]
-  §I[str:path]
-  §O[Config]
-  §E[fr]                  // Only file read
+§F{f001:LoadConfig:pub}
+  §I{str:path}
+  §O{Config}
+  §E{fr}                  // Only file read
   // ...
-§/F[f001]
+§/F{f001}
 
 // Read-write file operation
-§F[f002:UpdateConfig:pub]
-  §I[str:path]
-  §I[Config:config]
-  §O[void]
-  §E[fr,fw]               // File read and write
+§F{f002:UpdateConfig:pub}
+  §I{str:path}
+  §I{Config:config}
+  §O{void}
+  §E{fr,fw}               // File read and write
   // ...
-§/F[f002]
+§/F{f002}
 ```
 
 ### Interactive Console
 
 ```
-§F[f001:Prompt:pub]
-  §I[str:question]
-  §O[str]
-  §E[cw,cr]               // Console write and read
+§F{f001:Prompt:pub}
+  §I{str:question}
+  §O{str}
+  §E{cw,cr}               // Console write and read
   §P question
-  §R §C[Console.ReadLine] §/C
-§/F[f001]
+  §R §C{Console.ReadLine} §/C
+§/F{f001}
 ```
 
 ---
@@ -196,16 +196,16 @@ Or explicitly:
 
 "Find all functions that access the database":
 ```
-// Agent searches for §E[..db..]
+// Agent searches for §E{..db..}
 ```
 
 ### 2. Refactoring Safety
 
 "This function should be pure, but it has effects":
 ```
-§F[f001:Calculate:pub]
-  §O[i32]
-  §E[cw]                  // Wait, why is Calculate logging?
+§F{f001:Calculate:pub}
+  §O{i32}
+  §E{cw}                  // Wait, why is Calculate logging?
 ```
 
 ### 3. Testing Strategy
@@ -220,15 +220,15 @@ Or explicitly:
 
 ```
 // If f1 calls f2, f1's effects must include f2's effects
-§F[f001:ProcessAndSave:pub]
-  §E[db,cw]               // Must include f002's effects
-  §C[f002:Process] ... §/C
-§/F[f001]
+§F{f001:ProcessAndSave:pub}
+  §E{db,cw}               // Must include f002's effects
+  §C{f002:Process} ... §/C
+§/F{f001}
 
-§F[f002:Process:pri]
-  §E[cw]                  // Has console write effect
+§F{f002:Process:pri}
+  §E{cw}                  // Has console write effect
   // ...
-§/F[f002]
+§/F{f002}
 ```
 
 ---

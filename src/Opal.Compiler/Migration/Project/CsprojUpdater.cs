@@ -3,12 +3,16 @@ using System.Xml.Linq;
 namespace Opal.Compiler.Migration.Project;
 
 /// <summary>
-/// Updates .csproj files for OPAL integration.
+/// Updates .csproj files for OPAL integration during migration scenarios.
+/// For new project initialization, use <see cref="Opal.Compiler.Init.CsprojInitializer"/> instead.
 /// </summary>
 public sealed class CsprojUpdater
 {
+    private const string CompileOpalFilesTargetName = "CompileOpalFiles";
+
     /// <summary>
     /// Updates a .csproj file to include OPAL compilation support.
+    /// Uses proper incremental build support with obj/opal/ output directory.
     /// </summary>
     public async Task<CsprojUpdateResult> UpdateForOpalAsync(string csprojPath)
     {
@@ -47,8 +51,8 @@ public sealed class CsprojUpdater
 
             if (opalFiles.Length > 0 && !HasOpalCompileTarget(doc))
             {
-                AddOpalCompileTarget(doc);
-                changes.Add("Added OPAL pre-build compilation target");
+                AddOpalCompileTargets(doc);
+                changes.Add("Added OPAL compilation targets (output: obj/opal/)");
             }
 
             // Save changes
@@ -118,16 +122,40 @@ public sealed class CsprojUpdater
                     <PackageReference Include="Opal.Runtime" Version="*" />
                   </ItemGroup>
 
-                  <!-- Compile OPAL files before build -->
-                  <Target Name="CompileOpal" BeforeTargets="BeforeBuild">
-                    <Exec Command="opalc --input %(OpalFiles.Identity) --output %(OpalFiles.RootDir)%(OpalFiles.Directory)%(OpalFiles.Filename).g.cs"
-                          Condition="'@(OpalFiles)' != ''" />
+                  <!-- OPAL Compilation Configuration -->
+                  <PropertyGroup>
+                    <OpalOutputDirectory Condition="'$(OpalOutputDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\opal\</OpalOutputDirectory>
+                    <OpalCompilerPath Condition="'$(OpalCompilerPath)' == ''">opalc</OpalCompilerPath>
+                  </PropertyGroup>
+
+                  <!-- OPAL source files -->
+                  <ItemGroup>
+                    <OpalCompile Include="**\*.opal" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+                  </ItemGroup>
+
+                  <!-- Compile OPAL files before C# compilation -->
+                  <Target Name="CompileOpalFiles"
+                          BeforeTargets="BeforeCompile"
+                          Inputs="@(OpalCompile)"
+                          Outputs="@(OpalCompile->'$(OpalOutputDirectory)%(RecursiveDir)%(Filename).g.cs')"
+                          Condition="'@(OpalCompile)' != ''">
+                    <MakeDir Directories="$(OpalOutputDirectory)" />
+                    <Exec Command="&quot;$(OpalCompilerPath)&quot; --input &quot;%(OpalCompile.FullPath)&quot; --output &quot;$(OpalOutputDirectory)%(OpalCompile.RecursiveDir)%(OpalCompile.Filename).g.cs&quot;" />
                   </Target>
 
-                  <ItemGroup>
-                    <OpalFiles Include="**/*.opal" />
-                    <Compile Include="**/*.g.cs" Condition="Exists('**/*.g.cs')" />
-                  </ItemGroup>
+                  <!-- Include generated files in compilation -->
+                  <Target Name="IncludeOpalGeneratedFiles"
+                          BeforeTargets="CoreCompile"
+                          DependsOnTargets="CompileOpalFiles">
+                    <ItemGroup>
+                      <Compile Include="$(OpalOutputDirectory)**\*.g.cs" />
+                    </ItemGroup>
+                  </Target>
+
+                  <!-- Clean generated files -->
+                  <Target Name="CleanOpalFiles" BeforeTargets="Clean">
+                    <RemoveDir Directories="$(OpalOutputDirectory)" />
+                  </Target>
 
                 </Project>
                 """;
@@ -141,7 +169,7 @@ public sealed class CsprojUpdater
                 {
                     $"Created project file: {csprojPath}",
                     "Added Opal.Runtime reference",
-                    "Added OPAL pre-build compilation target"
+                    "Added OPAL compilation targets (output: obj/opal/)"
                 }
             };
         }
@@ -170,7 +198,8 @@ public sealed class CsprojUpdater
     private static bool HasOpalCompileTarget(XDocument doc)
     {
         return doc.Descendants("Target")
-            .Any(e => e.Attribute("Name")?.Value.Equals("CompileOpal", StringComparison.OrdinalIgnoreCase) == true);
+            .Any(e => e.Attribute("Name")?.Value == CompileOpalFilesTargetName ||
+                     e.Attribute("Name")?.Value.Equals("CompileOpal", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     private static void AddPackageReference(XDocument doc, string packageName, string version)
@@ -189,24 +218,67 @@ public sealed class CsprojUpdater
             new XAttribute("Version", version)));
     }
 
-    private static void AddOpalCompileTarget(XDocument doc)
+    private static void AddOpalCompileTargets(XDocument doc)
     {
-        var target = new XElement("Target",
-            new XAttribute("Name", "CompileOpal"),
-            new XAttribute("BeforeTargets", "BeforeBuild"),
+        var root = doc.Root!;
+
+        // Add comment
+        root.Add(new XComment(" OPAL Compilation Configuration "));
+
+        // Add PropertyGroup for OPAL configuration
+        // Use $(BaseIntermediateOutputPath) (defaults to obj/) since $(IntermediateOutputPath) may not be set yet
+        var propertyGroup = new XElement("PropertyGroup",
+            new XElement("OpalOutputDirectory",
+                new XAttribute("Condition", "'$(OpalOutputDirectory)' == ''"),
+                @"$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\opal\"),
+            new XElement("OpalCompilerPath",
+                new XAttribute("Condition", "'$(OpalCompilerPath)' == ''"),
+                "opalc"));
+
+        root.Add(propertyGroup);
+
+        // Add ItemGroup for OPAL source files
+        var itemGroup = new XElement("ItemGroup",
+            new XElement("OpalCompile",
+                new XAttribute("Include", @"**\*.opal"),
+                new XAttribute("Exclude", "$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)")));
+
+        root.Add(itemGroup);
+
+        // Add CompileOpalFiles target with proper incremental build support
+        var compileTarget = new XElement("Target",
+            new XAttribute("Name", CompileOpalFilesTargetName),
+            new XAttribute("BeforeTargets", "BeforeCompile"),
+            new XAttribute("Inputs", "@(OpalCompile)"),
+            new XAttribute("Outputs", @"@(OpalCompile->'$(OpalOutputDirectory)%(RecursiveDir)%(Filename).g.cs')"),
+            new XAttribute("Condition", "'@(OpalCompile)' != ''"),
+            new XElement("MakeDir",
+                new XAttribute("Directories", "$(OpalOutputDirectory)")),
             new XElement("Exec",
-                new XAttribute("Command", "opalc --input %(OpalFiles.Identity) --output %(OpalFiles.RootDir)%(OpalFiles.Directory)%(OpalFiles.Filename).g.cs"),
-                new XAttribute("Condition", "'@(OpalFiles)' != ''")));
+                new XAttribute("Command",
+                    @"""$(OpalCompilerPath)"" --input ""%(OpalCompile.FullPath)"" --output ""$(OpalOutputDirectory)%(OpalCompile.RecursiveDir)%(OpalCompile.Filename).g.cs""")));
 
-        var opalFilesItemGroup = new XElement("ItemGroup",
-            new XElement("OpalFiles",
-                new XAttribute("Include", "**/*.opal")),
-            new XElement("Compile",
-                new XAttribute("Include", "**/*.g.cs"),
-                new XAttribute("Condition", "Exists('**/*.g.cs')")));
+        root.Add(compileTarget);
 
-        doc.Root?.Add(target);
-        doc.Root?.Add(opalFilesItemGroup);
+        // Add IncludeOpalGeneratedFiles target
+        var includeTarget = new XElement("Target",
+            new XAttribute("Name", "IncludeOpalGeneratedFiles"),
+            new XAttribute("BeforeTargets", "CoreCompile"),
+            new XAttribute("DependsOnTargets", CompileOpalFilesTargetName),
+            new XElement("ItemGroup",
+                new XElement("Compile",
+                    new XAttribute("Include", @"$(OpalOutputDirectory)**\*.g.cs"))));
+
+        root.Add(includeTarget);
+
+        // Add CleanOpalFiles target
+        var cleanTarget = new XElement("Target",
+            new XAttribute("Name", "CleanOpalFiles"),
+            new XAttribute("BeforeTargets", "Clean"),
+            new XElement("RemoveDir",
+                new XAttribute("Directories", "$(OpalOutputDirectory)")));
+
+        root.Add(cleanTarget);
     }
 }
 

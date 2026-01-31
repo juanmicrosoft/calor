@@ -122,9 +122,9 @@ Instead of infix `a + b`, OPAL uses prefix `(+ a b)`:
 ### In Bindings
 
 ```
-§B[sum] (+ a b)
-§B[product] (* x y)
-§B[isValid] (&& (> x 0) (< x 100))
+§B{sum} (+ a b)
+§B{product} (* x y)
+§B{isValid} (&& (> x 0) (< x 100))
 ```
 
 ### In Print Statements
@@ -137,10 +137,10 @@ Instead of infix `a + b`, OPAL uses prefix `(+ a b)`:
 ### In Conditions
 
 ```
-§IF[if1] (> x 0) → §P "positive"
+§IF{if1} (> x 0) → §P "positive"
 §EI (< x 0) → §P "negative"
 §EL → §P "zero"
-§/I[if1]
+§/I{if1}
 ```
 
 ### In Contracts
@@ -157,8 +157,8 @@ Instead of infix `a + b`, OPAL uses prefix `(+ a b)`:
 Loop bounds can be expressions:
 
 ```
-§L[for1:i:0:(- n 1):1]    // i from 0 to n-1
-§L[for2:j:1:(* 2 n):2]    // j from 1 to 2n, step 2
+§L{for1:i:0:(- n 1):1}    // i from 0 to n-1
+§L{for2:j:1:(* 2 n):2}    // j from 1 to 2n, step 2
 ```
 
 ---

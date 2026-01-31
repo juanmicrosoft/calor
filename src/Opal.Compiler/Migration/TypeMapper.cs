@@ -86,10 +86,11 @@ public static class TypeMapper
 
     /// <summary>
     /// Maps OPAL type names to C# type names.
+    /// Also handles uppercase C# type names for backward compatibility.
     /// </summary>
     private static readonly Dictionary<string, string> OpalToCSharpMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Numeric types
+        // OPAL numeric types
         ["i32"] = "int",
         ["i64"] = "long",
         ["i16"] = "short",
@@ -99,16 +100,41 @@ public static class TypeMapper
         ["u16"] = "ushort",
         ["u8"] = "byte",
 
-        // Floating point
+        // C# numeric types (for backward compatibility with uppercase usage)
+        ["int"] = "int",
+        ["int32"] = "int",
+        ["long"] = "long",
+        ["int64"] = "long",
+        ["short"] = "short",
+        ["int16"] = "short",
+        ["byte"] = "byte",
+        ["sbyte"] = "sbyte",
+        ["uint"] = "uint",
+        ["uint32"] = "uint",
+        ["ulong"] = "ulong",
+        ["uint64"] = "ulong",
+        ["ushort"] = "ushort",
+        ["uint16"] = "ushort",
+
+        // OPAL floating point
         ["f32"] = "float",
         ["f64"] = "double",
         ["decimal"] = "decimal",
 
+        // C# floating point (for backward compatibility)
+        ["float"] = "float",
+        ["float32"] = "float",
+        ["single"] = "float",
+        ["double"] = "double",
+        ["float64"] = "double",
+
         // Boolean
         ["bool"] = "bool",
+        ["boolean"] = "bool",
 
         // String and char
         ["str"] = "string",
+        ["string"] = "string",
         ["char"] = "char",
 
         // Void
@@ -116,6 +142,7 @@ public static class TypeMapper
 
         // Object
         ["any"] = "object",
+        ["object"] = "object",
 
         // Collections
         ["List"] = "List",
@@ -126,6 +153,7 @@ public static class TypeMapper
 
         // Async
         ["Task"] = "Task",
+        ["ValueTask"] = "ValueTask",
     };
 
     /// <summary>

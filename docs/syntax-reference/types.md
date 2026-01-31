@@ -7,7 +7,7 @@ nav_order: 2
 
 # Types
 
-OPAL has a simple type system with primitives, optionals, and results.
+OPAL has a simple type system with primitives, optionals, results, and arrays.
 
 ---
 
@@ -17,6 +17,10 @@ OPAL has a simple type system with primitives, optionals, and results.
 |:-----|:------------|:---|:------|
 | `i32` | 32-bit signed integer | `int` | -2³¹ to 2³¹-1 |
 | `i64` | 64-bit signed integer | `long` | -2⁶³ to 2⁶³-1 |
+| `u8` | 8-bit unsigned integer | `byte` | 0 to 255 |
+| `u16` | 16-bit unsigned integer | `ushort` | 0 to 65535 |
+| `u32` | 32-bit unsigned integer | `uint` | 0 to 2³²-1 |
+| `u64` | 64-bit unsigned integer | `ulong` | 0 to 2⁶⁴-1 |
 | `f32` | 32-bit floating point | `float` | ±3.4 × 10³⁸ |
 | `f64` | 64-bit floating point | `double` | ±1.8 × 10³⁰⁸ |
 | `str` | String | `string` | UTF-16 text |
@@ -30,18 +34,52 @@ OPAL has a simple type system with primitives, optionals, and results.
 ### Input Parameters
 
 ```
-§I[i32:count]       // int count
-§I[str:name]        // string name
-§I[f64:price]       // double price
-§I[bool:active]     // bool active
+§I{i32:count}       // int count
+§I{str:name}        // string name
+§I{f64:price}       // double price
+§I{bool:active}     // bool active
+§I{[u8]:data}       // byte[] data
+§I{[str]:args}      // string[] args
 ```
 
 ### Output Types
 
 ```
-§O[i32]             // returns int
-§O[str]             // returns string
-§O[void]            // returns nothing
+§O{i32}             // returns int
+§O{str}             // returns string
+§O{void}            // returns nothing
+§O{[u8]}            // returns byte[]
+```
+
+---
+
+## Array Types
+
+OPAL uses bracket notation `[T]` for array types, which aligns with common programming language conventions.
+
+### Syntax
+
+```
+[T]                 // Array of T
+[[T]]               // Jagged array (array of arrays)
+```
+
+### Examples
+
+| OPAL Type | C# Equivalent |
+|:----------|:--------------|
+| `[u8]` | `byte[]` |
+| `[i32]` | `int[]` |
+| `[str]` | `string[]` |
+| `[bool]` | `bool[]` |
+| `[[i32]]` | `int[][]` |
+
+### Usage
+
+```
+§FLD{[u8]:_buffer:priv}       // private byte[] field
+§I{[str]:args}                // string[] parameter
+§O{[i32]}                     // returns int[]
 ```
 
 ---
@@ -59,38 +97,38 @@ Options represent values that may be absent.
 ### Examples
 
 ```
-§F[f001:Find:pub]
-  §I[str:key]
-  §O[?str]              // might return a string, might return nothing
+§F{f001:Find:pub}
+  §I{str:key}
+  §O{?str}              // might return a string, might return nothing
   // ...
-§/F[f001]
+§/F{f001}
 
-§F[f002:Process:pub]
-  §I[?i32:maybeValue]   // accepts null
-  §O[void]
+§F{f002:Process:pub}
+  §I{?i32:maybeValue}   // accepts null
+  §O{void}
   // ...
-§/F[f002]
+§/F{f002}
 ```
 
 ### Creating Option Values
 
 ```
 §SOME value         // Some(value) - has a value
-§NONE[type=T]       // None of type T - no value
+§NONE{type=T}       // None of type T - no value
 ```
 
 ### Example
 
 ```
-§F[f001:FindUser:pub]
-  §I[i32:id]
-  §O[?User]
-  §IF[if1] (== id 0)
-    §R §NONE[type=User]
+§F{f001:FindUser:pub}
+  §I{i32:id}
+  §O{?User}
+  §IF{if1} (== id 0)
+    §R §NONE{type=User}
   §EL
     §R §SOME user
-  §/I[if1]
-§/F[f001]
+  §/I{if1}
+§/F{f001}
 ```
 
 ---
@@ -108,16 +146,16 @@ T!E                 // Result: either T (success) or E (error)
 ### Examples
 
 ```
-§F[f001:Divide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32!str]           // returns int on success, string error on failure
-  §IF[if1] (== b 0)
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32!str}           // returns int on success, string error on failure
+  §IF{if1} (== b 0)
     §R §ERR "Division by zero"
   §EL
     §R §OK (/ a b)
-  §/I[if1]
-§/F[f001]
+  §/I{if1}
+§/F{f001}
 ```
 
 ### Creating Result Values
@@ -131,21 +169,21 @@ T!E                 // Result: either T (success) or E (error)
 
 **Parse integer:**
 ```
-§F[f001:ParseInt:pub]
-  §I[str:text]
-  §O[i32!str]
+§F{f001:ParseInt:pub}
+  §I{str:text}
+  §O{i32!str}
   // ...implementation
-§/F[f001]
+§/F{f001}
 ```
 
 **File read:**
 ```
-§F[f001:ReadFile:pub]
-  §I[str:path]
-  §O[str!str]
-  §E[fr]
+§F{f001:ReadFile:pub}
+  §I{str:path}
+  §O{str!str}
+  §E{fr}
   // ...implementation
-§/F[f001]
+§/F{f001}
 ```
 
 ---
@@ -155,16 +193,16 @@ T!E                 // Result: either T (success) or E (error)
 Types matter in contracts for proper comparisons:
 
 ```
-§F[f001:Clamp:pub]
-  §I[i32:value]
-  §I[i32:min]
-  §I[i32:max]
-  §O[i32]
+§F{f001:Clamp:pub}
+  §I{i32:value}
+  §I{i32:min}
+  §I{i32:max}
+  §O{i32}
   §Q (<= min max)           // Requires: min <= max
   §S (>= result min)        // Ensures: result >= min
   §S (<= result max)        // Ensures: result <= max
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ---

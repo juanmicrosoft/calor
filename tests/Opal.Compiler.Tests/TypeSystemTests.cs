@@ -156,14 +156,14 @@ public class TypeSystemTests
     {
         // Note: Using simple return type since generic syntax Option[INT] is not yet supported in attributes
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=GetValue][visibility=public]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=GetValue}{visibility=public}
+  §OUT{type=INT}
   §BODY
     §RETURN §SOME INT:42
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -185,14 +185,14 @@ public class TypeSystemTests
     {
         // Note: Using simple return type since generic syntax Option[INT] is not yet supported in attributes
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=GetNothing][visibility=public]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=GetNothing}{visibility=public}
+  §OUT{type=INT}
   §BODY
-    §RETURN §NONE[type=INT]
+    §RETURN §NONE{type=INT}
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -215,14 +215,14 @@ public class TypeSystemTests
     {
         // Note: Using simple return type since generic syntax Result[INT,STRING] is not yet supported in attributes
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=GetResult][visibility=public]
-  §OUT[type=INT]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=GetResult}{visibility=public}
+  §OUT{type=INT}
   §BODY
     §RETURN §OK INT:100
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -241,14 +241,14 @@ public class TypeSystemTests
     {
         // Note: Using simple return type since generic syntax Result[INT,STRING] is not yet supported in attributes
         var source = @"
-§MODULE[id=m001][name=Test]
-§FUNC[id=f001][name=GetError][visibility=public]
-  §OUT[type=STRING]
+§MODULE{id=m001}{name=Test}
+§FUNC{id=f001}{name=GetError}{visibility=public}
+  §OUT{type=STRING}
   §BODY
     §RETURN §ERR STR:""Something went wrong""
   §END_BODY
-§END_FUNC[id=f001]
-§END_MODULE[id=m001]
+§END_FUNC{id=f001}
+§END_MODULE{id=m001}
 ";
 
         var module = Parse(source, out var diagnostics);

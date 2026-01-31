@@ -647,4 +647,295 @@ public class MigrationAnalyzerTests
     }
 
     #endregion
+
+    #region Unsupported Constructs Detection
+
+    [Fact]
+    public void AnalyzeSource_SwitchExpression_NowSupported()
+    {
+        var source = """
+            public class Service
+            {
+                public string GetDay(int day) => day switch
+                {
+                    1 => "Monday",
+                    2 => "Tuesday",
+                    _ => "Unknown"
+                };
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        // Switch expressions are now supported - they should NOT appear in unsupported constructs
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "SwitchExpression");
+        // Should still be detected for pattern matching potential
+        Assert.True(result.Dimensions[ScoreDimension.PatternMatchPotential].PatternCount > 0);
+    }
+
+    [Fact]
+    public void AnalyzeSource_RelationalPattern_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Service
+            {
+                public bool IsValid(int value)
+                {
+                    return value is > 0 and < 100;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "RelationalPattern");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "CompoundPattern");
+    }
+
+    [Fact]
+    public void AnalyzeSource_PrimaryConstructor_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Service(string name)
+            {
+                private readonly string _name = name;
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "PrimaryConstructor");
+    }
+
+    [Fact]
+    public void AnalyzeSource_LambdaExpression_DetectedAsUnsupported()
+    {
+        var source = """
+            using System;
+            public class Service
+            {
+                public Func<int, int> GetDoubler() => x => x * 2;
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "LambdaExpression");
+    }
+
+    [Fact]
+    public void AnalyzeSource_ThrowExpression_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Service
+            {
+                public string Name { get; }
+                public Service(string name)
+                {
+                    Name = name ?? throw new ArgumentNullException(nameof(name));
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "ThrowExpression");
+    }
+
+    [Fact]
+    public void AnalyzeSource_GenericTypeConstraint_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Repository<T> where T : class, new()
+            {
+                public T Create() => new T();
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "GenericTypeConstraint");
+    }
+
+    [Fact]
+    public void AnalyzeSource_DeclarationPattern_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Service
+            {
+                public void Process(object obj)
+                {
+                    if (obj is string text)
+                    {
+                        Console.WriteLine(text);
+                    }
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "DeclarationPattern");
+    }
+
+    [Fact]
+    public void AnalyzeSource_OutParameter_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Parser
+            {
+                public bool TryParse(string input, out int result)
+                {
+                    result = 0;
+                    return int.TryParse(input, out result);
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "OutRefParameter");
+    }
+
+    [Fact]
+    public void AnalyzeSource_NestedGenericType_DetectedAsUnsupported()
+    {
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            public class Service
+            {
+                public void Process(Expression<Func<string, bool>> predicate) { }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "NestedGenericType");
+    }
+
+    [Fact]
+    public void AnalyzeSource_RangeExpression_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Service
+            {
+                public int[] GetSlice(int[] array)
+                {
+                    return array[1..5];
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "RangeExpression");
+    }
+
+    [Fact]
+    public void AnalyzeSource_SimpleCode_NoUnsupportedConstructs()
+    {
+        var source = """
+            public class Calculator
+            {
+                public int Add(int a, int b)
+                {
+                    return a + b;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.False(result.HasUnsupportedConstructs);
+        Assert.Empty(result.UnsupportedConstructs);
+    }
+
+    #endregion
+
+    #region Unsupported Constructs Penalty
+
+    [Fact]
+    public void AnalyzeSource_UnsupportedConstructs_ReduceScore()
+    {
+        // Code with potential for high score but has unsupported constructs
+        var sourceWithUnsupported = """
+            public class Service
+            {
+                public string? Name { get; set; }
+
+                public void Process(string input)
+                {
+                    if (input == null)
+                        throw new ArgumentNullException(nameof(input));
+
+                    // Unsupported: throw expression
+                    var result = input ?? throw new ArgumentNullException(nameof(input));
+                }
+            }
+            """;
+
+        // Similar code without unsupported constructs
+        var sourceWithoutUnsupported = """
+            public class Service
+            {
+                public string? Name { get; set; }
+
+                public void Process(string input)
+                {
+                    if (input == null)
+                        throw new ArgumentNullException(nameof(input));
+
+                    // Supported: null coalescing without throw
+                    var result = input ?? "default";
+                }
+            }
+            """;
+
+        var resultWithUnsupported = _analyzer.AnalyzeSource(sourceWithUnsupported, "test.cs", "test.cs");
+        var resultWithoutUnsupported = _analyzer.AnalyzeSource(sourceWithoutUnsupported, "test.cs", "test.cs");
+
+        // Score should be significantly lower when unsupported constructs are present
+        Assert.True(resultWithUnsupported.TotalScore < resultWithoutUnsupported.TotalScore,
+            $"Expected unsupported score ({resultWithUnsupported.TotalScore}) < supported score ({resultWithoutUnsupported.TotalScore})");
+    }
+
+    [Fact]
+    public void AnalyzeSource_MultipleUnsupportedConstructs_CompoundPenalty()
+    {
+        // Note: switch expression is now supported, so we don't count it as unsupported
+        // This test uses: primary constructor, relational pattern, compound pattern, lambda
+        var source = """
+            public class Service(string name)
+            {
+                public bool IsInRange(int x)
+                {
+                    // Unsupported: relational + compound pattern
+                    return x is > 0 and < 10;
+                }
+
+                public Func<int, int> Doubler => x => x * 2;
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        // Multiple unsupported constructs should result in very low score
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.True(result.UnsupportedConstructs.Count >= 3,
+            $"Expected at least 3 unsupported constructs, got {result.UnsupportedConstructs.Count}");
+        Assert.True(result.TotalScore < 20,
+            $"Expected score < 20 with multiple unsupported constructs, got {result.TotalScore}");
+    }
+
+    #endregion
 }
