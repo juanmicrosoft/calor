@@ -726,6 +726,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             var matchCase = node.Cases[i];
             var pattern = EmitPattern(matchCase.Pattern);
+
+            // Emit guard clause if present
+            var guard = matchCase.Guard != null ? $" when {matchCase.Guard.Accept(this)}" : "";
+
             // For expression match, the body should yield a value
             // Take the last statement if it's a return, otherwise default
             var body = "default";
@@ -737,7 +741,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     body = ret.Expression.Accept(this);
                 }
             }
-            sb.Append($"{pattern} => {body}");
+            sb.Append($"{pattern}{guard} => {body}");
             if (i < node.Cases.Count - 1) sb.Append(", ");
         }
 

@@ -898,7 +898,8 @@ public sealed class OpalEmitter : IAstVisitor<string>
     public string Visit(MatchCaseNode node)
     {
         var pattern = EmitPattern(node.Pattern);
-        AppendLine($"§CASE {pattern}");
+        var guard = node.Guard != null ? $" §WHEN {node.Guard.Accept(this)}" : "";
+        AppendLine($"§CASE {pattern}{guard}");
         Indent();
 
         foreach (var stmt in node.Body)

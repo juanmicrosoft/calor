@@ -1473,8 +1473,13 @@ public sealed class Parser
             var caseToken = Expect(TokenKind.Case);
             var pattern = ParsePattern();
 
+            // Check for guard clause: §WHEN expression
             ExpressionNode? guard = null;
-            // Guard could be indicated by an attribute or following expression
+            if (Check(TokenKind.When))
+            {
+                Expect(TokenKind.When);
+                guard = ParseExpression();
+            }
 
             var body = new List<StatementNode>();
             while (!IsAtEnd && !Check(TokenKind.Case) && !Check(TokenKind.EndMatch))
