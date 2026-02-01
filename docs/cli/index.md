@@ -34,6 +34,12 @@ curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/ini
 |:--------|:------------|
 | `opalc` (default) | Compile OPAL source files to C# |
 | [`opalc analyze`](/opal/cli/analyze/) | Score C# files for OPAL migration potential |
+| [`opalc init`](/opal/cli/init/) | Initialize OPAL with AI agent support and .csproj integration |
+| [`opalc convert`](/opal/cli/convert/) | Convert single files between C# and OPAL |
+| [`opalc migrate`](/opal/cli/migrate/) | Migrate entire projects between C# and OPAL |
+| [`opalc benchmark`](/opal/cli/benchmark/) | Compare OPAL vs C# across evaluation metrics |
+| [`opalc format`](/opal/cli/format/) | Format OPAL source files to canonical style |
+| [`opalc diagnose`](/opal/cli/diagnose/) | Output machine-readable diagnostics for tooling |
 
 ---
 

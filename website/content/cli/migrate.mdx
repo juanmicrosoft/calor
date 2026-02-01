@@ -1,0 +1,128 @@
+---
+title: "migrate"
+section: "cli"
+order: 4
+---
+
+# opalc migrate
+
+Migrate an entire project between C# and OPAL.
+
+```bash
+opalc migrate <path> [options]
+```
+
+---
+
+## Overview
+
+The `migrate` command converts all applicable files in a project or directory. It:
+
+- Scans for convertible files
+- Creates a migration plan
+- Converts files in parallel (optional)
+- Generates detailed reports
+- Handles errors gracefully without stopping
+
+---
+
+## Quick Start
+
+```bash
+# Preview migration (dry run)
+opalc migrate ./src --dry-run
+
+# Migrate C# to OPAL
+opalc migrate ./src
+
+# Migrate with report
+opalc migrate ./src --report migration-report.md
+
+# Migrate OPAL back to C#
+opalc migrate ./src --direction opal-to-cs
+```
+
+---
+
+## Options
+
+| Option | Short | Default | Description |
+|:-------|:------|:--------|:------------|
+| `--dry-run` | `-n` | `false` | Preview changes without writing files |
+| `--benchmark` | `-b` | `false` | Include before/after metrics comparison |
+| `--direction` | `-d` | `cs-to-opal` | Migration direction |
+| `--parallel` | `-p` | `true` | Run conversions in parallel |
+| `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
+| `--verbose` | `-v` | `false` | Enable verbose output |
+
+---
+
+## Migration Plan
+
+Before converting, the command analyzes your codebase and creates a plan:
+
+```bash
+opalc migrate ./src --dry-run
+```
+
+Output:
+```
+=== Migration Plan ===
+
+Direction: C# → OPAL
+Source: ./src
+
+Files to Convert:
+  ✓ 24 files fully convertible
+  ⚠ 8 files partially convertible (will have warnings)
+  ✗ 3 files skipped (unsupported constructs)
+```
+
+---
+
+## Benchmark Summary
+
+Use `--benchmark` to see aggregate metrics:
+
+```bash
+opalc migrate ./src --benchmark
+```
+
+Output includes:
+```
+=== Benchmark Summary ===
+
+Token Savings: 17,090 tokens (37.8% reduction)
+```
+
+---
+
+## Migration Reports
+
+Generate detailed reports for documentation:
+
+```bash
+# Markdown report
+opalc migrate ./src --report migration-report.md
+
+# JSON report
+opalc migrate ./src --report migration-report.json
+```
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|:-----|:--------|
+| `0` | All files migrated successfully |
+| `1` | Some files failed or had warnings |
+| `2` | Error - invalid arguments, directory not found, etc. |
+
+---
+
+## See Also
+
+- [opalc convert](/cli/convert/) - Convert single files
+- [opalc analyze](/cli/analyze/) - Find migration candidates
+- [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) - Complete migration guide

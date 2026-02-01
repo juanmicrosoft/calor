@@ -1,0 +1,92 @@
+---
+title: "format"
+section: "cli"
+order: 6
+---
+
+# opalc format
+
+Format OPAL source files to canonical style.
+
+```bash
+opalc format <files...> [options]
+```
+
+---
+
+## Overview
+
+The `format` command formats OPAL source files according to the canonical OPAL style guide. This ensures consistent formatting across your codebase.
+
+---
+
+## Quick Start
+
+```bash
+# Format a single file (output to stdout)
+opalc format MyModule.opal
+
+# Format and overwrite the file
+opalc format MyModule.opal --write
+
+# Check if files are formatted (for CI)
+opalc format src/*.opal --check
+
+# Show diff of changes
+opalc format MyModule.opal --diff
+```
+
+---
+
+## Options
+
+| Option | Short | Default | Description |
+|:-------|:------|:--------|:------------|
+| `--check` | `-c` | `false` | Check if files are formatted without modifying (exit 1 if not) |
+| `--write` | `-w` | `false` | Write formatted output back to the file(s) |
+| `--diff` | `-d` | `false` | Show diff of formatting changes |
+| `--verbose` | `-v` | `false` | Enable verbose output |
+
+---
+
+## Formatting Rules
+
+The OPAL formatter applies these rules:
+
+- 2 spaces per indentation level
+- Single space after structure tags
+- Single space around operators in expressions
+- No trailing whitespace
+- One blank line between functions
+- Newline at end of file
+
+---
+
+## Check Mode
+
+Use `--check` in CI/CD to verify formatting:
+
+```bash
+opalc format src/*.opal --check
+```
+
+Exit codes:
+- `0` - All files are formatted correctly
+- `1` - One or more files need formatting
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|:-----|:--------|
+| `0` | Success |
+| `1` | Unformatted files found (`--check` mode) |
+| `2` | Error processing files |
+
+---
+
+## See Also
+
+- [opalc diagnose](/cli/diagnose/) - Check for errors and warnings
+- [opalc compile](/cli/compile/) - Compile OPAL to C#

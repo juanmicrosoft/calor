@@ -1,0 +1,98 @@
+---
+title: "compile (default)"
+section: "cli"
+order: 0
+---
+
+# opalc (compile)
+
+Compile OPAL source files to C#.
+
+```bash
+opalc --input <file.opal> --output <file.cs>
+```
+
+---
+
+## Overview
+
+The default `opalc` command (when no subcommand is specified) compiles OPAL source files to C#. This is the core functionality of the OPAL compiler.
+
+---
+
+## Quick Start
+
+```bash
+# Compile a single file
+opalc --input MyModule.opal --output MyModule.g.cs
+
+# Short form
+opalc -i MyModule.opal -o MyModule.g.cs
+
+# With verbose output
+opalc -v -i MyModule.opal -o MyModule.g.cs
+```
+
+---
+
+## Options
+
+| Option | Short | Required | Description |
+|:-------|:------|:---------|:------------|
+| `--input` | `-i` | Yes | Input OPAL source file |
+| `--output` | `-o` | Yes | Output C# file path |
+| `--verbose` | `-v` | No | Show detailed compilation output |
+
+---
+
+## Output Convention
+
+The recommended convention for generated C# files is the `.g.cs` extension:
+
+```
+MyModule.opal → MyModule.g.cs
+```
+
+This indicates "generated C#" and helps distinguish OPAL-generated code from hand-written C#.
+
+---
+
+## Error Reporting
+
+When compilation fails, errors are reported with file location:
+
+```
+Error in Calculator.opal:12:5
+  Undefined variable 'x' in expression
+
+  §R (+ x 1)
+       ^
+
+Compilation failed with 1 error
+```
+
+For machine-readable error output, use [`opalc diagnose`](/cli/diagnose/).
+
+---
+
+## Integration with MSBuild
+
+For automatic compilation during `dotnet build`, use [`opalc init`](/cli/init/) to set up MSBuild integration.
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|:-----|:--------|
+| `0` | Compilation successful |
+| `1` | Compilation failed (syntax errors, validation errors) |
+| `2` | Error (file not found, invalid arguments) |
+
+---
+
+## See Also
+
+- [opalc init](/cli/init/) - Set up automatic compilation with MSBuild
+- [opalc diagnose](/cli/diagnose/) - Machine-readable diagnostics
+- [opalc format](/cli/format/) - Format OPAL source files

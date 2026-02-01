@@ -1,0 +1,191 @@
+---
+title: "Adding OPAL to Existing Projects"
+section: "guides"
+order: 1
+---
+
+# Adding OPAL to an Existing C# Project
+
+This guide walks you through adding OPAL to an existing C# project, from identifying migration candidates to building with mixed OPAL/C# code.
+
+---
+
+## Overview
+
+Adding OPAL to an existing project is a gradual process:
+
+1. **Analyze** - Find files that benefit most from OPAL's features
+2. **Initialize** - Set up tooling and MSBuild integration
+3. **Convert** - Migrate files one at a time
+4. **Build** - OPAL compiles automatically with your project
+
+You don't need to convert everything at once. OPAL and C# coexist seamlessly.
+
+---
+
+## Step 1: Find Migration Candidates
+
+Use `opalc analyze` to score your C# files for OPAL migration potential:
+
+```bash
+# Analyze your source directory
+opalc analyze ./src
+
+# Show top 10 candidates with detailed scores
+opalc analyze ./src --top 10 --verbose
+```
+
+### Understanding the Output
+
+```
+=== OPAL Migration Analysis ===
+
+Analyzed: 42 files
+Average Score: 34.2/100
+
+Top 10 Files for Migration:
+--------------------------------------------------------------------------------
+ 82/100 [Critical]  src/Services/PaymentProcessor.cs
+ 78/100 [Critical]  src/Services/OrderService.cs
+ 65/100 [High]      src/Repositories/UserRepository.cs
+```
+
+Files are scored based on patterns that map to OPAL features:
+
+| Pattern | OPAL Feature |
+|:--------|:-------------|
+| Argument validation, `ArgumentException` | `§Q` precondition contracts |
+| Null checks, `?.`, `??` | `Option<T>` types |
+| Try/catch blocks | `Result<T,E>` error handling |
+| File I/O, network, database calls | `§E` effect declarations |
+
+---
+
+## Step 2: Initialize Your Project
+
+Set up OPAL tooling and MSBuild integration:
+
+```bash
+# Initialize with Claude Code support
+opalc init --ai claude
+
+# Or specify a specific project file
+opalc init --ai claude --project MyApp.csproj
+```
+
+### What Gets Created
+
+| File | Purpose |
+|:-----|:--------|
+| `.claude/skills/opal.md` | Claude skill for writing OPAL code |
+| `.claude/skills/opal-convert.md` | Claude skill for C# to OPAL conversion |
+| `CLAUDE.md` | Project documentation with OPAL reference |
+| `MyApp.csproj` (updated) | MSBuild targets for automatic OPAL compilation |
+
+---
+
+## Step 3: Add Your First OPAL File
+
+Create a new `.opal` file alongside your existing code:
+
+```opal
+§M[m001:Calculator]
+
+§F[f001:Add:pub]
+  §I[i32:a]
+  §I[i32:b]
+  §O[i32]
+  §R (+ a b)
+§/F[f001]
+
+§/M[m001]
+```
+
+---
+
+## Step 4: Build and Verify
+
+```bash
+# Build your project - OPAL compiles automatically
+dotnet build
+```
+
+The build process:
+
+1. Finds all `.opal` files in your project
+2. Compiles each to `.g.cs` in the `obj/opal/` directory
+3. Includes generated C# in the normal compilation
+
+---
+
+## Step 5: Gradual Migration
+
+### Option A: Use Claude Code (Recommended)
+
+```
+/opal-convert src/Services/PaymentProcessor.cs
+```
+
+### Option B: Use the CLI
+
+```bash
+opalc convert src/Services/PaymentProcessor.cs
+```
+
+### Option C: Convert Entire Project
+
+```bash
+opalc migrate ./src --dry-run  # Preview first
+opalc migrate ./src            # Execute
+```
+
+---
+
+## Using Claude Code
+
+After initialization, Claude Code provides powerful assistance:
+
+### Writing New OPAL Code
+
+```
+/opal
+
+Write a function that validates email addresses with:
+- Precondition: input is not null or empty
+- Postcondition: returns true only for valid emails
+```
+
+### Converting Existing Code
+
+```
+/opal-convert
+
+Convert this C# class to OPAL:
+[paste your C# code]
+```
+
+---
+
+## Best Practices
+
+### What to Convert First
+
+1. **High-scoring files** from `opalc analyze`
+2. **Files with complex validation** - benefit from contracts
+3. **Files with error handling** - benefit from `Result<T,E>`
+4. **Files with side effects** - benefit from effect declarations
+
+### What to Keep in C#
+
+- Simple DTOs and record types
+- Auto-generated code (EF migrations, gRPC stubs)
+- Code using features OPAL doesn't support yet
+
+---
+
+## Next Steps
+
+- [Syntax Reference](/syntax-reference/) - Complete OPAL language reference
+- [Contracts](/syntax-reference/contracts/) - Writing preconditions and postconditions
+- [Effects](/syntax-reference/effects/) - Declaring side effects
+- [opalc analyze](/cli/analyze/) - Understanding migration scores

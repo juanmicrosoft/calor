@@ -20,17 +20,96 @@ opalc init --ai claude
 ```
 
 This creates:
-- `.claude/skills/opal.md` - Teaches Claude OPAL syntax
-- `.claude/skills/opal-convert.md` - Teaches Claude C# to OPAL conversion
-- `CLAUDE.md` - Project documentation with OPAL reference
+
+| File | Purpose |
+|:-----|:--------|
+| `.claude/skills/opal.md` | Teaches Claude OPAL v2+ syntax for writing new code |
+| `.claude/skills/opal-convert.md` | Teaches Claude how to convert C# to OPAL |
+| `CLAUDE.md` | Project documentation with OPAL reference and conventions |
 
 You can run this command again anytime to update the OPAL documentation section in CLAUDE.md without losing your custom content.
 
 ---
 
-## The `/opal` Skill
+## Available Skills
+
+### The `/opal` Skill
 
 When working with Claude Code in an OPAL-initialized project, use the `/opal` command to activate OPAL-aware code generation.
+
+**Example prompts:**
+
+```
+/opal
+
+Write a function that calculates compound interest with:
+- Preconditions: principal > 0, rate >= 0, years > 0
+- Postcondition: result >= principal
+- Effects: pure (no side effects)
+```
+
+```
+/opal
+
+Create a UserService class with methods for:
+- GetUserById (returns Option<User>)
+- CreateUser (returns Result<User, ValidationError>)
+- DeleteUser (effects: database write)
+```
+
+### The `/opal-convert` Skill
+
+Use `/opal-convert` to convert existing C# code to OPAL:
+
+```
+/opal-convert
+
+Convert this C# class to OPAL:
+
+public class Calculator
+{
+    public int Add(int a, int b) => a + b;
+
+    public int Divide(int a, int b)
+    {
+        if (b == 0) throw new ArgumentException("Cannot divide by zero");
+        return a / b;
+    }
+}
+```
+
+Claude will:
+1. Convert the class structure to OPAL syntax
+2. Add appropriate contracts (e.g., `§Q (!= b 0)` for the divide precondition)
+3. Generate unique IDs for all structural elements
+4. Declare effects based on detected side effects
+
+---
+
+## Skill Capabilities
+
+The OPAL skills teach Claude:
+
+### Syntax Knowledge
+
+- All OPAL v2+ structure tags (`§M`, `§F`, `§C`, etc.)
+- Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
+- Arrow syntax conditionals: `§IF{id} condition → action`
+- Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
+
+### Best Practices
+
+- Unique ID generation (`m001`, `f001`, `c001`, etc.)
+- Contract placement (`§Q` preconditions, `§S` postconditions)
+- Effect declarations (`§E[db,net,cw]`)
+- Proper structure nesting and closing tags
+
+### Code Patterns
+
+- Error handling with `Result<T,E>`
+- Null safety with `Option<T>`
+- Iteration patterns (for, while, do-while)
+- Class definitions with fields, properties, methods
 
 ---
 
@@ -251,7 +330,80 @@ Refactor this to extract the calculation into a separate function:
 
 ---
 
+## Workflow Tips
+
+### Starting a New Feature
+
+```
+/opal
+
+I need to implement [feature description].
+
+The requirements are:
+- [requirement 1]
+- [requirement 2]
+
+Please create the OPAL code with appropriate contracts and effects.
+```
+
+### Converting Existing Code
+
+```
+/opal-convert
+
+Convert src/Services/PaymentService.cs to OPAL, adding:
+- Contracts based on the validation logic
+- Effect declarations for database and network calls
+```
+
+### Refactoring OPAL
+
+Reference specific elements by their IDs:
+
+```
+In PaymentService.opal:
+- Extract the validation logic from f002 into a new private function
+- Add a postcondition to f001 ensuring the result is positive
+- Rename loop l001 to something more descriptive
+```
+
+### Debugging with Claude
+
+```
+Review OrderService.opal and identify:
+1. Any missing preconditions that could cause runtime errors
+2. Functions that should be marked pure but have undeclared effects
+3. Opportunities to use Result<T,E> instead of exceptions
+```
+
+---
+
+## IDE Integration
+
+While OPAL skills work in any Claude Code session, you'll have the best experience with proper editor support:
+
+### VS Code
+
+1. Install the OPAL extension (if available)
+2. Open your initialized project
+3. Use `/opal` and `/opal-convert` commands
+
+### Terminal
+
+Claude Code works from any terminal:
+
+```bash
+cd my-opal-project
+claude
+```
+
+Then use the skills as normal.
+
+---
+
 ## Next Steps
 
 - [Syntax Reference](/opal/syntax-reference/) - Complete language reference
+- [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) - Migration guide
+- [opalc init](/opal/cli/init/) - Full init command documentation
 - [Benchmarking](/opal/benchmarking/) - See how OPAL compares to C#

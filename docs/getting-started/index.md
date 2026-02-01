@@ -37,7 +37,11 @@ your_code.opal → OPAL Compiler → your_code.g.cs → .NET Build → executabl
 
 ---
 
-## Quick Start
+## Two Paths to OPAL
+
+Choose your starting point based on your situation:
+
+### New Project
 
 Get up and running with OPAL in one command:
 
@@ -51,17 +55,38 @@ curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/ini
 irm https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.ps1 | iex
 ```
 
+### Existing C# Project
+
+Add OPAL to your existing codebase:
+
+```bash
+# 1. Find best migration candidates
+opalc analyze ./src --top 10
+
+# 2. Set up tooling and MSBuild integration
+opalc init --ai claude
+
+# 3. Start migrating files
+opalc convert HighScoreFile.cs
+
+# 4. Build - OPAL compiles automatically
+dotnet build
+```
+
+See the [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) guide for the complete walkthrough.
+
 ---
 
 ## What You Get
 
-The init script sets up everything you need:
+The init script (new projects) or `opalc init` (existing projects) sets up:
 
 | Component | Description |
 |:----------|:------------|
 | `opalc` global tool | Compile OPAL to C# from anywhere: `opalc --input file.opal --output file.g.cs` |
 | Claude Code skills | Use `/opal` to write OPAL code and `/opal-convert` to convert C# to OPAL |
-| Sample project | A ready-to-run OPAL project to explore |
+| MSBuild integration | `.opal` files compile automatically during `dotnet build` |
+| Sample project | A ready-to-run OPAL project to explore (new projects only) |
 
 ---
 
@@ -75,5 +100,6 @@ For alternative installation methods (global tool only, manual Claude skills set
 
 - [Installation](/opal/getting-started/installation/) - Detailed setup instructions
 - [Hello World](/opal/getting-started/hello-world/) - Understand the hello world program
+- [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) - Complete migration guide
 - [Syntax Reference](/opal/syntax-reference/) - Complete language reference
 - [CLI Reference](/opal/cli/) - All `opalc` commands including migration analysis

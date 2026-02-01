@@ -32,27 +32,59 @@ dotnet tool update -g opalc
 
 ---
 
-## Claude Code Integration
+## AI Agent Integration
 
-OPAL includes built-in support for Claude Code. Initialize your project with:
+OPAL provides first-class support for AI coding agents. The `opalc init` command sets up your project for AI-assisted development.
+
+### Supported AI Agents
+
+| Agent | Flag | What Gets Created |
+|:------|:-----|:------------------|
+| Claude Code | `--ai claude` | Skills in `.claude/skills/`, `CLAUDE.md` project docs |
+| OpenAI Codex | `--ai codex` | Codex-optimized configuration |
+| Google Gemini | `--ai gemini` | Gemini-optimized configuration |
+| GitHub Copilot | `--ai github` | Copilot-optimized configuration |
+
+### Claude Code Integration
+
+Initialize your project for Claude Code:
 
 ```bash
 opalc init --ai claude
 ```
 
 This creates:
-- `.claude/skills/opal.md` - Skill for writing OPAL code
-- `.claude/skills/opal-convert.md` - Skill for converting C# to OPAL
-- `CLAUDE.md` - Project documentation for Claude
 
-You can run `opalc init --ai claude` again to update the OPAL section in CLAUDE.md without losing your custom content.
+| File | Purpose |
+|:-----|:--------|
+| `.claude/skills/opal.md` | OPAL code writing skill - teaches Claude OPAL v2+ syntax |
+| `.claude/skills/opal-convert.md` | C# to OPAL conversion skill |
+| `CLAUDE.md` | Project documentation (creates new or updates OPAL section) |
 
-### Available Commands
+### Claude Code Commands
+
+After initialization, use these commands in Claude Code:
 
 | Command | Description |
 |:--------|:------------|
 | `/opal` | Write new OPAL code with Claude's assistance |
 | `/opal-convert` | Convert existing C# code to OPAL syntax |
+
+### MSBuild Integration
+
+The `init` command also adds MSBuild targets to your `.csproj` file for automatic OPAL compilation:
+
+```bash
+# Specify project explicitly
+opalc init --ai claude --project MyApp.csproj
+
+# Auto-detect single .csproj
+opalc init --ai claude
+```
+
+After initialization, OPAL files compile automatically during `dotnet build`.
+
+See [`opalc init`](/cli/init/) for complete documentation.
 
 ---
 

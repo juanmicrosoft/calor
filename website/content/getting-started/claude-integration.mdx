@@ -19,17 +19,48 @@ opalc init --ai claude
 ```
 
 This creates:
-- `.claude/skills/opal.md` - Teaches Claude OPAL syntax
-- `.claude/skills/opal-convert.md` - Teaches Claude C# to OPAL conversion
-- `CLAUDE.md` - Project documentation with OPAL reference
+
+| File | Purpose |
+|:-----|:--------|
+| `.claude/skills/opal.md` | Teaches Claude OPAL v2+ syntax for writing new code |
+| `.claude/skills/opal-convert.md` | Teaches Claude how to convert C# to OPAL |
+| `CLAUDE.md` | Project documentation with OPAL reference and conventions |
 
 You can run this command again anytime to update the OPAL documentation section in CLAUDE.md without losing your custom content.
 
 ---
 
-## The `/opal` Skill
+## Available Skills
+
+### The `/opal` Skill
 
 When working with Claude Code in an OPAL-initialized project, use the `/opal` command to activate OPAL-aware code generation.
+
+**Example prompts:**
+
+```
+/opal
+
+Write a function that calculates compound interest with:
+- Preconditions: principal > 0, rate >= 0, years > 0
+- Postcondition: result >= principal
+- Effects: pure (no side effects)
+```
+
+### The `/opal-convert` Skill
+
+Use `/opal-convert` to convert existing C# code to OPAL:
+
+```
+/opal-convert
+
+Convert this C# class to OPAL:
+
+public class Calculator
+{
+    public int Add(int a, int b) => a + b;
+}
+```
 
 ---
 
@@ -250,7 +281,40 @@ Refactor this to extract the calculation into a separate function:
 
 ---
 
+## Workflow Tips
+
+### Starting a New Feature
+
+```
+/opal
+
+I need to implement [feature description].
+Please create the OPAL code with appropriate contracts and effects.
+```
+
+### Converting Existing Code
+
+```
+/opal-convert
+
+Convert src/Services/PaymentService.cs to OPAL
+```
+
+### Refactoring OPAL
+
+Reference specific elements by their IDs:
+
+```
+In PaymentService.opal:
+- Extract the validation logic from f002 into a new private function
+- Add a postcondition to f001 ensuring the result is positive
+```
+
+---
+
 ## Next Steps
 
 - [Syntax Reference](/syntax-reference/) - Complete language reference
+- [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) - Migration guide
+- [opalc init](/cli/init/) - Full init command documentation
 - [Benchmarking](/benchmarking/) - See how OPAL compares to C#

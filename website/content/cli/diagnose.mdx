@@ -1,0 +1,106 @@
+---
+title: "diagnose"
+section: "cli"
+order: 7
+---
+
+# opalc diagnose
+
+Output machine-readable diagnostics for OPAL files.
+
+```bash
+opalc diagnose <files...> [options]
+```
+
+---
+
+## Overview
+
+The `diagnose` command analyzes OPAL files and outputs diagnostics in formats suitable for tooling integration:
+
+- **Text** - Human-readable plain text
+- **JSON** - Machine-readable structured data
+- **SARIF** - Static Analysis Results Interchange Format for IDE/CI integration
+
+---
+
+## Quick Start
+
+```bash
+# Diagnose a single file (text output)
+opalc diagnose MyModule.opal
+
+# JSON output for processing
+opalc diagnose MyModule.opal --format json
+
+# SARIF output for IDE integration
+opalc diagnose src/*.opal --format sarif --output diagnostics.sarif
+
+# Enable strict checking
+opalc diagnose MyModule.opal --strict-api --require-docs
+```
+
+---
+
+## Options
+
+| Option | Short | Default | Description |
+|:-------|:------|:--------|:------------|
+| `--format` | `-f` | `text` | Output format: `text`, `json`, or `sarif` |
+| `--output` | `-o` | stdout | Output file (stdout if not specified) |
+| `--strict-api` | | `false` | Enable strict API checking |
+| `--require-docs` | | `false` | Require documentation on public functions |
+
+---
+
+## Output Formats
+
+### Text (Default)
+
+```
+Calculator.opal:12:5: error: Undefined variable 'x'
+  §R (+ x 1)
+       ^
+
+Summary: 1 error, 1 warning, 1 info
+```
+
+### JSON
+
+Machine-readable format for automated processing.
+
+### SARIF
+
+Integrates with VS Code, GitHub Code Scanning, Azure DevOps, and other SARIF-compatible tools.
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|:-----|:--------|
+| `0` | No errors |
+| `1` | One or more errors found |
+| `2` | Processing error |
+
+---
+
+## CI/CD Integration
+
+```yaml
+# GitHub Actions
+- name: Check OPAL diagnostics
+  run: opalc diagnose src/**/*.opal --format sarif --output opal.sarif
+
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v2
+  with:
+    sarif_file: opal.sarif
+```
+
+---
+
+## See Also
+
+- [opalc format](/cli/format/) - Format OPAL source files
+- [opalc compile](/cli/compile/) - Compile with error reporting
