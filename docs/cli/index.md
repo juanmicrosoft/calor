@@ -17,13 +17,13 @@ The `opalc` command-line tool provides commands for working with OPAL code and a
 Install `opalc` as a global .NET tool:
 
 ```bash
-dotnet tool install --global Opal.Compiler
+dotnet tool install -g opalc --version 0.1.2
 ```
 
-Or run the quick-start script which installs everything:
+Or update an existing installation:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.sh | bash
+dotnet tool update -g opalc
 ```
 
 ---

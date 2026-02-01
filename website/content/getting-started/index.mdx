@@ -36,22 +36,34 @@ your_code.opal → OPAL Compiler → your_code.g.cs → .NET Build → executabl
 
 ---
 
+## Installation
+
+Install the OPAL compiler as a global .NET tool:
+
+```bash
+dotnet tool install -g opalc --version 0.1.2
+```
+
+Or update an existing installation:
+
+```bash
+dotnet tool update -g opalc
+```
+
+---
+
 ## Two Paths to OPAL
 
 Choose your starting point based on your situation:
 
 ### New Project
 
-Get up and running with OPAL in one command:
+Create a new .NET project and initialize OPAL:
 
-**macOS/Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.ps1 | iex
+dotnet new console -o MyOpalApp
+cd MyOpalApp
+opalc init
 ```
 
 ### Existing C# Project
