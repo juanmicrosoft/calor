@@ -56,21 +56,28 @@ irm https://raw.githubusercontent.com/juanmicrosoft/opal/main/scripts/init-opal.
 
 ### Existing C# Project
 
-Add OPAL to your existing codebase:
+Add OPAL to your existing codebase in two steps:
 
 ```bash
-# 1. Find best migration candidates
+# 1. Enable OPAL in your project (adds MSBuild integration)
+opalc init
+
+# 2. Analyze your codebase to find migration candidates
 opalc analyze ./src --top 10
-
-# 2. Set up tooling and MSBuild integration
-opalc init --ai claude
-
-# 3. Start migrating files
-opalc convert HighScoreFile.cs
-
-# 4. Build - OPAL compiles automatically
-dotnet build
 ```
+
+After init, you can:
+- Write new `.opal` files that compile automatically during `dotnet build`
+- Use `opalc convert` to migrate high-scoring C# files to OPAL
+
+**Optional: Enable Claude Code integration**
+
+```bash
+# Add Claude skills for AI-assisted OPAL development
+opalc init --ai claude
+```
+
+This adds `/opal` and `/opal-convert` skills, plus CLAUDE.md with guidelines that instruct Claude to write new code in OPAL and analyze C# files before modifying them.
 
 See the [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) guide for the complete walkthrough.
 
@@ -78,14 +85,19 @@ See the [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-proje
 
 ## What You Get
 
-The init script (new projects) or `opalc init` (existing projects) sets up:
+### Basic Init (`opalc init`)
 
 | Component | Description |
 |:----------|:------------|
-| `opalc` global tool | Compile OPAL to C# from anywhere: `opalc --input file.opal --output file.g.cs` |
-| Claude Code skills | Use `/opal` to write OPAL code and `/opal-convert` to convert C# to OPAL |
 | MSBuild integration | `.opal` files compile automatically during `dotnet build` |
-| Sample project | A ready-to-run OPAL project to explore (new projects only) |
+| Generated output | C# files go to `obj/` directory, keeping source tree clean |
+
+### With Claude (`opalc init --ai claude`)
+
+| Component | Description |
+|:----------|:------------|
+| Claude Code skills | `/opal` to write OPAL code, `/opal-convert` to convert C# |
+| CLAUDE.md | Project guidelines instructing Claude to prefer OPAL for new code |
 
 ---
 

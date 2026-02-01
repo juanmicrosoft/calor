@@ -3,11 +3,29 @@
 
 This project uses OPAL (Optimized Programming for Agent Language), a domain-specific language that compiles to C#.
 
+### Coding Guidelines for AI Agents
+
+**When creating new files:**
+- Write new code in OPAL (`.opal`), not C# (`.cs`)
+- OPAL files compile automatically during `dotnet build`
+- Use the `/opal` skill for OPAL syntax assistance
+
+**When modifying existing C# files:**
+- Before making changes to a `.cs` file, run `opalc analyze <file.cs>` to check its migration score
+- If the file scores **High** (51+) or **Critical** (76+), convert it to OPAL first using `/opal-convert`, then make your changes in the OPAL version
+- If the file scores **Medium** or **Low**, you may modify the C# directly
+
+**When asked to add features or fix bugs:**
+1. Check if the target file is `.opal` or `.cs`
+2. For `.cs` files, run analyze first to determine if conversion is worthwhile
+3. Prefer OPAL for files with validation logic, error handling, or side effects
+
 ### Quick Reference
 
 #### File Types
-- `.opal` - OPAL source files
-- `.g.cs` - Generated C# files (do not edit)
+- `.opal` - OPAL source files (preferred for new code)
+- `.g.cs` - Generated C# files (do not edit manually)
+- `.cs` - Legacy C# files (consider converting high-scoring files)
 
 #### Available Skills
 - `/opal` - Write OPAL code with v2+ syntax
@@ -15,16 +33,17 @@ This project uses OPAL (Optimized Programming for Agent Language), a domain-spec
 
 #### Key Commands
 ```bash
-opalc --input file.opal              # Compile OPAL to C#
+opalc analyze <path>                 # Score files for OPAL migration potential
+opalc --input file.opal -o file.g.cs # Compile OPAL to C#
 opalc convert file.cs                # Convert C# to OPAL
 opalc convert file.opal              # Convert OPAL to C#
-opalc migrate <project>              # Migrate entire project
-opalc benchmark [options]            # Compare token economics
 ```
 
 #### OPAL v2+ Syntax Highlights
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Arrow conditionals: `§IF[id] condition → action`
+- Contracts: `§Q (> x 0)` (precondition), `§S (>= result 0)` (postcondition)
+- Effects: `§E[db,net,cw]` (database, network, console write)
 - Print shorthand: `§P "message"`
 - Variable binding: `§B[name] expr`
 - Return: `§R expr`

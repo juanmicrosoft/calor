@@ -15,9 +15,9 @@ This guide walks you through adding OPAL to an existing C# project, from identif
 
 Adding OPAL to an existing project is a gradual process:
 
-1. **Analyze** - Find files that benefit most from OPAL's features
-2. **Initialize** - Set up tooling and MSBuild integration
-3. **Convert** - Migrate files one at a time
+1. **Initialize** - Enable OPAL with MSBuild integration
+2. **Analyze** - Find files that benefit most from OPAL's features
+3. **Write/Convert** - Create new files in OPAL, convert high-scoring C# files
 4. **Build** - OPAL compiles automatically with your project
 
 You don't need to convert everything at once. OPAL and C# coexist seamlessly.
@@ -32,9 +32,35 @@ You don't need to convert everything at once. OPAL and C# coexist seamlessly.
 
 ---
 
-## Step 1: Find Migration Candidates
+## Step 1: Enable OPAL in Your Project
 
-Use `opalc analyze` to score your C# files for OPAL migration potential:
+Enable OPAL with MSBuild integration:
+
+```bash
+# Initialize OPAL in your project
+opalc init
+
+# Or specify a specific project file
+opalc init --project MyApp.csproj
+```
+
+### What Happens
+
+Your `.csproj` is updated with MSBuild targets that:
+
+- Compile `.opal` files automatically before C# compilation
+- Include generated `.g.cs` files in the build
+- Clean generated files on `dotnet clean`
+
+Generated files go to `obj/<Configuration>/<TargetFramework>/opal/`, keeping your source tree clean.
+
+After this step, you can immediately start writing `.opal` files and they'll compile during `dotnet build`.
+
+---
+
+## Step 2: Analyze Your Codebase
+
+Use `opalc analyze` to find C# files that would benefit most from OPAL:
 
 ```bash
 # Analyze your source directory
@@ -70,40 +96,14 @@ Files are scored based on patterns that map to OPAL features:
 | Try/catch blocks | `Result<T,E>` error handling |
 | File I/O, network, database calls | `§E` effect declarations |
 
-**Start with high-scoring files** - they'll benefit most from OPAL's features.
+### Priority Bands
 
----
-
-## Step 2: Initialize Your Project
-
-Set up OPAL tooling and MSBuild integration:
-
-```bash
-# Initialize with Claude Code support
-opalc init --ai claude
-
-# Or specify a specific project file
-opalc init --ai claude --project MyApp.csproj
-```
-
-### What Gets Created
-
-| File | Purpose |
-|:-----|:--------|
-| `.claude/skills/opal.md` | Claude skill for writing OPAL code |
-| `.claude/skills/opal-convert.md` | Claude skill for C# to OPAL conversion |
-| `CLAUDE.md` | Project documentation with OPAL reference |
-| `MyApp.csproj` (updated) | MSBuild targets for automatic OPAL compilation |
-
-### MSBuild Integration
-
-Your `.csproj` now includes targets that:
-
-- Compile `.opal` files before C# compilation
-- Include generated `.g.cs` files in the build
-- Clean generated files on `dotnet clean`
-
-Generated files go to `obj/<Configuration>/<TargetFramework>/opal/`, keeping your source tree clean.
+| Priority | Score | Recommendation |
+|:---------|:------|:---------------|
+| **Critical** | 76-100 | Convert to OPAL - high benefit |
+| **High** | 51-75 | Good conversion candidate |
+| **Medium** | 26-50 | Optional - some benefit |
+| **Low** | 0-25 | Keep in C# - minimal benefit |
 
 ---
 
@@ -161,39 +161,19 @@ cat obj/Debug/net8.0/opal/Calculator.g.cs
 
 ---
 
-## Step 5: Gradual Migration
+## Step 5: Convert High-Scoring C# Files
 
-Now you can migrate existing C# files one at a time.
-
-### Option A: Use Claude Code (Recommended)
-
-If you initialized with `--ai claude`, use the conversion skill:
-
-```
-/opal-convert src/Services/PaymentProcessor.cs
-```
-
-Claude will:
-1. Read the C# file
-2. Convert it to OPAL syntax
-3. Preserve all functionality
-4. Add contracts where appropriate
-
-### Option B: Use the CLI
-
-Convert a single file:
+Based on your analysis results, convert files that score High or Critical:
 
 ```bash
-# Convert C# to OPAL
+# Convert a single file
 opalc convert src/Services/PaymentProcessor.cs
 
 # Output: src/Services/PaymentProcessor.opal
 
-# With benchmark comparison
+# With benchmark comparison to see token savings
 opalc convert src/Services/PaymentProcessor.cs --benchmark
 ```
-
-### Option C: Convert Entire Project
 
 For bulk conversion:
 
@@ -201,7 +181,7 @@ For bulk conversion:
 # Preview what would be converted
 opalc migrate ./src --dry-run
 
-# Actually convert all files
+# Convert all files
 opalc migrate ./src --direction cs-to-opal
 
 # Generate a migration report
@@ -225,32 +205,55 @@ Or keep both if you want to compare them during a transition period.
 
 ---
 
-## Using Claude Code
+## Optional: Enable Claude Code Integration
 
-After initialization, Claude Code provides powerful assistance:
+For AI-assisted OPAL development, add Claude Code support:
 
-### Writing New OPAL Code
+```bash
+opalc init --ai claude
+```
 
+### What Gets Added
+
+| File | Purpose |
+|:-----|:--------|
+| `.claude/skills/opal.md` | Skill for writing OPAL code |
+| `.claude/skills/opal-convert.md` | Skill for C# to OPAL conversion |
+| `CLAUDE.md` | Project guidelines for Claude |
+
+### CLAUDE.md Guidelines
+
+The generated CLAUDE.md includes instructions that tell Claude to:
+
+- **Write new files in OPAL** instead of C#
+- **Analyze C# files before modifying** - if a file scores High or Critical, convert it to OPAL first, then make changes
+- **Prefer OPAL** for files with validation logic, error handling, or side effects
+
+### Using Claude Code
+
+After initialization, use these skills:
+
+**Write new OPAL code:**
 ```
 /opal
 
 Write a function that validates email addresses with:
 - Precondition: input is not null or empty
 - Postcondition: returns true only for valid emails
-- Effect: pure (no side effects)
 ```
 
-### Converting Existing Code
-
+**Convert existing C# to OPAL:**
 ```
-/opal-convert
-
-Convert this C# class to OPAL:
-[paste your C# code or reference a file]
+/opal-convert src/Services/PaymentProcessor.cs
 ```
 
-### Refactoring OPAL
+Claude will:
+1. Read the C# file
+2. Convert it to OPAL syntax
+3. Preserve all functionality
+4. Add contracts where appropriate
 
+**Refactor OPAL code:**
 ```
 Extract the validation logic from function f001 into a separate private function
 ```
