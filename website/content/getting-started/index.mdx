@@ -52,44 +52,61 @@ dotnet tool update -g opalc
 
 ---
 
-## Two Paths to OPAL
+## Quick Start
 
-Choose your starting point based on your situation:
+OPAL integrates into any .NET project. Start with a C# project (new or existing), enable OPAL, and from that point forward all new code is written in OPAL.
 
-### New Project
-
-Create a new .NET project and initialize OPAL:
+### Step 1: Start with a C# Project
 
 ```bash
-dotnet new console -o MyOpalApp
-cd MyOpalApp
+# Create a new project, or use an existing one
+dotnet new console -o MyApp
+cd MyApp
+```
+
+### Step 2: Enable OPAL
+
+```bash
 opalc init
 ```
 
-### Existing C# Project
+This adds MSBuild integration so `.opal` files compile automatically during `dotnet build`.
 
-Add OPAL to your existing codebase in two steps:
-
-```bash
-# 1. Enable OPAL in your project (adds MSBuild integration)
-opalc init
-
-# 2. Analyze your codebase to find migration candidates
-opalc analyze ./src --top 10
-```
-
-After init, you can:
-- Write new `.opal` files that compile automatically during `dotnet build`
-- Use `opalc convert` to migrate high-scoring C# files to OPAL
-
-**Optional: Enable Claude Code integration**
+### Step 3: (Optional) Enable AI Agent Integration
 
 ```bash
-# Add Claude skills for AI-assisted OPAL development
 opalc init --ai claude
 ```
 
-This adds `/opal` and `/opal-convert` skills, plus CLAUDE.md with guidelines that instruct Claude to write new code in OPAL and analyze C# files before modifying them.
+This adds `/opal` and `/opal-convert` skills, plus CLAUDE.md with guidelines that instruct Claude to:
+- Write all new code in OPAL (not C#)
+- Analyze existing C# files before modifying them to determine if they should be converted to OPAL first
+
+### Step 4: Write OPAL Code
+
+After init, create `.opal` files and they compile automatically:
+
+```bash
+# Create your first OPAL file
+echo 'namespace MyApp { §M Main() { Console.WriteLine("Hello from OPAL!") } }' > Program.opal
+
+# Build runs OPAL compilation automatically
+dotnet build
+```
+
+### Step 5: (Optional) Migrate Existing C# Files
+
+For existing C# codebases, analyze which files are good candidates for migration:
+
+```bash
+opalc analyze ./src --top 10
+```
+
+Then convert high-scoring files:
+
+```bash
+opalc convert HighScoreFile.cs
+```
 
 See the [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) guide for the complete walkthrough.
 
