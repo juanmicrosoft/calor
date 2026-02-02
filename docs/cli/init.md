@@ -99,7 +99,44 @@ After initialization, use these Claude Code commands:
 
 ### Codex (`--ai codex`)
 
-Creates configuration for OpenAI Codex integration.
+Creates the following files:
+
+| File | Purpose |
+|:-----|:--------|
+| `.codex/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
+| `.codex/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
+| `AGENTS.md` | Project documentation with OPAL-first guidelines |
+
+#### Guidance-Based Enforcement
+
+**Important:** Codex CLI does not support hooks like Claude Code. OPAL-first development is **guidance-based only**, relying on instructions in `AGENTS.md` and the skill files.
+
+This means:
+- Codex *should* create `.opal` files based on the instructions
+- However, enforcement is not automatic - Codex may occasionally create `.cs` files
+- Review file extensions after code generation
+- Use `opalc analyze` to find any unconverted `.cs` files
+
+After initialization, use these Codex commands:
+
+| Command | Description |
+|:--------|:------------|
+| `$opal` | Write new OPAL code with Codex's assistance |
+| `$opal-convert` | Convert existing C# code to OPAL syntax |
+
+#### Output Structure
+
+```
+project/
+├── .codex/
+│   └── skills/
+│       ├── opal/
+│       │   └── SKILL.md
+│       └── opal-convert/
+│           └── SKILL.md
+├── AGENTS.md
+└── MyProject.csproj
+```
 
 ### Gemini (`--ai gemini`)
 

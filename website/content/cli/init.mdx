@@ -92,6 +92,32 @@ After initialization, use these Claude Code commands:
 | `/opal` | Write new OPAL code with Claude's assistance |
 | `/opal-convert` | Convert existing C# code to OPAL syntax |
 
+### Codex (`--ai codex`)
+
+Creates the following files:
+
+| File | Purpose |
+|:-----|:--------|
+| `.codex/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
+| `.codex/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
+| `AGENTS.md` | Project documentation with OPAL-first guidelines |
+
+#### Guidance-Based Enforcement
+
+**Important:** Codex CLI does not support hooks like Claude Code. OPAL-first development is **guidance-based only**.
+
+This means:
+- Codex *should* create `.opal` files based on the instructions
+- Enforcement is not automatic - review file extensions after generation
+- Use `opalc analyze` to find any unconverted `.cs` files
+
+After initialization, use these Codex commands:
+
+| Command | Description |
+|:--------|:------------|
+| `$opal` | Write new OPAL code with Codex's assistance |
+| `$opal-convert` | Convert existing C# code to OPAL syntax |
+
 ---
 
 ## MSBuild Integration

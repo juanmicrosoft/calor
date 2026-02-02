@@ -362,18 +362,6 @@ Run `dotnet build` to compile.
     }
 
     [Fact]
-    public async Task CodexInitializer_Initialize_ReturnsNotImplemented()
-    {
-        var initializer = new CodexInitializer();
-
-        var result = await initializer.InitializeAsync(_testDirectory, force: false);
-
-        Assert.False(result.Success);
-        Assert.Contains("not yet implemented", result.Messages[0]);
-        Assert.Contains("OpenAI Codex", result.Messages[0]);
-    }
-
-    [Fact]
     public async Task GeminiInitializer_Initialize_ReturnsNotImplemented()
     {
         var initializer = new GeminiInitializer();
