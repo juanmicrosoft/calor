@@ -52,6 +52,7 @@ public class Program
         rootCommand.AddCommand(FormatCommand.Create());
         rootCommand.AddCommand(DiagnoseCommand.Create());
         rootCommand.AddCommand(AnalyzeCommand.Create());
+        rootCommand.AddCommand(HookCommand.Create());
 
         return await rootCommand.InvokeAsync(args);
     }

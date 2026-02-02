@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "opalc hook validate-write $TOOL_INPUT"
+          }
+        ]
+      }
+    ]
+  }
+}
