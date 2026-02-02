@@ -1,0 +1,97 @@
+---
+title: "Codex Integration"
+section: "getting-started"
+order: 4
+---
+
+# Using OPAL with OpenAI Codex CLI
+
+This guide explains how to use OPAL with OpenAI Codex CLI. For Claude Code integration, see [Claude Integration](/getting-started/claude-integration/).
+
+---
+
+## Quick Setup
+
+Initialize your project for Codex CLI with a single command:
+
+```bash
+opalc init --ai codex
+```
+
+This creates:
+
+| File | Purpose |
+|:-----|:--------|
+| `.codex/skills/opal/SKILL.md` | Teaches Codex OPAL v2+ syntax |
+| `.codex/skills/opal-convert/SKILL.md` | Teaches Codex C# to OPAL conversion |
+| `AGENTS.md` | Project documentation with OPAL-first guidelines |
+
+---
+
+## Important: Guidance-Based Enforcement
+
+Unlike Claude Code which uses hooks to enforce OPAL-first development, **Codex CLI does not support hooks**. This means:
+
+- OPAL-first development is **guidance-based only**
+- Codex *should* follow the instructions and create `.opal` files
+- Enforcement is not automatic - review file extensions after generation
+- Use `opalc analyze` to find any unconverted `.cs` files
+
+---
+
+## Available Skills
+
+### The `$opal` Skill
+
+Use `$opal` to activate OPAL-aware code generation:
+
+```
+$opal
+
+Write a function that calculates factorial with:
+- Precondition: n >= 0
+- Postcondition: result >= 1
+```
+
+### The `$opal-convert` Skill
+
+Use `$opal-convert` to convert existing C# code to OPAL:
+
+```
+$opal-convert
+
+Convert this C# class to OPAL:
+
+public class Calculator
+{
+    public int Add(int a, int b) => a + b;
+}
+```
+
+---
+
+## Codex vs Claude Code
+
+| Feature | Claude Code | Codex CLI |
+|:--------|:------------|:----------|
+| Skills directory | `.claude/skills/` | `.codex/skills/<name>/` |
+| Project instructions | `CLAUDE.md` | `AGENTS.md` |
+| Skill invocation | `/opal` | `$opal` |
+| Enforcement | **Hooks (enforced)** | **Guidance only** |
+
+---
+
+## Best Practices
+
+1. **Review generated files** - Check that Codex created `.opal` files, not `.cs`
+2. **Use explicit instructions** - Be specific about wanting OPAL output
+3. **Start with skill reference** - Begin prompts with `$opal` or `$opal-convert`
+4. **Run analysis regularly** - Use `opalc analyze` to find migration candidates
+
+---
+
+## See Also
+
+- [Syntax Reference](/syntax-reference/) - Complete language reference
+- [opalc init](/cli/init/) - Full init command documentation
+- [Claude Integration](/getting-started/claude-integration/) - Alternative with enforced OPAL-first
