@@ -26,7 +26,8 @@ your_code.opal → OPAL Compiler → your_code.g.cs → .NET Build → executabl
 
 1. **[Installation](/opal/getting-started/installation/)** - Set up the OPAL compiler
 2. **[Hello World](/opal/getting-started/hello-world/)** - Write and run your first OPAL program
-3. **[Claude Integration](/opal/getting-started/claude-integration/)** - Use OPAL with AI coding agents
+3. **[Claude Integration](/opal/getting-started/claude-integration/)** - Use OPAL with Claude Code (enforced OPAL-first)
+4. **[Codex Integration](/opal/getting-started/codex-integration/)** - Use OPAL with OpenAI Codex CLI
 
 ---
 
@@ -75,13 +76,21 @@ This adds MSBuild integration so `.opal` files compile automatically during `dot
 
 ### Step 3: (Optional) Enable AI Agent Integration
 
+For Claude Code (with enforced OPAL-first via hooks):
 ```bash
 opalc init --ai claude
 ```
 
-This adds `/opal` and `/opal-convert` skills, plus CLAUDE.md with guidelines that instruct Claude to:
+For OpenAI Codex CLI (guidance-based):
+```bash
+opalc init --ai codex
+```
+
+This adds OPAL skills and project documentation that instruct the AI to:
 - Write all new code in OPAL (not C#)
 - Analyze existing C# files before modifying them to determine if they should be converted to OPAL first
+
+**Note:** Claude Code enforces OPAL-first via hooks (blocks `.cs` creation). Codex CLI is guidance-based only.
 
 ### Step 4: Write OPAL Code
 
@@ -137,7 +146,17 @@ See the [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-
 | Component | Description |
 |:----------|:------------|
 | Claude Code skills | `/opal` to write OPAL code, `/opal-convert` to convert C# |
+| Hook configuration | **Enforces OPAL-first** - blocks `.cs` file creation |
 | CLAUDE.md | Project guidelines instructing Claude to prefer OPAL for new code |
+
+### With Codex (`opalc init --ai codex`)
+
+| Component | Description |
+|:----------|:------------|
+| Codex skills | `$opal` to write OPAL code, `$opal-convert` to convert C# |
+| AGENTS.md | Project guidelines (guidance-based, not enforced) |
+
+**Note:** Codex CLI does not support hooks, so OPAL-first is guidance-based only. Review file extensions after generation.
 
 ---
 
