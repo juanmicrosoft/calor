@@ -24,9 +24,42 @@ This creates:
 |:-----|:--------|
 | `.claude/skills/opal.md` | Teaches Claude OPAL v2+ syntax for writing new code |
 | `.claude/skills/opal-convert.md` | Teaches Claude how to convert C# to OPAL |
+| `.claude/settings.json` | **Enforces OPAL-first** - blocks `.cs` file creation |
 | `CLAUDE.md` | Project documentation with OPAL reference and conventions |
 
 You can run this command again anytime to update the OPAL documentation section in CLAUDE.md without losing your custom content.
+
+---
+
+## OPAL-First Enforcement
+
+When you initialize with `--ai claude`, hooks are configured that **automatically block Claude from creating `.cs` files**. This ensures all new code is written in OPAL.
+
+### What Happens
+
+When Claude tries to create a C# file:
+
+```
+BLOCKED: Cannot create C# file 'UserService.cs'
+
+This is an OPAL-first project. Create an .opal file instead:
+  UserService.opal
+
+Use /opal skill for OPAL syntax help.
+```
+
+Claude will automatically retry with an `.opal` file - no user intervention required.
+
+### Allowed Files
+
+The hook allows:
+- **`.opal` files** - All OPAL source files
+- **`.g.cs` files** - Generated C# output from OPAL compilation
+- **`obj/` directory** - Build artifacts
+
+### Disabling Enforcement
+
+If you need to temporarily allow `.cs` file creation, remove or rename `.claude/settings.json`. Re-run `opalc init --ai claude` to restore enforcement.
 
 ---
 

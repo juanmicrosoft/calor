@@ -17,7 +17,7 @@ The `opalc` command-line tool provides commands for working with OPAL code and a
 Install `opalc` as a global .NET tool:
 
 ```bash
-dotnet tool install -g opalc --version 0.1.2
+dotnet tool install -g opalc --version 0.1.3
 ```
 
 Or update an existing installation:
@@ -40,6 +40,7 @@ dotnet tool update -g opalc
 | [`opalc benchmark`](/opal/cli/benchmark/) | Compare OPAL vs C# across evaluation metrics |
 | [`opalc format`](/opal/cli/format/) | Format OPAL source files to canonical style |
 | [`opalc diagnose`](/opal/cli/diagnose/) | Output machine-readable diagnostics for tooling |
+| [`opalc hook`](/opal/cli/hook/) | Claude Code hook commands (internal) |
 
 ---
 

@@ -1,0 +1,131 @@
+---
+title: hook
+description: Claude Code hook commands for OPAL-first enforcement
+---
+
+# opalc hook
+
+Internal commands for Claude Code hook integration. These commands are called automatically by Claude Code hooks and are not typically invoked directly.
+
+```bash
+opalc hook <subcommand> [args]
+```
+
+---
+
+## Overview
+
+The `hook` command provides subcommands that integrate with Claude Code's hook system to enforce OPAL-first development. When you run `opalc init --ai claude`, it configures these hooks automatically.
+
+---
+
+## Subcommands
+
+### validate-write
+
+Validates Write tool calls to enforce OPAL-first development.
+
+```bash
+opalc hook validate-write <tool-input-json>
+```
+
+**Behavior:**
+
+| File Type | Action |
+|:----------|:-------|
+| `.opal` files | Allowed (exit 0) |
+| `.g.cs` generated files | Allowed (exit 0) |
+| Files in `obj/` directory | Allowed (exit 0) |
+| Other `.cs` files | **Blocked** (exit 1) |
+
+**Example:**
+
+```bash
+# This will be blocked (exit 1)
+opalc hook validate-write '{"file_path": "MyClass.cs"}'
+
+# Output:
+# BLOCKED: Cannot create C# file 'MyClass.cs'
+#
+# This is an OPAL-first project. Create an .opal file instead:
+#   MyClass.opal
+#
+# Use /opal skill for OPAL syntax help.
+
+# This will be allowed (exit 0)
+opalc hook validate-write '{"file_path": "MyClass.opal"}'
+```
+
+---
+
+## How Hooks Work
+
+When you initialize a project with `opalc init --ai claude`, it creates `.claude/settings.json` with hook configuration:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "opalc hook validate-write $TOOL_INPUT"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This hook runs **before** every Write tool call. If the hook returns exit code 1, Claude Code blocks the operation and shows the error message to Claude, who will then retry with an `.opal` file.
+
+---
+
+## User Experience
+
+When Claude tries to create a `.cs` file in an OPAL-initialized project:
+
+1. Claude calls the Write tool with a `.cs` file path
+2. The hook intercepts the call and validates the path
+3. Hook returns exit 1 with guidance message
+4. Claude Code blocks the write operation
+5. Claude sees the error and creates an `.opal` file instead
+
+This enforcement happens automatically - no user intervention required.
+
+---
+
+## Troubleshooting
+
+### Hook Not Blocking .cs Files
+
+1. **Verify hooks are configured:**
+   ```bash
+   cat .claude/settings.json
+   ```
+   Should contain `PreToolUse` hook for `Write`
+
+2. **Verify opalc is in PATH:**
+   ```bash
+   which opalc
+   opalc hook validate-write '{"file_path": "test.cs"}'
+   echo $?  # Should be 1
+   ```
+
+3. **Restart Claude Code** - hooks are loaded at session start
+
+### Re-enable Hooks After Manual Removal
+
+```bash
+opalc init --ai claude --force
+```
+
+---
+
+## See Also
+
+- [opalc init](/cli/init/) - Initialize OPAL with hook configuration
+- [Claude Integration](/getting-started/claude-integration/) - Using OPAL with Claude

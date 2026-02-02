@@ -62,7 +62,28 @@ Creates the following files:
 |:-----|:--------|
 | `.claude/skills/opal.md` | OPAL code writing skill - teaches Claude OPAL v2+ syntax |
 | `.claude/skills/opal-convert.md` | C# to OPAL conversion skill |
+| `.claude/settings.json` | **Hook configuration** - enforces OPAL-first development |
 | `CLAUDE.md` | Project guidelines instructing Claude to prefer OPAL for new code |
+
+#### OPAL-First Enforcement
+
+The `.claude/settings.json` file configures a `PreToolUse` hook that **blocks Claude from creating `.cs` files**. When Claude tries to write a C# file, it will see:
+
+```
+BLOCKED: Cannot create C# file 'MyClass.cs'
+
+This is an OPAL-first project. Create an .opal file instead:
+  MyClass.opal
+
+Use /opal skill for OPAL syntax help.
+```
+
+Claude will then automatically retry with an `.opal` file. This enforcement ensures all new code is written in OPAL.
+
+**Allowed file types:**
+- `.opal` files (always allowed)
+- `.g.cs` generated files (build output)
+- Files in `obj/` directory (build artifacts)
 
 After initialization, use these Claude Code commands:
 
