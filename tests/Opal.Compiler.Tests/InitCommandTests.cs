@@ -378,15 +378,74 @@ Run `dotnet build` to compile.
     }
 
     [Fact]
-    public async Task GitHubCopilotInitializer_Initialize_ReturnsNotImplemented()
+    public async Task GitHubCopilotInitializer_Initialize_CreatesExpectedFiles()
     {
         var initializer = new GitHubCopilotInitializer();
 
         var result = await initializer.InitializeAsync(_testDirectory, force: false);
 
-        Assert.False(result.Success);
-        Assert.Contains("not yet implemented", result.Messages[0]);
+        Assert.True(result.Success);
         Assert.Contains("GitHub Copilot", result.Messages[0]);
+
+        // Verify skill files are created
+        Assert.True(File.Exists(Path.Combine(_testDirectory, ".github", "copilot", "skills", "opal", "SKILL.md")));
+        Assert.True(File.Exists(Path.Combine(_testDirectory, ".github", "copilot", "skills", "opal-convert", "SKILL.md")));
+
+        // Verify copilot-instructions.md is created
+        Assert.True(File.Exists(Path.Combine(_testDirectory, ".github", "copilot-instructions.md")));
+
+        // Verify guidance-based enforcement note is present
+        Assert.Contains("guidance-based only", string.Join("\n", result.Messages));
+    }
+
+    [Fact]
+    public async Task GitHubCopilotInitializer_Initialize_CopilotInstructionsContainsOpalSection()
+    {
+        var initializer = new GitHubCopilotInitializer();
+
+        await initializer.InitializeAsync(_testDirectory, force: false);
+
+        var instructionsPath = Path.Combine(_testDirectory, ".github", "copilot-instructions.md");
+        var content = await File.ReadAllTextAsync(instructionsPath);
+
+        // Verify OPAL-first section markers
+        Assert.Contains("BEGIN OPALC SECTION", content);
+        Assert.Contains("END OPALC SECTION", content);
+
+        // Verify OPAL-first mandatory rules are in the generated file
+        Assert.Contains("OPAL-First Project", content);
+        Assert.Contains("MANDATORY Rules for AI Agents", content);
+        Assert.Contains("Rule 1: Never create new `.cs` files", content);
+        Assert.Contains("Rule 2: Convert C# to OPAL before modifying", content);
+        Assert.Contains("opalc analyze", content);
+        Assert.Contains("guidance-based only", content);
+    }
+
+    [Fact]
+    public async Task GitHubCopilotInitializer_Initialize_WithExistingInstructions_AppendsSection()
+    {
+        var initializer = new GitHubCopilotInitializer();
+
+        // Create existing copilot-instructions.md with custom content
+        var githubDir = Path.Combine(_testDirectory, ".github");
+        Directory.CreateDirectory(githubDir);
+        var instructionsPath = Path.Combine(githubDir, "copilot-instructions.md");
+        var existingContent = "# My Project Instructions\n\nThis is my project.\n";
+        await File.WriteAllTextAsync(instructionsPath, existingContent);
+
+        var result = await initializer.InitializeAsync(_testDirectory, force: false);
+
+        Assert.True(result.Success);
+
+        var content = await File.ReadAllTextAsync(instructionsPath);
+
+        // Verify original content is preserved
+        Assert.Contains("# My Project Instructions", content);
+        Assert.Contains("This is my project.", content);
+
+        // Verify OPAL section is appended
+        Assert.Contains("BEGIN OPALC SECTION", content);
+        Assert.Contains("OPAL-First Project", content);
     }
 
     [Fact]

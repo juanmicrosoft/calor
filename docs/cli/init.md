@@ -251,7 +251,40 @@ project/
 
 ### GitHub Copilot (`--ai github`)
 
-Creates configuration for GitHub Copilot integration.
+Creates the following files:
+
+| File | Purpose |
+|:-----|:--------|
+| `.github/copilot/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
+| `.github/copilot/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
+| `.github/copilot-instructions.md` | Project documentation with OPAL-first guidelines |
+
+#### Guidance-Based Enforcement
+
+**Important:** GitHub Copilot does not support hooks like Claude Code. OPAL-first development is **guidance-based only**, relying on instructions in `copilot-instructions.md` and the skill files.
+
+This means:
+- Copilot *should* create `.opal` files based on the instructions
+- However, enforcement is not automatic - Copilot may occasionally create `.cs` files
+- Review file extensions after code generation
+- Use `opalc analyze` to find any unconverted `.cs` files
+
+After initialization, reference the OPAL skills when asking Copilot about OPAL syntax or converting C# code.
+
+#### Output Structure
+
+```
+project/
+├── .github/
+│   ├── copilot-instructions.md     # OPAL guidelines
+│   └── copilot/
+│       └── skills/
+│           ├── opal/
+│           │   └── SKILL.md
+│           └── opal-convert/
+│               └── SKILL.md
+└── MyProject.csproj
+```
 
 ---
 
