@@ -117,14 +117,15 @@ public class InitCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task ClaudeInitializer_Initialize_CreatesSkillsDirectory()
+    public async Task ClaudeInitializer_Initialize_CreatesSkillsDirectories()
     {
         var initializer = new ClaudeInitializer();
 
         var result = await initializer.InitializeAsync(_testDirectory, force: false);
 
         Assert.True(result.Success);
-        Assert.True(Directory.Exists(Path.Combine(_testDirectory, ".claude", "skills")));
+        Assert.True(Directory.Exists(Path.Combine(_testDirectory, ".claude", "skills", "opal")));
+        Assert.True(Directory.Exists(Path.Combine(_testDirectory, ".claude", "skills", "opal-convert")));
     }
 
     [Fact]
@@ -134,12 +135,13 @@ public class InitCommandTests : IDisposable
 
         var result = await initializer.InitializeAsync(_testDirectory, force: false);
 
-        var skillPath = Path.Combine(_testDirectory, ".claude", "skills", "opal.md");
+        var skillPath = Path.Combine(_testDirectory, ".claude", "skills", "opal", "SKILL.md");
         Assert.True(File.Exists(skillPath));
         Assert.Contains(skillPath, result.CreatedFiles);
 
         var content = await File.ReadAllTextAsync(skillPath);
         Assert.Contains("OPAL", content);
+        Assert.Contains("name: opal", content); // YAML frontmatter
     }
 
     [Fact]
@@ -149,7 +151,7 @@ public class InitCommandTests : IDisposable
 
         var result = await initializer.InitializeAsync(_testDirectory, force: false);
 
-        var skillPath = Path.Combine(_testDirectory, ".claude", "skills", "opal-convert.md");
+        var skillPath = Path.Combine(_testDirectory, ".claude", "skills", "opal-convert", "SKILL.md");
         Assert.True(File.Exists(skillPath));
         Assert.Contains(skillPath, result.CreatedFiles);
     }
@@ -182,7 +184,7 @@ public class InitCommandTests : IDisposable
         await initializer.InitializeAsync(_testDirectory, force: false);
 
         // Modify a skill file
-        var skillPath = Path.Combine(_testDirectory, ".claude", "skills", "opal.md");
+        var skillPath = Path.Combine(_testDirectory, ".claude", "skills", "opal", "SKILL.md");
         await File.WriteAllTextAsync(skillPath, "Custom skill content");
 
         // Second initialization without force
@@ -206,7 +208,7 @@ public class InitCommandTests : IDisposable
         await initializer.InitializeAsync(_testDirectory, force: false);
 
         // Modify a skill file
-        var skillPath = Path.Combine(_testDirectory, ".claude", "skills", "opal.md");
+        var skillPath = Path.Combine(_testDirectory, ".claude", "skills", "opal", "SKILL.md");
         await File.WriteAllTextAsync(skillPath, "Custom skill content");
 
         // Second initialization with force

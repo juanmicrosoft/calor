@@ -58,8 +58,8 @@ This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/opal.md` | OPAL code writing skill - teaches Claude OPAL v2+ syntax |
-| `.claude/skills/opal-convert.md` | C# to OPAL conversion skill |
+| `.claude/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
+| `.claude/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
 | `CLAUDE.md` | Project documentation (creates new or updates OPAL section) |
 
 ### Claude Code Commands
