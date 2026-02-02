@@ -27,6 +27,56 @@ After running `init`, you can write `.opal` files alongside your `.cs` files and
 
 ---
 
+## Solution vs Project Mode
+
+The `init` command operates in one of two modes depending on your project structure:
+
+### Solution Mode
+
+When initializing a solution (`.sln` or `.slnx` file):
+
+- **AI files** (`CLAUDE.md`, `.claude/skills/`, etc.) are created in the **solution root directory**
+- **MSBuild targets** are added to **each project** in the solution
+- All projects share the same AI configuration
+
+This is ideal for multi-project solutions where you want consistent OPAL tooling across all projects.
+
+```
+MySolution/
+├── MySolution.sln
+├── CLAUDE.md                    # AI config in solution root
+├── .claude/
+│   ├── settings.json
+│   └── skills/opal/SKILL.md
+├── src/
+│   ├── Core/
+│   │   └── Core.csproj          # Has OPAL MSBuild targets
+│   └── Web/
+│       └── Web.csproj           # Has OPAL MSBuild targets
+└── tests/
+    └── Tests.csproj             # Has OPAL MSBuild targets
+```
+
+### Project Mode
+
+When initializing a single project (`.csproj` file):
+
+- **AI files** are created in the **project directory**
+- **MSBuild targets** are added to that specific project
+
+This is ideal for standalone projects or when you need different AI configurations per project.
+
+```
+MyProject/
+├── MyProject.csproj             # Has OPAL MSBuild targets
+├── CLAUDE.md                    # AI config in project root
+└── .claude/
+    ├── settings.json
+    └── skills/opal/SKILL.md
+```
+
+---
+
 ## Quick Start
 
 ```bash
@@ -35,6 +85,12 @@ opalc init
 
 # Initialize with Claude Code support
 opalc init --ai claude
+
+# Initialize a solution (auto-detected or explicit)
+opalc init --ai claude
+
+# Initialize with explicit solution file
+opalc init --solution MySolution.sln --ai claude
 
 # Initialize with a specific .csproj
 opalc init --project MyApp.csproj
@@ -51,6 +107,7 @@ opalc init --ai claude --project MyApp.csproj
 |:-------|:------|:---------|:------------|
 | `--ai` | `-a` | No | AI agent to configure: `claude`, `codex`, `gemini`, `github` |
 | `--project` | `-p` | No | Target .csproj file (auto-detects if single .csproj exists) |
+| `--solution` | `-s` | No | Target .sln or .slnx file (initializes all projects in solution) |
 | `--force` | `-f` | No | Overwrite existing files without prompting |
 
 ---
@@ -280,15 +337,37 @@ MyProject/
 
 ---
 
-## Project Detection
+## Auto-Detection
 
-If you don't specify `--project`, the command auto-detects your project:
+If you don't specify `--project` or `--solution`, the command auto-detects what to initialize:
 
-| Scenario | Behavior |
-|:---------|:---------|
-| Single `.csproj` in current directory | Uses that project |
-| Multiple `.csproj` files | Prompts you to specify one |
-| No `.csproj` found | Creates MSBuild targets file only |
+| Priority | Detection | Behavior |
+|:---------|:----------|:---------|
+| 1 | `.slnx` files | Uses solution mode (newer XML format) |
+| 2 | `.sln` files | Uses solution mode |
+| 3 | Single `.csproj` | Uses project mode |
+| 4 | Multiple `.csproj` | Error - specify with `--project` |
+
+### Multiple Solutions
+
+If multiple solution files are found in the current directory, you must specify which one to use:
+
+```bash
+# Error: Multiple solutions found
+opalc init --ai claude
+
+# Specify the solution explicitly
+opalc init --solution MyApp.sln --ai claude
+```
+
+### Solution Parsing
+
+The `init` command parses solution files to find all referenced C# projects:
+
+- **`.sln` files**: Traditional text format, parsed using regex
+- **`.slnx` files**: Newer XML format, parsed as XML
+
+Only C# projects (`.csproj`) are initialized. Solution folders and non-C# projects are skipped.
 
 ---
 
@@ -350,16 +429,45 @@ opalc init
 opalc init --ai claude  # Optional: add Claude support
 ```
 
-### Initialize Multiple Projects
+### Initialize a Solution
 
 ```bash
-# Initialize each project in a solution
-opalc init --project src/Core/Core.csproj
-opalc init --project src/Web/Web.csproj
-opalc init --project src/Tests/Tests.csproj
+# Initialize all projects in a solution (auto-detected)
+opalc init --ai claude
 
-# Optionally add Claude support to all
+# Or specify the solution explicitly
+opalc init --solution MySolution.sln --ai claude
+```
+
+This creates AI files in the solution root and adds MSBuild targets to all projects:
+
+```
+Initialized OPAL solution for Claude Code (opalc v0.1.5)
+
+Solution: MySolution.sln (3 projects)
+
+Created files:
+  CLAUDE.md
+  .claude/skills/opal/SKILL.md
+  .claude/skills/opal-convert/SKILL.md
+  .claude/settings.json
+
+Updated projects:
+  src/Core/Core.csproj
+  src/Web/Web.csproj
+  tests/Tests.csproj
+
+MSBuild configuration:
+  - Added OPAL compilation targets to 3 projects
+```
+
+### Initialize Individual Projects
+
+If you need to initialize projects independently (different AI configs per project):
+
+```bash
 opalc init --ai claude --project src/Core/Core.csproj
+opalc init --ai claude --project src/Web/Web.csproj
 ```
 
 ---
@@ -386,6 +494,14 @@ Specify the exact project:
 
 ```bash
 opalc init --ai claude --project ./src/MyApp/MyApp.csproj
+```
+
+### "Multiple solution files found"
+
+Specify which solution to use:
+
+```bash
+opalc init --solution MyApp.sln --ai claude
 ```
 
 ### Build Fails After Init
