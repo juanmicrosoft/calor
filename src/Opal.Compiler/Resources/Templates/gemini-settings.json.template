@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "write_file|replace",
+        "hooks": [
+          {
+            "name": "opal-validate-write",
+            "type": "command",
+            "command": "opalc hook validate-write --format gemini $TOOL_INPUT",
+            "description": "Enforce OPAL-first development - blocks creation of new .cs files"
+          }
+        ]
+      }
+    ]
+  }
+}

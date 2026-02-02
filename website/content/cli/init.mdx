@@ -118,6 +118,35 @@ After initialization, use these Codex commands:
 | `$opal` | Write new OPAL code with Codex's assistance |
 | `$opal-convert` | Convert existing C# code to OPAL syntax |
 
+### Gemini (`--ai gemini`)
+
+Creates the following files:
+
+| File | Purpose |
+|:-----|:--------|
+| `.gemini/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
+| `.gemini/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
+| `.gemini/settings.json` | **Hook configuration** - enforces OPAL-first development |
+| `GEMINI.md` | Project guidelines instructing Gemini to prefer OPAL for new code |
+
+#### OPAL-First Enforcement
+
+Like Claude Code, **Gemini CLI supports hooks** (as of v0.26.0+). The `.gemini/settings.json` file configures a `BeforeTool` hook that **blocks Gemini from creating `.cs` files**.
+
+Gemini will receive a JSON response blocking the operation and suggesting an `.opal` file instead. This enforcement ensures all new code is written in OPAL.
+
+**Allowed file types:**
+- `.opal` files (always allowed)
+- `.g.cs` generated files (build output)
+- Files in `obj/` directory (build artifacts)
+
+After initialization, use these Gemini CLI commands:
+
+| Command | Description |
+|:--------|:------------|
+| `@opal` | Write new OPAL code with Gemini's assistance |
+| `@opal-convert` | Convert existing C# code to OPAL syntax |
+
 ---
 
 ## MSBuild Integration
@@ -175,3 +204,6 @@ opalc init --ai claude  # Optional
 - [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) - Complete migration guide
 - [opalc convert](/cli/convert/) - Convert individual files
 - [opalc analyze](/cli/analyze/) - Find migration candidates
+- [Claude Integration](/getting-started/claude-integration/) - Using OPAL with Claude Code
+- [Codex Integration](/getting-started/codex-integration/) - Using OPAL with OpenAI Codex CLI
+- [Gemini Integration](/getting-started/gemini-integration/) - Using OPAL with Google Gemini CLI

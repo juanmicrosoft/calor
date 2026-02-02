@@ -140,7 +140,57 @@ project/
 
 ### Gemini (`--ai gemini`)
 
-Creates configuration for Google Gemini integration.
+Creates the following files:
+
+| File | Purpose |
+|:-----|:--------|
+| `.gemini/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
+| `.gemini/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
+| `.gemini/settings.json` | **Hook configuration** - enforces OPAL-first development |
+| `GEMINI.md` | Project documentation (creates new or updates OPAL section) |
+
+#### OPAL-First Enforcement
+
+Like Claude Code, **Gemini CLI supports hooks** (as of v0.26.0+). The `.gemini/settings.json` file configures a `BeforeTool` hook that **blocks Gemini from creating `.cs` files**.
+
+When Gemini tries to write a C# file, the hook returns a JSON response that blocks the operation and provides guidance:
+
+```json
+{
+  "decision": "deny",
+  "reason": "BLOCKED: Cannot create C# file 'MyClass.cs'",
+  "systemMessage": "This is an OPAL-first project. Create an .opal file instead: MyClass.opal\n\nUse @opal skill for OPAL syntax help."
+}
+```
+
+Gemini will then automatically retry with an `.opal` file. This enforcement ensures all new code is written in OPAL.
+
+**Allowed file types:**
+- `.opal` files (always allowed)
+- `.g.cs` generated files (build output)
+- Files in `obj/` directory (build artifacts)
+
+After initialization, use these Gemini CLI commands:
+
+| Command | Description |
+|:--------|:------------|
+| `@opal` | Write new OPAL code with Gemini's assistance |
+| `@opal-convert` | Convert existing C# code to OPAL syntax |
+
+#### Output Structure
+
+```
+project/
+├── .gemini/
+│   ├── skills/
+│   │   ├── opal/
+│   │   │   └── SKILL.md
+│   │   └── opal-convert/
+│   │       └── SKILL.md
+│   └── settings.json        # Hook configuration
+├── GEMINI.md
+└── MyProject.csproj
+```
 
 ### GitHub Copilot (`--ai github`)
 
@@ -351,4 +401,6 @@ opalc init --ai claude --project ./src/MyApp/MyApp.csproj
 - [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) - Complete migration guide
 - [opalc convert](/opal/cli/convert/) - Convert individual files
 - [opalc analyze](/opal/cli/analyze/) - Find migration candidates
-- [Claude Integration](/opal/getting-started/claude-integration/) - Using OPAL with Claude
+- [Claude Integration](/opal/getting-started/claude-integration/) - Using OPAL with Claude Code
+- [Codex Integration](/opal/getting-started/codex-integration/) - Using OPAL with OpenAI Codex CLI
+- [Gemini Integration](/opal/getting-started/gemini-integration/) - Using OPAL with Google Gemini CLI

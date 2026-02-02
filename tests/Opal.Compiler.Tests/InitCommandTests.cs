@@ -362,15 +362,17 @@ Run `dotnet build` to compile.
     }
 
     [Fact]
-    public async Task GeminiInitializer_Initialize_ReturnsNotImplemented()
+    public async Task GeminiInitializer_Initialize_ReturnsSuccess()
     {
         var initializer = new GeminiInitializer();
 
         var result = await initializer.InitializeAsync(_testDirectory, force: false);
 
-        Assert.False(result.Success);
-        Assert.Contains("not yet implemented", result.Messages[0]);
-        Assert.Contains("Google Gemini", result.Messages[0]);
+        Assert.True(result.Success);
+        Assert.Contains(result.Messages, m => m.Contains("Google Gemini"));
+        Assert.True(Directory.Exists(Path.Combine(_testDirectory, ".gemini", "skills", "opal")));
+        Assert.True(File.Exists(Path.Combine(_testDirectory, "GEMINI.md")));
+        Assert.True(File.Exists(Path.Combine(_testDirectory, ".gemini", "settings.json")));
     }
 
     [Fact]
