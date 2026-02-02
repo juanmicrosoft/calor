@@ -29,15 +29,19 @@ public class ClaudeInitializer : IAiInitializer
 
         try
         {
-            // Create .claude/skills/ directory
-            var skillsDir = Path.Combine(targetDirectory, ".claude", "skills");
-            Directory.CreateDirectory(skillsDir);
+            // Create .claude/skills/opal/ directory
+            var opalSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "opal");
+            Directory.CreateDirectory(opalSkillDir);
 
-            // Write skill files
-            var opalSkillPath = Path.Combine(skillsDir, "opal.md");
-            var convertSkillPath = Path.Combine(skillsDir, "opal-convert.md");
+            // Create .claude/skills/opal-convert/ directory
+            var convertSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "opal-convert");
+            Directory.CreateDirectory(convertSkillDir);
 
-            if (await WriteFileIfNeeded(opalSkillPath, EmbeddedResourceHelper.ReadSkill("opal.md"), force))
+            // Write skill files (Claude uses SKILL.md format with YAML frontmatter)
+            var opalSkillPath = Path.Combine(opalSkillDir, "SKILL.md");
+            var convertSkillPath = Path.Combine(convertSkillDir, "SKILL.md");
+
+            if (await WriteFileIfNeeded(opalSkillPath, EmbeddedResourceHelper.ReadSkill("claude-opal-SKILL.md"), force))
             {
                 createdFiles.Add(opalSkillPath);
             }
@@ -46,7 +50,7 @@ public class ClaudeInitializer : IAiInitializer
                 warnings.Add($"Skipped existing file: {opalSkillPath}");
             }
 
-            if (await WriteFileIfNeeded(convertSkillPath, EmbeddedResourceHelper.ReadSkill("opal-convert.md"), force))
+            if (await WriteFileIfNeeded(convertSkillPath, EmbeddedResourceHelper.ReadSkill("claude-opal-convert-SKILL.md"), force))
             {
                 createdFiles.Add(convertSkillPath);
             }

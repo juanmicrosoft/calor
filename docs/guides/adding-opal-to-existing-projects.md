@@ -217,8 +217,8 @@ opalc init --ai claude
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/opal.md` | Skill for writing OPAL code |
-| `.claude/skills/opal-convert.md` | Skill for C# to OPAL conversion |
+| `.claude/skills/opal/SKILL.md` | Skill for writing OPAL code |
+| `.claude/skills/opal-convert/SKILL.md` | Skill for C# to OPAL conversion |
 | `CLAUDE.md` | Project guidelines for Claude |
 
 ### CLAUDE.md Guidelines
@@ -272,8 +272,10 @@ MyProject/
 ├── CLAUDE.md                  # Project docs for Claude
 ├── .claude/
 │   └── skills/
-│       ├── opal.md           # OPAL writing skill
-│       └── opal-convert.md   # Conversion skill
+│       ├── opal/
+│       │   └── SKILL.md      # OPAL writing skill
+│       └── opal-convert/
+│           └── SKILL.md      # Conversion skill
 ├── src/
 │   ├── Program.cs            # C# entry point
 │   ├── Models/
