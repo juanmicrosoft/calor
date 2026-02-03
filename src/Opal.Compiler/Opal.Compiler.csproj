@@ -10,10 +10,9 @@
     <ToolCommandName>opalc</ToolCommandName>
     <PackageId>opalc</PackageId>
     <Version>0.1.4</Version>
-    <Description>OPAL compiler - Optimized Programming for Agent Language</Description>
-    <PackageProjectUrl>https://github.com/juanmicrosoft/opal-2</PackageProjectUrl>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Description>OPAL compiler CLI - Convert C# to OPAL and compile OPAL to C#</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See https://github.com/juanmicrosoft/opal/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

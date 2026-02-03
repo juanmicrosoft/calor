@@ -21,4 +21,13 @@
     <Product>OPAL Compiler</Product>
     <Copyright>Copyright © 2024</Copyright>
   </PropertyGroup>
+
+  <PropertyGroup Label="NuGet Package Metadata">
+    <Authors>Juan Rivera</Authors>
+    <PackageProjectUrl>https://github.com/juanmicrosoft/opal</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/juanmicrosoft/opal</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>opal;compiler;dsl;code-generation;dotnet;csharp</PackageTags>
+  </PropertyGroup>
 </Project>

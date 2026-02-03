@@ -5,8 +5,15 @@
     <RootNamespace>Opal.Tasks</RootNamespace>
     <IsPackable>true</IsPackable>
     <PackageId>Opal.Tasks</PackageId>
-    <Description>MSBuild tasks for compiling OPAL source files</Description>
+    <Version>0.1.4</Version>
+    <Description>MSBuild tasks for compiling OPAL source files to C#</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See https://github.com/juanmicrosoft/opal/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.0.2" />
