@@ -40,6 +40,7 @@ public sealed class ConversionStats
     public int SkippedNodes { get; set; }
     public int ClassesConverted { get; set; }
     public int InterfacesConverted { get; set; }
+    public int EnumsConverted { get; set; }
     public int MethodsConverted { get; set; }
     public int PropertiesConverted { get; set; }
     public int FieldsConverted { get; set; }
@@ -362,6 +363,7 @@ public sealed class ConversionContext
         Stats.SkippedNodes = 0;
         Stats.ClassesConverted = 0;
         Stats.InterfacesConverted = 0;
+        Stats.EnumsConverted = 0;
         Stats.MethodsConverted = 0;
         Stats.PropertiesConverted = 0;
         Stats.FieldsConverted = 0;

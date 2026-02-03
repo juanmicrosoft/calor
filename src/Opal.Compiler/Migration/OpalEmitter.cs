@@ -95,6 +95,13 @@ public sealed class OpalEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit enums
+        foreach (var enumDef in node.Enums)
+        {
+            Visit(enumDef);
+            AppendLine();
+        }
+
         // Emit classes
         foreach (var cls in node.Classes)
         {
@@ -1324,6 +1331,34 @@ public sealed class OpalEmitter : IAstVisitor<string>
         }
         Dedent();
         AppendLine("§/UNION");
+        return "";
+    }
+
+    public string Visit(EnumDefinitionNode node)
+    {
+        // Format: §ENUM{id:Name} or §ENUM{id:Name:underlyingType}
+        var header = node.UnderlyingType != null
+            ? $"§ENUM{{{node.Id}:{node.Name}:{node.UnderlyingType}}}"
+            : $"§ENUM{{{node.Id}:{node.Name}}}";
+        AppendLine(header);
+        Indent();
+
+        foreach (var member in node.Members)
+        {
+            Visit(member);
+        }
+
+        Dedent();
+        AppendLine($"§/ENUM{{{node.Id}}}");
+        return "";
+    }
+
+    public string Visit(EnumMemberNode node)
+    {
+        var line = node.Value != null
+            ? $"{node.Name} = {node.Value}"
+            : node.Name;
+        AppendLine(line);
         return "";
     }
 

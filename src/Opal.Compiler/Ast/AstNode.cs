@@ -49,6 +49,8 @@ public interface IAstVisitor
     // Phase 3: Type System
     void Visit(RecordDefinitionNode node);
     void Visit(UnionTypeDefinitionNode node);
+    void Visit(EnumDefinitionNode node);
+    void Visit(EnumMemberNode node);
     void Visit(RecordCreationNode node);
     void Visit(FieldAccessNode node);
     void Visit(SomeExpressionNode node);
@@ -187,6 +189,8 @@ public interface IAstVisitor<T>
     // Phase 3: Type System
     T Visit(RecordDefinitionNode node);
     T Visit(UnionTypeDefinitionNode node);
+    T Visit(EnumDefinitionNode node);
+    T Visit(EnumMemberNode node);
     T Visit(RecordCreationNode node);
     T Visit(FieldAccessNode node);
     T Visit(SomeExpressionNode node);

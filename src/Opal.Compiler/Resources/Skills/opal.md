@@ -231,11 +231,42 @@ Example with class and method:
 §/M{m001}
 ```
 
+## Enums
+
+```
+§ENUM{id:Name}              Simple enum
+  Red
+  Green
+  Blue
+§/ENUM{id}
+
+§ENUM{id:Name:underlyingType}  Enum with underlying type
+  Ok = 200
+  NotFound = 404
+  Error = 500
+§/ENUM{id}
+```
+
+Underlying types: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
+
+### Template: Status Enum
+
+```opal
+§M{m001:Api}
+§ENUM{e001:StatusCode}
+  Ok = 200
+  NotFound = 404
+  ServerError = 500
+§/ENUM{e001}
+§/M{m001}
+```
+
 ## ID Conventions
 
 - Modules: `m001`, `m002`
 - Functions: `f001`, `f002`
 - Classes: `c001`, `c002`
+- Enums: `e001`, `e002`
 - Properties: `p001`, `p002`
 - Methods: `m001`, `m002`
 - Loops: `for1`, `while1`, `do1`
