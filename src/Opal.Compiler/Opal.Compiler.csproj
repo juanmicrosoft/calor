@@ -9,7 +9,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>opalc</ToolCommandName>
     <PackageId>opalc</PackageId>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
     <Description>OPAL compiler - Optimized Programming for Agent Language</Description>
     <PackageProjectUrl>https://github.com/juanmicrosoft/opal-2</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
