@@ -8,7 +8,7 @@ import Link from 'next/link';
 function transformHref(href: string): string {
   if (!href) return href;
 
-  // Handle relative /calor/ links (legacy Jekyll format)
+  // Handle relative /calor/ links (legacy format, for backwards compatibility)
   if (href.startsWith('/calor/')) {
     // Convert /calor/getting-started/ to /docs/getting-started/
     const path = href.replace('/calor/', '');
