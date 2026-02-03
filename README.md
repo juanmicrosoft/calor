@@ -102,7 +102,7 @@ Evaluated across 20 paired OPAL/C# programs using V2 compact syntax:
 # Install the compiler
 dotnet tool install -g opalc
 
-# Initialize for Claude Code (optional)
+# Initialize for Claude Code (run in a folder with a C# project or solution)
 opalc init --ai claude
 
 # Compile OPAL to C#
@@ -142,9 +142,9 @@ dotnet run --project samples/HelloWorld
 
 ## Documentation
 
-- **[Syntax Reference](docs/syntax-reference/)** — Complete language reference
-- **[Getting Started](docs/getting-started/)** — Installation, hello world, Claude integration
-- **[Benchmarking](docs/benchmarking/)** — How we measure OPAL vs C#
+- **[Syntax Reference](https://juanrivera.github.io/opal/syntax-reference/)** — Complete language reference
+- **[Getting Started](https://juanrivera.github.io/opal/getting-started/)** — Installation, hello world, Claude integration
+- **[Benchmarking](https://juanrivera.github.io/opal/benchmarking/)** — How we measure OPAL vs C#
 
 ## Project Status
 
