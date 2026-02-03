@@ -27,7 +27,7 @@ export function Footer() {
               OPAL
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">
-              Optimized Programming for Agents Language. A language designed for AI coding agents.
+              Coding Agent Language for Optimized Reasoning. A language designed for AI coding agents.
             </p>
           </div>
 

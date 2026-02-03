@@ -17,17 +17,17 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Company>OPAL</Company>
-    <Product>OPAL Compiler</Product>
+    <Company>Calor</Company>
+    <Product>Calor Compiler</Product>
     <Copyright>Copyright © 2024</Copyright>
   </PropertyGroup>
 
   <PropertyGroup Label="NuGet Package Metadata">
     <Authors>Juan Rivera</Authors>
-    <PackageProjectUrl>https://github.com/juanmicrosoft/opal</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/juanmicrosoft/opal</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/juanmicrosoft/calor</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/juanmicrosoft/calor</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>opal;compiler;dsl;code-generation;dotnet;csharp</PackageTags>
+    <PackageTags>calor;compiler;dsl;code-generation;dotnet;csharp</PackageTags>
   </PropertyGroup>
 </Project>

@@ -4,24 +4,24 @@ section: "cli"
 order: 2
 ---
 
-# opalc init
+# calorc init
 
-Initialize OPAL development environment with MSBuild integration and optional AI agent support.
+Initialize Calor development environment with MSBuild integration and optional AI agent support.
 
 ```bash
-opalc init [options]
+calorc init [options]
 ```
 
 ---
 
 ## Overview
 
-The `init` command sets up your project for OPAL development by:
+The `init` command sets up your project for Calor development by:
 
-1. **Adding MSBuild targets** - Integrates OPAL compilation into your .NET build process
+1. **Adding MSBuild targets** - Integrates Calor compilation into your .NET build process
 2. **Configuring AI agent integration** (optional) - Creates skills/prompts for your preferred AI coding assistant
 
-After running `init`, you can write `.opal` files alongside your `.cs` files and they'll compile automatically during `dotnet build`.
+After running `init`, you can write `.calor` files alongside your `.cs` files and they'll compile automatically during `dotnet build`.
 
 ---
 
@@ -29,13 +29,13 @@ After running `init`, you can write `.opal` files alongside your `.cs` files and
 
 ```bash
 # Basic initialization (MSBuild integration only)
-opalc init
+calorc init
 
 # Initialize with Claude Code support
-opalc init --ai claude
+calorc init --ai claude
 
 # Initialize with a specific .csproj
-opalc init --project MyApp.csproj
+calorc init --project MyApp.csproj
 ```
 
 ---
@@ -60,28 +60,28 @@ Creates the following files:
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
-| `.claude/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
-| `.claude/settings.json` | **Hook configuration** - enforces OPAL-first development |
-| `CLAUDE.md` | Project guidelines instructing Claude to prefer OPAL for new code |
+| `.claude/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
+| `.claude/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
+| `.claude/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `CLAUDE.md` | Project guidelines instructing Claude to prefer Calor for new code |
 
-#### OPAL-First Enforcement
+#### Calor-First Enforcement
 
 The `.claude/settings.json` file configures a `PreToolUse` hook that **blocks Claude from creating `.cs` files**. When Claude tries to write a C# file, it will see:
 
 ```
 BLOCKED: Cannot create C# file 'MyClass.cs'
 
-This is an OPAL-first project. Create an .opal file instead:
-  MyClass.opal
+This is an Calor-first project. Create an .calor file instead:
+  MyClass.calor
 
-Use /opal skill for OPAL syntax help.
+Use /calor skill for Calor syntax help.
 ```
 
-Claude will then automatically retry with an `.opal` file. This enforcement ensures all new code is written in OPAL.
+Claude will then automatically retry with an `.calor` file. This enforcement ensures all new code is written in Calor.
 
 **Allowed file types:**
-- `.opal` files (always allowed)
+- `.calor` files (always allowed)
 - `.g.cs` generated files (build output)
 - Files in `obj/` directory (build artifacts)
 
@@ -89,8 +89,8 @@ After initialization, use these Claude Code commands:
 
 | Command | Description |
 |:--------|:------------|
-| `/opal` | Write new OPAL code with Claude's assistance |
-| `/opal-convert` | Convert existing C# code to OPAL syntax |
+| `/calor` | Write new Calor code with Claude's assistance |
+| `/calor-convert` | Convert existing C# code to Calor syntax |
 
 ### Codex (`--ai codex`)
 
@@ -98,25 +98,25 @@ Creates the following files:
 
 | File | Purpose |
 |:-----|:--------|
-| `.codex/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
-| `.codex/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
-| `AGENTS.md` | Project documentation with OPAL-first guidelines |
+| `.codex/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
+| `.codex/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
+| `AGENTS.md` | Project documentation with Calor-first guidelines |
 
 #### Guidance-Based Enforcement
 
-**Important:** Codex CLI does not support hooks like Claude Code. OPAL-first development is **guidance-based only**.
+**Important:** Codex CLI does not support hooks like Claude Code. Calor-first development is **guidance-based only**.
 
 This means:
-- Codex *should* create `.opal` files based on the instructions
+- Codex *should* create `.calor` files based on the instructions
 - Enforcement is not automatic - review file extensions after generation
-- Use `opalc analyze` to find any unconverted `.cs` files
+- Use `calorc analyze` to find any unconverted `.cs` files
 
 After initialization, use these Codex commands:
 
 | Command | Description |
 |:--------|:------------|
-| `$opal` | Write new OPAL code with Codex's assistance |
-| `$opal-convert` | Convert existing C# code to OPAL syntax |
+| `$calor` | Write new Calor code with Codex's assistance |
+| `$calor-convert` | Convert existing C# code to Calor syntax |
 
 ### Gemini (`--ai gemini`)
 
@@ -124,19 +124,19 @@ Creates the following files:
 
 | File | Purpose |
 |:-----|:--------|
-| `.gemini/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
-| `.gemini/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
-| `.gemini/settings.json` | **Hook configuration** - enforces OPAL-first development |
-| `GEMINI.md` | Project guidelines instructing Gemini to prefer OPAL for new code |
+| `.gemini/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
+| `.gemini/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
+| `.gemini/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `GEMINI.md` | Project guidelines instructing Gemini to prefer Calor for new code |
 
-#### OPAL-First Enforcement
+#### Calor-First Enforcement
 
 Like Claude Code, **Gemini CLI supports hooks** (as of v0.26.0+). The `.gemini/settings.json` file configures a `BeforeTool` hook that **blocks Gemini from creating `.cs` files**.
 
-Gemini will receive a JSON response blocking the operation and suggesting an `.opal` file instead. This enforcement ensures all new code is written in OPAL.
+Gemini will receive a JSON response blocking the operation and suggesting an `.calor` file instead. This enforcement ensures all new code is written in Calor.
 
 **Allowed file types:**
-- `.opal` files (always allowed)
+- `.calor` files (always allowed)
 - `.g.cs` generated files (build output)
 - Files in `obj/` directory (build artifacts)
 
@@ -144,8 +144,8 @@ After initialization, use these Gemini CLI commands:
 
 | Command | Description |
 |:--------|:------------|
-| `@opal` | Write new OPAL code with Gemini's assistance |
-| `@opal-convert` | Convert existing C# code to OPAL syntax |
+| `@calor` | Write new Calor code with Gemini's assistance |
+| `@calor-convert` | Convert existing C# code to Calor syntax |
 
 ---
 
@@ -153,7 +153,7 @@ After initialization, use these Gemini CLI commands:
 
 The `init` command adds MSBuild targets to your `.csproj` file that:
 
-- Compile `.opal` files before C# compilation
+- Compile `.calor` files before C# compilation
 - Include generated `.g.cs` files in the build
 - Clean generated files on `dotnet clean`
 
@@ -162,7 +162,7 @@ The `init` command adds MSBuild targets to your `.csproj` file that:
 Generated C# files are placed in:
 
 ```
-obj/<Configuration>/<TargetFramework>/opal/
+obj/<Configuration>/<TargetFramework>/calor/
 ```
 
 This keeps generated files out of your source tree.
@@ -174,36 +174,36 @@ This keeps generated files out of your source tree.
 ### Basic Initialization
 
 ```bash
-# Initialize OPAL (MSBuild only)
-opalc init
+# Initialize Calor (MSBuild only)
+calorc init
 
 # Analyze codebase for migration candidates
-opalc analyze ./src --top 10
+calorc analyze ./src --top 10
 ```
 
 ### With Claude Code
 
 ```bash
 # Add Claude Code support
-opalc init --ai claude
+calorc init --ai claude
 ```
 
 ### Initialize New Project
 
 ```bash
-dotnet new console -o MyOpalApp
-cd MyOpalApp
-opalc init
-opalc init --ai claude  # Optional
+dotnet new console -o MyCalorApp
+cd MyCalorApp
+calorc init
+calorc init --ai claude  # Optional
 ```
 
 ---
 
 ## See Also
 
-- [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) - Complete migration guide
-- [opalc convert](/cli/convert/) - Convert individual files
-- [opalc analyze](/cli/analyze/) - Find migration candidates
-- [Claude Integration](/getting-started/claude-integration/) - Using OPAL with Claude Code
-- [Codex Integration](/getting-started/codex-integration/) - Using OPAL with OpenAI Codex CLI
-- [Gemini Integration](/getting-started/gemini-integration/) - Using OPAL with Google Gemini CLI
+- [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) - Complete migration guide
+- [calorc convert](/cli/convert/) - Convert individual files
+- [calorc analyze](/cli/analyze/) - Find migration candidates
+- [Claude Integration](/getting-started/claude-integration/) - Using Calor with Claude Code
+- [Codex Integration](/getting-started/codex-integration/) - Using Calor with OpenAI Codex CLI
+- [Gemini Integration](/getting-started/gemini-integration/) - Using Calor with Google Gemini CLI

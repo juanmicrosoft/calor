@@ -6,21 +6,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- OPAL SDK configuration -->
-    <OpalTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\Opal.Tasks\bin\Debug\net8.0\Opal.Tasks.dll</OpalTasksAssembly>
-    <OpalOutputDirectory>$(MSBuildThisFileDirectory)obj\opal\</OpalOutputDirectory>
+    <!-- Calor SDK configuration -->
+    <CalorTasksAssembly>$(MSBuildThisFileDirectory)..\..\src\Calor.Tasks\bin\$(Configuration)\net8.0\Calor.Tasks.dll</CalorTasksAssembly>
+    <CalorOutputDirectory>$(MSBuildThisFileDirectory)obj\calor\</CalorOutputDirectory>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Opal.Runtime\Opal.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Calor.Runtime\Calor.Runtime.csproj" />
   </ItemGroup>
 
-  <!-- Include OPAL files -->
+  <!-- Include Calor files -->
   <ItemGroup>
-    <OpalCompile Include="**\*.opal" />
+    <CalorCompile Include="**\*.calr" />
   </ItemGroup>
 
-  <!-- Import OPAL compilation targets -->
-  <Import Project="..\..\src\Opal.Sdk\Sdk\Sdk.targets" />
+  <!-- Import Calor compilation targets -->
+  <Import Project="..\..\src\Calor.Sdk\Sdk\Sdk.targets" />
 
 </Project>

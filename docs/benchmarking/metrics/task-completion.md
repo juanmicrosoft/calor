@@ -36,7 +36,7 @@ This metric captures end-to-end success, not just individual capabilities.
 
 ### Completion Potential Score
 
-| Factor | OPAL | C# |
+| Factor | Calor | C# |
 |:-------|:-----|:---|
 | Token efficiency | Variable | Typically better |
 | Compilation success | +0.20 | +0.20 |
@@ -47,7 +47,7 @@ Base score: 0.50 for both
 
 ### Token Efficiency Bonus
 
-| Token Count | OPAL Bonus | C# Bonus |
+| Token Count | Calor Bonus | C# Bonus |
 |:------------|:-----------|:---------|
 | < 50 | +0.15 | N/A |
 | < 100 | +0.10 | +0.10 |
@@ -109,7 +109,7 @@ C# has:
 
 For the same logic, C# typically uses fewer tokens:
 
-| Task | OPAL Tokens | C# Tokens | Ratio |
+| Task | Calor Tokens | C# Tokens | Ratio |
 |:-----|:------------|:----------|:------|
 | Hello World | ~25 | ~15 | 1.67x |
 | FizzBuzz | ~80 | ~50 | 1.60x |
@@ -128,7 +128,7 @@ When things go wrong, C# errors are:
 
 ## Task Categories
 
-### Simple Tasks (OPAL competitive)
+### Simple Tasks (Calor competitive)
 
 - Hello World
 - Basic arithmetic
@@ -176,7 +176,7 @@ var task = new TaskDefinition
 };
 ```
 
-### OPAL Solution
+### Calor Solution
 
 ```
 §M[m001:FizzBuzz]
@@ -222,7 +222,7 @@ C# is 1.6x more token-efficient for this task.
 
 Given a typical 8K context window:
 
-| Metric | OPAL | C# |
+| Metric | Calor | C# |
 |:-------|:-----|:---|
 | Avg tokens per program | ~100 | ~60 |
 | Programs fitting in context | ~80 | ~130 |
@@ -240,14 +240,14 @@ This is primarily due to:
 2. **Training data** - LLMs know C# patterns better
 3. **Error recovery** - C# errors are easier to fix
 
-However, the gap is modest, and OPAL's advantages in comprehension and precision may offset this in specific scenarios.
+However, the gap is modest, and Calor's advantages in comprehension and precision may offset this in specific scenarios.
 
 ---
 
-## When OPAL Catches Up
+## When Calor Catches Up
 
-OPAL may perform better when:
-- Tasks require understanding existing OPAL code
+Calor may perform better when:
+- Tasks require understanding existing Calor code
 - Contract verification is part of the task
 - Precise edits are needed
 - Comprehension quality matters more than speed
@@ -256,4 +256,4 @@ OPAL may perform better when:
 
 ## Next
 
-- [Token Economics](/opal/benchmarking/metrics/token-economics/) - Token count comparison
+- [Token Economics](/calor/benchmarking/metrics/token-economics/) - Token count comparison

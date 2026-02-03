@@ -4,19 +4,19 @@ section: "cli"
 order: 7
 ---
 
-# opalc diagnose
+# calorc diagnose
 
-Output machine-readable diagnostics for OPAL files.
+Output machine-readable diagnostics for Calor files.
 
 ```bash
-opalc diagnose <files...> [options]
+calorc diagnose <files...> [options]
 ```
 
 ---
 
 ## Overview
 
-The `diagnose` command analyzes OPAL files and outputs diagnostics in formats suitable for tooling integration:
+The `diagnose` command analyzes Calor files and outputs diagnostics in formats suitable for tooling integration:
 
 - **Text** - Human-readable plain text
 - **JSON** - Machine-readable structured data
@@ -28,16 +28,16 @@ The `diagnose` command analyzes OPAL files and outputs diagnostics in formats su
 
 ```bash
 # Diagnose a single file (text output)
-opalc diagnose MyModule.opal
+calorc diagnose MyModule.calor
 
 # JSON output for processing
-opalc diagnose MyModule.opal --format json
+calorc diagnose MyModule.calor --format json
 
 # SARIF output for IDE integration
-opalc diagnose src/*.opal --format sarif --output diagnostics.sarif
+calorc diagnose src/*.calor --format sarif --output diagnostics.sarif
 
 # Enable strict checking
-opalc diagnose MyModule.opal --strict-api --require-docs
+calorc diagnose MyModule.calor --strict-api --require-docs
 ```
 
 ---
@@ -58,7 +58,7 @@ opalc diagnose MyModule.opal --strict-api --require-docs
 ### Text (Default)
 
 ```
-Calculator.opal:12:5: error: Undefined variable 'x'
+Calculator.calor:12:5: error: Undefined variable 'x'
   §R (+ x 1)
        ^
 
@@ -89,18 +89,18 @@ Integrates with VS Code, GitHub Code Scanning, Azure DevOps, and other SARIF-com
 
 ```yaml
 # GitHub Actions
-- name: Check OPAL diagnostics
-  run: opalc diagnose src/**/*.opal --format sarif --output opal.sarif
+- name: Check Calor diagnostics
+  run: calorc diagnose src/**/*.calor --format sarif --output calor.sarif
 
 - name: Upload SARIF
   uses: github/codeql-action/upload-sarif@v2
   with:
-    sarif_file: opal.sarif
+    sarif_file: calor.sarif
 ```
 
 ---
 
 ## See Also
 
-- [opalc format](/cli/format/) - Format OPAL source files
-- [opalc compile](/cli/compile/) - Compile with error reporting
+- [calorc format](/cli/format/) - Format Calor source files
+- [calorc compile](/cli/compile/) - Compile with error reporting

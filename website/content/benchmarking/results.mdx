@@ -6,33 +6,33 @@ order: 2
 
 # Benchmark Results
 
-Evaluated across 20 paired OPAL/C# programs (100% compilation success for both) using V2 compact syntax.
+Evaluated across 20 paired Calor/C# programs (100% compilation success for both) using V2 compact syntax.
 
 ---
 
 ## Summary Table
 
-| Category | OPAL vs C# | Winner | Interpretation |
+| Category | Calor vs C# | Winner | Interpretation |
 |:---------|:-----------|:-------|:---------------|
-| Comprehension | **1.33x** | OPAL | Explicit structure aids understanding |
-| Error Detection | **1.19x** | OPAL | Contracts surface invariant violations |
-| Edit Precision | **1.15x** | OPAL | Unique IDs enable targeted changes |
+| Comprehension | **1.33x** | Calor | Explicit structure aids understanding |
+| Error Detection | **1.19x** | Calor | Contracts surface invariant violations |
+| Edit Precision | **1.15x** | Calor | Unique IDs enable targeted changes |
 | Generation Accuracy | 0.94x | C# | Mature tooling, familiar patterns |
 | Task Completion | 0.93x | C# | Ecosystem maturity advantage |
-| Token Economics | 0.67x | C# | OPAL's explicit syntax uses more tokens |
-| Information Density | 0.22x | C# | OPAL trades density for explicitness |
+| Token Economics | 0.67x | C# | Calor's explicit syntax uses more tokens |
+| Information Density | 0.22x | C# | Calor trades density for explicitness |
 
 ---
 
 ## Category Breakdown
 
-### Where OPAL Wins
+### Where Calor Wins
 
 #### Comprehension (1.33x)
 
-OPAL's explicit structure provides clear signals for understanding:
+Calor's explicit structure provides clear signals for understanding:
 
-| Factor | OPAL | C# |
+| Factor | Calor | C# |
 |:-------|:-----|:---|
 | Module boundaries | `§M[id:name]...§/M[id]` | `namespace Name { }` |
 | Function signatures | `§F[id:name:vis]` with `§I`, `§O` | Method declarations |
@@ -44,7 +44,7 @@ OPAL's explicit structure provides clear signals for understanding:
 Contracts make invariants explicit:
 
 ```
-// OPAL: Contracts are syntax
+// Calor: Contracts are syntax
 §Q (>= x 0)
 §S (>= result 0)
 
@@ -73,19 +73,19 @@ for (int i = 0; i < 100; i++)
 
 C# is more compact:
 
-| Operation | OPAL | C# |
+| Operation | Calor | C# |
 |:----------|:-----|:---|
 | Return sum | `§R (+ a b)` | `return a + b;` |
 | Print value | `§P x` | `Console.WriteLine(x);` |
 | Function def | 5-7 lines | 3-5 lines |
 
-Average: OPAL uses ~1.5x more tokens than C#.
+Average: Calor uses ~1.5x more tokens than C#.
 
 #### Information Density (0.22x)
 
 C# packs more semantic content per token:
 
-| Metric | OPAL | C# | Ratio |
+| Metric | Calor | C# | Ratio |
 |:-------|:-----|:---|:------|
 | Avg semantic elements | 8.2 | 12.5 | 0.66x |
 | Avg tokens | 45 | 28 | 1.6x |
@@ -96,7 +96,7 @@ C# packs more semantic content per token:
 ## The Tradeoff Visualized
 
 ```
-                    OPAL better ←  → C# better
+                    Calor better ←  → C# better
                          |
 Comprehension     ████████████░░░░  1.33x
 Error Detection   ██████████░░░░░░  1.19x
@@ -126,7 +126,7 @@ V2 is now the standard and recommended syntax.
 
 ## Per-Program Results
 
-| Program | Comprehension | Error Det. | Edit Prec. | Tokens (OPAL/C#) |
+| Program | Comprehension | Error Det. | Edit Prec. | Tokens (Calor/C#) |
 |:--------|:--------------|:-----------|:-----------|:-----------------|
 | HelloWorld | 0.75 / 0.55 | 0.30 / 0.30 | 0.85 / 0.65 | 25 / 15 |
 | FizzBuzz | 0.95 / 0.70 | 0.35 / 0.30 | 0.90 / 0.70 | 80 / 50 |
@@ -135,7 +135,7 @@ V2 is now the standard and recommended syntax.
 | FileRead | 0.90 / 0.65 | 0.50 / 0.40 | 0.85 / 0.70 | 60 / 40 |
 | ... | ... | ... | ... | ... |
 
-*Scores are 0-1, higher is better for OPAL metrics.*
+*Scores are 0-1, higher is better for Calor metrics.*
 
 ---
 
@@ -155,7 +155,7 @@ The 1.15x edit precision advantage validates the unique ID design decision.
 
 ### 4. The Cost is Real
 
-The 0.67x token economics ratio means OPAL consumes more context window. This is the price of explicitness.
+The 0.67x token economics ratio means Calor consumes more context window. This is the price of explicitness.
 
 ### 5. Not a Universal Win
 
@@ -163,9 +163,9 @@ C# still wins on generation and completion metrics, reflecting ecosystem maturit
 
 ---
 
-## When to Use OPAL
+## When to Use Calor
 
-Based on results, OPAL is most valuable when:
+Based on results, Calor is most valuable when:
 
 - Agent comprehension is critical
 - Contract verification matters

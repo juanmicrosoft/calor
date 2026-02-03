@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Calor.Sdk</RootNamespace>
+
+    <!-- Package settings -->
+    <IsPackable>true</IsPackable>
+    <PackageId>Calor.Sdk</PackageId>
+    <PackageType>MSBuildSdk</PackageType>
+    <Version>0.1.4</Version>
+    <Description>MSBuild SDK for building Calor projects. Use with Sdk="Calor.Sdk/0.1.4"</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md</PackageReleaseNotes>
+
+    <!-- Suppress NU5128 warning about dependency groups -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+
+    <!-- Don't produce a DLL - this is just an SDK package -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+
+    <!-- Include content files in package -->
+    <ContentTargetFolders>content</ContentTargetFolders>
+  </PropertyGroup>
+
+  <!-- Reference Calor.Tasks to get its output -->
+  <ItemGroup>
+    <ProjectReference Include="..\Calor.Tasks\Calor.Tasks.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Include SDK files in the package -->
+  <ItemGroup>
+    <None Include="Sdk\Sdk.props" Pack="true" PackagePath="Sdk" />
+    <None Include="Sdk\Sdk.targets" Pack="true" PackagePath="Sdk" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Include task assemblies in the package -->
+  <Target Name="IncludeTaskAssemblies" BeforeTargets="GenerateNuspec">
+    <ItemGroup>
+      <None Include="..\Calor.Tasks\bin\$(Configuration)\net8.0\*.dll" Pack="true" PackagePath="tasks\net8.0" />
+    </ItemGroup>
+  </Target>
+
+</Project>

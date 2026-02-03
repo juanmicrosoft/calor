@@ -4,12 +4,12 @@ section: "cli"
 order: 4
 ---
 
-# opalc migrate
+# calorc migrate
 
-Migrate an entire project between C# and OPAL.
+Migrate an entire project between C# and Calor.
 
 ```bash
-opalc migrate <path> [options]
+calorc migrate <path> [options]
 ```
 
 ---
@@ -30,16 +30,16 @@ The `migrate` command converts all applicable files in a project or directory. I
 
 ```bash
 # Preview migration (dry run)
-opalc migrate ./src --dry-run
+calorc migrate ./src --dry-run
 
-# Migrate C# to OPAL
-opalc migrate ./src
+# Migrate C# to Calor
+calorc migrate ./src
 
 # Migrate with report
-opalc migrate ./src --report migration-report.md
+calorc migrate ./src --report migration-report.md
 
-# Migrate OPAL back to C#
-opalc migrate ./src --direction opal-to-cs
+# Migrate Calor back to C#
+calorc migrate ./src --direction calor-to-cs
 ```
 
 ---
@@ -50,7 +50,7 @@ opalc migrate ./src --direction opal-to-cs
 |:-------|:------|:--------|:------------|
 | `--dry-run` | `-n` | `false` | Preview changes without writing files |
 | `--benchmark` | `-b` | `false` | Include before/after metrics comparison |
-| `--direction` | `-d` | `cs-to-opal` | Migration direction |
+| `--direction` | `-d` | `cs-to-calor` | Migration direction |
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
@@ -62,14 +62,14 @@ opalc migrate ./src --direction opal-to-cs
 Before converting, the command analyzes your codebase and creates a plan:
 
 ```bash
-opalc migrate ./src --dry-run
+calorc migrate ./src --dry-run
 ```
 
 Output:
 ```
 === Migration Plan ===
 
-Direction: C# → OPAL
+Direction: C# → Calor
 Source: ./src
 
 Files to Convert:
@@ -85,7 +85,7 @@ Files to Convert:
 Use `--benchmark` to see aggregate metrics:
 
 ```bash
-opalc migrate ./src --benchmark
+calorc migrate ./src --benchmark
 ```
 
 Output includes:
@@ -103,10 +103,10 @@ Generate detailed reports for documentation:
 
 ```bash
 # Markdown report
-opalc migrate ./src --report migration-report.md
+calorc migrate ./src --report migration-report.md
 
 # JSON report
-opalc migrate ./src --report migration-report.json
+calorc migrate ./src --report migration-report.json
 ```
 
 ---
@@ -123,6 +123,6 @@ opalc migrate ./src --report migration-report.json
 
 ## See Also
 
-- [opalc convert](/cli/convert/) - Convert single files
-- [opalc analyze](/cli/analyze/) - Find migration candidates
-- [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) - Complete migration guide
+- [calorc convert](/cli/convert/) - Convert single files
+- [calorc analyze](/cli/analyze/) - Find migration candidates
+- [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) - Complete migration guide

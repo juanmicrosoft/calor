@@ -8,7 +8,7 @@ permalink: /benchmarking/
 
 # Benchmarking
 
-OPAL is evaluated against C# across 7 metrics designed to measure what matters for AI coding agents.
+Calor is evaluated against C# across 7 metrics designed to measure what matters for AI coding agents.
 
 ---
 
@@ -16,41 +16,41 @@ OPAL is evaluated against C# across 7 metrics designed to measure what matters f
 
 | Category | What It Measures | Why It Matters |
 |:---------|:-----------------|:---------------|
-| [**Comprehension**](/opal/benchmarking/metrics/comprehension/) | Structural clarity, semantic extractability | Can agents understand code without deep analysis? |
-| [**Error Detection**](/opal/benchmarking/metrics/error-detection/) | Bug identification, contract violation detection | Can agents find issues using explicit semantics? |
-| [**Edit Precision**](/opal/benchmarking/metrics/edit-precision/) | Targeting accuracy, change isolation | Can agents make precise edits using unique IDs? |
-| [**Generation Accuracy**](/opal/benchmarking/metrics/generation-accuracy/) | Compilation success, structural correctness | Can agents produce valid code? |
-| [**Task Completion**](/opal/benchmarking/metrics/task-completion/) | End-to-end success rates | Can agents complete full tasks? |
-| [**Token Economics**](/opal/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
-| [**Information Density**](/opal/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
+| [**Comprehension**](/calor/benchmarking/metrics/comprehension/) | Structural clarity, semantic extractability | Can agents understand code without deep analysis? |
+| [**Error Detection**](/calor/benchmarking/metrics/error-detection/) | Bug identification, contract violation detection | Can agents find issues using explicit semantics? |
+| [**Edit Precision**](/calor/benchmarking/metrics/edit-precision/) | Targeting accuracy, change isolation | Can agents make precise edits using unique IDs? |
+| [**Generation Accuracy**](/calor/benchmarking/metrics/generation-accuracy/) | Compilation success, structural correctness | Can agents produce valid code? |
+| [**Task Completion**](/calor/benchmarking/metrics/task-completion/) | End-to-end success rates | Can agents complete full tasks? |
+| [**Token Economics**](/calor/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
+| [**Information Density**](/calor/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
 
 ---
 
 ## Summary Results
 
-| Category | OPAL vs C# | Winner |
+| Category | Calor vs C# | Winner |
 |:---------|:-----------|:-------|
-| Comprehension | **1.33x** | OPAL |
-| Error Detection | **1.19x** | OPAL |
-| Edit Precision | **1.15x** | OPAL |
+| Comprehension | **1.33x** | Calor |
+| Error Detection | **1.19x** | Calor |
+| Edit Precision | **1.15x** | Calor |
 | Generation Accuracy | 0.94x | C# |
 | Task Completion | 0.93x | C# |
 | Token Economics | 0.67x | C# |
 | Information Density | 0.22x | C# |
 
-**Pattern:** OPAL wins on comprehension and precision metrics. C# wins on efficiency metrics.
+**Pattern:** Calor wins on comprehension and precision metrics. C# wins on efficiency metrics.
 
 ---
 
 ## Key Insight
 
-OPAL excels where explicitness matters:
+Calor excels where explicitness matters:
 - **Comprehension** (1.33x) - Explicit structure aids understanding
 - **Error Detection** (1.19x) - Contracts surface invariant violations
 - **Edit Precision** (1.15x) - Unique IDs enable targeted changes
 
 C# wins on token efficiency:
-- **Token Economics** (0.67x) - OPAL's explicit syntax uses more tokens
+- **Token Economics** (0.67x) - Calor's explicit syntax uses more tokens
 - **Information Density** (0.22x) - C# packs more per token
 
 This reflects a fundamental tradeoff: **explicit semantics require more tokens but enable better agent reasoning**.
@@ -59,6 +59,6 @@ This reflects a fundamental tradeoff: **explicit semantics require more tokens b
 
 ## Learn More
 
-- [Methodology](/opal/benchmarking/methodology/) - How benchmarks work
-- [Results](/opal/benchmarking/results/) - Detailed results table
-- [Individual Metrics](/opal/benchmarking/metrics/comprehension/) - Deep dive into each metric
+- [Methodology](/calor/benchmarking/methodology/) - How benchmarks work
+- [Results](/calor/benchmarking/results/) - Detailed results table
+- [Individual Metrics](/calor/benchmarking/metrics/comprehension/) - Deep dive into each metric

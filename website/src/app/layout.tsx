@@ -22,7 +22,7 @@ const vt323 = VT323({
 
 export const metadata: Metadata = {
   title: {
-    default: 'OPAL - Optimized Programming for Agents Language',
+    default: 'OPAL - Coding Agent Language for Optimized Reasoning',
     template: '%s | OPAL',
   },
   description:
@@ -34,13 +34,13 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://juanmicrosoft.github.io/opal',
     siteName: 'OPAL',
-    title: 'OPAL - Optimized Programming for Agents Language',
+    title: 'OPAL - Coding Agent Language for Optimized Reasoning',
     description:
       'A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'OPAL - Optimized Programming for Agents Language',
+    title: 'OPAL - Coding Agent Language for Optimized Reasoning',
     description:
       'A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.',
   },

@@ -4,19 +4,19 @@ section: "cli"
 order: 0
 ---
 
-# opalc (compile)
+# calorc (compile)
 
-Compile OPAL source files to C#.
+Compile Calor source files to C#.
 
 ```bash
-opalc --input <file.opal> --output <file.cs>
+calorc --input <file.calor> --output <file.cs>
 ```
 
 ---
 
 ## Overview
 
-The default `opalc` command (when no subcommand is specified) compiles OPAL source files to C#. This is the core functionality of the OPAL compiler.
+The default `calorc` command (when no subcommand is specified) compiles Calor source files to C#. This is the core functionality of the Calor compiler.
 
 ---
 
@@ -24,13 +24,13 @@ The default `opalc` command (when no subcommand is specified) compiles OPAL sour
 
 ```bash
 # Compile a single file
-opalc --input MyModule.opal --output MyModule.g.cs
+calorc --input MyModule.calor --output MyModule.g.cs
 
 # Short form
-opalc -i MyModule.opal -o MyModule.g.cs
+calorc -i MyModule.calor -o MyModule.g.cs
 
 # With verbose output
-opalc -v -i MyModule.opal -o MyModule.g.cs
+calorc -v -i MyModule.calor -o MyModule.g.cs
 ```
 
 ---
@@ -39,7 +39,7 @@ opalc -v -i MyModule.opal -o MyModule.g.cs
 
 | Option | Short | Required | Description |
 |:-------|:------|:---------|:------------|
-| `--input` | `-i` | Yes | Input OPAL source file |
+| `--input` | `-i` | Yes | Input Calor source file |
 | `--output` | `-o` | Yes | Output C# file path |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 
@@ -50,10 +50,10 @@ opalc -v -i MyModule.opal -o MyModule.g.cs
 The recommended convention for generated C# files is the `.g.cs` extension:
 
 ```
-MyModule.opal → MyModule.g.cs
+MyModule.calor → MyModule.g.cs
 ```
 
-This indicates "generated C#" and helps distinguish OPAL-generated code from hand-written C#.
+This indicates "generated C#" and helps distinguish Calor-generated code from hand-written C#.
 
 ---
 
@@ -62,7 +62,7 @@ This indicates "generated C#" and helps distinguish OPAL-generated code from han
 When compilation fails, errors are reported with file location:
 
 ```
-Error in Calculator.opal:12:5
+Error in Calculator.calor:12:5
   Undefined variable 'x' in expression
 
   §R (+ x 1)
@@ -71,13 +71,13 @@ Error in Calculator.opal:12:5
 Compilation failed with 1 error
 ```
 
-For machine-readable error output, use [`opalc diagnose`](/cli/diagnose/).
+For machine-readable error output, use [`calorc diagnose`](/cli/diagnose/).
 
 ---
 
 ## Integration with MSBuild
 
-For automatic compilation during `dotnet build`, use [`opalc init`](/cli/init/) to set up MSBuild integration.
+For automatic compilation during `dotnet build`, use [`calorc init`](/cli/init/) to set up MSBuild integration.
 
 ---
 
@@ -93,6 +93,6 @@ For automatic compilation during `dotnet build`, use [`opalc init`](/cli/init/) 
 
 ## See Also
 
-- [opalc init](/cli/init/) - Set up automatic compilation with MSBuild
-- [opalc diagnose](/cli/diagnose/) - Machine-readable diagnostics
-- [opalc format](/cli/format/) - Format OPAL source files
+- [calorc init](/cli/init/) - Set up automatic compilation with MSBuild
+- [calorc diagnose](/cli/diagnose/) - Machine-readable diagnostics
+- [calorc format](/cli/format/) - Format Calor source files

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Default properties for Calor projects -->
+  <PropertyGroup>
+    <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(IntermediateOutputPath)calor\</CalorOutputDirectory>
+    <CalorVerbose Condition="'$(CalorVerbose)' == ''">false</CalorVerbose>
+  </PropertyGroup>
+
+  <!-- Default item group for Calor files -->
+  <ItemGroup>
+    <CalorCompile Include="**\*.calr" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+  </ItemGroup>
+
+</Project>

@@ -7,7 +7,7 @@ nav_order: 1
 
 # Design Principles
 
-OPAL is built on five core principles that guide every language design decision.
+Calor is built on five core principles that guide every language design decision.
 
 ---
 
@@ -31,7 +31,7 @@ In traditional languages, side effects are implicit. You have to read the entire
 - Makes network calls
 - Accesses a database
 
-OPAL requires explicit effect declarations:
+Calor requires explicit effect declarations:
 
 ```
 §F[f001:SaveUser:pub]
@@ -157,7 +157,7 @@ Every opening tag has a matching closing tag with the same ID:
 Expressions use Lisp-style prefix notation that's directly manipulable:
 
 ```
-// OPAL: Clear AST structure
+// Calor: Clear AST structure
 (+ (* a b) (- c d))
 
 // Equivalent infix: Requires precedence parsing
@@ -192,4 +192,4 @@ These principles reinforce each other:
 
 ## Next
 
-- [Tradeoffs](/opal/philosophy/tradeoffs/) - What OPAL gives up for these principles
+- [Tradeoffs](/calor/philosophy/tradeoffs/) - What Calor gives up for these principles

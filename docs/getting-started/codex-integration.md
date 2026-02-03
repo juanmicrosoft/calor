@@ -5,9 +5,9 @@ parent: Getting Started
 nav_order: 4
 ---
 
-# Using OPAL with OpenAI Codex CLI
+# Using Calor with OpenAI Codex CLI
 
-This guide explains how to use OPAL with OpenAI Codex CLI. For Claude Code integration, see [Claude Integration](/opal/getting-started/claude-integration/).
+This guide explains how to use Calor with OpenAI Codex CLI. For Claude Code integration, see [Claude Integration](/calor/getting-started/claude-integration/).
 
 ---
 
@@ -16,43 +16,43 @@ This guide explains how to use OPAL with OpenAI Codex CLI. For Claude Code integ
 Initialize your project for Codex CLI with a single command:
 
 ```bash
-opalc init --ai codex
+calorc init --ai codex
 ```
 
 This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.codex/skills/opal/SKILL.md` | Teaches Codex OPAL v2+ syntax for writing new code |
-| `.codex/skills/opal-convert/SKILL.md` | Teaches Codex how to convert C# to OPAL |
-| `AGENTS.md` | Project documentation with OPAL-first guidelines |
+| `.codex/skills/calor/SKILL.md` | Teaches Codex Calor v2+ syntax for writing new code |
+| `.codex/skills/calor-convert/SKILL.md` | Teaches Codex how to convert C# to Calor |
+| `AGENTS.md` | Project documentation with Calor-first guidelines |
 
-You can run this command again anytime to update the OPAL documentation section in AGENTS.md without losing your custom content.
+You can run this command again anytime to update the Calor documentation section in AGENTS.md without losing your custom content.
 
 ---
 
 ## Important: Guidance-Based Enforcement
 
-Unlike Claude Code which uses hooks to enforce OPAL-first development, **Codex CLI does not support hooks**. This means:
+Unlike Claude Code which uses hooks to enforce Calor-first development, **Codex CLI does not support hooks**. This means:
 
-- OPAL-first development is **guidance-based only**
-- Codex *should* follow the instructions in AGENTS.md and create `.opal` files
+- Calor-first development is **guidance-based only**
+- Codex *should* follow the instructions in AGENTS.md and create `.calor` files
 - However, enforcement is not automatic - Codex may occasionally create `.cs` files
 - Always review file extensions after code generation
-- Use `opalc analyze` to find any unconverted `.cs` files
+- Use `calorc analyze` to find any unconverted `.cs` files
 
 ---
 
 ## Available Skills
 
-### The `$opal` Skill
+### The `$calor` Skill
 
-When working with Codex CLI in an OPAL-initialized project, use the `$opal` command to activate OPAL-aware code generation.
+When working with Codex CLI in an Calor-initialized project, use the `$calor` command to activate Calor-aware code generation.
 
 **Example prompts:**
 
 ```
-$opal
+$calor
 
 Write a function that calculates compound interest with:
 - Preconditions: principal > 0, rate >= 0, years > 0
@@ -61,7 +61,7 @@ Write a function that calculates compound interest with:
 ```
 
 ```
-$opal
+$calor
 
 Create a UserService class with methods for:
 - GetUserById (returns Option<User>)
@@ -69,14 +69,14 @@ Create a UserService class with methods for:
 - DeleteUser (effects: database write)
 ```
 
-### The `$opal-convert` Skill
+### The `$calor-convert` Skill
 
-Use `$opal-convert` to convert existing C# code to OPAL:
+Use `$calor-convert` to convert existing C# code to Calor:
 
 ```
-$opal-convert
+$calor-convert
 
-Convert this C# class to OPAL:
+Convert this C# class to Calor:
 
 public class Calculator
 {
@@ -91,7 +91,7 @@ public class Calculator
 ```
 
 Codex will:
-1. Convert the class structure to OPAL syntax
+1. Convert the class structure to Calor syntax
 2. Add appropriate contracts (e.g., `§Q (!= b 0)` for the divide precondition)
 3. Generate unique IDs for all structural elements
 4. Declare effects based on detected side effects
@@ -100,11 +100,11 @@ Codex will:
 
 ## Skill Capabilities
 
-The OPAL skills teach Codex:
+The Calor skills teach Codex:
 
 ### Syntax Knowledge
 
-- All OPAL v2+ structure tags (`§M`, `§F`, `§C`, etc.)
+- All Calor v2+ structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Arrow syntax conditionals: `§IF{id} condition → action`
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
@@ -130,10 +130,10 @@ The OPAL skills teach Codex:
 | Feature | Claude Code | Codex CLI |
 |:--------|:------------|:----------|
 | Skills directory | `.claude/skills/` | `.codex/skills/<name>/` |
-| Skill file format | `opal.md` | `SKILL.md` with YAML frontmatter |
+| Skill file format | `calor.md` | `SKILL.md` with YAML frontmatter |
 | Project instructions | `CLAUDE.md` | `AGENTS.md` |
-| Skill invocation | `/opal` | `$opal` |
-| OPAL-first enforcement | **Hooks (enforced)** | **Guidance only** |
+| Skill invocation | `/calor` | `$calor` |
+| Calor-first enforcement | **Hooks (enforced)** | **Guidance only** |
 | Blocks `.cs` creation | Yes | No |
 
 ---
@@ -144,9 +144,9 @@ The OPAL skills teach Codex:
 
 **Prompt:**
 ```
-$opal
+$calor
 
-Write an OPAL function that calculates factorial with a precondition
+Write an Calor function that calculates factorial with a precondition
 that n >= 0 and postcondition that result >= 1
 ```
 
@@ -169,7 +169,7 @@ that n >= 0 and postcondition that result >= 1
 
 **Prompt:**
 ```
-Is there a bug in this OPAL code?
+Is there a bug in this Calor code?
 
 §F[f001:Divide:pub]
   §I[i32:a]
@@ -195,7 +195,7 @@ Otherwise division by zero is possible.
 ### Starting a New Feature
 
 ```
-$opal
+$calor
 
 I need to implement [feature description].
 
@@ -203,28 +203,28 @@ The requirements are:
 - [requirement 1]
 - [requirement 2]
 
-Please create the OPAL code with appropriate contracts and effects.
+Please create the Calor code with appropriate contracts and effects.
 ```
 
 ### Converting Existing Code
 
 ```
-$opal-convert
+$calor-convert
 
-Convert src/Services/PaymentService.cs to OPAL, adding:
+Convert src/Services/PaymentService.cs to Calor, adding:
 - Contracts based on the validation logic
 - Effect declarations for database and network calls
 ```
 
-### Verifying OPAL-First Compliance
+### Verifying Calor-First Compliance
 
-Since Codex doesn't enforce OPAL-first automatically, periodically check for unconverted files:
+Since Codex doesn't enforce Calor-first automatically, periodically check for unconverted files:
 
 ```bash
 # Find C# files that might need conversion
-opalc analyze ./src --top 10
+calorc analyze ./src --top 10
 
-# Check for any new .cs files that should be .opal
+# Check for any new .cs files that should be .calor
 find . -name "*.cs" -not -name "*.g.cs" -not -path "./obj/*"
 ```
 
@@ -232,38 +232,38 @@ find . -name "*.cs" -not -name "*.g.cs" -not -path "./obj/*"
 
 ## Best Practices
 
-1. **Review generated files** - Always check that Codex created `.opal` files, not `.cs`
-2. **Use explicit instructions** - Be specific about wanting OPAL output
-3. **Include skill reference** - Start prompts with `$opal` or `$opal-convert`
-4. **Run analysis regularly** - Use `opalc analyze` to find migration candidates
+1. **Review generated files** - Always check that Codex created `.calor` files, not `.cs`
+2. **Use explicit instructions** - Be specific about wanting Calor output
+3. **Include skill reference** - Start prompts with `$calor` or `$calor-convert`
+4. **Run analysis regularly** - Use `calorc analyze` to find migration candidates
 5. **Convert promptly** - If Codex creates a `.cs` file, convert it immediately
 
 ---
 
 ## Troubleshooting
 
-### Codex Creates `.cs` Files Instead of `.opal`
+### Codex Creates `.cs` Files Instead of `.calor`
 
 This can happen since enforcement is guidance-based. Solutions:
 
-1. Be more explicit: "Create this as an OPAL file (`.opal`), not C#"
-2. Start your prompt with `$opal` to activate the skill
-3. Convert the file: `opalc convert filename.cs`
+1. Be more explicit: "Create this as an Calor file (`.calor`), not C#"
+2. Start your prompt with `$calor` to activate the skill
+3. Convert the file: `calorc convert filename.cs`
 
 ### Skills Not Recognized
 
-Ensure you've run `opalc init --ai codex` and the skill files exist:
+Ensure you've run `calorc init --ai codex` and the skill files exist:
 
 ```bash
-ls -la .codex/skills/opal/SKILL.md
-ls -la .codex/skills/opal-convert/SKILL.md
+ls -la .codex/skills/calor/SKILL.md
+ls -la .codex/skills/calor-convert/SKILL.md
 ```
 
 ---
 
 ## Next Steps
 
-- [Syntax Reference](/opal/syntax-reference/) - Complete language reference
-- [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) - Migration guide
-- [opalc init](/opal/cli/init/) - Full init command documentation
-- [Claude Integration](/opal/getting-started/claude-integration/) - Alternative with enforced OPAL-first
+- [Syntax Reference](/calor/syntax-reference/) - Complete language reference
+- [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Migration guide
+- [calorc init](/calor/cli/init/) - Full init command documentation
+- [Claude Integration](/calor/getting-started/claude-integration/) - Alternative with enforced Calor-first

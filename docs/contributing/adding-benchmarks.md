@@ -7,7 +7,7 @@ nav_order: 2
 
 # Adding Benchmarks
 
-The evaluation framework relies on benchmark programs to measure OPAL vs C#. This guide explains how to add new benchmarks.
+The evaluation framework relies on benchmark programs to measure Calor vs C#. This guide explains how to add new benchmarks.
 
 ---
 
@@ -15,7 +15,7 @@ The evaluation framework relies on benchmark programs to measure OPAL vs C#. Thi
 
 Each benchmark needs:
 
-1. **OPAL source file** - The OPAL implementation
+1. **Calor source file** - The Calor implementation
 2. **C# source file** - Semantically equivalent C# implementation
 3. **Metadata** - Description and expected behavior
 4. **Both must compile** - 100% compilation success required
@@ -25,17 +25,17 @@ Each benchmark needs:
 ## Directory Structure
 
 ```
-tests/Opal.Evaluation/Benchmarks/
+tests/Calor.Evaluation/Benchmarks/
 ├── HelloWorld/
-│   ├── hello.opal
+│   ├── hello.calor
 │   ├── hello.cs
 │   └── metadata.json
 ├── FizzBuzz/
-│   ├── fizzbuzz.opal
+│   ├── fizzbuzz.calor
 │   ├── fizzbuzz.cs
 │   └── metadata.json
 └── YourNewBenchmark/
-    ├── program.opal
+    ├── program.calor
     ├── program.cs
     └── metadata.json
 ```
@@ -47,13 +47,13 @@ tests/Opal.Evaluation/Benchmarks/
 ### Step 1: Create Directory
 
 ```bash
-mkdir tests/Opal.Evaluation/Benchmarks/YourBenchmark
-cd tests/Opal.Evaluation/Benchmarks/YourBenchmark
+mkdir tests/Calor.Evaluation/Benchmarks/YourBenchmark
+cd tests/Calor.Evaluation/Benchmarks/YourBenchmark
 ```
 
-### Step 2: Write OPAL Code
+### Step 2: Write Calor Code
 
-Create `program.opal`:
+Create `program.calor`:
 
 ```
 §M[m001:YourModule]
@@ -90,8 +90,8 @@ namespace YourModule
 ```
 
 **Guidelines:**
-- Match the OPAL logic exactly
-- Include equivalent contracts if OPAL has them (using Debug.Assert or exceptions)
+- Match the Calor logic exactly
+- Include equivalent contracts if Calor has them (using Debug.Assert or exceptions)
 - Keep structure as parallel as possible
 
 ### Step 4: Add Metadata
@@ -113,16 +113,16 @@ Create `metadata.json`:
 ### Step 5: Verify
 
 ```bash
-# Compile OPAL
-dotnet run --project src/Opal.Compiler -- \
-  --input tests/Opal.Evaluation/Benchmarks/YourBenchmark/program.opal \
+# Compile Calor
+dotnet run --project src/Calor.Compiler -- \
+  --input tests/Calor.Evaluation/Benchmarks/YourBenchmark/program.calor \
   --output /tmp/test.g.cs
 
 # Verify C# compiles
-dotnet build tests/Opal.Evaluation/Benchmarks/YourBenchmark/program.cs
+dotnet build tests/Calor.Evaluation/Benchmarks/YourBenchmark/program.cs
 
 # Run evaluation
-dotnet run --project tests/Opal.Evaluation -- --output report.json
+dotnet run --project tests/Calor.Evaluation -- --output report.json
 ```
 
 ---
@@ -143,7 +143,7 @@ dotnet run --project tests/Opal.Evaluation -- --output report.json
 
 ## Example: Factorial Benchmark
 
-### OPAL (`factorial.opal`)
+### Calor (`factorial.calor`)
 
 ```
 §M[m001:Math]
@@ -221,12 +221,12 @@ Both implementations must be semantically equivalent:
 - Same edge case handling
 
 ### Same Contracts
-- If OPAL has `§Q`, C# should have equivalent check
-- If OPAL has `§S`, C# should have equivalent assertion
+- If Calor has `§Q`, C# should have equivalent check
+- If Calor has `§S`, C# should have equivalent assertion
 
 ### Same Effects
-- If OPAL has `§E[cw]`, C# should write to console
-- If OPAL has `§E[fr]`, C# should read files
+- If Calor has `§E[cw]`, C# should write to console
+- If Calor has `§E[fr]`, C# should read files
 
 ---
 
@@ -234,10 +234,10 @@ Both implementations must be semantically equivalent:
 
 Before submitting:
 
-- [ ] OPAL compiles without errors
+- [ ] Calor compiles without errors
 - [ ] C# compiles without errors
 - [ ] Both produce identical output (if applicable)
-- [ ] Uses V2 OPAL syntax
+- [ ] Uses V2 Calor syntax
 - [ ] IDs are unique and meaningful
 - [ ] Effects are declared
 - [ ] Contracts are equivalent
@@ -253,13 +253,13 @@ For simpler test cases, you can add to the E2E test suite instead:
 ```
 tests/E2E/scenarios/
 ├── 01_hello_world/
-│   ├── input.opal
+│   ├── input.calor
 │   └── verify.sh
 ├── 02_fizzbuzz/
-│   ├── input.opal
+│   ├── input.calor
 │   └── verify.sh
 └── XX_your_test/
-    ├── input.opal
+    ├── input.calor
     └── verify.sh
 ```
 
@@ -287,5 +287,5 @@ grep -q "namespace" "$OUTPUT_FILE" || exit 1
 
 ## Next
 
-- [Development Setup](/opal/contributing/development-setup/) - Set up your environment
-- [Contributing Overview](/opal/contributing/) - Other ways to contribute
+- [Development Setup](/calor/contributing/development-setup/) - Set up your environment
+- [Contributing Overview](/calor/contributing/) - Other ways to contribute

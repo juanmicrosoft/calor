@@ -8,7 +8,7 @@ permalink: /syntax-reference/
 
 # Syntax Reference
 
-Complete reference for OPAL syntax. Always use V2+ syntax (Lisp-style expressions).
+Complete reference for Calor syntax. Always use V2+ syntax (Lisp-style expressions).
 
 ---
 
@@ -111,9 +111,9 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
 
 ## Detailed Reference
 
-- [Structure Tags](/opal/syntax-reference/structure-tags/) - Modules, functions, closing tags
-- [Types](/opal/syntax-reference/types/) - Type system, Option, Result
-- [Expressions](/opal/syntax-reference/expressions/) - Lisp-style operators
-- [Control Flow](/opal/syntax-reference/control-flow/) - Loops, conditionals
-- [Contracts](/opal/syntax-reference/contracts/) - Requires, ensures
-- [Effects](/opal/syntax-reference/effects/) - Effect declarations
+- [Structure Tags](/calor/syntax-reference/structure-tags/) - Modules, functions, closing tags
+- [Types](/calor/syntax-reference/types/) - Type system, Option, Result
+- [Expressions](/calor/syntax-reference/expressions/) - Lisp-style operators
+- [Control Flow](/calor/syntax-reference/control-flow/) - Loops, conditionals
+- [Contracts](/calor/syntax-reference/contracts/) - Requires, ensures
+- [Effects](/calor/syntax-reference/effects/) - Effect declarations

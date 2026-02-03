@@ -5,9 +5,9 @@ parent: Getting Started
 nav_order: 3
 ---
 
-# Using OPAL with Claude and AI Agents
+# Using Calor with Claude and AI Agents
 
-OPAL is designed specifically for AI coding agents. This guide explains how to use OPAL with Claude and other AI assistants.
+Calor is designed specifically for AI coding agents. This guide explains how to use Calor with Claude and other AI assistants.
 
 ---
 
@@ -16,25 +16,25 @@ OPAL is designed specifically for AI coding agents. This guide explains how to u
 Initialize your project for Claude Code with a single command:
 
 ```bash
-opalc init --ai claude
+calorc init --ai claude
 ```
 
 This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/opal/SKILL.md` | Teaches Claude OPAL v2+ syntax for writing new code |
-| `.claude/skills/opal-convert/SKILL.md` | Teaches Claude how to convert C# to OPAL |
-| `.claude/settings.json` | **Enforces OPAL-first** - blocks `.cs` file creation |
-| `CLAUDE.md` | Project documentation with OPAL reference and conventions |
+| `.claude/skills/calor/SKILL.md` | Teaches Claude Calor v2+ syntax for writing new code |
+| `.claude/skills/calor-convert/SKILL.md` | Teaches Claude how to convert C# to Calor |
+| `.claude/settings.json` | **Enforces Calor-first** - blocks `.cs` file creation |
+| `CLAUDE.md` | Project documentation with Calor reference and conventions |
 
-You can run this command again anytime to update the OPAL documentation section in CLAUDE.md without losing your custom content.
+You can run this command again anytime to update the Calor documentation section in CLAUDE.md without losing your custom content.
 
 ---
 
-## OPAL-First Enforcement
+## Calor-First Enforcement
 
-When you initialize with `--ai claude`, hooks are configured that **automatically block Claude from creating `.cs` files**. This ensures all new code is written in OPAL.
+When you initialize with `--ai claude`, hooks are configured that **automatically block Claude from creating `.cs` files**. This ensures all new code is written in Calor.
 
 ### What Happens
 
@@ -43,37 +43,37 @@ When Claude tries to create a C# file:
 ```
 BLOCKED: Cannot create C# file 'UserService.cs'
 
-This is an OPAL-first project. Create an .opal file instead:
-  UserService.opal
+This is an Calor-first project. Create an .calor file instead:
+  UserService.calor
 
-Use /opal skill for OPAL syntax help.
+Use /calor skill for Calor syntax help.
 ```
 
-Claude will automatically retry with an `.opal` file - no user intervention required.
+Claude will automatically retry with an `.calor` file - no user intervention required.
 
 ### Allowed Files
 
 The hook allows:
-- **`.opal` files** - All OPAL source files
-- **`.g.cs` files** - Generated C# output from OPAL compilation
+- **`.calor` files** - All Calor source files
+- **`.g.cs` files** - Generated C# output from Calor compilation
 - **`obj/` directory** - Build artifacts
 
 ### Disabling Enforcement
 
-If you need to temporarily allow `.cs` file creation, remove or rename `.claude/settings.json`. Re-run `opalc init --ai claude` to restore enforcement.
+If you need to temporarily allow `.cs` file creation, remove or rename `.claude/settings.json`. Re-run `calorc init --ai claude` to restore enforcement.
 
 ---
 
 ## Available Skills
 
-### The `/opal` Skill
+### The `/calor` Skill
 
-When working with Claude Code in an OPAL-initialized project, use the `/opal` command to activate OPAL-aware code generation.
+When working with Claude Code in an Calor-initialized project, use the `/calor` command to activate Calor-aware code generation.
 
 **Example prompts:**
 
 ```
-/opal
+/calor
 
 Write a function that calculates compound interest with:
 - Preconditions: principal > 0, rate >= 0, years > 0
@@ -82,7 +82,7 @@ Write a function that calculates compound interest with:
 ```
 
 ```
-/opal
+/calor
 
 Create a UserService class with methods for:
 - GetUserById (returns Option<User>)
@@ -90,14 +90,14 @@ Create a UserService class with methods for:
 - DeleteUser (effects: database write)
 ```
 
-### The `/opal-convert` Skill
+### The `/calor-convert` Skill
 
-Use `/opal-convert` to convert existing C# code to OPAL:
+Use `/calor-convert` to convert existing C# code to Calor:
 
 ```
-/opal-convert
+/calor-convert
 
-Convert this C# class to OPAL:
+Convert this C# class to Calor:
 
 public class Calculator
 {
@@ -112,7 +112,7 @@ public class Calculator
 ```
 
 Claude will:
-1. Convert the class structure to OPAL syntax
+1. Convert the class structure to Calor syntax
 2. Add appropriate contracts (e.g., `§Q (!= b 0)` for the divide precondition)
 3. Generate unique IDs for all structural elements
 4. Declare effects based on detected side effects
@@ -121,11 +121,11 @@ Claude will:
 
 ## Skill Capabilities
 
-The OPAL skills teach Claude:
+The Calor skills teach Claude:
 
 ### Syntax Knowledge
 
-- All OPAL v2+ structure tags (`§M`, `§F`, `§C`, etc.)
+- All Calor v2+ structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Arrow syntax conditionals: `§IF{id} condition → action`
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
@@ -146,14 +146,14 @@ The OPAL skills teach Claude:
 
 ---
 
-## Teaching Claude OPAL
+## Teaching Claude Calor
 
-If you're using Claude outside of Claude Code, you can teach it OPAL by including the syntax reference in your prompt:
+If you're using Claude outside of Claude Code, you can teach it Calor by including the syntax reference in your prompt:
 
 ### Minimal Prompt
 
 ```
-I'm working with OPAL, a language for AI agents that compiles to C#.
+I'm working with Calor, a language for AI agents that compiles to C#.
 
 Key syntax:
 - §M[id:Name] / §/M[id] - Module
@@ -184,12 +184,12 @@ Example:
 §/F[f001]
 §/M[m001]
 
-Please write OPAL code for: [your request]
+Please write Calor code for: [your request]
 ```
 
 ---
 
-## Why OPAL Works Well with Agents
+## Why Calor Works Well with Agents
 
 ### 1. Unambiguous Structure
 
@@ -205,7 +205,7 @@ if (x > 0) {
 }
 ```
 
-OPAL code:
+Calor code:
 ```
 §IF[if1] (> x 0)
   §L[for1:i:0:n:1]
@@ -279,7 +279,7 @@ No need to analyze the implementation.
 
 **Prompt:**
 ```
-Write an OPAL function that calculates factorial with a precondition
+Write an Calor function that calculates factorial with a precondition
 that n >= 0 and postcondition that result >= 1
 ```
 
@@ -302,7 +302,7 @@ that n >= 0 and postcondition that result >= 1
 
 **Prompt:**
 ```
-Is there a bug in this OPAL code?
+Is there a bug in this Calor code?
 
 §F[f001:Divide:pub]
   §I[i32:a]
@@ -368,7 +368,7 @@ Refactor this to extract the calculation into a separate function:
 ### Starting a New Feature
 
 ```
-/opal
+/calor
 
 I need to implement [feature description].
 
@@ -376,25 +376,25 @@ The requirements are:
 - [requirement 1]
 - [requirement 2]
 
-Please create the OPAL code with appropriate contracts and effects.
+Please create the Calor code with appropriate contracts and effects.
 ```
 
 ### Converting Existing Code
 
 ```
-/opal-convert
+/calor-convert
 
-Convert src/Services/PaymentService.cs to OPAL, adding:
+Convert src/Services/PaymentService.cs to Calor, adding:
 - Contracts based on the validation logic
 - Effect declarations for database and network calls
 ```
 
-### Refactoring OPAL
+### Refactoring Calor
 
 Reference specific elements by their IDs:
 
 ```
-In PaymentService.opal:
+In PaymentService.calor:
 - Extract the validation logic from f002 into a new private function
 - Add a postcondition to f001 ensuring the result is positive
 - Rename loop l001 to something more descriptive
@@ -403,7 +403,7 @@ In PaymentService.opal:
 ### Debugging with Claude
 
 ```
-Review OrderService.opal and identify:
+Review OrderService.calor and identify:
 1. Any missing preconditions that could cause runtime errors
 2. Functions that should be marked pure but have undeclared effects
 3. Opportunities to use Result<T,E> instead of exceptions
@@ -413,20 +413,20 @@ Review OrderService.opal and identify:
 
 ## IDE Integration
 
-While OPAL skills work in any Claude Code session, you'll have the best experience with proper editor support:
+While Calor skills work in any Claude Code session, you'll have the best experience with proper editor support:
 
 ### VS Code
 
-1. Install the OPAL extension (if available)
+1. Install the Calor extension (if available)
 2. Open your initialized project
-3. Use `/opal` and `/opal-convert` commands
+3. Use `/calor` and `/calor-convert` commands
 
 ### Terminal
 
 Claude Code works from any terminal:
 
 ```bash
-cd my-opal-project
+cd my-calor-project
 claude
 ```
 
@@ -436,7 +436,7 @@ Then use the skills as normal.
 
 ## Next Steps
 
-- [Syntax Reference](/opal/syntax-reference/) - Complete language reference
-- [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) - Migration guide
-- [opalc init](/opal/cli/init/) - Full init command documentation
-- [Benchmarking](/opal/benchmarking/) - See how OPAL compares to C#
+- [Syntax Reference](/calor/syntax-reference/) - Complete language reference
+- [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Migration guide
+- [calorc init](/calor/cli/init/) - Full init command documentation
+- [Benchmarking](/calor/benchmarking/) - See how Calor compares to C#

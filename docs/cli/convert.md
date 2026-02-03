@@ -6,22 +6,22 @@ nav_order: 3
 permalink: /cli/convert/
 ---
 
-# opalc convert
+# calorc convert
 
-Convert a single file between C# and OPAL.
+Convert a single file between C# and Calor.
 
 ```bash
-opalc convert <input> [options]
+calorc convert <input> [options]
 ```
 
 ---
 
 ## Overview
 
-The `convert` command performs bidirectional conversion between C# and OPAL:
+The `convert` command performs bidirectional conversion between C# and Calor:
 
-- **C# → OPAL**: Convert `.cs` files to OPAL syntax
-- **OPAL → C#**: Convert `.opal` files to generated C#
+- **C# → Calor**: Convert `.cs` files to Calor syntax
+- **Calor → C#**: Convert `.calor` files to generated C#
 
 The conversion direction is automatically detected from the input file extension.
 
@@ -30,17 +30,17 @@ The conversion direction is automatically detected from the input file extension
 ## Quick Start
 
 ```bash
-# Convert C# to OPAL
-opalc convert MyService.cs
+# Convert C# to Calor
+calorc convert MyService.cs
 
-# Convert OPAL to C#
-opalc convert MyService.opal
+# Convert Calor to C#
+calorc convert MyService.calor
 
 # Specify output path
-opalc convert MyService.cs --output src/MyService.opal
+calorc convert MyService.cs --output src/MyService.calor
 
 # Include benchmark comparison
-opalc convert MyService.cs --benchmark
+calorc convert MyService.cs --benchmark
 ```
 
 ---
@@ -49,7 +49,7 @@ opalc convert MyService.cs --benchmark
 
 | Argument | Required | Description |
 |:---------|:---------|:------------|
-| `input` | Yes | The source file to convert (`.cs` or `.opal`) |
+| `input` | Yes | The source file to convert (`.cs` or `.calor`) |
 
 ---
 
@@ -69,25 +69,25 @@ If `--output` is not specified:
 
 | Input | Output |
 |:------|:-------|
-| `MyFile.cs` | `MyFile.opal` |
-| `MyFile.opal` | `MyFile.g.cs` |
+| `MyFile.cs` | `MyFile.calor` |
+| `MyFile.calor` | `MyFile.g.cs` |
 
 ---
 
-## C# to OPAL Conversion
+## C# to Calor Conversion
 
-When converting C# to OPAL, the converter:
+When converting C# to Calor, the converter:
 
 1. Parses the C# source code
 2. Identifies supported constructs (classes, methods, properties, etc.)
-3. Maps C# patterns to OPAL equivalents
+3. Maps C# patterns to Calor equivalents
 4. Generates unique IDs for all structural elements
 5. Adds effect declarations based on detected side effects
 6. Suggests contracts based on validation patterns
 
 ### Supported Constructs
 
-| C# Construct | OPAL Equivalent |
+| C# Construct | Calor Equivalent |
 |:-------------|:----------------|
 | `namespace` | `§M[id:Name]` module |
 | `class` | `§C[id:Name:vis]` class |
@@ -105,7 +105,7 @@ When converting C# to OPAL, the converter:
 The converter reports patterns it can't perfectly translate:
 
 ```
-Converting MyService.cs → MyService.opal
+Converting MyService.cs → MyService.calor
   Warning: Complex LINQ query at line 42 - manual review recommended
   Warning: Async method at line 78 - converted to sync equivalent
 
@@ -114,12 +114,12 @@ Conversion complete with 2 warnings
 
 ---
 
-## OPAL to C# Conversion
+## Calor to C# Conversion
 
-When converting OPAL to C#, the converter generates idiomatic C# code:
+When converting Calor to C#, the converter generates idiomatic C# code:
 
 ```bash
-opalc convert Calculator.opal
+calorc convert Calculator.calor
 ```
 
 Output includes:
@@ -132,26 +132,26 @@ Output includes:
 
 ## Benchmark Comparison
 
-Use `--benchmark` to see how the OPAL version compares to C#:
+Use `--benchmark` to see how the Calor version compares to C#:
 
 ```bash
-opalc convert PaymentService.cs --benchmark
+calorc convert PaymentService.cs --benchmark
 ```
 
 Output:
 ```
-Converting PaymentService.cs → PaymentService.opal
+Converting PaymentService.cs → PaymentService.calor
 
 Benchmark Comparison:
 ┌─────────────────┬────────┬────────┬──────────┐
-│ Metric          │ C#     │ OPAL   │ Savings  │
+│ Metric          │ C#     │ Calor   │ Savings  │
 ├─────────────────┼────────┼────────┼──────────┤
 │ Tokens          │ 1,245  │ 842    │ 32.4%    │
 │ Lines           │ 156    │ 98     │ 37.2%    │
 │ Characters      │ 4,521  │ 2,891  │ 36.1%    │
 └─────────────────┴────────┴────────┴──────────┘
 
-Conversion complete: PaymentService.opal
+Conversion complete: PaymentService.calor
 ```
 
 ---
@@ -161,12 +161,12 @@ Conversion complete: PaymentService.opal
 Use `--verbose` to see detailed conversion progress:
 
 ```bash
-opalc convert MyService.cs --verbose
+calorc convert MyService.cs --verbose
 ```
 
 Output:
 ```
-Converting MyService.cs → MyService.opal
+Converting MyService.cs → MyService.calor
 
 Parsing C# source...
   Found: 1 namespace, 2 classes, 8 methods, 3 properties
@@ -187,7 +187,7 @@ Detecting effects:
 Generating contracts:
   f002: Added §Q (!= input null) from null check at line 24
 
-Writing output: MyService.opal
+Writing output: MyService.calor
 Conversion complete with 1 warning
 ```
 
@@ -199,10 +199,10 @@ Conversion complete with 1 warning
 
 ```bash
 # Convert a service class
-opalc convert src/Services/UserService.cs
+calorc convert src/Services/UserService.cs
 
 # Convert back to C#
-opalc convert src/Services/UserService.opal
+calorc convert src/Services/UserService.calor
 ```
 
 ### Batch Conversion with Shell
@@ -210,20 +210,20 @@ opalc convert src/Services/UserService.opal
 ```bash
 # Convert all C# files in a directory
 for f in src/Services/*.cs; do
-  opalc convert "$f"
+  calorc convert "$f"
 done
 ```
 
-For project-wide conversion, use [`opalc migrate`](/opal/cli/migrate/) instead.
+For project-wide conversion, use [`calorc migrate`](/calor/cli/migrate/) instead.
 
 ### Integration with Claude Code
 
-After conversion, use Claude to refine the OPAL:
+After conversion, use Claude to refine the Calor:
 
 ```
-/opal
+/calor
 
-Review the converted file src/Services/UserService.opal and:
+Review the converted file src/Services/UserService.calor and:
 1. Add appropriate contracts based on the business logic
 2. Verify effect declarations are complete
 3. Improve naming of generated IDs if needed
@@ -237,8 +237,8 @@ The converter may not perfectly handle:
 
 - **Complex LINQ expressions** - May need manual adjustment
 - **Async/await patterns** - Converted to synchronous equivalents
-- **Dynamic types** - Not supported in OPAL
-- **Unsafe code** - Not supported in OPAL
+- **Dynamic types** - Not supported in Calor
+- **Unsafe code** - Not supported in Calor
 - **Preprocessor directives** - Ignored during conversion
 
 Review the warnings and manually adjust as needed.
@@ -257,7 +257,7 @@ Review the warnings and manually adjust as needed.
 
 ## See Also
 
-- [opalc migrate](/opal/cli/migrate/) - Convert entire projects
-- [opalc analyze](/opal/cli/analyze/) - Find best conversion candidates
-- [opalc benchmark](/opal/cli/benchmark/) - Detailed metrics comparison
-- [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) - Complete migration guide
+- [calorc migrate](/calor/cli/migrate/) - Convert entire projects
+- [calorc analyze](/calor/cli/analyze/) - Find best conversion candidates
+- [calorc benchmark](/calor/cli/benchmark/) - Detailed metrics comparison
+- [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Complete migration guide

@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Opal.Runtime/Opal.Runtime.csproj" />
+    <ProjectReference Include="../../src/Calor.Runtime/Calor.Runtime.csproj" />
   </ItemGroup>
 
 </Project>

@@ -6,19 +6,19 @@ nav_order: 9
 permalink: /cli/hook/
 ---
 
-# opalc hook
+# calorc hook
 
 Internal commands for Claude Code hook integration. These commands are called automatically by Claude Code hooks and are not typically invoked directly.
 
 ```bash
-opalc hook <subcommand> [args]
+calorc hook <subcommand> [args]
 ```
 
 ---
 
 ## Overview
 
-The `hook` command provides subcommands that integrate with Claude Code's hook system to enforce OPAL-first development. When you run `opalc init --ai claude`, it configures these hooks automatically.
+The `hook` command provides subcommands that integrate with Claude Code's hook system to enforce Calor-first development. When you run `calorc init --ai claude`, it configures these hooks automatically.
 
 ---
 
@@ -26,17 +26,17 @@ The `hook` command provides subcommands that integrate with Claude Code's hook s
 
 ### validate-write
 
-Validates Write tool calls to enforce OPAL-first development.
+Validates Write tool calls to enforce Calor-first development.
 
 ```bash
-opalc hook validate-write <tool-input-json>
+calorc hook validate-write <tool-input-json>
 ```
 
 **Behavior:**
 
 | File Type | Action |
 |:----------|:-------|
-| `.opal` files | Allowed (exit 0) |
+| `.calor` files | Allowed (exit 0) |
 | `.g.cs` generated files | Allowed (exit 0) |
 | Files in `obj/` directory | Allowed (exit 0) |
 | Other `.cs` files | **Blocked** (exit 1) |
@@ -45,25 +45,25 @@ opalc hook validate-write <tool-input-json>
 
 ```bash
 # This will be blocked (exit 1)
-opalc hook validate-write '{"file_path": "MyClass.cs"}'
+calorc hook validate-write '{"file_path": "MyClass.cs"}'
 
 # Output:
 # BLOCKED: Cannot create C# file 'MyClass.cs'
 #
-# This is an OPAL-first project. Create an .opal file instead:
-#   MyClass.opal
+# This is an Calor-first project. Create an .calor file instead:
+#   MyClass.calor
 #
-# Use /opal skill for OPAL syntax help.
+# Use /calor skill for Calor syntax help.
 
 # This will be allowed (exit 0)
-opalc hook validate-write '{"file_path": "MyClass.opal"}'
+calorc hook validate-write '{"file_path": "MyClass.calor"}'
 ```
 
 ---
 
 ## How Hooks Work
 
-When you initialize a project with `opalc init --ai claude`, it creates `.claude/settings.json` with hook configuration:
+When you initialize a project with `calorc init --ai claude`, it creates `.claude/settings.json` with hook configuration:
 
 ```json
 {
@@ -74,7 +74,7 @@ When you initialize a project with `opalc init --ai claude`, it creates `.claude
         "hooks": [
           {
             "type": "command",
-            "command": "opalc hook validate-write $TOOL_INPUT"
+            "command": "calorc hook validate-write $TOOL_INPUT"
           }
         ]
       }
@@ -83,19 +83,19 @@ When you initialize a project with `opalc init --ai claude`, it creates `.claude
 }
 ```
 
-This hook runs **before** every Write tool call. If the hook returns exit code 1, Claude Code blocks the operation and shows the error message to Claude, who will then retry with an `.opal` file.
+This hook runs **before** every Write tool call. If the hook returns exit code 1, Claude Code blocks the operation and shows the error message to Claude, who will then retry with an `.calor` file.
 
 ---
 
 ## User Experience
 
-When Claude tries to create a `.cs` file in an OPAL-initialized project:
+When Claude tries to create a `.cs` file in an Calor-initialized project:
 
 1. Claude calls the Write tool with a `.cs` file path
 2. The hook intercepts the call and validates the path
 3. Hook returns exit 1 with guidance message
 4. Claude Code blocks the write operation
-5. Claude sees the error and creates an `.opal` file instead
+5. Claude sees the error and creates an `.calor` file instead
 
 This enforcement happens automatically - no user intervention required.
 
@@ -111,10 +111,10 @@ This enforcement happens automatically - no user intervention required.
    ```
    Should contain `PreToolUse` hook for `Write`
 
-2. **Verify opalc is in PATH:**
+2. **Verify calorc is in PATH:**
    ```bash
-   which opalc
-   opalc hook validate-write '{"file_path": "test.cs"}'
+   which calorc
+   calorc hook validate-write '{"file_path": "test.cs"}'
    echo $?  # Should be 1
    ```
 
@@ -123,12 +123,12 @@ This enforcement happens automatically - no user intervention required.
 ### Re-enable Hooks After Manual Removal
 
 ```bash
-opalc init --ai claude --force
+calorc init --ai claude --force
 ```
 
 ---
 
 ## See Also
 
-- [opalc init](/opal/cli/init/) - Initialize OPAL with hook configuration
-- [Claude Integration](/opal/getting-started/claude-integration/) - Using OPAL with Claude
+- [calorc init](/calor/cli/init/) - Initialize Calor with hook configuration
+- [Claude Integration](/calor/getting-started/claude-integration/) - Using Calor with Claude

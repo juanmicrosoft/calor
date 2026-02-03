@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "description": "C# test files for validating the C# to OPAL converter",
+  "description": "C# test files for validating the C# to Calor converter",
   "files": [
     {
       "id": "001",
@@ -136,7 +136,7 @@
       "level": 1,
       "features": ["unary_minus", "unary_plus"],
       "expectedResult": "partial",
-      "notes": "Unary operators +, - - OPAL parser may not support unary plus"
+      "notes": "Unary operators +, - - Calor parser may not support unary plus"
     },
     {
       "id": "018",

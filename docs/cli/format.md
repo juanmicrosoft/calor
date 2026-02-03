@@ -6,19 +6,19 @@ nav_order: 6
 permalink: /cli/format/
 ---
 
-# opalc format
+# calorc format
 
-Format OPAL source files to canonical style.
+Format Calor source files to canonical style.
 
 ```bash
-opalc format <files...> [options]
+calorc format <files...> [options]
 ```
 
 ---
 
 ## Overview
 
-The `format` command formats OPAL source files according to the canonical OPAL style guide. This ensures consistent formatting across your codebase and makes code easier to read and maintain.
+The `format` command formats Calor source files according to the canonical Calor style guide. This ensures consistent formatting across your codebase and makes code easier to read and maintain.
 
 ---
 
@@ -26,16 +26,16 @@ The `format` command formats OPAL source files according to the canonical OPAL s
 
 ```bash
 # Format a single file (output to stdout)
-opalc format MyModule.opal
+calorc format MyModule.calor
 
 # Format and overwrite the file
-opalc format MyModule.opal --write
+calorc format MyModule.calor --write
 
 # Check if files are formatted (for CI)
-opalc format src/*.opal --check
+calorc format src/*.calor --check
 
 # Show diff of changes
-opalc format MyModule.opal --diff
+calorc format MyModule.calor --diff
 ```
 
 ---
@@ -44,7 +44,7 @@ opalc format MyModule.opal --diff
 
 | Argument | Required | Description |
 |:---------|:---------|:------------|
-| `files` | Yes | One or more OPAL source files to format |
+| `files` | Yes | One or more Calor source files to format |
 
 ---
 
@@ -64,7 +64,7 @@ opalc format MyModule.opal --diff
 By default (no flags), the formatted output is written to stdout:
 
 ```bash
-opalc format MyModule.opal
+calorc format MyModule.calor
 ```
 
 This allows you to preview changes before applying them.
@@ -77,10 +77,10 @@ Use `--write` to format files in place:
 
 ```bash
 # Format single file
-opalc format MyModule.opal --write
+calorc format MyModule.calor --write
 
 # Format multiple files
-opalc format src/*.opal --write
+calorc format src/*.calor --write
 ```
 
 ---
@@ -90,7 +90,7 @@ opalc format src/*.opal --write
 Use `--check` in CI/CD to verify formatting:
 
 ```bash
-opalc format src/*.opal --check
+calorc format src/*.calor --check
 ```
 
 Exit codes:
@@ -101,8 +101,8 @@ Example CI configuration:
 
 ```yaml
 # GitHub Actions
-- name: Check OPAL formatting
-  run: opalc format src/**/*.opal --check
+- name: Check Calor formatting
+  run: calorc format src/**/*.calor --check
 ```
 
 ---
@@ -112,12 +112,12 @@ Example CI configuration:
 Use `--diff` to see what would change:
 
 ```bash
-opalc format MyModule.opal --diff
+calorc format MyModule.calor --diff
 ```
 
 Output:
 ```
-MyModule.opal
+MyModule.calor
 --- original
 +++ formatted
 @@ -5,7 +5,7 @@
@@ -140,7 +140,7 @@ Changes are highlighted:
 
 ## Formatting Rules
 
-The OPAL formatter applies these rules:
+The Calor formatter applies these rules:
 
 ### Indentation
 
@@ -166,7 +166,7 @@ The OPAL formatter applies these rules:
 
 ### Before and After
 
-```opal
+```calor
 // Before (inconsistent)
 §M[m001:Math]
 §F[f001:Add:pub]
@@ -178,7 +178,7 @@ The OPAL formatter applies these rules:
 §/M[m001]
 ```
 
-```opal
+```calor
 // After (formatted)
 §M[m001:Math]
 
@@ -199,17 +199,17 @@ The OPAL formatter applies these rules:
 When formatting multiple files, errors in one file don't stop processing of others:
 
 ```bash
-opalc format src/*.opal --write --verbose
+calorc format src/*.calor --write --verbose
 ```
 
 Output:
 ```
 Formatting 5 files...
-  [OK] src/Calculator.opal
-  [OK] src/UserService.opal
-  [ERR] src/Broken.opal: Parse error at line 12
-  [OK] src/OrderService.opal
-  [OK] src/PaymentService.opal
+  [OK] src/Calculator.calor
+  [OK] src/UserService.calor
+  [ERR] src/Broken.calor: Parse error at line 12
+  [OK] src/OrderService.calor
+  [OK] src/PaymentService.calor
 
 Summary: 4 formatted, 1 error
 ```
@@ -221,12 +221,12 @@ Summary: 4 formatted, 1 error
 Use `--verbose` to see detailed processing information:
 
 ```bash
-opalc format MyModule.opal --write --verbose
+calorc format MyModule.calor --write --verbose
 ```
 
 Output:
 ```
-Formatting MyModule.opal...
+Formatting MyModule.calor...
   Parsing: OK
   Changes: 3 lines modified
   Writing: OK
@@ -246,14 +246,14 @@ Formatting MyModule.opal...
 
 ## Examples
 
-### Format All OPAL Files
+### Format All Calor Files
 
 ```bash
-# Find and format all .opal files
-find . -name "*.opal" -exec opalc format {} --write \;
+# Find and format all .calor files
+find . -name "*.calor" -exec calorc format {} --write \;
 
 # Or use shell globbing
-opalc format **/*.opal --write
+calorc format **/*.calor --write
 ```
 
 ### Pre-Commit Hook
@@ -262,14 +262,14 @@ opalc format **/*.opal --write
 #!/bin/bash
 # .git/hooks/pre-commit
 
-# Check if any OPAL files are staged
-OPAL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.opal$')
+# Check if any Calor files are staged
+Calor_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.calor$')
 
-if [ -n "$OPAL_FILES" ]; then
+if [ -n "$Calor_FILES" ]; then
   # Format staged files
-  echo "$OPAL_FILES" | xargs opalc format --check
+  echo "$Calor_FILES" | xargs calorc format --check
   if [ $? -ne 0 ]; then
-    echo "OPAL files are not formatted. Run 'opalc format --write' to fix."
+    echo "Calor files are not formatted. Run 'calorc format --write' to fix."
     exit 1
   fi
 fi
@@ -282,10 +282,10 @@ Most editors can be configured to run formatters on save:
 **VS Code (settings.json):**
 ```json
 {
-  "[opal]": {
+  "[calor]": {
     "editor.formatOnSave": true
   },
-  "opal.formatCommand": "opalc format --write"
+  "calor.formatCommand": "calorc format --write"
 }
 ```
 
@@ -293,6 +293,6 @@ Most editors can be configured to run formatters on save:
 
 ## See Also
 
-- [opalc diagnose](/opal/cli/diagnose/) - Check for errors and warnings
-- [opalc compile](/opal/cli/compile/) - Compile OPAL to C#
-- [Syntax Reference](/opal/syntax-reference/) - OPAL language reference
+- [calorc diagnose](/calor/cli/diagnose/) - Check for errors and warnings
+- [calorc compile](/calor/cli/compile/) - Compile Calor to C#
+- [Syntax Reference](/calor/syntax-reference/) - Calor language reference

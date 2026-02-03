@@ -7,7 +7,7 @@ nav_order: 6
 
 # Effects
 
-Effects declare the side effects a function may have. This is unique to OPAL - traditional languages leave side effects implicit.
+Effects declare the side effects a function may have. This is unique to Calor - traditional languages leave side effects implicit.
 
 ---
 
@@ -19,7 +19,7 @@ In traditional code, you must read the entire implementation to know if a functi
 - Makes network calls
 - Modifies a database
 
-OPAL requires explicit declaration:
+Calor requires explicit declaration:
 
 ```
 §F{f001:SaveUser:pub}
@@ -245,5 +245,5 @@ The compiler warns if:
 
 ## Next
 
-- [Syntax Reference](/opal/syntax-reference/) - Back to overview
-- [Benchmarking](/opal/benchmarking/) - See how effects help comprehension
+- [Syntax Reference](/calor/syntax-reference/) - Back to overview
+- [Benchmarking](/calor/benchmarking/) - See how effects help comprehension

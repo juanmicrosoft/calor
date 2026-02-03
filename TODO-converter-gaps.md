@@ -1,6 +1,6 @@
-# OPAL Converter Gaps
+# Calor Converter Gaps
 
-This document tracks C# language features that the OPAL converter does not yet support.
+This document tracks C# language features that the Calor converter does not yet support.
 The MigrationAnalyzer now detects these constructs and applies score penalties to filter
 out files that use them.
 
@@ -20,8 +20,8 @@ var result = gender switch
 ```
 **Workaround:** Use switch statements instead (fully supported).
 
-**Implementation Notes:** Requires OPAL syntax for inline switch expressions, possibly:
-```opal
+**Implementation Notes:** Requires Calor syntax for inline switch expressions, possibly:
+```calor
 §X{sw001:gender}
   §WC Male => "Mr."
   §WC Female => "Ms."
@@ -37,7 +37,7 @@ if (age is >= 18) { ... }
 ```
 **Workaround:** Use explicit comparison operators: `if (value > 1000 && value < 2000)`
 
-**Implementation Notes:** Requires OPAL pattern syntax for relational operators.
+**Implementation Notes:** Requires Calor pattern syntax for relational operators.
 
 #### Compound Patterns (C# 9+)
 ```csharp
@@ -64,7 +64,7 @@ var result = resourceSet?.GetString(key);
 ```
 **Workaround:** Use explicit null checks.
 
-**Implementation Notes:** Need proper OPAL S-expression syntax for null-conditional operations.
+**Implementation Notes:** Need proper Calor S-expression syntax for null-conditional operations.
 
 #### Named Arguments
 ```csharp
@@ -73,7 +73,7 @@ Method(createIfNotExists: true, tryParents: false);
 ```
 **Workaround:** Use positional arguments (may require reordering).
 
-**Implementation Notes:** Named arguments should be converted to positional in OPAL.
+**Implementation Notes:** Named arguments should be converted to positional in Calor.
 
 #### Primary Constructors (C# 12+)
 ```csharp
@@ -96,7 +96,7 @@ TryConvert(input, out var result);
 ```
 **Workaround:** Refactor to use return types (Result<T, E> pattern).
 
-**Implementation Notes:** Need OPAL syntax for reference parameters and inline out declarations.
+**Implementation Notes:** Need Calor syntax for reference parameters and inline out declarations.
 
 #### Declaration Patterns (C# 7+)
 ```csharp
@@ -108,7 +108,7 @@ if (expression is UnaryExpression unary)
 ```
 **Workaround:** Use explicit type checks and casts.
 
-**Implementation Notes:** Need to generate proper OPAL pattern matching with variable binding.
+**Implementation Notes:** Need to generate proper Calor pattern matching with variable binding.
 
 #### Nested Generic Types
 ```csharp
@@ -128,7 +128,7 @@ Expression<Func<T, bool>> predicate = x => x.IsActive;
 ```
 **Workaround:** Use named methods instead of inline lambdas.
 
-**Implementation Notes:** Lambda syntax needs proper OPAL representation (maybe arrow functions).
+**Implementation Notes:** Lambda syntax needs proper Calor representation (maybe arrow functions).
 
 #### Throw Expressions (C# 7+)
 ```csharp
@@ -137,7 +137,7 @@ Name = value ?? throw new ArgumentNullException(nameof(value));
 ```
 **Workaround:** Use explicit if-throw pattern.
 
-**Implementation Notes:** Throw expressions need proper OPAL representation in S-expression context.
+**Implementation Notes:** Throw expressions need proper Calor representation in S-expression context.
 
 #### Generic Type Constraints
 ```csharp
@@ -146,7 +146,7 @@ public class UnitDefinition<TUnit> where TUnit : struct, Enum { }
 ```
 **Workaround:** Remove constraints or use simpler patterns.
 
-**Implementation Notes:** Constraint syntax needs OPAL §WHERE tag enhancement.
+**Implementation Notes:** Constraint syntax needs Calor §WHERE tag enhancement.
 
 ### Medium Priority
 
@@ -158,7 +158,7 @@ var last = array[^1];
 ```
 **Workaround:** Use explicit Substring/Take/Skip calls.
 
-**Implementation Notes:** Requires OPAL range syntax, possibly `[0..5]` or `{0 TO 5}`.
+**Implementation Notes:** Requires Calor range syntax, possibly `[0..5]` or `{0 TO 5}`.
 
 #### Index From End (C# 8+)
 ```csharp
@@ -202,12 +202,12 @@ int[] combined = [..first, ..second];
 ## Testing Strategy
 
 When implementing support for these features:
-1. Add unit tests in `tests/Opal.Compiler.Tests/`
+1. Add unit tests in `tests/Calor.Compiler.Tests/`
 2. Add real-world examples in E2E tests
 3. Update the MigrationAnalyzer to remove the penalty for the newly supported construct
 
 ## Related Files
 
-- `src/Opal.Compiler/Analysis/MigrationAnalyzer.cs` - Detects unsupported constructs
-- `src/Opal.Compiler/Migration/RoslynSyntaxVisitor.cs` - Main converter (needs updates)
-- `src/Opal.Compiler/CodeGen/CSharpEmitter.cs` - Emits back to C# (needs updates)
+- `src/Calor.Compiler/Analysis/MigrationAnalyzer.cs` - Detects unsupported constructs
+- `src/Calor.Compiler/Migration/RoslynSyntaxVisitor.cs` - Main converter (needs updates)
+- `src/Calor.Compiler/CodeGen/CSharpEmitter.cs` - Emits back to C# (needs updates)

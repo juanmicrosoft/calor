@@ -7,7 +7,7 @@ nav_order: 5
 
 # Contracts
 
-Contracts are first-class citizens in OPAL. They define what a function requires (preconditions) and guarantees (postconditions).
+Contracts are first-class citizens in Calor. They define what a function requires (preconditions) and guarantees (postconditions).
 
 ---
 
@@ -158,7 +158,7 @@ In postconditions, `result` refers to the return value:
   §E{db}
   §Q (> amount 0)                        // positive amount
   §Q (>= from.balance amount)            // sufficient funds
-  // Balance conservation would be expressed if OPAL supported old_ values
+  // Balance conservation would be expressed if Calor supported old_ values
   // ...
 §/F{f001}
 ```
@@ -233,4 +233,4 @@ Recommended order in function definition:
 
 ## Next
 
-- [Effects](/opal/syntax-reference/effects/) - Declaring side effects
+- [Effects](/calor/syntax-reference/effects/) - Declaring side effects

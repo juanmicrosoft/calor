@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Import the Calor.Tasks assembly -->
+  <PropertyGroup>
+    <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net8.0\Calor.Tasks.dll</CalorTasksAssembly>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Calor.Tasks.CompileCalor" AssemblyFile="$(CalorTasksAssembly)" />
+
+  <!-- Target to compile Calor files and add them to compilation -->
+  <Target Name="CompileCalorFiles"
+          BeforeTargets="BeforeCompile"
+          Inputs="@(CalorCompile)"
+          Outputs="@(CalorCompile->'$(CalorOutputDirectory)%(Filename).g.cs')"
+          Condition="'@(CalorCompile)' != ''">
+
+    <Message Text="Compiling Calor files..." Importance="high" />
+
+    <!-- Ensure output directory exists -->
+    <MakeDir Directories="$(CalorOutputDirectory)" />
+
+    <!-- Compile Calor files -->
+    <CompileCalor
+        SourceFiles="@(CalorCompile)"
+        OutputDirectory="$(CalorOutputDirectory)"
+        Verbose="$(CalorVerbose)">
+      <Output TaskParameter="GeneratedFiles" ItemName="CalorGeneratedFiles" />
+    </CompileCalor>
+
+    <ItemGroup>
+      <FileWrites Include="@(CalorGeneratedFiles)" />
+    </ItemGroup>
+
+    <Message Text="Generated @(CalorGeneratedFiles->Count()) C# files from Calor" Importance="high" />
+  </Target>
+
+  <!-- Add generated files to Compile before CoreCompile -->
+  <Target Name="AddCalorGeneratedFilesToCompile"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="CompileCalorFiles"
+          Condition="'@(CalorCompile)' != ''">
+    <ItemGroup>
+      <Compile Include="$(CalorOutputDirectory)*.g.cs" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Clean target to remove generated files -->
+  <Target Name="CleanCalorFiles" BeforeTargets="Clean">
+    <RemoveDir Directories="$(CalorOutputDirectory)" />
+  </Target>
+
+</Project>

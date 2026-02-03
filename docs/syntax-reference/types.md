@@ -7,13 +7,13 @@ nav_order: 2
 
 # Types
 
-OPAL has a simple type system with primitives, optionals, results, and arrays.
+Calor has a simple type system with primitives, optionals, results, and arrays.
 
 ---
 
 ## Primitive Types
 
-| OPAL | Description | C# | Range |
+| Calor | Description | C# | Range |
 |:-----|:------------|:---|:------|
 | `i32` | 32-bit signed integer | `int` | -2³¹ to 2³¹-1 |
 | `i64` | 64-bit signed integer | `long` | -2⁶³ to 2⁶³-1 |
@@ -55,7 +55,7 @@ OPAL has a simple type system with primitives, optionals, results, and arrays.
 
 ## Array Types
 
-OPAL uses bracket notation `[T]` for array types, which aligns with common programming language conventions.
+Calor uses bracket notation `[T]` for array types, which aligns with common programming language conventions.
 
 ### Syntax
 
@@ -66,7 +66,7 @@ OPAL uses bracket notation `[T]` for array types, which aligns with common progr
 
 ### Examples
 
-| OPAL Type | C# Equivalent |
+| Calor Type | C# Equivalent |
 |:----------|:--------------|
 | `[u8]` | `byte[]` |
 | `[i32]` | `int[]` |
@@ -234,4 +234,4 @@ Types matter in contracts for proper comparisons:
 
 ## Next
 
-- [Expressions](/opal/syntax-reference/expressions/) - Operators and expressions
+- [Expressions](/calor/syntax-reference/expressions/) - Operators and expressions

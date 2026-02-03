@@ -2,37 +2,37 @@
 layout: default
 title: Home
 nav_order: 1
-description: "OPAL - Optimized Programming for Agents Language"
+description: "Calor - Coding Agent Language for Optimized Reasoning"
 permalink: /
 ---
 
-# OPAL
+# Calor
 {: .fs-9 }
 
-Optimized Programming for Agents Language
+Coding Agent Language for Optimized Reasoning
 {: .fs-6 .fw-300 }
 
 A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.
 {: .fs-5 .fw-300 }
 
-[Get Started](/opal/getting-started/){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[View on GitHub](https://github.com/juanmicrosoft/opal){: .btn .fs-5 .mb-4 .mb-md-0 }
+[Get Started](/calor/getting-started/){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[View on GitHub](https://github.com/juanmicrosoft/calor){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
-## Why OPAL?
+## Why Calor?
 
 AI coding agents are transforming software development, but they're forced to work with languages designed for humans. This creates a fundamental mismatch.
 
 **AI agents need to understand code semantically** - what it does, what side effects it has, what contracts it upholds - but traditional languages hide this information behind syntax that requires deep semantic analysis to parse.
 
-OPAL asks: *What if we designed a language from the ground up for AI agents?*
+Calor asks: *What if we designed a language from the ground up for AI agents?*
 
 ---
 
 ## What Agents See
 
-### OPAL - Everything Explicit
+### Calor - Everything Explicit
 
 ```
 §F[f002:Square:pub]
@@ -44,7 +44,7 @@ OPAL asks: *What if we designed a language from the ground up for AI agents?*
 §/F[f002]
 ```
 
-**What OPAL tells the agent directly:**
+**What Calor tells the agent directly:**
 - Function ID: `f002` - can reference precisely
 - Precondition (`§Q`): `x >= 0`
 - Postcondition (`§S`): `result >= 0`
@@ -73,21 +73,21 @@ public static int Square(int x)
 
 ## Benchmark Results
 
-Evaluated across 20 paired OPAL/C# programs using V2 compact syntax:
+Evaluated across 20 paired Calor/C# programs using V2 compact syntax:
 
-| Category | OPAL vs C# | Winner | Interpretation |
+| Category | Calor vs C# | Winner | Interpretation |
 |:---------|:-----------|:-------|:---------------|
-| Comprehension | **1.33x** | OPAL | Explicit structure aids understanding |
-| Error Detection | **1.19x** | OPAL | Contracts surface invariant violations |
-| Edit Precision | **1.15x** | OPAL | Unique IDs enable targeted changes |
+| Comprehension | **1.33x** | Calor | Explicit structure aids understanding |
+| Error Detection | **1.19x** | Calor | Contracts surface invariant violations |
+| Edit Precision | **1.15x** | Calor | Unique IDs enable targeted changes |
 | Generation Accuracy | 0.94x | C# | Mature tooling, familiar patterns |
 | Task Completion | 0.93x | C# | Ecosystem maturity advantage |
-| Token Economics | 0.67x | C# | OPAL's explicit syntax uses more tokens |
-| Information Density | 0.22x | C# | OPAL trades density for explicitness |
+| Token Economics | 0.67x | C# | Calor's explicit syntax uses more tokens |
+| Information Density | 0.22x | C# | Calor trades density for explicitness |
 
-**Key Finding:** OPAL excels where explicitness matters - comprehension, error detection, and edit precision. C# wins on token efficiency, reflecting a fundamental tradeoff: explicit semantics require more tokens but enable better agent reasoning.
+**Key Finding:** Calor excels where explicitness matters - comprehension, error detection, and edit precision. C# wins on token efficiency, reflecting a fundamental tradeoff: explicit semantics require more tokens but enable better agent reasoning.
 
-[View detailed benchmarks](/opal/benchmarking/results/){: .btn .btn-outline }
+[View detailed benchmarks](/calor/benchmarking/results/){: .btn .btn-outline }
 
 ---
 
@@ -95,32 +95,32 @@ Evaluated across 20 paired OPAL/C# programs using V2 compact syntax:
 
 ```bash
 # Clone and build
-git clone https://github.com/juanmicrosoft/opal.git
-cd opal && dotnet build
+git clone https://github.com/juanmicrosoft/calor.git
+cd calor && dotnet build
 
-# Compile OPAL to C#
-dotnet run --project src/Opal.Compiler -- \
-  --input samples/HelloWorld/hello.opal \
+# Compile Calor to C#
+dotnet run --project src/Calor.Compiler -- \
+  --input samples/HelloWorld/hello.calor \
   --output samples/HelloWorld/hello.g.cs
 
 # Run the generated program
 dotnet run --project samples/HelloWorld
 ```
 
-[Full installation guide](/opal/getting-started/installation/){: .btn .btn-outline }
+[Full installation guide](/calor/getting-started/installation/){: .btn .btn-outline }
 
 ---
 
 ## Migration Analysis
 
-Have an existing C# codebase? Use `opalc analyze` to find files that would benefit most from OPAL:
+Have an existing C# codebase? Use `calorc analyze` to find files that would benefit most from Calor:
 
 ```bash
 # Score C# files for migration potential
-opalc analyze ./src
+calorc analyze ./src
 
 # Output:
-# === OPAL Migration Analysis ===
+# === Calor Migration Analysis ===
 # Analyzed: 42 files
 # Average Score: 34.2/100
 #
@@ -130,9 +130,9 @@ opalc analyze ./src
 #   ...
 ```
 
-The analyzer scores files based on patterns like null handling, error handling, and argument validation that map to OPAL features.
+The analyzer scores files based on patterns like null handling, error handling, and argument validation that map to Calor features.
 
-[Learn more about analyze](/opal/cli/analyze/){: .btn .btn-outline }
+[Learn more about analyze](/calor/cli/analyze/){: .btn .btn-outline }
 
 ---
 
@@ -152,11 +152,11 @@ The analyzer scores files based on patterns like null handling, error handling, 
 
 ## Contributing
 
-OPAL is an experiment in language design for AI agents. We welcome contributions, especially:
+Calor is an experiment in language design for AI agents. We welcome contributions, especially:
 
 - Additional benchmark programs
 - Metric refinements
 - Parser improvements
 - Documentation
 
-[Contributing guide](/opal/contributing/){: .btn .btn-outline }
+[Contributing guide](/calor/contributing/){: .btn .btn-outline }

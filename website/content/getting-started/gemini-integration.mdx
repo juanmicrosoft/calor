@@ -4,9 +4,9 @@ section: "getting-started"
 order: 5
 ---
 
-# Using OPAL with Google Gemini CLI
+# Using Calor with Google Gemini CLI
 
-This guide explains how to use OPAL with Google Gemini CLI. For other AI integrations, see [Claude Integration](/getting-started/claude-integration/) or [Codex Integration](/getting-started/codex-integration/).
+This guide explains how to use Calor with Google Gemini CLI. For other AI integrations, see [Claude Integration](/getting-started/claude-integration/) or [Codex Integration](/getting-started/codex-integration/).
 
 ---
 
@@ -15,23 +15,23 @@ This guide explains how to use OPAL with Google Gemini CLI. For other AI integra
 Initialize your project for Gemini CLI with a single command:
 
 ```bash
-opalc init --ai gemini
+calorc init --ai gemini
 ```
 
 This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.gemini/skills/opal/SKILL.md` | Teaches Gemini OPAL v2+ syntax |
-| `.gemini/skills/opal-convert/SKILL.md` | Teaches Gemini C# to OPAL conversion |
-| `.gemini/settings.json` | **Hook configuration** - enforces OPAL-first development |
-| `GEMINI.md` | Project documentation with OPAL-first guidelines |
+| `.gemini/skills/calor/SKILL.md` | Teaches Gemini Calor v2+ syntax |
+| `.gemini/skills/calor-convert/SKILL.md` | Teaches Gemini C# to Calor conversion |
+| `.gemini/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `GEMINI.md` | Project documentation with Calor-first guidelines |
 
 ---
 
-## OPAL-First Enforcement
+## Calor-First Enforcement
 
-Unlike Codex CLI, **Gemini CLI supports hooks** (as of v0.26.0+). This means OPAL-first development is **enforced**, not just guided.
+Unlike Codex CLI, **Gemini CLI supports hooks** (as of v0.26.0+). This means Calor-first development is **enforced**, not just guided.
 
 When Gemini tries to create a `.cs` file, the hook blocks the operation and returns:
 
@@ -39,36 +39,36 @@ When Gemini tries to create a `.cs` file, the hook blocks the operation and retu
 {
   "decision": "deny",
   "reason": "BLOCKED: Cannot create C# file 'MyClass.cs'",
-  "systemMessage": "This is an OPAL-first project. Create an .opal file instead..."
+  "systemMessage": "This is an Calor-first project. Create an .calor file instead..."
 }
 ```
 
-Gemini will then automatically retry with an `.opal` file.
+Gemini will then automatically retry with an `.calor` file.
 
 ---
 
 ## Available Skills
 
-### The `@opal` Skill
+### The `@calor` Skill
 
-Use `@opal` to activate OPAL-aware code generation:
+Use `@calor` to activate Calor-aware code generation:
 
 ```
-@opal
+@calor
 
 Write a function that calculates factorial with:
 - Precondition: n >= 0
 - Postcondition: result >= 1
 ```
 
-### The `@opal-convert` Skill
+### The `@calor-convert` Skill
 
-Use `@opal-convert` to convert existing C# code to OPAL:
+Use `@calor-convert` to convert existing C# code to Calor:
 
 ```
-@opal-convert
+@calor-convert
 
-Convert this C# class to OPAL:
+Convert this C# class to Calor:
 
 public class Calculator
 {
@@ -84,7 +84,7 @@ public class Calculator
 |:--------|:------------|:-----------|:----------|
 | Skills directory | `.claude/skills/` | `.gemini/skills/<name>/` | `.codex/skills/<name>/` |
 | Project instructions | `CLAUDE.md` | `GEMINI.md` | `AGENTS.md` |
-| Skill invocation | `/opal` | `@opal` | `$opal` |
+| Skill invocation | `/calor` | `@calor` | `$calor` |
 | Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only |
 | Hook mechanism | `PreToolUse` | `BeforeTool` | N/A |
 
@@ -94,7 +94,7 @@ public class Calculator
 
 1. **Trust the enforcement** - Gemini CLI will block `.cs` creation
 2. **Use explicit instructions** - Be specific about contracts and effects
-3. **Start with skill reference** - Begin prompts with `@opal` or `@opal-convert`
+3. **Start with skill reference** - Begin prompts with `@calor` or `@calor-convert`
 4. **Review contracts** - Verify generated contracts match your requirements
 
 ---
@@ -109,14 +109,14 @@ Verify the settings file exists:
 cat .gemini/settings.json
 ```
 
-It should contain the `BeforeTool` hook configuration with `opalc hook validate-write --format gemini`.
+It should contain the `BeforeTool` hook configuration with `calorc hook validate-write --format gemini`.
 
-### opalc Not Found
+### calorc Not Found
 
-Ensure the OPAL compiler is installed:
+Ensure the Calor compiler is installed:
 
 ```bash
-dotnet tool install -g opalc
+dotnet tool install -g calorc
 export PATH="$PATH:$HOME/.dotnet/tools"
 ```
 
@@ -125,6 +125,6 @@ export PATH="$PATH:$HOME/.dotnet/tools"
 ## See Also
 
 - [Syntax Reference](/syntax-reference/) - Complete language reference
-- [opalc init](/cli/init/) - Full init command documentation
+- [calorc init](/cli/init/) - Full init command documentation
 - [Claude Integration](/getting-started/claude-integration/) - Alternative with Claude Code
 - [Codex Integration](/getting-started/codex-integration/) - Alternative with OpenAI Codex CLI

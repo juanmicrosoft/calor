@@ -35,7 +35,7 @@ Languages that pack more meaning into fewer tokens use context windows more effi
 
 ### Semantic Elements Counted
 
-**OPAL elements:**
+**Calor elements:**
 | Element | What it represents |
 |:--------|:-------------------|
 | Modules (`§M[`) | Namespace/module |
@@ -86,7 +86,7 @@ This single line conveys:
 - Two parameters with types
 - Expression body
 
-**OPAL equivalent:**
+**Calor equivalent:**
 ```
 §F[f001:Add:pub]
   §I[i32:a]
@@ -102,11 +102,11 @@ Same semantics, but spread across more tokens.
 
 C# closing braces carry minimal semantic weight but are counted as tokens.
 
-OPAL closing tags (`§/F[f001]`) also carry minimal semantic weight but use more characters.
+Calor closing tags (`§/F[f001]`) also carry minimal semantic weight but use more characters.
 
 ### 3. Effect Information is "Extra"
 
-OPAL's effect declarations add semantic content that C# doesn't have:
+Calor's effect declarations add semantic content that C# doesn't have:
 
 ```
 §E[cw,fr,net]    // 3+ semantic elements
@@ -120,7 +120,7 @@ But C# has no equivalent, so it doesn't get penalized for missing this informati
 
 ### Example: FizzBuzz
 
-**OPAL:**
+**Calor:**
 ```
 §M[m001:FizzBuzz]
 §F[f001:Main:pub]
@@ -200,9 +200,9 @@ Effect declarations / total tokens
 
 The 0.22x ratio seems dramatic, but consider:
 
-### OPAL's "Extra" Semantics
+### Calor's "Extra" Semantics
 
-OPAL includes semantic elements C# doesn't have:
+Calor includes semantic elements C# doesn't have:
 - Explicit effects
 - First-class contracts
 - Unique IDs
@@ -213,7 +213,7 @@ These are counted as semantic elements but have no C# equivalent.
 
 Information density measures *quantity* of semantic content per token, not *quality* or *usefulness*.
 
-OPAL's explicit effects might be more valuable for agent reasoning than multiple C# type annotations, even if effects contribute fewer semantic elements.
+Calor's explicit effects might be more valuable for agent reasoning than multiple C# type annotations, even if effects contribute fewer semantic elements.
 
 ---
 
@@ -230,18 +230,18 @@ Low density is acceptable when:
 
 ## The Tradeoff
 
-This metric captures OPAL's fundamental tradeoff:
+This metric captures Calor's fundamental tradeoff:
 
 | Approach | Density | Explicitness |
 |:---------|:--------|:-------------|
 | C# | High | Low (implicit) |
-| OPAL | Low | High (explicit) |
+| Calor | Low | High (explicit) |
 
-OPAL deliberately trades density for explicitness.
+Calor deliberately trades density for explicitness.
 
 ---
 
-## Improving OPAL's Density
+## Improving Calor's Density
 
 Potential improvements (with tradeoffs):
 
@@ -255,7 +255,7 @@ Each improvement would sacrifice a design principle.
 
 ## Summary
 
-The 0.22x ratio reflects OPAL's design choice to prioritize explicit semantics over token efficiency.
+The 0.22x ratio reflects Calor's design choice to prioritize explicit semantics over token efficiency.
 
 This is not a flaw but a tradeoff. The value of explicitness must be weighed against the cost of lower density.
 
@@ -263,5 +263,5 @@ This is not a flaw but a tradeoff. The value of explicitness must be weighed aga
 
 ## Next
 
-- [Results](/opal/benchmarking/results/) - Summary of all metrics
-- [Tradeoffs](/opal/philosophy/tradeoffs/) - Understanding the design decisions
+- [Results](/calor/benchmarking/results/) - Summary of all metrics
+- [Tradeoffs](/calor/philosophy/tradeoffs/) - Understanding the design decisions

@@ -1,79 +1,79 @@
 ---
 layout: default
-title: Adding OPAL to Existing Projects
+title: Adding Calor to Existing Projects
 nav_order: 7
-permalink: /guides/adding-opal-to-existing-projects/
+permalink: /guides/adding-calor-to-existing-projects/
 ---
 
-# Adding OPAL to an Existing C# Project
+# Adding Calor to an Existing C# Project
 
-This guide walks you through adding OPAL to an existing C# project, from identifying migration candidates to building with mixed OPAL/C# code.
+This guide walks you through adding Calor to an existing C# project, from identifying migration candidates to building with mixed Calor/C# code.
 
 ---
 
 ## Overview
 
-Adding OPAL to an existing project is a gradual process:
+Adding Calor to an existing project is a gradual process:
 
-1. **Initialize** - Enable OPAL with MSBuild integration
-2. **Analyze** - Find files that benefit most from OPAL's features
-3. **Write/Convert** - Create new files in OPAL, convert high-scoring C# files
-4. **Build** - OPAL compiles automatically with your project
+1. **Initialize** - Enable Calor with MSBuild integration
+2. **Analyze** - Find files that benefit most from Calor's features
+3. **Write/Convert** - Create new files in Calor, convert high-scoring C# files
+4. **Build** - Calor compiles automatically with your project
 
-You don't need to convert everything at once. OPAL and C# coexist seamlessly.
+You don't need to convert everything at once. Calor and C# coexist seamlessly.
 
 ---
 
 ## Prerequisites
 
 - .NET 8.0 SDK or later
-- `opalc` global tool installed: `dotnet tool install -g opalc`
+- `calorc` global tool installed: `dotnet tool install -g calorc`
 - An existing C# project
 
 ---
 
-## Step 1: Enable OPAL in Your Project
+## Step 1: Enable Calor in Your Project
 
-Enable OPAL with MSBuild integration:
+Enable Calor with MSBuild integration:
 
 ```bash
-# Initialize OPAL in your project
-opalc init
+# Initialize Calor in your project
+calorc init
 
 # Or specify a specific project file
-opalc init --project MyApp.csproj
+calorc init --project MyApp.csproj
 ```
 
 ### What Happens
 
 Your `.csproj` is updated with MSBuild targets that:
 
-- Compile `.opal` files automatically before C# compilation
+- Compile `.calor` files automatically before C# compilation
 - Include generated `.g.cs` files in the build
 - Clean generated files on `dotnet clean`
 
-Generated files go to `obj/<Configuration>/<TargetFramework>/opal/`, keeping your source tree clean.
+Generated files go to `obj/<Configuration>/<TargetFramework>/calor/`, keeping your source tree clean.
 
-After this step, you can immediately start writing `.opal` files and they'll compile during `dotnet build`.
+After this step, you can immediately start writing `.calor` files and they'll compile during `dotnet build`.
 
 ---
 
 ## Step 2: Analyze Your Codebase
 
-Use `opalc analyze` to find C# files that would benefit most from OPAL:
+Use `calorc analyze` to find C# files that would benefit most from Calor:
 
 ```bash
 # Analyze your source directory
-opalc analyze ./src
+calorc analyze ./src
 
 # Show top 10 candidates with detailed scores
-opalc analyze ./src --top 10 --verbose
+calorc analyze ./src --top 10 --verbose
 ```
 
 ### Understanding the Output
 
 ```
-=== OPAL Migration Analysis ===
+=== Calor Migration Analysis ===
 
 Analyzed: 42 files
 Average Score: 34.2/100
@@ -87,9 +87,9 @@ Top 10 Files for Migration:
 ...
 ```
 
-Files are scored based on patterns that map to OPAL features:
+Files are scored based on patterns that map to Calor features:
 
-| Pattern | OPAL Feature |
+| Pattern | Calor Feature |
 |:--------|:-------------|
 | Argument validation, `ArgumentException` | `§Q` precondition contracts |
 | Null checks, `?.`, `??` | `Option<T>` types |
@@ -100,20 +100,20 @@ Files are scored based on patterns that map to OPAL features:
 
 | Priority | Score | Recommendation |
 |:---------|:------|:---------------|
-| **Critical** | 76-100 | Convert to OPAL - high benefit |
+| **Critical** | 76-100 | Convert to Calor - high benefit |
 | **High** | 51-75 | Good conversion candidate |
 | **Medium** | 26-50 | Optional - some benefit |
 | **Low** | 0-25 | Keep in C# - minimal benefit |
 
 ---
 
-## Step 3: Add Your First OPAL File
+## Step 3: Add Your First Calor File
 
-Create a new `.opal` file alongside your existing code:
+Create a new `.calor` file alongside your existing code:
 
 ```bash
-# Create a simple OPAL module
-cat > src/Services/Calculator.opal << 'EOF'
+# Create a simple Calor module
+cat > src/Services/Calculator.calor << 'EOF'
 §M[m001:Calculator]
 
 §F[f001:Add:pub]
@@ -140,23 +140,23 @@ EOF
 ## Step 4: Build and Verify
 
 ```bash
-# Build your project - OPAL compiles automatically
+# Build your project - Calor compiles automatically
 dotnet build
 ```
 
 The build process:
 
-1. Finds all `.opal` files in your project
-2. Compiles each to `.g.cs` in the `obj/opal/` directory
+1. Finds all `.calor` files in your project
+2. Compiles each to `.g.cs` in the `obj/calor/` directory
 3. Includes generated C# in the normal compilation
 4. Produces your final assembly
 
 ### Verify the Generated Code
 
-Check the generated C# to understand what OPAL produces:
+Check the generated C# to understand what Calor produces:
 
 ```bash
-cat obj/Debug/net8.0/opal/Calculator.g.cs
+cat obj/Debug/net8.0/calor/Calculator.g.cs
 ```
 
 ---
@@ -167,38 +167,38 @@ Based on your analysis results, convert files that score High or Critical:
 
 ```bash
 # Convert a single file
-opalc convert src/Services/PaymentProcessor.cs
+calorc convert src/Services/PaymentProcessor.cs
 
-# Output: src/Services/PaymentProcessor.opal
+# Output: src/Services/PaymentProcessor.calor
 
 # With benchmark comparison to see token savings
-opalc convert src/Services/PaymentProcessor.cs --benchmark
+calorc convert src/Services/PaymentProcessor.cs --benchmark
 ```
 
 For bulk conversion:
 
 ```bash
 # Preview what would be converted
-opalc migrate ./src --dry-run
+calorc migrate ./src --dry-run
 
 # Convert all files
-opalc migrate ./src --direction cs-to-opal
+calorc migrate ./src --direction cs-to-calor
 
 # Generate a migration report
-opalc migrate ./src --report migration-report.md
+calorc migrate ./src --report migration-report.md
 ```
 
 ---
 
 ## Step 6: Remove Original C# Files (Optional)
 
-Once you've verified the OPAL version works correctly:
+Once you've verified the Calor version works correctly:
 
 ```bash
 # Remove the original C# file
 rm src/Services/PaymentProcessor.cs
 
-# The OPAL file now produces the generated C# during build
+# The Calor file now produces the generated C# during build
 ```
 
 Or keep both if you want to compare them during a transition period.
@@ -207,58 +207,58 @@ Or keep both if you want to compare them during a transition period.
 
 ## Optional: Enable Claude Code Integration
 
-For AI-assisted OPAL development, add Claude Code support:
+For AI-assisted Calor development, add Claude Code support:
 
 ```bash
-opalc init --ai claude
+calorc init --ai claude
 ```
 
 ### What Gets Added
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/opal/SKILL.md` | Skill for writing OPAL code |
-| `.claude/skills/opal-convert/SKILL.md` | Skill for C# to OPAL conversion |
+| `.claude/skills/calor/SKILL.md` | Skill for writing Calor code |
+| `.claude/skills/calor-convert/SKILL.md` | Skill for C# to Calor conversion |
 | `CLAUDE.md` | Project guidelines for Claude |
 
 ### CLAUDE.md Guidelines
 
 The generated CLAUDE.md includes instructions that tell Claude to:
 
-- **Write new files in OPAL** instead of C#
-- **Analyze C# files before modifying** - if a file scores High or Critical, convert it to OPAL first, then make changes
-- **Prefer OPAL** for files with validation logic, error handling, or side effects
+- **Write new files in Calor** instead of C#
+- **Analyze C# files before modifying** - if a file scores High or Critical, convert it to Calor first, then make changes
+- **Prefer Calor** for files with validation logic, error handling, or side effects
 
 ### Using Claude Code
 
 After initialization, use these skills:
 
-**Write new OPAL code:**
+**Write new Calor code:**
 ```
-/opal
+/calor
 
 Write a function that validates email addresses with:
 - Precondition: input is not null or empty
 - Postcondition: returns true only for valid emails
 ```
 
-**Convert existing C# to OPAL:**
+**Convert existing C# to Calor:**
 ```
-/opal-convert src/Services/PaymentProcessor.cs
+/calor-convert src/Services/PaymentProcessor.cs
 ```
 
 Claude will:
 1. Read the C# file
-2. Convert it to OPAL syntax
+2. Convert it to Calor syntax
 3. Preserve all functionality
 4. Add contracts where appropriate
 
-**Refactor OPAL code:**
+**Refactor Calor code:**
 ```
 Extract the validation logic from function f001 into a separate private function
 ```
 
-Claude understands OPAL's ID-based structure, so you can reference specific functions, loops, and conditionals by their IDs.
+Claude understands Calor's ID-based structure, so you can reference specific functions, loops, and conditionals by their IDs.
 
 ---
 
@@ -268,13 +268,13 @@ A typical mixed project structure:
 
 ```
 MyProject/
-├── MyProject.csproj           # MSBuild with OPAL targets
+├── MyProject.csproj           # MSBuild with Calor targets
 ├── CLAUDE.md                  # Project docs for Claude
 ├── .claude/
 │   └── skills/
-│       ├── opal/
-│       │   └── SKILL.md      # OPAL writing skill
-│       └── opal-convert/
+│       ├── calor/
+│       │   └── SKILL.md      # Calor writing skill
+│       └── calor-convert/
 │           └── SKILL.md      # Conversion skill
 ├── src/
 │   ├── Program.cs            # C# entry point
@@ -282,10 +282,10 @@ MyProject/
 │   │   └── User.cs           # Keep simple DTOs in C#
 │   └── Services/
 │       ├── AuthService.cs    # Legacy C# (not yet converted)
-│       ├── PaymentService.opal    # Converted to OPAL
-│       └── OrderService.opal      # Converted to OPAL
+│       ├── PaymentService.calor    # Converted to Calor
+│       └── OrderService.calor      # Converted to Calor
 └── obj/
-    └── Debug/net8.0/opal/
+    └── Debug/net8.0/calor/
         ├── PaymentService.g.cs    # Generated C#
         └── OrderService.g.cs      # Generated C#
 ```
@@ -296,7 +296,7 @@ MyProject/
 
 ### What to Convert First
 
-1. **High-scoring files** from `opalc analyze`
+1. **High-scoring files** from `calorc analyze`
 2. **Files with complex validation** - benefit from contracts
 3. **Files with error handling** - benefit from `Result<T,E>`
 4. **Files with side effects** - benefit from effect declarations
@@ -306,20 +306,20 @@ MyProject/
 - Simple DTOs and record types
 - Auto-generated code (EF migrations, gRPC stubs)
 - Files with heavy framework integration
-- Code using features OPAL doesn't support yet
+- Code using features Calor doesn't support yet
 
 ### Conversion Tips
 
 - Convert one file at a time and verify it works
 - Run your tests after each conversion
 - Use `--benchmark` to see token savings
-- Keep the original C# until you're confident in the OPAL version
+- Keep the original C# until you're confident in the Calor version
 
 ---
 
 ## Troubleshooting
 
-### Build Fails: "opalc not found"
+### Build Fails: "calorc not found"
 
 Add the .NET tools directory to your PATH:
 
@@ -344,7 +344,7 @@ The converter warns about patterns it can't perfectly translate:
 Warning: Complex LINQ expression at line 42 - manual review recommended
 ```
 
-Review these manually and adjust the OPAL code as needed.
+Review these manually and adjust the Calor code as needed.
 
 ### Test Failures After Conversion
 
@@ -357,8 +357,8 @@ Review these manually and adjust the OPAL code as needed.
 
 ## Next Steps
 
-- [Syntax Reference](/opal/syntax-reference/) - Complete OPAL language reference
-- [Contracts](/opal/syntax-reference/contracts/) - Writing preconditions and postconditions
-- [Effects](/opal/syntax-reference/effects/) - Declaring side effects
-- [opalc analyze](/opal/cli/analyze/) - Understanding migration scores
-- [opalc benchmark](/opal/cli/benchmark/) - Comparing OPAL vs C# metrics
+- [Syntax Reference](/calor/syntax-reference/) - Complete Calor language reference
+- [Contracts](/calor/syntax-reference/contracts/) - Writing preconditions and postconditions
+- [Effects](/calor/syntax-reference/effects/) - Declaring side effects
+- [calorc analyze](/calor/cli/analyze/) - Understanding migration scores
+- [calorc benchmark](/calor/cli/benchmark/) - Comparing Calor vs C# metrics

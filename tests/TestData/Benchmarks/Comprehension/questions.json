@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "description": "Comprehension questions for OPAL vs C# evaluation",
+  "description": "Comprehension questions for Calor vs C# evaluation",
   "questionSets": [
     {
       "fileId": "003",

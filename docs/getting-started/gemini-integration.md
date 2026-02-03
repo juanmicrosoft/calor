@@ -5,9 +5,9 @@ parent: Getting Started
 nav_order: 5
 ---
 
-# Using OPAL with Google Gemini CLI
+# Using Calor with Google Gemini CLI
 
-This guide explains how to use OPAL with Google Gemini CLI. For other AI integrations, see [Claude Integration](/opal/getting-started/claude-integration/) or [Codex Integration](/opal/getting-started/codex-integration/).
+This guide explains how to use Calor with Google Gemini CLI. For other AI integrations, see [Claude Integration](/calor/getting-started/claude-integration/) or [Codex Integration](/calor/getting-started/codex-integration/).
 
 ---
 
@@ -16,25 +16,25 @@ This guide explains how to use OPAL with Google Gemini CLI. For other AI integra
 Initialize your project for Gemini CLI with a single command:
 
 ```bash
-opalc init --ai gemini
+calorc init --ai gemini
 ```
 
 This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.gemini/skills/opal/SKILL.md` | Teaches Gemini OPAL v2+ syntax for writing new code |
-| `.gemini/skills/opal-convert/SKILL.md` | Teaches Gemini how to convert C# to OPAL |
-| `.gemini/settings.json` | **Hook configuration** - enforces OPAL-first development |
-| `GEMINI.md` | Project documentation with OPAL-first guidelines |
+| `.gemini/skills/calor/SKILL.md` | Teaches Gemini Calor v2+ syntax for writing new code |
+| `.gemini/skills/calor-convert/SKILL.md` | Teaches Gemini how to convert C# to Calor |
+| `.gemini/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `GEMINI.md` | Project documentation with Calor-first guidelines |
 
-You can run this command again anytime to update the OPAL documentation section in GEMINI.md without losing your custom content.
+You can run this command again anytime to update the Calor documentation section in GEMINI.md without losing your custom content.
 
 ---
 
-## OPAL-First Enforcement
+## Calor-First Enforcement
 
-Unlike Codex CLI, **Gemini CLI supports hooks** (as of v0.26.0+). This means OPAL-first development is **enforced**, not just guided.
+Unlike Codex CLI, **Gemini CLI supports hooks** (as of v0.26.0+). This means Calor-first development is **enforced**, not just guided.
 
 When Gemini tries to create a `.cs` file, the hook blocks the operation:
 
@@ -42,29 +42,29 @@ When Gemini tries to create a `.cs` file, the hook blocks the operation:
 {
   "decision": "deny",
   "reason": "BLOCKED: Cannot create C# file 'MyClass.cs'",
-  "systemMessage": "This is an OPAL-first project. Create an .opal file instead: MyClass.opal\n\nUse @opal skill for OPAL syntax help."
+  "systemMessage": "This is an Calor-first project. Create an .calor file instead: MyClass.calor\n\nUse @calor skill for Calor syntax help."
 }
 ```
 
-Gemini will then automatically retry with an `.opal` file.
+Gemini will then automatically retry with an `.calor` file.
 
 **Allowed file types:**
-- `.opal` files (OPAL source code)
-- `.g.cs` files (generated C# from OPAL)
+- `.calor` files (Calor source code)
+- `.g.cs` files (generated C# from Calor)
 - Files in `obj/` directory (build artifacts)
 
 ---
 
 ## Available Skills
 
-### The `@opal` Skill
+### The `@calor` Skill
 
-When working with Gemini CLI in an OPAL-initialized project, use the `@opal` command to activate OPAL-aware code generation.
+When working with Gemini CLI in an Calor-initialized project, use the `@calor` command to activate Calor-aware code generation.
 
 **Example prompts:**
 
 ```
-@opal
+@calor
 
 Write a function that calculates compound interest with:
 - Preconditions: principal > 0, rate >= 0, years > 0
@@ -73,7 +73,7 @@ Write a function that calculates compound interest with:
 ```
 
 ```
-@opal
+@calor
 
 Create a UserService class with methods for:
 - GetUserById (returns Option<User>)
@@ -81,14 +81,14 @@ Create a UserService class with methods for:
 - DeleteUser (effects: database write)
 ```
 
-### The `@opal-convert` Skill
+### The `@calor-convert` Skill
 
-Use `@opal-convert` to convert existing C# code to OPAL:
+Use `@calor-convert` to convert existing C# code to Calor:
 
 ```
-@opal-convert
+@calor-convert
 
-Convert this C# class to OPAL:
+Convert this C# class to Calor:
 
 public class Calculator
 {
@@ -103,7 +103,7 @@ public class Calculator
 ```
 
 Gemini will:
-1. Convert the class structure to OPAL syntax
+1. Convert the class structure to Calor syntax
 2. Add appropriate contracts (e.g., `§Q (!= b 0)` for the divide precondition)
 3. Generate unique IDs for all structural elements
 4. Declare effects based on detected side effects
@@ -112,11 +112,11 @@ Gemini will:
 
 ## Skill Capabilities
 
-The OPAL skills teach Gemini:
+The Calor skills teach Gemini:
 
 ### Syntax Knowledge
 
-- All OPAL v2+ structure tags (`§M`, `§F`, `§C`, etc.)
+- All Calor v2+ structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Arrow syntax conditionals: `§IF{id} condition → action`
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
@@ -142,10 +142,10 @@ The OPAL skills teach Gemini:
 | Feature | Claude Code | Gemini CLI | Codex CLI |
 |:--------|:------------|:-----------|:----------|
 | Skills directory | `.claude/skills/` | `.gemini/skills/<name>/` | `.codex/skills/<name>/` |
-| Skill file format | `opal.md` | `SKILL.md` with YAML | `SKILL.md` with YAML |
+| Skill file format | `calor.md` | `SKILL.md` with YAML | `SKILL.md` with YAML |
 | Project instructions | `CLAUDE.md` | `GEMINI.md` | `AGENTS.md` |
-| Skill invocation | `/opal` | `@opal` | `$opal` |
-| OPAL-first enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only |
+| Skill invocation | `/calor` | `@calor` | `$calor` |
+| Calor-first enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only |
 | Blocks `.cs` creation | Yes | Yes | No |
 | Hook mechanism | `PreToolUse` | `BeforeTool` | N/A |
 
@@ -157,9 +157,9 @@ The OPAL skills teach Gemini:
 
 **Prompt:**
 ```
-@opal
+@calor
 
-Write an OPAL function that calculates factorial with a precondition
+Write an Calor function that calculates factorial with a precondition
 that n >= 0 and postcondition that result >= 1
 ```
 
@@ -182,7 +182,7 @@ that n >= 0 and postcondition that result >= 1
 
 **Prompt:**
 ```
-@opal
+@calor
 
 Create a PaymentService class with:
 - A ProcessPayment method that takes amount (f64) and returns Result<PaymentResult, PaymentError>
@@ -194,7 +194,7 @@ Create a PaymentService class with:
 
 **Prompt:**
 ```
-Is there a bug in this OPAL code?
+Is there a bug in this Calor code?
 
 §F[f001:Divide:pub]
   §I[i32:a]
@@ -220,7 +220,7 @@ Otherwise division by zero is possible.
 ### Starting a New Feature
 
 ```
-@opal
+@calor
 
 I need to implement [feature description].
 
@@ -228,15 +228,15 @@ The requirements are:
 - [requirement 1]
 - [requirement 2]
 
-Please create the OPAL code with appropriate contracts and effects.
+Please create the Calor code with appropriate contracts and effects.
 ```
 
 ### Converting Existing Code
 
 ```
-@opal-convert
+@calor-convert
 
-Convert src/Services/PaymentService.cs to OPAL, adding:
+Convert src/Services/PaymentService.cs to Calor, adding:
 - Contracts based on the validation logic
 - Effect declarations for database and network calls
 ```
@@ -249,7 +249,7 @@ Test that the hook blocks `.cs` creation:
 # Ask Gemini to create a C# file
 gemini "Create a new utility class called StringHelper in StringHelper.cs"
 
-# The hook should block and suggest StringHelper.opal instead
+# The hook should block and suggest StringHelper.calor instead
 ```
 
 ---
@@ -258,7 +258,7 @@ gemini "Create a new utility class called StringHelper in StringHelper.cs"
 
 1. **Trust the enforcement** - Unlike Codex, Gemini CLI will actually block `.cs` creation
 2. **Use explicit instructions** - Be specific about contracts and effects you want
-3. **Include skill reference** - Start prompts with `@opal` or `@opal-convert`
+3. **Include skill reference** - Start prompts with `@calor` or `@calor-convert`
 4. **Review contracts** - Verify generated contracts match your requirements
 5. **Check effects** - Ensure effect declarations are accurate
 
@@ -283,9 +283,9 @@ Expected content includes:
         "matcher": "write_file|replace",
         "hooks": [
           {
-            "name": "opal-validate-write",
+            "name": "calor-validate-write",
             "type": "command",
-            "command": "opalc hook validate-write --format gemini $TOOL_INPUT"
+            "command": "calorc hook validate-write --format gemini $TOOL_INPUT"
           }
         ]
       }
@@ -294,30 +294,30 @@ Expected content includes:
 }
 ```
 
-### "opalc: command not found"
+### "calorc: command not found"
 
-Ensure the OPAL compiler is installed and in your PATH:
+Ensure the Calor compiler is installed and in your PATH:
 
 ```bash
-dotnet tool install -g opalc
+dotnet tool install -g calorc
 export PATH="$PATH:$HOME/.dotnet/tools"
 ```
 
 ### Skills Not Recognized
 
-Ensure you've run `opalc init --ai gemini` and the skill files exist:
+Ensure you've run `calorc init --ai gemini` and the skill files exist:
 
 ```bash
-ls -la .gemini/skills/opal/SKILL.md
-ls -la .gemini/skills/opal-convert/SKILL.md
+ls -la .gemini/skills/calor/SKILL.md
+ls -la .gemini/skills/calor-convert/SKILL.md
 ```
 
 ---
 
 ## Next Steps
 
-- [Syntax Reference](/opal/syntax-reference/) - Complete language reference
-- [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) - Migration guide
-- [opalc init](/opal/cli/init/) - Full init command documentation
-- [Claude Integration](/opal/getting-started/claude-integration/) - Alternative with Claude Code
-- [Codex Integration](/opal/getting-started/codex-integration/) - Alternative with OpenAI Codex CLI
+- [Syntax Reference](/calor/syntax-reference/) - Complete language reference
+- [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Migration guide
+- [calorc init](/calor/cli/init/) - Full init command documentation
+- [Claude Integration](/calor/getting-started/claude-integration/) - Alternative with Claude Code
+- [Codex Integration](/calor/getting-started/codex-integration/) - Alternative with OpenAI Codex CLI

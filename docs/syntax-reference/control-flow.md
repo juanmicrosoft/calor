@@ -7,7 +7,7 @@ nav_order: 4
 
 # Control Flow
 
-OPAL provides loops and conditionals with explicit structure.
+Calor provides loops and conditionals with explicit structure.
 
 ---
 
@@ -321,4 +321,4 @@ The arrow `→` provides:
 
 ## Next
 
-- [Contracts](/opal/syntax-reference/contracts/) - Preconditions and postconditions
+- [Contracts](/calor/syntax-reference/contracts/) - Preconditions and postconditions

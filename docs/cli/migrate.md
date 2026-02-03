@@ -6,12 +6,12 @@ nav_order: 4
 permalink: /cli/migrate/
 ---
 
-# opalc migrate
+# calorc migrate
 
-Migrate an entire project between C# and OPAL.
+Migrate an entire project between C# and Calor.
 
 ```bash
-opalc migrate <path> [options]
+calorc migrate <path> [options]
 ```
 
 ---
@@ -34,16 +34,16 @@ Use this for bulk conversion of entire codebases.
 
 ```bash
 # Preview migration (dry run)
-opalc migrate ./src --dry-run
+calorc migrate ./src --dry-run
 
-# Migrate C# to OPAL
-opalc migrate ./src
+# Migrate C# to Calor
+calorc migrate ./src
 
 # Migrate with report
-opalc migrate ./src --report migration-report.md
+calorc migrate ./src --report migration-report.md
 
-# Migrate OPAL back to C#
-opalc migrate ./src --direction opal-to-cs
+# Migrate Calor back to C#
+calorc migrate ./src --direction calor-to-cs
 ```
 
 ---
@@ -62,7 +62,7 @@ opalc migrate ./src --direction opal-to-cs
 |:-------|:------|:--------|:------------|
 | `--dry-run` | `-n` | `false` | Preview changes without writing files |
 | `--benchmark` | `-b` | `false` | Include before/after metrics comparison |
-| `--direction` | `-d` | `cs-to-opal` | Migration direction |
+| `--direction` | `-d` | `cs-to-calor` | Migration direction |
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
@@ -71,8 +71,8 @@ opalc migrate ./src --direction opal-to-cs
 
 | Value | Aliases | Description |
 |:------|:--------|:------------|
-| `cs-to-opal` | `csharp-to-opal`, `c#-to-opal` | Convert C# files to OPAL |
-| `opal-to-cs` | `opal-to-csharp`, `opal-to-c#` | Convert OPAL files to C# |
+| `cs-to-calor` | `csharp-to-calor`, `c#-to-calor` | Convert C# files to Calor |
+| `calor-to-cs` | `calor-to-csharp`, `calor-to-c#` | Convert Calor files to C# |
 
 ---
 
@@ -81,14 +81,14 @@ opalc migrate ./src --direction opal-to-cs
 Before converting, the command analyzes your codebase and creates a plan:
 
 ```bash
-opalc migrate ./src --dry-run
+calorc migrate ./src --dry-run
 ```
 
 Output:
 ```
 === Migration Plan ===
 
-Direction: C# → OPAL
+Direction: C# → Calor
 Source: ./src
 
 Files to Convert:
@@ -113,7 +113,7 @@ Run without --dry-run to execute migration.
 During migration, you'll see progress updates:
 
 ```
-Migrating ./src (C# → OPAL)
+Migrating ./src (C# → Calor)
 
 [████████████████████████████████] 32/32 files
 
@@ -144,7 +144,7 @@ With `--verbose`, each file is logged individually:
 Use `--benchmark` to see aggregate metrics:
 
 ```bash
-opalc migrate ./src --benchmark
+calorc migrate ./src --benchmark
 ```
 
 Output includes:
@@ -172,7 +172,7 @@ Generate detailed reports for documentation:
 ### Markdown Report
 
 ```bash
-opalc migrate ./src --report migration-report.md
+calorc migrate ./src --report migration-report.md
 ```
 
 Creates a human-readable report with:
@@ -184,7 +184,7 @@ Creates a human-readable report with:
 ### JSON Report
 
 ```bash
-opalc migrate ./src --report migration-report.json
+calorc migrate ./src --report migration-report.json
 ```
 
 Creates a machine-readable report for processing:
@@ -193,7 +193,7 @@ Creates a machine-readable report for processing:
 {
   "version": "1.0",
   "migratedAt": "2025-01-15T10:30:00Z",
-  "direction": "cs-to-opal",
+  "direction": "cs-to-calor",
   "sourcePath": "./src",
   "summary": {
     "totalFiles": 32,
@@ -205,7 +205,7 @@ Creates a machine-readable report for processing:
   "files": [
     {
       "source": "src/Services/UserService.cs",
-      "output": "src/Services/UserService.opal",
+      "output": "src/Services/UserService.calor",
       "status": "success",
       "warnings": [],
       "benchmark": {
@@ -233,7 +233,7 @@ By default, files are converted in parallel for speed. Disable for debugging:
 
 ```bash
 # Sequential processing
-opalc migrate ./src --parallel false --verbose
+calorc migrate ./src --parallel false --verbose
 ```
 
 ---
@@ -244,7 +244,7 @@ The migrate command automatically skips:
 
 - **Generated files**: `*.g.cs`, `*.generated.cs`, `*.Designer.cs`
 - **Build artifacts**: `obj/`, `bin/`
-- **Already converted**: Files that already have a corresponding `.opal` or `.g.cs`
+- **Already converted**: Files that already have a corresponding `.calor` or `.g.cs`
 
 ---
 
@@ -264,38 +264,38 @@ The migrate command automatically skips:
 
 ```bash
 # See what would be converted
-opalc migrate ./src --dry-run
+calorc migrate ./src --dry-run
 
 # See detailed plan
-opalc migrate ./src --dry-run --verbose
+calorc migrate ./src --dry-run --verbose
 ```
 
 ### Migrate with Full Reporting
 
 ```bash
 # Complete migration with benchmark and report
-opalc migrate ./src --benchmark --report migration.md --verbose
+calorc migrate ./src --benchmark --report migration.md --verbose
 ```
 
 ### Migrate Specific Project
 
 ```bash
 # Migrate a specific .csproj
-opalc migrate ./src/MyProject/MyProject.csproj
+calorc migrate ./src/MyProject/MyProject.csproj
 ```
 
 ### Reverse Migration
 
 ```bash
-# Convert OPAL back to C# (e.g., for debugging)
-opalc migrate ./src --direction opal-to-cs
+# Convert Calor back to C# (e.g., for debugging)
+calorc migrate ./src --direction calor-to-cs
 ```
 
 ### CI/CD Integration
 
 ```bash
 # In CI: verify all files can be converted
-opalc migrate ./src --dry-run
+calorc migrate ./src --dry-run
 if [ $? -ne 0 ]; then
   echo "Migration issues detected"
   exit 1
@@ -316,7 +316,7 @@ fi
 
 ## See Also
 
-- [opalc convert](/opal/cli/convert/) - Convert single files
-- [opalc analyze](/opal/cli/analyze/) - Find migration candidates
-- [opalc benchmark](/opal/cli/benchmark/) - Detailed metrics comparison
-- [Adding OPAL to Existing Projects](/opal/guides/adding-opal-to-existing-projects/) - Complete migration guide
+- [calorc convert](/calor/cli/convert/) - Convert single files
+- [calorc analyze](/calor/cli/analyze/) - Find migration candidates
+- [calorc benchmark](/calor/cli/benchmark/) - Detailed metrics comparison
+- [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Complete migration guide

@@ -7,13 +7,13 @@ nav_order: 1
 
 # Methodology
 
-How the OPAL evaluation framework measures language effectiveness for AI agents.
+How the Calor evaluation framework measures language effectiveness for AI agents.
 
 ---
 
 ## Evaluation Approach
 
-The framework compares OPAL and C# implementations of the same programs across multiple dimensions. It doesn't use LLM-based evaluation (which would introduce variance) but instead uses deterministic static analysis.
+The framework compares Calor and C# implementations of the same programs across multiple dimensions. It doesn't use LLM-based evaluation (which would introduce variance) but instead uses deterministic static analysis.
 
 ---
 
@@ -22,7 +22,7 @@ The framework compares OPAL and C# implementations of the same programs across m
 ### Paired Programs
 
 Each benchmark consists of:
-- An OPAL implementation
+- An Calor implementation
 - A semantically equivalent C# implementation
 - Metadata about expected behavior
 
@@ -50,7 +50,7 @@ Both implementations must:
 
 **Measures:** How easily an agent can understand code structure.
 
-**OPAL factors:**
+**Calor factors:**
 - Module declarations (`§M[`)
 - Function declarations (`§F[`)
 - Input/output annotations (`§I[`, `§O[`)
@@ -73,7 +73,7 @@ Both implementations must:
 
 **Measures:** Ability to detect bugs through explicit contracts.
 
-**OPAL factors:**
+**Calor factors:**
 - Preconditions (`§Q`)
 - Postconditions (`§S`)
 - Invariants (`§INV`)
@@ -94,7 +94,7 @@ Both implementations must:
 
 **Measures:** Ability to target specific code elements.
 
-**OPAL factors:**
+**Calor factors:**
 - Unique module IDs
 - Unique function IDs
 - Unique loop/conditional IDs
@@ -120,7 +120,7 @@ Both implementations must:
 - Error count (20%)
 
 **Structural completeness:**
-- OPAL: Module, functions, bodies present
+- Calor: Module, functions, bodies present
 - C#: Namespace, class, methods present
 
 ---
@@ -158,7 +158,7 @@ Both implementations must:
 **Measures:** Semantic content per token.
 
 **Semantic elements counted:**
-- OPAL: Modules, functions, variables, type annotations, contracts, effects, control flow, expressions
+- Calor: Modules, functions, variables, type annotations, contracts, effects, control flow, expressions
 - C#: Namespaces, classes, methods, variables, type annotations, control flow, expressions
 
 **Density:** Total semantic elements / token count
@@ -171,13 +171,13 @@ Both implementations must:
 
 ```bash
 # Run with JSON output
-dotnet run --project tests/Opal.Evaluation -- --output report.json
+dotnet run --project tests/Calor.Evaluation -- --output report.json
 
 # Run with Markdown output
-dotnet run --project tests/Opal.Evaluation -- --output report.md --format markdown
+dotnet run --project tests/Calor.Evaluation -- --output report.md --format markdown
 
 # Run specific metrics
-dotnet run --project tests/Opal.Evaluation -- \
+dotnet run --project tests/Calor.Evaluation -- \
   --metrics Comprehension,TokenEconomics \
   --output partial.json
 ```
@@ -189,13 +189,13 @@ dotnet run --project tests/Opal.Evaluation -- \
 ### Winner Determination
 
 For each metric:
-- **Higher is better** (Comprehension, Error Detection, etc.): OPAL wins if ratio > 1.0
+- **Higher is better** (Comprehension, Error Detection, etc.): Calor wins if ratio > 1.0
 - **Lower is better** (Token Economics): C# wins if ratio < 1.0
 
 ### The Tradeoff
 
 Results consistently show:
-- OPAL wins on **comprehension** metrics (structure, contracts, effects)
+- Calor wins on **comprehension** metrics (structure, contracts, effects)
 - C# wins on **efficiency** metrics (tokens, density)
 
 This isn't a flaw—it's the designed tradeoff of explicit semantics.
@@ -222,4 +222,4 @@ This isn't a flaw—it's the designed tradeoff of explicit semantics.
 
 ## Next
 
-- [Results](/opal/benchmarking/results/) - Detailed results table
+- [Results](/calor/benchmarking/results/) - Detailed results table

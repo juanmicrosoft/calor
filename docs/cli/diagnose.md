@@ -6,19 +6,19 @@ nav_order: 7
 permalink: /cli/diagnose/
 ---
 
-# opalc diagnose
+# calorc diagnose
 
-Output machine-readable diagnostics for OPAL files.
+Output machine-readable diagnostics for Calor files.
 
 ```bash
-opalc diagnose <files...> [options]
+calorc diagnose <files...> [options]
 ```
 
 ---
 
 ## Overview
 
-The `diagnose` command analyzes OPAL files and outputs diagnostics in formats suitable for tooling integration:
+The `diagnose` command analyzes Calor files and outputs diagnostics in formats suitable for tooling integration:
 
 - **Text** - Human-readable plain text
 - **JSON** - Machine-readable structured data
@@ -32,16 +32,16 @@ Use this for automated fix workflows, CI/CD pipelines, and editor integrations.
 
 ```bash
 # Diagnose a single file (text output)
-opalc diagnose MyModule.opal
+calorc diagnose MyModule.calor
 
 # JSON output for processing
-opalc diagnose MyModule.opal --format json
+calorc diagnose MyModule.calor --format json
 
 # SARIF output for IDE integration
-opalc diagnose src/*.opal --format sarif --output diagnostics.sarif
+calorc diagnose src/*.calor --format sarif --output diagnostics.sarif
 
 # Enable strict checking
-opalc diagnose MyModule.opal --strict-api --require-docs
+calorc diagnose MyModule.calor --strict-api --require-docs
 ```
 
 ---
@@ -50,7 +50,7 @@ opalc diagnose MyModule.opal --strict-api --require-docs
 
 | Argument | Required | Description |
 |:---------|:---------|:------------|
-| `files` | Yes | One or more OPAL source files to diagnose |
+| `files` | Yes | One or more Calor source files to diagnose |
 
 ---
 
@@ -72,19 +72,19 @@ opalc diagnose MyModule.opal --strict-api --require-docs
 Human-readable diagnostics:
 
 ```bash
-opalc diagnose Calculator.opal
+calorc diagnose Calculator.calor
 ```
 
 Output:
 ```
-Calculator.opal:12:5: error: Undefined variable 'x'
+Calculator.calor:12:5: error: Undefined variable 'x'
   §R (+ x 1)
        ^
 
-Calculator.opal:8:3: warning: Function 'Calculate' has no effect declaration
+Calculator.calor:8:3: warning: Function 'Calculate' has no effect declaration
   Consider adding §E[] for pure functions
 
-Calculator.opal:15:3: info: Unused variable 'temp'
+Calculator.calor:15:3: info: Unused variable 'temp'
   §B[temp] 42
 
 Summary: 1 error, 1 warning, 1 info
@@ -95,7 +95,7 @@ Summary: 1 error, 1 warning, 1 info
 Machine-readable format for automated processing:
 
 ```bash
-opalc diagnose Calculator.opal --format json
+calorc diagnose Calculator.calor --format json
 ```
 
 Output:
@@ -104,11 +104,11 @@ Output:
   "version": "1.0",
   "files": [
     {
-      "path": "Calculator.opal",
+      "path": "Calculator.calor",
       "diagnostics": [
         {
           "severity": "error",
-          "code": "OPAL001",
+          "code": "Calor001",
           "message": "Undefined variable 'x'",
           "location": {
             "line": 12,
@@ -126,7 +126,7 @@ Output:
         },
         {
           "severity": "warning",
-          "code": "OPAL002",
+          "code": "Calor002",
           "message": "Function 'Calculate' has no effect declaration",
           "location": {
             "line": 8,
@@ -155,7 +155,7 @@ Output:
 [SARIF](https://sarifweb.azurewebsites.net/) format for IDE and CI/CD integration:
 
 ```bash
-opalc diagnose src/*.opal --format sarif --output diagnostics.sarif
+calorc diagnose src/*.calor --format sarif --output diagnostics.sarif
 ```
 
 SARIF output integrates with:
@@ -170,16 +170,16 @@ SARIF output integrates with:
 
 | Code | Severity | Description |
 |:-----|:---------|:------------|
-| `OPAL001` | Error | Undefined variable |
-| `OPAL002` | Warning | Missing effect declaration |
-| `OPAL003` | Warning | Unused variable |
-| `OPAL004` | Error | Type mismatch |
-| `OPAL005` | Error | Invalid ID reference |
-| `OPAL006` | Warning | Missing contract |
-| `OPAL007` | Info | Redundant parentheses |
-| `OPAL008` | Error | Unclosed structure tag |
-| `OPAL009` | Warning | Undocumented public API |
-| `OPAL010` | Error | Duplicate ID |
+| `Calor001` | Error | Undefined variable |
+| `Calor002` | Warning | Missing effect declaration |
+| `Calor003` | Warning | Unused variable |
+| `Calor004` | Error | Type mismatch |
+| `Calor005` | Error | Invalid ID reference |
+| `Calor006` | Warning | Missing contract |
+| `Calor007` | Info | Redundant parentheses |
+| `Calor008` | Error | Unclosed structure tag |
+| `Calor009` | Warning | Undocumented public API |
+| `Calor010` | Error | Duplicate ID |
 
 ---
 
@@ -194,7 +194,7 @@ Enforces stricter API rules:
 - No implicit any types
 
 ```bash
-opalc diagnose MyModule.opal --strict-api
+calorc diagnose MyModule.calor --strict-api
 ```
 
 ### Require Docs (`--require-docs`)
@@ -202,12 +202,12 @@ opalc diagnose MyModule.opal --strict-api
 Requires documentation on public APIs:
 
 ```bash
-opalc diagnose MyModule.opal --require-docs
+calorc diagnose MyModule.calor --require-docs
 ```
 
 Error:
 ```
-MyModule.opal:5:1: error: Public function 'ProcessOrder' missing documentation
+MyModule.calor:5:1: error: Public function 'ProcessOrder' missing documentation
   Add documentation comment before function declaration
 ```
 
@@ -218,7 +218,7 @@ MyModule.opal:5:1: error: Public function 'ProcessOrder' missing documentation
 Diagnostics from all files are aggregated:
 
 ```bash
-opalc diagnose src/*.opal --format json
+calorc diagnose src/*.calor --format json
 ```
 
 The output includes diagnostics from all files in a single report.
@@ -231,7 +231,7 @@ The output includes diagnostics from all files in a single report.
 |:-----|:--------|
 | `0` | No errors (warnings and info are OK) |
 | `1` | One or more errors found |
-| `2` | Processing error (file not found, invalid OPAL, etc.) |
+| `2` | Processing error (file not found, invalid Calor, etc.) |
 
 ---
 
@@ -243,12 +243,12 @@ The `diagnose` command is designed for AI agent workflows:
 
 ```bash
 # 1. Get diagnostics in JSON
-opalc diagnose MyModule.opal --format json > diagnostics.json
+calorc diagnose MyModule.calor --format json > diagnostics.json
 
 # 2. AI agent reads diagnostics and applies fixes
 
 # 3. Re-run diagnostics to verify
-opalc diagnose MyModule.opal --format json
+calorc diagnose MyModule.calor --format json
 ```
 
 ### Claude Code Integration
@@ -256,7 +256,7 @@ opalc diagnose MyModule.opal --format json
 In Claude Code, use the diagnostics to guide fixes:
 
 ```
-Run opalc diagnose on MyModule.opal and fix any errors
+Run calorc diagnose on MyModule.calor and fix any errors
 ```
 
 Claude will:
@@ -272,26 +272,26 @@ Claude will:
 ### GitHub Actions
 
 ```yaml
-- name: Check OPAL diagnostics
+- name: Check Calor diagnostics
   run: |
-    opalc diagnose src/**/*.opal --format sarif --output opal.sarif
+    calorc diagnose src/**/*.calor --format sarif --output calor.sarif
 
 - name: Upload SARIF
   uses: github/codeql-action/upload-sarif@v2
   with:
-    sarif_file: opal.sarif
+    sarif_file: calor.sarif
 ```
 
 ### Azure Pipelines
 
 ```yaml
 - script: |
-    opalc diagnose src/**/*.opal --format sarif --output $(Build.ArtifactStagingDirectory)/opal.sarif
-  displayName: 'Run OPAL diagnostics'
+    calorc diagnose src/**/*.calor --format sarif --output $(Build.ArtifactStagingDirectory)/calor.sarif
+  displayName: 'Run Calor diagnostics'
 
 - task: PublishBuildArtifacts@1
   inputs:
-    pathToPublish: $(Build.ArtifactStagingDirectory)/opal.sarif
+    pathToPublish: $(Build.ArtifactStagingDirectory)/calor.sarif
     artifactName: CodeAnalysis
 ```
 
@@ -303,7 +303,7 @@ Claude will:
 
 ```bash
 # Check for errors only
-opalc diagnose MyModule.opal
+calorc diagnose MyModule.calor
 if [ $? -ne 0 ]; then
   echo "Errors found, fix before committing"
   exit 1
@@ -314,7 +314,7 @@ fi
 
 ```bash
 # Generate comprehensive report
-opalc diagnose src/*.opal \
+calorc diagnose src/*.calor \
   --strict-api \
   --require-docs \
   --format json \
@@ -327,12 +327,12 @@ opalc diagnose src/*.opal \
 #!/bin/bash
 # .git/hooks/pre-commit
 
-OPAL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.opal$')
+Calor_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.calor$')
 
-if [ -n "$OPAL_FILES" ]; then
-  echo "$OPAL_FILES" | xargs opalc diagnose
+if [ -n "$Calor_FILES" ]; then
+  echo "$Calor_FILES" | xargs calorc diagnose
   if [ $? -ne 0 ]; then
-    echo "OPAL diagnostics found errors. Fix before committing."
+    echo "Calor diagnostics found errors. Fix before committing."
     exit 1
   fi
 fi
@@ -342,6 +342,6 @@ fi
 
 ## See Also
 
-- [opalc format](/opal/cli/format/) - Format OPAL source files
-- [opalc compile](/opal/cli/compile/) - Compile with error reporting
-- [opalc analyze](/opal/cli/analyze/) - Analyze C# for migration potential
+- [calorc format](/calor/cli/format/) - Format Calor source files
+- [calorc compile](/calor/cli/compile/) - Compile with error reporting
+- [calorc analyze](/calor/cli/analyze/) - Analyze C# for migration potential
