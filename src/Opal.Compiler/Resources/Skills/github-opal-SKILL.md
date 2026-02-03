@@ -34,6 +34,18 @@ str, bool, void       String, boolean, unit
 T!E                   Result<T,E> (fallible)
 [T]                   Array of T (e.g., [u8], [i32], [str])
 [[T]]                 Nested array (e.g., [[i32]] for int[][])
+
+datetime              DateTime
+datetimeoffset        DateTimeOffset
+timespan              TimeSpan
+date                  DateOnly
+time                  TimeOnly
+guid                  Guid
+
+List<T>               List<T>
+Dict<K,V>             Dictionary<K,V>
+ReadList<T>           IReadOnlyList<T>
+ReadDict<K,V>         IReadOnlyDictionary<K,V>
 ```
 
 ### Array Type Examples

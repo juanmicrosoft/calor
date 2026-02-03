@@ -79,9 +79,31 @@ public static class TypeMapper
         ["IDictionary"] = "Dict",
         ["ICollection"] = "Collection",
 
+        // Read-only collections
+        ["IReadOnlyList"] = "ReadList",
+        ["IReadOnlyCollection"] = "ReadCollection",
+        ["IReadOnlyDictionary"] = "ReadDict",
+        ["IReadOnlySet"] = "ReadSet",
+
         // Async types
         ["Task"] = "Task",
         ["ValueTask"] = "Task",
+
+        // Date/Time types
+        ["DateTime"] = "datetime",
+        ["System.DateTime"] = "datetime",
+        ["DateTimeOffset"] = "datetimeoffset",
+        ["System.DateTimeOffset"] = "datetimeoffset",
+        ["TimeSpan"] = "timespan",
+        ["System.TimeSpan"] = "timespan",
+        ["DateOnly"] = "date",
+        ["System.DateOnly"] = "date",
+        ["TimeOnly"] = "time",
+        ["System.TimeOnly"] = "time",
+
+        // Other common types
+        ["Guid"] = "guid",
+        ["System.Guid"] = "guid",
     };
 
     /// <summary>
@@ -151,9 +173,25 @@ public static class TypeMapper
         ["Seq"] = "IEnumerable",
         ["Collection"] = "ICollection",
 
+        // Read-only collections
+        ["ReadList"] = "IReadOnlyList",
+        ["ReadCollection"] = "IReadOnlyCollection",
+        ["ReadDict"] = "IReadOnlyDictionary",
+        ["ReadSet"] = "IReadOnlySet",
+
         // Async
         ["Task"] = "Task",
         ["ValueTask"] = "ValueTask",
+
+        // Date/Time types
+        ["datetime"] = "DateTime",
+        ["datetimeoffset"] = "DateTimeOffset",
+        ["timespan"] = "TimeSpan",
+        ["date"] = "DateOnly",
+        ["time"] = "TimeOnly",
+
+        // Other common types
+        ["guid"] = "Guid",
     };
 
     /// <summary>

@@ -18,6 +18,14 @@
 | `void` | `void` |
 | `T?` | `?T` |
 | `Result<T,E>` | `T!E` |
+| `DateTime` | `datetime` |
+| `DateTimeOffset` | `datetimeoffset` |
+| `TimeSpan` | `timespan` |
+| `DateOnly` | `date` |
+| `TimeOnly` | `time` |
+| `Guid` | `guid` |
+| `IReadOnlyList<T>` | `ReadList<T>` |
+| `IReadOnlyDictionary<K,V>` | `ReadDict<K,V>` |
 
 ## Operator Mappings
 
@@ -63,6 +71,33 @@ public static int Add(int a, int b) {
   §O[i32]
   §R (+ a b)
 §/F[f001]
+```
+
+### Enum
+```csharp
+public enum Color { Red, Green, Blue }
+```
+```opal
+§ENUM{e001:Color}
+  Red
+  Green
+  Blue
+§/ENUM{e001}
+```
+
+```csharp
+public enum StatusCode {
+    Ok = 200,
+    NotFound = 404,
+    Error = 500
+}
+```
+```opal
+§ENUM{e001:StatusCode}
+  Ok = 200
+  NotFound = 404
+  Error = 500
+§/ENUM{e001}
 ```
 
 ### For Loop
@@ -173,22 +208,29 @@ public void Post() { }
 
 ## Supported Features
 
-- Static methods
-- Primitive types
-- Basic control flow (for, if/else)
-- Console I/O
-- Arithmetic/comparison operators
-- Simple contracts
+- Classes, interfaces, records, structs
+- Enums (with optional explicit values)
+- Methods, properties, fields, constructors
+- Control flow (for, foreach, while, do-while, if/else, switch)
+- Try/catch/finally, throw
+- Async/await
+- Lambdas and delegates
+- Generics with constraints
+- Pattern matching (basic patterns)
+- String interpolation
+- Null-conditional and null-coalescing operators
 - C# attributes (on classes, methods, properties, fields, parameters)
+- Contracts (preconditions, postconditions)
+
+## Partially Supported
+
+- LINQ (method syntax works, query syntax may need review)
+- ref/out parameters (kept as-is with warning)
 
 ## Not Yet Supported
 
-- Async/await
-- LINQ
-- Generics
-- Events/delegates
-- Exception handling (try/catch)
-- Collections (List, Dictionary)
+- Unsafe code and pointers
+- goto/labeled statements
 
 ## Conversion Example
 

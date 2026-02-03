@@ -287,3 +287,58 @@ public sealed class ErrExpressionNode : ExpressionNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents an enum member in an enum definition.
+/// </summary>
+public sealed class EnumMemberNode : AstNode
+{
+    public string Name { get; }
+    public string? Value { get; }
+
+    public EnumMemberNode(TextSpan span, string name, string? value)
+        : base(span)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Value = value;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents an enum type definition.
+/// §ENUM{id:Name} or §ENUM{id:Name:underlyingType}
+///   Red
+///   Green = 1
+/// §/ENUM{id}
+/// </summary>
+public sealed class EnumDefinitionNode : TypeDefinitionNode
+{
+    /// <summary>
+    /// The underlying type of the enum (null = default int, or "i8", "u8", "i16", etc.).
+    /// </summary>
+    public string? UnderlyingType { get; }
+
+    /// <summary>
+    /// The enum members.
+    /// </summary>
+    public IReadOnlyList<EnumMemberNode> Members { get; }
+
+    public EnumDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        string? underlyingType,
+        IReadOnlyList<EnumMemberNode> members,
+        AttributeCollection attributes)
+        : base(span, id, name, attributes)
+    {
+        UnderlyingType = underlyingType;
+        Members = members ?? throw new ArgumentNullException(nameof(members));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

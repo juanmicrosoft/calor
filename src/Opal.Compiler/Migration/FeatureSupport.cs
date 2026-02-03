@@ -64,6 +64,12 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Structs are converted to OPAL struct definitions"
         },
+        ["enum"] = new FeatureInfo
+        {
+            Name = "enum",
+            Support = SupportLevel.Full,
+            Description = "Enums are converted to OPAL enum definitions"
+        },
         ["method"] = new FeatureInfo
         {
             Name = "method",

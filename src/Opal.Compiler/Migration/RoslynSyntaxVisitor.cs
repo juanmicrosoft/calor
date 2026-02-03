@@ -15,6 +15,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<UsingDirectiveNode> _usings = new();
     private readonly List<InterfaceDefinitionNode> _interfaces = new();
     private readonly List<ClassDefinitionNode> _classes = new();
+    private readonly List<EnumDefinitionNode> _enums = new();
     private readonly List<FunctionNode> _functions = new();
     private readonly List<StatementNode> _topLevelStatements = new();
 
@@ -36,6 +37,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _usings.Clear();
         _interfaces.Clear();
         _classes.Clear();
+        _enums.Clear();
         _functions.Clear();
         _topLevelStatements.Clear();
 
@@ -70,6 +72,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _usings,
             _interfaces,
             _classes,
+            _enums,
             functions,
             new AttributeCollection());
     }
@@ -190,6 +193,43 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.Stats.ClassesConverted++;
         _context.IncrementConverted();
         _context.ExitType();
+    }
+
+    public override void VisitEnumDeclaration(EnumDeclarationSyntax node)
+    {
+        _context.RecordFeatureUsage("enum");
+
+        var id = _context.GenerateId("e");
+        var name = node.Identifier.Text;
+
+        // Get the underlying type if specified (e.g., : byte, : int)
+        string? underlyingType = null;
+        if (node.BaseList?.Types.Count > 0)
+        {
+            var baseTypeName = node.BaseList.Types.First().Type.ToString();
+            underlyingType = TypeMapper.CSharpToOpal(baseTypeName);
+        }
+
+        // Convert enum members
+        var members = new List<EnumMemberNode>();
+        foreach (var member in node.Members)
+        {
+            var memberName = member.Identifier.Text;
+            var memberValue = member.EqualsValue?.Value.ToString();
+            members.Add(new EnumMemberNode(GetTextSpan(member), memberName, memberValue));
+        }
+
+        var enumNode = new EnumDefinitionNode(
+            GetTextSpan(node),
+            id,
+            name,
+            underlyingType,
+            members,
+            new AttributeCollection());
+
+        _enums.Add(enumNode);
+        _context.Stats.EnumsConverted++;
+        _context.IncrementConverted();
     }
 
     private ClassDefinitionNode ConvertClass(ClassDeclarationSyntax node)

@@ -121,6 +121,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit enums
+        foreach (var enumDef in node.Enums)
+        {
+            Visit(enumDef);
+            AppendLine();
+        }
+
         // Emit classes
         foreach (var cls in node.Classes)
         {
@@ -670,6 +677,37 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
         }
 
+        return "";
+    }
+
+    public string Visit(EnumDefinitionNode node)
+    {
+        // Generate C# enum with optional underlying type
+        var typeName = SanitizeIdentifier(node.Name);
+        var baseType = node.UnderlyingType != null
+            ? $" : {MapTypeName(node.UnderlyingType)}"
+            : "";
+
+        AppendLine($"public enum {typeName}{baseType}");
+        AppendLine("{");
+        Indent();
+
+        foreach (var member in node.Members)
+        {
+            Visit(member);
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(EnumMemberNode node)
+    {
+        var memberName = SanitizeIdentifier(node.Name);
+        var value = node.Value != null ? $" = {node.Value}" : "";
+        AppendLine($"{memberName}{value},");
         return "";
     }
 

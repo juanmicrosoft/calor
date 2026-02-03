@@ -23,6 +23,14 @@ description: Convert C# code to OPAL syntax with type mappings, operator convers
 | `void` | `void` |
 | `T?` | `?T` |
 | `Result<T,E>` | `T!E` |
+| `DateTime` | `datetime` |
+| `DateTimeOffset` | `datetimeoffset` |
+| `TimeSpan` | `timespan` |
+| `DateOnly` | `date` |
+| `TimeOnly` | `time` |
+| `Guid` | `guid` |
+| `IReadOnlyList<T>` | `ReadList<T>` |
+| `IReadOnlyDictionary<K,V>` | `ReadDict<K,V>` |
 
 ## Operator Mappings
 
