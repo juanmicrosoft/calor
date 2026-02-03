@@ -4,7 +4,7 @@
 
 # Calor
 > Coding Agent Language for Optimized Reasoning
-
+<br/>
 A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.
 
 ## Why Calor Exists
