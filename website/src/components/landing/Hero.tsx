@@ -1,12 +1,26 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Github, ArrowRight } from 'lucide-react';
+import { getBasePath } from '@/lib/utils';
+
+const basePath = getBasePath();
 
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-white to-slate-50 py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
+          <div className="flex justify-center mb-6">
+            <Image
+              src={`${basePath}/calor-logo.png`}
+              alt="Calor logo"
+              width={120}
+              height={120}
+              className="h-24 w-24 sm:h-32 sm:w-32 drop-shadow-lg"
+              priority
+            />
+          </div>
           <h1 className="text-4xl font-bold tracking-tight text-calor-navy sm:text-6xl">
             Calor
           </h1>
