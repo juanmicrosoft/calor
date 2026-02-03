@@ -148,7 +148,7 @@ dotnet run --project src/Opal.Compiler -- --help
 
 Expected output:
 ```
-OPAL Compiler - Optimized Programming for Agent Language
+OPAL Compiler - Optimized Programming for Agents Language
 
 Usage:
   opalc --input <file.opal> --output <file.cs>

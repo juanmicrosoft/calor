@@ -1,4 +1,4 @@
-# OPAL — Optimized Programming for Agent Language
+# OPAL — Optimized Programming for Agents Language
 
 A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.
 
