@@ -7,15 +7,15 @@ nav_order: 3
 
 # Expressions
 
-OPAL uses Lisp-style prefix notation for all operations. This eliminates operator precedence ambiguity.
+Calor uses Lisp-style prefix notation for all operations. This eliminates operator precedence ambiguity.
 
 ---
 
 ## Prefix Notation
 
-Instead of infix `a + b`, OPAL uses prefix `(+ a b)`:
+Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 
-| Infix | OPAL Prefix |
+| Infix | Calor Prefix |
 |:------|:------------|
 | `a + b` | `(+ a b)` |
 | `a * b + c` | `(+ (* a b) c)` |
@@ -172,7 +172,7 @@ Infix:
 a + b * c    // Is this (a+b)*c or a+(b*c)?
 ```
 
-OPAL:
+Calor:
 ```
 (+ a (* b c))    // Clearly a + (b * c)
 (* (+ a b) c)    // Clearly (a + b) * c
@@ -220,4 +220,4 @@ Every operation follows the same pattern: `(operator arguments...)`
 
 ## Next
 
-- [Control Flow](/opal/syntax-reference/control-flow/) - Loops and conditionals
+- [Control Flow](/calor/syntax-reference/control-flow/) - Loops and conditionals

@@ -7,7 +7,7 @@ hasChildren: true
 
 # Benchmarking
 
-OPAL is evaluated against C# across 7 metrics designed to measure what matters for AI coding agents.
+Calor is evaluated against C# across 7 metrics designed to measure what matters for AI coding agents.
 
 ---
 
@@ -27,29 +27,29 @@ OPAL is evaluated against C# across 7 metrics designed to measure what matters f
 
 ## Summary Results
 
-| Category | OPAL vs C# | Winner |
+| Category | Calor vs C# | Winner |
 |:---------|:-----------|:-------|
-| Comprehension | **1.33x** | OPAL |
-| Error Detection | **1.19x** | OPAL |
-| Edit Precision | **1.15x** | OPAL |
+| Comprehension | **1.33x** | Calor |
+| Error Detection | **1.19x** | Calor |
+| Edit Precision | **1.15x** | Calor |
 | Generation Accuracy | 0.94x | C# |
 | Task Completion | 0.93x | C# |
 | Token Economics | 0.67x | C# |
 | Information Density | 0.22x | C# |
 
-**Pattern:** OPAL wins on comprehension and precision metrics. C# wins on efficiency metrics.
+**Pattern:** Calor wins on comprehension and precision metrics. C# wins on efficiency metrics.
 
 ---
 
 ## Key Insight
 
-OPAL excels where explicitness matters:
+Calor excels where explicitness matters:
 - **Comprehension** (1.33x) - Explicit structure aids understanding
 - **Error Detection** (1.19x) - Contracts surface invariant violations
 - **Edit Precision** (1.15x) - Unique IDs enable targeted changes
 
 C# wins on token efficiency:
-- **Token Economics** (0.67x) - OPAL's explicit syntax uses more tokens
+- **Token Economics** (0.67x) - Calor's explicit syntax uses more tokens
 - **Information Density** (0.22x) - C# packs more per token
 
 This reflects a fundamental tradeoff: **explicit semantics require more tokens but enable better agent reasoning**.

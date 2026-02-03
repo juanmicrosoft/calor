@@ -7,7 +7,7 @@ nav_order: 1
 
 # Structure Tags
 
-Structure tags define the organization of OPAL code: modules, functions, and their boundaries.
+Structure tags define the organization of Calor code: modules, functions, and their boundaries.
 
 ---
 
@@ -160,7 +160,7 @@ Every function must declare its output type.
 
 ## Array Types
 
-OPAL uses bracket notation `[T]` for array types, which aligns with common programming language conventions.
+Calor uses bracket notation `[T]` for array types, which aligns with common programming language conventions.
 
 ### Syntax
 
@@ -171,7 +171,7 @@ OPAL uses bracket notation `[T]` for array types, which aligns with common progr
 
 ### Examples
 
-| OPAL Type | C# Equivalent |
+| Calor Type | C# Equivalent |
 |:----------|:--------------|
 | `[u8]` | `byte[]` |
 | `[i32]` | `int[]` |
@@ -308,4 +308,4 @@ Attributes can be attached to:
 
 ## Next
 
-- [Types](/opal/syntax-reference/types/) - Type system reference
+- [Types](/calor/syntax-reference/types/) - Type system reference

@@ -63,9 +63,9 @@ foreach (var ch in source)
 | Token count | Number of tokens |
 | Character count | Non-whitespace characters |
 | Line count | Number of lines |
-| Token ratio | C# tokens / OPAL tokens |
-| Char ratio | C# chars / OPAL chars |
-| Line ratio | C# lines / OPAL lines |
+| Token ratio | C# tokens / Calor tokens |
+| Char ratio | C# chars / Calor chars |
+| Line ratio | C# lines / Calor lines |
 
 ### Composite Score
 
@@ -81,7 +81,7 @@ Geometric mean of all three ratios.
 
 ### Hello World
 
-**OPAL:**
+**Calor:**
 ```
 §M[m001:Hello]
 §F[f001:Main:pub]
@@ -107,11 +107,11 @@ class Program
 - Tokens: ~15
 - Lines: 7
 
-**Ratio:** 25/15 = **1.67x** (OPAL uses more)
+**Ratio:** 25/15 = **1.67x** (Calor uses more)
 
 ### FizzBuzz
 
-**OPAL:**
+**Calor:**
 ```
 §M[m001:FizzBuzz]
 §F[f001:Main:pub]
@@ -143,11 +143,11 @@ for (int i = 1; i <= 100; i++)
 - Tokens: ~50
 - Lines: 7
 
-**Ratio:** 80/50 = **1.60x** (OPAL uses more)
+**Ratio:** 80/50 = **1.60x** (Calor uses more)
 
 ### Function with Contract
 
-**OPAL:**
+**Calor:**
 ```
 §F[f001:Divide:pub]
   §I[i32:a]
@@ -179,7 +179,7 @@ public static int Divide(int a, int b)
 
 ## Token Breakdown by Element
 
-| Element | OPAL Tokens | C# Tokens |
+| Element | Calor Tokens | C# Tokens |
 |:--------|:------------|:----------|
 | Module declaration | 5-7 | 3-4 |
 | Function declaration | 8-10 | 6-8 |
@@ -192,7 +192,7 @@ public static int Divide(int a, int b)
 
 ---
 
-## Why OPAL Uses More Tokens
+## Why Calor Uses More Tokens
 
 ### 1. Explicit Tags
 
@@ -262,7 +262,7 @@ V1 syntax was extremely verbose:
 
 ## Context Window Impact
 
-| Context Size | OPAL Programs | C# Programs |
+| Context Size | Calor Programs | C# Programs |
 |:-------------|:--------------|:------------|
 | 4K tokens | ~40-50 | ~65-80 |
 | 8K tokens | ~80-100 | ~130-160 |
@@ -283,7 +283,7 @@ Token efficiency is less critical when:
 
 ## Interpretation
 
-The 0.67x ratio means OPAL uses ~1.5x more tokens than C# on average.
+The 0.67x ratio means Calor uses ~1.5x more tokens than C# on average.
 
 This is the price of:
 - Explicit structure
@@ -297,4 +297,4 @@ The V2 syntax improved this from ~0.4x (V1 was ~2.5x more tokens).
 
 ## Next
 
-- [Information Density](/opal/benchmarking/metrics/information-density/) - Semantic content per token
+- [Information Density](/calor/benchmarking/metrics/information-density/) - Semantic content per token

@@ -5,28 +5,28 @@ order: 0
 hasChildren: true
 ---
 
-# Getting Started with OPAL
+# Getting Started with Calor
 
-This guide will help you install OPAL, write your first program, and understand how to integrate OPAL with AI coding agents.
+This guide will help you install Calor, write your first program, and understand how to integrate Calor with AI coding agents.
 
 ---
 
 ## Quick Overview
 
-OPAL is a programming language that compiles to C# via source-to-source transformation. The workflow is:
+Calor is a programming language that compiles to C# via source-to-source transformation. The workflow is:
 
 ```
-your_code.opal → OPAL Compiler → your_code.g.cs → .NET Build → executable
+your_code.calor → Calor Compiler → your_code.g.cs → .NET Build → executable
 ```
 
 ---
 
 ## What You'll Learn
 
-1. **[Installation](/getting-started/installation/)** - Set up the OPAL compiler
-2. **[Hello World](/getting-started/hello-world/)** - Write and run your first OPAL program
-3. **[Claude Integration](/getting-started/claude-integration/)** - Use OPAL with Claude Code (enforced OPAL-first)
-4. **[Codex Integration](/getting-started/codex-integration/)** - Use OPAL with OpenAI Codex CLI
+1. **[Installation](/getting-started/installation/)** - Set up the Calor compiler
+2. **[Hello World](/getting-started/hello-world/)** - Write and run your first Calor program
+3. **[Claude Integration](/getting-started/claude-integration/)** - Use Calor with Claude Code (enforced Calor-first)
+4. **[Codex Integration](/getting-started/codex-integration/)** - Use Calor with OpenAI Codex CLI
 
 ---
 
@@ -39,23 +39,23 @@ your_code.opal → OPAL Compiler → your_code.g.cs → .NET Build → executabl
 
 ## Installation
 
-Install the OPAL compiler as a global .NET tool:
+Install the Calor compiler as a global .NET tool:
 
 ```bash
-dotnet tool install -g opalc --version 0.1.2
+dotnet tool install -g calorc --version 0.1.2
 ```
 
 Or update an existing installation:
 
 ```bash
-dotnet tool update -g opalc
+dotnet tool update -g calorc
 ```
 
 ---
 
 ## Quick Start
 
-OPAL integrates into any .NET project. Start with a C# project (new or existing), enable OPAL, and from that point forward all new code is written in OPAL.
+Calor integrates into any .NET project. Start with a C# project (new or existing), enable Calor, and from that point forward all new code is written in Calor.
 
 ### Step 1: Start with a C# Project
 
@@ -65,42 +65,42 @@ dotnet new console -o MyApp
 cd MyApp
 ```
 
-### Step 2: Enable OPAL
+### Step 2: Enable Calor
 
 ```bash
-opalc init
+calorc init
 ```
 
-This adds MSBuild integration so `.opal` files compile automatically during `dotnet build`.
+This adds MSBuild integration so `.calor` files compile automatically during `dotnet build`.
 
 ### Step 3: (Optional) Enable AI Agent Integration
 
-For Claude Code (with enforced OPAL-first via hooks):
+For Claude Code (with enforced Calor-first via hooks):
 ```bash
-opalc init --ai claude
+calorc init --ai claude
 ```
 
 For OpenAI Codex CLI (guidance-based):
 ```bash
-opalc init --ai codex
+calorc init --ai codex
 ```
 
-This adds OPAL skills and project documentation that instruct the AI to:
-- Write all new code in OPAL (not C#)
+This adds Calor skills and project documentation that instruct the AI to:
+- Write all new code in Calor (not C#)
 - Analyze existing C# files before modifying them
 
-**Note:** Claude Code enforces OPAL-first via hooks (blocks `.cs` creation). Codex CLI is guidance-based only.
+**Note:** Claude Code enforces Calor-first via hooks (blocks `.cs` creation). Codex CLI is guidance-based only.
 
-### Step 4: Write OPAL Code
+### Step 4: Write Calor Code
 
-After init, create `.opal` files and they compile automatically. Create `Program.opal`:
+After init, create `.calor` files and they compile automatically. Create `Program.calor`:
 
 ```
 §M{m001:MyApp}
 §F{f001:Main:pub}
   §O{void}
   §E{cw}
-  §P "Hello from OPAL!"
+  §P "Hello from Calor!"
 §/F{f001}
 §/M{m001}
 ```
@@ -118,44 +118,44 @@ See [Hello World](/getting-started/hello-world/) for a detailed explanation of t
 For existing C# codebases, analyze which files are good candidates for migration:
 
 ```bash
-opalc analyze ./src --top 10
+calorc analyze ./src --top 10
 ```
 
 Then convert high-scoring files:
 
 ```bash
-opalc convert HighScoreFile.cs
+calorc convert HighScoreFile.cs
 ```
 
-See the [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) guide for the complete walkthrough.
+See the [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) guide for the complete walkthrough.
 
 ---
 
 ## What You Get
 
-### Basic Init (`opalc init`)
+### Basic Init (`calorc init`)
 
 | Component | Description |
 |:----------|:------------|
-| MSBuild integration | `.opal` files compile automatically during `dotnet build` |
+| MSBuild integration | `.calor` files compile automatically during `dotnet build` |
 | Generated output | C# files go to `obj/` directory, keeping source tree clean |
 
-### With Claude (`opalc init --ai claude`)
+### With Claude (`calorc init --ai claude`)
 
 | Component | Description |
 |:----------|:------------|
-| Claude Code skills | `/opal` to write OPAL code, `/opal-convert` to convert C# |
-| Hook configuration | **Enforces OPAL-first** - blocks `.cs` file creation |
-| CLAUDE.md | Project guidelines instructing Claude to prefer OPAL for new code |
+| Claude Code skills | `/calor` to write Calor code, `/calor-convert` to convert C# |
+| Hook configuration | **Enforces Calor-first** - blocks `.cs` file creation |
+| CLAUDE.md | Project guidelines instructing Claude to prefer Calor for new code |
 
-### With Codex (`opalc init --ai codex`)
+### With Codex (`calorc init --ai codex`)
 
 | Component | Description |
 |:----------|:------------|
-| Codex skills | `$opal` to write OPAL code, `$opal-convert` to convert C# |
+| Codex skills | `$calor` to write Calor code, `$calor-convert` to convert C# |
 | AGENTS.md | Project guidelines (guidance-based, not enforced) |
 
-**Note:** Codex CLI does not support hooks, so OPAL-first is guidance-based only.
+**Note:** Codex CLI does not support hooks, so Calor-first is guidance-based only.
 
 ---
 
@@ -169,6 +169,6 @@ For alternative installation methods (global tool only, manual Claude skills set
 
 - [Installation](/getting-started/installation/) - Detailed setup instructions
 - [Hello World](/getting-started/hello-world/) - Understand the hello world program
-- [Adding OPAL to Existing Projects](/guides/adding-opal-to-existing-projects/) - Complete migration guide
+- [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) - Complete migration guide
 - [Syntax Reference](/syntax-reference/) - Complete language reference
-- [CLI Reference](/cli/) - All `opalc` commands including migration analysis
+- [CLI Reference](/cli/) - All `calorc` commands including migration analysis

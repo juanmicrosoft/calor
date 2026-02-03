@@ -4,19 +4,19 @@ section: "cli"
 order: 6
 ---
 
-# opalc format
+# calorc format
 
-Format OPAL source files to canonical style.
+Format Calor source files to canonical style.
 
 ```bash
-opalc format <files...> [options]
+calorc format <files...> [options]
 ```
 
 ---
 
 ## Overview
 
-The `format` command formats OPAL source files according to the canonical OPAL style guide. This ensures consistent formatting across your codebase.
+The `format` command formats Calor source files according to the canonical Calor style guide. This ensures consistent formatting across your codebase.
 
 ---
 
@@ -24,16 +24,16 @@ The `format` command formats OPAL source files according to the canonical OPAL s
 
 ```bash
 # Format a single file (output to stdout)
-opalc format MyModule.opal
+calorc format MyModule.calor
 
 # Format and overwrite the file
-opalc format MyModule.opal --write
+calorc format MyModule.calor --write
 
 # Check if files are formatted (for CI)
-opalc format src/*.opal --check
+calorc format src/*.calor --check
 
 # Show diff of changes
-opalc format MyModule.opal --diff
+calorc format MyModule.calor --diff
 ```
 
 ---
@@ -51,7 +51,7 @@ opalc format MyModule.opal --diff
 
 ## Formatting Rules
 
-The OPAL formatter applies these rules:
+The Calor formatter applies these rules:
 
 - 2 spaces per indentation level
 - Single space after structure tags
@@ -67,7 +67,7 @@ The OPAL formatter applies these rules:
 Use `--check` in CI/CD to verify formatting:
 
 ```bash
-opalc format src/*.opal --check
+calorc format src/*.calor --check
 ```
 
 Exit codes:
@@ -88,5 +88,5 @@ Exit codes:
 
 ## See Also
 
-- [opalc diagnose](/cli/diagnose/) - Check for errors and warnings
-- [opalc compile](/cli/compile/) - Compile OPAL to C#
+- [calorc diagnose](/cli/diagnose/) - Check for errors and warnings
+- [calorc compile](/cli/compile/) - Compile Calor to C#

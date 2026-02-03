@@ -48,7 +48,7 @@ Score = (CompilationSuccess × 0.5) + (StructureScore × 0.3) + (NoErrors × 0.2
 
 ## Structure Score Calculation
 
-### OPAL Structure Score
+### Calor Structure Score
 
 | Element | Points | Check |
 |:--------|:-------|:------|
@@ -73,7 +73,7 @@ Score = (CompilationSuccess × 0.5) + (StructureScore × 0.3) + (NoErrors × 0.2
 
 ### 1. Training Data Advantage
 
-LLMs have seen vastly more C# code than OPAL code. This creates:
+LLMs have seen vastly more C# code than Calor code. This creates:
 - Better pattern recognition
 - Fewer syntax errors
 - More accurate boilerplate generation
@@ -89,7 +89,7 @@ public static int Add(int a, int b)
 ```
 
 ```
-// OPAL: Novel syntax, less exposure
+// Calor: Novel syntax, less exposure
 §F[f001:Add:pub]
   §I[i32:a]
   §I[i32:b]
@@ -105,7 +105,7 @@ C# errors often have clear fixes:
 - Missing brace → add brace
 - Wrong type → cast or convert
 
-OPAL errors may be less familiar:
+Calor errors may be less familiar:
 - Missing `§/F[id]` → requires understanding closing tag rules
 - Wrong ID in closing tag → requires ID matching understanding
 
@@ -127,7 +127,7 @@ public static int Add(int a, int b)
 - Errors: 0
 - Score: 1.0
 
-**OPAL generation (typical):**
+**Calor generation (typical):**
 ```
 §F[f001:Add:pub]
   §I[i32:a]
@@ -141,7 +141,7 @@ public static int Add(int a, int b)
 - Errors: 0
 - Score: 1.0
 
-**OPAL generation (common error):**
+**Calor generation (common error):**
 ```
 §F[f001:Add:pub]
   §I[i32:a]
@@ -158,7 +158,7 @@ public static int Add(int a, int b)
 
 ## Error Patterns
 
-### Common OPAL Errors
+### Common Calor Errors
 
 | Error | Cause | Example |
 |:------|:------|:--------|
@@ -180,7 +180,7 @@ public static int Add(int a, int b)
 
 ## Mitigation Strategies
 
-### For OPAL
+### For Calor
 
 1. **Template-based generation:** Start with valid templates
 2. **ID tracking:** Maintain list of open IDs, ensure matching closes
@@ -202,19 +202,19 @@ The framework provides detailed breakdowns:
 results.Add(MetricResult.CreateHigherIsBetter(
     Category,
     "CompilationSuccess",
-    opalCompilation.Success ? 1.0 : 0.0,
+    calorCompilation.Success ? 1.0 : 0.0,
     csharpCompilation.Success ? 1.0 : 0.0));
 
 results.Add(MetricResult.CreateLowerIsBetter(
     Category,
     "ErrorCount",
-    opalCompilation.Errors.Count,
+    calorCompilation.Errors.Count,
     csharpCompilation.Errors.Count));
 
 results.Add(MetricResult.CreateHigherIsBetter(
     Category,
     "StructureCompleteness",
-    CalculateOpalStructureScore(opalCompilation),
+    CalculateCalorStructureScore(calorCompilation),
     CalculateCSharpStructureScore(csharpCompilation)));
 ```
 
@@ -229,10 +229,10 @@ This is expected because:
 - C# patterns are more familiar to LLMs
 - C# tooling provides better error feedback
 
-The gap is relatively small, suggesting OPAL's explicit structure helps offset the novelty disadvantage.
+The gap is relatively small, suggesting Calor's explicit structure helps offset the novelty disadvantage.
 
 ---
 
 ## Next
 
-- [Task Completion](/opal/benchmarking/metrics/task-completion/) - End-to-end success rates
+- [Task Completion](/calor/benchmarking/metrics/task-completion/) - End-to-end success rates

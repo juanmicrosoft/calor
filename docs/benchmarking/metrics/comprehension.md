@@ -8,7 +8,7 @@ nav_order: 3
 # Comprehension Metric
 
 **Category:** Comprehension
-**Result:** OPAL wins (1.33x)
+**Result:** Calor wins (1.33x)
 **What it measures:** Structural clarity and semantic extractability
 
 ---
@@ -27,13 +27,13 @@ When an AI agent reads code, it needs to answer:
 - What side effects are possible?
 - What constraints must hold?
 
-Traditional languages require parsing and inference. OPAL makes these explicit.
+Traditional languages require parsing and inference. Calor makes these explicit.
 
 ---
 
 ## How It's Measured
 
-### OPAL Clarity Factors
+### Calor Clarity Factors
 
 | Factor | Points | Check |
 |:-------|:-------|:------|
@@ -66,7 +66,7 @@ Traditional languages require parsing and inference. OPAL makes these explicit.
 
 ## Example Comparison
 
-### OPAL (High Clarity)
+### Calor (High Clarity)
 
 ```
 §M[m001:Calculator]
@@ -122,13 +122,13 @@ namespace Calculator
 
 **Total: 0.65**
 
-**Ratio: 0.95 / 0.65 = 1.46x** (OPAL wins)
+**Ratio: 0.95 / 0.65 = 1.46x** (Calor wins)
 
 ---
 
 ## What Agents Can Extract
 
-### From OPAL (Direct Extraction)
+### From Calor (Direct Extraction)
 
 | Information | Extraction Method |
 |:------------|:------------------|
@@ -159,7 +159,7 @@ namespace Calculator
 
 ### Agent Task: "What are the constraints on the Divide function?"
 
-**From OPAL:**
+**From Calor:**
 ```
 Preconditions: b != 0
 Postconditions: result >= 0
@@ -179,12 +179,12 @@ Must analyze:
 
 ## Interpretation
 
-The 1.33x advantage indicates that OPAL's explicit structure provides ~33% more structural clarity signals than equivalent C# code.
+The 1.33x advantage indicates that Calor's explicit structure provides ~33% more structural clarity signals than equivalent C# code.
 
-This doesn't mean C# is hard to understand—it means OPAL makes structure *more explicit*, which benefits automated analysis.
+This doesn't mean C# is hard to understand—it means Calor makes structure *more explicit*, which benefits automated analysis.
 
 ---
 
 ## Next
 
-- [Error Detection](/opal/benchmarking/metrics/error-detection/) - How contracts help find bugs
+- [Error Detection](/calor/benchmarking/metrics/error-detection/) - How contracts help find bugs

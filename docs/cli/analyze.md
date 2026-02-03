@@ -6,23 +6,23 @@ nav_order: 1
 permalink: /cli/analyze/
 ---
 
-# opalc analyze
+# calorc analyze
 
-Score C# files for OPAL migration potential.
+Score C# files for Calor migration potential.
 
 ```bash
-opalc analyze <path> [options]
+calorc analyze <path> [options]
 ```
 
 ---
 
 ## Overview
 
-The `analyze` command scans a C# codebase and scores each file based on how much it would benefit from OPAL's features. It detects patterns like argument validation, null handling, error handling, and side effects that map directly to OPAL language constructs.
+The `analyze` command scans a C# codebase and scores each file based on how much it would benefit from Calor's features. It detects patterns like argument validation, null handling, error handling, and side effects that map directly to Calor language constructs.
 
 Use this command to:
 
-- **Prioritize migration efforts** - Focus on files that benefit most from OPAL's contracts and effects
+- **Prioritize migration efforts** - Focus on files that benefit most from Calor's contracts and effects
 - **Understand your codebase** - See which patterns are most common across your project
 - **Generate reports** - Export analysis in JSON or SARIF format for tooling integration
 
@@ -32,28 +32,28 @@ Use this command to:
 
 ```bash
 # Analyze current directory
-opalc analyze .
+calorc analyze .
 
 # Analyze with detailed breakdown
-opalc analyze ./src --verbose
+calorc analyze ./src --verbose
 
 # Export as JSON for processing
-opalc analyze ./src --format json --output analysis.json
+calorc analyze ./src --format json --output analysis.json
 ```
 
 ---
 
 ## Scoring Dimensions
 
-Each file is scored across six dimensions that correspond to OPAL language features:
+Each file is scored across six dimensions that correspond to Calor language features:
 
-| Dimension | Weight | What It Detects | OPAL Feature |
+| Dimension | Weight | What It Detects | Calor Feature |
 |:----------|:------:|:----------------|:-------------|
 | **ContractPotential** | 20% | Argument validation, `ArgumentException` throws, range checks | `§Q`/`§S` contracts |
 | **NullSafetyPotential** | 20% | Nullable types, `?.`, `??`, null checks | `Option<T>` |
 | **ErrorHandlingPotential** | 20% | Try/catch blocks, throw statements | `Result<T,E>` |
 | **EffectPotential** | 15% | File I/O, network calls, database access, console | `§E` effect declarations |
-| **ApiComplexityPotential** | 15% | Undocumented public APIs | OPAL metadata requirements |
+| **ApiComplexityPotential** | 15% | Undocumented public APIs | Calor metadata requirements |
 | **PatternMatchPotential** | 10% | Switch statements/expressions | Exhaustiveness checking |
 
 The total score (0-100) is the weighted sum of individual dimension scores.
@@ -66,10 +66,10 @@ Files are categorized into priority bands based on their total score:
 
 | Priority | Score Range | Meaning |
 |:---------|:------------|:--------|
-| **Critical** | 76-100 | Excellent migration candidate - high density of patterns that OPAL improves |
-| **High** | 51-75 | Good migration candidate - significant benefit from OPAL features |
+| **Critical** | 76-100 | Excellent migration candidate - high density of patterns that Calor improves |
+| **High** | 51-75 | Good migration candidate - significant benefit from Calor features |
 | **Medium** | 26-50 | Some benefit from migration - moderate pattern density |
-| **Low** | 0-25 | Minimal benefit - few patterns that OPAL addresses |
+| **Low** | 0-25 | Minimal benefit - few patterns that Calor addresses |
 
 ---
 
@@ -92,7 +92,7 @@ Files are categorized into priority bands based on their total score:
 Human-readable summary with ASCII bar charts:
 
 ```
-=== OPAL Migration Analysis ===
+=== Calor Migration Analysis ===
 
 Analyzed: 42 files
 Skipped: 8 files (generated/errors)
@@ -135,7 +135,7 @@ With `--verbose`, each file shows dimension breakdown:
 Machine-readable format for processing:
 
 ```bash
-opalc analyze ./src --format json --output analysis.json
+calorc analyze ./src --format json --output analysis.json
 ```
 
 ```json
@@ -189,7 +189,7 @@ opalc analyze ./src --format json --output analysis.json
 [SARIF](https://sarifweb.azurewebsites.net/) (Static Analysis Results Interchange Format) for IDE and CI/CD integration:
 
 ```bash
-opalc analyze ./src --format sarif --output analysis.sarif
+calorc analyze ./src --format sarif --output analysis.sarif
 ```
 
 SARIF output integrates with:
@@ -198,7 +198,7 @@ SARIF output integrates with:
 - **Azure DevOps** - Build results
 - **Other tools** - Any SARIF-compatible viewer
 
-Each scoring dimension becomes a SARIF rule (e.g., `OPAL-ContractPotential`), and findings appear as diagnostics in your IDE.
+Each scoring dimension becomes a SARIF rule (e.g., `Calor-ContractPotential`), and findings appear as diagnostics in your IDE.
 
 ---
 
@@ -214,9 +214,9 @@ Use exit code `1` in CI/CD to flag codebases with high migration potential:
 
 ```bash
 # Fail CI if high-priority migration candidates exist
-opalc analyze ./src --threshold 51
+calorc analyze ./src --threshold 51
 if [ $? -eq 1 ]; then
-  echo "High-priority OPAL migration candidates found"
+  echo "High-priority Calor migration candidates found"
 fi
 ```
 
@@ -228,28 +228,28 @@ fi
 
 ```bash
 # Show top 10 files scoring above 50
-opalc analyze ./src --threshold 50 --top 10
+calorc analyze ./src --threshold 50 --top 10
 ```
 
 ### CI/CD Integration
 
 ```yaml
 # GitHub Actions example
-- name: Analyze OPAL migration potential
+- name: Analyze Calor migration potential
   run: |
-    opalc analyze ./src --format sarif --output opal-analysis.sarif
+    calorc analyze ./src --format sarif --output calor-analysis.sarif
 
 - name: Upload SARIF
   uses: github/codeql-action/upload-sarif@v2
   with:
-    sarif_file: opal-analysis.sarif
+    sarif_file: calor-analysis.sarif
 ```
 
 ### Generate Migration Report
 
 ```bash
 # Full JSON report for documentation
-opalc analyze . --format json --output migration-report.json
+calorc analyze . --format json --output migration-report.json
 
 # Parse with jq to find critical files
 cat migration-report.json | jq '.files[] | select(.priority == "critical") | .path'
@@ -259,7 +259,7 @@ cat migration-report.json | jq '.files[] | select(.priority == "critical") | .pa
 
 ```bash
 # Deep dive into a specific directory
-opalc analyze ./src/Services --verbose --top 50
+calorc analyze ./src/Services --verbose --top 50
 ```
 
 ---
@@ -280,7 +280,7 @@ Skipped files are reported in the summary but don't affect scoring.
 
 ## See Also
 
-- [Getting Started](/opal/getting-started/) - Install OPAL and write your first program
-- [Syntax Reference](/opal/syntax-reference/) - Complete language reference
-- [Contracts](/opal/syntax-reference/contracts/) - Learn about `§Q`/`§S` contracts
-- [Effects](/opal/syntax-reference/effects/) - Learn about `§E` effect declarations
+- [Getting Started](/calor/getting-started/) - Install Calor and write your first program
+- [Syntax Reference](/calor/syntax-reference/) - Complete language reference
+- [Contracts](/calor/syntax-reference/contracts/) - Learn about `§Q`/`§S` contracts
+- [Effects](/calor/syntax-reference/effects/) - Learn about `§E` effect declarations

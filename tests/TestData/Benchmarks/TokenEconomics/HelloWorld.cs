@@ -6,7 +6,7 @@ namespace Hello
     {
         public static void Main()
         {
-            Console.WriteLine("Hello from OPAL!");
+            Console.WriteLine("Hello from Calor!");
         }
     }
 }

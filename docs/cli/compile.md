@@ -6,19 +6,19 @@ nav_order: 0
 permalink: /cli/compile/
 ---
 
-# opalc (compile)
+# calorc (compile)
 
-Compile OPAL source files to C#.
+Compile Calor source files to C#.
 
 ```bash
-opalc --input <file.opal> --output <file.cs>
+calorc --input <file.calor> --output <file.cs>
 ```
 
 ---
 
 ## Overview
 
-The default `opalc` command (when no subcommand is specified) compiles OPAL source files to C#. This is the core functionality of the OPAL compiler.
+The default `calorc` command (when no subcommand is specified) compiles Calor source files to C#. This is the core functionality of the Calor compiler.
 
 ---
 
@@ -26,13 +26,13 @@ The default `opalc` command (when no subcommand is specified) compiles OPAL sour
 
 ```bash
 # Compile a single file
-opalc --input MyModule.opal --output MyModule.g.cs
+calorc --input MyModule.calor --output MyModule.g.cs
 
 # Short form
-opalc -i MyModule.opal -o MyModule.g.cs
+calorc -i MyModule.calor -o MyModule.g.cs
 
 # With verbose output
-opalc -v -i MyModule.opal -o MyModule.g.cs
+calorc -v -i MyModule.calor -o MyModule.g.cs
 ```
 
 ---
@@ -41,7 +41,7 @@ opalc -v -i MyModule.opal -o MyModule.g.cs
 
 | Option | Short | Required | Description |
 |:-------|:------|:---------|:------------|
-| `--input` | `-i` | Yes | Input OPAL source file |
+| `--input` | `-i` | Yes | Input Calor source file |
 | `--output` | `-o` | Yes | Output C# file path |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 
@@ -52,10 +52,10 @@ opalc -v -i MyModule.opal -o MyModule.g.cs
 The recommended convention for generated C# files is the `.g.cs` extension:
 
 ```
-MyModule.opal → MyModule.g.cs
+MyModule.calor → MyModule.g.cs
 ```
 
-This indicates "generated C#" and helps distinguish OPAL-generated code from hand-written C#.
+This indicates "generated C#" and helps distinguish Calor-generated code from hand-written C#.
 
 ---
 
@@ -63,9 +63,9 @@ This indicates "generated C#" and helps distinguish OPAL-generated code from han
 
 The compiler performs these steps:
 
-1. **Parse** - Read and parse the OPAL source file
+1. **Parse** - Read and parse the Calor source file
 2. **Validate** - Check syntax and semantic correctness
-3. **Transform** - Convert OPAL AST to C# AST
+3. **Transform** - Convert Calor AST to C# AST
 4. **Generate** - Emit formatted C# source code
 5. **Write** - Save to the output file
 
@@ -76,18 +76,18 @@ The compiler performs these steps:
 Use `--verbose` to see compilation details:
 
 ```bash
-opalc -v -i Calculator.opal -o Calculator.g.cs
+calorc -v -i Calculator.calor -o Calculator.g.cs
 ```
 
 Output:
 ```
-Compiling Calculator.opal...
+Compiling Calculator.calor...
   Parsing: OK
   Validating: OK
   Modules: 1
   Functions: 3
   Classes: 0
-  Lines of OPAL: 24
+  Lines of Calor: 24
   Lines of C#: 42
 Output: Calculator.g.cs
 Compilation successful
@@ -100,7 +100,7 @@ Compilation successful
 When compilation fails, errors are reported with file location:
 
 ```
-Error in Calculator.opal:12:5
+Error in Calculator.calor:12:5
   Undefined variable 'x' in expression
 
   §R (+ x 1)
@@ -109,18 +109,18 @@ Error in Calculator.opal:12:5
 Compilation failed with 1 error
 ```
 
-For machine-readable error output, use [`opalc diagnose`](/opal/cli/diagnose/).
+For machine-readable error output, use [`calorc diagnose`](/calor/cli/diagnose/).
 
 ---
 
 ## Integration with MSBuild
 
-For automatic compilation during `dotnet build`, use [`opalc init`](/opal/cli/init/) to set up MSBuild integration. This eliminates the need to run `opalc` manually.
+For automatic compilation during `dotnet build`, use [`calorc init`](/calor/cli/init/) to set up MSBuild integration. This eliminates the need to run `calorc` manually.
 
 After initialization:
 
 ```bash
-# OPAL files compile automatically
+# Calor files compile automatically
 dotnet build
 ```
 
@@ -131,9 +131,9 @@ dotnet build
 To compile multiple files, use shell scripting:
 
 ```bash
-# Compile all .opal files in a directory
-for f in src/*.opal; do
-  opalc -i "$f" -o "${f%.opal}.g.cs"
+# Compile all .calor files in a directory
+for f in src/*.calor; do
+  calorc -i "$f" -o "${f%.calor}.g.cs"
 done
 ```
 
@@ -156,8 +156,8 @@ Or use the MSBuild integration which handles this automatically.
 ### Compile and Run
 
 ```bash
-# Compile OPAL to C#
-opalc -i Program.opal -o Program.g.cs
+# Compile Calor to C#
+calorc -i Program.calor -o Program.g.cs
 
 # Build and run with .NET
 dotnet run
@@ -167,18 +167,18 @@ dotnet run
 
 ```bash
 # Output to build directory
-opalc -i src/MyModule.opal -o build/generated/MyModule.g.cs
+calorc -i src/MyModule.calor -o build/generated/MyModule.g.cs
 ```
 
 ### Watch Mode (using external tools)
 
 ```bash
 # Using fswatch (macOS)
-fswatch -o src/*.opal | xargs -n1 -I{} opalc -i src/MyModule.opal -o src/MyModule.g.cs
+fswatch -o src/*.calor | xargs -n1 -I{} calorc -i src/MyModule.calor -o src/MyModule.g.cs
 
 # Using inotifywait (Linux)
-while inotifywait -e modify src/*.opal; do
-  opalc -i src/MyModule.opal -o src/MyModule.g.cs
+while inotifywait -e modify src/*.calor; do
+  calorc -i src/MyModule.calor -o src/MyModule.g.cs
 done
 ```
 
@@ -186,7 +186,7 @@ done
 
 ## See Also
 
-- [opalc init](/opal/cli/init/) - Set up automatic compilation with MSBuild
-- [opalc diagnose](/opal/cli/diagnose/) - Machine-readable diagnostics
-- [opalc format](/opal/cli/format/) - Format OPAL source files
-- [Getting Started](/opal/getting-started/) - Installation and first program
+- [calorc init](/calor/cli/init/) - Set up automatic compilation with MSBuild
+- [calorc diagnose](/calor/cli/diagnose/) - Machine-readable diagnostics
+- [calorc format](/calor/cli/format/) - Format Calor source files
+- [Getting Started](/calor/getting-started/) - Installation and first program

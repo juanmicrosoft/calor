@@ -7,35 +7,35 @@ nav_order: 1
 
 # Installation
 
-This guide covers installing the OPAL compiler and setting up your development environment.
+This guide covers installing the Calor compiler and setting up your development environment.
 
 ---
 
 ## Global Tool Install
 
-Install the OPAL compiler as a global .NET tool:
+Install the Calor compiler as a global .NET tool:
 
 ```bash
-dotnet tool install -g opalc
+dotnet tool install -g calorc
 ```
 
-After installation, you can compile OPAL files from anywhere:
+After installation, you can compile Calor files from anywhere:
 
 ```bash
-opalc --input program.opal --output program.g.cs
+calorc --input program.calor --output program.g.cs
 ```
 
 To update to the latest version:
 
 ```bash
-dotnet tool update -g opalc
+dotnet tool update -g calorc
 ```
 
 ---
 
 ## AI Agent Integration
 
-OPAL provides first-class support for AI coding agents. The `opalc init` command sets up your project for AI-assisted development.
+Calor provides first-class support for AI coding agents. The `calorc init` command sets up your project for AI-assisted development.
 
 ### Supported AI Agents
 
@@ -51,16 +51,16 @@ OPAL provides first-class support for AI coding agents. The `opalc init` command
 Initialize your project for Claude Code:
 
 ```bash
-opalc init --ai claude
+calorc init --ai claude
 ```
 
 This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/opal/SKILL.md` | OPAL code writing skill with YAML frontmatter |
-| `.claude/skills/opal-convert/SKILL.md` | C# to OPAL conversion skill |
-| `CLAUDE.md` | Project documentation (creates new or updates OPAL section) |
+| `.claude/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
+| `.claude/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
+| `CLAUDE.md` | Project documentation (creates new or updates Calor section) |
 
 ### Claude Code Commands
 
@@ -68,44 +68,44 @@ After initialization, use these commands in Claude Code:
 
 | Command | Description |
 |:--------|:------------|
-| `/opal` | Write new OPAL code with Claude's assistance |
-| `/opal-convert` | Convert existing C# code to OPAL syntax |
+| `/calor` | Write new Calor code with Claude's assistance |
+| `/calor-convert` | Convert existing C# code to Calor syntax |
 
 ### Re-running Init
 
-You can run `opalc init --ai claude` multiple times safely:
+You can run `calorc init --ai claude` multiple times safely:
 
-- **CLAUDE.md** - Updates only the OPAL section, preserving your custom content
+- **CLAUDE.md** - Updates only the Calor section, preserving your custom content
 - **Skills files** - Updates to latest version (prompts to confirm or use `--force`)
 - **.csproj targets** - Skips if already present (idempotent)
 
 ### MSBuild Integration
 
-The `init` command also adds MSBuild targets to your `.csproj` file for automatic OPAL compilation:
+The `init` command also adds MSBuild targets to your `.csproj` file for automatic Calor compilation:
 
 ```bash
 # Specify project explicitly
-opalc init --ai claude --project MyApp.csproj
+calorc init --ai claude --project MyApp.csproj
 
 # Auto-detect single .csproj
-opalc init --ai claude
+calorc init --ai claude
 ```
 
-After initialization, OPAL files compile automatically during `dotnet build`:
+After initialization, Calor files compile automatically during `dotnet build`:
 
 ```
 dotnet build
-# → Compiles all .opal files to obj/<config>/<tfm>/opal/*.g.cs
+# → Compiles all .calor files to obj/<config>/<tfm>/calor/*.g.cs
 # → Includes generated C# in compilation
 ```
 
-See [`opalc init`](/opal/cli/init/) for complete documentation.
+See [`calorc init`](/calor/cli/init/) for complete documentation.
 
 ---
 
 ## Prerequisites
 
-Before installing OPAL, ensure you have:
+Before installing Calor, ensure you have:
 
 | Requirement | Version | Check Command |
 |:------------|:--------|:--------------|
@@ -132,29 +132,29 @@ sudo apt-get install -y dotnet-sdk-8.0
 
 ## Clone and Build (For Contributors)
 
-If you want to contribute to OPAL or build from source:
+If you want to contribute to Calor or build from source:
 
 ```bash
 # Clone the repository
-git clone https://github.com/juanmicrosoft/opal.git
-cd opal
+git clone https://github.com/juanmicrosoft/calor.git
+cd calor
 
 # Build the entire solution
 dotnet build
 
 # Verify the build
-dotnet run --project src/Opal.Compiler -- --help
+dotnet run --project src/Calor.Compiler -- --help
 ```
 
 Expected output:
 ```
-OPAL Compiler - Optimized Programming for Agents Language
+Calor Compiler - Coding Agent Language for Optimized Reasoning
 
 Usage:
-  opalc --input <file.opal> --output <file.cs>
+  calorc --input <file.calor> --output <file.cs>
 
 Options:
-  --input, -i    Input OPAL source file
+  --input, -i    Input Calor source file
   --output, -o   Output C# file
   --help, -h     Show this help message
 ```
@@ -164,26 +164,26 @@ Options:
 ## Project Structure
 
 ```
-opal/
+calor/
 ├── src/
-│   └── Opal.Compiler/      # The OPAL compiler
+│   └── Calor.Compiler/      # The Calor compiler
 ├── samples/
-│   └── HelloWorld/         # Sample OPAL program
+│   └── HelloWorld/         # Sample Calor program
 ├── tests/
 │   ├── E2E/                # End-to-end tests
-│   └── Opal.Evaluation/    # Evaluation framework
+│   └── Calor.Evaluation/    # Evaluation framework
 └── docs/                   # This documentation
 ```
 
 ---
 
-## Compiling OPAL Files
+## Compiling Calor Files
 
 Basic usage:
 
 ```bash
-dotnet run --project src/Opal.Compiler -- \
-  --input path/to/your/program.opal \
+dotnet run --project src/Calor.Compiler -- \
+  --input path/to/your/program.calor \
   --output path/to/output/program.g.cs
 ```
 
@@ -198,9 +198,9 @@ After compilation, you need a C# project to run the generated code:
 ### Option 1: Use the HelloWorld Sample
 
 ```bash
-# Compile your OPAL file
-dotnet run --project src/Opal.Compiler -- \
-  --input your-program.opal \
+# Compile your Calor file
+dotnet run --project src/Calor.Compiler -- \
+  --input your-program.calor \
   --output samples/HelloWorld/your-program.g.cs
 
 # Run it (requires modifying HelloWorld.csproj or including the file)
@@ -211,12 +211,12 @@ dotnet run --project samples/HelloWorld
 
 ```bash
 # Create a new console project
-dotnet new console -o MyOpalProgram
-cd MyOpalProgram
+dotnet new console -o MyCalorProgram
+cd MyCalorProgram
 
-# Compile OPAL to the project directory
-dotnet run --project ../src/Opal.Compiler -- \
-  --input ../my-code.opal \
+# Compile Calor to the project directory
+dotnet run --project ../src/Calor.Compiler -- \
+  --input ../my-code.calor \
   --output my-code.g.cs
 
 # Run the program
@@ -241,10 +241,10 @@ dotnet run
 
 ```bash
 # Run the evaluation
-dotnet run --project tests/Opal.Evaluation -- --output report.json
+dotnet run --project tests/Calor.Evaluation -- --output report.json
 
 # Generate markdown report
-dotnet run --project tests/Opal.Evaluation -- --output report.md --format markdown
+dotnet run --project tests/Calor.Evaluation -- --output report.md --format markdown
 ```
 
 ---
@@ -263,8 +263,8 @@ dotnet --info
 
 **"Project not found":**
 ```bash
-# Ensure you're in the opal directory
-pwd  # Should show .../opal
+# Ensure you're in the calor directory
+pwd  # Should show .../calor
 
 # List available projects
 ls src/
@@ -273,7 +273,7 @@ ls src/
 ### Runtime Errors
 
 **"Main method not found":**
-- Ensure your OPAL code has a public `Main` function:
+- Ensure your Calor code has a public `Main` function:
   ```
   §F[f001:Main:pub]
     §O[void]
@@ -285,5 +285,5 @@ ls src/
 
 ## Next Steps
 
-- [Hello World](/opal/getting-started/hello-world/) - Understand OPAL syntax
-- [Syntax Reference](/opal/syntax-reference/) - Complete language reference
+- [Hello World](/calor/getting-started/hello-world/) - Understand Calor syntax
+- [Syntax Reference](/calor/syntax-reference/) - Complete language reference

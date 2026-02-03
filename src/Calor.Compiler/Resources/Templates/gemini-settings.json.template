@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "write_file|replace",
+        "hooks": [
+          {
+            "name": "calor-validate-write",
+            "type": "command",
+            "command": "calor hook validate-write --format gemini $TOOL_INPUT",
+            "description": "Enforce Calor-first development - blocks creation of new .cs files"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -8,7 +8,7 @@ nav_order: 4
 # Error Detection Metric
 
 **Category:** Error Detection
-**Result:** OPAL wins (1.19x)
+**Result:** Calor wins (1.19x)
 **What it measures:** Bug identification and contract violation detection
 
 ---
@@ -34,7 +34,7 @@ Explicit contracts make these violations visible without deep analysis.
 
 ## How It's Measured
 
-### OPAL Detection Factors
+### Calor Detection Factors
 
 | Factor | Points | Rationale |
 |:-------|:-------|:----------|
@@ -66,7 +66,7 @@ Base score: 0.30, cap at 0.90
 
 ## Example Comparison
 
-### OPAL with Contracts
+### Calor with Contracts
 
 ```
 §F[f001:Divide:pub]
@@ -112,7 +112,7 @@ public static int Divide(int a, int b)
 
 ### Null Reference
 
-**OPAL detection:**
+**Calor detection:**
 ```
 §Q (!= input null)    // Explicit null check requirement
 ```
@@ -126,7 +126,7 @@ input ?? throw new ArgumentNullException();
 
 ### Bounds Check
 
-**OPAL detection:**
+**Calor detection:**
 ```
 §Q (>= index 0)
 §Q (< index (len array))
@@ -140,7 +140,7 @@ if (index < 0 || index >= array.Length)
 
 ### Contract Violation
 
-**OPAL:** Direct contract syntax enables automated verification.
+**Calor:** Direct contract syntax enables automated verification.
 
 **C#:** Must parse exception throws and assertions.
 
@@ -157,7 +157,7 @@ Given this buggy call:
 §B[result] §C[Divide] §A x §A (- y y) §/C    // (y - y) = 0!
 ```
 
-**OPAL agent detection:**
+**Calor agent detection:**
 1. See `§C[Divide]`
 2. Look up `Divide` contracts: `§Q (!= b 0)`
 3. Evaluate second argument: `(- y y)` = 0
@@ -175,7 +175,7 @@ Given this buggy call:
 
 ## Scoring Example
 
-### OPAL Code
+### Calor Code
 
 ```
 §F[f001:SafeDivide:pub]
@@ -217,13 +217,13 @@ public static Result<int, string> SafeDivide(int a, int b)
 
 **Total: 0.45**
 
-**Ratio: 0.85 / 0.45 = 1.89x** (OPAL significantly better for this example)
+**Ratio: 0.85 / 0.45 = 1.89x** (Calor significantly better for this example)
 
 ---
 
 ## Interpretation
 
-The 1.19x advantage indicates that OPAL's first-class contracts provide substantially better bug detection signals.
+The 1.19x advantage indicates that Calor's first-class contracts provide substantially better bug detection signals.
 
 The advantage is highest when:
 - Functions have explicit preconditions and postconditions
@@ -234,4 +234,4 @@ The advantage is highest when:
 
 ## Next
 
-- [Edit Precision](/opal/benchmarking/metrics/edit-precision/) - How IDs enable precise changes
+- [Edit Precision](/calor/benchmarking/metrics/edit-precision/) - How IDs enable precise changes

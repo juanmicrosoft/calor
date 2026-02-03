@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "opalc hook validate-write $TOOL_INPUT"
+            "command": "calor hook validate-write $TOOL_INPUT"
           }
         ]
       }

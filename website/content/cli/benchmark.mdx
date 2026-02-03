@@ -4,19 +4,19 @@ section: "cli"
 order: 5
 ---
 
-# opalc benchmark
+# calorc benchmark
 
-Compare OPAL vs C# across evaluation metrics.
+Compare Calor vs C# across evaluation metrics.
 
 ```bash
-opalc benchmark [project] [options]
+calorc benchmark [project] [options]
 ```
 
 ---
 
 ## Overview
 
-The `benchmark` command measures and compares OPAL against C# across seven evaluation categories designed to assess AI agent effectiveness:
+The `benchmark` command measures and compares Calor against C# across seven evaluation categories designed to assess AI agent effectiveness:
 
 1. **Token Economics** - Token count and density
 2. **Generation Accuracy** - Code correctness
@@ -32,16 +32,16 @@ The `benchmark` command measures and compares OPAL against C# across seven evalu
 
 ```bash
 # Compare two files
-opalc benchmark --opal Calculator.opal --csharp Calculator.cs
+calorc benchmark --calor Calculator.calor --csharp Calculator.cs
 
 # Benchmark entire project
-opalc benchmark ./src
+calorc benchmark ./src
 
 # Quick token-only comparison
-opalc benchmark --opal file.opal --csharp file.cs --quick
+calorc benchmark --calor file.calor --csharp file.cs --quick
 
 # Generate markdown report
-opalc benchmark ./src --format markdown --output report.md
+calorc benchmark ./src --format markdown --output report.md
 ```
 
 ---
@@ -50,7 +50,7 @@ opalc benchmark ./src --format markdown --output report.md
 
 | Option | Short | Default | Description |
 |:-------|:------|:--------|:------------|
-| `--opal` | | None | OPAL file to benchmark |
+| `--calor` | | None | Calor file to benchmark |
 | `--csharp`, `--cs` | | None | C# file to benchmark |
 | `--category` | `-c` | All | Filter by category |
 | `--format` | `-f` | `console` | Output format: `console`, `markdown`, `json` |
@@ -62,25 +62,25 @@ opalc benchmark ./src --format markdown --output report.md
 
 ## File-Level Benchmark
 
-Compare a specific OPAL file against its C# equivalent:
+Compare a specific Calor file against its C# equivalent:
 
 ```bash
-opalc benchmark --opal PaymentService.opal --csharp PaymentService.cs
+calorc benchmark --calor PaymentService.calor --csharp PaymentService.cs
 ```
 
 Output:
 ```
-=== OPAL vs C# Benchmark ===
+=== Calor vs C# Benchmark ===
 
 ┌─────────────────────┬────────┬────────┬───────────┐
-│ Category            │ OPAL   │ C#     │ Advantage │
+│ Category            │ Calor   │ C#     │ Advantage │
 ├─────────────────────┼────────┼────────┼───────────┤
 │ Token Economics     │ 82.4   │ 58.2   │ 1.42x     │
 │ Generation Accuracy │ 91.2   │ 76.5   │ 1.19x     │
 │ Overall             │ 87.4   │ 68.9   │ 1.27x     │
 └─────────────────────┴────────┴────────┴───────────┘
 
-OPAL shows 1.27x overall advantage for AI agent tasks.
+Calor shows 1.27x overall advantage for AI agent tasks.
 ```
 
 ---
@@ -90,13 +90,13 @@ OPAL shows 1.27x overall advantage for AI agent tasks.
 For fast token/line comparison without the full 7-metric evaluation:
 
 ```bash
-opalc benchmark --opal file.opal --csharp file.cs --quick
+calorc benchmark --calor file.calor --csharp file.cs --quick
 ```
 
 Output:
 ```
 ┌─────────────────┬────────┬────────┬──────────┐
-│ Metric          │ OPAL   │ C#     │ Savings  │
+│ Metric          │ Calor   │ C#     │ Savings  │
 ├─────────────────┼────────┼────────┼──────────┤
 │ Tokens          │ 842    │ 1,245  │ 32.4%    │
 │ Lines           │ 98     │ 156    │ 37.2%    │
@@ -110,13 +110,13 @@ Output:
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Benchmark completed successfully |
-| `1` | Benchmark completed but OPAL showed no advantage |
+| `1` | Benchmark completed but Calor showed no advantage |
 | `2` | Error - files not found, invalid arguments, etc. |
 
 ---
 
 ## See Also
 
-- [opalc analyze](/cli/analyze/) - Score files for migration potential
+- [calorc analyze](/cli/analyze/) - Score files for migration potential
 - [Benchmarking Methodology](/benchmarking/methodology/) - Detailed methodology
 - [Benchmark Results](/benchmarking/results/) - Published results

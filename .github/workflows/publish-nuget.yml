@@ -24,17 +24,17 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore src/Opal.Compiler/Opal.Compiler.csproj
+        run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj
 
       - name: Build
-        run: dotnet build src/Opal.Compiler/Opal.Compiler.csproj -c Release --no-restore
+        run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-restore
 
       - name: Pack
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
-            dotnet pack src/Opal.Compiler/Opal.Compiler.csproj -c Release --no-build -o ./nupkg /p:Version=${{ github.event.inputs.version }}
+            dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o ./nupkg /p:Version=${{ github.event.inputs.version }}
           else
-            dotnet pack src/Opal.Compiler/Opal.Compiler.csproj -c Release --no-build -o ./nupkg
+            dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o ./nupkg
           fi
 
       - name: Push to NuGet

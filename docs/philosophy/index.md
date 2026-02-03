@@ -6,7 +6,7 @@ has_children: true
 permalink: /philosophy/
 ---
 
-# Why OPAL Exists
+# Why Calor Exists
 
 AI coding agents are transforming software development, but they're forced to work with languages designed for humans. This creates a fundamental mismatch.
 
@@ -16,7 +16,7 @@ AI coding agents are transforming software development, but they're forced to wo
 
 When an AI agent reads code, it needs answers to specific questions:
 
-| Question | Traditional Languages | OPAL |
+| Question | Traditional Languages | Calor |
 |:---------|:---------------------|:-----|
 | What does this function **do**? | Infer from implementation | Explicit contracts (`§Q`, `§S`) |
 | What are the **side effects**? | Guess from I/O patterns | Declared with `§E[cw,fr,net]` |
@@ -24,13 +24,13 @@ When an AI agent reads code, it needs answers to specific questions:
 | How do I **precisely reference** this? | Hope line numbers don't change | Unique IDs (`§F[f001:Main]`) |
 | Where does this **scope end**? | Count braces, handle nesting | Matched closing tags (`§/F[f001]`) |
 
-Traditional languages make agents *infer* these answers through complex analysis. OPAL makes them *explicit* in the syntax.
+Traditional languages make agents *infer* these answers through complex analysis. Calor makes them *explicit* in the syntax.
 
 ---
 
 ## Optimizing for Agents, Not Humans
 
-OPAL deliberately optimizes for machine readability over human aesthetics:
+Calor deliberately optimizes for machine readability over human aesthetics:
 
 ```
 §M[m001:Calculator]
@@ -74,15 +74,15 @@ This might look unusual to human programmers, but for an AI agent:
 
 ### 4. What's the cost of explicit semantics?
 
-**Honest answer:** Token efficiency. OPAL uses more tokens than C# (0.67x ratio), trading brevity for explicitness.
+**Honest answer:** Token efficiency. Calor uses more tokens than C# (0.67x ratio), trading brevity for explicitness.
 
 ---
 
 ## Not a General-Purpose Language
 
-OPAL is not trying to replace C#, Python, or any other language. It's a research project exploring whether language design can be optimized for AI agent workflows.
+Calor is not trying to replace C#, Python, or any other language. It's a research project exploring whether language design can be optimized for AI agent workflows.
 
-Use OPAL when:
+Use Calor when:
 - You're building AI-powered code analysis or generation tools
 - You want to experiment with agent-friendly language design
 - You need explicit contracts and effects for verification
@@ -96,6 +96,6 @@ Use traditional languages when:
 
 ## Learn More
 
-- [Design Principles](/opal/philosophy/design-principles/) - The five core principles behind OPAL
-- [Tradeoffs](/opal/philosophy/tradeoffs/) - What OPAL gives up for explicitness
-- [Benchmarking](/opal/benchmarking/) - How we measure success
+- [Design Principles](/calor/philosophy/design-principles/) - The five core principles behind Calor
+- [Tradeoffs](/calor/philosophy/tradeoffs/) - What Calor gives up for explicitness
+- [Benchmarking](/calor/benchmarking/) - How we measure success

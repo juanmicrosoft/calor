@@ -7,7 +7,7 @@ nav_order: 1
 
 # Development Setup
 
-This guide helps you set up a development environment for contributing to OPAL.
+This guide helps you set up a development environment for contributing to Calor.
 
 ---
 
@@ -25,8 +25,8 @@ This guide helps you set up a development environment for contributing to OPAL.
 
 ```bash
 # Clone your fork (or the main repo)
-git clone https://github.com/YOUR_USERNAME/opal.git
-cd opal
+git clone https://github.com/YOUR_USERNAME/calor.git
+cd calor
 
 # Build everything
 dotnet build
@@ -40,9 +40,9 @@ dotnet test
 ## Project Structure
 
 ```
-opal/
+calor/
 ├── src/
-│   └── Opal.Compiler/           # The compiler
+│   └── Calor.Compiler/           # The compiler
 │       ├── Lexer/               # Tokenization
 │       ├── Parser/              # Parsing
 │       ├── AST/                 # Abstract syntax tree
@@ -57,7 +57,7 @@ opal/
 │   │   ├── run-tests.sh         # Mac/Linux runner
 │   │   └── run-tests.ps1        # Windows runner
 │   │
-│   └── Opal.Evaluation/         # Evaluation framework
+│   └── Calor.Evaluation/         # Evaluation framework
 │       ├── Metrics/             # Metric calculators
 │       ├── Core/                # Framework core
 │       └── Benchmarks/          # Benchmark programs
@@ -70,14 +70,14 @@ opal/
 ## Running the Compiler
 
 ```bash
-# Compile an OPAL file
-dotnet run --project src/Opal.Compiler -- \
-  --input path/to/file.opal \
+# Compile an Calor file
+dotnet run --project src/Calor.Compiler -- \
+  --input path/to/file.calor \
   --output path/to/output.g.cs
 
 # With verbose output
-dotnet run --project src/Opal.Compiler -- \
-  --input file.opal \
+dotnet run --project src/Calor.Compiler -- \
+  --input file.calor \
   --output file.g.cs \
   --verbose
 ```
@@ -106,17 +106,17 @@ dotnet run --project src/Opal.Compiler -- \
 dotnet test
 
 # Run specific test project
-dotnet test tests/Opal.Compiler.Tests
+dotnet test tests/Calor.Compiler.Tests
 ```
 
 ### Evaluation Framework
 
 ```bash
 # Run evaluation
-dotnet run --project tests/Opal.Evaluation -- --output report.json
+dotnet run --project tests/Calor.Evaluation -- --output report.json
 
 # Generate markdown report
-dotnet run --project tests/Opal.Evaluation -- --output report.md --format markdown
+dotnet run --project tests/Calor.Evaluation -- --output report.md --format markdown
 ```
 
 ---
@@ -175,14 +175,14 @@ Then create a pull request on GitHub.
 
 ### Adding a New Metric
 
-1. Create calculator in `tests/Opal.Evaluation/Metrics/`
+1. Create calculator in `tests/Calor.Evaluation/Metrics/`
 2. Implement `IMetricCalculator` interface
 3. Register in evaluation runner
 4. Add documentation
 
 ### Adding a Benchmark
 
-See [Adding Benchmarks](/opal/contributing/adding-benchmarks/).
+See [Adding Benchmarks](/calor/contributing/adding-benchmarks/).
 
 ---
 
@@ -200,8 +200,8 @@ Add to `.vscode/launch.json`:
       "name": "Debug Compiler",
       "type": "coreclr",
       "request": "launch",
-      "program": "${workspaceFolder}/src/Opal.Compiler/bin/Debug/net8.0/Opal.Compiler.dll",
-      "args": ["--input", "test.opal", "--output", "test.g.cs"],
+      "program": "${workspaceFolder}/src/Calor.Compiler/bin/Debug/net8.0/Calor.Compiler.dll",
+      "args": ["--input", "test.calor", "--output", "test.g.cs"],
       "cwd": "${workspaceFolder}",
       "console": "internalConsole"
     }
@@ -211,9 +211,9 @@ Add to `.vscode/launch.json`:
 
 ### Rider/Visual Studio
 
-Set `Opal.Compiler` as startup project with command line arguments:
+Set `Calor.Compiler` as startup project with command line arguments:
 ```
---input samples/HelloWorld/hello.opal --output output.g.cs
+--input samples/HelloWorld/hello.calor --output output.g.cs
 ```
 
 ---
@@ -227,7 +227,7 @@ Set `Opal.Compiler` as startup project with command line arguments:
 - Use `var` for obvious types
 - Use meaningful names
 
-### OPAL Conventions
+### Calor Conventions
 
 - Use V2 syntax (Lisp-style expressions)
 - Include IDs on all structures
@@ -246,4 +246,4 @@ Set `Opal.Compiler` as startup project with command line arguments:
 
 ## Next
 
-- [Adding Benchmarks](/opal/contributing/adding-benchmarks/) - Add evaluation programs
+- [Adding Benchmarks](/calor/contributing/adding-benchmarks/) - Add evaluation programs

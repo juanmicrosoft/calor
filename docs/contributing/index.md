@@ -6,9 +6,9 @@ has_children: true
 permalink: /contributing/
 ---
 
-# Contributing to OPAL
+# Contributing to Calor
 
-OPAL is an experiment in language design for AI agents. We welcome contributions from the community.
+Calor is an experiment in language design for AI agents. We welcome contributions from the community.
 
 ---
 
@@ -16,11 +16,11 @@ OPAL is an experiment in language design for AI agents. We welcome contributions
 
 | Area | Description | Skill Level |
 |:-----|:------------|:------------|
-| **Benchmark Programs** | Add new OPAL/C# program pairs | Beginner |
+| **Benchmark Programs** | Add new Calor/C# program pairs | Beginner |
 | **Documentation** | Improve docs, add examples | Beginner |
 | **Bug Reports** | Report compiler issues | Beginner |
 | **Metric Refinements** | Improve evaluation metrics | Intermediate |
-| **Parser Improvements** | Fix or extend OPAL parsing | Intermediate |
+| **Parser Improvements** | Fix or extend Calor parsing | Intermediate |
 | **Code Generation** | Improve C# output quality | Advanced |
 | **New Features** | Add language features | Advanced |
 
@@ -30,7 +30,7 @@ OPAL is an experiment in language design for AI agents. We welcome contributions
 
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally
-3. **Set up the development environment** (see [Development Setup](/opal/contributing/development-setup/))
+3. **Set up the development environment** (see [Development Setup](/calor/contributing/development-setup/))
 4. **Make your changes** on a feature branch
 5. **Run tests** to ensure nothing is broken
 6. **Submit a pull request**
@@ -71,7 +71,7 @@ The evaluation framework needs more programs:
 - Varying complexity levels
 - Edge cases for metrics
 
-See [Adding Benchmarks](/opal/contributing/adding-benchmarks/).
+See [Adding Benchmarks](/calor/contributing/adding-benchmarks/).
 
 ### 2. Documentation
 
@@ -81,7 +81,7 @@ See [Adding Benchmarks](/opal/contributing/adding-benchmarks/).
 
 ### 3. Parser Edge Cases
 
-The OPAL parser needs testing with:
+The Calor parser needs testing with:
 - Complex nested structures
 - Edge case syntax
 - Error recovery scenarios
@@ -90,10 +90,10 @@ The OPAL parser needs testing with:
 
 ## Quick Links
 
-- [Development Setup](/opal/contributing/development-setup/) - Set up your environment
-- [Adding Benchmarks](/opal/contributing/adding-benchmarks/) - Add evaluation programs
-- [GitHub Repository](https://github.com/juanmicrosoft/opal) - Source code
-- [Issues](https://github.com/juanmicrosoft/opal/issues) - Bug reports and feature requests
+- [Development Setup](/calor/contributing/development-setup/) - Set up your environment
+- [Adding Benchmarks](/calor/contributing/adding-benchmarks/) - Add evaluation programs
+- [GitHub Repository](https://github.com/juanmicrosoft/calor) - Source code
+- [Issues](https://github.com/juanmicrosoft/calor/issues) - Bug reports and feature requests
 
 ---
 

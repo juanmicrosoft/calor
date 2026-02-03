@@ -8,22 +8,22 @@ permalink: /cli/
 
 # CLI Reference
 
-The `opalc` command-line tool provides commands for working with OPAL code and analyzing C# codebases for migration.
+The `calorc` command-line tool provides commands for working with Calor code and analyzing C# codebases for migration.
 
 ---
 
 ## Installation
 
-Install `opalc` as a global .NET tool:
+Install `calorc` as a global .NET tool:
 
 ```bash
-dotnet tool install -g opalc --version 0.1.3
+dotnet tool install -g calorc --version 0.1.3
 ```
 
 Or update an existing installation:
 
 ```bash
-dotnet tool update -g opalc
+dotnet tool update -g calorc
 ```
 
 ---
@@ -32,31 +32,31 @@ dotnet tool update -g opalc
 
 | Command | Description |
 |:--------|:------------|
-| `opalc` (default) | Compile OPAL source files to C# |
-| [`opalc analyze`](/opal/cli/analyze/) | Score C# files for OPAL migration potential |
-| [`opalc init`](/opal/cli/init/) | Initialize OPAL with AI agent support and .csproj integration |
-| [`opalc convert`](/opal/cli/convert/) | Convert single files between C# and OPAL |
-| [`opalc migrate`](/opal/cli/migrate/) | Migrate entire projects between C# and OPAL |
-| [`opalc benchmark`](/opal/cli/benchmark/) | Compare OPAL vs C# across evaluation metrics |
-| [`opalc format`](/opal/cli/format/) | Format OPAL source files to canonical style |
-| [`opalc diagnose`](/opal/cli/diagnose/) | Output machine-readable diagnostics for tooling |
-| [`opalc hook`](/opal/cli/hook/) | Claude Code hook commands (internal) |
+| `calorc` (default) | Compile Calor source files to C# |
+| [`calorc analyze`](/calor/cli/analyze/) | Score C# files for Calor migration potential |
+| [`calorc init`](/calor/cli/init/) | Initialize Calor with AI agent support and .csproj integration |
+| [`calorc convert`](/calor/cli/convert/) | Convert single files between C# and Calor |
+| [`calorc migrate`](/calor/cli/migrate/) | Migrate entire projects between C# and Calor |
+| [`calorc benchmark`](/calor/cli/benchmark/) | Compare Calor vs C# across evaluation metrics |
+| [`calorc format`](/calor/cli/format/) | Format Calor source files to canonical style |
+| [`calorc diagnose`](/calor/cli/diagnose/) | Output machine-readable diagnostics for tooling |
+| [`calorc hook`](/calor/cli/hook/) | Claude Code hook commands (internal) |
 
 ---
 
 ## Compilation (Default Command)
 
-Compile OPAL source files to C#:
+Compile Calor source files to C#:
 
 ```bash
-opalc --input file.opal --output file.g.cs
+calorc --input file.calor --output file.g.cs
 ```
 
 ### Options
 
 | Option | Description |
 |:-------|:------------|
-| `--input`, `-i` | Input OPAL file path (required) |
+| `--input`, `-i` | Input Calor file path (required) |
 | `--output`, `-o` | Output C# file path (required) |
 | `--verbose`, `-v` | Show detailed compilation output |
 
@@ -64,15 +64,15 @@ opalc --input file.opal --output file.g.cs
 
 ```bash
 # Compile a single file
-opalc --input src/MyModule.opal --output src/MyModule.g.cs
+calorc --input src/MyModule.calor --output src/MyModule.g.cs
 
 # Compile with verbose output
-opalc -v -i src/MyModule.opal -o src/MyModule.g.cs
+calorc -v -i src/MyModule.calor -o src/MyModule.g.cs
 ```
 
 ---
 
 ## See Also
 
-- [Getting Started](/opal/getting-started/) - Installation and first program
-- [Syntax Reference](/opal/syntax-reference/) - Complete language reference
+- [Getting Started](/calor/getting-started/) - Installation and first program
+- [Syntax Reference](/calor/syntax-reference/) - Complete language reference

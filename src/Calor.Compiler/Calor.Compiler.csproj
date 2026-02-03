@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>calor</AssemblyName>
+    <RootNamespace>Calor.Compiler</RootNamespace>
+
+    <!-- dotnet global tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>calor</ToolCommandName>
+    <PackageId>calor</PackageId>
+    <Version>0.1.4</Version>
+    <Description>Calor compiler CLI - Convert C# to Calor and compile Calor to C#</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Calor.Runtime\Calor.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DiffPlex" Version="1.7.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Skills\*.md">
+      <LogicalName>Calor.Compiler.Resources.Skills.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Templates\*.template">
+      <LogicalName>Calor.Compiler.Resources.Templates.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

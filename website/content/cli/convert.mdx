@@ -4,22 +4,22 @@ section: "cli"
 order: 3
 ---
 
-# opalc convert
+# calorc convert
 
-Convert a single file between C# and OPAL.
+Convert a single file between C# and Calor.
 
 ```bash
-opalc convert <input> [options]
+calorc convert <input> [options]
 ```
 
 ---
 
 ## Overview
 
-The `convert` command performs bidirectional conversion between C# and OPAL:
+The `convert` command performs bidirectional conversion between C# and Calor:
 
-- **C# → OPAL**: Convert `.cs` files to OPAL syntax
-- **OPAL → C#**: Convert `.opal` files to generated C#
+- **C# → Calor**: Convert `.cs` files to Calor syntax
+- **Calor → C#**: Convert `.calor` files to generated C#
 
 The conversion direction is automatically detected from the input file extension.
 
@@ -28,17 +28,17 @@ The conversion direction is automatically detected from the input file extension
 ## Quick Start
 
 ```bash
-# Convert C# to OPAL
-opalc convert MyService.cs
+# Convert C# to Calor
+calorc convert MyService.cs
 
-# Convert OPAL to C#
-opalc convert MyService.opal
+# Convert Calor to C#
+calorc convert MyService.calor
 
 # Specify output path
-opalc convert MyService.cs --output src/MyService.opal
+calorc convert MyService.cs --output src/MyService.calor
 
 # Include benchmark comparison
-opalc convert MyService.cs --benchmark
+calorc convert MyService.cs --benchmark
 ```
 
 ---
@@ -59,14 +59,14 @@ If `--output` is not specified:
 
 | Input | Output |
 |:------|:-------|
-| `MyFile.cs` | `MyFile.opal` |
-| `MyFile.opal` | `MyFile.g.cs` |
+| `MyFile.cs` | `MyFile.calor` |
+| `MyFile.calor` | `MyFile.g.cs` |
 
 ---
 
 ## Supported Constructs
 
-| C# Construct | OPAL Equivalent |
+| C# Construct | Calor Equivalent |
 |:-------------|:----------------|
 | `namespace` | `§M[id:Name]` module |
 | `class` | `§C[id:Name:vis]` class |
@@ -81,17 +81,17 @@ If `--output` is not specified:
 
 ## Benchmark Comparison
 
-Use `--benchmark` to see how the OPAL version compares to C#:
+Use `--benchmark` to see how the Calor version compares to C#:
 
 ```bash
-opalc convert PaymentService.cs --benchmark
+calorc convert PaymentService.cs --benchmark
 ```
 
 Output:
 ```
 Benchmark Comparison:
 ┌─────────────────┬────────┬────────┬──────────┐
-│ Metric          │ C#     │ OPAL   │ Savings  │
+│ Metric          │ C#     │ Calor   │ Savings  │
 ├─────────────────┼────────┼────────┼──────────┤
 │ Tokens          │ 1,245  │ 842    │ 32.4%    │
 │ Lines           │ 156    │ 98     │ 37.2%    │
@@ -113,6 +113,6 @@ Benchmark Comparison:
 
 ## See Also
 
-- [opalc migrate](/cli/migrate/) - Convert entire projects
-- [opalc analyze](/cli/analyze/) - Find best conversion candidates
-- [opalc benchmark](/cli/benchmark/) - Detailed metrics comparison
+- [calorc migrate](/cli/migrate/) - Convert entire projects
+- [calorc analyze](/cli/analyze/) - Find best conversion candidates
+- [calorc benchmark](/cli/benchmark/) - Detailed metrics comparison

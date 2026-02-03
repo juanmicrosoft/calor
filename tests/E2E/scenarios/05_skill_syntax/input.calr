@@ -1,0 +1,82 @@
+§M{m001:SkillSyntax}
+
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
+    §A "=== Calor Skill Syntax Validation ==="
+  §/C
+  §C{Console.WriteLine}
+    §A ""
+  §/C
+  §C{TestArithmetic}
+  §/C
+  §C{TestComparison}
+  §/C
+  §C{TestControlFlow}
+  §/C
+§/F{f001}
+
+§F{f002:TestArithmetic:pri}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
+    §A "Testing arithmetic operators..."
+  §/C
+§/F{f002}
+
+§F{f003:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f003}
+
+§F{f004:Subtract:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (- a b)
+§/F{f004}
+
+§F{f005:Multiply:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (* a b)
+§/F{f005}
+
+§F{f006:TestComparison:pri}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
+    §A "Testing comparison operators..."
+  §/C
+§/F{f006}
+
+§F{f007:IsPositive:pub}
+  §I{i32:x}
+  §O{bool}
+  §R (> x 0)
+§/F{f007}
+
+§F{f008:IsZero:pub}
+  §I{i32:x}
+  §O{bool}
+  §R (== x 0)
+§/F{f008}
+
+§F{f009:TestControlFlow:pri}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
+    §A "Testing control flow..."
+  §/C
+  §L{for1:i:1:5:1}
+    §C{Console.WriteLine}
+      §A i
+    §/C
+  §/L{for1}
+§/F{f009}
+
+§/M{m001}

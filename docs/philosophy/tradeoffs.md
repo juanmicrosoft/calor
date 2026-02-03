@@ -7,19 +7,19 @@ nav_order: 2
 
 # The Tradeoffs
 
-OPAL deliberately trades certain qualities for others. Understanding these tradeoffs helps you decide when OPAL is the right tool.
+Calor deliberately trades certain qualities for others. Understanding these tradeoffs helps you decide when Calor is the right tool.
 
 ---
 
 ## The Core Tradeoff
 
-OPAL trades **token efficiency** for **semantic explicitness**.
+Calor trades **token efficiency** for **semantic explicitness**.
 
 ```
 // C#: 4 tokens, implicit semantics
 return a + b;
 
-// OPAL: Explicit Lisp-style operations
+// Calor: Explicit Lisp-style operations
 §R (+ a b)
 ```
 
@@ -27,9 +27,9 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 ---
 
-## What OPAL Optimizes For
+## What Calor Optimizes For
 
-| Quality | OPAL Approach | Result |
+| Quality | Calor Approach | Result |
 |:--------|:--------------|:-------|
 | **Comprehension** | Explicit structure and contracts | 1.33x better than C# |
 | **Error Detection** | First-class preconditions/postconditions | 1.19x better than C# |
@@ -39,7 +39,7 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 ---
 
-## What OPAL Trades Away
+## What Calor Trades Away
 
 | Quality | Impact | Mitigation |
 |:--------|:-------|:-----------|
@@ -53,7 +53,7 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 ## When the Tradeoff Pays Off
 
-OPAL's tradeoff pays off when:
+Calor's tradeoff pays off when:
 
 ### 1. Agents Need to Reason About Behavior
 
@@ -123,7 +123,7 @@ Use C#/Python/etc when:
 
 If you're operating at the edge of context window limits, C#'s compactness wins:
 
-| Code | OPAL Tokens | C# Tokens |
+| Code | Calor Tokens | C# Tokens |
 |:-----|:------------|:----------|
 | Hello World | ~25 | ~15 |
 | FizzBuzz | ~80 | ~50 |
@@ -131,7 +131,7 @@ If you're operating at the edge of context window limits, C#'s compactness wins:
 
 ### 2. Human Developers Are Primary Readers
 
-OPAL's syntax is optimized for machine parsing:
+Calor's syntax is optimized for machine parsing:
 
 ```
 // Familiar to humans
@@ -143,7 +143,7 @@ if (x > 0) return x;
 
 ### 3. You Need Library Ecosystem
 
-OPAL compiles to C#, so interop is possible, but native library support doesn't exist.
+Calor compiles to C#, so interop is possible, but native library support doesn't exist.
 
 ---
 
@@ -174,13 +174,13 @@ This improved token economics by ~40% while maintaining parseability.
 
 Our evaluation framework measures both sides:
 
-| Metric | Measures | OPAL Result |
+| Metric | Measures | Calor Result |
 |:-------|:---------|:------------|
 | Token Economics | Cost of explicitness | 0.67x (C# wins) |
 | Information Density | Semantic content per token | 0.22x (C# wins) |
-| Comprehension | Benefit of explicitness | 1.33x (OPAL wins) |
-| Error Detection | Contract effectiveness | 1.19x (OPAL wins) |
-| Edit Precision | ID-based targeting | 1.15x (OPAL wins) |
+| Comprehension | Benefit of explicitness | 1.33x (Calor wins) |
+| Error Detection | Contract effectiveness | 1.19x (Calor wins) |
+| Edit Precision | ID-based targeting | 1.15x (Calor wins) |
 
 The question isn't "which is better" but "which matters more for your use case."
 
@@ -188,5 +188,5 @@ The question isn't "which is better" but "which matters more for your use case."
 
 ## Next
 
-- [Benchmarking Overview](/opal/benchmarking/) - How we measure these tradeoffs
-- [Results](/opal/benchmarking/results/) - Detailed evaluation data
+- [Benchmarking Overview](/calor/benchmarking/) - How we measure these tradeoffs
+- [Results](/calor/benchmarking/results/) - Detailed evaluation data
