@@ -142,9 +142,9 @@ dotnet run --project samples/HelloWorld
 
 ## Documentation
 
-- **[Syntax Reference](https://juanrivera.github.io/opal/syntax-reference/)** — Complete language reference
-- **[Getting Started](https://juanrivera.github.io/opal/getting-started/)** — Installation, hello world, Claude integration
-- **[Benchmarking](https://juanrivera.github.io/opal/benchmarking/)** — How we measure OPAL vs C#
+- **[Syntax Reference](https://juanmicrosoft.github.io/opal/syntax-reference/)** — Complete language reference
+- **[Getting Started](https://juanmicrosoft.github.io/opal/getting-started/)** — Installation, hello world, Claude integration
+- **[Benchmarking](https://juanmicrosoft.github.io/opal/benchmarking/)** — How we measure OPAL vs C#
 
 ## Project Status
 
