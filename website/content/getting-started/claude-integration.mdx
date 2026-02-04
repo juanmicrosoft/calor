@@ -65,78 +65,82 @@ If you need to temporarily allow `.cs` file creation, remove or rename `.claude/
 
 ## Available Skills
 
+Claude automatically consults the installed skills when needed. You can also invoke them explicitly for specific tasks:
+
 ### The `/calor` Skill
 
-When working with Claude Code in an Calor-initialized project, use the `/calor` command to activate Calor-aware code generation.
-
-**Example prompts:**
+Invoke `/calor` when you want Claude to focus specifically on Calor syntax or see detailed templates:
 
 ```
 /calor
 
-Write a function that calculates compound interest with:
-- Preconditions: principal > 0, rate >= 0, years > 0
-- Postcondition: result >= principal
-- Effects: pure (no side effects)
+What's the syntax for a while loop with a condition?
 ```
 
 ### The `/calor-convert` Skill
 
-Use `/calor-convert` to convert existing C# code to Calor:
+Invoke `/calor-convert` when converting C# files to Calor:
 
 ```
 /calor-convert
 
-Convert this C# class to Calor:
-
-public class Calculator
-{
-    public int Add(int a, int b) => a + b;
-}
+Convert src/Services/UserService.cs to Calor
 ```
+
+**Note:** For most tasks, you don't need to invoke skills explicitly. Just describe what you want and Claude will write Calor automatically.
 
 ---
 
-## Teaching Claude Calor
+## How Claude Learns Calor
 
-If you're using Claude outside of Claude Code, you can teach it Calor by including the syntax reference in your prompt:
+When you run `calor init --ai claude`, three components work together to enable Claude to write Calor code automatically:
 
-### Minimal Prompt
+### 1. CLAUDE.md - Project Instructions
+
+The `CLAUDE.md` file is read by Claude Code at the start of every conversation. It contains:
+
+- **Mandatory rules** - "All new code MUST be written in Calor"
+- **Workflow guidance** - When to create `.calr` files vs. convert existing `.cs` files
+- **Syntax highlights** - Quick reference for Calor v2+ syntax
+- **Type mappings** - How C# types map to Calor types (`int` → `i32`, `string` → `str`)
+
+Claude reads this file automatically - you don't need to reference it in your prompts.
+
+### 2. Skills - Syntax Reference
+
+Two skills are installed in `.claude/skills/`:
+
+| Skill | Purpose |
+|:------|:--------|
+| `calor` | Complete Calor v2+ syntax reference with templates |
+| `calor-convert` | Guidelines for converting C# to Calor |
+
+Claude consults these skills when it needs detailed syntax information. You can also invoke them explicitly with `/calor` or `/calor-convert` if you want Claude to focus on a specific task.
+
+### 3. Hooks - Enforcement
+
+The `.claude/settings.json` file configures a `PreToolUse` hook that runs before Claude creates any file. If Claude tries to create a `.cs` file, the hook:
+
+1. **Blocks the operation** - The file is not created
+2. **Returns guidance** - Tells Claude to create a `.calr` file instead
+3. **Claude retries** - Automatically creates the correct file type
+
+This means even if Claude "forgets" the CLAUDE.md instructions, the hook ensures Calor-first compliance.
+
+### The Result
+
+You simply ask Claude to write code:
 
 ```
-I'm working with Calor, a language for AI agents that compiles to C#.
-
-Key syntax:
-- §M[id:Name] / §/M[id] - Module
-- §F[id:Name:vis] / §/F[id] - Function (pub/pri)
-- §I[type:name] - Input parameter
-- §O[type] - Output type
-- §E[cw,fr,net] - Effects (console write, file read, network)
-- §Q condition - Requires (precondition)
-- §S condition - Ensures (postcondition)
-- §L[id:var:from:to:step] / §/L[id] - Loop
-- §IF[id] cond → action §EI cond → action §EL → action §/I[id] - Conditional
-- §P expr - Print
-- §R expr - Return
-- (+ a b), (* a b), (== a b) - Lisp-style expressions
-
-Example:
-§M[m001:FizzBuzz]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §L[for1:i:1:100:1]
-    §IF[if1] (== (% i 15) 0) → §P "FizzBuzz"
-    §EI (== (% i 3) 0) → §P "Fizz"
-    §EI (== (% i 5) 0) → §P "Buzz"
-    §EL → §P i
-    §/I[if1]
-  §/L[for1]
-§/F[f001]
-§/M[m001]
-
-Please write Calor code for: [your request]
+Write a function that validates email addresses
 ```
+
+Claude automatically:
+1. Reads CLAUDE.md and knows to use Calor
+2. Consults the calor skill for syntax details
+3. Creates a `.calr` file (hook prevents `.cs`)
+
+No special prompts or syntax teaching required.
 
 ---
 
@@ -158,13 +162,13 @@ if (x > 0) {
 
 Calor code:
 ```
-§IF[if1] (> x 0)
-  §L[for1:i:0:n:1]
-    §IF[if2] (> y 0)
+§IF{if1} (> x 0)
+  §L{for1:i:0:n:1}
+    §IF{if2} (> y 0)
       // ...
-    §/I[if2]
-  §/L[for1]
-§/I[if1]
+    §/I{if2}
+  §/L{for1}
+§/I{if1}
 ```
 
 Every scope has explicit open and close tags with matching IDs. No ambiguity.
@@ -175,10 +179,10 @@ Tell Claude: "Change the loop `for1` to start at 1 instead of 0"
 
 ```
 // Before
-§L[for1:i:0:n:1]
+§L{for1:i:0:n:1}
 
 // After
-§L[for1:i:1:n:1]
+§L{for1:i:1:n:1}
 ```
 
 The ID `for1` uniquely identifies the target. No confusion with other loops.
@@ -186,17 +190,17 @@ The ID `for1` uniquely identifies the target. No confusion with other loops.
 ### 3. Explicit Contracts for Verification
 
 ```
-§F[f001:CalculateInterest:pub]
-  §I[f64:principal]
-  §I[f64:rate]
-  §I[i32:years]
-  §O[f64]
+§F{f001:CalculateInterest:pub}
+  §I{f64:principal}
+  §I{f64:rate}
+  §I{i32:years}
+  §O{f64}
   §Q (> principal 0)
   §Q (>= rate 0)
   §Q (> years 0)
   §S (>= result principal)
   §R (* principal (** (+ 1 rate) years))
-§/F[f001]
+§/F{f001}
 ```
 
 Claude can verify:
@@ -207,12 +211,12 @@ Claude can verify:
 ### 4. Effects for Side Effect Analysis
 
 ```
-§F[f001:ProcessOrder:pub]
-  §I[Order:order]
-  §O[bool]
-  §E[db,net,cw]  // Explicit effects
+§F{f001:ProcessOrder:pub}
+  §I{Order:order}
+  §O{bool}
+  §E{db,net,cw}
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 Claude knows immediately that this function:
@@ -230,40 +234,40 @@ No need to analyze the implementation.
 
 **Prompt:**
 ```
-Write an Calor function that calculates factorial with a precondition
-that n >= 0 and postcondition that result >= 1
+Write a factorial function with a precondition that n >= 0
+and postcondition that result >= 1
 ```
 
-**Response:**
+**Claude generates:**
 ```
-§M[m001:Math]
-§F[f001:Factorial:pub]
-  §I[i32:n]
-  §O[i32]
+§M{m001:Math}
+§F{f001:Factorial:pub}
+  §I{i32:n}
+  §O{i32}
   §Q (>= n 0)
   §S (>= result 1)
-  §IF[if1] (<= n 1) → §R 1
-  §EL → §R (* n §C[Factorial] §A (- n 1) §/C)
-  §/I[if1]
-§/F[f001]
-§/M[m001]
+  §IF{if1} (<= n 1) → §R 1
+  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
+  §/I{if1}
+§/F{f001}
+§/M{m001}
 ```
 
 ### Find Bugs
 
 **Prompt:**
 ```
-Is there a bug in this Calor code?
+Is there a bug in this code?
 
-§F[f001:Divide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (/ a b)
-§/F[f001]
+§/F{f001}
 ```
 
-**Response:**
+**Claude responds:**
 ```
 Yes - missing precondition. Add:
 
@@ -278,28 +282,28 @@ Otherwise division by zero is possible.
 ```
 Refactor this to extract the calculation into a separate function:
 
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §B[x] (* 5 5)
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §B{x} (* 5 5)
   §P x
-§/F[f001]
+§/F{f001}
 ```
 
-**Response:**
+**Claude generates:**
 ```
-§F[f001:Square:pri]
-  §I[i32:n]
-  §O[i32]
+§F{f001:Square:pri}
+  §I{i32:n}
+  §O{i32}
   §R (* n n)
-§/F[f001]
+§/F{f001}
 
-§F[f002:Main:pub]
-  §O[void]
-  §E[cw]
-  §B[x] §C[Square] §A 5 §/C
+§F{f002:Main:pub}
+  §O{void}
+  §E{cw}
+  §B{x} §C{Square} §A 5 §/C
   §P x
-§/F[f002]
+§/F{f002}
 ```
 
 ---
@@ -307,7 +311,7 @@ Refactor this to extract the calculation into a separate function:
 ## Best Practices
 
 1. **Always include IDs** - They enable precise references
-2. **Declare effects** - Even if empty (`§E[]`)
+2. **Declare effects** - Even if empty (`§E{}`)
 3. **Write contracts** - They serve as executable documentation
 4. **Use closing tags** - They prevent scope ambiguity
 5. **Use V2 syntax** - `(+ a b)` not legacy verbose syntax
@@ -318,24 +322,26 @@ Refactor this to extract the calculation into a separate function:
 
 ### Starting a New Feature
 
-```
-/calor
+Just describe what you need - Claude writes Calor automatically:
 
-I need to implement [feature description].
-Please create the Calor code with appropriate contracts and effects.
+```
+I need a payment processing service that:
+- Validates the payment amount is positive
+- Connects to the payment gateway
+- Returns success or failure
 ```
 
 ### Converting Existing Code
 
-```
-/calor-convert
+Ask Claude to convert specific files:
 
+```
 Convert src/Services/PaymentService.cs to Calor
 ```
 
 ### Refactoring Calor
 
-Reference specific elements by their IDs:
+Reference specific elements by their IDs for precise edits:
 
 ```
 In PaymentService.calr:
