@@ -9,14 +9,16 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>calor</ToolCommandName>
     <PackageId>calor</PackageId>
-    <Version>0.1.4</Version>
+    <Version>0.1.5</Version>
     <Description>Calor compiler CLI - Convert C# to Calor and compile Calor to C#</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>See https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="README.nuget.md" Pack="true" PackagePath="README.md" />
+    <None Include="..\..\docs\assets\calor-icon.png" Pack="true" PackagePath="icon.png" />
   </ItemGroup>
 
   <ItemGroup>
