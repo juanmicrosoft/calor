@@ -11,6 +11,7 @@
     <PackageId>calor</PackageId>
     <Version>0.1.5</Version>
     <Description>Calor compiler CLI - Convert C# to Calor and compile Calor to C#</Description>
+    <PackageProjectUrl>https://calor.dev</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>See https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md</PackageReleaseNotes>
