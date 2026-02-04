@@ -143,6 +143,9 @@ public static class InitCommand
             return;
         }
 
+        // Initialize .gitattributes for GitHub linguist
+        var (gitAttrCreated, gitAttrUpdated) = await GitAttributesInitializer.InitializeAsync(solutionDirectory);
+
         // Check if calor is available in PATH
         var warnings = new List<string>(result.Warnings);
         if (!IsCalorcInPath())
@@ -164,12 +167,36 @@ public static class InitCommand
         Console.WriteLine();
         Console.WriteLine($"Solution: {result.SolutionName} ({result.TotalProjects} projects)");
 
+        // Build lists of created and updated files including .gitattributes
+        var createdFiles = new List<string>(result.CreatedFiles);
+        var updatedFiles = new List<string>();
+        if (gitAttrCreated)
+        {
+            createdFiles.Add(Path.Combine(solutionDirectory, ".gitattributes"));
+        }
+        else if (gitAttrUpdated)
+        {
+            updatedFiles.Add(Path.Combine(solutionDirectory, ".gitattributes"));
+        }
+
         // Show created files
-        if (result.CreatedFiles.Count > 0)
+        if (createdFiles.Count > 0)
         {
             Console.WriteLine();
             Console.WriteLine("Created files:");
-            foreach (var file in result.CreatedFiles)
+            foreach (var file in createdFiles)
+            {
+                var relativePath = Path.GetRelativePath(solutionDirectory, file);
+                Console.WriteLine($"  {relativePath}");
+            }
+        }
+
+        // Show updated files (non-project files like .gitattributes)
+        if (updatedFiles.Count > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Updated files:");
+            foreach (var file in updatedFiles)
             {
                 var relativePath = Path.GetRelativePath(solutionDirectory, file);
                 Console.WriteLine($"  {relativePath}");
@@ -293,6 +320,17 @@ public static class InitCommand
         else
         {
             updatedFiles.Add(projectPath);
+        }
+
+        // Step 4: Initialize .gitattributes for GitHub linguist
+        var (gitAttrCreated, gitAttrUpdated) = await GitAttributesInitializer.InitializeAsync(targetDirectory);
+        if (gitAttrCreated)
+        {
+            createdFiles.Add(Path.Combine(targetDirectory, ".gitattributes"));
+        }
+        else if (gitAttrUpdated)
+        {
+            updatedFiles.Add(Path.Combine(targetDirectory, ".gitattributes"));
         }
 
         // Check if calor is available in PATH
