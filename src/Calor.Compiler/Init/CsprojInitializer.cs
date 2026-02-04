@@ -102,12 +102,26 @@ public sealed class CsprojInitializer
         // Remove existing Calor property groups
         var propsToRemove = doc.Root.Elements()
             .Where(e => e.Name.LocalName == "PropertyGroup" &&
-                       e.Elements().Any(p => p.Name.LocalName == "CalorOutputDirectory"))
+                       e.Elements().Any(p => p.Name.LocalName == "CalorOutputDirectory" ||
+                                            p.Name.LocalName == "CalorToolVersion" ||
+                                            p.Name.LocalName == "CalorRuntimePath"))
             .ToList();
 
         foreach (var prop in propsToRemove)
         {
             prop.Remove();
+        }
+
+        // Remove existing Calor.Runtime references
+        var refsToRemove = doc.Root.Elements()
+            .Where(e => e.Name.LocalName == "ItemGroup" &&
+                       e.Elements().Any(i => i.Name.LocalName == "Reference" &&
+                                            i.Attribute("Include")?.Value == "Calor.Runtime"))
+            .ToList();
+
+        foreach (var refItem in refsToRemove)
+        {
+            refItem.Remove();
         }
 
         // Remove existing CalorCompile item groups
@@ -151,6 +165,24 @@ public sealed class CsprojInitializer
                 "calor"));
 
         root.Add(propertyGroup);
+
+        // Add PropertyGroup for Calor.Runtime reference
+        var runtimePropertyGroup = new XElement("PropertyGroup",
+            new XElement("CalorToolVersion",
+                new XAttribute("Condition", "'$(CalorToolVersion)' == ''"),
+                "0.1.6"),
+            new XElement("CalorRuntimePath",
+                @"$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net8.0/any/Calor.Runtime.dll"));
+
+        root.Add(runtimePropertyGroup);
+
+        // Add ItemGroup for Calor.Runtime reference
+        var runtimeItemGroup = new XElement("ItemGroup",
+            new XElement("Reference",
+                new XAttribute("Include", "Calor.Runtime"),
+                new XElement("HintPath", "$(CalorRuntimePath)")));
+
+        root.Add(runtimeItemGroup);
 
         // Add ItemGroup for Calor source files
         var itemGroup = new XElement("ItemGroup",
@@ -238,6 +270,17 @@ public sealed class CsprojInitializer
               <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\calor\</CalorOutputDirectory>
               <CalorCompilerPath Condition="'$(CalorCompilerPath)' == ''">calor</CalorCompilerPath>
             </PropertyGroup>
+
+            <PropertyGroup>
+              <CalorToolVersion Condition="'$(CalorToolVersion)' == ''">0.1.6</CalorToolVersion>
+              <CalorRuntimePath>$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net8.0/any/Calor.Runtime.dll</CalorRuntimePath>
+            </PropertyGroup>
+
+            <ItemGroup>
+              <Reference Include="Calor.Runtime">
+                <HintPath>$(CalorRuntimePath)</HintPath>
+              </Reference>
+            </ItemGroup>
 
             <!-- Calor source files -->
             <ItemGroup>

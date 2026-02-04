@@ -9,7 +9,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>calor</ToolCommandName>
     <PackageId>calor</PackageId>
-    <Version>0.1.5</Version>
+    <Version>0.1.6</Version>
     <Description>Calor compiler CLI - Convert C# to Calor and compile Calor to C#</Description>
     <PackageProjectUrl>https://calor.dev</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>

@@ -475,7 +475,7 @@ calor init --solution MySolution.sln --ai claude
 This creates AI files in the solution root and adds MSBuild targets to all projects:
 
 ```
-Initialized Calor solution for Claude Code (calor v0.1.5)
+Initialized Calor solution for Claude Code (calor v0.1.6)
 
 Solution: MySolution.sln (3 projects)
 
