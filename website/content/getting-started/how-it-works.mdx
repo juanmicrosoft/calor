@@ -1,0 +1,158 @@
+---
+title: "How It Works"
+section: "getting-started"
+order: 3
+---
+
+# How It Works: The Bootstrap Problem
+
+If you're skeptical about Calor, you're in good company. The most common question we hear is:
+
+> "AI models were trained on millions of files of Python, JavaScript, C#, and other languages. They've never seen Calor. How can they possibly write it?"
+
+This is a completely valid concern. Let's address it directly.
+
+---
+
+## The Chicken and Egg Problem
+
+Traditional programming languages succeed because:
+1. Developers learn them
+2. Developers write code in them
+3. That code becomes training data for AI
+4. AI learns to write that language
+
+Calor breaks this cycle. It's a new language designed *for* AI agents, but AI agents weren't trained on it. So how can this work?
+
+---
+
+## Our Approach: Teach at Runtime
+
+Instead of waiting for AI models to be trained on Calor (which could take years), we teach them at runtime using three mechanisms:
+
+### 1. Project Instructions (CLAUDE.md)
+
+When Claude Code starts a session, it reads `CLAUDE.md` from your project root. This file contains:
+
+- **Clear rules**: "All new code MUST be written in Calor"
+- **Syntax overview**: Key constructs and their meanings
+- **Type mappings**: How C# types translate to Calor (`int` → `i32`)
+
+Modern AI models are remarkably good at following instructions. When you tell Claude "use this syntax for modules: `§M{id:Name}`", it does.
+
+### 2. Skills (Detailed Syntax Reference)
+
+The `.claude/skills/` directory contains detailed syntax documentation that Claude can consult. Think of it as giving Claude a language reference manual it can look up when needed.
+
+The `calor` skill includes:
+- Complete syntax for all constructs
+- Working templates (FizzBuzz, functions with contracts, classes)
+- ID naming conventions
+
+When Claude needs to write a loop or a conditional, it has the reference right there.
+
+### 3. Hooks (Enforcement)
+
+Here's where healthy skepticism meets practical engineering. What if Claude "forgets" the instructions? What if it falls back to C# out of habit?
+
+The hook mechanism catches this:
+
+```
+Claude tries to create: UserService.cs
+Hook response: BLOCKED
+
+"This is a Calor-first project. Create UserService.calr instead."
+```
+
+Claude receives this feedback and automatically retries with the correct file extension. The enforcement is automatic - no human intervention required.
+
+---
+
+## Why This Works
+
+### AI Models Are Excellent Learners
+
+Modern large language models like Claude aren't just pattern matchers trained on existing code. They're capable of:
+
+- **Following novel instructions** - Claude can write code in formats it's never seen if you explain them clearly
+- **Generalizing from examples** - A few templates are enough to extrapolate
+- **Adapting to constraints** - When blocked from one approach, Claude tries alternatives
+
+### Calor's Syntax Is Designed for This
+
+Calor wasn't designed arbitrarily. Its syntax choices make it easier for AI to learn:
+
+| Design Choice | Why It Helps |
+|:--------------|:-------------|
+| Explicit open/close tags | No ambiguous brace matching |
+| Unique IDs on every block | Clear targets for edits |
+| Lisp-style expressions | Unambiguous operator precedence |
+| Declared effects | AI knows what side effects are allowed |
+
+The syntax is regular and predictable. Once Claude understands `§F{id:Name:vis}` for functions, it naturally extends to `§M{id:Name}` for modules, `§L{id:var:from:to:step}` for loops, and so on.
+
+### The Feedback Loop Works
+
+When the hook blocks a `.cs` file, Claude doesn't just fail - it learns from the feedback in that session. After being blocked once, Claude typically writes Calor correctly for the rest of the conversation.
+
+---
+
+## Evidence from Practice
+
+We've tested this approach extensively:
+
+1. **Hello World** - Claude writes correct Calor on the first try with just CLAUDE.md instructions
+2. **Complex programs** - FizzBuzz, REST APIs, data processing - Claude handles them
+3. **Edge cases** - When Claude makes syntax errors, the compiler catches them and Claude self-corrects
+
+The combination of instructions + skills + hooks creates a reliable system, not a hopeful one.
+
+---
+
+## Addressing Remaining Concerns
+
+### "But what about complex programs?"
+
+Calor compiles to C#. Claude already knows C# deeply. It's translating concepts it understands into a new syntax, not learning new programming concepts.
+
+### "What if Claude hallucinates syntax?"
+
+The Calor compiler validates all code. If Claude invents syntax that doesn't exist, compilation fails with clear error messages. Claude reads these errors and fixes them.
+
+### "Is this just prompt engineering?"
+
+Yes and no. Prompt engineering (CLAUDE.md, skills) teaches Claude *what* to do. Hooks *enforce* compliance. The combination is more robust than either alone.
+
+### "Will this work with other AI models?"
+
+We support Claude Code, Gemini CLI, Codex CLI, and GitHub Copilot. Models that support hooks (Claude, Gemini) get enforcement. Others rely on guidance. See the [integration pages](/getting-started/) for details.
+
+---
+
+## The Bottom Line
+
+Calor works not because AI was trained on it, but because:
+
+1. **Modern AI can follow novel instructions** - CLAUDE.md provides the rules
+2. **Reference documentation helps** - Skills provide syntax details
+3. **Enforcement catches mistakes** - Hooks ensure compliance
+
+You don't need to trust that Claude will "just know" Calor. The system is designed to teach, guide, and enforce.
+
+Try it yourself. Initialize a project, ask Claude to write some code, and see what happens:
+
+```bash
+dotnet new console -o TestProject
+cd TestProject
+calor init --ai claude
+```
+
+Then open Claude Code and ask: "Write a function that calculates factorial."
+
+---
+
+## Next Steps
+
+- [Claude Integration](/getting-started/claude-integration/) - Detailed setup for Claude Code
+- [Hello World](/getting-started/hello-world/) - See the workflow in action
+- [Syntax Reference](/syntax-reference/) - Understand what Claude generates
