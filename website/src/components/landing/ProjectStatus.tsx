@@ -15,7 +15,7 @@ const statusItems: StatusItem[] = [
   { label: 'MSBuild SDK integration', completed: true },
   { label: 'Evaluation framework (7 metrics, 20 benchmarks)', completed: true },
   { label: 'Direct IL emission', completed: false },
-  { label: 'IDE language server', completed: false },
+  { label: 'VS Code Extension', completed: true },
 ];
 
 export function ProjectStatus() {
