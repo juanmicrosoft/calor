@@ -5,6 +5,27 @@
 - Use arrow syntax for conditionals: `§IF[id] condition → action`
 - Use `§P` for Console.WriteLine, `§B` for variable bindings
 
+## Agent-Optimized Format Rules
+
+Calor uses a compact format optimized for AI agents:
+
+| Rule | Why it helps agents | Example |
+|------|---------------------|---------|
+| No indentation | Indentation has no semantic value for agents | `§L{l1:i:1:10:1}` not `  §L{l1:i:1:10:1}` |
+| One statement per line | Clean diffs, targeted edits | Each `§X` on its own line |
+| No blank lines | Reduces token count without losing structure | No empty lines between statements |
+| Abbreviated IDs | Padding adds no value | `§M{m1:Name}` not `§M{m001:Name}` |
+| Keep expression spaces | Helps agents parse tokens | `(+ a b)` not `(+a b)` |
+| No trailing whitespace | Reduces noise in diffs | Lines end at last meaningful char |
+
+**ID Abbreviation Rules:**
+- `m001` → `m1` (module)
+- `f001` → `f1` (function)
+- `for1` → `l1` (loop)
+- `if1` → `i1` (conditional)
+- `while1` → `w1` (while loop)
+- `do1` → `d1` (do-while loop)
+
 ## Type Mappings
 
 | C# | Calor |
@@ -53,9 +74,9 @@
 namespace MyApp { ... }
 ```
 ```calor
-§M[m001:MyApp]
+§M{m1:MyApp}
 ...
-§/M[m001]
+§/M{m1}
 ```
 
 ### Method → Function
@@ -65,12 +86,12 @@ public static int Add(int a, int b) {
 }
 ```
 ```calor
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §R (+ a b)
-§/F[f001]
+§F{f1:Add:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§R (+ a b)
+§/F{f1}
 ```
 
 ### Enum
@@ -78,11 +99,11 @@ public static int Add(int a, int b) {
 public enum Color { Red, Green, Blue }
 ```
 ```calor
-§ENUM{e001:Color}
-  Red
-  Green
-  Blue
-§/ENUM{e001}
+§ENUM{e1:Color}
+Red
+Green
+Blue
+§/ENUM{e1}
 ```
 
 ```csharp
@@ -93,11 +114,11 @@ public enum StatusCode {
 }
 ```
 ```calor
-§ENUM{e001:StatusCode}
-  Ok = 200
-  NotFound = 404
-  Error = 500
-§/ENUM{e001}
+§ENUM{e1:StatusCode}
+Ok = 200
+NotFound = 404
+Error = 500
+§/ENUM{e1}
 ```
 
 ### For Loop
@@ -105,9 +126,9 @@ public enum StatusCode {
 for (int i = 1; i <= 100; i++) { ... }
 ```
 ```calor
-§L[for1:i:1:100:1]
-  ...
-§/L[for1]
+§L{l1:i:1:100:1}
+...
+§/L{l1}
 ```
 
 ### If/Else
@@ -117,10 +138,10 @@ else if (x < 0) { DoB(); }
 else { DoC(); }
 ```
 ```calor
-§IF[if1] (> x 0) → §C[DoA] §/C
-§EI (< x 0) → §C[DoB] §/C
-§EL → §C[DoC] §/C
-§/I[if1]
+§IF{i1} (> x 0) → §C{DoA} §/C
+§EI (< x 0) → §C{DoB} §/C
+§EL → §C{DoC} §/C
+§/I{i1}
 ```
 
 ### Console.WriteLine
@@ -138,12 +159,12 @@ Console.WriteLine(x);
 var result = a + b;
 ```
 ```calor
-§B[result] (+ a b)
+§B{result} (+ a b)
 ```
 
 ## Effect Detection
 
-Add `§E[...]` based on C# calls:
+Add `§E{...}` based on C# calls:
 
 | C# Usage | Effect |
 |---|---|
@@ -183,8 +204,8 @@ Attributes are preserved using inline bracket syntax `[@Attribute]`:
 public class TestController : ControllerBase { }
 ```
 ```calor
-§CLASS[c001:TestController:ControllerBase][@Route("api/[controller]")][@ApiController]
-§/CLASS[c001]
+§CLASS{c1:TestController:ControllerBase}[@Route("api/[controller]")][@ApiController]
+§/CLASS{c1}
 ```
 
 ### Method Attributes
@@ -194,8 +215,8 @@ public class TestController : ControllerBase { }
 public void Post() { }
 ```
 ```calor
-§METHOD[m001:Post:pub][@HttpPost][@Authorize]
-§/METHOD[m001]
+§METHOD{m1:Post:pub}[@HttpPost][@Authorize]
+§/METHOD{m1}
 ```
 
 ### Attribute Arguments
@@ -253,21 +274,20 @@ namespace Calculator {
 
 ### Calor Output
 ```calor
-§M[m001:Calculator]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §C[Console.WriteLine]
-    §A §C[Add] §A 5 §A 3 §/C
-  §/C
-§/F[f001]
-
-§F[f002:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §Q (&& (>= a 0) (>= b 0))
-  §R (+ a b)
-§/F[f002]
-§/M[m001]
+§M{m1:Calculator}
+§F{f1:Main:pub}
+§O{void}
+§E{cw}
+§C{Console.WriteLine}
+§A §C{Add} §A 5 §A 3 §/C
+§/C
+§/F{f1}
+§F{f2:Add:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§Q (&& (>= a 0) (>= b 0))
+§R (+ a b)
+§/F{f2}
+§/M{m1}
 ```

@@ -50,6 +50,7 @@ public class Program
         rootCommand.AddCommand(BenchmarkCommand.Create());
         rootCommand.AddCommand(InitCommand.Create());
         rootCommand.AddCommand(FormatCommand.Create());
+        rootCommand.AddCommand(LintCommand.Create());
         rootCommand.AddCommand(DiagnoseCommand.Create());
         rootCommand.AddCommand(AnalyzeCommand.Create());
         rootCommand.AddCommand(HookCommand.Create());

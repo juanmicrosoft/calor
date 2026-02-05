@@ -32,7 +32,8 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("m001", result);
+        // Formatter produces abbreviated IDs: m001 → m1
+        Assert.Contains("m1", result);
         Assert.Contains("Test", result);
     }
 
@@ -219,7 +220,8 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("FOR", result);
+        // Formatter uses compact §L for loops instead of §FOR
+        Assert.Contains("§L{", result);
     }
 
     [Fact]
@@ -245,7 +247,8 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("WHILE", result);
+        // Formatter uses compact §WH for while loops instead of §WHILE
+        Assert.Contains("§WH", result);
     }
 
     [Fact]
@@ -456,7 +459,8 @@ public class CalorFormatterTests
         var formatted = formatter.Format(module);
 
         // Verify the formatted output contains key elements
-        Assert.Contains("m001", formatted);
+        // Formatter produces abbreviated IDs: m001 → m1, f001 → f1
+        Assert.Contains("m1", formatted);
         Assert.Contains("Test", formatted);
         Assert.Contains("Add", formatted);
         Assert.Contains("pub", formatted);
