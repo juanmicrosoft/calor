@@ -44,13 +44,13 @@ run_scenario() {
     local scenario_name
     scenario_name=$(basename "$scenario_dir")
 
-    local input_file="$scenario_dir/input.opal"
+    local input_file="$scenario_dir/input.calr"
     local verify_script="$scenario_dir/verify.sh"
     local output_file="$scenario_dir/output.g.cs"
 
     # Check for required files
     if [[ ! -f "$input_file" ]]; then
-        skip "$scenario_name - no input.opal"
+        skip "$scenario_name - no input.calr"
         return 0
     fi
 

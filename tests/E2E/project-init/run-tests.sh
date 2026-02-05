@@ -142,7 +142,7 @@ count_analyzed_files() {
 # Convert a single C# file to Calor
 convert_file() {
     local cs_file="$1"
-    local opal_file="${cs_file%.cs}.opal"
+    local opal_file="${cs_file%.cs}.calr"
 
     if "$COMPILER" convert "$cs_file" > /dev/null 2>&1; then
         if [[ -f "$opal_file" ]]; then
@@ -316,9 +316,9 @@ test_github_project() {
     # Step 8: Verify generated files exist
     step "Verifying generated .g.cs files..."
     local gen_count
-    gen_count=$(find . -path "*/opal/*.g.cs" 2>/dev/null | wc -l | tr -d ' ')
+    gen_count=$(find . -path "*/calor/*.g.cs" 2>/dev/null | wc -l | tr -d ' ')
     if [[ "$gen_count" -eq 0 ]]; then
-        fail "$test_name - no generated files found in obj/*/opal/"
+        fail "$test_name - no generated files found in obj/*/calor/"
         return 0
     fi
     detail "Found $gen_count generated files"
@@ -386,13 +386,13 @@ test_basic_console_app() {
     use_local_compiler "TestApp.csproj"
 
     step "Verifying .csproj changes..."
-    if ! grep -q "CompileOpalFiles" TestApp.csproj; then
-        fail "$test_name - CompileOpalFiles target not found"
+    if ! grep -q "CompileCalorFiles" TestApp.csproj; then
+        fail "$test_name - CompileCalorFiles target not found"
         return 0
     fi
 
-    step "Creating test.opal file..."
-    cat > test.opal << 'CALOR_EOF'
+    step "Creating test.calr file..."
+    cat > test.calr << 'CALOR_EOF'
 §M{m001:TestModule}
 §F{f001:Add:pub}
   §I{i32:a}
@@ -480,11 +480,11 @@ EOF
         return 0
     fi
 
-    if ! grep -q "CompileOpalFiles" Project1.csproj; then
+    if ! grep -q "CompileCalorFiles" Project1.csproj; then
         fail "$test_name - Project1 not modified"
         return 0
     fi
-    if grep -q "CompileOpalFiles" Project2.csproj; then
+    if grep -q "CompileCalorFiles" Project2.csproj; then
         fail "$test_name - Project2 incorrectly modified"
         return 0
     fi
@@ -571,7 +571,7 @@ CSEOF
         fail "$test_name - conversion failed"
         return 0
     fi
-    if [[ ! -f "Calculator.opal" ]]; then
+    if [[ ! -f "Calculator.calr" ]]; then
         fail "$test_name - Calor file not created"
         return 0
     fi
@@ -614,8 +614,8 @@ CSEOF
     detail "Application ran correctly"
 
     # Step 6: Verify generated file location
-    step "Verifying generated file in obj/opal/..."
-    if ! find obj -path "*/opal/Calculator.g.cs" 2>/dev/null | grep -q .; then
+    step "Verifying generated file in obj/calor/..."
+    if ! find obj -path "*/calor/Calculator.g.cs" 2>/dev/null | grep -q .; then
         fail "$test_name - generated file not in expected location"
         return 0
     fi
