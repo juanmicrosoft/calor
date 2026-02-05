@@ -1,0 +1,15 @@
+§M{m1:Mixed}
+§F{f1:Calculate:pub}
+§I{i32:x}
+§I{i32:y}
+§O{i32}
+§B{sum} (+ x y)
+§B{product} (* x y)
+§B{diff} (- product sum)
+§IF{i1} (> diff 0)
+§R diff
+§EL
+§R (- 0 diff)
+§/I{i1}
+§/F{f1}
+§/M{m1}

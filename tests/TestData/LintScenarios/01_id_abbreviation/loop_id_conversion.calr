@@ -1,0 +1,12 @@
+§M{m1:LoopTest}
+§F{f1:Main:pub}
+§O{void}
+§E{cw}
+§L{for1:i:1:10:1}
+§P i
+§L{for2:j:1:5:1}
+§P j
+§/L{for2}
+§/L{for1}
+§/F{f1}
+§/M{m1}

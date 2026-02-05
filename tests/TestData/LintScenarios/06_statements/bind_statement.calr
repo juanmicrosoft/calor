@@ -1,0 +1,11 @@
+§M{m1:Bind}
+§F{f1:Main:pub}
+§O{i32}
+§B{a} 10
+§B{b} 20
+§B{sum} (+ a b)
+§B{~counter} 0
+§B{~counter} (+ counter 1)
+§R sum
+§/F{f1}
+§/M{m1}

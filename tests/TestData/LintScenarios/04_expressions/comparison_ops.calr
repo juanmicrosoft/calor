@@ -1,0 +1,38 @@
+§M{m1:Compare}
+§F{f1:IsEqual:pub}
+§I{i32:a}
+§I{i32:b}
+§O{bool}
+§R (== a b)
+§/F{f1}
+§F{f2:IsNotEqual:pub}
+§I{i32:a}
+§I{i32:b}
+§O{bool}
+§R (!= a b)
+§/F{f2}
+§F{f3:IsLess:pub}
+§I{i32:a}
+§I{i32:b}
+§O{bool}
+§R (< a b)
+§/F{f3}
+§F{f4:IsGreater:pub}
+§I{i32:a}
+§I{i32:b}
+§O{bool}
+§R (> a b)
+§/F{f4}
+§F{f5:IsLessEqual:pub}
+§I{i32:a}
+§I{i32:b}
+§O{bool}
+§R (<= a b)
+§/F{f5}
+§F{f6:IsGreaterEqual:pub}
+§I{i32:a}
+§I{i32:b}
+§O{bool}
+§R (>= a b)
+§/F{f6}
+§/M{m1}

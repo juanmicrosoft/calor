@@ -1,0 +1,22 @@
+§M{m1:MaxNest}
+§F{f1:Deep:pub}
+§I{i32:n}
+§O{i32}
+§IF{i1} (> n 0)
+§IF{i2} (> n 1)
+§IF{i3} (> n 2)
+§IF{i4} (> n 3)
+§IF{i5} (> n 4)
+§R n
+§/I{i5}
+§R 4
+§/I{i4}
+§R 3
+§/I{i3}
+§R 2
+§/I{i2}
+§R 1
+§/I{i1}
+§R 0
+§/F{f1}
+§/M{m1}

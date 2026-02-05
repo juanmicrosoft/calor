@@ -27,7 +27,7 @@ tests/E2E/
 ├── run-tests.ps1          # Windows runner
 ├── scenarios/
 │   ├── 01_hello_world/
-│   │   ├── input.calor     # Source to compile
+│   │   ├── input.calr     # Source to compile
 │   │   └── verify.sh      # Verification script
 │   ├── 02_fizzbuzz/
 │   ├── 03_contracts/
@@ -39,11 +39,11 @@ tests/E2E/
 ## Scenario Requirements
 
 Each scenario directory must contain:
-- `input.calor` - Calor source file to compile
+- `input.calr` - Calor source file to compile
 - `verify.sh` (optional) - Verification script
 
 The test runner will:
-1. Compile `input.calor` to `output.g.cs`
+1. Compile `input.calr` to `output.g.cs`
 2. Run `verify.sh` if present
 3. Report pass/fail status
 
@@ -63,6 +63,6 @@ grep -q "Console.WriteLine" "$OUTPUT_FILE" || exit 1
 ## Adding New Tests
 
 1. Create a new directory: `scenarios/XX_name/`
-2. Add `input.calor` with Calor source code
+2. Add `input.calr` with Calor source code
 3. Add `verify.sh` with verification logic
 4. Run `./run-tests.sh` to verify

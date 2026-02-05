@@ -1,0 +1,14 @@
+§M{m1:References}
+§F{f1:Identity:pub}
+§I{i32:x}
+§O{i32}
+§R x
+§/F{f1}
+§F{f2:UseVars:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§B{temp} (+ a b)
+§R temp
+§/F{f2}
+§/M{m1}

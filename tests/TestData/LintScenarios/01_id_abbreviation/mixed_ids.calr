@@ -1,0 +1,14 @@
+§M{m001:MixedTest}
+§F{f001:Process:pub}
+§I{i32:n}
+§O{void}
+§E{cw}
+§L{for1:i:1:n:1}
+§IF{if1} (== (% i 2) 0)
+§P "even"
+§EL
+§P "odd"
+§/I{if1}
+§/L{for1}
+§/F{f001}
+§/M{m001}

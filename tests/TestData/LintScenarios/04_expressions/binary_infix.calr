@@ -1,0 +1,20 @@
+§M{m1:Binary}
+§F{f1:Add:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§R (+ a b)
+§/F{f1}
+§F{f2:Subtract:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§R (- a b)
+§/F{f2}
+§F{f3:Multiply:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§R (* a b)
+§/F{f3}
+§/M{m1}

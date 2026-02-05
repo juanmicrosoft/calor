@@ -1,0 +1,19 @@
+§M{m1:Complex}
+§F{f1:Process:pub}
+§O{i32}
+§E{cw}
+§B{~result} 0
+§L{l1:i:1:10:1}
+§IF{i1} (> i 5)
+§L{l2:j:1:5:1}
+§IF{i2} (== (% j 2) 0)
+§B{~result} (+ result j)
+§/I{i2}
+§/L{l2}
+§EL
+§B{~result} (+ result i)
+§/I{i1}
+§/L{l1}
+§R result
+§/F{f1}
+§/M{m1}

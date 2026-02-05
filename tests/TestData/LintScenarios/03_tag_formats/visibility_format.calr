@@ -1,0 +1,13 @@
+§M{m1:Visibility}
+§F{f1:PublicFunc:pub}
+§O{void}
+§/F{f1}
+§F{f2:PrivateFunc:pri}
+§O{void}
+§/F{f2}
+§F{f3:AnotherPublic:pub}
+§I{i32:x}
+§O{i32}
+§R x
+§/F{f3}
+§/M{m1}

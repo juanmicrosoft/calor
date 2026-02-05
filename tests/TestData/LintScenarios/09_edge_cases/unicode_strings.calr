@@ -1,0 +1,10 @@
+§M{m1:Unicode}
+§F{f1:Greet:pub}
+§O{void}
+§E{cw}
+§P "Hello World"
+§P "Bonjour le monde"
+§P "Hola mundo"
+§P "Ciao mondo"
+§/F{f1}
+§/M{m1}

@@ -1,0 +1,17 @@
+§M{m1:Types}
+§F{f1:GetVoid:pub}
+§O{void}
+§/F{f1}
+§F{f2:GetInt:pub}
+§O{i32}
+§R 42
+§/F{f2}
+§F{f3:GetString:pub}
+§O{str}
+§R "hello"
+§/F{f3}
+§F{f4:GetBool:pub}
+§O{bool}
+§R true
+§/F{f4}
+§/M{m1}

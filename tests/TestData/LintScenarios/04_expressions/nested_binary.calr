@@ -1,0 +1,16 @@
+§M{m1:Nested}
+§F{f1:Complex:pub}
+§I{i32:a}
+§I{i32:b}
+§I{i32:c}
+§O{i32}
+§R (+ (* a b) c)
+§/F{f1}
+§F{f2:VeryNested:pub}
+§I{i32:x}
+§I{i32:y}
+§I{i32:z}
+§O{i32}
+§R (+ (- (* x y) z) (* z 2))
+§/F{f2}
+§/M{m1}

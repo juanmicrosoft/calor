@@ -1,0 +1,17 @@
+§M{m1:Params}
+§F{f1:Process:pub}
+§I{i32:count}
+§I{str:name}
+§I{bool:active}
+§I{f64:value}
+§O{str}
+§R name
+§/F{f1}
+§F{f2:Math:pub}
+§I{i32:a}
+§I{i32:b}
+§I{i32:c}
+§O{i32}
+§R (+ (+ a b) c)
+§/F{f2}
+§/M{m1}

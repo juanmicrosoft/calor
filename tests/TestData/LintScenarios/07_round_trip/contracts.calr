@@ -1,0 +1,16 @@
+§M{m1:Contracts}
+§F{f1:Square:pub}
+§I{i32:x}
+§O{i32}
+§Q (>= x 0)
+§S (>= result 0)
+§R (* x x)
+§/F{f1}
+§F{f2:Divide:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§Q (!= b 0)
+§R (/ a b)
+§/F{f2}
+§/M{m1}

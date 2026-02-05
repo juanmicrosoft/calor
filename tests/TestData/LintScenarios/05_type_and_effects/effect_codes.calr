@@ -1,0 +1,12 @@
+§M{m1:Effects}
+§F{f1:PrintHello:pub}
+§O{void}
+§E{cw}
+§P "Hello"
+§/F{f1}
+§F{f2:ReadInput:pub}
+§O{str}
+§E{cr}
+§R "input"
+§/F{f2}
+§/M{m1}

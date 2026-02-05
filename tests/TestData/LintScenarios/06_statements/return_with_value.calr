@@ -1,0 +1,16 @@
+§M{m1:ReturnVal}
+§F{f1:GetNumber:pub}
+§O{i32}
+§R 42
+§/F{f1}
+§F{f2:GetSum:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§R (+ a b)
+§/F{f2}
+§F{f3:GetString:pub}
+§O{str}
+§R "result"
+§/F{f3}
+§/M{m1}

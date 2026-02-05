@@ -1,0 +1,11 @@
+§M{m1:Returns}
+§F{f1:GetValue:pub}
+§O{i32}
+§R 42
+§/F{f1}
+§F{f2:GetDouble:pub}
+§I{i32:x}
+§O{i32}
+§R (* x 2)
+§/F{f2}
+§/M{m1}

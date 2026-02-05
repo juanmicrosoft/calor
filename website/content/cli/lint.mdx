@@ -1,0 +1,262 @@
+---
+title: "lint"
+section: "cli"
+order: 7
+---
+
+# lint
+
+The `lint` command checks Calor source files for compliance with the agent-optimized format and can automatically fix issues.
+
+## Usage
+
+```bash
+# Check files and report issues
+calor lint <files...>
+
+# Auto-fix all fixable issues
+calor lint <files...> --fix
+
+# Check without modifying (exit code indicates issues)
+calor lint <files...> --check
+
+# Show detailed issue information
+calor lint <files...> --verbose
+
+# Combine options
+calor lint src/*.calr --fix --verbose
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--fix` | Automatically fix all fixable issues |
+| `--check` | Check mode - exit with error if issues found (CI-friendly) |
+| `--verbose` | Show detailed information about each issue |
+| `--agent` | Output in compact agent-optimized format |
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | No issues found (or all issues fixed with `--fix`) |
+| `1` | Issues found and not fixed |
+| `2` | Parse error or invalid file |
+
+## Design Principles
+
+The Calor linter is designed specifically for **agent-optimized code**, not human-readable code. This fundamentally changes the linting philosophy compared to traditional linters.
+
+### Traditional Linters vs Agent-Optimized Linters
+
+| Aspect | Traditional Linters | Calor Linter |
+|--------|---------------------|--------------|
+| **Indentation** | Enforce consistent indentation | Remove all indentation |
+| **Whitespace** | Format for readability | Eliminate unnecessary whitespace |
+| **Identifiers** | Descriptive names encouraged | Abbreviated IDs (`m1`, `f1`, `l1`) |
+| **Blank lines** | Separate logical sections | Remove all blank lines |
+| **Comments** | Encouraged for clarity | Stripped (contracts replace comments) |
+| **Line length** | 80-120 character limits | No limit (single-line preferred) |
+
+### Why Agent-Optimized?
+
+AI coding agents process code as tokens. Every character costs tokens and processing time. The Calor linter optimizes for:
+
+1. **Minimal token count** - Fewer tokens = faster processing, lower cost
+2. **Unambiguous structure** - Tags and IDs replace indentation for structure
+3. **Consistent format** - No style variations that add noise to agent context
+4. **Semantic density** - Maximum information per token
+
+### Key Principle: Structure Through Tags, Not Whitespace
+
+Traditional code uses indentation to show structure:
+
+```csharp
+// Human-optimized (indentation shows structure)
+public void Main() {
+    for (int i = 0; i < 10; i++) {
+        if (i % 2 == 0) {
+            Console.WriteLine(i);
+        }
+    }
+}
+```
+
+Calor uses explicit tags with IDs:
+
+```calor
+§F{f1:Main:pub}
+§O{void}
+§L{l1:i:0:10:1}
+§IF{i1}
+§?(== (% i 2) 0)
+§P i
+§/IF{i1}
+§/L{l1}
+§/F{f1}
+```
+
+The structure is explicit in the tags (`§L{l1}...§/L{l1}`), making indentation redundant noise.
+
+## Lint Rules
+
+### ID Abbreviation
+
+Identifiers should use the shortest unambiguous form.
+
+| Issue | Input | Fixed |
+|-------|-------|-------|
+| Padded module ID | `§M{m001:Name}` | `§M{m1:Name}` |
+| Padded function ID | `§F{f001:Main}` | `§F{f1:Main}` |
+| Verbose loop ID | `§L{for1:i:...}` | `§L{l1:i:...}` |
+| Verbose if ID | `§IF{if1}` | `§IF{i1}` |
+| Verbose while ID | `§WH{while1}` | `§WH{w1}` |
+
+### Whitespace
+
+No indentation or trailing whitespace should exist.
+
+| Issue | Example |
+|-------|---------|
+| Leading spaces | `  §P "text"` (2 leading spaces) |
+| Leading tabs | `\t§P "text"` (leading tab) |
+| Trailing whitespace | `§M{m1:Name}  ` (trailing spaces) |
+| Blank lines | Empty lines between statements |
+| Multiple blank lines | Consecutive empty lines |
+
+### Tag Formats
+
+Tags should use the canonical v2 format.
+
+| Issue | Input | Fixed |
+|-------|-------|-------|
+| Verbose return | `§RET` | `§R` |
+| Verbose call | `§CALL` | `§C` |
+| Verbose while | `§WHILE{...}` | `§WH{...}` |
+| Verbose for | `§FOR{...}` | `§L{...}` |
+| External visibility | `§F{f1:Main} pub` | `§F{f1:Main:pub}` |
+
+### Expression Format
+
+Expressions should use prefix (Polish) notation.
+
+| Issue | Input | Fixed |
+|-------|-------|-------|
+| Infix binary | `(a + b)` | `(+ a b)` |
+| Nested infix | `(a + (b * c))` | `(+ a (* b c))` |
+
+### Type Names
+
+Type names should be lowercase.
+
+| Issue | Input | Fixed |
+|-------|-------|-------|
+| Uppercase void | `§O{VOID}` | `§O{void}` |
+| Uppercase int | `§I{x:INT}` | `§I{x:int}` |
+| Uppercase string | `§I{s:STRING}` | `§I{s:string}` |
+
+### Effect Codes
+
+Effects should use abbreviated codes.
+
+| Issue | Input | Fixed |
+|-------|-------|-------|
+| Verbose effect | `§E{io/console_write}` | `§E{cw}` |
+| Multiple verbose | `§E{io/console_read,io/console_write}` | `§E{cr,cw}` |
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Lint a single file
+calor lint src/hello.calr
+
+# Output:
+# src/hello.calr
+#   line 1: padded_id - Module ID 'm001' should be 'm1'
+#   line 2: padded_id - Function ID 'f001' should be 'f1'
+#   line 3: leading_whitespace - Line has 2 leading spaces
+#
+# 3 issues found (3 fixable)
+```
+
+### Auto-Fix
+
+```bash
+# Fix all issues automatically
+calor lint src/hello.calr --fix
+
+# Output:
+# src/hello.calr
+#   Fixed 3 issues
+#
+# All issues fixed
+```
+
+### CI Integration
+
+```bash
+# In CI pipeline - fail if any issues
+calor lint src/**/*.calr --check
+
+# Exit code 1 if issues found, 0 if clean
+```
+
+### Verbose Output
+
+```bash
+calor lint src/hello.calr --verbose
+
+# Output:
+# src/hello.calr
+#   line 1, col 4: padded_id
+#     Found: m001
+#     Expected: m1
+#     Rule: IDs should use minimal padding
+#
+#   line 3, col 1: leading_whitespace
+#     Found: 2 leading spaces
+#     Expected: no indentation
+#     Rule: Agent-optimized format uses no indentation
+```
+
+### Agent Output
+
+```bash
+calor lint src/hello.calr --agent
+
+# Compact output for agent consumption:
+# §LINT{3}src/hello.calr:1:padded_id:m001→m1|:3:leading_whitespace:2sp
+```
+
+## Best Practices
+
+1. **Run lint before commit** - Use pre-commit hooks to ensure all code is properly formatted
+2. **Use `--fix` during development** - Let the linter handle formatting automatically
+3. **Use `--check` in CI** - Fail builds on lint issues to maintain consistency
+4. **Format after code generation** - If generating Calor from other sources, always lint the output
+
+## Integration with Format
+
+The `lint` command checks for issues while `format` rewrites the entire file. Use them together:
+
+```bash
+# Check for issues first
+calor lint src/module.calr
+
+# If issues found, format to fix
+calor format src/module.calr
+```
+
+Or use lint with `--fix` for targeted fixes without full reformatting:
+
+```bash
+calor lint src/module.calr --fix
+```
+
+## Related Commands
+
+- [format](/docs/cli/format) - Reformat entire files to canonical output
+- [parse](/docs/cli/parse) - Parse files and show AST structure

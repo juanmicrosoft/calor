@@ -1,0 +1,13 @@
+§M{m1:MultiEffect}
+§F{f1:ProcessFile:pub}
+§I{str:path}
+§O{void}
+§E{fr,fw,cw}
+§P path
+§/F{f1}
+§F{f2:NetworkOp:pub}
+§O{void}
+§E{net,cw}
+§P "network"
+§/F{f2}
+§/M{m1}

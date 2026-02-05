@@ -1,0 +1,11 @@
+§M{m1:Print}
+§F{f1:Main:pub}
+§O{void}
+§E{cw}
+§P "Hello World"
+§P 42
+§P true
+§B{x} 100
+§P x
+§/F{f1}
+§/M{m1}
