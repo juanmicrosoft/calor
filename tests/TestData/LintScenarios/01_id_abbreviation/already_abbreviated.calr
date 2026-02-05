@@ -1,0 +1,11 @@
+§M{m1:Clean}
+§F{f1:Main:pub}
+§O{void}
+§E{cw}
+§L{l1:i:1:10:1}
+§IF{i1} (> i 5)
+§P "high"
+§/I{i1}
+§/L{l1}
+§/F{f1}
+§/M{m1}

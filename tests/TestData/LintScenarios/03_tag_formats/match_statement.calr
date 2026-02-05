@@ -1,0 +1,14 @@
+§M{m1:MatchTest}
+§F{f1:Describe:pub}
+§I{i32:n}
+§O{str}
+§MATCH{m1} n
+§CASE 0
+§R "zero"
+§CASE 1
+§R "one"
+§CASE _
+§R "other"
+§/MATCH{m1}
+§/F{f1}
+§/M{m1}

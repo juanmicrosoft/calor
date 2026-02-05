@@ -1,0 +1,9 @@
+§M{m1:Calls}
+§F{f1:Main:pub}
+§O{void}
+§E{cw}
+§C{Console.WriteLine} "Hello"
+§C{Console.WriteLine} 42
+§C{Math.Abs} -5
+§/F{f1}
+§/M{m1}

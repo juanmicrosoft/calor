@@ -1,0 +1,17 @@
+§M{m1:FizzBuzz}
+§F{f1:Main:pub}
+§O{void}
+§E{cw}
+§L{l1:i:1:100:1}
+§IF{i1} (== (% i 15) 0)
+§P "FizzBuzz"
+§EI (== (% i 3) 0)
+§P "Fizz"
+§EI (== (% i 5) 0)
+§P "Buzz"
+§EL
+§P i
+§/I{i1}
+§/L{l1}
+§/F{f1}
+§/M{m1}

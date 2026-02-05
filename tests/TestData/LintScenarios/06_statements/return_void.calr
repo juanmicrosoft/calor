@@ -1,0 +1,15 @@
+§M{m1:ReturnVoid}
+§F{f1:DoNothing:pub}
+§O{void}
+§R
+§/F{f1}
+§F{f2:EarlyExit:pub}
+§I{bool:condition}
+§O{void}
+§E{cw}
+§IF{i1} condition
+§R
+§/I{i1}
+§P "continuing"
+§/F{f2}
+§/M{m1}

@@ -1,0 +1,553 @@
+{
+  "version": "1.0",
+  "description": "Lint regression test scenarios for validating the Calor linter and formatter",
+  "categories": [
+    {
+      "id": "01_id_abbreviation",
+      "name": "ID Abbreviation",
+      "description": "Tests for ID shortening rules (m001→m1, for1→l1)"
+    },
+    {
+      "id": "02_whitespace",
+      "name": "Whitespace",
+      "description": "Tests for whitespace detection and removal"
+    },
+    {
+      "id": "03_tag_formats",
+      "name": "Tag Formats",
+      "description": "Tests for correct v2 tag syntax"
+    },
+    {
+      "id": "04_expressions",
+      "name": "Expressions",
+      "description": "Tests for expression formatting (prefix notation)"
+    },
+    {
+      "id": "05_type_and_effects",
+      "name": "Types and Effects",
+      "description": "Tests for type names and effect code formatting"
+    },
+    {
+      "id": "06_statements",
+      "name": "Statements",
+      "description": "Tests for statement formatting"
+    },
+    {
+      "id": "07_round_trip",
+      "name": "Round Trip",
+      "description": "Tests that format output is parseable"
+    },
+    {
+      "id": "08_idempotency",
+      "name": "Idempotency",
+      "description": "Tests that formatting twice gives same result"
+    },
+    {
+      "id": "09_edge_cases",
+      "name": "Edge Cases",
+      "description": "Tests for edge cases and boundaries"
+    },
+    {
+      "id": "10_error_cases",
+      "name": "Error Cases",
+      "description": "Tests for files that should fail lint"
+    }
+  ],
+  "files": [
+    {
+      "id": "id_001",
+      "file": "01_id_abbreviation/padded_module_id.calr",
+      "category": "01_id_abbreviation",
+      "expectedIssues": 4,
+      "issueTypes": ["padded_id"],
+      "canAutoFix": true,
+      "notes": "Module ID m001 and function ID f001 should become m1, f1"
+    },
+    {
+      "id": "id_002",
+      "file": "01_id_abbreviation/padded_function_id.calr",
+      "category": "01_id_abbreviation",
+      "expectedIssues": 4,
+      "issueTypes": ["padded_id"],
+      "canAutoFix": true,
+      "notes": "Multiple function IDs with leading zeros"
+    },
+    {
+      "id": "id_003",
+      "file": "01_id_abbreviation/loop_id_conversion.calr",
+      "category": "01_id_abbreviation",
+      "expectedIssues": 4,
+      "issueTypes": ["verbose_loop_id"],
+      "canAutoFix": true,
+      "notes": "for1 should become l1"
+    },
+    {
+      "id": "id_004",
+      "file": "01_id_abbreviation/if_id_conversion.calr",
+      "category": "01_id_abbreviation",
+      "expectedIssues": 2,
+      "issueTypes": ["verbose_loop_id"],
+      "canAutoFix": true,
+      "notes": "if1 should become i1"
+    },
+    {
+      "id": "id_005",
+      "file": "01_id_abbreviation/while_id_conversion.calr",
+      "category": "01_id_abbreviation",
+      "expectedIssues": 2,
+      "issueTypes": ["verbose_loop_id"],
+      "canAutoFix": true,
+      "notes": "while1 should become w1"
+    },
+    {
+      "id": "id_006",
+      "file": "01_id_abbreviation/mixed_ids.calr",
+      "category": "01_id_abbreviation",
+      "expectedIssues": 8,
+      "issueTypes": ["padded_id", "verbose_loop_id"],
+      "canAutoFix": true,
+      "notes": "Multiple ID types needing abbreviation"
+    },
+    {
+      "id": "id_007",
+      "file": "01_id_abbreviation/already_abbreviated.calr",
+      "category": "01_id_abbreviation",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Already abbreviated IDs should pass"
+    },
+    {
+      "id": "ws_001",
+      "file": "02_whitespace/leading_spaces.calr",
+      "category": "02_whitespace",
+      "expectedIssues": 2,
+      "issueTypes": ["leading_whitespace"],
+      "canAutoFix": true,
+      "notes": "Lines with leading spaces"
+    },
+    {
+      "id": "ws_002",
+      "file": "02_whitespace/leading_tabs.calr",
+      "category": "02_whitespace",
+      "expectedIssues": 2,
+      "issueTypes": ["leading_whitespace"],
+      "canAutoFix": true,
+      "notes": "Lines with leading tabs"
+    },
+    {
+      "id": "ws_003",
+      "file": "02_whitespace/trailing_spaces.calr",
+      "category": "02_whitespace",
+      "expectedIssues": 2,
+      "issueTypes": ["trailing_whitespace"],
+      "canAutoFix": true,
+      "notes": "Lines with trailing spaces"
+    },
+    {
+      "id": "ws_004",
+      "file": "02_whitespace/mixed_indentation.calr",
+      "category": "02_whitespace",
+      "expectedIssues": 4,
+      "issueTypes": ["leading_whitespace"],
+      "canAutoFix": true,
+      "notes": "Various indentation levels"
+    },
+    {
+      "id": "ws_005",
+      "file": "02_whitespace/blank_lines.calr",
+      "category": "02_whitespace",
+      "expectedIssues": 2,
+      "issueTypes": ["blank_line"],
+      "canAutoFix": true,
+      "notes": "Empty lines between statements"
+    },
+    {
+      "id": "ws_006",
+      "file": "02_whitespace/multiple_blank_lines.calr",
+      "category": "02_whitespace",
+      "expectedIssues": 3,
+      "issueTypes": ["blank_line"],
+      "canAutoFix": true,
+      "notes": "Multiple consecutive blank lines"
+    },
+    {
+      "id": "ws_007",
+      "file": "02_whitespace/clean_file.calr",
+      "category": "02_whitespace",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Already compliant file"
+    },
+    {
+      "id": "tag_001",
+      "file": "03_tag_formats/return_statement.calr",
+      "category": "03_tag_formats",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Correctly formatted return statements"
+    },
+    {
+      "id": "tag_002",
+      "file": "03_tag_formats/call_statement.calr",
+      "category": "03_tag_formats",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Correctly formatted call statements"
+    },
+    {
+      "id": "tag_003",
+      "file": "03_tag_formats/while_loop.calr",
+      "category": "03_tag_formats",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "While loop with correct tag format"
+    },
+    {
+      "id": "tag_004",
+      "file": "03_tag_formats/for_loop.calr",
+      "category": "03_tag_formats",
+      "expectedIssues": 2,
+      "issueTypes": ["verbose_loop_id"],
+      "canAutoFix": true,
+      "notes": "For loop ID should be abbreviated"
+    },
+    {
+      "id": "tag_005",
+      "file": "03_tag_formats/if_statement.calr",
+      "category": "03_tag_formats",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "If statement with correct format"
+    },
+    {
+      "id": "tag_006",
+      "file": "03_tag_formats/match_statement.calr",
+      "category": "03_tag_formats",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Match statement preserved"
+    },
+    {
+      "id": "tag_007",
+      "file": "03_tag_formats/visibility_format.calr",
+      "category": "03_tag_formats",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Visibility inside braces format"
+    },
+    {
+      "id": "expr_001",
+      "file": "04_expressions/binary_infix.calr",
+      "category": "04_expressions",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Binary expressions in prefix notation"
+    },
+    {
+      "id": "expr_002",
+      "file": "04_expressions/nested_binary.calr",
+      "category": "04_expressions",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Complex nested expressions"
+    },
+    {
+      "id": "expr_003",
+      "file": "04_expressions/comparison_ops.calr",
+      "category": "04_expressions",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Comparison operators"
+    },
+    {
+      "id": "expr_004",
+      "file": "04_expressions/logical_ops.calr",
+      "category": "04_expressions",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Logical operators"
+    },
+    {
+      "id": "expr_005",
+      "file": "04_expressions/reference_format.calr",
+      "category": "04_expressions",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Variable references without wrapper"
+    },
+    {
+      "id": "expr_006",
+      "file": "04_expressions/mixed_expressions.calr",
+      "category": "04_expressions",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Various expression types"
+    },
+    {
+      "id": "type_001",
+      "file": "05_type_and_effects/uppercase_types.calr",
+      "category": "05_type_and_effects",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Type names should be lowercase in output"
+    },
+    {
+      "id": "type_002",
+      "file": "05_type_and_effects/effect_codes.calr",
+      "category": "05_type_and_effects",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Effect codes should be abbreviated"
+    },
+    {
+      "id": "type_003",
+      "file": "05_type_and_effects/multiple_effects.calr",
+      "category": "05_type_and_effects",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Multiple effect codes"
+    },
+    {
+      "id": "type_004",
+      "file": "05_type_and_effects/parameter_types.calr",
+      "category": "05_type_and_effects",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Input parameter types"
+    },
+    {
+      "id": "stmt_001",
+      "file": "06_statements/print_statement.calr",
+      "category": "06_statements",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Print statement outputs correctly"
+    },
+    {
+      "id": "stmt_002",
+      "file": "06_statements/bind_statement.calr",
+      "category": "06_statements",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Variable bindings"
+    },
+    {
+      "id": "stmt_003",
+      "file": "06_statements/return_with_value.calr",
+      "category": "06_statements",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Return with expression"
+    },
+    {
+      "id": "stmt_004",
+      "file": "06_statements/return_void.calr",
+      "category": "06_statements",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Void return"
+    },
+    {
+      "id": "stmt_005",
+      "file": "06_statements/try_catch.calr",
+      "category": "06_statements",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Exception handling"
+    },
+    {
+      "id": "stmt_006",
+      "file": "06_statements/throw_statement.calr",
+      "category": "06_statements",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Throw statements"
+    },
+    {
+      "id": "rt_001",
+      "file": "07_round_trip/hello_world.calr",
+      "category": "07_round_trip",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Simple module round-trip"
+    },
+    {
+      "id": "rt_002",
+      "file": "07_round_trip/fizzbuzz.calr",
+      "category": "07_round_trip",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Loops and conditionals"
+    },
+    {
+      "id": "rt_003",
+      "file": "07_round_trip/contracts.calr",
+      "category": "07_round_trip",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Pre/post conditions"
+    },
+    {
+      "id": "rt_004",
+      "file": "07_round_trip/complex_nesting.calr",
+      "category": "07_round_trip",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Deeply nested code"
+    },
+    {
+      "id": "rt_005",
+      "file": "07_round_trip/all_features.calr",
+      "category": "07_round_trip",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Every feature combined"
+    },
+    {
+      "id": "idem_001",
+      "file": "08_idempotency/already_formatted.calr",
+      "category": "08_idempotency",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Pre-formatted file"
+    },
+    {
+      "id": "idem_002",
+      "file": "08_idempotency/needs_formatting.calr",
+      "category": "08_idempotency",
+      "expectedIssues": 4,
+      "issueTypes": ["padded_id"],
+      "canAutoFix": true,
+      "notes": "Unformatted file"
+    },
+    {
+      "id": "idem_003",
+      "file": "08_idempotency/partial_format.calr",
+      "category": "08_idempotency",
+      "expectedIssues": 2,
+      "issueTypes": ["padded_id"],
+      "canAutoFix": true,
+      "notes": "Partially formatted"
+    },
+    {
+      "id": "edge_001",
+      "file": "09_edge_cases/empty_module.calr",
+      "category": "09_edge_cases",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Module with no functions"
+    },
+    {
+      "id": "edge_002",
+      "file": "09_edge_cases/empty_function.calr",
+      "category": "09_edge_cases",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Function with no body"
+    },
+    {
+      "id": "edge_003",
+      "file": "09_edge_cases/single_statement.calr",
+      "category": "09_edge_cases",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Minimal function"
+    },
+    {
+      "id": "edge_004",
+      "file": "09_edge_cases/unicode_strings.calr",
+      "category": "09_edge_cases",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Unicode in strings"
+    },
+    {
+      "id": "edge_005",
+      "file": "09_edge_cases/escaped_strings.calr",
+      "category": "09_edge_cases",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Escape sequences"
+    },
+    {
+      "id": "edge_006",
+      "file": "09_edge_cases/long_identifiers.calr",
+      "category": "09_edge_cases",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Very long names"
+    },
+    {
+      "id": "edge_007",
+      "file": "09_edge_cases/max_nesting.calr",
+      "category": "09_edge_cases",
+      "expectedIssues": 0,
+      "issueTypes": [],
+      "canAutoFix": false,
+      "notes": "Deep nesting levels"
+    },
+    {
+      "id": "err_001",
+      "file": "10_error_cases/syntax_error.calr",
+      "category": "10_error_cases",
+      "expectedIssues": -1,
+      "issueTypes": ["parse_error"],
+      "canAutoFix": false,
+      "notes": "Invalid syntax - parse should fail"
+    },
+    {
+      "id": "err_002",
+      "file": "10_error_cases/mismatched_ids.calr",
+      "category": "10_error_cases",
+      "expectedIssues": -1,
+      "issueTypes": ["parse_error"],
+      "canAutoFix": false,
+      "notes": "Closing ID mismatch"
+    },
+    {
+      "id": "err_003",
+      "file": "10_error_cases/unterminated_string.calr",
+      "category": "10_error_cases",
+      "expectedIssues": -1,
+      "issueTypes": ["parse_error"],
+      "canAutoFix": false,
+      "notes": "Unclosed string"
+    }
+  ]
+}

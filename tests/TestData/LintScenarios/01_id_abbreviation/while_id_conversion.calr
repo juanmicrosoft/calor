@@ -1,0 +1,12 @@
+§M{m1:WhileTest}
+§F{f1:CountDown:pub}
+§I{i32:n}
+§O{void}
+§E{cw}
+§B{~x} n
+§WH{w1} (> x 0)
+§P x
+§B{~x} (- x 1)
+§/WH{w1}
+§/F{f1}
+§/M{m1}

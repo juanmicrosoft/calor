@@ -1,0 +1,12 @@
+§M{m1:WhileTest}
+§F{f1:CountUp:pub}
+§I{i32:max}
+§O{void}
+§E{cw}
+§B{~i} 0
+§WH{w1} (< i max)
+§P i
+§B{~i} (+ i 1)
+§/WH{w1}
+§/F{f1}
+§/M{m1}

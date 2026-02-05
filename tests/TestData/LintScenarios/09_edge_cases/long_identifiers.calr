@@ -1,0 +1,8 @@
+§M{m1:LongIds}
+§F{f1:ProcessValue:pub}
+§I{i32:inputValue}
+§O{i32}
+§B{localVariable} inputValue
+§R localVariable
+§/F{f1}
+§/M{m1}

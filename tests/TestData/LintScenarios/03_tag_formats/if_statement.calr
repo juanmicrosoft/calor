@@ -1,0 +1,13 @@
+§M{m1:IfTest}
+§F{f1:Classify:pub}
+§I{i32:x}
+§O{str}
+§IF{i1} (< x 0)
+§R "negative"
+§EI (== x 0)
+§R "zero"
+§EL
+§R "positive"
+§/I{i1}
+§/F{f1}
+§/M{m1}

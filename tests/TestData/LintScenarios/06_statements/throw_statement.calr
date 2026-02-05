@@ -1,0 +1,13 @@
+§M{m1:Throw}
+§F{f1:Fail:pub}
+§O{void}
+§THROW "failure"
+§/F{f1}
+§F{f2:FailIf:pub}
+§I{bool:condition}
+§O{void}
+§IF{i1} condition
+§THROW "invalid"
+§/I{i1}
+§/F{f2}
+§/M{m1}

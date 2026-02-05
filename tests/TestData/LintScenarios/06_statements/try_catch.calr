@@ -1,0 +1,23 @@
+§M{m1:TryCatch}
+§F{f1:SafeDivide:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§TRY{t1}
+§R (/ a b)
+§CATCH{Exception:ex}
+§R 0
+§/TRY{t1}
+§/F{f1}
+§F{f2:WithFinally:pub}
+§O{void}
+§E{cw}
+§TRY{t2}
+§P "try"
+§CATCH{Exception:e}
+§P "catch"
+§FINALLY
+§P "finally"
+§/TRY{t2}
+§/F{f2}
+§/M{m1}

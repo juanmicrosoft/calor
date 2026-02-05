@@ -1,0 +1,26 @@
+§M{m1:Logic}
+§F{f1:And:pub}
+§I{bool:a}
+§I{bool:b}
+§O{bool}
+§R (&& a b)
+§/F{f1}
+§F{f2:Or:pub}
+§I{bool:a}
+§I{bool:b}
+§O{bool}
+§R (|| a b)
+§/F{f2}
+§F{f3:Not:pub}
+§I{bool:a}
+§O{bool}
+§R (! a)
+§/F{f3}
+§F{f4:Complex:pub}
+§I{bool:x}
+§I{bool:y}
+§I{bool:z}
+§O{bool}
+§R (|| (&& x y) z)
+§/F{f4}
+§/M{m1}

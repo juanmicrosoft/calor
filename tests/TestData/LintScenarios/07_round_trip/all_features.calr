@@ -1,0 +1,42 @@
+§M{m1:AllFeatures}
+§F{f1:Main:pub}
+§O{void}
+§E{cw}
+§P "Starting"
+§B{x} 10
+§B{~y} 0
+§L{l1:i:1:10:1}
+§IF{i1} (> i 5)
+§P "high"
+§EI (== i 5)
+§P "middle"
+§EL
+§P "low"
+§/I{i1}
+§B{~y} (+ y i)
+§/L{l1}
+§P y
+§/F{f1}
+§F{f2:Calculate:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§Q (> a 0)
+§Q (> b 0)
+§S (> result 0)
+§B{sum} (+ a b)
+§B{product} (* a b)
+§R (+ sum product)
+§/F{f2}
+§F{f3:Divide:pri}
+§I{i32:x}
+§I{i32:y}
+§O{i32}
+§Q (!= y 0)
+§TRY{t1}
+§R (/ x y)
+§CATCH{Exception:e}
+§R 0
+§/TRY{t1}
+§/F{f3}
+§/M{m1}
