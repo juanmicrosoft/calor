@@ -4,6 +4,7 @@ import { CodeComparison } from '@/components/landing/CodeComparison';
 import { BenchmarkChart } from '@/components/landing/BenchmarkChart';
 import { CompetitivePositioning } from '@/components/landing/CompetitivePositioning';
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
+import { VSCodeExtension } from '@/components/landing/VSCodeExtension';
 import { QuickStart } from '@/components/landing/QuickStart';
 import { ProjectStatus } from '@/components/landing/ProjectStatus';
 
@@ -16,6 +17,7 @@ export default function HomePage() {
       <BenchmarkChart />
       <CompetitivePositioning />
       <FeatureGrid />
+      <VSCodeExtension />
       <QuickStart />
       <ProjectStatus />
     </div>
