@@ -1,0 +1,209 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Calor",
+  "scopeName": "source.calor",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#closing-tags" },
+    { "include": "#opening-tags" },
+    { "include": "#keywords" },
+    { "include": "#operators" },
+    { "include": "#types" },
+    { "include": "#constants" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.calor",
+      "match": "//.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.calor",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.calor",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "closing-tags": {
+      "patterns": [
+        {
+          "name": "keyword.control.module.close.calor",
+          "match": "\u00a7/M\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.control.function.close.calor",
+          "match": "\u00a7/F\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.control.loop.close.calor",
+          "match": "\u00a7/L\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.control.conditional.close.calor",
+          "match": "\u00a7/I\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.control.call.close.calor",
+          "match": "\u00a7/C"
+        }
+      ]
+    },
+    "opening-tags": {
+      "patterns": [
+        {
+          "name": "keyword.control.module.calor",
+          "match": "\u00a7M\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.control.function.calor",
+          "match": "\u00a7F\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.other.input.calor",
+          "match": "\u00a7I\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.other.output.calor",
+          "match": "\u00a7O\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.other.effects.calor",
+          "match": "\u00a7E\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.other.binding.calor",
+          "match": "\u00a7B\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.control.call.calor",
+          "match": "\u00a7C\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.control.loop.calor",
+          "match": "\u00a7L\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.control.conditional.calor",
+          "match": "\u00a7IF\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.other.contract.requires.calor",
+          "match": "\u00a7Q\\{[^}]+\\}"
+        },
+        {
+          "name": "keyword.other.contract.requires.calor",
+          "match": "\u00a7Q(?!\\{)"
+        },
+        {
+          "name": "keyword.other.contract.ensures.calor",
+          "match": "\u00a7S"
+        },
+        {
+          "name": "keyword.control.conditional.elseif.calor",
+          "match": "\u00a7EI"
+        },
+        {
+          "name": "keyword.control.conditional.else.calor",
+          "match": "\u00a7EL"
+        },
+        {
+          "name": "keyword.other.argument.calor",
+          "match": "\u00a7A"
+        },
+        {
+          "name": "keyword.control.return.calor",
+          "match": "\u00a7R"
+        },
+        {
+          "name": "keyword.other.print.calor",
+          "match": "\u00a7P"
+        },
+        {
+          "name": "constant.language.option.some.calor",
+          "match": "\u00a7SOME"
+        },
+        {
+          "name": "constant.language.option.none.calor",
+          "match": "\u00a7NONE\\{[^}]+\\}"
+        },
+        {
+          "name": "constant.language.result.ok.calor",
+          "match": "\u00a7OK"
+        },
+        {
+          "name": "constant.language.result.err.calor",
+          "match": "\u00a7ERR"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arrow.calor",
+          "match": "\u2192|->"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arithmetic.calor",
+          "match": "\\(\\s*[+\\-*/%](?=\\s)"
+        },
+        {
+          "name": "keyword.operator.comparison.calor",
+          "match": "\\(\\s*(==|!=|<=|>=|<|>)(?=\\s)"
+        },
+        {
+          "name": "keyword.operator.logical.calor",
+          "match": "\\(\\s*(&&|\\|\\||!)(?=\\s)"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.primitive.calor",
+          "match": "\\b(i32|i64|str|bool|void)\\b"
+        },
+        {
+          "name": "storage.modifier.visibility.calor",
+          "match": "\\b(pub|pri|prot)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.calor",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "variable.language.result.calor",
+          "match": "\\bresult\\b"
+        },
+        {
+          "name": "constant.other.effect-code.calor",
+          "match": "\\b(cw|cr|fw|fr|net|db)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.calor",
+          "match": "-?\\d+\\.\\d+"
+        },
+        {
+          "name": "constant.numeric.integer.calor",
+          "match": "-?\\d+"
+        }
+      ]
+    }
+  }
+}

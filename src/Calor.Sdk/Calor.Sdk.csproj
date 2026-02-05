@@ -8,8 +8,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Calor.Sdk</PackageId>
     <PackageType>MSBuildSdk</PackageType>
-    <Version>0.1.4</Version>
-    <Description>MSBuild SDK for building Calor projects. Use with Sdk="Calor.Sdk/0.1.4"</Description>
+    <Description>MSBuild SDK for building Calor projects. Use with Sdk="Calor.Sdk/$(Version)"</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>See https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md</PackageReleaseNotes>
 

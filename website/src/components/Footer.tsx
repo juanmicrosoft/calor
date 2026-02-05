@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import packageJson from '../../../package.json';
 
 const footerLinks = {
   documentation: [
@@ -82,9 +83,12 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 border-t pt-8">
-          <p className="text-center text-sm text-muted-foreground">
+        <div className="mt-12 border-t pt-8 flex flex-col sm:flex-row justify-between items-center gap-2">
+          <p className="text-sm text-muted-foreground">
             Calor is open source. Licensed under MIT.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            v{packageJson.version}
           </p>
         </div>
       </div>
