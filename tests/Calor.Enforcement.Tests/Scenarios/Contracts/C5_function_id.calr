@@ -1,0 +1,8 @@
+§M{m1:Test}
+§F{f002:RequirePositive:pub}
+  §I{i32:n}
+  §O{i32}
+  §Q (> n INT:0)
+  §R n
+§/F{f002}
+§/M{m1}

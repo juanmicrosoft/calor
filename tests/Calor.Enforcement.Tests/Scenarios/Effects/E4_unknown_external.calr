@@ -1,0 +1,7 @@
+§M{m1:Test}
+§F{f001:CallUnknown:pub}
+  §O{void}
+  §C{MyCustomLib.DoSomething}
+  §/C
+§/F{f001}
+§/M{m1}

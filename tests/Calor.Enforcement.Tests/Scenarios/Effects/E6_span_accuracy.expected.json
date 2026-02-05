@@ -1,0 +1,10 @@
+{
+  "diagnostics": [
+    {
+      "code": "Calor0410",
+      "functionId": "f001",
+      "line": 8,
+      "messageContains": "cw"
+    }
+  ]
+}

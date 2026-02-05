@@ -1,0 +1,6 @@
+§M{m1:Test}
+§F{f001:PrintHello:pub}
+  §O{void}
+  §P STR:"Hello, World!"
+§/F{f001}
+§/M{m1}

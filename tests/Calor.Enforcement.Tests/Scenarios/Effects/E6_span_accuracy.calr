@@ -1,0 +1,9 @@
+§M{m1:Test}
+§F{f001:SpanTest:pub}
+  §I{i32:x}
+  §O{i32}
+  §B{i32:result} (* x INT:2)
+  §P STR:"The result is: "
+  §R result
+§/F{f001}
+§/M{m1}

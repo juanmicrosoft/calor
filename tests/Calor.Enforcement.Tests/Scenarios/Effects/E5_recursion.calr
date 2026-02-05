@@ -1,0 +1,12 @@
+§M{m1:Test}
+§F{f001:RecursivePrint:pub}
+  §I{i32:n}
+  §O{void}
+  §IF{i1} (> n INT:0)
+    §P n
+    §C{RecursivePrint}
+      §A (- n INT:1)
+    §/C
+  §/I{i1}
+§/F{f001}
+§/M{m1}

@@ -196,7 +196,7 @@ public class ContractTests
         var result = requires.Accept(emitter);
 
         Assert.Contains("if (!", result);
-        Assert.Contains("ArgumentException", result);
+        Assert.Contains("ContractViolationException", result);
         Assert.Contains("(x >= 0)", result);
     }
 
@@ -217,7 +217,7 @@ public class ContractTests
         var result = ensures.Accept(emitter);
 
         Assert.Contains("if (!", result);
-        Assert.Contains("InvalidOperationException", result);
+        Assert.Contains("ContractViolationException", result);
         Assert.Contains("(result >= 0)", result);
     }
 
@@ -264,7 +264,7 @@ public class ContractTests
 
         // The emitter wraps the binary expression in parentheses
         Assert.Contains("(x >= 0)", code);
-        Assert.Contains("throw new ArgumentException", code);
+        Assert.Contains("throw new Calor.Runtime.ContractViolationException", code);
     }
 
     [Fact]
@@ -290,7 +290,7 @@ public class ContractTests
         var code = emitter.Emit(module);
 
         Assert.Contains("__result__", code);
-        Assert.Contains("throw new InvalidOperationException", code);
+        Assert.Contains("throw new Calor.Runtime.ContractViolationException", code);
         Assert.Contains("return __result__", code);
     }
 

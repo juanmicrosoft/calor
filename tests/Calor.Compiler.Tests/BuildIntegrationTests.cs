@@ -15,16 +15,15 @@ public class BuildIntegrationTests
         {
             var sourceFile = Path.Combine(tempDir, "test.calr");
             var source = @"
-§MODULE{id=m001}{name=Test}
-§FUNC{id=f001}{name=Hello}{visibility=public}
-  §OUT{type=VOID}
-  §BODY
-    §CALL{target=Console.WriteLine}{fallible=false}
-      §ARG STR:""Hello from test!""
-    §END_CALL
-  §END_BODY
-§END_FUNC{id=f001}
-§END_MODULE{id=m001}
+§M{m001:Test}
+§F{f001:Hello:pub}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
+    §A STR:""Hello from test!""
+  §/C
+§/F{f001}
+§/M{m001}
 ";
             File.WriteAllText(sourceFile, source);
 
@@ -150,7 +149,7 @@ public class BuildIntegrationTests
 
         // Assert
         Assert.False(result.HasErrors);
-        Assert.Contains("ArgumentException", result.GeneratedCode);
+        Assert.Contains("ContractViolationException", result.GeneratedCode);
         Assert.Contains("b != 0", result.GeneratedCode);
     }
 }

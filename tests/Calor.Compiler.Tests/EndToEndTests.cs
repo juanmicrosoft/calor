@@ -60,16 +60,15 @@ public class EndToEndTests
     public void Compile_WithStringEscapes_GeneratesCorrectLiteral()
     {
         var source = """
-            §MODULE{id=m001}{name=Test}
-            §FUNC{id=f001}{name=Main}{visibility=public}
-              §OUT{type=VOID}
-              §BODY
-                §CALL{target=Console.WriteLine}{fallible=false}
-                  §ARG STR:"Line1\nLine2"
-                §END_CALL
-              §END_BODY
-            §END_FUNC{id=f001}
-            §END_MODULE{id=m001}
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §E{cw}
+              §C{Console.WriteLine}
+                §A STR:"Line1\nLine2"
+              §/C
+            §/F{f001}
+            §/M{m001}
             """;
 
         var result = Program.Compile(source);
@@ -220,6 +219,7 @@ public class EndToEndTests
             §M{m001:Test}
             §F{f001:Main:pub}
               §O{void}
+              §E{cw}
               §BODY
                 §P "Hello v2!"
               §END_BODY
@@ -240,6 +240,7 @@ public class EndToEndTests
             §M{m001:Test}
             §F{f001:Main:pub}
               §O{void}
+              §E{cw}
               §BODY
                 §C{Console.WriteLine} "Implicit close"
               §END_BODY
@@ -282,6 +283,7 @@ public class EndToEndTests
             §F{f001:Main:pub}
               §I{i32:x}
               §O{void}
+              §E{cw}
               §BODY
                 §P (+ x 10)
               §END_BODY
