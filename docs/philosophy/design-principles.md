@@ -190,6 +190,21 @@ These principles reinforce each other:
 
 ---
 
+## Why These Principles Are Now Practical
+
+These principles aren't new. Effect systems date to 1986. Design-by-contract to 1986. Unique identifiers have always been possible.
+
+**What's new is who writes the code.**
+
+When humans write code, these principles impose annotation burden that developers resist. When agents write code, annotation cost is zero.
+
+Calor's principles represent 40 years of programming language research that only becomes practical when agents are the primary code authors.
+
+[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/)
+
+---
+
 ## Next
 
+- [The Verification Opportunity](/calor/philosophy/the-verification-opportunity/) - Why agent languages unlock practical verification
 - [Tradeoffs](/calor/philosophy/tradeoffs/) - What Calor gives up for these principles

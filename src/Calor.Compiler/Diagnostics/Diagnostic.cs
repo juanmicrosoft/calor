@@ -48,6 +48,12 @@ public static class DiagnosticCode
     public const string UnusedEffectDeclaration = "Calor0401";
     public const string EffectMismatch = "Calor0402";
 
+    // Effect enforcement (Calor0410-0419)
+    public const string ForbiddenEffect = "Calor0410";
+    public const string UnknownExternalCall = "Calor0411";
+    public const string MissingSpecificEffect = "Calor0412";
+    public const string AmbiguousStub = "Calor0413";
+
     // Pattern matching errors (Calor0500-0599)
     public const string NonExhaustiveMatch = "Calor0500";
     public const string UnreachablePattern = "Calor0501";

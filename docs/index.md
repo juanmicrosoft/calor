@@ -71,6 +71,37 @@ public static int Square(int x)
 
 ---
 
+## The Verification Breakthrough
+
+For 50 years, computer scientists have known how to make software more reliable: effect systems, design-by-contract, dependent types. These techniques can **prove** code correctness.
+
+**So why isn't all software written this way?**
+
+Because humans find annotation burden too high. Every verification system that relies on human discipline has failed to achieve mainstream adoption.
+
+**Coding agents change this equation.** When agents write code, annotation cost is zero. They never forget contracts, never skip effects declarations, never cut corners under deadline pressure.
+
+Calor is the first language to leverage this insight:
+
+```
+§F{f001:ProcessOrder:pub}
+  §I{Order:order}
+  §O{bool}
+  §E{db}                    // Effect declaration enforced at compile time
+  §Q (> order.amount 0)     // Precondition verified at runtime
+  §S (!= result null)       // Postcondition verified at runtime
+
+  §C{SaveOrder} order       // OK: SaveOrder has db effect
+  §C{SendEmail} order       // COMPILE ERROR: net effect not declared
+§/F{f001}
+```
+
+The compiler catches effect violations with full call chains. The runtime catches contract violations with function ID and source location. Bugs that would ship to production in traditional languages are **impossible** in Calor.
+
+[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/){: .btn .btn-outline }
+
+---
+
 ## Benchmark Results
 
 Evaluated across 20 paired Calor/C# programs using V2 compact syntax:
@@ -139,10 +170,11 @@ The analyzer scores files based on patterns like null handling, error handling, 
 ## Project Status
 
 - [x] Core compiler (lexer, parser, C# code generation)
-- [x] Control flow (for, if/else, while)
+- [x] Control flow (for, if/else, while, do-while)
 - [x] Type system (Option, Result)
-- [x] Contracts (requires, ensures)
-- [x] Effects declarations
+- [x] Contracts (requires, ensures) with runtime enforcement
+- [x] Effects declarations with compile-time enforcement
+- [x] Interprocedural effect analysis (SCC-based)
 - [x] MSBuild SDK integration
 - [x] Evaluation framework (7 metrics, 20 benchmarks)
 - [ ] Direct IL emission

@@ -1,0 +1,8 @@
+{
+  "diagnostics": [
+    {
+      "code": "Calor0411",
+      "messageContains": "UnknownLib.Calculate"
+    }
+  ]
+}

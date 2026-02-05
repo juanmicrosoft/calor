@@ -233,17 +233,73 @@ Or explicitly:
 
 ---
 
-## Effect Checking
+## Effect Enforcement
 
-The compiler warns if:
+**Effect enforcement is enabled by default.** The compiler doesn't just warn - it **rejects** code with undeclared effects.
 
-1. **Missing effect**: Function has side effect but doesn't declare it
-2. **Unused effect**: Function declares effect but doesn't use it
-3. **Propagation**: Caller doesn't include callee's effects
+### Why Strict Enforcement?
+
+In traditional languages, effect annotations are optional hints. Developers forget them, skip them under time pressure, or let them rot as code evolves.
+
+Calor takes a different approach: **effects are enforced, not suggested.**
+
+This is practical because Calor is designed for coding agents, not humans. Agents:
+- Generate effect annotations for free (no annotation burden)
+- Maintain perfect consistency (never forget to update)
+- Don't cut corners under deadline pressure
+
+[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/)
+
+### Compile-Time Errors
+
+```
+error Calor0410: Function 'f001' uses effect 'console_write' but does not declare it
+  Call chain: f001 → f002 → Console.WriteLine
+```
+
+The compiler provides:
+1. **Exact violation** - Which effect is missing
+2. **Call chain** - How the effect propagates through your code
+3. **Function ID** - Precise reference for agents to fix
+
+### Interprocedural Analysis
+
+The compiler doesn't just check individual functions. It performs **interprocedural analysis** using Strongly Connected Components (SCC) to trace effects through any depth of calls.
+
+You cannot hide an effect by burying it in helper functions.
+
+```
+§F{f001:Helper:pri}
+  §C{Console.WriteLine} "hidden"   // Has cw effect
+§/F{f001}
+
+§F{f002:Main:pub}
+  §O{void}
+  // No §E declaration
+  §C{f001:Helper}                  // ERROR: cw effect leaks through
+§/F{f002}
+```
+
+### Disabling Enforcement (Not Recommended)
+
+For migration scenarios, you can disable enforcement:
+
+```bash
+calor compile myprogram.calr --enforce-effects=false
+```
+
+Or in MSBuild:
+
+```xml
+<PropertyGroup>
+  <CalorEnforceEffects>false</CalorEnforceEffects>
+</PropertyGroup>
+```
 
 ---
 
 ## Next
 
-- [Syntax Reference](/calor/syntax-reference/) - Back to overview
+- [The Verification Opportunity](/calor/philosophy/the-verification-opportunity/) - Why this matters
+- [Contracts](/calor/syntax-reference/contracts/) - Preconditions and postconditions
 - [Benchmarking](/calor/benchmarking/) - See how effects help comprehension

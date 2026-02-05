@@ -1,0 +1,12 @@
+§M{m1:Test}
+§F{f001:Caller:pub}
+  §O{void}
+  §C{Callee}
+  §/C
+§/F{f001}
+§F{f002:Callee:pub}
+  §O{void}
+  §E{cw}
+  §P STR:"Hello from Callee"
+§/F{f002}
+§/M{m1}

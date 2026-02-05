@@ -94,8 +94,26 @@ Use traditional languages when:
 
 ---
 
+## The Verification Breakthrough
+
+Perhaps the most significant implication of agent-oriented language design: **verification becomes practical**.
+
+For 50 years, techniques like effect systems and design-by-contract have remained academic curiosities because humans find the annotation burden too high. But when agents write code, annotation cost is zero.
+
+Calor enforces:
+- **Effect declarations** at compile time (catch undeclared side effects before they ship)
+- **Contracts** at runtime (violations include function ID, source location, and condition)
+- **Effect propagation** through call chains (you can't hide effects in helper functions)
+
+This enables guarantees that have been impossible in practice in human-oriented languages.
+
+[Read more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/)
+
+---
+
 ## Learn More
 
 - [Design Principles](/calor/philosophy/design-principles/) - The five core principles behind Calor
+- [The Verification Opportunity](/calor/philosophy/the-verification-opportunity/) - Why agent languages unlock practical verification
 - [Tradeoffs](/calor/philosophy/tradeoffs/) - What Calor gives up for explicitness
 - [Benchmarking](/calor/benchmarking/) - How we measure success

@@ -51,6 +51,21 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 ---
 
+## The Verification Dividend
+
+The most significant payoff from Calor's tradeoffs isn't just better comprehension - it's **practical verification**.
+
+For 50 years, effect systems and design-by-contract have remained academic curiosities because humans resist the annotation overhead. Calor's explicit syntax is verbose for humans - but agents generate it for free.
+
+This enables:
+- **Compile-time effect verification**: Undeclared side effects are impossible
+- **Runtime contract enforcement**: Violations include function ID and source location
+- **Interprocedural analysis**: Effects traced through any depth of calls
+
+[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/)
+
+---
+
 ## When the Tradeoff Pays Off
 
 Calor's tradeoff pays off when:

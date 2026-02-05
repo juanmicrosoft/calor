@@ -231,6 +231,91 @@ Recommended order in function definition:
 
 ---
 
+## Runtime Contract Enforcement
+
+Contracts aren't just documentation - they're **executable verification**.
+
+### ContractViolationException
+
+When a contract fails at runtime, Calor throws `ContractViolationException` with rich diagnostic information:
+
+```csharp
+public class ContractViolationException : Exception
+{
+    public string FunctionId { get; }         // e.g., "f001"
+    public ContractKind Kind { get; }         // Requires, Ensures, or Invariant
+    public int StartOffset { get; }           // Source position
+    public int Length { get; }
+    public string? SourceFile { get; }
+    public int Line { get; }
+    public int Column { get; }
+}
+```
+
+This enables:
+- **Precise debugging**: Know exactly which contract failed and where
+- **Agent feedback**: Function ID allows agents to locate and fix issues
+- **Production monitoring**: Structured exceptions for observability
+
+### Contract Modes
+
+Control how contracts are emitted with `--contract-mode`:
+
+| Mode | Behavior | Use Case |
+|:-----|:---------|:---------|
+| `debug` (default) | Full diagnostics: condition text, source location | Development |
+| `release` | Minimal: exception type + function ID only | Production |
+| `off` | No contract checks emitted | Performance-critical paths |
+
+```bash
+# Development (default)
+calor compile myprogram.calr --contract-mode=debug
+
+# Production
+calor compile myprogram.calr --contract-mode=release
+
+# Disable (not recommended)
+calor compile myprogram.calr --contract-mode=off
+```
+
+### Why Runtime Enforcement Works
+
+In traditional languages, contract libraries exist (Code Contracts for .NET, JSR-303 for Java), but they're:
+- **Optional**: Developers skip them under time pressure
+- **Verbose**: Annotation overhead discourages use
+- **Unmaintained**: Contracts rot as code evolves
+
+Calor solves this because agents:
+- Generate contracts automatically (no overhead)
+- Maintain contract-implementation consistency
+- Never skip verification for convenience
+
+[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/)
+
+---
+
+## Contracts Don't Require Effect Declarations
+
+A common question: Do contracts count as effects?
+
+**No.** Contract checks are verification mechanisms, not operational effects:
+
+```
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)       // No §E needed
+  §R (/ a b)
+§/F{f001}
+```
+
+This function is pure (no `§E` declaration) even though the precondition might throw. The `throw` effect in `§E` is only for intentional `§THROW` statements in business logic, not contract violations.
+
+---
+
 ## Next
 
+- [The Verification Opportunity](/calor/philosophy/the-verification-opportunity/) - Why this matters
 - [Effects](/calor/syntax-reference/effects/) - Declaring side effects
+- [Enforcement Details](/calor/effects-and-contracts-enforcement/) - Technical specification

@@ -1,0 +1,10 @@
+§M{m1:Test}
+§F{f001:PureFunctionWithUnknownCall:pub}
+  §I{i32:x}
+  §O{i32}
+  §C{UnknownLib.Calculate}
+    §A x
+  §/C
+  §R x
+§/F{f001}
+§/M{m1}

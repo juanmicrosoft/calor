@@ -1,0 +1,8 @@
+§M{m1:Test}
+§F{f001:GetPositive:pub}
+  §I{i32:n}
+  §O{i32}
+  §S (> result INT:0)
+  §R n
+§/F{f001}
+§/M{m1}

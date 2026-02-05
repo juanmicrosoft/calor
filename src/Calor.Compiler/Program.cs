@@ -4,6 +4,7 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler;
@@ -32,17 +33,29 @@ public class Program
             aliases: ["--require-docs"],
             description: "Require documentation on public functions and types");
 
+        var enforceEffectsOption = new Option<bool>(
+            aliases: ["--enforce-effects"],
+            description: "Enforce effect declarations (default: true)",
+            getDefaultValue: () => true);
+
+        var contractModeOption = new Option<string>(
+            aliases: ["--contract-mode"],
+            description: "Contract enforcement mode: off, debug, or release (default: debug)",
+            getDefaultValue: () => "debug");
+
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
             inputOption,
             outputOption,
             verboseOption,
             strictApiOption,
-            requireDocsOption
+            requireDocsOption,
+            enforceEffectsOption,
+            contractModeOption
         };
 
         // Legacy compile handler (when --input is provided)
-        rootCommand.SetHandler(CompileAsync, inputOption, outputOption, verboseOption, strictApiOption, requireDocsOption);
+        rootCommand.SetHandler(CompileAsync, inputOption, outputOption, verboseOption, strictApiOption, requireDocsOption, enforceEffectsOption, contractModeOption);
 
         // Add subcommands
         rootCommand.AddCommand(ConvertCommand.Create());
@@ -58,7 +71,7 @@ public class Program
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs)
+    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, string contractMode)
     {
         try
         {
@@ -77,8 +90,10 @@ public class Program
                 Console.WriteLine("  calor format <files>                           Format Calor source files");
                 Console.WriteLine();
                 Console.WriteLine("Strictness options:");
-                Console.WriteLine("  --strict-api    Require §BREAKING markers for public API changes");
-                Console.WriteLine("  --require-docs  Require documentation on public functions");
+                Console.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
+                Console.WriteLine("  --require-docs    Require documentation on public functions");
+                Console.WriteLine("  --enforce-effects Enforce effect declarations (default: true)");
+                Console.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
                 Console.WriteLine();
                 Console.WriteLine("Run 'calor --help' for more information.");
                 return;
@@ -97,11 +112,20 @@ public class Program
             }
 
             var source = await File.ReadAllTextAsync(input.FullName);
+            var parsedContractMode = contractMode?.ToLowerInvariant() switch
+            {
+                "off" => ContractMode.Off,
+                "release" => ContractMode.Release,
+                _ => ContractMode.Debug
+            };
             var options = new CompilationOptions
             {
                 Verbose = verbose,
                 StrictApi = strictApi,
-                RequireDocs = requireDocs
+                RequireDocs = requireDocs,
+                EnforceEffects = enforceEffects,
+                ContractMode = parsedContractMode,
+                ProjectDirectory = Path.GetDirectoryName(input.FullName)
             };
             var result = Compile(source, input.FullName, options);
 
@@ -207,8 +231,26 @@ public class Program
             }
         }
 
+        // Effect enforcement checking
+        if (options.EnforceEffects)
+        {
+            var catalog = EffectsCatalog.CreateWithProjectStubs(options.ProjectDirectory);
+            var enforcementPass = new EffectEnforcementPass(diagnostics, catalog, options.UnknownCallPolicy);
+            enforcementPass.Enforce(ast);
+
+            if (options.Verbose)
+            {
+                Console.WriteLine("Effect enforcement completed");
+            }
+        }
+
+        if (diagnostics.HasErrors)
+        {
+            return new CompilationResult(diagnostics, ast, "");
+        }
+
         // Code generation
-        var emitter = new CSharpEmitter();
+        var emitter = new CSharpEmitter(options.ContractMode);
         var generatedCode = emitter.Emit(ast);
 
         if (options.Verbose)
@@ -239,6 +281,48 @@ public sealed class CompilationOptions
     /// Require documentation on public functions and types.
     /// </summary>
     public bool RequireDocs { get; init; }
+
+    /// <summary>
+    /// Enable effect enforcement checking.
+    /// Enabled by default to catch missing effect annotations early.
+    /// </summary>
+    public bool EnforceEffects { get; init; } = true;
+
+    /// <summary>
+    /// Policy for handling unknown external calls.
+    /// </summary>
+    public UnknownCallPolicy UnknownCallPolicy { get; init; } = UnknownCallPolicy.Strict;
+
+    /// <summary>
+    /// Contract enforcement mode.
+    /// </summary>
+    public ContractMode ContractMode { get; init; } = ContractMode.Debug;
+
+    /// <summary>
+    /// Project directory for loading calor.effects.json stubs.
+    /// </summary>
+    public string? ProjectDirectory { get; init; }
+}
+
+/// <summary>
+/// Contract enforcement mode.
+/// </summary>
+public enum ContractMode
+{
+    /// <summary>
+    /// No contract checks emitted.
+    /// </summary>
+    Off,
+
+    /// <summary>
+    /// Full contract checks with detailed messages.
+    /// </summary>
+    Debug,
+
+    /// <summary>
+    /// Lean contract checks with minimal messages.
+    /// </summary>
+    Release
 }
 
 public sealed class CompilationResult

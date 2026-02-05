@@ -249,18 +249,17 @@ public class ControlFlowTests
     public void Compile_ForLoop_GeneratesValidCSharp()
     {
         var source = """
-            §MODULE{id=m001}{name=Test}
-            §FUNC{id=f001}{name=Main}{visibility=public}
-              §OUT{type=VOID}
-              §BODY
-                §FOR{id=for1}{var=i}{from=1}{to=10}{step=1}
-                  §CALL{target=Console.WriteLine}{fallible=false}
-                    §ARG i
-                  §END_CALL
-                §END_FOR{id=for1}
-              §END_BODY
-            §END_FUNC{id=f001}
-            §END_MODULE{id=m001}
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §E{cw}
+              §L{l1:i:1:10:1}
+                §C{Console.WriteLine}
+                  §A i
+                §/C
+              §/L{l1}
+            §/F{f001}
+            §/M{m001}
             """;
 
         var result = Program.Compile(source);
@@ -274,22 +273,21 @@ public class ControlFlowTests
     public void Compile_IfElse_GeneratesValidCSharp()
     {
         var source = """
-            §MODULE{id=m001}{name=Test}
-            §FUNC{id=f001}{name=Main}{visibility=public}
-              §OUT{type=VOID}
-              §BODY
-                §IF{id=if1} BOOL:true
-                  §CALL{target=Console.WriteLine}{fallible=false}
-                    §ARG STR:"Yes"
-                  §END_CALL
-                §EL
-                  §CALL{target=Console.WriteLine}{fallible=false}
-                    §ARG STR:"No"
-                  §END_CALL
-                §END_IF{id=if1}
-              §END_BODY
-            §END_FUNC{id=f001}
-            §END_MODULE{id=m001}
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §E{cw}
+              §IF{i1} BOOL:true
+                §C{Console.WriteLine}
+                  §A STR:"Yes"
+                §/C
+              §EL
+                §C{Console.WriteLine}
+                  §A STR:"No"
+                §/C
+              §/I{i1}
+            §/F{f001}
+            §/M{m001}
             """;
 
         var result = Program.Compile(source);
@@ -303,23 +301,22 @@ public class ControlFlowTests
     public void Compile_Bind_GeneratesValidCSharp()
     {
         var source = """
-            §MODULE{id=m001}{name=Test}
-            §FUNC{id=f001}{name=Main}{visibility=public}
-              §OUT{type=VOID}
-              §BODY
-                §BIND{name=x}{type=INT} INT:42
-                §CALL{target=Console.WriteLine}{fallible=false}
-                  §ARG x
-                §END_CALL
-              §END_BODY
-            §END_FUNC{id=f001}
-            §END_MODULE{id=m001}
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §E{cw}
+              §B{x} INT:42
+              §C{Console.WriteLine}
+                §A x
+              §/C
+            §/F{f001}
+            §/M{m001}
             """;
 
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors);
-        Assert.Contains("int x = 42;", result.GeneratedCode);
+        Assert.Contains("var x = 42;", result.GeneratedCode);
         Assert.Contains("Console.WriteLine(x)", result.GeneratedCode);
     }
 
@@ -421,19 +418,18 @@ public class ControlFlowTests
     public void Compile_DoWhileLoop_GeneratesValidCSharp()
     {
         var source = """
-            §MODULE{id=m001}{name=Test}
-            §FUNC{id=f001}{name=Main}{visibility=public}
-              §OUT{type=VOID}
-              §BODY
-                §BIND{name=i}{type=INT} INT:0
-                §DO{id=do1}
-                  §CALL{target=Console.WriteLine}{fallible=false}
-                    §ARG i
-                  §END_CALL
-                §END_DO{id=do1} (< i INT:10)
-              §END_BODY
-            §END_FUNC{id=f001}
-            §END_MODULE{id=m001}
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §E{cw}
+              §B{i} INT:0
+              §DO{d1}
+                §C{Console.WriteLine}
+                  §A i
+                §/C
+              §/DO{d1} (< i INT:10)
+            §/F{f001}
+            §/M{m001}
             """;
 
         var result = Program.Compile(source);

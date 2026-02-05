@@ -1,0 +1,11 @@
+§M{m1:Test}
+§F{f001:Abs:pub}
+  §I{i32:n}
+  §O{i32}
+  §S (>= result INT:0)
+  §IF{i1} (< n INT:0)
+    §R (- INT:0 n)
+  §/I{i1}
+  §R n
+§/F{f001}
+§/M{m1}

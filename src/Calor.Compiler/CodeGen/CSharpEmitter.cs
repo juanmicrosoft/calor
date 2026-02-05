@@ -2,7 +2,31 @@ using System.Text;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Migration;
 
+// Import ContractMode from Program.cs
+using ContractMode = Calor.Compiler.ContractMode;
+
 namespace Calor.Compiler.CodeGen;
+
+/// <summary>
+/// Contract enforcement mode for code generation.
+/// </summary>
+public enum EmitContractMode
+{
+    /// <summary>
+    /// No contract checks emitted.
+    /// </summary>
+    Off,
+
+    /// <summary>
+    /// Full contract checks with detailed messages.
+    /// </summary>
+    Debug,
+
+    /// <summary>
+    /// Lean contract checks with minimal messages.
+    /// </summary>
+    Release
+}
 
 /// <summary>
 /// Emits C# source code from an Calor AST.
@@ -12,14 +36,42 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly StringBuilder _builder = new();
     private int _indentLevel;
     private string? _currentClassName;
+    private string? _currentFunctionId;
+    private string? _currentFilePath;
+    private readonly EmitContractMode _contractMode;
 
-    public string Emit(ModuleNode module)
+    public CSharpEmitter() : this(EmitContractMode.Debug)
+    {
+    }
+
+    public CSharpEmitter(ContractMode contractMode)
+    {
+        _contractMode = contractMode switch
+        {
+            ContractMode.Off => EmitContractMode.Off,
+            ContractMode.Release => EmitContractMode.Release,
+            _ => EmitContractMode.Debug
+        };
+    }
+
+    public CSharpEmitter(EmitContractMode contractMode)
+    {
+        _contractMode = contractMode;
+    }
+
+    public string Emit(ModuleNode module, string? filePath = null)
     {
         _builder.Clear();
         _indentLevel = 0;
+        _currentFilePath = filePath;
 
         var result = Visit(module);
         return result;
+    }
+
+    public string Emit(ModuleNode module)
+    {
+        return Emit(module, null);
     }
 
     private void AppendLine(string line = "")
@@ -176,6 +228,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(FunctionNode node)
     {
+        // Track current function ID for contract emission
+        _currentFunctionId = node.Id;
+
         // Emit extended metadata as documentation comments
         foreach (var issue in node.Issues)
         {
@@ -866,29 +921,107 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(RequiresNode node)
     {
+        // Off mode: no contract checks
+        if (_contractMode == EmitContractMode.Off)
+        {
+            return ""; // No check emitted
+        }
+
         var condition = node.Condition.Accept(this);
+        var functionId = _currentFunctionId ?? "unknown";
+
+        // Release mode: lean exception
+        if (_contractMode == EmitContractMode.Release)
+        {
+            return $"if (!({condition})) throw new Calor.Runtime.ContractViolationException(\"{EscapeString(functionId)}\", Calor.Runtime.ContractKind.Requires);";
+        }
+
+        // Debug mode: full details
         var message = node.Message != null
-            ? $"\"{EscapeString(node.Message)}\""
-            : $"\"Precondition failed: {EscapeString(condition)}\"";
-        return $"if (!({condition})) throw new ArgumentException({message});";
+            ? EscapeString(node.Message)
+            : $"Precondition failed: {EscapeString(condition)}";
+        var sourceFile = _currentFilePath != null ? $"\"{EscapeString(_currentFilePath)}\"" : "null";
+
+        return $"if (!({condition})) throw new Calor.Runtime.ContractViolationException(" +
+               $"\"{message}\", " +
+               $"\"{EscapeString(functionId)}\", " +
+               $"Calor.Runtime.ContractKind.Requires, " +
+               $"startOffset: {node.Span.Start}, " +
+               $"length: {node.Span.Length}, " +
+               $"sourceFile: {sourceFile}, " +
+               $"line: {node.Span.Line}, " +
+               $"column: {node.Span.Column}, " +
+               $"condition: \"{EscapeString(condition)}\");";
     }
 
     public string Visit(EnsuresNode node)
     {
+        // Off mode: no contract checks
+        if (_contractMode == EmitContractMode.Off)
+        {
+            return ""; // No check emitted
+        }
+
         var condition = node.Condition.Accept(this);
+        var functionId = _currentFunctionId ?? "unknown";
+
+        // Release mode: lean exception
+        if (_contractMode == EmitContractMode.Release)
+        {
+            return $"if (!({condition})) throw new Calor.Runtime.ContractViolationException(\"{EscapeString(functionId)}\", Calor.Runtime.ContractKind.Ensures);";
+        }
+
+        // Debug mode: full details
         var message = node.Message != null
-            ? $"\"{EscapeString(node.Message)}\""
-            : $"\"Postcondition failed: {EscapeString(condition)}\"";
-        return $"if (!({condition})) throw new InvalidOperationException({message});";
+            ? EscapeString(node.Message)
+            : $"Postcondition failed: {EscapeString(condition)}";
+        var sourceFile = _currentFilePath != null ? $"\"{EscapeString(_currentFilePath)}\"" : "null";
+
+        return $"if (!({condition})) throw new Calor.Runtime.ContractViolationException(" +
+               $"\"{message}\", " +
+               $"\"{EscapeString(functionId)}\", " +
+               $"Calor.Runtime.ContractKind.Ensures, " +
+               $"startOffset: {node.Span.Start}, " +
+               $"length: {node.Span.Length}, " +
+               $"sourceFile: {sourceFile}, " +
+               $"line: {node.Span.Line}, " +
+               $"column: {node.Span.Column}, " +
+               $"condition: \"{EscapeString(condition)}\");";
     }
 
     public string Visit(InvariantNode node)
     {
+        // Off mode: no contract checks
+        if (_contractMode == EmitContractMode.Off)
+        {
+            return ""; // No check emitted
+        }
+
         var condition = node.Condition.Accept(this);
+        var functionId = _currentFunctionId ?? "unknown";
+
+        // Release mode: lean exception
+        if (_contractMode == EmitContractMode.Release)
+        {
+            return $"if (!({condition})) throw new Calor.Runtime.ContractViolationException(\"{EscapeString(functionId)}\", Calor.Runtime.ContractKind.Invariant);";
+        }
+
+        // Debug mode: full details
         var message = node.Message != null
-            ? $"\"{EscapeString(node.Message)}\""
-            : $"\"Invariant violated: {EscapeString(condition)}\"";
-        return $"if (!({condition})) throw new InvalidOperationException({message});";
+            ? EscapeString(node.Message)
+            : $"Invariant violated: {EscapeString(condition)}";
+        var sourceFile = _currentFilePath != null ? $"\"{EscapeString(_currentFilePath)}\"" : "null";
+
+        return $"if (!({condition})) throw new Calor.Runtime.ContractViolationException(" +
+               $"\"{message}\", " +
+               $"\"{EscapeString(functionId)}\", " +
+               $"Calor.Runtime.ContractKind.Invariant, " +
+               $"startOffset: {node.Span.Start}, " +
+               $"length: {node.Span.Length}, " +
+               $"sourceFile: {sourceFile}, " +
+               $"line: {node.Span.Line}, " +
+               $"column: {node.Span.Column}, " +
+               $"condition: \"{EscapeString(condition)}\");";
     }
 
     private static string EscapeString(string s)
