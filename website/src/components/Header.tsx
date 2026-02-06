@@ -28,76 +28,81 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between p-4 lg:px-8">
-        <div className="flex lg:flex-1">
-          <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">
-            <Image
-              src={`${basePath}/calor-logo.png`}
-              alt="Calor logo"
-              width={32}
-              height={32}
-              className="h-8 w-8"
-            />
-            <span className="text-xl font-bold">Calor</span>
-          </Link>
-        </div>
-
-        <div className="flex lg:hidden">
-          <button
-            type="button"
-            className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5"
-            onClick={() => setMobileMenuOpen(true)}
-          >
-            <span className="sr-only">Open main menu</span>
-            <Menu className="h-6 w-6" aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="hidden lg:flex lg:gap-x-8">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                'text-sm font-medium transition-colors hover:text-primary',
-                pathname?.startsWith(item.path.replace(/\/$/, ''))
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
-              )}
-            >
-              {item.name}
+    <>
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <nav className="mx-auto flex max-w-7xl items-center justify-between p-4 lg:px-8">
+          <div className="flex lg:flex-1">
+            <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">
+              <Image
+                src={`${basePath}/calor-logo.png`}
+                alt="Calor logo"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
+              <span className="text-xl font-bold">Calor</span>
             </Link>
-          ))}
-        </div>
+          </div>
 
-        <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
-          <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
-            {isDark ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-            <span className="sr-only">Toggle dark mode</span>
-          </Button>
-          <Button variant="ghost" size="icon" asChild>
-            <a
-              href="https://github.com/juanmicrosoft/calor"
-              target="_blank"
-              rel="noopener noreferrer"
+          <div className="flex lg:hidden">
+            <button
+              type="button"
+              className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5"
+              onClick={() => setMobileMenuOpen(true)}
             >
-              <Github className="h-5 w-5" />
-              <span className="sr-only">GitHub</span>
-            </a>
-          </Button>
-        </div>
-      </nav>
+              <span className="sr-only">Open main menu</span>
+              <Menu className="h-6 w-6" aria-hidden="true" />
+            </button>
+          </div>
 
-      {/* Mobile menu */}
+          <div className="hidden lg:flex lg:gap-x-8">
+            {navigation.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  'text-sm font-medium transition-colors hover:text-primary',
+                  pathname?.startsWith(item.path.replace(/\/$/, ''))
+                    ? 'text-primary'
+                    : 'text-muted-foreground'
+                )}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+
+          <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
+            <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
+              {isDark ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+              <span className="sr-only">Toggle dark mode</span>
+            </Button>
+            <Button variant="ghost" size="icon" asChild>
+              <a
+                href="https://github.com/juanmicrosoft/calor"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Github className="h-5 w-5" />
+                <span className="sr-only">GitHub</span>
+              </a>
+            </Button>
+          </div>
+        </nav>
+      </header>
+
+      {/* Mobile menu - rendered outside header to avoid stacking context issues */}
       {mobileMenuOpen && (
-        <div className="lg:hidden">
-          <div className="fixed inset-0 z-50" />
-          <div className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-background px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-border">
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="fixed inset-y-0 right-0 w-full overflow-y-auto bg-background p-4 sm:max-w-sm sm:ring-1 sm:ring-border">
             <div className="flex items-center justify-between">
               <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">
                 <Image
@@ -111,7 +116,7 @@ export function Header() {
               </Link>
               <button
                 type="button"
-                className="-m-2.5 rounded-md p-2.5"
+                className="-m-2.5 rounded-md p-2.5 text-foreground"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <span className="sr-only">Close menu</span>
@@ -125,7 +130,7 @@ export function Header() {
                     <Link
                       key={item.name}
                       href={item.href}
-                      className="-mx-3 block rounded-lg px-3 py-2 text-base font-semibold leading-7 hover:bg-accent"
+                      className="-mx-3 block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-foreground hover:bg-accent"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {item.name}
@@ -155,6 +160,6 @@ export function Header() {
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 }
