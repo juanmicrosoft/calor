@@ -12,6 +12,27 @@ Calor (Optimized Programming for Agents Language) compiles to C# via .NET.
 - Use arrow syntax for conditionals: `§IF{id} condition → action`
 - Use `§P` for print, `§B` for bindings, `§R` for return
 
+## Semantic Guarantees
+
+Calor has formal semantics (v1.0.0) that differ from C#. **Do not assume C# behavior.**
+
+| Rule | Calor Behavior | Test |
+|------|----------------|------|
+| Evaluation Order | Strictly left-to-right for all expressions | S1, S2 |
+| Short-Circuit | `&&`/`||` always short-circuit | S3, S4 |
+| Scoping | Lexical with shadowing; inner scope does NOT mutate outer | S5 |
+| Integer Overflow | TRAP by default (throws `OverflowException`) | S7 |
+| Type Coercion | Explicit for narrowing; implicit only for widening | S8 |
+| Contracts | `§Q` before body, `§S` after body | S10 |
+
+**Always declare semantics version in modules:**
+```calor
+§M{m001:MyModule}
+  §SEMVER[1.0.0]
+```
+
+See `docs/semantics/core.md` for full specification.
+
 ## Structure Tags
 
 ```
@@ -183,6 +204,7 @@ Example with class and method:
 
 ```calor
 §M{m001:FizzBuzz}
+  §SEMVER[1.0.0]
 §F{f001:Main:pub}
   §O{void}
   §E{cw}
@@ -201,6 +223,7 @@ Example with class and method:
 
 ```calor
 §M{m001:Math}
+  §SEMVER[1.0.0]
 §F{f001:SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -216,6 +239,7 @@ Example with class and method:
 
 ```calor
 §M{m001:DataProcessor}
+  §SEMVER[1.0.0]
 §CLASS{c001:DataProcessor}
   §FLD{[u8]:_buffer:priv}
   §FLD{[i32]:_indices:priv}

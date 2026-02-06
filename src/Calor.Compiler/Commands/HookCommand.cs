@@ -27,6 +27,9 @@ public static class HookCommand
         var command = new Command("hook", "AI agent hook commands for Calor-first enforcement");
 
         command.AddCommand(CreateValidateWriteCommand());
+        command.AddCommand(CreateValidateEditCommand());
+        command.AddCommand(CreateValidateCalrContentCommand());
+        command.AddCommand(CreatePostWriteLintCommand());
 
         return command;
     }
@@ -83,7 +86,11 @@ public static class HookCommand
         }
         else
         {
-            var systemMessage = $"This is an Calor-first project. Create an .calr file instead: {suggestedPath}\n\nUse @calor skill for Calor syntax help.";
+            var systemMessage = $"This is a Calor-first project. Create an .calr file instead: {suggestedPath}\n\n" +
+                                "Calor has formal semantics v1.0.0. Key rules:\n" +
+                                "- Overflow traps, evaluation is left-to-right\n" +
+                                "- Always add §SEMVER[1.0.0] to modules\n\n" +
+                                "Use @calor for syntax, @calor-semantics for behavior rules.";
             response = new GeminiDenyResponse
             {
                 Decision = "deny",
@@ -156,9 +163,13 @@ public static class HookCommand
                 var suggestedPath = Path.ChangeExtension(path, ".calr");
 
                 var blockReason = $"BLOCKED: Cannot create C# file '{path}'\n\n" +
-                                  "This is an Calor-first project. Create an .calr file instead:\n" +
+                                  "This is a Calor-first project. Create an .calr file instead:\n" +
                                   $"  {suggestedPath}\n\n" +
-                                  "Use /calor skill for Calor syntax help.";
+                                  "IMPORTANT: Calor has formal semantics that differ from C#:\n" +
+                                  "  - Integer overflow TRAPS (throws OverflowException)\n" +
+                                  "  - Evaluation is strictly left-to-right\n" +
+                                  "  - Always include §SEMVER[1.0.0] in modules\n\n" +
+                                  "Use /calor skill for syntax, /calor-semantics for behavior rules.";
 
                 return (1, blockReason, suggestedPath);
             }
@@ -170,6 +181,224 @@ public static class HookCommand
         {
             // If we can't parse the JSON, allow the operation
             return (0, null, null);
+        }
+    }
+
+    private static Command CreateValidateEditCommand()
+    {
+        var inputArgument = new Argument<string>(
+            name: "tool-input",
+            description: "The JSON tool input from the AI agent");
+
+        var formatOption = new Option<string?>(
+            aliases: new[] { "--format", "-f" },
+            description: "Output format: 'gemini' for JSON response, default for exit codes only");
+
+        var command = new Command("validate-edit", "Validate an Edit tool call to enforce Calor-first development")
+        {
+            inputArgument,
+            formatOption
+        };
+
+        command.SetHandler((System.CommandLine.Invocation.InvocationContext context) =>
+        {
+            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
+            var format = context.ParseResult.GetValueForOption(formatOption);
+
+            // Edit validation uses the same logic as Write validation
+            var (exitCode, blockReason, suggestedPath) = ValidateWriteWithReason(toolInputJson);
+
+            if (string.Equals(format, "gemini", StringComparison.OrdinalIgnoreCase))
+            {
+                OutputGeminiResponse(exitCode, blockReason, suggestedPath);
+            }
+            else
+            {
+                if (exitCode != 0 && !string.IsNullOrEmpty(blockReason))
+                {
+                    // Adjust message for Edit context
+                    var editBlockReason = blockReason.Replace("Cannot create", "Cannot edit");
+                    Console.Error.WriteLine(editBlockReason);
+                }
+            }
+
+            context.ExitCode = exitCode;
+        });
+
+        return command;
+    }
+
+    private static Command CreateValidateCalrContentCommand()
+    {
+        var inputArgument = new Argument<string>(
+            name: "tool-input",
+            description: "The JSON tool input from the AI agent");
+
+        var command = new Command("validate-calr-content", "Check .calr file content for semantic version declaration")
+        {
+            inputArgument
+        };
+
+        command.SetHandler((System.CommandLine.Invocation.InvocationContext context) =>
+        {
+            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
+            var (exitCode, warning) = ValidateCalrContent(toolInputJson);
+
+            if (!string.IsNullOrEmpty(warning))
+            {
+                Console.Error.WriteLine(warning);
+            }
+
+            context.ExitCode = exitCode;
+        });
+
+        return command;
+    }
+
+    /// <summary>
+    /// Validates .calr file content for semantic version declaration.
+    /// Returns (0, warning) - always allows but may warn if §SEMVER is missing.
+    /// </summary>
+    public static (int ExitCode, string? Warning) ValidateCalrContent(string toolInputJson)
+    {
+        try
+        {
+            var input = JsonSerializer.Deserialize<WriteToolInput>(toolInputJson, JsonOptions);
+
+            if (input == null)
+            {
+                return (0, null);
+            }
+
+            var path = input.FilePathSnake ?? input.FilePathCamel;
+            var content = input.Content;
+
+            // Only check .calr files
+            if (string.IsNullOrEmpty(path) || !path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
+            {
+                return (0, null);
+            }
+
+            // Check if content contains §SEMVER declaration
+            if (string.IsNullOrEmpty(content))
+            {
+                return (0, null);
+            }
+
+            // Look for §SEMVER[x.y.z] or §SEMVER{x.y.z}
+            if (!content.Contains("§SEMVER[") && !content.Contains("§SEMVER{"))
+            {
+                return (0, "REMINDER: Add §SEMVER[1.0.0] to your module for semantic versioning");
+            }
+
+            return (0, null);
+        }
+        catch (JsonException)
+        {
+            return (0, null);
+        }
+    }
+
+    private static Command CreatePostWriteLintCommand()
+    {
+        var inputArgument = new Argument<string>(
+            name: "tool-input",
+            description: "The JSON tool input from the AI agent");
+
+        var command = new Command("post-write-lint", "Run lint check after .calr file is written")
+        {
+            inputArgument
+        };
+
+        command.SetHandler(async (System.CommandLine.Invocation.InvocationContext context) =>
+        {
+            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
+            var exitCode = await PostWriteLintAsync(toolInputJson);
+            context.ExitCode = exitCode;
+        });
+
+        return command;
+    }
+
+    /// <summary>
+    /// Runs lint check on .calr files after they are written.
+    /// Returns 0 if OK or not a .calr file, 1 if lint issues found.
+    /// </summary>
+    public static async Task<int> PostWriteLintAsync(string toolInputJson)
+    {
+        try
+        {
+            var input = JsonSerializer.Deserialize<WriteToolInput>(toolInputJson, JsonOptions);
+
+            if (input == null)
+            {
+                return 0;
+            }
+
+            var path = input.FilePathSnake ?? input.FilePathCamel;
+
+            // Only lint .calr files
+            if (string.IsNullOrEmpty(path) || !path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            // Check if file exists
+            if (!File.Exists(path))
+            {
+                return 0;
+            }
+
+            // Run calor lint --check on the file
+            var processInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "calor",
+                Arguments = $"lint --check \"{path}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            try
+            {
+                using var process = System.Diagnostics.Process.Start(processInfo);
+                if (process == null)
+                {
+                    return 0; // Can't start process, don't block
+                }
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode != 0)
+                {
+                    var fileName = Path.GetFileName(path);
+                    Console.Error.WriteLine($"Lint issues found in {fileName}:");
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        Console.Error.WriteLine(output);
+                    }
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        Console.Error.WriteLine(error);
+                    }
+                    Console.Error.WriteLine($"\nRun 'calor lint --fix {fileName}' to auto-fix.");
+                    return 1;
+                }
+
+                return 0;
+            }
+            catch
+            {
+                // If calor lint fails to run, don't block the operation
+                return 0;
+            }
+        }
+        catch (JsonException)
+        {
+            return 0;
         }
     }
 

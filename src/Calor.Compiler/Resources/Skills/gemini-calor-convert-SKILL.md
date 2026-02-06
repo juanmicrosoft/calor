@@ -10,6 +10,21 @@ description: Convert C# code to Calor syntax with type mappings, operator conver
 - Use arrow syntax for conditionals: `§IF[id] condition → action`
 - Use `§P` for Console.WriteLine, `§B` for variable bindings
 
+## Semantic Guarantees
+
+When converting C# to Calor, be aware that Calor has stricter semantics:
+
+| C# Behavior | Calor Behavior | Action |
+|-------------|----------------|--------|
+| Unspecified argument order | Left-to-right (S1) | Safe to convert |
+| Unchecked arithmetic | Overflow traps (S7) | Consider if overflow expected |
+| Implicit narrowing | Explicit required (S8) | Add `§CAST` |
+| Guard clauses | Use `§Q` contracts | Convert to preconditions |
+
+**Always add `§SEMVER[1.0.0]` to converted modules.**
+
+See `docs/semantics/core.md` for full specification.
+
 ## Type Mappings
 
 | C# | Calor |
@@ -225,6 +240,7 @@ namespace Calculator {
 ### Calor Output
 ```calor
 §M[m001:Calculator]
+§SEMVER[1.0.0]
 §F[f001:Main:pub]
   §O[void]
   §E[cw]

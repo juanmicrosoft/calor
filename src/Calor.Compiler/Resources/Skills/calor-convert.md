@@ -5,6 +5,21 @@
 - Use arrow syntax for conditionals: `§IF[id] condition → action`
 - Use `§P` for Console.WriteLine, `§B` for variable bindings
 
+## Semantic Guarantees
+
+When converting C# to Calor, be aware that Calor has stricter semantics:
+
+| C# Behavior | Calor Behavior | Action |
+|-------------|----------------|--------|
+| Unspecified argument order | Left-to-right (S1) | Safe to convert |
+| Unchecked arithmetic | Overflow traps (S7) | Consider if overflow expected |
+| Implicit narrowing | Explicit required (S8) | Add `§CAST` |
+| Guard clauses | Use `§Q` contracts | Convert to preconditions |
+
+**Always add `§SEMVER[1.0.0]` to converted modules.**
+
+See `docs/semantics/core.md` for full specification.
+
 ## Agent-Optimized Format Rules
 
 Calor uses a compact format optimized for AI agents:
@@ -275,6 +290,7 @@ namespace Calculator {
 ### Calor Output
 ```calor
 §M{m1:Calculator}
+§SEMVER[1.0.0]
 §F{f1:Main:pub}
 §O{void}
 §E{cw}

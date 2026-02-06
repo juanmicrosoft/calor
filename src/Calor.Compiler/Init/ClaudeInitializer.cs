@@ -37,9 +37,14 @@ public class ClaudeInitializer : IAiInitializer
             var convertSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "calor-convert");
             Directory.CreateDirectory(convertSkillDir);
 
+            // Create .claude/skills/calor-semantics/ directory
+            var semanticsSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "calor-semantics");
+            Directory.CreateDirectory(semanticsSkillDir);
+
             // Write skill files (Claude uses SKILL.md format with YAML frontmatter)
             var calorSkillPath = Path.Combine(calorSkillDir, "SKILL.md");
             var convertSkillPath = Path.Combine(convertSkillDir, "SKILL.md");
+            var semanticsSkillPath = Path.Combine(semanticsSkillDir, "SKILL.md");
 
             if (await WriteFileIfNeeded(calorSkillPath, EmbeddedResourceHelper.ReadSkill("claude-calor-SKILL.md"), force))
             {
@@ -57,6 +62,15 @@ public class ClaudeInitializer : IAiInitializer
             else
             {
                 warnings.Add($"Skipped existing file: {convertSkillPath}");
+            }
+
+            if (await WriteFileIfNeeded(semanticsSkillPath, EmbeddedResourceHelper.ReadSkill("claude-calor-semantics-SKILL.md"), force))
+            {
+                createdFiles.Add(semanticsSkillPath);
+            }
+            else
+            {
+                warnings.Add($"Skipped existing file: {semanticsSkillPath}");
             }
 
             // Create or update CLAUDE.md from template with section-aware handling
@@ -178,7 +192,8 @@ public class ClaudeInitializer : IAiInitializer
 
     private static async Task<HookSettingsResult> ConfigureHooksAsync(string settingsPath, bool force)
     {
-        var calorHookConfig = new ClaudeHookMatcher
+        // PreToolUse hooks: validate-write and validate-calr-content for Write, validate-edit for Edit
+        var writePreHookConfig = new ClaudeHookMatcher
         {
             Matcher = "Write",
             Hooks = new[]
@@ -187,6 +202,38 @@ public class ClaudeInitializer : IAiInitializer
                 {
                     Type = "command",
                     Command = "calor hook validate-write $TOOL_INPUT"
+                },
+                new ClaudeHook
+                {
+                    Type = "command",
+                    Command = "calor hook validate-calr-content $TOOL_INPUT"
+                }
+            }
+        };
+
+        var editPreHookConfig = new ClaudeHookMatcher
+        {
+            Matcher = "Edit",
+            Hooks = new[]
+            {
+                new ClaudeHook
+                {
+                    Type = "command",
+                    Command = "calor hook validate-edit $TOOL_INPUT"
+                }
+            }
+        };
+
+        // PostToolUse hook: post-write-lint for Write
+        var writePostHookConfig = new ClaudeHookMatcher
+        {
+            Matcher = "Write",
+            Hooks = new[]
+            {
+                new ClaudeHook
+                {
+                    Type = "command",
+                    Command = "calor hook post-write-lint $TOOL_INPUT"
                 }
             }
         };
@@ -198,7 +245,8 @@ public class ClaudeInitializer : IAiInitializer
             {
                 Hooks = new ClaudeHooksConfig
                 {
-                    PreToolUse = new[] { calorHookConfig }
+                    PreToolUse = new[] { writePreHookConfig, editPreHookConfig },
+                    PostToolUse = new[] { writePostHookConfig }
                 }
             };
 
@@ -223,7 +271,8 @@ public class ClaudeInitializer : IAiInitializer
                 {
                     Hooks = new ClaudeHooksConfig
                     {
-                        PreToolUse = new[] { calorHookConfig }
+                        PreToolUse = new[] { writePreHookConfig, editPreHookConfig },
+                        PostToolUse = new[] { writePostHookConfig }
                     }
                 };
                 await File.WriteAllTextAsync(settingsPath, JsonSerializer.Serialize(settings, JsonOptions));
@@ -236,20 +285,54 @@ public class ClaudeInitializer : IAiInitializer
         existingSettings ??= new ClaudeSettings();
         existingSettings.Hooks ??= new ClaudeHooksConfig();
 
-        // Check if our hook already exists
-        var existingHooks = existingSettings.Hooks.PreToolUse?.ToList() ?? new List<ClaudeHookMatcher>();
-        var hasCalorHook = existingHooks.Any(h =>
+        var updated = false;
+
+        // Check and add PreToolUse hooks
+        var existingPreHooks = existingSettings.Hooks.PreToolUse?.ToList() ?? new List<ClaudeHookMatcher>();
+
+        // Check for Write validate hook
+        var hasWriteValidateHook = existingPreHooks.Any(h =>
             h.Matcher == "Write" &&
             h.Hooks?.Any(hook => hook.Command?.Contains("calor hook validate-write") == true) == true);
 
-        if (hasCalorHook)
+        if (!hasWriteValidateHook)
+        {
+            existingPreHooks.Add(writePreHookConfig);
+            updated = true;
+        }
+
+        // Check for Edit validate hook
+        var hasEditValidateHook = existingPreHooks.Any(h =>
+            h.Matcher == "Edit" &&
+            h.Hooks?.Any(hook => hook.Command?.Contains("calor hook validate-edit") == true) == true);
+
+        if (!hasEditValidateHook)
+        {
+            existingPreHooks.Add(editPreHookConfig);
+            updated = true;
+        }
+
+        existingSettings.Hooks.PreToolUse = existingPreHooks.ToArray();
+
+        // Check and add PostToolUse hooks
+        var existingPostHooks = existingSettings.Hooks.PostToolUse?.ToList() ?? new List<ClaudeHookMatcher>();
+
+        var hasPostWriteLintHook = existingPostHooks.Any(h =>
+            h.Matcher == "Write" &&
+            h.Hooks?.Any(hook => hook.Command?.Contains("calor hook post-write-lint") == true) == true);
+
+        if (!hasPostWriteLintHook)
+        {
+            existingPostHooks.Add(writePostHookConfig);
+            updated = true;
+        }
+
+        existingSettings.Hooks.PostToolUse = existingPostHooks.ToArray();
+
+        if (!updated)
         {
             return HookSettingsResult.Unchanged;
         }
-
-        // Add our hook
-        existingHooks.Add(calorHookConfig);
-        existingSettings.Hooks.PreToolUse = existingHooks.ToArray();
 
         var newJson = JsonSerializer.Serialize(existingSettings, JsonOptions);
 
@@ -276,6 +359,9 @@ internal class ClaudeHooksConfig
 {
     // PreToolUse must be PascalCase - this is a Claude Code requirement
     public ClaudeHookMatcher[]? PreToolUse { get; set; }
+
+    // PostToolUse must be PascalCase - this is a Claude Code requirement
+    public ClaudeHookMatcher[]? PostToolUse { get; set; }
 }
 
 internal class ClaudeHookMatcher
