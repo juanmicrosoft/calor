@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-02-06
+
+### Changed
+- Documentation updated to remove v1/v2 version references
+- Fixed invalid tokens in documentation to match current lexer (§SM, §NN, §CL, §MT, §IV, §TH)
+
 ## [0.1.8] - 2026-02-05
 
 ### Added
