@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-02-05
+
+### Added
+- New documentation page: "The Verification Opportunity" explaining why effects and contracts enforcement is a key value proposition
+- "Learn more" links on landing page feature cards for Contracts and Effects
+
 ## [0.1.7] - 2026-02-05
 
 ### Added
