@@ -3,56 +3,31 @@ using Calor.Compiler.Ast;
 namespace Calor.Compiler.Parsing;
 
 /// <summary>
-/// Helper for interpreting v2 positional attributes in context.
-/// Maps positional attributes to their v1 named equivalents.
+/// Helper for interpreting positional attributes in context.
 /// </summary>
-public static class V2AttributeHelper
+public static class AttributeHelper
 {
     /// <summary>
-    /// Interprets attributes for MODULE/§M: [id:name]
+    /// Interprets attributes for MODULE/§M: {id:name}
     /// </summary>
     public static (string Id, string Name) InterpretModuleAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return (v1Id, attrs["name"] ?? "");
-        }
-
-        // v2 positional format: [id:name]
         return (attrs["_pos0"] ?? "", attrs["_pos1"] ?? "");
     }
 
     /// <summary>
-    /// Interprets attributes for END_MODULE/§/M: [id]
+    /// Interprets attributes for END_MODULE/§/M: {id}
     /// </summary>
     public static string InterpretEndModuleAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return v1Id;
-        }
-
-        // v2 positional format: [id]
         return attrs["_pos0"] ?? "";
     }
 
     /// <summary>
-    /// Interprets attributes for FUNC/§F: [id:name:visibility]
+    /// Interprets attributes for FUNC/§F: {id:name:visibility}
     /// </summary>
     public static (string Id, string Name, string Visibility) InterpretFuncAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return (v1Id, attrs["name"] ?? "", attrs["visibility"] ?? "private");
-        }
-
-        // v2 positional format: [id:name:visibility] or [id:name] (private default)
         var visibility = attrs["_pos2"] ?? "";
         if (string.IsNullOrEmpty(visibility))
         {
@@ -75,34 +50,18 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for END_FUNC/§/F: [id]
+    /// Interprets attributes for END_FUNC/§/F: {id}
     /// </summary>
     public static string InterpretEndFuncAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return v1Id;
-        }
-
-        // v2 positional format: [id]
         return attrs["_pos0"] ?? "";
     }
 
     /// <summary>
-    /// Interprets attributes for IN/§I: [type:name:semantic]
+    /// Interprets attributes for IN/§I: {type:name:semantic}
     /// </summary>
     public static (string Type, string Name, string? Semantic) InterpretInputAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Type = attrs["type"];
-        if (!string.IsNullOrEmpty(v1Type))
-        {
-            return (v1Type, attrs["name"] ?? "", attrs["semantic"]);
-        }
-
-        // v2 positional format: [type:name:semantic] or [type:name]
         var semantic = attrs["_pos2"];
         if (!string.IsNullOrEmpty(semantic) && semantic.StartsWith('#'))
         {
@@ -114,36 +73,19 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for OUT/§O: [type]
+    /// Interprets attributes for OUT/§O: {type}
     /// </summary>
     public static string InterpretOutputAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Type = attrs["type"];
-        if (!string.IsNullOrEmpty(v1Type))
-        {
-            return v1Type;
-        }
-
-        // v2 positional format: [type]
         var compactType = attrs["_pos0"] ?? "";
         return ExpandType(compactType);
     }
 
     /// <summary>
-    /// Interprets attributes for CALL/§C: [target] or [target!]
+    /// Interprets attributes for CALL/§C: {target} or {target!}
     /// </summary>
     public static (string Target, bool Fallible) InterpretCallAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Target = attrs["target"];
-        if (!string.IsNullOrEmpty(v1Target))
-        {
-            var fallible = attrs["fallible"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false;
-            return (v1Target, fallible);
-        }
-
-        // v2 positional format: [target] or [target!]
         var target = attrs["_pos0"] ?? "";
         var isFallible = target.EndsWith('!');
         if (isFallible)
@@ -155,19 +97,10 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for BIND/§B: [name] or [~name]
+    /// Interprets attributes for BIND/§B: {name} or {~name}
     /// </summary>
     public static (string Name, bool Mutable) InterpretBindAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Name = attrs["name"];
-        if (!string.IsNullOrEmpty(v1Name))
-        {
-            var mutable = attrs["mutable"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false;
-            return (v1Name, mutable);
-        }
-
-        // v2 positional format: [name] or [~name]
         var name = attrs["_pos0"] ?? "";
         var isMutable = name.StartsWith('~');
         if (isMutable)
@@ -179,18 +112,10 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for FOR/§L (loop): [id:var:from:to:step]
+    /// Interprets attributes for FOR/§L (loop): {id:var:from:to:step}
     /// </summary>
     public static (string Id, string Var, string From, string To, string Step) InterpretForAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return (v1Id, attrs["var"] ?? "", attrs["from"] ?? "", attrs["to"] ?? "", attrs["step"] ?? "1");
-        }
-
-        // v2 positional format: [id:var:from:to:step] or [id:var:from:to]
         var step = attrs["_pos4"] ?? "";
         if (string.IsNullOrEmpty(step))
         {
@@ -201,18 +126,10 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for IF/§I: [id]
+    /// Interprets attributes for IF/§IF: {id}
     /// </summary>
     public static string InterpretIfAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return v1Id;
-        }
-
-        // v2 positional format: [id]
         return attrs["_pos0"] ?? "";
     }
 
@@ -221,14 +138,6 @@ public static class V2AttributeHelper
     /// </summary>
     public static string InterpretMatchAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return v1Id;
-        }
-
-        // v2 positional format: {id}
         return attrs["_pos0"] ?? "";
     }
 
@@ -237,30 +146,15 @@ public static class V2AttributeHelper
     /// </summary>
     public static string InterpretEndMatchAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return v1Id;
-        }
-
-        // v2 positional format: {id}
         return attrs["_pos0"] ?? "";
     }
 
     /// <summary>
-    /// Interprets attributes for REQUIRES/§Q: [message]
+    /// Interprets attributes for REQUIRES/§Q: {message}
     /// </summary>
     public static string? InterpretRequiresAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Msg = attrs["message"];
-        if (!string.IsNullOrEmpty(v1Msg))
-        {
-            return v1Msg;
-        }
-
-        // v2 doesn't have positional attributes for requires, just the expression
+        // No positional attributes for requires, just the expression
         return null;
     }
 
@@ -271,15 +165,6 @@ public static class V2AttributeHelper
     {
         var effects = new Dictionary<string, string>();
 
-        // Check for v1 format first
-        var v1Io = attrs["io"];
-        if (!string.IsNullOrEmpty(v1Io))
-        {
-            effects["io"] = v1Io;
-            return effects;
-        }
-
-        // v2 format: effect codes like cw, cr, fw, fr
         for (int i = 0; ; i++)
         {
             var code = attrs[$"_pos{i}"];
@@ -301,7 +186,7 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Expands v2 compact type to v1 full type name.
+    /// Expands compact type to full type name.
     /// </summary>
     public static string ExpandType(string compactType)
     {
@@ -347,7 +232,7 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Expands v2 effect shortcode to category and value.
+    /// Expands effect shortcode to category and value.
     /// </summary>
     public static (string Category, string Value) ExpandEffectCode(string code)
     {
@@ -388,7 +273,7 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Expands v2 semantic shortcode to full description.
+    /// Expands semantic shortcode to full description.
     /// </summary>
     public static string? ExpandSemanticShortcode(string? shortcode)
     {
@@ -421,21 +306,13 @@ public static class V2AttributeHelper
         };
     }
 
-    #region Extended Features - Phase 1: Quick Wins
+    #region Extended Features - Quick Wins
 
     /// <summary>
-    /// Interprets attributes for EXAMPLE/§EX: [id:msg:"message"]
+    /// Interprets attributes for EXAMPLE/§EX: {id:msg:"message"}
     /// </summary>
     public static (string? Id, string? Message) InterpretExampleAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return (v1Id, attrs["msg"] ?? attrs["message"]);
-        }
-
-        // v2 positional format: [id:msg:"message"] or [id] or empty
         var id = attrs["_pos0"];
         var msg = attrs["_pos1"];
 
@@ -449,19 +326,10 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for TODO/FIXME/HACK: [id:category:priority]
+    /// Interprets attributes for TODO/FIXME/HACK: {id:category:priority}
     /// </summary>
     public static (string? Id, string? Category, IssuePriority Priority) InterpretIssueAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            var v1Priority = ParseIssuePriority(attrs["priority"]);
-            return (v1Id, attrs["category"], v1Priority);
-        }
-
-        // v2 positional format: [id:category:priority] or [id:category] or [id]
         var id = attrs["_pos0"];
         var category = attrs["_pos1"];
         var priority = ParseIssuePriority(attrs["_pos2"]);
@@ -486,10 +354,10 @@ public static class V2AttributeHelper
 
     #endregion
 
-    #region Extended Features - Phase 2: Core Features
+    #region Extended Features - Core Features
 
     /// <summary>
-    /// Interprets attributes for USES/USEDBY: [dep1, dep2, dep3]
+    /// Interprets attributes for USES/USEDBY: {dep1, dep2, dep3}
     /// Returns list of dependency targets.
     /// </summary>
     public static IReadOnlyList<string> InterpretDependencyListAttributes(AttributeCollection attrs)
@@ -508,18 +376,10 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for ASSUME: [category]
+    /// Interprets attributes for ASSUME: {category}
     /// </summary>
     public static AssumptionCategory? InterpretAssumeAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Cat = attrs["category"];
-        if (!string.IsNullOrEmpty(v1Cat))
-        {
-            return ParseAssumptionCategory(v1Cat);
-        }
-
-        // v2 positional format: [category]
         var category = attrs["_pos0"];
         return ParseAssumptionCategory(category);
     }
@@ -542,25 +402,13 @@ public static class V2AttributeHelper
 
     #endregion
 
-    #region Extended Features - Phase 3: Enhanced Contracts
+    #region Extended Features - Enhanced Contracts
 
     /// <summary>
-    /// Interprets attributes for COMPLEXITY: [time:O(n)][space:O(1)] or [worst:time:O(n)]
+    /// Interprets attributes for COMPLEXITY: {time:O(n)}{space:O(1)} or {worst:time:O(n)}
     /// </summary>
     public static (ComplexityClass? Time, ComplexityClass? Space, bool IsWorstCase, string? Custom) InterpretComplexityAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Time = attrs["time"];
-        if (!string.IsNullOrEmpty(v1Time))
-        {
-            var time = ParseComplexityClass(v1Time);
-            var space = ParseComplexityClass(attrs["space"]);
-            var worst = attrs["worst"]?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false;
-            return (time, space, worst, attrs["custom"]);
-        }
-
-        // v2 format: [time:O(n)][space:O(1)] or [worst:time:O(n)]
-        // Check for positional attributes
         ComplexityClass? timeComplexity = null;
         ComplexityClass? spaceComplexity = null;
         bool isWorstCase = false;
@@ -630,34 +478,18 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for SINCE: [version]
+    /// Interprets attributes for SINCE: {version}
     /// </summary>
     public static string InterpretSinceAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Version = attrs["version"];
-        if (!string.IsNullOrEmpty(v1Version))
-        {
-            return v1Version;
-        }
-
-        // v2 positional format: [version]
         return attrs["_pos0"] ?? "";
     }
 
     /// <summary>
-    /// Interprets attributes for DEPRECATED: [since:version][use:replacement][reason:"reason"]
+    /// Interprets attributes for DEPRECATED: {since:version}{use:replacement}{reason:"reason"}
     /// </summary>
     public static (string Since, string? Replacement, string? Reason, string? RemovedIn) InterpretDeprecatedAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Since = attrs["since"];
-        if (!string.IsNullOrEmpty(v1Since))
-        {
-            return (v1Since, attrs["use"] ?? attrs["replacement"], attrs["reason"], attrs["removed"]);
-        }
-
-        // v2 format: parse key:value pairs from positional attributes
         string since = "";
         string? replacement = null;
         string? reason = null;
@@ -684,103 +516,55 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for BREAKING: [version]
+    /// Interprets attributes for BREAKING: {version}
     /// </summary>
     public static string InterpretBreakingAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Version = attrs["version"];
-        if (!string.IsNullOrEmpty(v1Version))
-        {
-            return v1Version;
-        }
-
-        // v2 positional format: [version]
         return attrs["_pos0"] ?? "";
     }
 
     #endregion
 
-    #region Extended Features - Phase 4: Future Extensions
+    #region Extended Features - Future Extensions
 
     /// <summary>
-    /// Interprets attributes for DECISION: [id]
+    /// Interprets attributes for DECISION: {id}
     /// </summary>
     public static string InterpretDecisionAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Id = attrs["id"];
-        if (!string.IsNullOrEmpty(v1Id))
-        {
-            return v1Id;
-        }
-
-        // v2 positional format: [id]
         return attrs["_pos0"] ?? "";
     }
 
     /// <summary>
-    /// Interprets attributes for CONTEXT: [partial] or empty
+    /// Interprets attributes for CONTEXT: {partial} or empty
     /// </summary>
     public static bool InterpretContextAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Partial = attrs["partial"];
-        if (!string.IsNullOrEmpty(v1Partial))
-        {
-            return v1Partial.Equals("true", StringComparison.OrdinalIgnoreCase);
-        }
-
-        // v2 positional format: [partial] means partial=true
         var pos0 = attrs["_pos0"];
         return pos0?.Equals("partial", StringComparison.OrdinalIgnoreCase) ?? false;
     }
 
     /// <summary>
-    /// Interprets attributes for FILE: [path]
+    /// Interprets attributes for FILE: {path}
     /// </summary>
     public static string InterpretFileRefAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Path = attrs["path"];
-        if (!string.IsNullOrEmpty(v1Path))
-        {
-            return v1Path;
-        }
-
-        // v2 positional format: [path]
         return attrs["_pos0"] ?? "";
     }
 
     /// <summary>
-    /// Interprets attributes for FOCUS: [target]
+    /// Interprets attributes for FOCUS: {target}
     /// </summary>
     public static string InterpretFocusAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Target = attrs["target"];
-        if (!string.IsNullOrEmpty(v1Target))
-        {
-            return v1Target;
-        }
-
-        // v2 positional format: [target]
         return attrs["_pos0"] ?? "";
     }
 
     /// <summary>
-    /// Interprets attributes for LOCK: [agent:id][expires:datetime]
+    /// Interprets attributes for LOCK: {agent:id}{expires:datetime}
     /// </summary>
     public static (string AgentId, DateTime? Acquired, DateTime? Expires) InterpretLockAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Agent = attrs["agent"];
-        if (!string.IsNullOrEmpty(v1Agent))
-        {
-            return (v1Agent, TryParseDateTime(attrs["acquired"]), TryParseDateTime(attrs["expires"]));
-        }
-
-        // v2 format: parse key:value pairs from positional attributes
         string agentId = "";
         DateTime? acquired = null;
         DateTime? expires = null;
@@ -802,19 +586,10 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for AUTHOR: [agent:id][date:date][task:taskId]
+    /// Interprets attributes for AUTHOR: {agent:id}{date:date}{task:taskId}
     /// </summary>
     public static (string AgentId, DateOnly Date, string? TaskId) InterpretAuthorAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Agent = attrs["agent"];
-        if (!string.IsNullOrEmpty(v1Agent))
-        {
-            var v1Date = TryParseDateOnly(attrs["date"]) ?? DateOnly.FromDateTime(DateTime.Now);
-            return (v1Agent, v1Date, attrs["task"]);
-        }
-
-        // v2 format: parse key:value pairs from positional attributes
         string agentId = "";
         DateOnly date = DateOnly.FromDateTime(DateTime.Now);
         string? taskId = null;
@@ -836,34 +611,18 @@ public static class V2AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for TASK: [taskId]
+    /// Interprets attributes for TASK: {taskId}
     /// </summary>
     public static string InterpretTaskRefAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Task = attrs["task"] ?? attrs["id"];
-        if (!string.IsNullOrEmpty(v1Task))
-        {
-            return v1Task;
-        }
-
-        // v2 positional format: [taskId]
         return attrs["_pos0"] ?? "";
     }
 
     /// <summary>
-    /// Interprets attributes for DATE: [date]
+    /// Interprets attributes for DATE: {date}
     /// </summary>
     public static DateOnly? InterpretDateAttributes(AttributeCollection attrs)
     {
-        // Check for v1 format first
-        var v1Date = attrs["date"];
-        if (!string.IsNullOrEmpty(v1Date))
-        {
-            return TryParseDateOnly(v1Date);
-        }
-
-        // v2 positional format: date value directly
         return TryParseDateOnly(attrs["_pos0"]);
     }
 
