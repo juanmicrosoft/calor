@@ -1,0 +1,296 @@
+---
+title: "Core Semantics"
+section: "semantics"
+order: 1
+---
+
+# Core Semantics Specification
+
+Version: 1.0.0
+
+This document defines the formal semantics of Calor. These semantics are **backend-independent**—any backend must conform to these rules.
+
+---
+
+## 1. Design Principles
+
+### 1.1 Why "Emits C#" Is Not Enough
+
+**Problem:** An agent-friendly language needs a spec that is tighter than "it emits C#."
+
+Emitting C# can hide semantic gaps:
+
+| What You Write | What You Need to Know |
+|:---------------|:---------------------|
+| `f(a(), b())` | Is `a()` guaranteed to be called before `b()`? |
+| `x + y` | What happens if the result overflows? |
+| `inner.x = 1` | Does this shadow or mutate the outer `x`? |
+| `return` in `if` | Does this return from the function or just the block? |
+
+If these answers depend on C# implementation details, agents cannot reliably reason about their code. **If the semantics are not crisp, you get "works on this compiler version" behavior, and that kills trust.**
+
+### 1.2 Backend Independence
+
+> **Key Principle:** The semantics of Calor are defined independently of any backend. The C# emitter must conform to Calor semantics, not define them.
+
+The backend must:
+- Enforce evaluation order through code generation
+- Never rely on unspecified backend behavior
+- Generate explicit temporaries when needed to preserve semantics
+
+### 1.3 Safety First
+
+Calor prioritizes safety and predictability:
+- Overflow traps by default (no silent wraparound bugs)
+- Explicit type conversions for narrowing (no accidental data loss)
+- Contracts are first-class semantic constructs (not just comments)
+- Effects are tracked and enforced (side effects are visible)
+
+---
+
+## 2. Evaluation Order
+
+### 2.1 Left-to-Right Evaluation
+
+All expressions with multiple sub-expressions are evaluated **strictly left-to-right**.
+
+#### Function Arguments
+
+```
+f(a(), b(), c())
+```
+
+**Semantics:** Evaluate `a()`, then `b()`, then `c()`, then call `f`.
+
+**Rationale:** Predictable side-effect ordering enables reasoning about code behavior.
+
+**Test:** `S1: FunctionArguments_EvaluatedLeftToRight`
+
+#### Binary Operators
+
+```
+a() + b() + c()
+```
+
+**Semantics:** Evaluate `a()`, then `b()`, compute `a() + b()`, then evaluate `c()`, compute result.
+
+**Test:** `S2: BinaryOperators_EvaluatedLeftToRight`
+
+### 2.2 Short-Circuit Evaluation
+
+Logical operators `&&` and `||` use short-circuit evaluation.
+
+#### Logical AND (`&&`)
+
+```
+left && right
+```
+
+**Semantics:**
+1. Evaluate `left`
+2. If `left` is `false`, result is `false` (do NOT evaluate `right`)
+3. If `left` is `true`, evaluate `right` and return its value
+
+**Test:** `S3: LogicalAnd_ShortCircuits`
+
+#### Logical OR (`||`)
+
+```
+left || right
+```
+
+**Semantics:**
+1. Evaluate `left`
+2. If `left` is `true`, result is `true` (do NOT evaluate `right`)
+3. If `left` is `false`, evaluate `right` and return its value
+
+**Test:** `S4: LogicalOr_ShortCircuits`
+
+### 2.3 Conditional Expressions
+
+```
+condition ? whenTrue : whenFalse
+```
+
+**Semantics:**
+1. Evaluate `condition`
+2. If `true`, evaluate and return `whenTrue` (do NOT evaluate `whenFalse`)
+3. If `false`, evaluate and return `whenFalse` (do NOT evaluate `whenTrue`)
+
+---
+
+## 3. Scoping Rules
+
+### 3.1 Lexical Scoping
+
+Calor uses **lexical scoping** with parent chain lookup.
+
+```
+§B{x} INT:1
+§IF{if1} BOOL:true
+  §B{x} INT:2   // Shadows outer x
+  §P x          // Prints 2
+§/I{if1}
+§P x            // Prints 1 (outer x unchanged)
+```
+
+### 3.2 Shadowing
+
+Inner scope bindings **shadow** outer bindings with the same name.
+
+**Key Semantics:**
+- Inner binding takes precedence within its scope
+- Shadowing does NOT mutate the outer binding
+- When inner scope exits, outer binding is restored
+
+**Test:** `S5: LexicalScoping_InnerReadsOuter`
+
+### 3.3 Scope Resolution Order
+
+1. Look up in current scope
+2. If not found, look up in parent scope
+3. Continue until found or root scope reached
+4. If not found in any scope, emit `Calor0200: UndefinedReference`
+
+### 3.4 Return from Nested Scope
+
+Return statements in nested scopes must correctly unwind to the function boundary.
+
+```
+§IF{if1} BOOL:true
+  §R INT:42   // Returns from function, not just if block
+§/I{if1}
+```
+
+**Test:** `S6: ReturnFromNestedScope`
+
+---
+
+## 4. Numeric Semantics
+
+### 4.1 Integer Overflow
+
+**Default Behavior:** TRAP (throw `OverflowException`)
+
+```
+§B{max} INT:2147483647
+§B{result} (+ max INT:1)
+// Throws OverflowException
+```
+
+**Rationale:** Safety-first philosophy aligns with the contracts design. Silent wraparound can hide bugs.
+
+**Compiler Flag:** `--overflow=[trap|wrap]`
+- `trap` (default): Overflow throws `OverflowException`
+- `wrap`: Overflow wraps around (two's complement)
+
+**Test:** `S7: IntegerOverflow_Traps`
+
+### 4.2 Type Coercion
+
+| Conversion | Behavior | Rationale |
+|:-----------|:---------|:----------|
+| INT to FLOAT | Implicit (widening) | No precision loss |
+| FLOAT to INT | Explicit required | Potential precision loss |
+| Narrowing | Explicit required | Data may be lost |
+
+```
+§B{i} INT:42
+§B{f} i           // OK: implicit widening to float
+§B{j} §CAST{INT} f  // Required: explicit narrowing
+```
+
+**Test:** `S8: NumericConversion_IntToFloat`
+
+### 4.3 Division
+
+- Integer division: Truncates toward zero
+- Division by zero: Throws `DivideByZeroException`
+- Float division by zero: Returns `Infinity` or `NaN` per IEEE 754
+
+---
+
+## 5. Contracts
+
+Contracts are semantic constructs that specify behavioral requirements.
+
+### 5.1 Preconditions (REQUIRES)
+
+```
+§Q (> x INT:0)
+```
+
+**Semantics:**
+1. Evaluated **before** function body execution
+2. Has access to all function parameters
+3. If condition is `false`, throws `ContractViolationException`
+4. Exception includes function identifier
+
+**Test:** `S10: RequiresFails_ThrowsContractViolation`
+
+### 5.2 Postconditions (ENSURES)
+
+```
+§S (> result INT:0)
+```
+
+**Semantics:**
+1. Evaluated **after** function body, **before** return
+2. Has access to parameters and special `result` binding
+3. If condition is `false`, throws `ContractViolationException`
+
+### 5.3 Contract Evaluation Order
+
+1. All REQUIRES clauses (in declaration order)
+2. Function body
+3. All ENSURES clauses (in declaration order)
+
+---
+
+## 6. Option and Result Types
+
+### 6.1 Option<T>
+
+Represents an optional value: either `Some(value)` or `None`.
+
+**Semantics:**
+- `Some(v)` wraps a value
+- `None` represents absence of value
+- Must be pattern-matched or explicitly unwrapped
+
+**Test:** `S9: OptionNone_BehavesCorrectly`
+
+### 6.2 Result<T,E>
+
+Represents a computation that may fail: either `Ok(value)` or `Err(error)`.
+
+---
+
+## 7. Effects System
+
+Effects track side-effect capabilities of functions.
+
+### 7.1 Effect Categories
+
+| Effect | Symbol | Description |
+|:-------|:-------|:------------|
+| Console Read | `cr` | Reads from console |
+| Console Write | `cw` | Writes to console |
+| File Read | `fr` | Reads from files |
+| File Write | `fw` | Writes to files |
+| Network Read | `nr` | Network input |
+| Network Write | `nw` | Network output |
+
+### 7.2 Effect Enforcement
+
+Functions may only:
+1. Perform effects they declare
+2. Call functions whose effects are subsets of their own
+
+---
+
+## References
+
+- [Normal Form Specification](/docs/semantics/normal-form/)
+- [.NET Backend Specification](/docs/semantics/dotnet-backend/)
+- [Versioning Specification](/docs/semantics/versioning/)

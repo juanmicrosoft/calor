@@ -1,0 +1,219 @@
+---
+title: "Normal Form (CNF)"
+section: "semantics"
+order: 3
+---
+
+# Calor Normal Form (CNF)
+
+Version: 1.0.0
+
+This document specifies the Calor Normal Form (CNF), an intermediate representation that makes evaluation semantics explicit.
+
+---
+
+## The Problem: Backend-Dependent Semantics
+
+When compiling directly to a backend language (like C#), semantic decisions can become implicit:
+
+```
+result = f(a(), b()) + c()
+```
+
+Direct compilation to C# might produce:
+
+```csharp
+var result = f(a(), b()) + c();
+```
+
+This **delegates** evaluation order to C#. If C# changes its evaluation order (or if a different backend has different rules), the code's behavior changes silently.
+
+**CNF prevents this by making every semantic decision explicit in the IR.**
+
+---
+
+## Purpose
+
+CNF is an intermediate representation (IR) between the Calor AST and backend code generation. Its purpose is to:
+
+1. **Make evaluation order explicit** - Temporaries enforce left-to-right evaluation
+2. **Introduce explicit temporaries** - All intermediate values have names
+3. **Linearize control flow** - Branch/label/goto instead of structured control
+4. **Remove implicit conversions** - All conversions are explicit nodes
+
+By lowering to CNF before emitting backend code, we guarantee that **Calor semantics are enforced regardless of backend**.
+
+---
+
+## Pipeline Position
+
+```
+Source -> Parser -> AST -> TypeChecker -> Binder -> CNF Lowering -> CNF -> Backend -> Output
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^
+                                                    Semantics enforced here
+```
+
+---
+
+## CNF Node Types
+
+### Expressions (Atomic)
+
+CNF expressions are always atomic—they reference either literals, variables, or the results of previous operations.
+
+| Node | Description |
+|:-----|:------------|
+| `CnfLiteral` | Constant value (42, 3.14, true, "hello") |
+| `CnfVariableRef` | Reference to a named variable |
+| `CnfBinaryOp` | Binary operation on two atomic operands |
+| `CnfUnaryOp` | Unary operation on one atomic operand |
+| `CnfCall` | Function call with atomic arguments |
+| `CnfConversion` | Explicit type conversion |
+
+### Statements
+
+| Node | Description |
+|:-----|:------------|
+| `CnfAssign` | Assign value to variable |
+| `CnfSequence` | Ordered list of statements |
+| `CnfBranch` | Conditional jump to label |
+| `CnfLabel` | Target for jumps |
+| `CnfGoto` | Unconditional jump |
+| `CnfReturn` | Return from function |
+| `CnfThrow` | Throw exception |
+| `CnfTry` | Try/catch/finally block |
+
+---
+
+## Lowering Examples
+
+### Binary Operations
+
+**Source:**
+```
+§R (+ (* a b) c)
+```
+
+**CNF:**
+```
+t1 = CnfBinaryOp(Multiply, a, b)
+t2 = CnfBinaryOp(Add, t1, c)
+return t2
+```
+
+The evaluation order is now explicit: `a * b` is computed first, stored in `t1`, then `t1 + c` is computed.
+
+### Short-Circuit AND
+
+**Source:**
+```
+§R (&& A B)
+```
+
+**CNF:**
+```
+t_result = false
+branch A -> then_block, end_block
+then_block:
+  t_result = B
+  goto end_block
+end_block:
+return t_result
+```
+
+Short-circuit semantics are now explicit control flow. If `A` is false, `B` is never evaluated.
+
+### Short-Circuit OR
+
+**Source:**
+```
+§R (|| A B)
+```
+
+**CNF:**
+```
+t_result = true
+branch A -> end_block, else_block
+else_block:
+  t_result = B
+  goto end_block
+end_block:
+return t_result
+```
+
+If `A` is true, `B` is never evaluated.
+
+### Function Call
+
+**Source:**
+```
+§R (f (a) (b) (c))
+```
+
+**CNF:**
+```
+t1 = call a()
+t2 = call b()
+t3 = call c()
+t4 = call f(t1, t2, t3)
+return t4
+```
+
+Arguments are evaluated left-to-right, stored in temporaries, then the function is called.
+
+---
+
+## Design Principles
+
+### Explicit Over Implicit
+
+Every semantic operation is a visible node. There are no hidden evaluation orders or implicit conversions.
+
+### Flat Structure
+
+No deeply nested expressions. Every intermediate value has a name.
+
+### Backend Agnostic
+
+The same CNF serves all backends. Whether emitting C#, IL, or LLVM IR, the semantics are already decided.
+
+### Verifiable
+
+CNF can be validated against the semantics specification. A `CnfValidator` checks:
+- Variables are defined before use
+- Types are consistent
+- Control flow is well-formed
+
+---
+
+## CNF Validation
+
+The `CnfValidator` checks CNF for correctness:
+
+```csharp
+var validator = new CnfValidator();
+validator.ValidateFunction(func);
+
+if (!validator.IsValid)
+{
+    foreach (var error in validator.Errors)
+    {
+        Console.WriteLine(error);
+    }
+}
+```
+
+### Validation Rules
+
+1. **Definition before use**: Variables must be assigned before referenced
+2. **Type consistency**: Operations must have compatible operand types
+3. **Label targets**: All branch targets must exist
+4. **Return paths**: All code paths must return or throw
+
+---
+
+## References
+
+- [Core Semantics](/docs/semantics/core/)
+- [.NET Backend](/docs/semantics/dotnet-backend/)
+- Implementation: `src/Calor.Compiler/IR/`

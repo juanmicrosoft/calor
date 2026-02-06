@@ -1,0 +1,215 @@
+---
+title: "Versioning"
+section: "semantics"
+order: 2
+---
+
+# Semantics Versioning
+
+Version: 1.0.0
+
+This document specifies how Calor semantics are versioned and how version compatibility is managed.
+
+---
+
+## Why Versioning Matters for Agents
+
+> **Agents will be trained and prompted against specific rules.**
+
+When an agent generates Calor code, it relies on specific semantic behaviors:
+- "Overflow traps" (not wraps)
+- "Left-to-right evaluation" (not unspecified)
+- "`&&` short-circuits" (not eager)
+
+If these rules change between versions without clear versioning:
+1. Agents trained on v1 rules will generate incorrect code on v2 compilers
+2. Prompts that describe v1 behavior will mislead agents on v2
+3. Code that "worked before" will silently break
+
+**Stable versioning ensures that agents know exactly which rules apply.**
+
+---
+
+## Version Format
+
+Calor semantics versions follow [Semantic Versioning 2.0.0](https://semver.org/):
+
+```
+MAJOR.MINOR.PATCH
+```
+
+- **MAJOR**: Breaking semantic changes (agents must be retrained)
+- **MINOR**: Backward-compatible semantic additions (old code still works)
+- **PATCH**: Clarifications, bug fixes in semantics (no behavior change)
+
+---
+
+## Current Version
+
+**Semantics Version: 1.0.0**
+
+This is the initial formal semantics specification.
+
+---
+
+## Version Declaration
+
+Modules can declare their required semantics version:
+
+```
+§M{m001:MyModule}
+  §SEMVER[1.0.0]
+  ...
+§/M{m001}
+```
+
+### Syntax Variants
+
+```
+// Exact version
+§SEMVER[1.0.0]
+
+// Minimum version (any 1.x.x compatible)
+§SEMVER[^1.0.0]
+
+// Range
+§SEMVER[>=1.0.0 <2.0.0]
+```
+
+---
+
+## Compatibility Rules
+
+### Patch Version Changes (x.y.Z)
+
+**Fully compatible.** Changes include:
+- Documentation clarifications
+- Specification bug fixes
+- Test additions
+
+**Example:** 1.0.0 to 1.0.1 is safe.
+
+### Minor Version Changes (x.Y.z)
+
+**Backward compatible.** Changes include:
+- New constructs added
+- New operators added
+- New optional behaviors
+- Extended standard library
+
+**Example:** Code written for 1.0.0 will compile and run correctly under 1.1.0.
+
+### Major Version Changes (X.y.z)
+
+**May be incompatible.** Changes may include:
+- Evaluation order changes
+- Operator precedence changes
+- Type system changes
+- Default behavior changes
+- Removed constructs
+
+**Example:** Code written for 1.x may not work correctly under 2.0.
+
+---
+
+## Compiler Behavior
+
+### Diagnostic Codes
+
+| Code | Severity | Condition |
+|:-----|:---------|:----------|
+| Calor0700 | Warning | Module version newer than compiler (might work) |
+| Calor0701 | Error | Module version incompatible (major mismatch) |
+
+### Compatibility Matrix
+
+| Module Version | Compiler Version | Result |
+|:---------------|:-----------------|:-------|
+| 1.0.0 | 1.0.0 | Compatible |
+| 1.0.0 | 1.1.0 | Compatible |
+| 1.0.0 | 2.0.0 | Compatible |
+| 1.1.0 | 1.0.0 | Warning (Calor0700) |
+| 2.0.0 | 1.0.0 | Error (Calor0701) |
+
+---
+
+## Version History
+
+### Version 1.0.0 (Current)
+
+Initial formal semantics specification including:
+
+**Evaluation Order**
+- Left-to-right function argument evaluation
+- Left-to-right binary operator evaluation
+- Short-circuit `&&` and `||`
+
+**Scoping**
+- Lexical scoping with parent chain lookup
+- Inner scope shadows outer
+- Return from nested scope
+
+**Numeric Semantics**
+- Integer overflow traps by default
+- INT to FLOAT implicit
+- FLOAT to INT explicit
+
+**Contracts**
+- REQUIRES evaluated before body
+- ENSURES evaluated after body with `result` binding
+- ContractViolationException with FunctionId
+
+---
+
+## When to Bump Versions
+
+### Bump MAJOR When
+
+- Changing evaluation order of existing constructs
+- Changing default overflow behavior
+- Removing constructs
+- Changing type coercion rules
+- Changing contract semantics
+
+### Bump MINOR When
+
+- Adding new syntax constructs
+- Adding new operators
+- Adding new built-in types
+- Extending pattern matching
+- Adding optional compiler flags
+
+### Bump PATCH When
+
+- Fixing ambiguities in specification
+- Adding test cases
+- Improving documentation
+- Fixing compiler bugs that didn't match spec
+
+---
+
+## Migration Guidance
+
+### Upgrading Modules
+
+When upgrading a module to a new semantics version:
+
+1. **Review changelog** for breaking changes
+2. **Run tests** with new compiler version
+3. **Update `§SEMVER`** declaration
+4. **Test edge cases** related to changed semantics
+
+### Multi-Version Projects
+
+Projects can contain modules targeting different semantics versions. The compiler will:
+
+1. Check each module against its declared version
+2. Emit warnings if version mismatches exist
+3. Use the highest required version for cross-module calls
+
+---
+
+## References
+
+- [Core Semantics](/docs/semantics/core/)
+- [.NET Backend](/docs/semantics/dotnet-backend/)
