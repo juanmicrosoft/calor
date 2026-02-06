@@ -35,13 +35,13 @@ function Invoke-Scenario {
     param($ScenarioDir)
 
     $scenarioName = Split-Path -Leaf $ScenarioDir
-    $inputFile = Join-Path $ScenarioDir "input.opal"
+    $inputFile = Join-Path $ScenarioDir "input.calr"
     $verifyScript = Join-Path $ScenarioDir "verify.ps1"
     $outputFile = Join-Path $ScenarioDir "output.g.cs"
 
     # Check for required files
     if (-not (Test-Path $inputFile)) {
-        Write-Skip "$scenarioName - no input.opal"
+        Write-Skip "$scenarioName - no input.calr"
         return
     }
 

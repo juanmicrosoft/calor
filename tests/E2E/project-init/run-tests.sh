@@ -142,10 +142,10 @@ count_analyzed_files() {
 # Convert a single C# file to Calor
 convert_file() {
     local cs_file="$1"
-    local opal_file="${cs_file%.cs}.calr"
+    local calor_file="${cs_file%.cs}.calr"
 
     if "$COMPILER" convert "$cs_file" > /dev/null 2>&1; then
-        if [[ -f "$opal_file" ]]; then
+        if [[ -f "$calor_file" ]]; then
             return 0
         fi
     fi
