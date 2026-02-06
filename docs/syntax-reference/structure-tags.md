@@ -182,16 +182,16 @@ Calor uses bracket notation `[T]` for array types, which aligns with common prog
 ### Usage in Fields and Methods
 
 ```
-§CLASS{c001:DataProcessor}
+§CL{c001:DataProcessor}
   §FLD{[u8]:_buffer:priv}       // private byte[] _buffer
   §FLD{[i32]:_indices:priv}     // private int[] _indices
 
-  §METHOD{m001:ProcessData:pub}
+  §MT{m001:ProcessData:pub}
     §I{[str]:args}              // string[] args parameter
     §O{i32}
     §R args.Length
-  §/METHOD{m001}
-§/CLASS{c001}
+  §/MT{m001}
+§/CL{c001}
 ```
 
 ---
@@ -253,19 +253,19 @@ C# attributes are preserved during conversion using inline bracket syntax `[@Att
 ### Syntax
 
 ```
-§CLASS{id:name}[@AttributeName]
-§CLASS{id:name}[@AttributeName(args)]
-§METHOD{id:name:vis}[@Attr1][@Attr2]
+§CL{id:name}[@AttributeName]
+§CL{id:name}[@AttributeName(args)]
+§MT{id:name:vis}[@Attr1][@Attr2]
 ```
 
 ### Examples
 
 **Class with routing attributes (ASP.NET Core):**
 ```
-§CLASS{c001:JoinController:ControllerBase}[@Route("api/[controller]")][@ApiController]
-  §METHOD{m001:Post:pub}[@HttpPost]
-  §/METHOD{m001}
-§/CLASS{c001}
+§CL{c001:JoinController:ControllerBase}[@Route("api/[controller]")][@ApiController]
+  §MT{m001:Post:pub}[@HttpPost]
+  §/MT{m001}
+§/CL{c001}
 ```
 
 **Property with validation:**
@@ -288,9 +288,9 @@ C# attributes are preserved during conversion using inline bracket syntax `[@Att
 ### Supported Elements
 
 Attributes can be attached to:
-- Classes: `§CLASS{...}[@attr]`
+- Classes: `§CL{...}[@attr]`
 - Interfaces: `§IFACE{...}[@attr]`
-- Methods: `§METHOD{...}[@attr]`
+- Methods: `§MT{...}[@attr]`
 - Properties: `§PROP{...}[@attr]`
 - Fields: `§FLD{...}[@attr]`
 - Parameters: `§I{type:name}[@attr]`

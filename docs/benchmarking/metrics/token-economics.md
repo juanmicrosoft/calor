@@ -237,29 +237,6 @@ Contract.Ensures(Contract.Result<int>() >= 0);
 
 ---
 
-## V2 Improvement
-
-V1 syntax was extremely verbose:
-
-```
-// V1 (legacy)
-§OP[kind=add]
-  §REF[name=a]
-  §REF[name=b]
-§/OP
-```
-- Tokens: ~15 for addition
-
-```
-// V2 (current)
-(+ a b)
-```
-- Tokens: ~4 for addition
-
-**Improvement:** ~40% token reduction.
-
----
-
 ## Context Window Impact
 
 | Context Size | Calor Programs | C# Programs |
@@ -291,7 +268,7 @@ This is the price of:
 - Effect declarations
 - Closing tags
 
-The V2 syntax improved this from ~0.4x (V1 was ~2.5x more tokens).
+Lisp-style expressions help keep this ratio manageable.
 
 ---
 

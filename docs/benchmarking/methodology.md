@@ -76,7 +76,7 @@ Both implementations must:
 **Calor factors:**
 - Preconditions (`§Q`)
 - Postconditions (`§S`)
-- Invariants (`§INV`)
+- Invariants (`§IV`)
 - Effect declarations
 - Typed inputs/outputs
 

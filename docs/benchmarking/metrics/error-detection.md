@@ -40,7 +40,7 @@ Explicit contracts make these violations visible without deep analysis.
 |:-------|:-------|:----------|
 | Has `§Q` (requires) | 0.25 | Preconditions catch caller errors |
 | Has `§S` (ensures) | 0.20 | Postconditions catch implementation errors |
-| Has `§INV` (invariant) | 0.15 | Invariants catch state errors |
+| Has `§IV` (invariant) | 0.15 | Invariants catch state errors |
 | Has `§E[...]` (effects) | 0.10 | Effect tracking catches side-effect bugs |
 | Has typed inputs | 0.05 | Type errors caught at compile time |
 | Has typed output | 0.05 | Return type errors caught |

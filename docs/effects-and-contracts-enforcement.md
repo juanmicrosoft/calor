@@ -51,7 +51,7 @@ For the motivation behind this design, see [The Verification Opportunity](/calor
 **Contract checks do NOT require a `throw` effect declaration.**
 - Contracts are a verification mechanism, not a business effect
 - A function with `§Q` and `§S` but no `§E` is valid and compiles
-- The `throw` effect applies only to intentional `§THROW` statements
+- The `throw` effect applies only to intentional `§TH` statements
 
 **Missing §E means: no operational effects allowed**
 - Contract-generated exceptions are not "operational effects"
@@ -92,7 +92,7 @@ The effect enforcement pass uses Strongly Connected Component (SCC) analysis:
 ### Effect Inference Coverage
 
 Effect inference covers:
-- Statements: §P (print), §C (call), §THROW
+- Statements: §P (print), §C (call), §TH
 - Expressions: CallExpressionNode
 - **Property getters/setters**: Treat as calls, need stubs
 - **Constructors**: `Type::.ctor()` in catalog

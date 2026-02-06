@@ -104,7 +104,7 @@ The compiler catches effect violations with full call chains. The runtime catche
 
 ## Benchmark Results
 
-Evaluated across 20 paired Calor/C# programs using V2 compact syntax:
+Evaluated across 20 paired Calor/C# programs:
 
 | Category | Calor vs C# | Winner | Interpretation |
 |:---------|:-----------|:-------|:---------------|

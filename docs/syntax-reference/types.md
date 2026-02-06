@@ -113,8 +113,8 @@ Options represent values that may be absent.
 ### Creating Option Values
 
 ```
-§SOME value         // Some(value) - has a value
-§NONE{type=T}       // None of type T - no value
+§SM value           // Some(value) - has a value
+§NN                 // None - no value
 ```
 
 ### Example
@@ -124,9 +124,9 @@ Options represent values that may be absent.
   §I{i32:id}
   §O{?User}
   §IF{if1} (== id 0)
-    §R §NONE{type=User}
+    §R §NN
   §EL
-    §R §SOME user
+    §R §SM user
   §/I{if1}
 §/F{f001}
 ```

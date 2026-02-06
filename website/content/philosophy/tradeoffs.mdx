@@ -42,7 +42,7 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 | Quality | Impact | Mitigation |
 |:--------|:-------|:-----------|
-| **Token Efficiency** | 0.67x vs C# | V2 syntax improved 40% over V1 |
+| **Token Efficiency** | 0.67x vs C# | Lisp-style expressions minimize overhead |
 | **Information Density** | 0.22x vs C# | Acceptable for agent workflows |
 | **Human Readability** | Unfamiliar syntax | Not the target audience |
 | **Ecosystem** | No libraries | Compiles to C#, interop possible |
@@ -143,29 +143,6 @@ if (x > 0) return x;
 ### 3. You Need Library Ecosystem
 
 Calor compiles to C#, so interop is possible, but native library support doesn't exist.
-
----
-
-## The V2 Syntax Improvement
-
-V1 syntax was extremely verbose:
-
-```
-// V1 (legacy - do not use)
-§OP[kind=add]
-  §REF[name=a]
-  §REF[name=b]
-§/OP
-```
-
-V2 uses Lisp-style expressions:
-
-```
-// V2 (current)
-(+ a b)
-```
-
-This improved token economics by ~40% while maintaining parseability.
 
 ---
 

@@ -310,7 +310,7 @@ A common question: Do contracts count as effects?
 §/F{f001}
 ```
 
-This function is pure (no `§E` declaration) even though the precondition might throw. The `throw` effect in `§E` is only for intentional `§THROW` statements in business logic, not contract violations.
+This function is pure (no `§E` declaration) even though the precondition might throw. The `throw` effect in `§E` is only for intentional `§TH` statements in business logic, not contract violations.
 
 ---
 

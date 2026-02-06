@@ -8,7 +8,7 @@ permalink: /syntax-reference/
 
 # Syntax Reference
 
-Complete reference for Calor syntax. Always use V2+ syntax (Lisp-style expressions).
+Complete reference for Calor syntax. Calor uses Lisp-style expressions for all operations.
 
 ---
 

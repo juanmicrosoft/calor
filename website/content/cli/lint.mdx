@@ -89,10 +89,9 @@ Calor uses explicit tags with IDs:
 §F{f1:Main:pub}
 §O{void}
 §L{l1:i:0:10:1}
-§IF{i1}
-§?(== (% i 2) 0)
+§IF{i1} (== (% i 2) 0)
 §P i
-§/IF{i1}
+§/I{i1}
 §/L{l1}
 §/F{f1}
 ```
@@ -131,10 +130,6 @@ Tags should use the canonical format.
 
 | Issue | Input | Fixed |
 |-------|-------|-------|
-| Verbose return | `§RET` | `§R` |
-| Verbose call | `§CALL` | `§C` |
-| Verbose while | `§WHILE{...}` | `§WH{...}` |
-| Verbose for | `§FOR{...}` | `§L{...}` |
 | External visibility | `§F{f1:Main} pub` | `§F{f1:Main:pub}` |
 
 ### Expression Format
