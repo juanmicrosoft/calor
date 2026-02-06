@@ -19,114 +19,128 @@ public sealed class Lexer
 
     private static readonly Dictionary<string, TokenKind> Keywords = new(StringComparer.Ordinal)
     {
-        // v1 verbose keywords
-        ["MODULE"] = TokenKind.Module,
-        ["END_MODULE"] = TokenKind.EndModule,
-        ["FUNC"] = TokenKind.Func,
-        ["END_FUNC"] = TokenKind.EndFunc,
-        ["IN"] = TokenKind.In,
-        ["OUT"] = TokenKind.Out,
-        ["EFFECTS"] = TokenKind.Effects,
-        ["BODY"] = TokenKind.Body,
-        ["END_BODY"] = TokenKind.EndBody,
-        ["CALL"] = TokenKind.Call,
-        ["END_CALL"] = TokenKind.EndCall,
-        ["ARG"] = TokenKind.Arg,
-        ["RETURN"] = TokenKind.Return,
-        // Phase 2: Control Flow
-        ["FOR"] = TokenKind.For,
-        ["END_FOR"] = TokenKind.EndFor,
-        ["IF"] = TokenKind.If,
-        ["END_IF"] = TokenKind.EndIf,
-        ["WHILE"] = TokenKind.While,
-        ["END_WHILE"] = TokenKind.EndWhile,
-        ["DO"] = TokenKind.Do,
-        ["END_DO"] = TokenKind.EndDo,
-        ["BREAK"] = TokenKind.Break,
-        ["CONTINUE"] = TokenKind.Continue,
-        ["BIND"] = TokenKind.Bind,
-        // Phase 3: Type System
-        ["TYPE"] = TokenKind.Type,
-        ["END_TYPE"] = TokenKind.EndType,
-        ["RECORD"] = TokenKind.Record,
-        ["END_RECORD"] = TokenKind.EndRecord,
-        ["FIELD"] = TokenKind.Field,
-        ["MATCH"] = TokenKind.Match,
-        ["END_MATCH"] = TokenKind.EndMatch,
-        ["CASE"] = TokenKind.Case,
-        ["SOME"] = TokenKind.Some,
-        ["NONE"] = TokenKind.None,
-        ["OK"] = TokenKind.Ok,
-        ["ERR"] = TokenKind.Err,
-        ["VARIANT"] = TokenKind.Variant,
-        // Phase 4: Contracts and Effects
-        ["REQUIRES"] = TokenKind.Requires,
-        ["ENSURES"] = TokenKind.Ensures,
-        ["INVARIANT"] = TokenKind.Invariant,
-        // Phase 5: Using Statements
-        ["USING"] = TokenKind.Using,
-        // Phase 6: Arrays and Collections
+        // Single-letter keywords (compact syntax)
+        ["M"] = TokenKind.Module,           // §M = Module
+        ["F"] = TokenKind.Func,             // §F = Function
+        ["C"] = TokenKind.Call,             // §C = Call
+        ["B"] = TokenKind.Bind,             // §B = Bind
+        ["R"] = TokenKind.Return,           // §R = Return
+        ["I"] = TokenKind.In,               // §I = Input parameter
+        ["O"] = TokenKind.Out,              // §O = Output
+        ["A"] = TokenKind.Arg,              // §A = Argument
+        ["E"] = TokenKind.Effects,          // §E = Effects
+        ["L"] = TokenKind.For,              // §L = Loop
+        ["W"] = TokenKind.Match,            // §W = Match (sWitch)
+        ["K"] = TokenKind.Case,             // §K = Case
+        ["Q"] = TokenKind.Requires,         // §Q = Requires (preCondition)
+        ["S"] = TokenKind.Ensures,          // §S = Ensures (poStcondition)
+        ["T"] = TokenKind.Type,             // §T = Type
+        ["D"] = TokenKind.Record,           // §D = Record (Data)
+        ["V"] = TokenKind.Variant,          // §V = Variant
+        ["U"] = TokenKind.Using,            // §U = Using
+
+        // Closing tags (§/X pattern)
+        ["/M"] = TokenKind.EndModule,       // §/M
+        ["/F"] = TokenKind.EndFunc,         // §/F
+        ["/C"] = TokenKind.EndCall,         // §/C
+        ["/I"] = TokenKind.EndIf,           // §/I
+        ["/L"] = TokenKind.EndFor,          // §/L
+        ["/W"] = TokenKind.EndMatch,        // §/W
+        ["/T"] = TokenKind.EndType,         // §/T
+        ["/D"] = TokenKind.EndRecord,       // §/D
+
+        // Control flow keywords
+        ["IF"] = TokenKind.If,              // §IF = explicit if
+        ["EI"] = TokenKind.ElseIf,          // §EI = ElseIf
+        ["EL"] = TokenKind.Else,            // §EL = Else
+        ["WH"] = TokenKind.While,           // §WH = While
+        ["/WH"] = TokenKind.EndWhile,       // §/WH
+        ["DO"] = TokenKind.Do,              // §DO = Do (do-while loop)
+        ["/DO"] = TokenKind.EndDo,          // §/DO
+        ["SW"] = TokenKind.Match,           // §SW = Switch/Match (alias)
+        ["/SW"] = TokenKind.EndMatch,       // §/SW
+        ["BK"] = TokenKind.Break,           // §BK = Break
+        ["CN"] = TokenKind.Continue,        // §CN = Continue
+        ["BODY"] = TokenKind.Body,          // §BODY - explicit body start (optional)
+        ["END_BODY"] = TokenKind.EndBody,   // §END_BODY - explicit body end (optional)
+
+        // Type system - Option/Result patterns
+        ["SM"] = TokenKind.Some,            // §SM = Some
+        ["NN"] = TokenKind.None,            // §NN = None
+        ["OK"] = TokenKind.Ok,              // §OK = Ok (already short)
+        ["ERR"] = TokenKind.Err,            // §ERR = Err (already short)
+        ["FL"] = TokenKind.Field,           // §FL = Field
+        ["IV"] = TokenKind.Invariant,       // §IV = Invariant
+
+        // Arrays and Collections
         ["ARR"] = TokenKind.Array,
-        ["END_ARR"] = TokenKind.EndArray,
+        ["/ARR"] = TokenKind.EndArray,
         ["IDX"] = TokenKind.Index,
         ["LEN"] = TokenKind.Length,
         ["EACH"] = TokenKind.Foreach,
-        ["END_EACH"] = TokenKind.EndForeach,
-        // Phase 7: Generics
+        ["/EACH"] = TokenKind.EndForeach,
+
+        // Generics
         ["TP"] = TokenKind.TypeParam,
-        ["WHERE"] = TokenKind.Where,
+        ["WR"] = TokenKind.Where,           // §WR = Where
         ["G"] = TokenKind.Generic,
-        // Phase 8: Classes, Interfaces, Inheritance
-        ["CLASS"] = TokenKind.Class,
-        ["END_CLASS"] = TokenKind.EndClass,
-        ["IFACE"] = TokenKind.Interface,
-        ["END_IFACE"] = TokenKind.EndInterface,
+
+        // Classes, Interfaces, Inheritance
+        ["CL"] = TokenKind.Class,           // §CL = Class
+        ["/CL"] = TokenKind.EndClass,       // §/CL
+        ["IFACE"] = TokenKind.Interface,    // §IFACE (already 5 chars)
+        ["/IFACE"] = TokenKind.EndInterface,
         ["IMPL"] = TokenKind.Implements,
         ["EXT"] = TokenKind.Extends,
-        ["METHOD"] = TokenKind.Method,
-        ["END_METHOD"] = TokenKind.EndMethod,
-        ["VIRTUAL"] = TokenKind.Virtual,
-        ["OVERRIDE"] = TokenKind.Override,
-        ["ABSTRACT"] = TokenKind.Abstract,
-        ["SEALED"] = TokenKind.Sealed,
+        ["MT"] = TokenKind.Method,          // §MT = Method
+        ["/MT"] = TokenKind.EndMethod,      // §/MT
+        ["VR"] = TokenKind.Virtual,         // §VR = Virtual
+        ["OV"] = TokenKind.Override,        // §OV = Override
+        ["AB"] = TokenKind.Abstract,        // §AB = Abstract
+        ["SD"] = TokenKind.Sealed,          // §SD = Sealed
         ["THIS"] = TokenKind.This,
         ["/THIS"] = TokenKind.EndThis,
         ["BASE"] = TokenKind.Base,
         ["/BASE"] = TokenKind.EndBase,
         ["NEW"] = TokenKind.New,
         ["FLD"] = TokenKind.FieldDef,
-        // Phase 9: Properties and Constructors
+
+        // Properties and Constructors
         ["PROP"] = TokenKind.Property,
-        ["END_PROP"] = TokenKind.EndProperty,
+        ["/PROP"] = TokenKind.EndProperty,
         ["GET"] = TokenKind.Get,
         ["/GET"] = TokenKind.EndGet,
         ["SET"] = TokenKind.Set,
         ["/SET"] = TokenKind.EndSet,
         ["INIT"] = TokenKind.Init,
         ["CTOR"] = TokenKind.Constructor,
-        ["END_CTOR"] = TokenKind.EndConstructor,
+        ["/CTOR"] = TokenKind.EndConstructor,
         ["ASSIGN"] = TokenKind.Assign,
         ["DEFAULT"] = TokenKind.Default,
-        // Phase 10: Try/Catch/Finally
+
+        // Try/Catch/Finally
         ["TRY"] = TokenKind.Try,
-        ["END_TRY"] = TokenKind.EndTry,
-        ["CATCH"] = TokenKind.Catch,
-        ["FINALLY"] = TokenKind.Finally,
-        ["THROW"] = TokenKind.Throw,
-        ["RETHROW"] = TokenKind.Rethrow,
+        ["/TRY"] = TokenKind.EndTry,
+        ["CA"] = TokenKind.Catch,           // §CA = Catch
+        ["FI"] = TokenKind.Finally,         // §FI = Finally
+        ["TH"] = TokenKind.Throw,           // §TH = Throw
+        ["RT"] = TokenKind.Rethrow,         // §RT = Rethrow
         ["WHEN"] = TokenKind.When,
-        // Phase 11: Lambdas, Delegates, Events
+
+        // Lambdas, Delegates, Events
         ["LAM"] = TokenKind.Lambda,
-        ["END_LAM"] = TokenKind.EndLambda,
+        ["/LAM"] = TokenKind.EndLambda,
         ["DEL"] = TokenKind.Delegate,
-        ["END_DEL"] = TokenKind.EndDelegate,
+        ["/DEL"] = TokenKind.EndDelegate,
         ["EVT"] = TokenKind.Event,
         ["SUB"] = TokenKind.Subscribe,
         ["UNSUB"] = TokenKind.Unsubscribe,
-        // Phase 12: Async/Await
+
+        // Async/Await
         ["ASYNC"] = TokenKind.Async,
         ["AWAIT"] = TokenKind.Await,
-        // Phase 9: String Interpolation and Modern Operators
+
+        // String Interpolation and Modern Operators
         ["INTERP"] = TokenKind.Interpolate,
         ["/INTERP"] = TokenKind.EndInterpolate,
         ["??"] = TokenKind.NullCoalesce,
@@ -134,7 +148,8 @@ public sealed class Lexer
         ["RANGE"] = TokenKind.RangeOp,
         ["^"] = TokenKind.IndexEnd,
         ["EXP"] = TokenKind.Expression,
-        // Phase 10: Advanced Patterns
+
+        // Advanced Patterns
         ["WITH"] = TokenKind.With,
         ["/WITH"] = TokenKind.EndWith,
         ["PPOS"] = TokenKind.PositionalPattern,
@@ -145,108 +160,50 @@ public sealed class Lexer
         ["VAR"] = TokenKind.Var,
         ["REST"] = TokenKind.Rest,
 
-        // Extended Features Phase 1: Quick Wins
+        // Extended Features: Quick Wins
         ["EX"] = TokenKind.Example,             // §EX - Inline examples/tests
-        ["TODO"] = TokenKind.Todo,              // §TODO - Structured todo items
-        ["FIXME"] = TokenKind.Fixme,            // §FIXME - Bug markers
-        ["HACK"] = TokenKind.Hack,              // §HACK - Workaround markers
+        ["TD"] = TokenKind.Todo,                // §TD = Todo
+        ["FX"] = TokenKind.Fixme,               // §FX = Fixme
+        ["HK"] = TokenKind.Hack,                // §HK = Hack
 
-        // Extended Features Phase 2: Core Features
-        ["USES"] = TokenKind.Uses,              // §USES - Dependency declarations
-        ["/USES"] = TokenKind.EndUses,          // §/USES
-        ["USEDBY"] = TokenKind.UsedBy,          // §USEDBY - Reverse dependency tracking
-        ["/USEDBY"] = TokenKind.EndUsedBy,      // §/USEDBY
-        ["ASSUME"] = TokenKind.Assume,          // §ASSUME - Assumptions
+        // Extended Features: Core Features
+        ["US"] = TokenKind.Uses,                // §US = Uses
+        ["/US"] = TokenKind.EndUses,            // §/US
+        ["UB"] = TokenKind.UsedBy,              // §UB = UsedBy
+        ["/UB"] = TokenKind.EndUsedBy,          // §/UB
+        ["AS"] = TokenKind.Assume,              // §AS = Assume
 
-        // Extended Features Phase 3: Enhanced Contracts
-        ["COMPLEXITY"] = TokenKind.Complexity,  // §COMPLEXITY - Performance contracts
-        ["SINCE"] = TokenKind.Since,            // §SINCE - API versioning
-        ["DEPRECATED"] = TokenKind.Deprecated,  // §DEPRECATED - Deprecation markers
-        ["BREAKING"] = TokenKind.Breaking,      // §BREAKING - Breaking change markers
-        ["EXPERIMENTAL"] = TokenKind.Experimental, // §EXPERIMENTAL - Experimental feature markers
-        ["STABLE"] = TokenKind.Stable,          // §STABLE - Stability markers
+        // Extended Features: Enhanced Contracts
+        ["CX"] = TokenKind.Complexity,          // §CX = Complexity
+        ["SN"] = TokenKind.Since,               // §SN = Since
+        ["DP"] = TokenKind.Deprecated,          // §DP = Deprecated
+        ["BR"] = TokenKind.Breaking,            // §BR = Breaking
+        ["XP"] = TokenKind.Experimental,        // §XP = Experimental
+        ["SB"] = TokenKind.Stable,              // §SB = Stable
 
-        // Extended Features Phase 4: Future Extensions
-        ["DECISION"] = TokenKind.Decision,      // §DECISION - Decision records
-        ["/DECISION"] = TokenKind.EndDecision,  // §/DECISION
-        ["CHOSEN"] = TokenKind.Chosen,          // §CHOSEN - Chosen option in decision
-        ["REJECTED"] = TokenKind.Rejected,      // §REJECTED - Rejected option in decision
-        ["REASON"] = TokenKind.Reason,          // §REASON - Reason for decision
-        ["CONTEXT"] = TokenKind.Context,        // §CONTEXT - Context markers
-        ["/CONTEXT"] = TokenKind.EndContext,    // §/CONTEXT
-        ["VISIBLE"] = TokenKind.Visible,        // §VISIBLE - Visible files in context
-        ["/VISIBLE"] = TokenKind.EndVisible,    // §/VISIBLE
-        ["HIDDEN"] = TokenKind.HiddenSection,   // §HIDDEN - Hidden files in context
-        ["/HIDDEN"] = TokenKind.EndHidden,      // §/HIDDEN
-        ["FOCUS"] = TokenKind.Focus,            // §FOCUS - Focus target
-        ["FILE"] = TokenKind.FileRef,           // §FILE - File reference
-        ["PROPERTY"] = TokenKind.PropertyTest,  // §PROPERTY - Property-based testing
-        ["LOCK"] = TokenKind.Lock,              // §LOCK - Multi-agent locking
-        ["AUTHOR"] = TokenKind.AgentAuthor,     // §AUTHOR - Agent authorship tracking
-        ["TASK"] = TokenKind.TaskRef,           // §TASK - Task reference
-        ["DATE"] = TokenKind.DateMarker,        // §DATE - Date marker
+        // Extended Features: Future Extensions
+        ["DC"] = TokenKind.Decision,            // §DC = Decision
+        ["/DC"] = TokenKind.EndDecision,        // §/DC
+        ["CHOSEN"] = TokenKind.Chosen,          // §CHOSEN - short enough
+        ["REJECTED"] = TokenKind.Rejected,      // Keep for clarity
+        ["REASON"] = TokenKind.Reason,          // Keep for clarity
+        ["CT"] = TokenKind.Context,             // §CT = Context
+        ["/CT"] = TokenKind.EndContext,         // §/CT
+        ["VS"] = TokenKind.Visible,             // §VS = Visible
+        ["/VS"] = TokenKind.EndVisible,         // §/VS
+        ["HD"] = TokenKind.HiddenSection,       // §HD = Hidden
+        ["/HD"] = TokenKind.EndHidden,          // §/HD
+        ["FC"] = TokenKind.Focus,               // §FC = Focus
+        ["FILE"] = TokenKind.FileRef,           // §FILE - keep for clarity
+        ["PT"] = TokenKind.PropertyTest,        // §PT = Property test
+        ["LK"] = TokenKind.Lock,                // §LK = Lock
+        ["AU"] = TokenKind.AgentAuthor,         // §AU = Author
+        ["TASK"] = TokenKind.TaskRef,           // §TASK - keep for clarity
+        ["DATE"] = TokenKind.DateMarker,        // §DATE - keep for clarity
 
-        // v2 single-letter keywords (compact syntax)
-        ["M"] = TokenKind.Module,           // §M = §MODULE
-        ["F"] = TokenKind.Func,             // §F = §FUNC
-        ["C"] = TokenKind.Call,             // §C = §CALL
-        ["B"] = TokenKind.Bind,             // §B = §BIND
-        ["R"] = TokenKind.Return,           // §R = §RETURN
-        ["I"] = TokenKind.In,               // §I = §IN (input parameter)
-        ["O"] = TokenKind.Out,              // §O = §OUT
-        ["A"] = TokenKind.Arg,              // §A = §ARG
-        ["E"] = TokenKind.Effects,          // §E = §EFFECTS (also used for else in context)
-        ["L"] = TokenKind.For,              // §L = §LOOP (maps to FOR)
-        ["W"] = TokenKind.Match,            // §W = §MATCH (sWitch)
-        ["K"] = TokenKind.Case,             // §K = §CASE
-        ["Q"] = TokenKind.Requires,         // §Q = §REQUIRES (preCondition)
-        ["S"] = TokenKind.Ensures,          // §S = §ENSURES (poStcondition)
-        ["T"] = TokenKind.Type,             // §T = §TYPE
-        ["D"] = TokenKind.Record,           // §D = §RECORD (Data)
-        ["V"] = TokenKind.Variant,          // §V = §VARIANT
-        ["U"] = TokenKind.Using,            // §U = §USING
-        // Phase 6: v2 closing tags for arrays
-        ["/ARR"] = TokenKind.EndArray,      // §/ARR = §END_ARR
-        ["/EACH"] = TokenKind.EndForeach,   // §/EACH = §END_EACH
-        // Phase 8: v2 closing tags for classes
-        ["/CLASS"] = TokenKind.EndClass,    // §/CLASS = §END_CLASS
-        ["/IFACE"] = TokenKind.EndInterface, // §/IFACE = §END_IFACE
-        ["/METHOD"] = TokenKind.EndMethod,  // §/METHOD = §END_METHOD
-        // Phase 9: v2 closing tags for properties/constructors
-        ["/PROP"] = TokenKind.EndProperty,  // §/PROP = §END_PROP
-        ["/CTOR"] = TokenKind.EndConstructor, // §/CTOR = §END_CTOR
-        // Phase 10: v2 closing tags for try/catch
-        ["/TRY"] = TokenKind.EndTry,        // §/TRY = §END_TRY
-        // Phase 11: v2 closing tags for lambdas/delegates
-        ["/LAM"] = TokenKind.EndLambda,     // §/LAM = §END_LAM
-        ["/DEL"] = TokenKind.EndDelegate,   // §/DEL = §END_DEL
-
-        // v2 closing tags (§/X pattern)
-        ["/M"] = TokenKind.EndModule,       // §/M = §END_MODULE
-        ["/F"] = TokenKind.EndFunc,         // §/F = §END_FUNC
-        ["/C"] = TokenKind.EndCall,         // §/C = §END_CALL
-        ["/I"] = TokenKind.EndIf,           // §/I = §END_IF
-        ["/L"] = TokenKind.EndFor,          // §/L = §END_LOOP
-        ["/W"] = TokenKind.EndMatch,        // §/W = §END_MATCH
-        ["/MATCH"] = TokenKind.EndMatch,    // §/MATCH = §END_MATCH
-        ["/T"] = TokenKind.EndType,         // §/T = §END_TYPE
-        ["/D"] = TokenKind.EndRecord,       // §/D = §END_RECORD
-
-        // v2 expression enhancements: short control flow keywords
-        ["IF"] = TokenKind.If,              // §IF = explicit if
-        ["EI"] = TokenKind.ElseIf,          // §EI = §ELSEIF
-        ["EL"] = TokenKind.Else,            // §EL = §ELSE
-        ["WH"] = TokenKind.While,           // §WH = §WHILE
-        ["/WH"] = TokenKind.EndWhile,       // §/WH = §END_WHILE
-        ["DO"] = TokenKind.Do,              // §DO = §DO (do-while loop)
-        ["/DO"] = TokenKind.EndDo,          // §/DO = §END_DO
-        ["SW"] = TokenKind.Match,           // §SW = §SWITCH/MATCH
-        ["/SW"] = TokenKind.EndMatch,       // §/SW = §END_SWITCH/MATCH
-
-        // v2 built-in aliases for common operations
+        // Built-in aliases for common operations
         ["P"] = TokenKind.Print,            // §P = Console.WriteLine
         ["Pf"] = TokenKind.PrintF,          // §Pf = Console.Write
-        ["G"] = TokenKind.Get,              // §G = Console.ReadLine
     };
 
     public Lexer(string source, DiagnosticBag diagnostics)
