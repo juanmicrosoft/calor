@@ -22,7 +22,7 @@ This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/calor/SKILL.md` | Teaches Claude Calor v2+ syntax for writing new code |
+| `.claude/skills/calor/SKILL.md` | Teaches Claude Calor syntax for writing new code |
 | `.claude/skills/calor-convert/SKILL.md` | Teaches Claude how to convert C# to Calor |
 | `.claude/settings.json` | **Enforces Calor-first** - blocks `.cs` file creation |
 | `CLAUDE.md` | Project documentation with Calor reference and conventions |
@@ -101,7 +101,7 @@ The `CLAUDE.md` file is read by Claude Code at the start of every conversation. 
 
 - **Mandatory rules** - "All new code MUST be written in Calor"
 - **Workflow guidance** - When to create `.calr` files vs. convert existing `.cs` files
-- **Syntax highlights** - Quick reference for Calor v2+ syntax
+- **Syntax highlights** - Quick reference for Calor syntax
 - **Type mappings** - How C# types map to Calor types (`int` → `i32`, `string` → `str`)
 
 Claude reads this file automatically - you don't need to reference it in your prompts.
@@ -112,7 +112,7 @@ Two skills are installed in `.claude/skills/`:
 
 | Skill | Purpose |
 |:------|:--------|
-| `calor` | Complete Calor v2+ syntax reference with templates |
+| `calor` | Complete Calor syntax reference with templates |
 | `calor-convert` | Guidelines for converting C# to Calor |
 
 Claude consults these skills when it needs detailed syntax information. You can also invoke them explicitly with `/calor` or `/calor-convert` if you want Claude to focus on a specific task.
@@ -314,7 +314,7 @@ Refactor this to extract the calculation into a separate function:
 2. **Declare effects** - Even if empty (`§E{}`)
 3. **Write contracts** - They serve as executable documentation
 4. **Use closing tags** - They prevent scope ambiguity
-5. **Use V2 syntax** - `(+ a b)` not legacy verbose syntax
+5. **Use standard syntax** - `(+ a b)` for expressions
 
 ---
 

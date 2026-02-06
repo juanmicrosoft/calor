@@ -1,17 +1,16 @@
 ---
 name: calor
-description: Write Calor v2+ code with Lisp-style expressions, contracts, and effects. Use for all new code in Calor-first projects.
+description: Write Calor code with Lisp-style expressions, contracts, and effects. Use for all new code in Calor-first projects.
 ---
 
 # /calor - Write Calor Code
 
 Calor (Optimized Programming for Agents Language) compiles to C# via .NET.
 
-**IMPORTANT: Always use v2+ syntax when writing Calor code:**
+**Calor syntax:**
 - Use Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Use arrow syntax for conditionals: `§IF{id} condition → action`
 - Use `§P` for print, `§B` for bindings, `§R` for return
-- Do NOT use the legacy v1 syntax with `§OP[kind=...]` or `§REF[name=...]`
 
 ## Structure Tags
 
@@ -57,7 +56,7 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 [[i32]]               int[][] (jagged array)
 ```
 
-## Lisp-Style Expressions (v2+)
+## Lisp-Style Expressions
 
 ```
 (+ a b)               Add
@@ -104,7 +103,7 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 §/DO{id} condition
 ```
 
-### Conditionals (v2 arrow syntax)
+### Conditionals (arrow syntax)
 ```
 §IF{id} condition → action
 §EI condition → action        ElseIf
@@ -134,8 +133,8 @@ Multi-line form:
 ## Option/Result
 
 ```
-§SOME value           Some(value)
-§NONE{type=T}         None of type T
+§SM value             Some(value)
+§NN{type=T}           None of type T
 §OK value             Ok(value)
 §ERR "message"        Err(message)
 ```

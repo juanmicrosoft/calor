@@ -23,7 +23,7 @@ This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.codex/skills/calor/SKILL.md` | Teaches Codex Calor v2+ syntax for writing new code |
+| `.codex/skills/calor/SKILL.md` | Teaches Codex Calor syntax for writing new code |
 | `.codex/skills/calor-convert/SKILL.md` | Teaches Codex how to convert C# to Calor |
 | `AGENTS.md` | Project documentation with Calor-first guidelines |
 
@@ -104,7 +104,7 @@ The Calor skills teach Codex:
 
 ### Syntax Knowledge
 
-- All Calor v2+ structure tags (`§M`, `§F`, `§C`, etc.)
+- All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Arrow syntax conditionals: `§IF{id} condition → action`
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays

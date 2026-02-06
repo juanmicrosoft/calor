@@ -23,7 +23,7 @@ This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.claude/skills/calor/SKILL.md` | Teaches Claude Calor v2+ syntax for writing new code |
+| `.claude/skills/calor/SKILL.md` | Teaches Claude Calor syntax for writing new code |
 | `.claude/skills/calor-convert/SKILL.md` | Teaches Claude how to convert C# to Calor |
 | `.claude/settings.json` | **Enforces Calor-first** - blocks `.cs` file creation |
 | `CLAUDE.md` | Project documentation with Calor reference and conventions |
@@ -125,7 +125,7 @@ The Calor skills teach Claude:
 
 ### Syntax Knowledge
 
-- All Calor v2+ structure tags (`§M`, `§F`, `§C`, etc.)
+- All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Arrow syntax conditionals: `§IF{id} condition → action`
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
@@ -359,7 +359,7 @@ Refactor this to extract the calculation into a separate function:
 2. **Declare effects** - Even if empty (`§E[]`)
 3. **Write contracts** - They serve as executable documentation
 4. **Use closing tags** - They prevent scope ambiguity
-5. **Use V2 syntax** - `(+ a b)` not legacy verbose syntax
+5. **Use standard syntax** - `(+ a b)` for expressions
 
 ---
 

@@ -23,7 +23,7 @@ This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.gemini/skills/calor/SKILL.md` | Teaches Gemini Calor v2+ syntax for writing new code |
+| `.gemini/skills/calor/SKILL.md` | Teaches Gemini Calor syntax for writing new code |
 | `.gemini/skills/calor-convert/SKILL.md` | Teaches Gemini how to convert C# to Calor |
 | `.gemini/settings.json` | **Hook configuration** - enforces Calor-first development |
 | `GEMINI.md` | Project documentation with Calor-first guidelines |
@@ -116,7 +116,7 @@ The Calor skills teach Gemini:
 
 ### Syntax Knowledge
 
-- All Calor v2+ structure tags (`§M`, `§F`, `§C`, etc.)
+- All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Arrow syntax conditionals: `§IF{id} condition → action`
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays

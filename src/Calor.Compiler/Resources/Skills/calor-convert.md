@@ -1,7 +1,7 @@
 # /calor-convert - Convert C# to Calor
 
-**IMPORTANT: Always generate Calor v2+ syntax:**
-- Use Lisp-style expressions: `(+ a b)` not `§OP[kind=add] §REF[name=a] §REF[name=b]`
+**Calor syntax requirements:**
+- Use Lisp-style expressions: `(+ a b)`
 - Use arrow syntax for conditionals: `§IF[id] condition → action`
 - Use `§P` for Console.WriteLine, `§B` for variable bindings
 

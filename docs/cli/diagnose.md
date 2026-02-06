@@ -327,10 +327,10 @@ calor diagnose src/*.calr \
 #!/bin/bash
 # .git/hooks/pre-commit
 
-Calor_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.calr$')
+CALOR_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.calr$')
 
-if [ -n "$Calor_FILES" ]; then
-  echo "$Calor_FILES" | xargs calor diagnose
+if [ -n "$CALOR_FILES" ]; then
+  echo "$CALOR_FILES" | xargs calor diagnose
   if [ $? -ne 0 ]; then
     echo "Calor diagnostics found errors. Fix before committing."
     exit 1

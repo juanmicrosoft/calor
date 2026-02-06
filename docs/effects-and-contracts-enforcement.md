@@ -30,7 +30,7 @@ For the motivation behind this design, see [The Verification Opportunity](/calor
 | `mut`        | Mutation         | heap_write      | Observable heap writes     |
 | `throw`      | Exception        | intentional     | Intentional throw statements |
 
-### Internal-only Kinds (Not User-Visible in v1)
+### Internal-only Kinds (Not User-Visible)
 
 - **Allocation**: Memory allocation. **Not required in §E** to avoid every function needing `alloc`.
 - **Unknown**: Worst-case for unresolved external calls.
@@ -61,11 +61,11 @@ For the motivation behind this design, see [The Verification Opportunity](/calor
 
 | Mode              | Behavior                                      | When              |
 |-------------------|-----------------------------------------------|-------------------|
-| `strict` (default)| Unknown calls → worst-case effects → error    | v1 implementation |
+| `strict` (default)| Unknown calls → worst-case effects → error    | Current implementation |
 | `warn`            | Unknown calls → warning + assume worst-case   | Future option     |
 | `stub-required`   | Unknown calls → compile error unless stubbed  | Future option     |
 
-**Escape hatch design**: Wire through `CompilationOptions.UnknownCallPolicy` enum even though only `Strict` is implemented in v1.
+**Escape hatch design**: Wire through `CompilationOptions.UnknownCallPolicy` enum even though only `Strict` is currently implemented.
 
 ## Compile-Time Enforcement
 
@@ -271,5 +271,5 @@ error Calor0411: Unknown external call to 'MyLib.Helper::DoSomething()'
 
 ## Version History
 
-- **v1.0**: Initial implementation with strict mode only
+- **1.0**: Initial implementation with strict mode only
 - Future: `warn` and `stub-required` policies
