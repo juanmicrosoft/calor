@@ -27,21 +27,25 @@ export interface DocSection {
 // Map section slugs to display titles
 const sectionTitles: Record<string, string> = {
   'getting-started': 'Getting Started',
-  'syntax-reference': 'Syntax Reference',
-  'benchmarking': 'Benchmarking',
   'philosophy': 'Philosophy',
-  'contributing': 'Contributing',
   'cli': 'CLI Reference',
+  'guides': 'Guides',
+  'syntax-reference': 'Syntax Reference',
+  'semantics': 'Semantics',
+  'benchmarking': 'Benchmarking',
+  'contributing': 'Contributing',
 };
 
 // Map section slugs to nav order
 const sectionOrder: Record<string, number> = {
   'getting-started': 1,
-  'syntax-reference': 2,
+  'philosophy': 2,
   'cli': 3,
-  'benchmarking': 4,
-  'philosophy': 5,
-  'contributing': 6,
+  'guides': 4,
+  'syntax-reference': 5,
+  'semantics': 6,
+  'benchmarking': 7,
+  'contributing': 8,
 };
 
 function getSlugFromPath(filePath: string): string {
