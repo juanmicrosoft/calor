@@ -200,22 +200,23 @@ public sealed class CalorFormatter
                 break;
 
             case WhileStatementNode whileStmt:
-                AppendLine($"§WH {FormatExpression(whileStmt.Condition)}");
+                var whileId = AbbreviateId(whileStmt.Id);
+                AppendLine($"§WH{{{whileId}}} {FormatExpression(whileStmt.Condition)}");
                 foreach (var s in whileStmt.Body) FormatStatement(s);
-                AppendLine("§/WH");
+                AppendLine($"§/WH{{{whileId}}}");
                 break;
 
             case MatchStatementNode match:
                 var matchId = AbbreviateId(match.Id);
-                AppendLine($"§MATCH{{{matchId}}} {FormatExpression(match.Target)}");
+                AppendLine($"§W{{{matchId}}} {FormatExpression(match.Target)}");
                 foreach (var c in match.Cases)
                 {
                     var guard = c.Guard != null ? $" §WHEN {FormatExpression(c.Guard)}" : "";
-                    AppendLine($"§CASE {FormatPattern(c.Pattern)}{guard}");
+                    AppendLine($"§K {FormatPattern(c.Pattern)}{guard}");
                     foreach (var s in c.Body) FormatStatement(s);
-                    AppendLine("§/CASE");
+                    // No §/K needed - cases are delimited by next §K or §/W
                 }
-                AppendLine($"§/MATCH{{{matchId}}}");
+                AppendLine($"§/W{{{matchId}}}");
                 break;
 
             case TryStatementNode tryStmt:
@@ -223,19 +224,19 @@ public sealed class CalorFormatter
                 foreach (var s in tryStmt.TryBody) FormatStatement(s);
                 foreach (var catchClause in tryStmt.CatchClauses)
                 {
-                    AppendLine($"§CATCH{{{catchClause.ExceptionType}:{catchClause.VariableName}}}");
+                    AppendLine($"§CA{{{catchClause.ExceptionType}:{catchClause.VariableName}}}");
                     foreach (var s in catchClause.Body) FormatStatement(s);
                 }
                 if (tryStmt.FinallyBody != null && tryStmt.FinallyBody.Count > 0)
                 {
-                    AppendLine("§FINALLY");
+                    AppendLine("§FI");
                     foreach (var s in tryStmt.FinallyBody) FormatStatement(s);
                 }
                 AppendLine("§/TRY");
                 break;
 
             case ThrowStatementNode throwStmt:
-                AppendLine($"§THROW {FormatExpression(throwStmt.Exception!)}");
+                AppendLine($"§TH {FormatExpression(throwStmt.Exception!)}");
                 break;
 
             case PrintStatementNode print:
@@ -260,16 +261,16 @@ public sealed class CalorFormatter
             ReferenceNode r => r.Name, // Just the variable name, not §REF{name}
             BinaryOperationNode bin => $"({FormatOperator(bin.Operator)} {FormatExpression(bin.Left)} {FormatExpression(bin.Right)})", // Lisp prefix: (op left right)
             UnaryOperationNode un => $"({FormatUnaryOperator(un.Operator)} {FormatExpression(un.Operand)})",
-            CallExpressionNode call => $"§CALL{{{call.Target}}} {string.Join(" ", call.Arguments.Select(FormatExpression))}".TrimEnd(),
-            SomeExpressionNode some => $"§SOME {FormatExpression(some.Value)}",
-            NoneExpressionNode none => none.TypeName != null ? $"§NONE{{{none.TypeName}}}" : "§NONE",
+            CallExpressionNode call => $"§C{{{call.Target}}} {string.Join(" ", call.Arguments.Select(FormatExpression))}".TrimEnd(),
+            SomeExpressionNode some => $"§SM {FormatExpression(some.Value)}",
+            NoneExpressionNode none => none.TypeName != null ? $"§NN{{{none.TypeName}}}" : "§NN",
             OkExpressionNode ok => $"§OK {FormatExpression(ok.Value)}",
             ErrExpressionNode err => $"§ERR {FormatExpression(err.Error)}",
             NewExpressionNode newExpr => $"§NEW{{{newExpr.TypeName}}} {string.Join(" ", newExpr.Arguments.Select(FormatExpression))}".TrimEnd(),
             RecordCreationNode rec => FormatRecordCreation(rec),
             FieldAccessNode field => $"{FormatExpression(field.Target)}.{field.FieldName}",
             ArrayAccessNode arr => $"{FormatExpression(arr.Array)}[{FormatExpression(arr.Index)}]",
-            MatchExpressionNode match => $"§MATCH{{{match.Id}}} ...",
+            MatchExpressionNode match => $"§W{{{match.Id}}} ...",
             LambdaExpressionNode lambda => FormatLambda(lambda),
             ArrayCreationNode arr => FormatArrayCreation(arr),
             AwaitExpressionNode await => $"§AWAIT {FormatExpression(await.Awaited)}",
@@ -290,8 +291,8 @@ public sealed class CalorFormatter
             VarPatternNode var => $"§VAR{{{var.Name}}}",
             LiteralPatternNode lit => FormatExpression(lit.Literal),
             ConstantPatternNode c => FormatExpression(c.Value),
-            SomePatternNode some => $"§SOME {FormatPattern(some.InnerPattern)}",
-            NonePatternNode => "§NONE",
+            SomePatternNode some => $"§SM {FormatPattern(some.InnerPattern)}",
+            NonePatternNode => "§NN",
             OkPatternNode ok => $"§OK {FormatPattern(ok.InnerPattern)}",
             ErrPatternNode err => $"§ERR {FormatPattern(err.InnerPattern)}",
             _ => $"/* {pattern.GetType().Name} */"
@@ -307,7 +308,7 @@ public sealed class CalorFormatter
     private string FormatLambda(LambdaExpressionNode lambda)
     {
         var parameters = string.Join(",", lambda.Parameters.Select(p => $"{p.Name}:{p.TypeName}"));
-        return $"§LAMBDA{{{parameters}}} => ...";
+        return $"§LAM{{{parameters}}} => ...";
     }
 
     private string FormatArrayCreation(ArrayCreationNode arr)
