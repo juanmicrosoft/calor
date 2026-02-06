@@ -138,11 +138,11 @@ public class BypassTests
 §M{m001:Test}
 §F{f001:PrintInTry:pub}
   §O{void}
-  §TRY{t1}
+  §TR{t1}
     §P ""In try""
-  §CATCH{Exception:ex}
+  §CA{Exception:ex}
     §P ""In catch""
-  §/TRY{t1}
+  §/TR{t1}
 §/F{f001}
 §/M{m001}
 ";

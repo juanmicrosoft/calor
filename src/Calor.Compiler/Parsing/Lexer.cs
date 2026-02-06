@@ -119,8 +119,8 @@ public sealed class Lexer
         ["DEFAULT"] = TokenKind.Default,
 
         // Try/Catch/Finally
-        ["TRY"] = TokenKind.Try,
-        ["/TRY"] = TokenKind.EndTry,
+        ["TR"] = TokenKind.Try,             // §TR = Try
+        ["/TR"] = TokenKind.EndTry,         // §/TR = EndTry
         ["CA"] = TokenKind.Catch,           // §CA = Catch
         ["FI"] = TokenKind.Finally,         // §FI = Finally
         ["TH"] = TokenKind.Throw,           // §TH = Throw
