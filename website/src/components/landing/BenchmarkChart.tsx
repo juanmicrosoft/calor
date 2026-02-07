@@ -1,6 +1,10 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Clock } from 'lucide-react';
 
 interface BenchmarkResult {
   category: string;
@@ -9,24 +13,21 @@ interface BenchmarkResult {
   interpretation: string;
 }
 
-const results: BenchmarkResult[] = [
-  {
-    category: 'Comprehension',
-    ratio: 1.33,
-    winner: 'calor',
-    interpretation: 'Explicit structure aids understanding',
-  },
+interface BenchmarkData {
+  timestamp: string;
+  summary: {
+    programCount: number;
+  };
+  metrics: Record<string, { ratio: number; winner: 'calor' | 'csharp' }>;
+}
+
+// Fallback hardcoded data for when fetch fails
+const fallbackResults: BenchmarkResult[] = [
   {
     category: 'Error Detection',
-    ratio: 1.19,
+    ratio: 1.08,
     winner: 'calor',
     interpretation: 'Contracts surface invariant violations',
-  },
-  {
-    category: 'Edit Precision',
-    ratio: 1.15,
-    winner: 'calor',
-    interpretation: 'Unique IDs enable targeted changes',
   },
   {
     category: 'Generation Accuracy',
@@ -36,22 +37,93 @@ const results: BenchmarkResult[] = [
   },
   {
     category: 'Task Completion',
-    ratio: 0.93,
+    ratio: 0.75,
     winner: 'csharp',
     interpretation: 'Ecosystem maturity advantage',
   },
   {
+    category: 'Edit Precision',
+    ratio: 0.73,
+    winner: 'csharp',
+    interpretation: 'Established editing patterns',
+  },
+  {
     category: 'Token Economics',
-    ratio: 0.67,
+    ratio: 0.63,
     winner: 'csharp',
     interpretation: "Calor's explicit syntax uses more tokens",
   },
+  {
+    category: 'Comprehension',
+    ratio: 0.25,
+    winner: 'csharp',
+    interpretation: 'Familiar syntax easier to follow',
+  },
 ];
 
+// Human-readable metric names and interpretations
+const metricDisplayInfo: Record<
+  string,
+  { name: string; calorInterpretation: string; csharpInterpretation: string }
+> = {
+  TokenEconomics: {
+    name: 'Token Economics',
+    calorInterpretation: 'More compact representation',
+    csharpInterpretation: "Calor's explicit syntax uses more tokens",
+  },
+  GenerationAccuracy: {
+    name: 'Generation Accuracy',
+    calorInterpretation: 'Better code generation from prompts',
+    csharpInterpretation: 'Mature tooling, familiar patterns',
+  },
+  Comprehension: {
+    name: 'Comprehension',
+    calorInterpretation: 'Explicit structure aids understanding',
+    csharpInterpretation: 'Familiar syntax easier to follow',
+  },
+  EditPrecision: {
+    name: 'Edit Precision',
+    calorInterpretation: 'Unique IDs enable targeted changes',
+    csharpInterpretation: 'Established editing patterns',
+  },
+  ErrorDetection: {
+    name: 'Error Detection',
+    calorInterpretation: 'Contracts surface invariant violations',
+    csharpInterpretation: 'Mature error handling ecosystem',
+  },
+  InformationDensity: {
+    name: 'Information Density',
+    calorInterpretation: 'More semantic content per token',
+    csharpInterpretation: 'Calor trades density for explicitness',
+  },
+  TaskCompletion: {
+    name: 'Task Completion',
+    calorInterpretation: 'Better task completion rate',
+    csharpInterpretation: 'Ecosystem maturity advantage',
+  },
+  RefactoringStability: {
+    name: 'Refactoring Stability',
+    calorInterpretation: 'More stable during refactoring',
+    csharpInterpretation: 'Better refactoring support',
+  },
+};
+
+function transformMetrics(data: BenchmarkData): BenchmarkResult[] {
+  return Object.entries(data.metrics)
+    .map(([key, metric]) => {
+      const info = metricDisplayInfo[key] || { name: key, calorInterpretation: '', csharpInterpretation: '' };
+      return {
+        category: info.name,
+        ratio: metric.ratio,
+        winner: metric.winner,
+        interpretation:
+          metric.winner === 'calor' ? info.calorInterpretation : info.csharpInterpretation,
+      };
+    })
+    .sort((a, b) => b.ratio - a.ratio); // Sort by ratio descending
+}
+
 function formatRatio(ratio: number): string {
-  if (ratio >= 1) {
-    return `${ratio.toFixed(2)}x`;
-  }
   return `${ratio.toFixed(2)}x`;
 }
 
@@ -63,7 +135,46 @@ function getBarWidth(ratio: number): number {
   return Math.max(ratio * 50, 10);
 }
 
+function formatDate(isoString: string): string {
+  try {
+    const date = new Date(isoString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
+
 export function BenchmarkChart() {
+  const [results, setResults] = useState<BenchmarkResult[]>(fallbackResults);
+  const [programCount, setProgramCount] = useState<number>(28);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [isLive, setIsLive] = useState(false);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await fetch('/data/benchmark-results.json');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data: BenchmarkData = await response.json();
+        setResults(transformMetrics(data));
+        setProgramCount(data.summary.programCount);
+        setLastUpdated(data.timestamp);
+        setIsLive(true);
+      } catch (err) {
+        console.warn('Failed to fetch benchmark data, using fallback:', err);
+        // Keep using fallback data
+      }
+    }
+
+    fetchData();
+  }, []);
+
   return (
     <section className="py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -72,8 +183,19 @@ export function BenchmarkChart() {
             Benchmark Results
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Evaluated across 20 paired Calor/C# programs using V2 compact syntax
+            Evaluated across {programCount} paired Calor/C# programs
           </p>
+          {lastUpdated && (
+            <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>Last updated: {formatDate(lastUpdated)}</span>
+              {isLive && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-500/10 text-green-600">
+                  Live
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-16 mx-auto max-w-4xl">
@@ -138,9 +260,9 @@ export function BenchmarkChart() {
           <div className="mt-12 p-6 rounded-lg border bg-muted/50">
             <h3 className="font-semibold mb-2">Key Finding</h3>
             <p className="text-muted-foreground">
-              Calor excels where explicitness matters - comprehension, error detection,
-              and edit precision. C# wins on token efficiency, reflecting a fundamental
-              tradeoff: explicit semantics require more tokens but enable better agent reasoning.
+              Calor excels in error detection through explicit contracts. C# currently leads
+              in most other metrics, reflecting ecosystem maturity and LLM training data bias.
+              The tradeoff: explicit semantics require more tokens but enable better invariant checking.
             </p>
           </div>
 

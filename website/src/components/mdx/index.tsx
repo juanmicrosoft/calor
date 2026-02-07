@@ -1,5 +1,6 @@
 import { CodeBlock } from './CodeBlock';
 import { Callout } from './Callout';
+import { BenchmarkDashboard } from '@/components/benchmarks/BenchmarkDashboard';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -173,5 +174,6 @@ export const mdxComponents = {
   // Callout component
   Callout,
 
-  // Custom components can be added here
+  // Benchmark dashboard component
+  BenchmarkDashboard,
 };
