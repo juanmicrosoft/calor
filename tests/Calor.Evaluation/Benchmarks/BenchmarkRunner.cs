@@ -345,11 +345,10 @@ public class BenchmarkRunner
         summary.CalorPassCount = result.CaseResults.Count(c => c.CalorSuccess);
         summary.CSharpPassCount = result.CaseResults.Count(c => c.CSharpSuccess);
 
-        // Identify top categories
+        // Identify top categories (all categories where Calor wins)
         summary.TopCalorCategories = summary.CategoryAdvantages
             .Where(kv => kv.Value > 1.0)
             .OrderByDescending(kv => kv.Value)
-            .Take(3)
             .Select(kv => kv.Key)
             .ToList();
 
