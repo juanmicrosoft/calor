@@ -18,7 +18,7 @@ public class MetricCalculatorTests
         var calculator = new TokenEconomicsCalculator();
         // Using realistic Calor/C# comparison - C# has more verbose boilerplate
         var context = CreateContext(
-            calor: @"§M[m:Calc] §F[f:Add] §I[i32:a] §I[i32:b] §O[i32] §R (+ a b) §/F §/M",
+            calor: @"§M{m:Calc} §F{f:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F §/M",
             csharp: @"using System;
 namespace Calculator
 {
@@ -49,7 +49,7 @@ namespace Calculator
         // Arrange
         var calculator = new TokenEconomicsCalculator();
         var context = CreateContext(
-            calor: "§M[m001:Test] §F[f001:Foo] §R 42 §/F §/M",
+            calor: "§M{m001:Test} §F{f001:Foo} §R 42 §/F §/M",
             csharp: "namespace Test { class C { int Foo() { return 42; } } }");
 
         // Act
@@ -72,13 +72,13 @@ namespace Calculator
         // Arrange
         var calculator = new GenerationAccuracyCalculator();
         var context = CreateContext(
-            calor: @"§M[m001:Test]
-§F[f001:Add:pub]
-  §I[i32:a] §I[i32:b]
-  §O[i32]
+            calor: @"§M{m001:Test}
+§F{f001:Add:pub}
+  §I{i32:a} §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
-§/M[m001]",
+§/F{f001}
+§/M{m001}",
             csharp: @"namespace Test { public static class TestModule { public static int Add(int a, int b) { return a + b; } } }");
 
         // Act
@@ -117,15 +117,15 @@ namespace Calculator
         // Arrange
         var calculator = new ComprehensionCalculator();
         var context = CreateContext(
-            calor: @"§M[m001:Math]
-§F[f001:Divide:pub]
-  §I[i32:a] §I[i32:b]
-  §O[i32]
+            calor: @"§M{m001:Math}
+§F{f001:Divide:pub}
+  §I{i32:a} §I{i32:b}
+  §O{i32}
   §REQ (> b 0)
   §ENS (== result (/ a b))
   §R (/ a b)
-§/F[f001]
-§/M[m001]",
+§/F{f001}
+§/M{m001}",
             csharp: @"namespace Math { public class MathOps { public int Divide(int a, int b) { return a / b; } } }");
 
         // Act
@@ -147,14 +147,14 @@ namespace Calculator
         // Arrange
         var calculator = new EditPrecisionCalculator();
         var context = CreateContext(
-            calor: @"§M[m001:App]
-§F[f001:Method1:pub]
-  §O[void]
-§/F[f001]
-§F[f002:Method2:pub]
-  §O[void]
-§/F[f002]
-§/M[m001]",
+            calor: @"§M{m001:App}
+§F{f001:Method1:pub}
+  §O{void}
+§/F{f001}
+§F{f002:Method2:pub}
+  §O{void}
+§/F{f002}
+§/M{m001}",
             csharp: @"namespace App { public class AppModule { public void Method1() { } public void Method2() { } } }");
 
         // Act
@@ -172,8 +172,8 @@ namespace Calculator
         // Arrange
         var calculator = new EditPrecisionCalculator();
 
-        var calorBefore = "§F[f001:Foo] §R 1 §/F";
-        var calorAfter = "§F[f001:Foo] §R 2 §/F";
+        var calorBefore = "§F{f001:Foo} §R 1 §/F";
+        var calorAfter = "§F{f001:Foo} §R 2 §/F";
         var csharpBefore = "int Foo() { return 1; }";
         var csharpAfter = "int Foo() { return 2; }";
 
@@ -199,14 +199,14 @@ namespace Calculator
         // Arrange
         var calculator = new ErrorDetectionCalculator();
         var context = CreateContext(
-            calor: @"§M[m001:Safe]
-§F[f001:Divide:pub]
-  §I[i32:a] §I[i32:b]
-  §O[i32]
+            calor: @"§M{m001:Safe}
+§F{f001:Divide:pub}
+  §I{i32:a} §I{i32:b}
+  §O{i32}
   §REQ (!= b 0)
   §R (/ a b)
-§/F[f001]
-§/M[m001]",
+§/F{f001}
+§/M{m001}",
             csharp: @"public class Safe { public int Divide(int a, int b) { return a / b; } }");
 
         // Act
@@ -228,16 +228,16 @@ namespace Calculator
         // Arrange
         var calculator = new InformationDensityCalculator();
         var context = CreateContext(
-            calor: @"§M[m001:Dense]
-§F[f001:Process:pub]
-  §I[i32:x]
-  §O[i32]
-  §E[pure]
+            calor: @"§M{m001:Dense}
+§F{f001:Process:pub}
+  §I{i32:x}
+  §O{i32}
+  §E{pure}
   §REQ (>= x 0)
   §ENS (>= result 0)
   §R (* x x)
-§/F[f001]
-§/M[m001]",
+§/F{f001}
+§/M{m001}",
             csharp: @"namespace Dense { public class DenseModule { public int Process(int x) { return x * x; } } }");
 
         // Act
@@ -255,7 +255,7 @@ namespace Calculator
         // Arrange
         var calculator = new InformationDensityCalculator();
         var context = CreateContext(
-            calor: "§M[m] §F[f] §I[i32:x] §O[i32] §REQ (> x 0) §R x §/F §/M",
+            calor: "§M{m} §F{f} §I{i32:x} §O{i32} §REQ (> x 0) §R x §/F §/M",
             csharp: "class C { int F(int x) { return x; } }");
 
         // Act
@@ -277,11 +277,11 @@ namespace Calculator
         // Arrange
         var calculator = new TaskCompletionCalculator();
         var context = CreateContext(
-            calor: @"§M[m001:Task]
-§F[f001:Run:pub]
-  §O[void]
-§/F[f001]
-§/M[m001]",
+            calor: @"§M{m001:Task}
+§F{f001:Run:pub}
+  §O{void}
+§/F{f001}
+§/M{m001}",
             csharp: @"namespace Task { public class TaskModule { public void Run() { } } }");
 
         // Act

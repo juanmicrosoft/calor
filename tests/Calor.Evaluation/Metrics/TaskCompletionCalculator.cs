@@ -82,8 +82,8 @@ public class TaskCompletionCalculator : IMetricCalculator
 
         // Structural completeness
         var source = context.CalorSource;
-        if (source.Contains("§M[") && source.Contains("§/M[")) score += 0.05;
-        if (source.Contains("§F[") && source.Contains("§/F[")) score += 0.05;
+        if (source.Contains("§M{") && source.Contains("§/M{")) score += 0.05;
+        if (source.Contains("§F{") && source.Contains("§/F{")) score += 0.05;
 
         // Contracts enable verification
         if (source.Contains("§REQ") || source.Contains("§ENS")) score += 0.05;
@@ -122,7 +122,7 @@ public class TaskCompletionCalculator : IMetricCalculator
         {
             ["tokenCount"] = tokenCount,
             ["compilesSuccessfully"] = context.CalorCompilation.Success,
-            ["hasCompleteStructure"] = context.CalorSource.Contains("§/M["),
+            ["hasCompleteStructure"] = context.CalorSource.Contains("§/M{"),
             ["hasContracts"] = context.CalorSource.Contains("§REQ") || context.CalorSource.Contains("§ENS"),
             ["estimatedContextUsage"] = tokenCount / 4096.0 // Fraction of typical context
         };

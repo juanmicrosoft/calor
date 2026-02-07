@@ -278,7 +278,7 @@ public class BenchmarkRunnerTests
 
         try
         {
-            await File.WriteAllTextAsync(calorPath, "§M[test] §/M");
+            await File.WriteAllTextAsync(calorPath, "§M{test} §/M");
             await File.WriteAllTextAsync(csharpPath, "class Test { }");
 
             // Act
@@ -286,7 +286,7 @@ public class BenchmarkRunnerTests
                 calorPath, csharpPath, level: 2, features: new List<string> { "test" });
 
             // Assert
-            Assert.Equal("§M[test] §/M", context.CalorSource);
+            Assert.Equal("§M{test} §/M", context.CalorSource);
             Assert.Equal("class Test { }", context.CSharpSource);
             Assert.Equal(2, context.Level);
             Assert.Contains("test", context.Features);

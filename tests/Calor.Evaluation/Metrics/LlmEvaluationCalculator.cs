@@ -170,7 +170,7 @@ public class LlmEvaluationCalculator : IMetricCalculator
         }
 
         // Add effect-specific questions if effects are present
-        if (context.CalorSource.Contains("§E["))
+        if (context.CalorSource.Contains("§E{"))
         {
             questions.Add(new LlmComprehensionQuestion
             {

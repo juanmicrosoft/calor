@@ -61,7 +61,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         var csharpSource = context.CSharpSource;
 
         // Task 1: Change loop bounds (if loops exist)
-        var calorLoops = Regex.Matches(calorSource, @"§LOOP\[([^:]+):");
+        var calorLoops = Regex.Matches(calorSource, @"§LOOP\{([^:]+):");
         var csharpLoops = Regex.Matches(csharpSource, @"\bfor\s*\([^)]+\)");
 
         if (calorLoops.Count > 0 || csharpLoops.Count > 0)
@@ -79,7 +79,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         }
 
         // Task 2: Add precondition to function
-        var calorFunctions = Regex.Matches(calorSource, @"§F\[([^:]+):([^\]]+)\]");
+        var calorFunctions = Regex.Matches(calorSource, @"§F\{([^:]+):([^\}]+)\}");
         var csharpMethods = Regex.Matches(csharpSource, @"\b(public|private|protected)\s+\w+\s+(\w+)\s*\(");
 
         if (calorFunctions.Count > 0 || csharpMethods.Count > 0)
@@ -186,7 +186,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         var result = new EditTaskResult { TaskId = task.Id };
 
         // Check if target is uniquely identifiable
-        var targetPattern = $@"§[A-Z]\[{Regex.Escape(task.CalorTarget)}:";
+        var targetPattern = $@"§[A-Z]\{{{Regex.Escape(task.CalorTarget)}:";
         var matches = Regex.Matches(source, targetPattern);
 
         result.TargetFound = matches.Count > 0;
@@ -254,7 +254,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         if (isCalor)
         {
             // Calor: Find loop/variable by ID
-            var pattern = $@"§(?:LOOP|V)\[{Regex.Escape(target)}:";
+            var pattern = $@"§(?:LOOP|V)\{{{Regex.Escape(target)}:";
             return Regex.IsMatch(source, pattern) ? 0.9 : 0.4;
         }
         else
@@ -269,7 +269,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         if (isCalor)
         {
             // Calor: Insert §REQ after function header (well-defined insertion point)
-            var pattern = $@"§F\[{Regex.Escape(target)}:";
+            var pattern = $@"§F\{{{Regex.Escape(target)}:";
             if (!Regex.IsMatch(source, pattern)) return 0.3;
 
             // Already has contracts = easier to add more
@@ -288,7 +288,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         if (isCalor)
         {
             // Calor: Change name but keep ID - call sites don't need updating if using ID
-            var idPattern = $@"§F\[{Regex.Escape(target)}:";
+            var idPattern = $@"§F\{{{Regex.Escape(target)}:";
             return Regex.IsMatch(source, idPattern) ? 0.95 : 0.5;
         }
         else
@@ -304,9 +304,9 @@ public class EditPrecisionCalculator : IMetricCalculator
     {
         if (isCalor)
         {
-            // Calor: Update §I[ section, call sites can be found by ID
-            var pattern = $@"§F\[{Regex.Escape(target)}:";
-            var hasInputSection = source.Contains("§I[");
+            // Calor: Update §I{ section, call sites can be found by ID
+            var pattern = $@"§F\{{{Regex.Escape(target)}:";
+            var hasInputSection = source.Contains("§I{");
             return Regex.IsMatch(source, pattern) ? (hasInputSection ? 0.9 : 0.8) : 0.4;
         }
         else
@@ -321,9 +321,9 @@ public class EditPrecisionCalculator : IMetricCalculator
     {
         if (isCalor)
         {
-            // Calor: Update §O[ section
-            var pattern = $@"§F\[{Regex.Escape(target)}:";
-            var hasOutputSection = source.Contains("§O[");
+            // Calor: Update §O{ section
+            var pattern = $@"§F\{{{Regex.Escape(target)}:";
+            var hasOutputSection = source.Contains("§O{");
             return Regex.IsMatch(source, pattern) ? (hasOutputSection ? 0.9 : 0.75) : 0.4;
         }
         else
@@ -339,7 +339,7 @@ public class EditPrecisionCalculator : IMetricCalculator
         {
             // Calor: IDs reduce collateral risk significantly
             // Risk mainly from incorrect boundary detection
-            var hasClosingTags = source.Contains("§/F[") || source.Contains("§/M[");
+            var hasClosingTags = source.Contains("§/F{") || source.Contains("§/M{");
             return hasClosingTags ? 0.1 : 0.25;
         }
         else
@@ -425,9 +425,9 @@ public class EditPrecisionCalculator : IMetricCalculator
         var source = context.CalorSource;
 
         // Calor unique IDs enable precise targeting
-        var moduleIds = CountPattern(source, @"\§M\[[^\]]+:");
-        var functionIds = CountPattern(source, @"\§F\[[^\]]+:");
-        var variableIds = CountPattern(source, @"\§V\[[^\]]+:");
+        var moduleIds = CountPattern(source, @"\§M\{[^\}]+:");
+        var functionIds = CountPattern(source, @"\§F\{[^\}]+:");
+        var variableIds = CountPattern(source, @"\§V\{[^\}]+:");
 
         // More unique IDs = higher precision capability
         if (moduleIds > 0) score += 0.15;
@@ -435,8 +435,8 @@ public class EditPrecisionCalculator : IMetricCalculator
         if (variableIds > 0) score += 0.10;
 
         // Closing tags enable safe modifications
-        if (source.Contains("§/F[")) score += 0.05;
-        if (source.Contains("§/M[")) score += 0.05;
+        if (source.Contains("§/F{")) score += 0.05;
+        if (source.Contains("§/M{")) score += 0.05;
 
         return Math.Min(score, 1.0);
     }
@@ -471,12 +471,12 @@ public class EditPrecisionCalculator : IMetricCalculator
         var source = context.CalorSource;
         return new Dictionary<string, object>
         {
-            ["hasUniqueModuleIds"] = source.Contains("§M["),
-            ["hasUniqueFunctionIds"] = source.Contains("§F["),
-            ["hasUniqueVariableIds"] = source.Contains("§V["),
+            ["hasUniqueModuleIds"] = source.Contains("§M{"),
+            ["hasUniqueFunctionIds"] = source.Contains("§F{"),
+            ["hasUniqueVariableIds"] = source.Contains("§V{"),
             ["hasClosingTags"] = source.Contains("§/"),
-            ["moduleIdCount"] = CountPattern(source, @"\§M\["),
-            ["functionIdCount"] = CountPattern(source, @"\§F\[")
+            ["moduleIdCount"] = CountPattern(source, @"\§M\{"),
+            ["functionIdCount"] = CountPattern(source, @"\§F\{")
         };
     }
 

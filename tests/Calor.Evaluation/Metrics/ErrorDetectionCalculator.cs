@@ -96,11 +96,11 @@ public class ErrorDetectionCalculator : IMetricCalculator
         if (source.Contains("§INV")) score += 0.15; // Invariants
 
         // Effect declarations help detect side-effect bugs
-        if (source.Contains("§E[")) score += 0.10;
+        if (source.Contains("§E{")) score += 0.10;
 
         // Type annotations catch type errors
-        if (source.Contains("§I[") && source.Contains(":")) score += 0.05;
-        if (source.Contains("§O[")) score += 0.05;
+        if (source.Contains("§I{") && source.Contains(":")) score += 0.05;
+        if (source.Contains("§O{")) score += 0.05;
 
         return Math.Min(score, 1.0);
     }
@@ -140,9 +140,9 @@ public class ErrorDetectionCalculator : IMetricCalculator
             ["hasRequires"] = source.Contains("§REQ"),
             ["hasEnsures"] = source.Contains("§ENS"),
             ["hasInvariants"] = source.Contains("§INV"),
-            ["hasEffects"] = source.Contains("§E["),
-            ["hasTypedInputs"] = source.Contains("§I[") && source.Contains(":"),
-            ["hasTypedOutput"] = source.Contains("§O[")
+            ["hasEffects"] = source.Contains("§E{"),
+            ["hasTypedInputs"] = source.Contains("§I{") && source.Contains(":"),
+            ["hasTypedOutput"] = source.Contains("§O{")
         };
     }
 

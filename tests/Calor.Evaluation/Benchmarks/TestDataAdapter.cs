@@ -209,19 +209,19 @@ public class TestDataAdapter
         var features = new List<string>();
         var content = await File.ReadAllTextAsync(calorPath);
 
-        if (content.Contains("§M[")) features.Add("module");
-        if (content.Contains("§F[")) features.Add("function");
-        if (content.Contains("§V[")) features.Add("variable");
-        if (content.Contains("§I[")) features.Add("parameters");
-        if (content.Contains("§O[")) features.Add("return_type");
+        if (content.Contains("§M{")) features.Add("module");
+        if (content.Contains("§F{")) features.Add("function");
+        if (content.Contains("§V{")) features.Add("variable");
+        if (content.Contains("§I{")) features.Add("parameters");
+        if (content.Contains("§O{")) features.Add("return_type");
         if (content.Contains("§REQ")) features.Add("requires");
         if (content.Contains("§ENS")) features.Add("ensures");
         if (content.Contains("§INV")) features.Add("invariant");
-        if (content.Contains("§E[")) features.Add("effects");
+        if (content.Contains("§E{")) features.Add("effects");
         if (content.Contains("§IF")) features.Add("conditional");
         if (content.Contains("§LOOP")) features.Add("loop");
         if (content.Contains("§MATCH")) features.Add("pattern_matching");
-        if (content.Contains("§C[")) features.Add("call");
+        if (content.Contains("§C{")) features.Add("call");
 
         return features;
     }

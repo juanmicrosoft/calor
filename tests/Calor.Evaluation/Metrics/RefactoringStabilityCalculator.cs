@@ -10,7 +10,7 @@ namespace Calor.Evaluation.Metrics;
 /// Category 8: Refactoring Stability Calculator
 /// Measures how well unique IDs preserve references during code transformations.
 ///
-/// Calor's unique IDs (§F[funcId:, §M[modId:, etc.) are hypothesized to survive
+/// Calor's unique IDs (§F{funcId:, §M{modId:, etc.) are hypothesized to survive
 /// refactoring operations better than C#'s name-based references.
 /// </summary>
 public class RefactoringStabilityCalculator : IMetricCalculator
@@ -130,23 +130,23 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var score = 0.0;
 
         // Module IDs
-        var moduleIds = ExtractIds(source, @"§M\[([^:]+):");
+        var moduleIds = ExtractIds(source, @"§M\{([^:]+):");
         if (moduleIds.Count > 0 && moduleIds.All(IsUniqueId))
             score += 0.25;
 
         // Function IDs
-        var functionIds = ExtractIds(source, @"§F\[([^:]+):");
+        var functionIds = ExtractIds(source, @"§F\{([^:]+):");
         if (functionIds.Count > 0 && functionIds.All(IsUniqueId))
             score += 0.35;
 
         // Variable IDs
-        var variableIds = ExtractIds(source, @"§V\[([^:]+):");
+        var variableIds = ExtractIds(source, @"§V\{([^:]+):");
         if (variableIds.Count > 0)
             score += 0.20;
 
         // Loop/Control IDs
-        var loopIds = ExtractIds(source, @"§LOOP\[([^:]+):");
-        var ifIds = ExtractIds(source, @"§IF\[([^:]+):");
+        var loopIds = ExtractIds(source, @"§LOOP\{([^:]+):");
+        var ifIds = ExtractIds(source, @"§IF\{([^:]+):");
         if (loopIds.Count > 0 || ifIds.Count > 0)
             score += 0.20;
 
@@ -161,15 +161,15 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var score = 0.5; // Base score
 
         // Function calls with proper IDs
-        var funcCalls = CountPattern(source, @"§C\[[^\]]+\]");
+        var funcCalls = CountPattern(source, @"§C\{[^\}]+\}");
         if (funcCalls > 0) score += 0.2;
 
         // Proper closing tags (enable safe boundary detection)
-        var closingTags = CountPattern(source, @"§/[A-Z]\[");
+        var closingTags = CountPattern(source, @"§/[A-Z]\{");
         if (closingTags > 0) score += 0.15;
 
         // Input/output annotations (typed references)
-        var typeAnnotations = CountPattern(source, @"§[IO]\[");
+        var typeAnnotations = CountPattern(source, @"§[IO]\{");
         if (typeAnnotations > 0) score += 0.15;
 
         return Math.Min(score, 1.0);
@@ -183,8 +183,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var score = 0.5;
 
         // Clear boundaries help minimize diffs
-        var hasModuleBoundaries = source.Contains("§M[") && source.Contains("§/M[");
-        var hasFunctionBoundaries = source.Contains("§F[") && source.Contains("§/F[");
+        var hasModuleBoundaries = source.Contains("§M{") && source.Contains("§/M{");
+        var hasFunctionBoundaries = source.Contains("§F{") && source.Contains("§/F{");
 
         if (hasModuleBoundaries) score += 0.25;
         if (hasFunctionBoundaries) score += 0.25;
@@ -205,7 +205,7 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         if (source.Contains("§INV")) score += 0.1;
 
         // Effect declarations preserve behavior constraints
-        if (source.Contains("§E[")) score += 0.2;
+        if (source.Contains("§E{")) score += 0.2;
 
         return Math.Min(score, 1.0);
     }
@@ -251,8 +251,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorRename(string before, string after)
     {
         // In Calor, IDs should stay the same even when names change
-        var beforeIds = ExtractIds(before, @"§F\[([^:]+):");
-        var afterIds = ExtractIds(after, @"§F\[([^:]+):");
+        var beforeIds = ExtractIds(before, @"§F\{([^:]+):");
+        var afterIds = ExtractIds(after, @"§F\{([^:]+):");
 
         var preserved = beforeIds.Intersect(afterIds).Count();
         return beforeIds.Count > 0 ? (double)preserved / beforeIds.Count : 0.5;
@@ -269,8 +269,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorExtract(string before, string after)
     {
         // After extract, original IDs should remain, new function gets new ID
-        var beforeFuncCount = CountPattern(before, @"§F\[");
-        var afterFuncCount = CountPattern(after, @"§F\[");
+        var beforeFuncCount = CountPattern(before, @"§F\{");
+        var afterFuncCount = CountPattern(after, @"§F\{");
 
         // Extract should add exactly one new function
         return afterFuncCount == beforeFuncCount + 1 ? 1.0 : 0.5;
@@ -287,8 +287,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorMove(string before, string after)
     {
         // Moving a function should preserve its ID
-        var beforeIds = ExtractIds(before, @"§F\[([^:]+):");
-        var afterIds = ExtractIds(after, @"§F\[([^:]+):");
+        var beforeIds = ExtractIds(before, @"§F\{([^:]+):");
+        var afterIds = ExtractIds(after, @"§F\{([^:]+):");
 
         var preserved = beforeIds.Intersect(afterIds).Count();
         return beforeIds.Count > 0 ? (double)preserved / beforeIds.Count : 0.5;
@@ -304,8 +304,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorSignatureChange(string before, string after)
     {
         // Signature change keeps ID, updates callers
-        var beforeIds = ExtractIds(before, @"§F\[([^:]+):");
-        var afterIds = ExtractIds(after, @"§F\[([^:]+):");
+        var beforeIds = ExtractIds(before, @"§F\{([^:]+):");
+        var afterIds = ExtractIds(after, @"§F\{([^:]+):");
 
         return beforeIds.SetEquals(afterIds) ? 1.0 : 0.6;
     }
@@ -320,8 +320,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
     private static double EvaluateCalorInline(string before, string after)
     {
         // Inlining should reduce variable count but maintain readability
-        var beforeVars = CountPattern(before, @"§V\[");
-        var afterVars = CountPattern(after, @"§V\[");
+        var beforeVars = CountPattern(before, @"§V\{");
+        var afterVars = CountPattern(after, @"§V\{");
 
         return afterVars < beforeVars ? 0.9 : 0.6;
     }
@@ -336,8 +336,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
 
     private static int CountPreservedIds(string before, string after)
     {
-        var beforeIds = ExtractIds(before, @"§[A-Z]\[([^:]+):");
-        var afterIds = ExtractIds(after, @"§[A-Z]\[([^:]+):");
+        var beforeIds = ExtractIds(before, @"§[A-Z]\{([^:]+):");
+        var afterIds = ExtractIds(after, @"§[A-Z]\{([^:]+):");
         return beforeIds.Intersect(afterIds).Count();
     }
 
@@ -390,11 +390,11 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var source = context.CalorSource;
         return new Dictionary<string, object>
         {
-            ["moduleIds"] = ExtractIds(source, @"§M\[([^:]+):").ToList(),
-            ["functionIds"] = ExtractIds(source, @"§F\[([^:]+):").ToList(),
-            ["variableIds"] = ExtractIds(source, @"§V\[([^:]+):").ToList(),
+            ["moduleIds"] = ExtractIds(source, @"§M\{([^:]+):").ToList(),
+            ["functionIds"] = ExtractIds(source, @"§F\{([^:]+):").ToList(),
+            ["variableIds"] = ExtractIds(source, @"§V\{([^:]+):").ToList(),
             ["hasClosingTags"] = source.Contains("§/"),
-            ["idDensity"] = CountPattern(source, @"§[A-Z]\[") / Math.Max(1.0, source.Split('\n').Length)
+            ["idDensity"] = CountPattern(source, @"§[A-Z]\{") / Math.Max(1.0, source.Split('\n').Length)
         };
     }
 

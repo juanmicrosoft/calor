@@ -80,18 +80,18 @@ public class ComprehensionCalculator : IMetricCalculator
         var source = context.CalorSource;
 
         // Calor-specific clarity indicators
-        if (source.Contains("§M[")) score += 0.15;  // Module declaration
-        if (source.Contains("§F[")) score += 0.15;  // Function declaration
-        if (source.Contains("§I[")) score += 0.10;  // Input parameters
-        if (source.Contains("§O[")) score += 0.10;  // Output type
+        if (source.Contains("§M{")) score += 0.15;  // Module declaration
+        if (source.Contains("§F{")) score += 0.15;  // Function declaration
+        if (source.Contains("§I{")) score += 0.10;  // Input parameters
+        if (source.Contains("§O{")) score += 0.10;  // Output type
         if (source.Contains("§R")) score += 0.10;   // Return statement
-        if (source.Contains("§E[")) score += 0.15;  // Effect declaration
+        if (source.Contains("§E{")) score += 0.15;  // Effect declaration
         if (source.Contains("§REQ")) score += 0.15; // Requires contract
         if (source.Contains("§ENS")) score += 0.10; // Ensures contract
 
         // Explicit closing tags aid comprehension
-        if (source.Contains("§/F[")) score += 0.05;
-        if (source.Contains("§/M[")) score += 0.05;
+        if (source.Contains("§/F{")) score += 0.05;
+        if (source.Contains("§/M{")) score += 0.05;
 
         return Math.Min(score, 1.0);
     }
@@ -129,11 +129,11 @@ public class ComprehensionCalculator : IMetricCalculator
         var source = context.CalorSource;
         return new Dictionary<string, bool>
         {
-            ["hasModuleDeclaration"] = source.Contains("§M["),
-            ["hasFunctionDeclaration"] = source.Contains("§F["),
-            ["hasInputParameters"] = source.Contains("§I["),
-            ["hasOutputType"] = source.Contains("§O["),
-            ["hasEffects"] = source.Contains("§E["),
+            ["hasModuleDeclaration"] = source.Contains("§M{"),
+            ["hasFunctionDeclaration"] = source.Contains("§F{"),
+            ["hasInputParameters"] = source.Contains("§I{"),
+            ["hasOutputType"] = source.Contains("§O{"),
+            ["hasEffects"] = source.Contains("§E{"),
             ["hasContracts"] = source.Contains("§REQ") || source.Contains("§ENS"),
             ["hasClosingTags"] = source.Contains("§/")
         };
