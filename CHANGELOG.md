@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-07
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 0.80x (C# leads overall)
+- **Metrics**: Calor wins 4, C# wins 4
+- **Highlights**:
+  - ErrorDetection: 1.55x (Calor wins, large effect)
+  - Comprehension: 1.49x (Calor wins, large effect)
+  - RefactoringStability: 1.49x (Calor wins, large effect)
+  - EditPrecision: 1.36x (Calor wins, large effect)
+- **Programs Tested**: 28
+
+### Fixed
+- Benchmark calculators now use correct curly brace syntax `{` for Calor patterns instead of square brackets `[`
+- This fix enables proper detection of Calor language constructs in RefactoringStability, Comprehension, ErrorDetection, and EditPrecision metrics
+
 ## [0.1.9] - 2026-02-06
 
 ### Changed
