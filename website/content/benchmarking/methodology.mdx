@@ -12,104 +12,68 @@ How the Calor evaluation framework measures language effectiveness for AI agents
 
 ## Evaluation Approach
 
-The framework compares Calor and C# implementations of the same programs across multiple dimensions. It doesn't use LLM-based evaluation (which would introduce variance) but instead uses deterministic static analysis.
+The framework compares Calor and C# implementations of the same programs across multiple dimensions. It combines deterministic static analysis with optional LLM-based evaluation for a comprehensive assessment.
+
+### Statistical Rigor
+
+All metrics support statistical analysis mode:
+- Multiple runs (default: n=30) for variance measurement
+- 95% confidence intervals for all ratios
+- Cohen's d effect size calculations
+- Paired t-tests for statistical significance (p &lt; 0.05)
+
+```bash
+# Run with statistical analysis
+dotnet run --project tests/Calor.Evaluation -- --statistical --runs 30
+```
 
 ---
 
 ## Test Corpus
 
-### Paired Programs
+### Current Scale
 
-Each benchmark consists of:
-- An Calor implementation
-- A semantically equivalent C# implementation
-- Metadata about expected behavior
+- **100 programs** across 6 categories
+- Each program has paired Calor (.calr) and C# (.cs) implementations
+- Complexity levels 1-5 (simple to advanced)
 
-### Current Corpus
+### Categories
 
-20 paired programs covering:
-- Hello World (basic I/O)
-- FizzBuzz (loops and conditionals)
-- Mathematical functions (contracts)
-- Data processing (effects)
-- Error handling (Option/Result types)
+| Category | Count | Examples |
+|:---------|:------|:---------|
+| Data Structures | 15 | LinkedList, BinaryTree, HashTable, LRUCache |
+| Async/Concurrent | 12 | AsyncFileReader, ProducerConsumer, RateLimiter |
+| Design Patterns | 15 | Factory, Observer, Strategy, State Machine |
+| Domain Problems | 18 | ShoppingCart, OrderProcessor, AuthService |
+| Error Handling | 10 | ResultMonad, ValidationChain, CircuitBreaker |
+| Complex Algorithms | 10 | Dijkstra, QuickSort, A* Pathfinding |
 
 ### Requirements
 
 Both implementations must:
 1. Compile successfully
-2. Produce identical output
+2. Produce identical output for the same inputs
 3. Have the same logical structure
 
 ---
 
-## Metric Calculation
+## The Eight Metrics
 
-### Comprehension
+### 1. Token Economics
 
-**Measures:** How easily an agent can understand code structure.
+**Measures:** Tokens required to represent equivalent logic.
 
-**Calor factors:**
-- Module declarations (`§M[`)
-- Function declarations (`§F[`)
-- Input/output annotations (`§I[`, `§O[`)
-- Effect declarations (`§E[`)
-- Contracts (`§Q`, `§S`)
-- Closing tags (`§/`)
+**Method:**
+- Simple tokenization (split on whitespace and punctuation)
+- Character count (excluding whitespace)
+- Line count
+- Composite ratio
 
-**C# factors:**
-- Namespace declarations
-- Class declarations
-- Documentation comments (`///`)
-- Type annotations
-- Contract patterns (Code Contracts, Debug.Assert)
-
-**Scoring:** Weighted sum of factors present, normalized to 0-1.
+**Interpretation:** Lower is better (less context window usage).
 
 ---
 
-### Error Detection
-
-**Measures:** Ability to detect bugs through explicit contracts.
-
-**Calor factors:**
-- Preconditions (`§Q`)
-- Postconditions (`§S`)
-- Invariants (`§IV`)
-- Effect declarations
-- Typed inputs/outputs
-
-**C# factors:**
-- `Debug.Assert` statements
-- `Contract.Requires` / `Contract.Ensures`
-- Null checks
-- Exception handling
-
-**Scoring:** Weighted sum based on contract coverage.
-
----
-
-### Edit Precision
-
-**Measures:** Ability to target specific code elements.
-
-**Calor factors:**
-- Unique module IDs
-- Unique function IDs
-- Unique loop/conditional IDs
-- Closing tag presence
-
-**C# factors:**
-- Namespace presence
-- Class presence
-- Method count
-- Brace nesting depth (penalty)
-
-**Scoring:** Higher score for more unique identifiers, lower for ambiguous structure.
-
----
-
-### Generation Accuracy
+### 2. Generation Accuracy
 
 **Measures:** Ability to generate valid code.
 
@@ -124,7 +88,85 @@ Both implementations must:
 
 ---
 
-### Task Completion
+### 3. Comprehension
+
+**Measures:** How easily an agent can understand code structure.
+
+**Calor factors:**
+- Module declarations (`§M[`)
+- Function declarations (`§F[`)
+- Input/output annotations (`§I[`, `§O[`)
+- Effect declarations (`§E[`)
+- Contracts (`§REQ`, `§ENS`)
+- Closing tags (`§/`)
+
+**C# factors:**
+- Namespace declarations
+- Class declarations
+- Documentation comments (`///`)
+- Type annotations
+- Contract patterns
+
+**Scoring:** Weighted sum of factors present, normalized to 0-1.
+
+---
+
+### 4. Edit Precision
+
+**Measures:** Ability to target specific code elements accurately.
+
+**Approach:** Simulates actual edit tasks and measures success rate:
+- Change loop bounds by ID
+- Add preconditions to functions
+- Rename functions (ID vs name-based)
+- Change function signatures
+- Modify return types
+
+**Calor advantages:**
+- Unique IDs enable precise targeting (`§F[f001:`)
+- Closing tags define clear boundaries
+- ID-based references don't break on rename
+
+**C# challenges:**
+- Name collisions reduce targeting accuracy
+- Brace nesting creates ambiguity
+- Cascading changes needed for renames
+
+**Scoring:** 40% structural analysis + 60% simulated edit success rate
+
+---
+
+### 5. Error Detection
+
+**Measures:** Bug detection capability through explicit contracts.
+
+**Calor factors:**
+- Preconditions (`§REQ`) - +0.25
+- Postconditions (`§ENS`) - +0.20
+- Invariants (`§INV`) - +0.15
+- Effect declarations - +0.10
+
+**C# factors:**
+- `Debug.Assert` statements
+- `Contract.Requires` / `Contract.Ensures`
+- Null checks
+- Exception handling
+
+---
+
+### 6. Information Density
+
+**Measures:** Semantic content per token.
+
+**Semantic elements counted:**
+- Calor: Modules, functions, variables, type annotations, contracts, effects, control flow, expressions
+- C#: Namespaces, classes, methods, variables, type annotations, control flow, expressions
+
+**Density formula:** Total semantic elements / token count
+
+---
+
+### 7. Task Completion
 
 **Measures:** End-to-end task success potential.
 
@@ -134,51 +176,94 @@ Both implementations must:
 - Structural completeness
 - Contract presence
 
-**Scoring:** Combines efficiency and correctness factors.
+---
+
+### 8. Refactoring Stability (NEW)
+
+**Measures:** How well unique IDs preserve references during code transformations.
+
+**Scenarios tested:**
+| Scenario | What's Measured |
+|:---------|:----------------|
+| Rename function | Does ID survive when name changes? |
+| Extract method | Is new ID assigned, original preserved? |
+| Move function | Does ID survive cross-module move? |
+| Change signature | Do callers update correctly? |
+| Inline variable | Do references resolve correctly? |
+
+**Scoring weights:**
+- ID preservation: 30%
+- Reference validity after edit: 25%
+- Minimal diff size: 20%
+- Semantic equivalence: 25%
 
 ---
 
-### Token Economics
+## LLM-Based Evaluation
 
-**Measures:** Tokens required to represent equivalent logic.
+### Multi-LLM Validation
 
-**Method:**
-1. Simple tokenization (split on whitespace and punctuation)
-2. Character count (excluding whitespace)
-3. Line count
-4. Composite ratio
+To ensure unbiased results, we test with multiple LLMs:
 
-**Interpretation:** Lower is better (less context window usage).
+| Provider | Model | Purpose |
+|:---------|:------|:--------|
+| Anthropic | Claude 3.5 Sonnet | Primary evaluation |
+| OpenAI | GPT-4o | Cross-validation |
 
----
+### Comprehension Questions
 
-### Information Density
+LLMs answer questions about code understanding:
+1. What is the main purpose of this code?
+2. What are the input parameters and their constraints?
+3. What does this function return?
+4. What side effects does this code have?
+5. What would happen if [edge case]?
 
-**Measures:** Semantic content per token.
+### Scoring
 
-**Semantic elements counted:**
-- Calor: Modules, functions, variables, type annotations, contracts, effects, control flow, expressions
-- C#: Namespaces, classes, methods, variables, type annotations, control flow, expressions
-
-**Density:** Total semantic elements / token count
-
-**Interpretation:** Higher is better (more meaning per token).
+- Correctness of answers (0-1) graded against ground truth
+- Tokens used to formulate answer
+- Consistency across multiple runs
+- Cross-model agreement (higher = more reliable)
 
 ---
 
 ## Running the Evaluation
 
+### Basic Run
+
 ```bash
-# Run with JSON output
-dotnet run --project tests/Calor.Evaluation -- --output report.json
+# JSON output (default)
+dotnet run --project tests/Calor.Evaluation -- run --output report.json
 
-# Run with Markdown output
-dotnet run --project tests/Calor.Evaluation -- --output report.md --format markdown
+# Markdown output
+dotnet run --project tests/Calor.Evaluation -- run --format markdown --output report.md
 
-# Run specific metrics
-dotnet run --project tests/Calor.Evaluation -- \
-  --metrics Comprehension,TokenEconomics \
-  --output partial.json
+# Website dashboard format
+dotnet run --project tests/Calor.Evaluation -- run --format website --output results.json
+
+# HTML dashboard
+dotnet run --project tests/Calor.Evaluation -- run --format html --output dashboard.html
+```
+
+### Statistical Analysis
+
+```bash
+# Run with 30 statistical samples
+dotnet run --project tests/Calor.Evaluation -- run --statistical --runs 30
+
+# Custom run count
+dotnet run --project tests/Calor.Evaluation -- run --statistical --runs 50
+```
+
+### Specific Metrics
+
+```bash
+# Run only specific categories
+dotnet run --project tests/Calor.Evaluation -- run \
+  --category Comprehension \
+  --category EditPrecision \
+  --category RefactoringStability
 ```
 
 ---
@@ -188,37 +273,57 @@ dotnet run --project tests/Calor.Evaluation -- \
 ### Winner Determination
 
 For each metric:
-- **Higher is better** (Comprehension, Error Detection, etc.): Calor wins if ratio > 1.0
-- **Lower is better** (Token Economics): C# wins if ratio < 1.0
+- **Higher is better** (Comprehension, Error Detection, etc.): Calor wins if ratio &gt; 1.0
+- **Lower is better** (Token Economics): C# wins if ratio &lt; 1.0
+
+### Statistical Significance
+
+With statistical mode enabled:
+- **p &lt; 0.05**: Result is statistically significant
+- **Cohen's d**: Effect size interpretation
+  - d &lt; 0.2: Negligible
+  - d &lt; 0.5: Small
+  - d &lt; 0.8: Medium
+  - d ≥ 0.8: Large
 
 ### The Tradeoff
 
 Results consistently show:
-- Calor wins on **comprehension** metrics (structure, contracts, effects)
+- Calor wins on **comprehension** metrics (structure, contracts, effects, refactoring)
 - C# wins on **efficiency** metrics (tokens, density)
 
-This isn't a flaw—it's the designed tradeoff of explicit semantics.
+This reflects the designed tradeoff: **explicit semantics require more tokens but enable better agent reasoning and safer refactoring**.
+
+---
+
+## CI/CD Integration
+
+### Automated Benchmarks
+
+Benchmarks run automatically via GitHub Actions:
+- **On every push**: Quick validation run
+- **Weekly (Sunday)**: Full statistical analysis with LLM evaluation
+- **Manual trigger**: On-demand with custom parameters
+
+### Regression Detection
+
+The CI pipeline checks for:
+- Any metric dropping by more than 10%
+- Statistical significance of changes
+- Failing compilation in any benchmark
 
 ---
 
 ## Limitations
 
-1. **No LLM evaluation:** We don't test with actual AI agents (yet)
-2. **Small corpus:** 20 programs may not represent all use cases
-3. **Structural metrics:** Comprehension is measured structurally, not semantically
-4. **C# baseline:** Other languages might perform differently
-
----
-
-## Future Work
-
-- Expand test corpus
-- Add LLM-based evaluation (with controlled prompts)
-- Compare against more languages
-- Add runtime behavior metrics
+1. **Corpus size**: While expanded to 100 programs, may not cover all patterns
+2. **C# baseline**: Other languages might perform differently
+3. **Static analysis**: Some metrics don't capture runtime behavior
+4. **LLM variance**: Model updates can affect evaluation scores
 
 ---
 
 ## Next
 
 - [Results](/benchmarking/results/) - Detailed results table
+- [Individual Metrics](/benchmarking/metrics/comprehension/) - Deep dive into each metric

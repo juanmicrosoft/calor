@@ -1,0 +1,744 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-02-07T14:30:04.330151Z",
+  "commit": "0090057",
+  "frameworkVersion": "1.0.0",
+  "summary": {
+    "overallAdvantage": 0.52,
+    "programCount": 28,
+    "metricCount": 8,
+    "calorWins": 1,
+    "cSharpWins": 7,
+    "statisticalRunCount": 0
+  },
+  "metrics": {
+    "TokenEconomics": {
+      "ratio": 0.63,
+      "winner": "csharp"
+    },
+    "GenerationAccuracy": {
+      "ratio": 0.94,
+      "winner": "csharp"
+    },
+    "Comprehension": {
+      "ratio": 0.25,
+      "winner": "csharp"
+    },
+    "EditPrecision": {
+      "ratio": 0.73,
+      "winner": "csharp"
+    },
+    "ErrorDetection": {
+      "ratio": 1.08,
+      "winner": "calor"
+    },
+    "InformationDensity": {
+      "ratio": 0.09,
+      "winner": "csharp"
+    },
+    "TaskCompletion": {
+      "ratio": 0.75,
+      "winner": "csharp"
+    },
+    "RefactoringStability": {
+      "ratio": 0.64,
+      "winner": "csharp"
+    }
+  },
+  "programs": [
+    {
+      "id": "001",
+      "name": "HelloWorld",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "console_write",
+        "effects"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.64,
+      "metrics": {
+        "TokenEconomics": 0.717,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0,
+        "EditPrecision": 0.781,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.179,
+        "TaskCompletion": 0.944,
+        "RefactoringStability": 0.556
+      }
+    },
+    {
+      "id": "002",
+      "name": "Calculator",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "parameters",
+        "return_type",
+        "arithmetic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.614,
+      "metrics": {
+        "TokenEconomics": 0.48,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.111,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.588
+      }
+    },
+    {
+      "id": "003",
+      "name": "FizzBuzz",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "loop",
+        "modulo"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.635,
+      "metrics": {
+        "TokenEconomics": 0.96,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0,
+        "EditPrecision": 0.647,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.074,
+        "TaskCompletion": 0.833,
+        "RefactoringStability": 0.625
+      }
+    },
+    {
+      "id": "004",
+      "name": "Factorial",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.63,
+      "metrics": {
+        "TokenEconomics": 0.533,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.781,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.167,
+        "TaskCompletion": 0.842,
+        "RefactoringStability": 0.577
+      }
+    },
+    {
+      "id": "005",
+      "name": "Fibonacci",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.614,
+      "metrics": {
+        "TokenEconomics": 0.482,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.781,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.145,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.577
+      }
+    },
+    {
+      "id": "006",
+      "name": "ContractedDivide",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "contracts",
+        "requires",
+        "ensures"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.463,
+      "metrics": {
+        "TokenEconomics": 0.906,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.154,
+        "EditPrecision": 0.781,
+        "ErrorDetection": 0.667,
+        "InformationDensity": 0.055,
+        "TaskCompletion": 0.632,
+        "RefactoringStability": 0.508
+      }
+    },
+    {
+      "id": "007",
+      "name": "StringUtils",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "multiple_methods"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.601,
+      "metrics": {
+        "TokenEconomics": 0.419,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.065,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.588
+      }
+    },
+    {
+      "id": "008",
+      "name": "MathOperations",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "contracts",
+        "effects",
+        "pure"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.66,
+      "metrics": {
+        "TokenEconomics": 1.136,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.154,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 0.667,
+        "InformationDensity": 0.103,
+        "TaskCompletion": 0.882,
+        "RefactoringStability": 0.588
+      }
+    },
+    {
+      "id": "009",
+      "name": "ArraySum",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.606,
+      "metrics": {
+        "TokenEconomics": 0.566,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.629,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.154,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.566
+      }
+    },
+    {
+      "id": "010",
+      "name": "MaxValue",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.541,
+      "metrics": {
+        "TokenEconomics": 0.527,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.154,
+        "EditPrecision": 0.629,
+        "ErrorDetection": 0.667,
+        "InformationDensity": 0.097,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.526
+      }
+    },
+    {
+      "id": "011",
+      "name": "IsPrime",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "conditional",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.592,
+      "metrics": {
+        "TokenEconomics": 0.649,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.154,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 0.667,
+        "InformationDensity": 0.13,
+        "TaskCompletion": 0.833,
+        "RefactoringStability": 0.556
+      }
+    },
+    {
+      "id": "012",
+      "name": "BinarySearch",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.675,
+      "metrics": {
+        "TokenEconomics": 0.956,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.065,
+        "TaskCompletion": 0.833,
+        "RefactoringStability": 0.6
+      }
+    },
+    {
+      "id": "013",
+      "name": "TemperatureConverter",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "multiple_methods"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.637,
+      "metrics": {
+        "TokenEconomics": 0.543,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.25,
+        "EditPrecision": 0.781,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.212,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.577
+      }
+    },
+    {
+      "id": "014",
+      "name": "LeapYear",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "boolean"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.645,
+      "metrics": {
+        "TokenEconomics": 0.709,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.112,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.6
+      }
+    },
+    {
+      "id": "015",
+      "name": "GCD",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.625,
+      "metrics": {
+        "TokenEconomics": 0.567,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.781,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.089,
+        "TaskCompletion": 0.842,
+        "RefactoringStability": 0.577
+      }
+    },
+    {
+      "id": "016",
+      "name": "ReverseString",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "loop"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.652,
+      "metrics": {
+        "TokenEconomics": 0.75,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.781,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.136,
+        "TaskCompletion": 0.842,
+        "RefactoringStability": 0.566
+      }
+    },
+    {
+      "id": "017",
+      "name": "CountVowels",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "loop",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.601,
+      "metrics": {
+        "TokenEconomics": 0.608,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.629,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.068,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.577
+      }
+    },
+    {
+      "id": "018",
+      "name": "Palindrome",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "loop",
+        "boolean"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.616,
+      "metrics": {
+        "TokenEconomics": 0.535,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.2,
+        "EditPrecision": 0.781,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.103,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.577
+      }
+    },
+    {
+      "id": "019",
+      "name": "Power",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.595,
+      "metrics": {
+        "TokenEconomics": 0.75,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.154,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 0.667,
+        "InformationDensity": 0.117,
+        "TaskCompletion": 0.789,
+        "RefactoringStability": 0.536
+      }
+    },
+    {
+      "id": "020",
+      "name": "Clamp",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "contracts",
+        "ensures"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.64,
+      "metrics": {
+        "TokenEconomics": 1.122,
+        "GenerationAccuracy": 0.94,
+        "Comprehension": 0.154,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 0.667,
+        "InformationDensity": 0.065,
+        "TaskCompletion": 0.833,
+        "RefactoringStability": 0.536
+      }
+    },
+    {
+      "id": "021",
+      "name": "Stack",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "effects"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.569,
+      "metrics": {
+        "TokenEconomics": 0.525,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.455,
+        "EditPrecision": 0.626,
+        "ErrorDetection": 1.571,
+        "InformationDensity": 0.063,
+        "TaskCompletion": 0.611,
+        "RefactoringStability": 0.7
+      }
+    },
+    {
+      "id": "022",
+      "name": "Queue",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "effects"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.566,
+      "metrics": {
+        "TokenEconomics": 0.544,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.455,
+        "EditPrecision": 0.626,
+        "ErrorDetection": 1.571,
+        "InformationDensity": 0.021,
+        "TaskCompletion": 0.611,
+        "RefactoringStability": 0.7
+      }
+    },
+    {
+      "id": "023",
+      "name": "LinkedList",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "nested_types",
+        "optional"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.59,
+      "metrics": {
+        "TokenEconomics": 0.541,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.455,
+        "EditPrecision": 0.626,
+        "ErrorDetection": 1.571,
+        "InformationDensity": 0.049,
+        "TaskCompletion": 0.647,
+        "RefactoringStability": 0.833
+      }
+    },
+    {
+      "id": "024",
+      "name": "BinaryTree",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "state",
+        "contracts",
+        "tree"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.603,
+      "metrics": {
+        "TokenEconomics": 0.552,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.455,
+        "EditPrecision": 0.626,
+        "ErrorDetection": 1.571,
+        "InformationDensity": 0.049,
+        "TaskCompletion": 0.647,
+        "RefactoringStability": 0.921
+      }
+    },
+    {
+      "id": "025",
+      "name": "Singleton",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "design_pattern"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.542,
+      "metrics": {
+        "TokenEconomics": 0.385,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.364,
+        "EditPrecision": 0.626,
+        "ErrorDetection": 1.667,
+        "InformationDensity": 0.031,
+        "TaskCompletion": 0.579,
+        "RefactoringStability": 0.686
+      }
+    },
+    {
+      "id": "026",
+      "name": "Factory",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "contracts",
+        "polymorphism",
+        "design_pattern"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.795,
+      "metrics": {
+        "TokenEconomics": 0.83,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.7,
+        "EditPrecision": 0.806,
+        "ErrorDetection": 2.143,
+        "InformationDensity": 0.152,
+        "TaskCompletion": 0.647,
+        "RefactoringStability": 1.081
+      }
+    },
+    {
+      "id": "027",
+      "name": "ShoppingCart",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "domain_logic",
+        "business_rules"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.728,
+      "metrics": {
+        "TokenEconomics": 0.616,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.636,
+        "EditPrecision": 0.63,
+        "ErrorDetection": 2.143,
+        "InformationDensity": 0.068,
+        "TaskCompletion": 0.647,
+        "RefactoringStability": 1.081
+      }
+    },
+    {
+      "id": "028",
+      "name": "QuickSort",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "contracts",
+        "algorithm",
+        "in_place"
+      ],
+      "calorSuccess": false,
+      "cSharpSuccess": true,
+      "advantage": 0.705,
+      "metrics": {
+        "TokenEconomics": 0.587,
+        "GenerationAccuracy": 0,
+        "Comprehension": 0.636,
+        "EditPrecision": 0.647,
+        "ErrorDetection": 2.143,
+        "InformationDensity": 0.09,
+        "TaskCompletion": 0.647,
+        "RefactoringStability": 0.889
+      }
+    }
+  ]
+}

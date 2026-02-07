@@ -29,7 +29,8 @@ public class BenchmarkRunner
             new EditPrecisionCalculator(),
             new ErrorDetectionCalculator(),
             new InformationDensityCalculator(),
-            new TaskCompletionCalculator()
+            new TaskCompletionCalculator(),
+            new RefactoringStabilityCalculator()
         };
     }
 
@@ -38,9 +39,15 @@ public class BenchmarkRunner
     /// </summary>
     public async Task<EvaluationResult> RunAllAsync(BenchmarkManifest manifest)
     {
+        if (_options.StatisticalMode)
+        {
+            return await RunWithStatisticalAnalysisAsync(manifest);
+        }
+
         var result = new EvaluationResult
         {
-            BenchmarkCount = manifest.Benchmarks.Count
+            BenchmarkCount = manifest.Benchmarks.Count,
+            CommitHash = GetGitCommitHash()
         };
 
         var benchmarks = await _adapter.LoadAllBenchmarksAsync(manifest);
@@ -59,6 +66,154 @@ public class BenchmarkRunner
         result.Summary = CalculateSummary(result);
 
         return result;
+    }
+
+    /// <summary>
+    /// Runs benchmarks multiple times for statistical analysis.
+    /// </summary>
+    public async Task<EvaluationResult> RunWithStatisticalAnalysisAsync(BenchmarkManifest manifest)
+    {
+        var runs = _options.StatisticalRuns;
+        if (_options.Verbose)
+            Console.WriteLine($"Running statistical analysis with {runs} runs...");
+
+        var allRunResults = new List<EvaluationResult>();
+
+        for (var i = 0; i < runs; i++)
+        {
+            if (_options.Verbose)
+                Console.WriteLine($"Run {i + 1}/{runs}...");
+
+            var runResult = new EvaluationResult
+            {
+                BenchmarkCount = manifest.Benchmarks.Count
+            };
+
+            var benchmarks = await _adapter.LoadAllBenchmarksAsync(manifest);
+
+            foreach (var (entry, context) in benchmarks)
+            {
+                var caseResult = await RunSingleBenchmarkAsync(entry, context);
+                runResult.CaseResults.Add(caseResult);
+                runResult.Metrics.AddRange(caseResult.Metrics);
+            }
+
+            runResult.Summary = CalculateSummary(runResult);
+            allRunResults.Add(runResult);
+        }
+
+        // Aggregate results with statistical analysis
+        return AggregateStatisticalResults(allRunResults, manifest);
+    }
+
+    /// <summary>
+    /// Aggregates multiple run results into a single result with statistical summaries.
+    /// </summary>
+    private EvaluationResult AggregateStatisticalResults(
+        List<EvaluationResult> runResults,
+        BenchmarkManifest manifest)
+    {
+        var firstRun = runResults[0];
+
+        // Collect all metric results grouped by category and name
+        var metricGroups = runResults
+            .SelectMany(r => r.Metrics)
+            .GroupBy(m => (m.Category, m.MetricName))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var statisticalSummaries = new List<StatisticalSummary>();
+
+        foreach (var ((category, metricName), metrics) in metricGroups)
+        {
+            var calorScores = metrics.Select(m => m.CalorScore).ToList();
+            var csharpScores = metrics.Select(m => m.CSharpScore).ToList();
+            var advantageRatios = metrics.Select(m => m.AdvantageRatio).ToList();
+
+            var summary = new StatisticalSummary
+            {
+                Category = category,
+                MetricName = metricName,
+                SampleCount = metrics.Count,
+                CalorMean = StatisticalAnalysis.Mean(calorScores),
+                CalorStdDev = StatisticalAnalysis.StandardDeviation(calorScores),
+                CalorCI = StatisticalAnalysis.CalculateConfidenceInterval(calorScores, _options.ConfidenceLevel),
+                CSharpMean = StatisticalAnalysis.Mean(csharpScores),
+                CSharpStdDev = StatisticalAnalysis.StandardDeviation(csharpScores),
+                CSharpCI = StatisticalAnalysis.CalculateConfidenceInterval(csharpScores, _options.ConfidenceLevel),
+                AdvantageRatioMean = StatisticalAnalysis.Mean(advantageRatios),
+                AdvantageRatioCI = StatisticalAnalysis.CalculateConfidenceInterval(advantageRatios, _options.ConfidenceLevel),
+                CohensD = StatisticalAnalysis.CohensD(calorScores, csharpScores),
+                EffectSizeInterpretation = StatisticalAnalysis.InterpretEffectSize(
+                    StatisticalAnalysis.CohensD(calorScores, csharpScores)),
+                TTest = StatisticalAnalysis.PairedTTest(calorScores, csharpScores)
+            };
+
+            statisticalSummaries.Add(summary);
+        }
+
+        // Create aggregated result using means
+        var aggregatedMetrics = metricGroups.Select(g => new MetricResult(
+            g.Key.Category,
+            g.Key.MetricName,
+            StatisticalAnalysis.Mean(g.Value.Select(m => m.CalorScore)),
+            StatisticalAnalysis.Mean(g.Value.Select(m => m.CSharpScore)),
+            StatisticalAnalysis.Mean(g.Value.Select(m => m.AdvantageRatio)),
+            new Dictionary<string, object>
+            {
+                ["statisticalSampleCount"] = g.Value.Count
+            })).ToList();
+
+        var result = new EvaluationResult
+        {
+            BenchmarkCount = manifest.Benchmarks.Count,
+            Metrics = aggregatedMetrics,
+            CaseResults = firstRun.CaseResults, // Use first run for case details
+            StatisticalSummaries = statisticalSummaries,
+            StatisticalRunCount = runResults.Count,
+            CommitHash = GetGitCommitHash()
+        };
+
+        result.Summary = CalculateSummary(result);
+
+        // Add confidence intervals to summary
+        foreach (var catSummary in statisticalSummaries.GroupBy(s => s.Category))
+        {
+            var avgCI = StatisticalAnalysis.CalculateConfidenceInterval(
+                catSummary.Select(s => s.AdvantageRatioMean));
+            result.Summary.CategoryConfidenceIntervals[catSummary.Key] = avgCI;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Gets the current git commit hash, if available.
+    /// </summary>
+    private static string? GetGitCommitHash()
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "rev-parse --short HEAD",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            if (process == null) return null;
+
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+
+            return process.ExitCode == 0 ? output : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -251,4 +406,19 @@ public class BenchmarkRunnerOptions
     /// Enable parallel execution.
     /// </summary>
     public bool Parallel { get; set; } = true;
+
+    /// <summary>
+    /// Enable statistical analysis mode with multiple runs.
+    /// </summary>
+    public bool StatisticalMode { get; set; }
+
+    /// <summary>
+    /// Number of runs for statistical analysis (default: 30).
+    /// </summary>
+    public int StatisticalRuns { get; set; } = 30;
+
+    /// <summary>
+    /// Confidence level for intervals (default: 0.95 = 95%).
+    /// </summary>
+    public double ConfidenceLevel { get; set; } = 0.95;
 }

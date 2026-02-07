@@ -1,0 +1,94 @@
+§M{m001:QuickSort}
+§F{f001:Sort:pub}
+  §I{list:arr}
+  §O{void}
+  §E{state:write}
+  §ENS (is-sorted arr)
+  §B
+    §IF (> (list-count arr) 1)
+      (quick-sort-range arr 0 (- (list-count arr) 1))
+    §/IF
+  §/B
+§/F{f001}
+§F{f002:QuickSortRange:prv}
+  §I{list:arr}
+  §I{i32:low}
+  §I{i32:high}
+  §O{void}
+  §E{state:write}
+  §REQ (>= low 0)
+  §REQ (< high (list-count arr))
+  §B
+    §IF (< low high)
+      §V{v001:pivotIndex:loc}
+        §INIT (partition arr low high)
+      §/V{v001}
+      (quick-sort-range arr low (- pivotIndex 1))
+      (quick-sort-range arr (+ pivotIndex 1) high)
+    §/IF
+  §/B
+§/F{f002}
+§F{f003:Partition:prv}
+  §I{list:arr}
+  §I{i32:low}
+  §I{i32:high}
+  §O{i32}
+  §E{state:write}
+  §REQ (>= low 0)
+  §REQ (< high (list-count arr))
+  §ENS (>= result low)
+  §ENS (<= result high)
+  §B
+    §V{v002:pivot:loc}
+      §INIT (list-get arr high)
+    §/V{v002}
+    §V{v003:i:loc}
+      §INIT (- low 1)
+    §/V{v003}
+    §LOOP{loop1}
+      §FOR j low high
+        §IF (<= (list-get arr j) pivot)
+          (set i (+ i 1))
+          (swap arr i j)
+        §/IF
+    §/LOOP{loop1}
+    (swap arr (+ i 1) high)
+    §R (+ i 1)
+  §/B
+§/F{f003}
+§F{f004:Swap:prv}
+  §I{list:arr}
+  §I{i32:i}
+  §I{i32:j}
+  §O{void}
+  §E{state:write}
+  §REQ (>= i 0)
+  §REQ (< i (list-count arr))
+  §REQ (>= j 0)
+  §REQ (< j (list-count arr))
+  §B
+    §V{v004:temp:loc}
+      §INIT (list-get arr i)
+    §/V{v004}
+    (list-set arr i (list-get arr j))
+    (list-set arr j temp)
+  §/B
+§/F{f004}
+§F{f005:IsSorted:pub}
+  §I{list:arr}
+  §O{bool}
+  §E{pure}
+  §B
+    §IF (<= (list-count arr) 1)
+      §R true
+    §/IF
+    §LOOP{loop2}
+      §FOR i 1 (list-count arr)
+        §IF (> (list-get arr (- i 1)) (list-get arr i))
+          §R false
+        §/IF
+    §/LOOP{loop2}
+    §R true
+  §/B
+§/F{f005}
+§/M{m001}

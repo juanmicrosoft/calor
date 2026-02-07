@@ -2,7 +2,7 @@
   "name": "calor",
   "displayName": "Calor Language",
   "description": "Syntax highlighting for the Calor programming language",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "publisher": "calor-dev",
   "license": "Apache-2.0",
   "icon": "icons/calor-icon.png",

@@ -38,6 +38,26 @@ public class EvaluationResult
     public List<BenchmarkCaseResult> CaseResults { get; init; } = new();
 
     /// <summary>
+    /// Statistical summaries for each metric (when running in statistical mode).
+    /// </summary>
+    public List<StatisticalSummary> StatisticalSummaries { get; init; } = new();
+
+    /// <summary>
+    /// Whether this result includes statistical analysis from multiple runs.
+    /// </summary>
+    public bool HasStatisticalAnalysis => StatisticalSummaries.Count > 0;
+
+    /// <summary>
+    /// Number of runs used for statistical analysis (0 if not in statistical mode).
+    /// </summary>
+    public int StatisticalRunCount { get; init; }
+
+    /// <summary>
+    /// Git commit hash when the benchmark was run (for tracking).
+    /// </summary>
+    public string? CommitHash { get; init; }
+
+    /// <summary>
     /// Calculates and returns the overall Calor advantage ratio (geometric mean of all category ratios).
     /// </summary>
     public double CalculateOverallAdvantage()
@@ -69,6 +89,11 @@ public class EvaluationSummary
     public Dictionary<string, double> CategoryAdvantages { get; set; } = new();
 
     /// <summary>
+    /// 95% confidence intervals for category advantages (when statistical mode enabled).
+    /// </summary>
+    public Dictionary<string, ConfidenceInterval> CategoryConfidenceIntervals { get; set; } = new();
+
+    /// <summary>
     /// Total benchmarks that passed for Calor.
     /// </summary>
     public int CalorPassCount { get; set; }
@@ -87,6 +112,11 @@ public class EvaluationSummary
     /// Categories where C# has an advantage (if any).
     /// </summary>
     public List<string> CSharpAdvantageCategories { get; set; } = new();
+
+    /// <summary>
+    /// Categories with statistically significant differences (p < 0.05).
+    /// </summary>
+    public List<string> StatisticallySignificantCategories { get; set; } = new();
 }
 
 /// <summary>

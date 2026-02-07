@@ -1,0 +1,102 @@
+§M{m001:BinaryTree}
+§V{v001:root:prv}
+  §T{opt:treenode}
+  §INIT none
+§/V{v001}
+§F{f001:Insert:pub}
+  §I{i32:value}
+  §O{void}
+  §E{state:write}
+  §B
+    §IF (is-none root)
+      (set root (some (treenode value none none)))
+    §ELSE
+      (insert-recursive (unwrap root) value)
+    §/IF
+  §/B
+§/F{f001}
+§F{f002:InsertRecursive:prv}
+  §I{treenode:node}
+  §I{i32:value}
+  §O{void}
+  §E{state:write}
+  §B
+    §IF (< value (treenode-value node))
+      §IF (is-none (treenode-left node))
+        (treenode-set-left node (some (treenode value none none)))
+      §ELSE
+        (insert-recursive (unwrap (treenode-left node)) value)
+      §/IF
+    §ELSE
+      §IF (is-none (treenode-right node))
+        (treenode-set-right node (some (treenode value none none)))
+      §ELSE
+        (insert-recursive (unwrap (treenode-right node)) value)
+      §/IF
+    §/IF
+  §/B
+§/F{f002}
+§F{f003:Contains:pub}
+  §I{i32:value}
+  §O{bool}
+  §E{state:read}
+  §B
+    §IF (is-none root)
+      §R false
+    §/IF
+    §R (contains-recursive (unwrap root) value)
+  §/B
+§/F{f003}
+§F{f004:ContainsRecursive:prv}
+  §I{treenode:node}
+  §I{i32:value}
+  §O{bool}
+  §E{state:read}
+  §B
+    §IF (== value (treenode-value node))
+      §R true
+    §/IF
+    §IF (< value (treenode-value node))
+      §IF (is-none (treenode-left node))
+        §R false
+      §/IF
+      §R (contains-recursive (unwrap (treenode-left node)) value)
+    §ELSE
+      §IF (is-none (treenode-right node))
+        §R false
+      §/IF
+      §R (contains-recursive (unwrap (treenode-right node)) value)
+    §/IF
+  §/B
+§/F{f004}
+§F{f005:FindMin:pub}
+  §O{i32}
+  §E{state:read}
+  §REQ (not (is-none root))
+  §B
+    §V{v002:current:loc}
+      §INIT (unwrap root)
+    §/V{v002}
+    §LOOP{loop1}
+      §WHILE (not (is-none (treenode-left current)))
+        (set current (unwrap (treenode-left current)))
+    §/LOOP{loop1}
+    §R (treenode-value current)
+  §/B
+§/F{f005}
+§F{f006:FindMax:pub}
+  §O{i32}
+  §E{state:read}
+  §REQ (not (is-none root))
+  §B
+    §V{v003:current:loc}
+      §INIT (unwrap root)
+    §/V{v003}
+    §LOOP{loop2}
+      §WHILE (not (is-none (treenode-right current)))
+        (set current (unwrap (treenode-right current)))
+    §/LOOP{loop2}
+    §R (treenode-value current)
+  §/B
+§/F{f006}
+§/M{m001}

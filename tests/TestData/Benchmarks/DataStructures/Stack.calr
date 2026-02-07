@@ -1,0 +1,48 @@
+§M{m001:Stack}
+§V{v001:items:prv}
+  §T{list:i32}
+  §INIT (list)
+§/V{v001}
+§V{v002:count:prv}
+  §T{i32}
+  §INIT 0
+§/V{v002}
+§F{f001:Push:pub}
+  §I{i32:item}
+  §O{void}
+  §E{state:write}
+  §B
+    (list-add items item)
+    (set count (+ count 1))
+  §/B
+§/F{f001}
+§F{f002:Pop:pub}
+  §O{i32}
+  §E{state:write}
+  §REQ (> count 0)
+  §B
+    §V{v003:result:loc}
+      §INIT (list-get items (- count 1))
+    §/V{v003}
+    (list-remove-at items (- count 1))
+    (set count (- count 1))
+    §R result
+  §/B
+§/F{f002}
+§F{f003:Peek:pub}
+  §O{i32}
+  §E{state:read}
+  §REQ (> count 0)
+  §R (list-get items (- count 1))
+§/F{f003}
+§F{f004:IsEmpty:pub}
+  §O{bool}
+  §E{pure}
+  §R (== count 0)
+§/F{f004}
+§F{f005:Count:pub}
+  §O{i32}
+  §E{pure}
+  §R count
+§/F{f005}
+§/M{m001}
