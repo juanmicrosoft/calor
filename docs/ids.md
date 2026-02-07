@@ -36,14 +36,14 @@ Every structural declaration in Calor must have a unique ID:
 
 | Kind | Tag | Prefix | Example |
 |------|-----|--------|---------|
-| Module | `§M` | `m_` | `m_01J5X7K9M2NPQRSTUVWXYZ12` |
-| Function | `§F` | `f_` | `f_01J5X7K9M2NPQRSTUVWXYZ12` |
-| Class | `§CL` | `c_` | `c_01J5X7K9M2NPQRSTUVWXYZ12` |
-| Interface | `§IFACE` | `i_` | `i_01J5X7K9M2NPQRSTUVWXYZ12` |
-| Property | `§PROP` | `p_` | `p_01J5X7K9M2NPQRSTUVWXYZ12` |
-| Method | `§MT` | `mt_` | `mt_01J5X7K9M2NPQRSTUVWXYZ12` |
-| Constructor | `§CTOR` | `ctor_` | `ctor_01J5X7K9M2NPQRSTUVWXYZ12` |
-| Enum | `§EN` | `e_` | `e_01J5X7K9M2NPQRSTUVWXYZ12` |
+| Module | `§M` | `m_` | `m_01J5X7K9M2NPQRSTABWXYZ12` |
+| Function | `§F` | `f_` | `f_01J5X7K9M2NPQRSTABWXYZ12` |
+| Class | `§CL` | `c_` | `c_01J5X7K9M2NPQRSTABWXYZ12` |
+| Interface | `§IFACE` | `i_` | `i_01J5X7K9M2NPQRSTABWXYZ12` |
+| Property | `§PROP` | `p_` | `p_01J5X7K9M2NPQRSTABWXYZ12` |
+| Method | `§MT` | `mt_` | `mt_01J5X7K9M2NPQRSTABWXYZ12` |
+| Constructor | `§CTOR` | `ctor_` | `ctor_01J5X7K9M2NPQRSTABWXYZ12` |
+| Enum | `§EN` | `e_` | `e_01J5X7K9M2NPQRSTABWXYZ12` |
 
 ### 2.1 Declarations NOT Requiring IDs
 
@@ -73,11 +73,11 @@ Production IDs use ULID (Universally Unique Lexicographically Sortable Identifie
 
 **Examples:**
 ```
-f_01J5X7K9M2NPQRSTUVWXYZ12     Function
-m_01J5X7K9M2NPQRSTUVWXYZ12     Module
-c_01J5X7K9M2NPQRSTUVWXYZ12     Class
-mt_01J5X7K9M2NPQRSTUVWXYZ12    Method
-ctor_01J5X7K9M2NPQRSTUVWXYZ12  Constructor
+f_01J5X7K9M2NPQRSTABWXYZ12     Function
+m_01J5X7K9M2NPQRSTABWXYZ12     Module
+c_01J5X7K9M2NPQRSTABWXYZ12     Class
+mt_01J5X7K9M2NPQRSTABWXYZ12    Method
+ctor_01J5X7K9M2NPQRSTABWXYZ12  Constructor
 ```
 
 ### 3.2 Test IDs (ONLY in tests/, docs/, examples/)
@@ -101,8 +101,8 @@ c001, c002          Classes
 | Rule | Valid | Invalid |
 |------|-------|---------|
 | Prefix matches kind | `f_01...` for function | `m_01...` for function |
-| ULID is 26 chars | `f_01J5X7K9M2NPQRSTUVWXYZ12` | `f_01J5X7` |
-| Crockford Base32 | `f_01J5X7K9M2NPQRSTUVWXYZ12` | `f_01I5X7...` (I invalid) |
+| ULID is 26 chars | `f_01J5X7K9M2NPQRSTABWXYZ12` | `f_01J5X7` |
+| Crockford Base32 | `f_01J5X7K9M2NPQRSTABWXYZ12` | `f_01I5X7...` (I invalid) |
 | Test ID location | `tests/foo.calr: f001` | `src/foo.calr: f001` |
 
 ---
@@ -156,7 +156,7 @@ c001, c002          Classes
 The compiler detects duplicate IDs and reports them as errors:
 
 ```
-Error Calor0803: Duplicate ID 'f_01J5X7K9M2NPQRSTUVWXYZ12'
+Error Calor0803: Duplicate ID 'f_01J5X7K9M2NPQRSTABWXYZ12'
   First defined: src/math.calr:15 (function Calculate)
   Also defined:  src/utils.calr:42 (function Validate)
 ```
@@ -206,28 +206,28 @@ Converting Calor → C# → Calor must preserve all IDs:
 
 ```calor
 // Original
-§F{f_01J5X7K9M2NPQRSTUVWXYZ12:Add:pub}
+§F{f_01J5X7K9M2NPQRSTABWXYZ12:Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f_01J5X7K9M2NPQRSTUVWXYZ12}
+§/F{f_01J5X7K9M2NPQRSTABWXYZ12}
 ```
 
 ```csharp
 // Generated C#
-[CalorId("f_01J5X7K9M2NPQRSTUVWXYZ12")]
+[CalorId("f_01J5X7K9M2NPQRSTABWXYZ12")]
 public static int Add(int a, int b) => a + b;
 ```
 
 ```calor
 // Re-converted to Calor - ID preserved
-§F{f_01J5X7K9M2NPQRSTUVWXYZ12:Add:pub}
+§F{f_01J5X7K9M2NPQRSTABWXYZ12:Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f_01J5X7K9M2NPQRSTUVWXYZ12}
+§/F{f_01J5X7K9M2NPQRSTABWXYZ12}
 ```
 
 ---
@@ -353,7 +353,7 @@ calor ids check .
 IDs are stored in the first positional attribute (`_pos0`):
 
 ```calor
-§F{f_01J5X7K9M2NPQRSTUVWXYZ12:Name:pub}
+§F{f_01J5X7K9M2NPQRSTABWXYZ12:Name:pub}
      ^^^^^^^^^^^^^^^^^^^^^^^^^
      _pos0 = ID
 ```
