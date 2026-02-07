@@ -48,8 +48,8 @@ Each file is scored across six dimensions that correspond to Calor language feat
 | Dimension | Weight | What It Detects | Calor Feature |
 |:----------|:------:|:----------------|:-------------|
 | **ContractPotential** | 20% | Argument validation, `ArgumentException` throws, range checks | `§Q`/`§S` contracts |
-| **NullSafetyPotential** | 20% | Nullable types, `?.`, `??`, null checks | `Option<T>` |
-| **ErrorHandlingPotential** | 20% | Try/catch blocks, throw statements | `Result<T,E>` |
+| **NullSafetyPotential** | 20% | Nullable types, `?.`, `??`, null checks | `Option\<T\>` |
+| **ErrorHandlingPotential** | 20% | Try/catch blocks, throw statements | `Result\<T,E\>` |
 | **EffectPotential** | 15% | File I/O, network calls, database access, console | `§E` effect declarations |
 | **ApiComplexityPotential** | 15% | Undocumented public APIs | Calor metadata requirements |
 | **PatternMatchPotential** | 10% | Switch statements/expressions | Exhaustiveness checking |
