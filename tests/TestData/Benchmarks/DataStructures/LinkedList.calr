@@ -1,0 +1,85 @@
+§M{m001:LinkedList}
+§V{v001:head:prv}
+  §T{opt:node}
+  §INIT none
+§/V{v001}
+§V{v002:tail:prv}
+  §T{opt:node}
+  §INIT none
+§/V{v002}
+§V{v003:size:prv}
+  §T{i32}
+  §INIT 0
+§/V{v003}
+§F{f001:AddFirst:pub}
+  §I{i32:value}
+  §O{void}
+  §E{state:write}
+  §B
+    §V{v004:newNode:loc}
+      §INIT (node value head)
+    §/V{v004}
+    (set head (some newNode))
+    §IF (== size 0)
+      (set tail (some newNode))
+    §/IF
+    (set size (+ size 1))
+  §/B
+§/F{f001}
+§F{f002:AddLast:pub}
+  §I{i32:value}
+  §O{void}
+  §E{state:write}
+  §B
+    §V{v005:newNode:loc}
+      §INIT (node value none)
+    §/V{v005}
+    §IF (== size 0)
+      (set head (some newNode))
+      (set tail (some newNode))
+    §ELSE
+      (node-set-next (unwrap tail) (some newNode))
+      (set tail (some newNode))
+    §/IF
+    (set size (+ size 1))
+  §/B
+§/F{f002}
+§F{f003:RemoveFirst:pub}
+  §O{i32}
+  §E{state:write}
+  §REQ (> size 0)
+  §B
+    §V{v006:value:loc}
+      §INIT (node-value (unwrap head))
+    §/V{v006}
+    (set head (node-next (unwrap head)))
+    (set size (- size 1))
+    §IF (== size 0)
+      (set tail none)
+    §/IF
+    §R value
+  §/B
+§/F{f003}
+§F{f004:GetFirst:pub}
+  §O{i32}
+  §E{state:read}
+  §REQ (> size 0)
+  §R (node-value (unwrap head))
+§/F{f004}
+§F{f005:GetLast:pub}
+  §O{i32}
+  §E{state:read}
+  §REQ (> size 0)
+  §R (node-value (unwrap tail))
+§/F{f005}
+§F{f006:Size:pub}
+  §O{i32}
+  §E{pure}
+  §R size
+§/F{f006}
+§F{f007:IsEmpty:pub}
+  §O{bool}
+  §E{pure}
+  §R (== size 0)
+§/F{f007}
+§/M{m001}

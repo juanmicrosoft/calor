@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Calor.Evaluation.Benchmarks;
+using Calor.Evaluation.Core;
 using Calor.Evaluation.Reports;
 
 namespace Calor.Evaluation;
@@ -26,7 +27,7 @@ public static class Program
 
         var formatOption = new Option<string>(
             aliases: new[] { "--format", "-f" },
-            description: "Output format (json, markdown, both)",
+            description: "Output format (json, markdown, both, website, html)",
             getDefaultValue: () => "json");
 
         var categoryOption = new Option<string[]>(
@@ -44,16 +45,27 @@ public static class Program
             aliases: new[] { "--manifest", "-m" },
             description: "Path to benchmark manifest file");
 
+        var statisticalOption = new Option<bool>(
+            aliases: new[] { "--statistical", "-s" },
+            description: "Enable statistical analysis with multiple runs");
+
+        var runsOption = new Option<int>(
+            aliases: new[] { "--runs", "-r" },
+            description: "Number of runs for statistical analysis",
+            getDefaultValue: () => 30);
+
         runCommand.AddOption(outputOption);
         runCommand.AddOption(formatOption);
         runCommand.AddOption(categoryOption);
         runCommand.AddOption(verboseOption);
         runCommand.AddOption(manifestOption);
+        runCommand.AddOption(statisticalOption);
+        runCommand.AddOption(runsOption);
 
-        runCommand.SetHandler(async (output, format, categories, verbose, manifest) =>
+        runCommand.SetHandler(async (output, format, categories, verbose, manifest, statistical, runs) =>
         {
-            await RunBenchmarksAsync(output, format, categories, verbose, manifest);
-        }, outputOption, formatOption, categoryOption, verboseOption, manifestOption);
+            await RunBenchmarksAsync(output, format, categories, verbose, manifest, statistical, runs);
+        }, outputOption, formatOption, categoryOption, verboseOption, manifestOption, statisticalOption, runsOption);
 
         rootCommand.AddCommand(runCommand);
 
@@ -117,7 +129,9 @@ public static class Program
         string format,
         string[] categories,
         bool verbose,
-        string? manifestPath)
+        string? manifestPath,
+        bool statistical = false,
+        int runs = 30)
     {
         Console.WriteLine("Calor vs C# Evaluation Framework");
         Console.WriteLine("================================");
@@ -126,8 +140,16 @@ public static class Program
         var options = new BenchmarkRunnerOptions
         {
             Verbose = verbose,
-            Categories = categories.ToList()
+            Categories = categories.ToList(),
+            StatisticalMode = statistical,
+            StatisticalRuns = runs
         };
+
+        if (statistical)
+        {
+            Console.WriteLine($"Statistical analysis mode: {runs} runs");
+            Console.WriteLine();
+        }
 
         var runner = new BenchmarkRunner(options);
 
@@ -179,16 +201,72 @@ public static class Program
             Console.WriteLine($"Markdown report saved to: {mdPath}");
         }
 
+        if (format is "website")
+        {
+            var websiteGenerator = new WebsiteReportGenerator();
+            await websiteGenerator.SaveAsync(result, output);
+            Console.WriteLine($"Website JSON saved to: {output}");
+        }
+
+        if (format is "html")
+        {
+            // Generate both website JSON and an HTML dashboard
+            var websiteGenerator = new WebsiteReportGenerator();
+            var jsonPath = Path.ChangeExtension(output, ".json");
+            await websiteGenerator.SaveAsync(result, jsonPath);
+
+            var htmlPath = Path.ChangeExtension(output, ".html");
+            await GenerateHtmlDashboard(result, htmlPath);
+            Console.WriteLine($"HTML dashboard saved to: {htmlPath}");
+        }
+
         // Print summary
         Console.WriteLine();
         Console.WriteLine("Summary:");
         Console.WriteLine($"  Overall Calor Advantage: {result.Summary.OverallCalorAdvantage:F2}x");
+
+        if (result.HasStatisticalAnalysis)
+        {
+            Console.WriteLine($"  Statistical runs: {result.StatisticalRunCount}");
+        }
+
         Console.WriteLine();
         Console.WriteLine("  Category Advantages:");
         foreach (var (category, advantage) in result.Summary.CategoryAdvantages.OrderByDescending(kv => kv.Value))
         {
             var indicator = advantage > 1.0 ? "+" : (advantage < 1.0 ? "-" : "=");
-            Console.WriteLine($"    {indicator} {category}: {advantage:F2}x");
+            var ciStr = "";
+            if (result.Summary.CategoryConfidenceIntervals.TryGetValue(category, out var ci))
+            {
+                ciStr = $" (95% CI: [{ci.Lower:F2}, {ci.Upper:F2}])";
+            }
+            Console.WriteLine($"    {indicator} {category}: {advantage:F2}x{ciStr}");
+        }
+
+        // Print statistical significance if available
+        if (result.HasStatisticalAnalysis && result.StatisticalSummaries.Count > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("  Statistical Significance (p < 0.05):");
+            var significantCategories = result.StatisticalSummaries
+                .Where(s => s.TTest?.IsSignificant == true)
+                .GroupBy(s => s.Category)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (significantCategories.Count > 0)
+            {
+                foreach (var cat in significantCategories)
+                {
+                    var summary = result.StatisticalSummaries.First(s => s.Category == cat);
+                    var winner = summary.AdvantageRatioMean > 1.0 ? "Calor" : "C#";
+                    Console.WriteLine($"    * {cat}: {winner} wins (d={summary.CohensD:F2}, {summary.EffectSizeInterpretation} effect)");
+                }
+            }
+            else
+            {
+                Console.WriteLine("    No statistically significant differences found.");
+            }
         }
     }
 
@@ -275,5 +353,149 @@ public static class Program
                 }
             }
         };
+    }
+
+    private static async Task GenerateHtmlDashboard(EvaluationResult result, string outputPath)
+    {
+        var html = $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <title>Calor Benchmark Dashboard</title>
+    <style>
+        :root {{
+            --calor-green: #22c55e;
+            --csharp-blue: #3b82f6;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+        }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            padding: 2rem;
+        }}
+        .container {{ max-width: 1200px; margin: 0 auto; }}
+        h1 {{ font-size: 2rem; margin-bottom: 0.5rem; }}
+        .subtitle {{ color: var(--text-secondary); margin-bottom: 2rem; }}
+        .summary-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }}
+        .card {{
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }}
+        .card-label {{ color: var(--text-secondary); font-size: 0.875rem; }}
+        .card-value {{ font-size: 2rem; font-weight: bold; margin-top: 0.5rem; }}
+        .card-value.calor {{ color: var(--calor-green); }}
+        .card-value.csharp {{ color: var(--csharp-blue); }}
+        .metrics-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }}
+        .metrics-table th, .metrics-table td {{
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }}
+        .metrics-table th {{ color: var(--text-secondary); font-weight: 500; }}
+        .winner-calor {{ color: var(--calor-green); }}
+        .winner-csharp {{ color: var(--csharp-blue); }}
+        .badge {{
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }}
+        .badge-calor {{ background: rgba(34, 197, 94, 0.2); color: var(--calor-green); }}
+        .badge-csharp {{ background: rgba(59, 130, 246, 0.2); color: var(--csharp-blue); }}
+        .ci {{ color: var(--text-secondary); font-size: 0.875rem; }}
+        .timestamp {{ color: var(--text-secondary); font-size: 0.875rem; margin-top: 2rem; }}
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h1>Calor Benchmark Results</h1>
+        <p class=""subtitle"">Comparing Calor vs C# for AI coding agent effectiveness</p>
+
+        <div class=""summary-grid"">
+            <div class=""card"">
+                <div class=""card-label"">Overall Advantage</div>
+                <div class=""card-value {(result.Summary.OverallCalorAdvantage > 1 ? "calor" : "csharp")}"">{result.Summary.OverallCalorAdvantage:F2}x</div>
+            </div>
+            <div class=""card"">
+                <div class=""card-label"">Programs Tested</div>
+                <div class=""card-value"">{result.BenchmarkCount}</div>
+            </div>
+            <div class=""card"">
+                <div class=""card-label"">Calor Wins</div>
+                <div class=""card-value calor"">{result.Summary.TopCalorCategories.Count}</div>
+            </div>
+            <div class=""card"">
+                <div class=""card-label"">C# Wins</div>
+                <div class=""card-value csharp"">{result.Summary.CSharpAdvantageCategories.Count}</div>
+            </div>
+        </div>
+
+        <div class=""card"">
+            <h2>Metric Results</h2>
+            <table class=""metrics-table"">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Ratio</th>
+                        <th>Winner</th>
+                        <th>95% CI</th>
+                    </tr>
+                </thead>
+                <tbody>
+{GenerateMetricRows(result)}
+                </tbody>
+            </table>
+        </div>
+
+        <p class=""timestamp"">Generated: {result.Timestamp:yyyy-MM-dd HH:mm:ss UTC}{(result.CommitHash != null ? $" | Commit: {result.CommitHash}" : "")}</p>
+    </div>
+</body>
+</html>";
+
+        await File.WriteAllTextAsync(outputPath, html);
+    }
+
+    private static string GenerateMetricRows(EvaluationResult result)
+    {
+        var rows = new System.Text.StringBuilder();
+
+        foreach (var (category, advantage) in result.Summary.CategoryAdvantages.OrderByDescending(kv => kv.Value))
+        {
+            var winner = advantage > 1.0 ? "Calor" : (advantage < 1.0 ? "C#" : "Tie");
+            var winnerClass = advantage > 1.0 ? "winner-calor" : (advantage < 1.0 ? "winner-csharp" : "");
+            var badgeClass = advantage > 1.0 ? "badge-calor" : "badge-csharp";
+
+            var ciStr = "";
+            if (result.Summary.CategoryConfidenceIntervals.TryGetValue(category, out var ci))
+            {
+                ciStr = $"<span class=\"ci\">[{ci.Lower:F2}, {ci.Upper:F2}]</span>";
+            }
+
+            rows.AppendLine($@"                    <tr>
+                        <td>{category}</td>
+                        <td class=""{winnerClass}"">{advantage:F2}x</td>
+                        <td><span class=""badge {badgeClass}"">{winner}</span></td>
+                        <td>{ciStr}</td>
+                    </tr>");
+        }
+
+        return rows.ToString();
     }
 }

@@ -1,0 +1,56 @@
+§M{m001:ShapeFactory}
+§F{f001:CreateCircle:pub}
+  §I{f64:radius}
+  §O{shape}
+  §E{pure}
+  §REQ (> radius 0.0)
+  §ENS (== (shape-type result) "circle")
+  §R (circle radius)
+§/F{f001}
+§F{f002:CreateRectangle:pub}
+  §I{f64:width}
+  §I{f64:height}
+  §O{shape}
+  §E{pure}
+  §REQ (> width 0.0)
+  §REQ (> height 0.0)
+  §ENS (== (shape-type result) "rectangle")
+  §R (rectangle width height)
+§/F{f002}
+§F{f003:CreateSquare:pub}
+  §I{f64:side}
+  §O{shape}
+  §E{pure}
+  §REQ (> side 0.0)
+  §ENS (== (shape-type result) "rectangle")
+  §R (rectangle side side)
+§/F{f003}
+§F{f004:CalculateArea:pub}
+  §I{shape:s}
+  §O{f64}
+  §E{pure}
+  §ENS (>= result 0.0)
+  §B
+    §MATCH s
+      §CASE circle(r)
+        §R (* 3.14159 (* r r))
+      §CASE rectangle(w, h)
+        §R (* w h)
+    §/MATCH
+  §/B
+§/F{f004}
+§F{f005:CalculatePerimeter:pub}
+  §I{shape:s}
+  §O{f64}
+  §E{pure}
+  §ENS (>= result 0.0)
+  §B
+    §MATCH s
+      §CASE circle(r)
+        §R (* 2.0 (* 3.14159 r))
+      §CASE rectangle(w, h)
+        §R (* 2.0 (+ w h))
+    §/MATCH
+  §/B
+§/F{f005}
+§/M{m001}

@@ -1,0 +1,127 @@
+§M{m001:ShoppingCart}
+§V{v001:items:prv}
+  §T{list:cartitem}
+  §INIT (list)
+§/V{v001}
+§F{f001:AddItem:pub}
+  §I{str:productId}
+  §I{str:name}
+  §I{f64:price}
+  §I{i32:quantity}
+  §O{void}
+  §E{state:write}
+  §REQ (> (str-len productId) 0)
+  §REQ (> price 0.0)
+  §REQ (> quantity 0)
+  §B
+    §V{v002:existingIndex:loc}
+      §INIT (find-item-index items productId)
+    §/V{v002}
+    §IF (>= existingIndex 0)
+      §V{v003:existing:loc}
+        §INIT (list-get items existingIndex)
+      §/V{v003}
+      (cartitem-set-quantity existing (+ (cartitem-quantity existing) quantity))
+    §ELSE
+      (list-add items (cartitem productId name price quantity))
+    §/IF
+  §/B
+§/F{f001}
+§F{f002:RemoveItem:pub}
+  §I{str:productId}
+  §O{bool}
+  §E{state:write}
+  §B
+    §V{v004:index:loc}
+      §INIT (find-item-index items productId)
+    §/V{v004}
+    §IF (>= index 0)
+      (list-remove-at items index)
+      §R true
+    §/IF
+    §R false
+  §/B
+§/F{f002}
+§F{f003:UpdateQuantity:pub}
+  §I{str:productId}
+  §I{i32:newQuantity}
+  §O{bool}
+  §E{state:write}
+  §REQ (>= newQuantity 0)
+  §B
+    §V{v005:index:loc}
+      §INIT (find-item-index items productId)
+    §/V{v005}
+    §IF (>= index 0)
+      §IF (== newQuantity 0)
+        (list-remove-at items index)
+      §ELSE
+        (cartitem-set-quantity (list-get items index) newQuantity)
+      §/IF
+      §R true
+    §/IF
+    §R false
+  §/B
+§/F{f003}
+§F{f004:GetSubtotal:pub}
+  §O{f64}
+  §E{state:read}
+  §ENS (>= result 0.0)
+  §B
+    §V{v006:total:loc}
+      §INIT 0.0
+    §/V{v006}
+    §LOOP{loop1}
+      §FOR i 0 (list-count items)
+        §V{v007:item:loc}
+          §INIT (list-get items i)
+        §/V{v007}
+        (set total (+ total (* (cartitem-price item) (i32-to-f64 (cartitem-quantity item)))))
+    §/LOOP{loop1}
+    §R total
+  §/B
+§/F{f004}
+§F{f005:GetTotalWithTax:pub}
+  §I{f64:taxRate}
+  §O{f64}
+  §E{state:read}
+  §REQ (>= taxRate 0.0)
+  §REQ (<= taxRate 1.0)
+  §ENS (>= result (GetSubtotal))
+  §B
+    §V{v008:subtotal:loc}
+      §INIT (GetSubtotal)
+    §/V{v008}
+    §R (+ subtotal (* subtotal taxRate))
+  §/B
+§/F{f005}
+§F{f006:GetItemCount:pub}
+  §O{i32}
+  §E{state:read}
+  §ENS (>= result 0)
+  §R (list-count items)
+§/F{f006}
+§F{f007:Clear:pub}
+  §O{void}
+  §E{state:write}
+  §ENS (== (GetItemCount) 0)
+  §B
+    (list-clear items)
+  §/B
+§/F{f007}
+§F{f008:FindItemIndex:prv}
+  §I{list:items}
+  §I{str:productId}
+  §O{i32}
+  §E{pure}
+  §B
+    §LOOP{loop2}
+      §FOR i 0 (list-count items)
+        §IF (== (cartitem-product-id (list-get items i)) productId)
+          §R i
+        §/IF
+    §/LOOP{loop2}
+    §R -1
+  §/B
+§/F{f008}
+§/M{m001}

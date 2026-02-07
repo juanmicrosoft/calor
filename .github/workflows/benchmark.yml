@@ -1,0 +1,166 @@
+name: Benchmarks
+
+on:
+  # Run weekly on Sunday at midnight UTC
+  schedule:
+    - cron: '0 0 * * 0'
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      statistical_runs:
+        description: 'Number of statistical runs (default 30)'
+        required: false
+        default: '30'
+      llm_eval:
+        description: 'Run LLM evaluation'
+        required: false
+        default: 'false'
+        type: boolean
+  # Run on pushes to benchmark-related files
+  push:
+    branches: [main]
+    paths:
+      - 'tests/Calor.Evaluation/**'
+      - 'tests/TestData/Benchmarks/**'
+      - '.github/workflows/benchmark.yml'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Run benchmarks
+        run: |
+          dotnet run --project tests/Calor.Evaluation -c Release -- run \
+            --format website \
+            --output website/public/data/benchmark-results.json \
+            --verbose
+
+      - name: Run statistical analysis
+        if: github.event_name == 'schedule' || github.event.inputs.statistical_runs != ''
+        run: |
+          RUNS="${{ github.event.inputs.statistical_runs || '30' }}"
+          dotnet run --project tests/Calor.Evaluation -c Release -- run \
+            --statistical \
+            --runs "$RUNS" \
+            --format website \
+            --output website/public/data/benchmark-results-statistical.json \
+            --verbose
+
+      - name: Generate HTML dashboard
+        run: |
+          dotnet run --project tests/Calor.Evaluation -c Release -- run \
+            --format html \
+            --output website/public/data/dashboard
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            website/public/data/benchmark-results.json
+            website/public/data/benchmark-results-statistical.json
+            website/public/data/dashboard.html
+          retention-days: 90
+
+      - name: Commit results to repo
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add website/public/data/benchmark-results*.json website/public/data/dashboard.html || true
+          git diff --staged --quiet || git commit -m "chore: Update benchmark results [skip ci]"
+          git push || echo "No changes to push"
+
+  # LLM evaluation runs separately (more expensive, weekly only)
+  llm-evaluation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.llm_eval == 'true'
+    needs: benchmark
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Run LLM evaluation (Claude)
+        if: env.ANTHROPIC_API_KEY != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "LLM evaluation with Claude would run here"
+          # TODO: Implement LLM evaluation
+          # dotnet run --project tests/Calor.Evaluation -c Release -- run \
+          #   --llm-eval \
+          #   --llm-provider anthropic \
+          #   --format website \
+          #   --output website/public/data/llm-eval-claude.json
+
+      - name: Run LLM evaluation (GPT-4)
+        if: env.OPENAI_API_KEY != ''
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "LLM evaluation with GPT-4 would run here"
+          # TODO: Implement LLM evaluation
+          # dotnet run --project tests/Calor.Evaluation -c Release -- run \
+          #   --llm-eval \
+          #   --llm-provider openai \
+          #   --format website \
+          #   --output website/public/data/llm-eval-gpt4.json
+
+  regression-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: benchmark
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Download current results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results
+          path: current-results
+
+      - name: Check for regression
+        run: |
+          echo "Checking for benchmark regressions..."
+          # TODO: Implement regression detection
+          # Compare current results with previous results
+          # Alert if any metric drops by more than 10%
+          if [ -f "current-results/benchmark-results.json" ]; then
+            echo "Benchmark results generated successfully"
+            cat current-results/benchmark-results.json | head -50
+          else
+            echo "Warning: No benchmark results found"
+          fi

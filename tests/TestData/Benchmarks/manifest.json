@@ -202,6 +202,86 @@
       "level": 2,
       "features": ["module", "function", "conditional", "contracts", "ensures"],
       "notes": "Value clamping with postconditions"
+    },
+    {
+      "id": "021",
+      "name": "Stack",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/Stack.calr",
+      "csharpFile": "DataStructures/Stack.cs",
+      "level": 3,
+      "features": ["module", "function", "state", "contracts", "effects"],
+      "notes": "Stack data structure with push, pop, peek operations"
+    },
+    {
+      "id": "022",
+      "name": "Queue",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/Queue.calr",
+      "csharpFile": "DataStructures/Queue.cs",
+      "level": 3,
+      "features": ["module", "function", "state", "contracts", "effects"],
+      "notes": "Queue data structure with enqueue, dequeue operations"
+    },
+    {
+      "id": "023",
+      "name": "LinkedList",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/LinkedList.calr",
+      "csharpFile": "DataStructures/LinkedList.cs",
+      "level": 4,
+      "features": ["module", "function", "state", "contracts", "nested_types", "optional"],
+      "notes": "Singly linked list with add/remove operations"
+    },
+    {
+      "id": "024",
+      "name": "BinaryTree",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/BinaryTree.calr",
+      "csharpFile": "DataStructures/BinaryTree.cs",
+      "level": 4,
+      "features": ["module", "function", "recursion", "state", "contracts", "tree"],
+      "notes": "Binary search tree with insert and search"
+    },
+    {
+      "id": "025",
+      "name": "Singleton",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Singleton.calr",
+      "csharpFile": "DesignPatterns/Singleton.cs",
+      "level": 2,
+      "features": ["module", "function", "state", "contracts", "design_pattern"],
+      "notes": "Singleton pattern implementation"
+    },
+    {
+      "id": "026",
+      "name": "Factory",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Factory.calr",
+      "csharpFile": "DesignPatterns/Factory.cs",
+      "level": 3,
+      "features": ["module", "function", "contracts", "polymorphism", "design_pattern"],
+      "notes": "Factory pattern for shape creation"
+    },
+    {
+      "id": "027",
+      "name": "ShoppingCart",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/ShoppingCart.calr",
+      "csharpFile": "DomainProblems/ShoppingCart.cs",
+      "level": 4,
+      "features": ["module", "function", "state", "contracts", "domain_logic", "business_rules"],
+      "notes": "Shopping cart with add/remove items and tax calculation"
+    },
+    {
+      "id": "028",
+      "name": "QuickSort",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/QuickSort.calr",
+      "csharpFile": "ComplexAlgorithms/QuickSort.cs",
+      "level": 4,
+      "features": ["module", "function", "recursion", "contracts", "algorithm", "in_place"],
+      "notes": "QuickSort algorithm with partition"
     }
   ],
   "comprehensionQuestions": {
