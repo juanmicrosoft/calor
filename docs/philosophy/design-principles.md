@@ -113,10 +113,12 @@ Every structural element has a unique identifier that persists across refactorin
 
 | Element | Convention | Example |
 |:--------|:-----------|:--------|
-| Modules | `m001`, `m002` | `§M[m001:Calculator]` |
-| Functions | `f001`, `f002` | `§F[f001:Add:pub]` |
-| Loops | `for1`, `while1` | `§L[for1:i:1:10:1]` |
-| Conditionals | `if1`, `if2` | `§IF[if1] condition` |
+| Modules | `m_` + ULID | `§M[m_01J5X7...:Calculator]` |
+| Functions | `f_` + ULID | `§F[f_01J5X7...:Add:pub]` |
+| Classes | `c_` + ULID | `§CL[c_01J5X7...:MyClass]` |
+| Test files | Sequential | `§F[f001:Add:pub]` |
+
+[Learn more: Stable Identifiers](/calor/philosophy/stable-identifiers/) - Why IDs matter and how challenges are overcome
 
 ---
 
