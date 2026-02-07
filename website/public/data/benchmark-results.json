@@ -1,48 +1,112 @@
 {
   "version": "1.0",
-  "timestamp": "2026-02-07T14:30:04.330151Z",
-  "commit": "0090057",
+  "timestamp": "2026-02-07T17:28:07.100421Z",
+  "commit": "ef3e5c7",
   "frameworkVersion": "1.0.0",
   "summary": {
-    "overallAdvantage": 0.52,
+    "overallAdvantage": 0.8,
     "programCount": 28,
     "metricCount": 8,
-    "calorWins": 1,
-    "cSharpWins": 7,
-    "statisticalRunCount": 0
+    "calorWins": 3,
+    "cSharpWins": 4,
+    "statisticalRunCount": 30
   },
   "metrics": {
     "TokenEconomics": {
-      "ratio": 0.63,
-      "winner": "csharp"
+      "ratio": 0.66,
+      "winner": "csharp",
+      "ci95": [
+        0.661,
+        0.661
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 0.503,
+      "effectInterpretation": "medium"
     },
     "GenerationAccuracy": {
-      "ratio": 0.94,
-      "winner": "csharp"
+      "ratio": 0.64,
+      "winner": "csharp",
+      "ci95": [
+        0.638,
+        0.638
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": -1.166,
+      "effectInterpretation": "large"
     },
     "Comprehension": {
-      "ratio": 0.25,
-      "winner": "csharp"
+      "ratio": 1.49,
+      "winner": "calor",
+      "ci95": [
+        1.49,
+        1.49
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 2.224,
+      "effectInterpretation": "large"
     },
     "EditPrecision": {
-      "ratio": 0.73,
-      "winner": "csharp"
+      "ratio": 1.36,
+      "winner": "calor",
+      "ci95": [
+        1.362,
+        1.362
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 12.06,
+      "effectInterpretation": "large"
     },
     "ErrorDetection": {
-      "ratio": 1.08,
-      "winner": "calor"
+      "ratio": 1.55,
+      "winner": "calor",
+      "ci95": [
+        1.549,
+        1.549
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 1.238,
+      "effectInterpretation": "large"
     },
     "InformationDensity": {
-      "ratio": 0.09,
-      "winner": "csharp"
+      "ratio": 0.1,
+      "winner": "csharp",
+      "ci95": [
+        0.099,
+        0.099
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": -9.172,
+      "effectInterpretation": "large"
     },
     "TaskCompletion": {
-      "ratio": 0.75,
-      "winner": "csharp"
+      "ratio": 0.87,
+      "winner": "csharp",
+      "ci95": [
+        0.868,
+        0.868
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": -1.57,
+      "effectInterpretation": "large"
     },
     "RefactoringStability": {
-      "ratio": 0.64,
-      "winner": "csharp"
+      "ratio": 1.49,
+      "winner": "calor",
+      "ci95": [
+        1.494,
+        1.494
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 3.288,
+      "effectInterpretation": "large"
     }
   },
   "programs": [
@@ -58,16 +122,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.64,
+      "advantage": 1.15,
       "metrics": {
         "TokenEconomics": 0.717,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0,
-        "EditPrecision": 0.781,
-        "ErrorDetection": 1,
+        "Comprehension": 2.167,
+        "EditPrecision": 1.334,
+        "ErrorDetection": 1.5,
         "InformationDensity": 0.179,
-        "TaskCompletion": 0.944,
-        "RefactoringStability": 0.556
+        "TaskCompletion": 1.056,
+        "RefactoringStability": 1.306
       }
     },
     {
@@ -83,16 +147,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.614,
+      "advantage": 0.978,
       "metrics": {
         "TokenEconomics": 0.48,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.111,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.588
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.284
       }
     },
     {
@@ -108,16 +172,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.635,
+      "advantage": 1.059,
       "metrics": {
         "TokenEconomics": 0.96,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0,
-        "EditPrecision": 0.647,
-        "ErrorDetection": 1,
+        "Comprehension": 1.3,
+        "EditPrecision": 1.283,
+        "ErrorDetection": 1.5,
         "InformationDensity": 0.074,
-        "TaskCompletion": 0.833,
-        "RefactoringStability": 0.625
+        "TaskCompletion": 0.944,
+        "RefactoringStability": 1.469
       }
     },
     {
@@ -132,16 +196,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.63,
+      "advantage": 1.002,
       "metrics": {
         "TokenEconomics": 0.533,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.781,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.167,
-        "TaskCompletion": 0.842,
-        "RefactoringStability": 0.577
+        "TaskCompletion": 0.947,
+        "RefactoringStability": 1.356
       }
     },
     {
@@ -156,16 +220,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.614,
+      "advantage": 0.987,
       "metrics": {
         "TokenEconomics": 0.482,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.781,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.145,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.577
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.356
       }
     },
     {
@@ -181,16 +245,16 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.463,
+      "advantage": 0.765,
       "metrics": {
         "TokenEconomics": 0.906,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.154,
-        "EditPrecision": 0.781,
-        "ErrorDetection": 0.667,
+        "Comprehension": 1.077,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 0.889,
         "InformationDensity": 0.055,
-        "TaskCompletion": 0.632,
-        "RefactoringStability": 0.508
+        "TaskCompletion": 0.737,
+        "RefactoringStability": 1.11
       }
     },
     {
@@ -205,16 +269,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.601,
+      "advantage": 0.977,
       "metrics": {
         "TokenEconomics": 0.419,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.065,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.588
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.382
       }
     },
     {
@@ -230,16 +294,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.66,
+      "advantage": 0.991,
       "metrics": {
         "TokenEconomics": 1.136,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.154,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 0.667,
+        "Comprehension": 1.077,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 0.889,
         "InformationDensity": 0.103,
-        "TaskCompletion": 0.882,
-        "RefactoringStability": 0.588
+        "TaskCompletion": 1,
+        "RefactoringStability": 1.402
       }
     },
     {
@@ -254,16 +318,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.606,
+      "advantage": 0.972,
       "metrics": {
         "TokenEconomics": 0.566,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.629,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.154,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.566
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.236
       }
     },
     {
@@ -279,16 +343,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.541,
+      "advantage": 0.867,
       "metrics": {
         "TokenEconomics": 0.527,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.154,
-        "EditPrecision": 0.629,
-        "ErrorDetection": 0.667,
+        "Comprehension": 1.077,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 0.889,
         "InformationDensity": 0.097,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.526
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.254
       }
     },
     {
@@ -304,16 +368,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.592,
+      "advantage": 0.917,
       "metrics": {
         "TokenEconomics": 0.649,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.154,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 0.667,
+        "Comprehension": 1.077,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 0.889,
         "InformationDensity": 0.13,
-        "TaskCompletion": 0.833,
-        "RefactoringStability": 0.556
+        "TaskCompletion": 0.944,
+        "RefactoringStability": 1.324
       }
     },
     {
@@ -329,16 +393,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.675,
+      "advantage": 1.041,
       "metrics": {
         "TokenEconomics": 0.956,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.065,
-        "TaskCompletion": 0.833,
-        "RefactoringStability": 0.6
+        "TaskCompletion": 0.944,
+        "RefactoringStability": 1.31
       }
     },
     {
@@ -353,16 +417,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.637,
+      "advantage": 1.034,
       "metrics": {
         "TokenEconomics": 0.543,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.25,
-        "EditPrecision": 0.781,
-        "ErrorDetection": 1,
+        "Comprehension": 1.75,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.212,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.577
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.26
       }
     },
     {
@@ -377,16 +441,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.645,
+      "advantage": 1.01,
       "metrics": {
         "TokenEconomics": 0.709,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.112,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.6
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.31
       }
     },
     {
@@ -401,16 +465,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.625,
+      "advantage": 0.997,
       "metrics": {
         "TokenEconomics": 0.567,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.781,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.089,
-        "TaskCompletion": 0.842,
-        "RefactoringStability": 0.577
+        "TaskCompletion": 0.947,
+        "RefactoringStability": 1.356
       }
     },
     {
@@ -425,16 +489,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.652,
+      "advantage": 1.011,
       "metrics": {
         "TokenEconomics": 0.75,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.781,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.136,
-        "TaskCompletion": 0.842,
-        "RefactoringStability": 0.566
+        "TaskCompletion": 0.947,
+        "RefactoringStability": 1.236
       }
     },
     {
@@ -450,16 +514,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.601,
+      "advantage": 0.97,
       "metrics": {
         "TokenEconomics": 0.608,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.629,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.068,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.577
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.26
       }
     },
     {
@@ -475,16 +539,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.616,
+      "advantage": 0.99,
       "metrics": {
         "TokenEconomics": 0.535,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.2,
-        "EditPrecision": 0.781,
-        "ErrorDetection": 1,
+        "Comprehension": 1.4,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
         "InformationDensity": 0.103,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.577
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.375
       }
     },
     {
@@ -499,16 +563,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.595,
+      "advantage": 0.913,
       "metrics": {
         "TokenEconomics": 0.75,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.154,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 0.667,
+        "Comprehension": 1.077,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 0.889,
         "InformationDensity": 0.117,
-        "TaskCompletion": 0.789,
-        "RefactoringStability": 0.536
+        "TaskCompletion": 0.895,
+        "RefactoringStability": 1.259
       }
     },
     {
@@ -524,16 +588,16 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.64,
+      "advantage": 0.948,
       "metrics": {
         "TokenEconomics": 1.122,
         "GenerationAccuracy": 0.94,
-        "Comprehension": 0.154,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 0.667,
+        "Comprehension": 1.077,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 0.889,
         "InformationDensity": 0.065,
-        "TaskCompletion": 0.833,
-        "RefactoringStability": 0.536
+        "TaskCompletion": 0.944,
+        "RefactoringStability": 1.17
       }
     },
     {
@@ -549,16 +613,16 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.569,
+      "advantage": 1.041,
       "metrics": {
         "TokenEconomics": 0.525,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.455,
-        "EditPrecision": 0.626,
-        "ErrorDetection": 1.571,
+        "Comprehension": 1.818,
+        "EditPrecision": 1.423,
+        "ErrorDetection": 2.143,
         "InformationDensity": 0.063,
-        "TaskCompletion": 0.611,
-        "RefactoringStability": 0.7
+        "TaskCompletion": 0.722,
+        "RefactoringStability": 1.63
       }
     },
     {
@@ -574,16 +638,16 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.566,
+      "advantage": 1.038,
       "metrics": {
         "TokenEconomics": 0.544,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.455,
-        "EditPrecision": 0.626,
-        "ErrorDetection": 1.571,
+        "Comprehension": 1.818,
+        "EditPrecision": 1.423,
+        "ErrorDetection": 2.143,
         "InformationDensity": 0.021,
-        "TaskCompletion": 0.611,
-        "RefactoringStability": 0.7
+        "TaskCompletion": 0.722,
+        "RefactoringStability": 1.63
       }
     },
     {
@@ -600,16 +664,16 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.59,
+      "advantage": 1.085,
       "metrics": {
         "TokenEconomics": 0.541,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.455,
-        "EditPrecision": 0.626,
-        "ErrorDetection": 1.571,
+        "Comprehension": 1.818,
+        "EditPrecision": 1.423,
+        "ErrorDetection": 2.143,
         "InformationDensity": 0.049,
-        "TaskCompletion": 0.647,
-        "RefactoringStability": 0.833
+        "TaskCompletion": 0.765,
+        "RefactoringStability": 1.94
       }
     },
     {
@@ -626,16 +690,16 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.603,
+      "advantage": 1.131,
       "metrics": {
         "TokenEconomics": 0.552,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.455,
-        "EditPrecision": 0.626,
-        "ErrorDetection": 1.571,
+        "Comprehension": 1.818,
+        "EditPrecision": 1.415,
+        "ErrorDetection": 2.143,
         "InformationDensity": 0.049,
-        "TaskCompletion": 0.647,
-        "RefactoringStability": 0.921
+        "TaskCompletion": 0.765,
+        "RefactoringStability": 2.303
       }
     },
     {
@@ -651,16 +715,16 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.542,
+      "advantage": 1.023,
       "metrics": {
         "TokenEconomics": 0.385,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.364,
-        "EditPrecision": 0.626,
-        "ErrorDetection": 1.667,
+        "Comprehension": 1.727,
+        "EditPrecision": 1.423,
+        "ErrorDetection": 2.333,
         "InformationDensity": 0.031,
-        "TaskCompletion": 0.579,
-        "RefactoringStability": 0.686
+        "TaskCompletion": 0.684,
+        "RefactoringStability": 1.598
       }
     },
     {
@@ -676,16 +740,16 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.795,
+      "advantage": 1.252,
       "metrics": {
         "TokenEconomics": 0.83,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.7,
-        "EditPrecision": 0.806,
-        "ErrorDetection": 2.143,
+        "Comprehension": 2,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 2.714,
         "InformationDensity": 0.152,
-        "TaskCompletion": 0.647,
-        "RefactoringStability": 1.081
+        "TaskCompletion": 0.765,
+        "RefactoringStability": 2.176
       }
     },
     {
@@ -702,16 +766,16 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.728,
+      "advantage": 1.237,
       "metrics": {
         "TokenEconomics": 0.616,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.636,
-        "EditPrecision": 0.63,
-        "ErrorDetection": 2.143,
+        "Comprehension": 1.818,
+        "EditPrecision": 1.415,
+        "ErrorDetection": 2.714,
         "InformationDensity": 0.068,
-        "TaskCompletion": 0.647,
-        "RefactoringStability": 1.081
+        "TaskCompletion": 0.765,
+        "RefactoringStability": 2.5
       }
     },
     {
@@ -728,17 +792,105 @@
       ],
       "calorSuccess": false,
       "cSharpSuccess": true,
-      "advantage": 0.705,
+      "advantage": 1.179,
       "metrics": {
         "TokenEconomics": 0.587,
         "GenerationAccuracy": 0,
-        "Comprehension": 0.636,
-        "EditPrecision": 0.647,
-        "ErrorDetection": 2.143,
+        "Comprehension": 1.818,
+        "EditPrecision": 1.403,
+        "ErrorDetection": 2.714,
         "InformationDensity": 0.09,
-        "TaskCompletion": 0.647,
-        "RefactoringStability": 0.889
+        "TaskCompletion": 0.765,
+        "RefactoringStability": 2.056
       }
     }
-  ]
+  ],
+  "statisticalAnalysis": {
+    "runCount": 30,
+    "confidenceLevel": 0.95,
+    "significantCategories": [
+      "TokenEconomics",
+      "GenerationAccuracy",
+      "Comprehension",
+      "EditPrecision",
+      "ErrorDetection",
+      "InformationDensity",
+      "TaskCompletion",
+      "RefactoringStability"
+    ],
+    "categoryDetails": {
+      "TokenEconomics": {
+        "mean": 0.661,
+        "stdDev": 60.245,
+        "ci95Lower": 0.647,
+        "ci95Upper": 0.674,
+        "cohensD": 0.503,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "GenerationAccuracy": {
+        "mean": 0.638,
+        "stdDev": 0.311,
+        "ci95Lower": 0.608,
+        "ci95Upper": 0.668,
+        "cohensD": -1.166,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "Comprehension": {
+        "mean": 1.49,
+        "stdDev": 0.041,
+        "ci95Lower": 1.469,
+        "ci95Upper": 1.511,
+        "cohensD": 2.224,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "EditPrecision": {
+        "mean": 1.362,
+        "stdDev": 0.012,
+        "ci95Lower": 1.358,
+        "ci95Upper": 1.365,
+        "cohensD": 12.06,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "ErrorDetection": {
+        "mean": 1.549,
+        "stdDev": 0.097,
+        "ci95Lower": 1.51,
+        "ci95Upper": 1.588,
+        "cohensD": 1.238,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "InformationDensity": {
+        "mean": 0.099,
+        "stdDev": 0.023,
+        "ci95Lower": 0.096,
+        "ci95Upper": 0.102,
+        "cohensD": -9.172,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "TaskCompletion": {
+        "mean": 0.868,
+        "stdDev": 0.042,
+        "ci95Lower": 0.862,
+        "ci95Upper": 0.875,
+        "cohensD": -1.57,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "RefactoringStability": {
+        "mean": 1.494,
+        "stdDev": 0.019,
+        "ci95Lower": 1.47,
+        "ci95Upper": 1.519,
+        "cohensD": 3.288,
+        "pValue": 0.0001,
+        "significant": true
+      }
+    }
+  }
 }
