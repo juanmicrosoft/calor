@@ -29,6 +29,9 @@ export const metadata: Metadata = {
     'A programming language designed specifically for AI coding agents, compiling to .NET via C# emission.',
   keywords: ['Calor', 'programming language', 'AI', 'coding agents', 'compiler', '.NET', 'C#'],
   authors: [{ name: 'Calor Team' }],
+  icons: {
+    icon: '/favicon.ico',
+  },
   openGraph: {
     type: 'website',
     locale: 'en_US',
