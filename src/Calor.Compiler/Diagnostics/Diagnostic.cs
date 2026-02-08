@@ -77,6 +77,37 @@ public static class DiagnosticCode
     /// The code cannot be compiled with this compiler version.
     /// </summary>
     public const string SemanticsVersionIncompatible = "Calor0701";
+
+    // ID errors (Calor0800-0899)
+    /// <summary>
+    /// Error: Declaration is missing a required ID.
+    /// </summary>
+    public const string Calor0800 = "Calor0800";
+
+    /// <summary>
+    /// Error: ID has an invalid format (not a valid ULID or test ID).
+    /// </summary>
+    public const string Calor0801 = "Calor0801";
+
+    /// <summary>
+    /// Error: ID prefix doesn't match the declaration kind.
+    /// </summary>
+    public const string Calor0802 = "Calor0802";
+
+    /// <summary>
+    /// Error: Duplicate ID detected across declarations.
+    /// </summary>
+    public const string Calor0803 = "Calor0803";
+
+    /// <summary>
+    /// Error: Test ID (e.g., f001) used in production code.
+    /// </summary>
+    public const string Calor0804 = "Calor0804";
+
+    /// <summary>
+    /// Error: ID churn detected (existing ID was modified).
+    /// </summary>
+    public const string Calor0805 = "Calor0805";
 }
 
 /// <summary>
@@ -100,6 +131,21 @@ public sealed class Diagnostic
         Code = code;
         Message = message;
         Span = span;
+        Severity = severity;
+        FilePath = filePath;
+    }
+
+    public Diagnostic(
+        string code,
+        DiagnosticSeverity severity,
+        string message,
+        string? filePath,
+        int line,
+        int column)
+    {
+        Code = code;
+        Message = message;
+        Span = new TextSpan(0, 0, line, column);
         Severity = severity;
         FilePath = filePath;
     }

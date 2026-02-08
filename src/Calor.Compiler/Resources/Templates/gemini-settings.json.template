@@ -9,6 +9,12 @@
             "type": "command",
             "command": "calor hook validate-write --format gemini $TOOL_INPUT",
             "description": "Enforce Calor-first development - blocks creation of new .cs files"
+          },
+          {
+            "name": "calor-validate-ids",
+            "type": "command",
+            "command": "calor hook validate-ids --format gemini $TOOL_INPUT",
+            "description": "Validate Calor IDs - blocks ID churn and duplicates"
           }
         ]
       }

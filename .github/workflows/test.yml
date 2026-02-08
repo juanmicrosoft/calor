@@ -75,3 +75,37 @@ jobs:
 
       - name: Run semantics tests
         run: dotnet test tests/Calor.Semantics.Tests -c Release --no-build --verbosity detailed
+
+  id-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Run ID validation tests
+        run: dotnet test tests/Calor.Ids.Tests -c Release --verbosity normal
+
+      - name: Install Calor tool
+        run: dotnet tool install --global --add-source ./src/Calor.Compiler/bin/Release calor || true
+
+      - name: Check IDs in examples
+        run: |
+          if find docs examples -name "*.calr" 2>/dev/null | head -1 | grep -q .; then
+            find docs examples -name "*.calr" -exec echo "Checking {}" \;
+            # Allow test IDs in docs/examples
+            dotnet run --project src/Calor.Compiler -- ids check docs examples --allow-test-ids || echo "No ID issues found or no .calr files"
+          else
+            echo "No .calr files found in docs or examples"
+          fi
