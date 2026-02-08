@@ -46,6 +46,9 @@
     <EmbeddedResource Include="Resources\Templates\*.template">
       <LogicalName>Calor.Compiler.Resources.Templates.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Manifests\*.calor-effects.json">
+      <LogicalName>Calor.Compiler.Manifests.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

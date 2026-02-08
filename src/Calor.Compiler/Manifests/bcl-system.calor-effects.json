@@ -1,0 +1,183 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for System namespace core types (Console, Math, String, Collections, Linq)",
+  "mappings": [
+    {
+      "type": "System.Console",
+      "methods": {
+        "WriteLine": ["cw"],
+        "Write": ["cw"],
+        "ReadLine": ["cr"],
+        "Read": ["cr"],
+        "ReadKey": ["cr"],
+        "Clear": ["cw"],
+        "Beep": ["cw"],
+        "SetCursorPosition": ["cw"]
+      },
+      "getters": {
+        "In": [],
+        "Out": [],
+        "Error": [],
+        "CursorLeft": ["cr"],
+        "CursorTop": ["cr"],
+        "WindowWidth": ["cr"],
+        "WindowHeight": ["cr"],
+        "ForegroundColor": ["cr"],
+        "BackgroundColor": ["cr"]
+      },
+      "setters": {
+        "ForegroundColor": ["cw"],
+        "BackgroundColor": ["cw"],
+        "CursorLeft": ["cw"],
+        "CursorTop": ["cw"]
+      }
+    },
+    {
+      "type": "System.Math",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.String",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.Int32",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Int64",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Double",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Boolean",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Convert",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.Array",
+      "defaultEffects": [],
+      "methods": {
+        "Sort": ["mut"],
+        "Reverse": ["mut"],
+        "Copy": [],
+        "Clear": ["mut"],
+        "IndexOf": [],
+        "LastIndexOf": [],
+        "Find": [],
+        "FindAll": [],
+        "Exists": [],
+        "TrueForAll": []
+      }
+    },
+    {
+      "type": "System.Collections.Generic.List`1",
+      "defaultEffects": [],
+      "methods": {
+        "Add": ["mut"],
+        "AddRange": ["mut"],
+        "Remove": ["mut"],
+        "RemoveAt": ["mut"],
+        "RemoveAll": ["mut"],
+        "Clear": ["mut"],
+        "Insert": ["mut"],
+        "InsertRange": ["mut"],
+        "Sort": ["mut"],
+        "Reverse": ["mut"],
+        "Contains": [],
+        "IndexOf": [],
+        "Find": [],
+        "FindAll": [],
+        "FindIndex": [],
+        "Count": [],
+        "ToArray": []
+      }
+    },
+    {
+      "type": "System.Collections.Generic.Dictionary`2",
+      "defaultEffects": [],
+      "methods": {
+        "Add": ["mut"],
+        "Remove": ["mut"],
+        "Clear": ["mut"],
+        "TryGetValue": [],
+        "ContainsKey": [],
+        "ContainsValue": [],
+        "Keys": [],
+        "Values": []
+      }
+    },
+    {
+      "type": "System.Collections.Generic.HashSet`1",
+      "defaultEffects": [],
+      "methods": {
+        "Add": ["mut"],
+        "Remove": ["mut"],
+        "Clear": ["mut"],
+        "Contains": [],
+        "UnionWith": ["mut"],
+        "IntersectWith": ["mut"],
+        "ExceptWith": ["mut"]
+      }
+    },
+    {
+      "type": "System.Linq.Enumerable",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.Text.StringBuilder",
+      "defaultEffects": [],
+      "methods": {
+        "Append": ["mut"],
+        "AppendLine": ["mut"],
+        "Insert": ["mut"],
+        "Remove": ["mut"],
+        "Replace": ["mut"],
+        "Clear": ["mut"],
+        "ToString": []
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "System.Collections.Immutable": [],
+    "System.Linq": []
+  }
+}

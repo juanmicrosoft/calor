@@ -1,0 +1,235 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for System.IO namespace (File, Directory, Path, StreamReader/Writer)",
+  "mappings": [
+    {
+      "type": "System.IO.File",
+      "methods": {
+        "ReadAllText": ["fs:r"],
+        "ReadAllTextAsync": ["fs:r"],
+        "ReadAllLines": ["fs:r"],
+        "ReadAllLinesAsync": ["fs:r"],
+        "ReadAllBytes": ["fs:r"],
+        "ReadAllBytesAsync": ["fs:r"],
+        "ReadLines": ["fs:r"],
+        "WriteAllText": ["fs:w"],
+        "WriteAllTextAsync": ["fs:w"],
+        "WriteAllLines": ["fs:w"],
+        "WriteAllLinesAsync": ["fs:w"],
+        "WriteAllBytes": ["fs:w"],
+        "WriteAllBytesAsync": ["fs:w"],
+        "AppendAllText": ["fs:w"],
+        "AppendAllTextAsync": ["fs:w"],
+        "AppendAllLines": ["fs:w"],
+        "AppendAllLinesAsync": ["fs:w"],
+        "Delete": ["fs:w"],
+        "Copy": ["fs:rw"],
+        "Move": ["fs:w"],
+        "Exists": ["fs:r"],
+        "Create": ["fs:w"],
+        "CreateText": ["fs:w"],
+        "Open": ["fs:rw"],
+        "OpenRead": ["fs:r"],
+        "OpenWrite": ["fs:w"],
+        "OpenText": ["fs:r"],
+        "GetAttributes": ["fs:r"],
+        "SetAttributes": ["fs:w"],
+        "GetCreationTime": ["fs:r"],
+        "GetLastWriteTime": ["fs:r"],
+        "GetLastAccessTime": ["fs:r"],
+        "SetCreationTime": ["fs:w"],
+        "SetLastWriteTime": ["fs:w"],
+        "SetLastAccessTime": ["fs:w"]
+      }
+    },
+    {
+      "type": "System.IO.Directory",
+      "methods": {
+        "CreateDirectory": ["fs:w"],
+        "Delete": ["fs:w"],
+        "Exists": ["fs:r"],
+        "GetFiles": ["fs:r"],
+        "GetDirectories": ["fs:r"],
+        "GetFileSystemEntries": ["fs:r"],
+        "EnumerateFiles": ["fs:r"],
+        "EnumerateDirectories": ["fs:r"],
+        "EnumerateFileSystemEntries": ["fs:r"],
+        "Move": ["fs:w"],
+        "GetCurrentDirectory": ["fs:r"],
+        "SetCurrentDirectory": ["fs:w"],
+        "GetParent": ["fs:r"],
+        "GetDirectoryRoot": ["fs:r"],
+        "GetCreationTime": ["fs:r"],
+        "GetLastWriteTime": ["fs:r"],
+        "GetLastAccessTime": ["fs:r"]
+      }
+    },
+    {
+      "type": "System.IO.Path",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.IO.StreamReader",
+      "methods": {
+        "Read": ["fs:r"],
+        "ReadLine": ["fs:r"],
+        "ReadLineAsync": ["fs:r"],
+        "ReadToEnd": ["fs:r"],
+        "ReadToEndAsync": ["fs:r"],
+        "ReadBlock": ["fs:r"],
+        "ReadBlockAsync": ["fs:r"],
+        "Peek": ["fs:r"],
+        "Close": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "(String)": ["fs:r"],
+        "(Stream)": [],
+        "(String,Encoding)": ["fs:r"],
+        "(Stream,Encoding)": []
+      }
+    },
+    {
+      "type": "System.IO.StreamWriter",
+      "methods": {
+        "Write": ["fs:w"],
+        "WriteAsync": ["fs:w"],
+        "WriteLine": ["fs:w"],
+        "WriteLineAsync": ["fs:w"],
+        "Flush": ["fs:w"],
+        "FlushAsync": ["fs:w"],
+        "Close": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "(String)": ["fs:w"],
+        "(Stream)": [],
+        "(String,Boolean)": ["fs:w"],
+        "(Stream,Encoding)": []
+      }
+    },
+    {
+      "type": "System.IO.FileStream",
+      "methods": {
+        "Read": ["fs:r"],
+        "ReadAsync": ["fs:r"],
+        "Write": ["fs:w"],
+        "WriteAsync": ["fs:w"],
+        "Flush": ["fs:w"],
+        "FlushAsync": ["fs:w"],
+        "Seek": [],
+        "SetLength": ["fs:w"],
+        "Close": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "(String,FileMode)": ["fs:rw"],
+        "(String,FileMode,FileAccess)": ["fs:rw"],
+        "(String,FileMode,FileAccess,FileShare)": ["fs:rw"]
+      }
+    },
+    {
+      "type": "System.IO.BinaryReader",
+      "methods": {
+        "Read*": ["fs:r"],
+        "Close": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "(Stream)": []
+      }
+    },
+    {
+      "type": "System.IO.BinaryWriter",
+      "methods": {
+        "Write": ["fs:w"],
+        "Flush": ["fs:w"],
+        "Close": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "(Stream)": []
+      }
+    },
+    {
+      "type": "System.IO.MemoryStream",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.IO.StringReader",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.IO.StringWriter",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.IO.FileInfo",
+      "methods": {
+        "Delete": ["fs:w"],
+        "CopyTo": ["fs:rw"],
+        "MoveTo": ["fs:w"],
+        "Open": ["fs:rw"],
+        "OpenRead": ["fs:r"],
+        "OpenWrite": ["fs:w"],
+        "OpenText": ["fs:r"],
+        "CreateText": ["fs:w"],
+        "Create": ["fs:w"],
+        "AppendText": ["fs:w"],
+        "Refresh": ["fs:r"]
+      },
+      "getters": {
+        "Exists": ["fs:r"],
+        "Length": ["fs:r"],
+        "Name": [],
+        "FullName": [],
+        "DirectoryName": [],
+        "Extension": [],
+        "CreationTime": ["fs:r"],
+        "LastWriteTime": ["fs:r"],
+        "LastAccessTime": ["fs:r"]
+      },
+      "constructors": {
+        "(String)": []
+      }
+    },
+    {
+      "type": "System.IO.DirectoryInfo",
+      "methods": {
+        "Create": ["fs:w"],
+        "Delete": ["fs:w"],
+        "GetFiles": ["fs:r"],
+        "GetDirectories": ["fs:r"],
+        "GetFileSystemInfos": ["fs:r"],
+        "EnumerateFiles": ["fs:r"],
+        "EnumerateDirectories": ["fs:r"],
+        "MoveTo": ["fs:w"],
+        "Refresh": ["fs:r"]
+      },
+      "getters": {
+        "Exists": ["fs:r"],
+        "Name": [],
+        "FullName": [],
+        "Parent": []
+      },
+      "constructors": {
+        "(String)": []
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "System.IO.Compression": ["fs:rw"]
+  }
+}

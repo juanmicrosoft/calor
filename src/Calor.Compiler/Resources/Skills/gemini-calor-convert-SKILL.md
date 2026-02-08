@@ -142,10 +142,10 @@ Add `§E[...]` based on C# calls:
 |---|---|
 | `Console.Write*` | `cw` |
 | `Console.Read*` | `cr` |
-| `File.Write*`, `StreamWriter` | `fw` |
-| `File.Read*`, `StreamReader` | `fr` |
-| `HttpClient`, `WebRequest` | `net` |
-| `SqlConnection`, `DbContext` | `db` |
+| `File.Write*`, `StreamWriter` | `fs:w` |
+| `File.Read*`, `StreamReader` | `fs:r` |
+| `HttpClient`, `WebRequest` | `net:rw` |
+| `SqlConnection`, `DbContext` | `db:rw` |
 
 ## Contract Conversion
 

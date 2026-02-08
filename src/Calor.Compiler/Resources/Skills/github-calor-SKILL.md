@@ -40,7 +40,7 @@ See `docs/semantics/core.md` for full specification.
 §F{id:Name:vis}       Function (pub|pri)
 §I{type:name}         Input parameter
 §O{type}              Output/return type
-§E{effects}           Side effects: cw,cr,fw,fr,net,db
+§E{effects}           Side effects: cw,cr,fs:r,fs:w,net:rw,db:rw
 §/M{id} §/F{id}       Close tags (ID must match)
 ```
 

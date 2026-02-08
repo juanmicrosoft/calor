@@ -25,7 +25,7 @@ Calor requires explicit declaration:
 §F{f001:SaveUser:pub}
   §I{User:user}
   §O{bool}
-  §E{db,net}              // Declares: database and network operations
+  §E{db:rw,net:rw}        // Declares: database and network operations
   // ...
 §/F{f001}
 ```
@@ -62,10 +62,15 @@ Place the effect declaration after the output type:
 |:-----|:-------|:------------|:------------|
 | `cw` | Console write | Output to console | `Console.WriteLine()` |
 | `cr` | Console read | Input from console | `Console.ReadLine()` |
-| `fw` | File write | Write to filesystem | `File.WriteAllText()` |
-| `fr` | File read | Read from filesystem | `File.ReadAllText()` |
-| `net` | Network | HTTP, sockets, etc. | `HttpClient.GetAsync()` |
-| `db` | Database | Database operations | SQL queries, ORM calls |
+| `fs:r` | Filesystem read | Read from filesystem | `File.ReadAllText()` |
+| `fs:w` | Filesystem write | Write to filesystem | `File.WriteAllText()` |
+| `fs:rw` | Filesystem read/write | Read and write filesystem | `File.Copy()` |
+| `net:r` | Network read | HTTP GET, etc. | `HttpClient.GetStringAsync()` |
+| `net:w` | Network write | HTTP POST, etc. | `HttpClient.PostAsync()` |
+| `net:rw` | Network read/write | HTTP operations | `HttpClient.SendAsync()` |
+| `db:r` | Database read | Database queries | `SELECT` queries |
+| `db:w` | Database write | Database mutations | `INSERT/UPDATE/DELETE` |
+| `db:rw` | Database read/write | Database operations | ORM calls |
 
 ---
 
@@ -113,7 +118,7 @@ Or explicitly:
   §I{str:source}
   §I{str:dest}
   §O{bool}
-  §E{fr,fw}               // File read and write
+  §E{fs:rw}               // Filesystem read and write
   // ...
 §/F{f001}
 ```
@@ -124,7 +129,7 @@ Or explicitly:
 §F{f001:FetchData:pub}
   §I{str:url}
   §O{str!str}
-  §E{net}                 // Network operations
+  §E{net:rw}              // Network operations
   // ...
 §/F{f001}
 ```
@@ -135,7 +140,7 @@ Or explicitly:
 §F{f001:CreateUser:pub}
   §I{User:user}
   §O{i32}
-  §E{db,cw}               // Database and console (for logging)
+  §E{db:rw,cw}            // Database and console (for logging)
   // ...
 §/F{f001}
 ```
@@ -146,7 +151,7 @@ Or explicitly:
 §F{f001:ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
-  §E{db,net,fw,cw}        // Database, network, file write, console write
+  §E{db:rw,net:rw,fs:w,cw} // Database, network, filesystem write, console write
   // ...
 §/F{f001}
 ```
@@ -162,7 +167,7 @@ Or explicitly:
 §F{f001:LoadConfig:pub}
   §I{str:path}
   §O{Config}
-  §E{fr}                  // Only file read
+  §E{fs:r}                // Only filesystem read
   // ...
 §/F{f001}
 
@@ -171,7 +176,7 @@ Or explicitly:
   §I{str:path}
   §I{Config:config}
   §O{void}
-  §E{fr,fw}               // File read and write
+  §E{fs:rw}               // Filesystem read and write
   // ...
 §/F{f002}
 ```
@@ -212,16 +217,16 @@ Or explicitly:
 
 - Functions with no effects: Unit test directly
 - Functions with `cw/cr`: Mock console
-- Functions with `fr/fw`: Mock filesystem
-- Functions with `net`: Mock HTTP
-- Functions with `db`: Mock database
+- Functions with `fs:r/fs:w/fs:rw`: Mock filesystem
+- Functions with `net:r/net:w/net:rw`: Mock HTTP
+- Functions with `db:r/db:w/db:rw`: Mock database
 
 ### 4. Composition Analysis
 
 ```
 // If f1 calls f2, f1's effects must include f2's effects
 §F{f001:ProcessAndSave:pub}
-  §E{db,cw}               // Must include f002's effects
+  §E{db:rw,cw}            // Must include f002's effects
   §C{f002:Process} ... §/C
 §/F{f001}
 

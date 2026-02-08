@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
@@ -39,6 +40,11 @@ public class Program
             description: "Enforce effect declarations (default: true)",
             getDefaultValue: () => true);
 
+        var strictEffectsOption = new Option<bool>(
+            aliases: ["--strict-effects"],
+            description: "Promote unknown external call warnings (Calor0411) to errors",
+            getDefaultValue: () => false);
+
         var contractModeOption = new Option<string>(
             aliases: ["--contract-mode"],
             description: "Contract enforcement mode: off, debug, or release (default: debug)",
@@ -56,12 +62,25 @@ public class Program
             strictApiOption,
             requireDocsOption,
             enforceEffectsOption,
+            strictEffectsOption,
             contractModeOption,
             verifyOption
         };
 
         // Legacy compile handler (when --input is provided)
-        rootCommand.SetHandler(CompileAsync, inputOption, outputOption, verboseOption, strictApiOption, requireDocsOption, enforceEffectsOption, contractModeOption, verifyOption);
+        rootCommand.SetHandler(async (InvocationContext ctx) =>
+        {
+            var input = ctx.ParseResult.GetValueForOption(inputOption);
+            var output = ctx.ParseResult.GetValueForOption(outputOption);
+            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
+            var strictApi = ctx.ParseResult.GetValueForOption(strictApiOption);
+            var requireDocs = ctx.ParseResult.GetValueForOption(requireDocsOption);
+            var enforceEffects = ctx.ParseResult.GetValueForOption(enforceEffectsOption);
+            var strictEffects = ctx.ParseResult.GetValueForOption(strictEffectsOption);
+            var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
+            var verify = ctx.ParseResult.GetValueForOption(verifyOption);
+            await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify);
+        });
 
         // Add subcommands
         rootCommand.AddCommand(ConvertCommand.Create());
@@ -74,11 +93,12 @@ public class Program
         rootCommand.AddCommand(AnalyzeCommand.Create());
         rootCommand.AddCommand(HookCommand.Create());
         rootCommand.AddCommand(IdsCommand.Create());
+        rootCommand.AddCommand(EffectsCommand.Create());
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, string contractMode, bool verify)
+    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode, bool verify)
     {
         try
         {
@@ -100,6 +120,7 @@ public class Program
                 Console.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
                 Console.WriteLine("  --require-docs    Require documentation on public functions");
                 Console.WriteLine("  --enforce-effects Enforce effect declarations (default: true)");
+                Console.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
                 Console.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
                 Console.WriteLine("  --verify          Enable static contract verification with Z3");
                 Console.WriteLine();
@@ -132,6 +153,7 @@ public class Program
                 StrictApi = strictApi,
                 RequireDocs = requireDocs,
                 EnforceEffects = enforceEffects,
+                StrictEffects = strictEffects,
                 ContractMode = parsedContractMode,
                 VerifyContracts = verify,
                 ProjectDirectory = Path.GetDirectoryName(input.FullName)
@@ -244,7 +266,13 @@ public class Program
         if (options.EnforceEffects)
         {
             var catalog = EffectsCatalog.CreateWithProjectStubs(options.ProjectDirectory);
-            var enforcementPass = new EffectEnforcementPass(diagnostics, catalog, options.UnknownCallPolicy);
+            var enforcementPass = new EffectEnforcementPass(
+                diagnostics,
+                catalog,
+                options.UnknownCallPolicy,
+                resolver: null,
+                strictEffects: options.StrictEffects,
+                projectDirectory: options.ProjectDirectory);
             enforcementPass.Enforce(ast);
 
             if (options.Verbose)
@@ -315,6 +343,11 @@ public sealed class CompilationOptions
     /// Policy for handling unknown external calls.
     /// </summary>
     public UnknownCallPolicy UnknownCallPolicy { get; init; } = UnknownCallPolicy.Strict;
+
+    /// <summary>
+    /// Promote unknown external call warnings (Calor0411) to errors.
+    /// </summary>
+    public bool StrictEffects { get; init; }
 
     /// <summary>
     /// Contract enforcement mode.
