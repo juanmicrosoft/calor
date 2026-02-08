@@ -1,0 +1,307 @@
+---
+title: ids
+description: Manage unique identifiers for Calor declarations
+---
+
+# calor ids
+
+Manage unique identifiers for Calor declarations.
+
+```bash
+calor ids <command> [paths] [options]
+```
+
+---
+
+## Overview
+
+The `ids` command provides tools for managing the unique identifiers (ULIDs) that Calor assigns to every declaration. IDs enable stable references that survive renaming, moving, and refactoring.
+
+Commands:
+- **check** - Validate IDs for correctness
+- **assign** - Generate IDs for declarations missing them
+- **index** - Create a JSON index of all IDs
+
+---
+
+## Quick Start
+
+```bash
+# Check for ID issues
+calor ids check src/
+
+# Fix missing IDs
+calor ids assign src/
+
+# Preview what would be assigned
+calor ids assign src/ --dry-run
+
+# Fix duplicate IDs
+calor ids assign src/ --fix-duplicates
+```
+
+---
+
+## Commands
+
+### check
+
+Validate IDs in Calor files.
+
+```bash
+calor ids check <paths...> [options]
+```
+
+**Detects:**
+- Missing IDs (declarations without IDs in production code)
+- Duplicate IDs (same ID used for multiple declarations)
+- Invalid format (malformed ULID)
+- Wrong prefix (ID prefix doesn't match declaration kind)
+- Test IDs in production (e.g., `f001` in `src/`)
+
+**Options:**
+
+| Option | Description |
+|:-------|:------------|
+| `--allow-test-ids` | Allow test IDs (`f001`) in any location |
+
+**Exit Codes:**
+
+| Code | Meaning |
+|:-----|:--------|
+| `0` | All IDs valid |
+| `1` | Issues found |
+
+**Example:**
+
+```bash
+$ calor ids check src/
+
+Checking IDs in 12 files...
+
+Error Calor0803: Duplicate ID 'f_01J5X7K9M2NPQRSTABWXYZ12'
+  First: src/math.calr:15 (function Calculate)
+  Also:  src/utils.calr:42 (function Validate)
+
+Error Calor0800: Missing ID
+  src/services.calr:28 (function ProcessOrder)
+
+Found 2 issues in 2 files
+```
+
+---
+
+### assign
+
+Generate IDs for declarations that need them.
+
+```bash
+calor ids assign <paths...> [options]
+```
+
+**Options:**
+
+| Option | Short | Description |
+|:-------|:------|:------------|
+| `--dry-run` | `-n` | Preview changes without modifying files |
+| `--fix-duplicates` | | Reassign duplicate IDs (keep first occurrence) |
+| `--allow-test-ids` | | Don't warn about test IDs |
+
+**Example - Assign missing IDs:**
+
+```bash
+$ calor ids assign src/ --dry-run
+
+Would assign 3 IDs:
+  src/services.calr:28 ProcessOrder → f_01KGTY8A...
+  src/services.calr:45 ValidateInput → f_01KGTY8B...
+  src/models.calr:12 UserModel → c_01KGTY8C...
+
+Use 'calor ids assign src/' to apply changes.
+```
+
+**Example - Fix duplicates:**
+
+```bash
+$ calor ids assign src/ --fix-duplicates
+
+Fixed 1 duplicate:
+  src/utils.calr:42 Validate: f_01J5X7... → f_01KGTY9D...
+
+Modified 1 file
+```
+
+---
+
+### index
+
+Generate a JSON index of all IDs in a codebase.
+
+```bash
+calor ids index <paths...> [options]
+```
+
+**Options:**
+
+| Option | Short | Description |
+|:-------|:------|:------------|
+| `--output` | `-o` | Output file path (default: stdout) |
+
+**Example:**
+
+```bash
+$ calor ids index src/ --output calor.ids.json
+```
+
+**Output format:**
+
+```json
+{
+  "generated": "2024-01-15T10:30:00Z",
+  "entries": [
+    {
+      "id": "m_01J5X7K9M2NPQRSTABWXYZ12",
+      "kind": "Module",
+      "name": "Calculator",
+      "file": "src/math.calr",
+      "line": 1
+    },
+    {
+      "id": "f_01J5X7K9M2NPQRSTABWXYZ34",
+      "kind": "Function",
+      "name": "Add",
+      "file": "src/math.calr",
+      "line": 3
+    }
+  ]
+}
+```
+
+---
+
+## ID Format
+
+### Production IDs
+
+Production code requires ULID-based IDs:
+
+```
+{prefix}_{ULID}
+```
+
+| Prefix | Kind | Example |
+|:-------|:-----|:--------|
+| `m_` | Module | `m_01J5X7K9M2NPQRSTABWXYZ12` |
+| `f_` | Function | `f_01J5X7K9M2NPQRSTABWXYZ12` |
+| `c_` | Class | `c_01J5X7K9M2NPQRSTABWXYZ12` |
+| `i_` | Interface | `i_01J5X7K9M2NPQRSTABWXYZ12` |
+| `mt_` | Method | `mt_01J5X7K9M2NPQRSTABWXYZ12` |
+| `p_` | Property | `p_01J5X7K9M2NPQRSTABWXYZ12` |
+| `ctor_` | Constructor | `ctor_01J5X7K9M2NPQRSTABWXYZ12` |
+| `e_` | Enum | `e_01J5X7K9M2NPQRSTABWXYZ12` |
+
+### Test IDs
+
+Short sequential IDs are allowed only in `tests/`, `docs/`, and `examples/`:
+
+```
+f001, f002, m001, c001
+```
+
+---
+
+## Diagnostics
+
+| Code | Name | Description |
+|:-----|:-----|:------------|
+| `Calor0800` | MissingId | Declaration missing required ID |
+| `Calor0801` | InvalidIdFormat | ID doesn't match ULID format |
+| `Calor0802` | WrongIdPrefix | ID prefix doesn't match declaration kind |
+| `Calor0803` | DuplicateId | Same ID used for multiple declarations |
+| `Calor0804` | TestIdInProduction | Test ID (`f001`) in production code |
+
+---
+
+## Workflow Examples
+
+### Initial Setup
+
+When adding Calor to a project:
+
+```bash
+# Convert C# to Calor
+calor migrate src/
+
+# Assign IDs to all declarations
+calor ids assign src/
+
+# Verify everything is valid
+calor ids check src/
+```
+
+### Before Committing
+
+```bash
+# Check for any ID issues
+calor ids check .
+
+# If issues found, fix them
+calor ids assign . --fix-duplicates
+```
+
+### CI Integration
+
+Add to your CI pipeline:
+
+```yaml
+- name: Validate Calor IDs
+  run: calor ids check src/ --allow-test-ids
+```
+
+### After Agent Edits
+
+When an AI agent creates new code:
+
+```bash
+# Agent may create declarations without IDs
+# Assign IDs to new declarations
+calor ids assign src/
+
+# Verify no duplicates were introduced
+calor ids check src/
+```
+
+---
+
+## Hook Integration
+
+The `ids` system integrates with Calor's hook mechanism to prevent ID issues during AI-assisted editing.
+
+### Claude Code Hook
+
+Automatically validates IDs before file writes:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": { "tool": "Write", "file": "*.calr" },
+      "hooks": [{ "command": "calor hook validate-ids $TOOL_INPUT" }]
+    }]
+  }
+}
+```
+
+### What the Hook Catches
+
+- **Duplicate IDs**: Block writes that would create duplicates
+- **ID Churn**: Block writes that change existing IDs
+- **Invalid Format**: Block writes with malformed IDs
+
+---
+
+## See Also
+
+- [Stable Identifiers Philosophy](/philosophy/stable-identifiers/) - Why IDs matter
+- [calor hook](/cli/hook/) - Hook commands including `validate-ids`
+- [calor init](/cli/init/) - Sets up hook configuration

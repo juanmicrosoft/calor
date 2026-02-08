@@ -165,7 +165,7 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         if (funcCalls > 0) score += 0.2;
 
         // Proper closing tags (enable safe boundary detection)
-        var closingTags = CountPattern(source, @"§/[A-Z]\{");
+        var closingTags = CountPattern(source, @"§/[A-Z]+\{");
         if (closingTags > 0) score += 0.15;
 
         // Input/output annotations (typed references)
@@ -336,8 +336,8 @@ public class RefactoringStabilityCalculator : IMetricCalculator
 
     private static int CountPreservedIds(string before, string after)
     {
-        var beforeIds = ExtractIds(before, @"§[A-Z]\{([^:]+):");
-        var afterIds = ExtractIds(after, @"§[A-Z]\{([^:]+):");
+        var beforeIds = ExtractIds(before, @"§[A-Z]+\{([^:]+):");
+        var afterIds = ExtractIds(after, @"§[A-Z]+\{([^:]+):");
         return beforeIds.Intersect(afterIds).Count();
     }
 
@@ -373,8 +373,10 @@ public class RefactoringStabilityCalculator : IMetricCalculator
 
     private static bool IsUniqueId(string id)
     {
-        // Check if ID looks like a unique identifier (e.g., "f001", "mod_main", etc.)
-        return Regex.IsMatch(id, @"^[a-z]+[0-9]+$|^[a-z_]+$", RegexOptions.IgnoreCase);
+        // Check if ID looks like a unique identifier
+        // Supports: test IDs (f001, m001), named IDs (mod_main), and ULID-style IDs (f_01J5X7K9M2NPQRSTABWXYZ12)
+        // ULID format: prefix + underscore + 26 chars of Crockford Base32 (excludes I, L, O, U)
+        return Regex.IsMatch(id, @"^[a-z]+[0-9]+$|^[a-z_]+$|^[a-z]+_[0-9A-HJKMNP-TV-Z]{26}$", RegexOptions.IgnoreCase);
     }
 
     private static int CalculateDiffSize(string before, string after)
@@ -394,7 +396,7 @@ public class RefactoringStabilityCalculator : IMetricCalculator
             ["functionIds"] = ExtractIds(source, @"§F\{([^:]+):").ToList(),
             ["variableIds"] = ExtractIds(source, @"§V\{([^:]+):").ToList(),
             ["hasClosingTags"] = source.Contains("§/"),
-            ["idDensity"] = CountPattern(source, @"§[A-Z]\{") / Math.Max(1.0, source.Split('\n').Length)
+            ["idDensity"] = CountPattern(source, @"§[A-Z]+\{") / Math.Max(1.0, source.Split('\n').Length)
         };
     }
 

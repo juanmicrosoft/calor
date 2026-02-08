@@ -250,4 +250,107 @@ public class HookCommandTests : IDisposable
 
         Assert.Contains(settingsPath, result.UpdatedFiles);
     }
+
+    #region Additional obj Directory Tests
+
+    [Fact]
+    public void ValidateWrite_ObjSubdirectory_IsAllowed()
+    {
+        // Nested subdirectory in obj
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj/Debug/net8.0/ref/MyAssembly.cs\"}");
+
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void ValidateWrite_ObjLikeDirectory_IsBlocked()
+    {
+        // obj_backup is NOT obj, so .cs should be blocked
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj_backup/MyClass.cs\"}");
+
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void ValidateWrite_ObjectDirectory_IsBlocked()
+    {
+        // "object" is NOT "obj", so .cs should be blocked
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"object/MyClass.cs\"}");
+
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void ValidateWrite_ObjInMiddleOfPath_IsAllowed()
+    {
+        // obj in the middle of the path
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"src/obj/Debug/MyClass.cs\"}");
+
+        Assert.Equal(0, result);
+    }
+
+    #endregion
+
+    #region Extension Case Sensitivity Tests
+
+    [Theory]
+    [InlineData("{\"file_path\": \"Test.CS\"}")]
+    [InlineData("{\"file_path\": \"Test.Cs\"}")]
+    [InlineData("{\"file_path\": \"Test.cS\"}")]
+    public void ValidateWrite_CaseInsensitiveExtension_BlocksCsFiles(string json)
+    {
+        var result = HookCommand.ValidateWrite(json);
+
+        Assert.Equal(1, result);
+    }
+
+    [Theory]
+    [InlineData("{\"file_path\": \"Test.G.CS\"}")]
+    [InlineData("{\"file_path\": \"Test.G.Cs\"}")]
+    [InlineData("{\"file_path\": \"Test.g.CS\"}")]
+    public void ValidateWrite_CaseInsensitiveExtension_AllowsGeneratedFiles(string json)
+    {
+        var result = HookCommand.ValidateWrite(json);
+
+        Assert.Equal(0, result);
+    }
+
+    #endregion
+
+    #region No Extension and Special Paths Tests
+
+    [Fact]
+    public void ValidateWrite_NoExtension_IsAllowed()
+    {
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"Makefile\"}");
+
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void ValidateWrite_DotOnlyPath_IsAllowed()
+    {
+        var result = HookCommand.ValidateWrite("{\"file_path\": \".\"}");
+
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void ValidateWrite_HiddenFile_IsAllowed()
+    {
+        var result = HookCommand.ValidateWrite("{\"file_path\": \".gitignore\"}");
+
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void ValidateWrite_EndsWithDotCs_NoExtension_IsBlocked()
+    {
+        // File literally ending in ".cs" should be blocked
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"test.cs\"}");
+
+        Assert.Equal(1, result);
+    }
+
+    #endregion
 }

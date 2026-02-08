@@ -192,7 +192,7 @@ public class ClaudeInitializer : IAiInitializer
 
     private static async Task<HookSettingsResult> ConfigureHooksAsync(string settingsPath, bool force)
     {
-        // PreToolUse hooks: validate-write and validate-calr-content for Write, validate-edit for Edit
+        // PreToolUse hooks: validate-write, validate-calr-content, and validate-ids for Write, validate-edit for Edit
         var writePreHookConfig = new ClaudeHookMatcher
         {
             Matcher = "Write",
@@ -207,6 +207,11 @@ public class ClaudeInitializer : IAiInitializer
                 {
                     Type = "command",
                     Command = "calor hook validate-calr-content $TOOL_INPUT"
+                },
+                new ClaudeHook
+                {
+                    Type = "command",
+                    Command = "calor hook validate-ids $TOOL_INPUT"
                 }
             }
         };

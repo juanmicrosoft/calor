@@ -115,5 +115,6 @@ This enables guarantees that have been impossible in practice in human-oriented 
 
 - [Design Principles](/calor/philosophy/design-principles/) - The five core principles behind Calor
 - [The Verification Opportunity](/calor/philosophy/the-verification-opportunity/) - Why agent languages unlock practical verification
+- [Stable Identifiers](/calor/philosophy/stable-identifiers/) - How language-level IDs enable reliable AI workflows
 - [Tradeoffs](/calor/philosophy/tradeoffs/) - What Calor gives up for explicitness
 - [Benchmarking](/calor/benchmarking/) - How we measure success

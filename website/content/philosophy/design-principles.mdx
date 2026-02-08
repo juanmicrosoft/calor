@@ -110,12 +110,18 @@ Every structural element has a unique identifier that persists across refactorin
 
 ### ID Conventions
 
-| Element | Convention | Example |
-|:--------|:-----------|:--------|
-| Modules | `m001`, `m002` | `§M[m001:Calculator]` |
-| Functions | `f001`, `f002` | `§F[f001:Add:pub]` |
-| Loops | `for1`, `while1` | `§L[for1:i:1:10:1]` |
-| Conditionals | `if1`, `if2` | `§IF[if1] condition` |
+Production code uses ULID-based IDs with kind prefixes:
+
+| Element | Prefix | Example |
+|:--------|:-------|:--------|
+| Modules | `m_` | `§M[m_01J5X7K9M2NPQRSTABWXYZ12:Calculator]` |
+| Functions | `f_` | `§F[f_01J5X7K9M2NPQRSTABWXYZ12:Add:pub]` |
+| Classes | `c_` | `§CL[c_01J5X7K9M2NPQRSTABWXYZ12:MyClass]` |
+| Methods | `mt_` | `§MT[mt_01J5X7K9M2NPQRSTABWXYZ12:Process:pub]` |
+
+Short test IDs (`f001`, `m001`) are allowed only in `tests/`, `docs/`, and examples.
+
+[Learn more: Stable Identifiers](/philosophy/stable-identifiers/) - Why IDs matter and how challenges are overcome
 
 ---
 
@@ -191,4 +197,5 @@ These principles reinforce each other:
 
 ## Next
 
+- [Stable Identifiers](/philosophy/stable-identifiers/) - Deep dive into language-level IDs
 - [Tradeoffs](/philosophy/tradeoffs/) - What Calor gives up for these principles

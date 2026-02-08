@@ -259,12 +259,41 @@ Example with class and method:
 §/M{m001}
 ```
 
-## ID Conventions
+## ID Integrity Rules
 
-- Modules: `m001`, `m002`
-- Functions: `f001`, `f002`
-- Classes: `c001`, `c002`
-- Properties: `p001`, `p002`
-- Methods: `m001`, `m002`
-- Loops: `for1`, `while1`, `do1`
-- Conditionals: `if1`, `if2`
+### Canonical IDs (Production Code)
+```
+f_01J5X7K9M2NPQRSTABWXYZ12    Function
+m_01J5X7K9M2NPQRSTABWXYZ12    Module
+c_01J5X7K9M2NPQRSTABWXYZ12    Class
+mt_01J5X7K9M2NPQRSTABWXYZ12   Method
+ctor_01J5X7K9M2NPQRSTABWXYZ12 Constructor
+p_01J5X7K9M2NPQRSTABWXYZ12    Property
+i_01J5X7K9M2NPQRSTABWXYZ12    Interface
+e_01J5X7K9M2NPQRSTABWXYZ12    Enum
+```
+
+### Test IDs (ONLY in tests/, docs/, examples/)
+```
+f001, m001, c001              Sequential test IDs
+```
+
+### Agent Rules - CRITICAL
+1. **NEVER** modify an existing ID
+2. **NEVER** copy IDs when extracting code
+3. **OMIT** IDs for new declarations - run `calor ids assign`
+4. **VERIFY** before commit: `calor ids check`
+
+### Preservation Rules
+| Operation | ID Behavior |
+|-----------|-------------|
+| Rename | PRESERVE |
+| Move file | PRESERVE |
+| Reformat | PRESERVE |
+| Extract helper | NEW ID |
+
+### Verification Steps
+```bash
+calor ids check .
+calor ids assign . --dry-run
+```

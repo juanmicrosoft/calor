@@ -1,6 +1,9 @@
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Ids;
+using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Commands;
 
@@ -30,6 +33,7 @@ public static class HookCommand
         command.AddCommand(CreateValidateEditCommand());
         command.AddCommand(CreateValidateCalrContentCommand());
         command.AddCommand(CreatePostWriteLintCommand());
+        command.AddCommand(CreateValidateIdsCommand());
 
         return command;
     }
@@ -424,5 +428,188 @@ public static class HookCommand
         public string Decision { get; set; } = "deny";
         public string? Reason { get; set; }
         public string? SystemMessage { get; set; }
+    }
+
+    private static Command CreateValidateIdsCommand()
+    {
+        var inputArgument = new Argument<string>(
+            name: "tool-input",
+            description: "The JSON tool input from the AI agent");
+
+        var formatOption = new Option<string?>(
+            aliases: new[] { "--format", "-f" },
+            description: "Output format: 'gemini' for JSON response, default for exit codes only");
+
+        var command = new Command("validate-ids", "Validate IDs in .calr file content")
+        {
+            inputArgument,
+            formatOption
+        };
+
+        command.SetHandler((System.CommandLine.Invocation.InvocationContext context) =>
+        {
+            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
+            var format = context.ParseResult.GetValueForOption(formatOption);
+
+            var (exitCode, blockReason) = ValidateIds(toolInputJson);
+
+            if (string.Equals(format, "gemini", StringComparison.OrdinalIgnoreCase))
+            {
+                OutputGeminiIdResponse(exitCode, blockReason);
+            }
+            else
+            {
+                if (exitCode != 0 && !string.IsNullOrEmpty(blockReason))
+                {
+                    Console.Error.WriteLine(blockReason);
+                }
+            }
+
+            context.ExitCode = exitCode;
+        });
+
+        return command;
+    }
+
+    private static void OutputGeminiIdResponse(int exitCode, string? blockReason)
+    {
+        object response;
+        if (exitCode == 0)
+        {
+            response = new GeminiAllowResponse { Decision = "allow" };
+        }
+        else
+        {
+            var systemMessage = "ID validation failed. Key rules:\n" +
+                                "- NEVER modify existing IDs\n" +
+                                "- OMIT IDs for new declarations (run `calor ids assign`)\n" +
+                                "- NEVER copy IDs when extracting code\n" +
+                                "- Run `calor ids check .` before commit";
+            response = new GeminiDenyResponse
+            {
+                Decision = "deny",
+                Reason = blockReason ?? "ID validation failed",
+                SystemMessage = systemMessage
+            };
+        }
+
+        Console.WriteLine(JsonSerializer.Serialize(response, JsonOutputOptions));
+    }
+
+    /// <summary>
+    /// Validates IDs in .calr file content.
+    /// Returns (0, null) to allow, (1, reason) to block.
+    /// </summary>
+    public static (int ExitCode, string? BlockReason) ValidateIds(string toolInputJson)
+    {
+        try
+        {
+            var input = JsonSerializer.Deserialize<WriteToolInput>(toolInputJson, JsonOptions);
+
+            if (input == null)
+            {
+                return (0, null);
+            }
+
+            var path = input.FilePathSnake ?? input.FilePathCamel;
+            var content = input.Content;
+
+            // Only validate .calr files
+            if (string.IsNullOrEmpty(path) || !path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
+            {
+                return (0, null);
+            }
+
+            if (string.IsNullOrEmpty(content))
+            {
+                return (0, null);
+            }
+
+            // Parse the content to scan IDs
+            var diagnostics = new DiagnosticBag();
+            diagnostics.SetFilePath(path);
+
+            var lexer = new Lexer(content, diagnostics);
+            var tokens = lexer.TokenizeAll();
+
+            if (diagnostics.HasErrors)
+            {
+                // Can't parse, allow but don't validate IDs
+                return (0, null);
+            }
+
+            var parser = new Parser(tokens, diagnostics);
+            var module = parser.Parse();
+
+            if (diagnostics.HasErrors)
+            {
+                // Can't parse, allow but don't validate IDs
+                return (0, null);
+            }
+
+            // Scan IDs in the new content
+            var scanner = new IdScanner();
+            var newEntries = scanner.Scan(module, path);
+
+            // Check for issues
+            var isTestPath = IdValidator.IsTestPath(path);
+            var result = IdChecker.Check(newEntries, allowTestIds: isTestPath);
+
+            // Check for duplicates within the file
+            if (result.DuplicateGroups.Count > 0)
+            {
+                var first = result.DuplicateGroups[0][0];
+                return (1, $"BLOCKED: Duplicate ID '{first.Id}' detected in {Path.GetFileName(path)}.\n" +
+                          "Each declaration must have a unique ID.\n" +
+                          "Run `calor ids assign --fix-duplicates` to fix.");
+            }
+
+            // Check for ID churn if the file already exists
+            if (File.Exists(path))
+            {
+                var existingContent = File.ReadAllText(path);
+                var existingDiagnostics = new DiagnosticBag();
+                existingDiagnostics.SetFilePath(path);
+
+                var existingLexer = new Lexer(existingContent, existingDiagnostics);
+                var existingTokens = existingLexer.TokenizeAll();
+
+                if (!existingDiagnostics.HasErrors)
+                {
+                    var existingParser = new Parser(existingTokens, existingDiagnostics);
+                    var existingModule = existingParser.Parse();
+
+                    if (!existingDiagnostics.HasErrors)
+                    {
+                        var existingScanner = new IdScanner();
+                        var existingEntries = existingScanner.Scan(existingModule, path);
+
+                        // Detect ID churn
+                        var churn = IdChecker.DetectIdChurn(existingEntries, newEntries);
+                        if (churn.Count > 0)
+                        {
+                            var (old, @new) = churn[0];
+                            return (1, $"BLOCKED: ID churn detected for {old.Kind} '{old.Name}'.\n" +
+                                      $"  Existing ID: {old.Id}\n" +
+                                      $"  New ID: {@new.Id}\n\n" +
+                                      "IDs are immutable. NEVER modify an existing ID.\n" +
+                                      "If you need to rename, preserve the ID.");
+                        }
+                    }
+                }
+            }
+
+            // All checks passed
+            return (0, null);
+        }
+        catch (JsonException)
+        {
+            return (0, null);
+        }
+        catch (Exception)
+        {
+            // On any error, allow the operation
+            return (0, null);
+        }
     }
 }
