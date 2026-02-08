@@ -95,7 +95,7 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Run ID validation tests
-        run: dotnet test tests/Calor.Ids.Tests -c Release --no-build --verbosity normal
+        run: dotnet test tests/Calor.Ids.Tests -c Release --verbosity normal
 
       - name: Install Calor tool
         run: dotnet tool install --global --add-source ./src/Calor.Compiler/bin/Release calor || true
