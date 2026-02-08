@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Effects;
@@ -13,7 +14,9 @@ public sealed class EffectEnforcementPass
 {
     private readonly DiagnosticBag _diagnostics;
     private readonly EffectsCatalog _catalog;
+    private readonly EffectResolver _resolver;
     private readonly UnknownCallPolicy _policy;
+    private readonly bool _strictEffects;
 
     // Maps function ID to its node
     private readonly Dictionary<string, FunctionNode> _functions = new(StringComparer.Ordinal);
@@ -27,11 +30,23 @@ public sealed class EffectEnforcementPass
     // Reverse call graph: caller → list of callees
     private readonly Dictionary<string, List<(string Callee, TextSpan Span)>> _reverseCallGraph = new(StringComparer.Ordinal);
 
-    public EffectEnforcementPass(DiagnosticBag diagnostics, EffectsCatalog? catalog = null, UnknownCallPolicy policy = UnknownCallPolicy.Strict)
+    public EffectEnforcementPass(
+        DiagnosticBag diagnostics,
+        EffectsCatalog? catalog = null,
+        UnknownCallPolicy policy = UnknownCallPolicy.Strict,
+        EffectResolver? resolver = null,
+        bool strictEffects = false,
+        string? projectDirectory = null,
+        string? solutionDirectory = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _catalog = catalog ?? EffectsCatalog.CreateDefault();
         _policy = policy;
+        _strictEffects = strictEffects;
+
+        // Initialize the effect resolver with manifests
+        _resolver = resolver ?? new EffectResolver(null, _catalog);
+        _resolver.Initialize(projectDirectory, solutionDirectory);
     }
 
     /// <summary>
@@ -216,7 +231,7 @@ public sealed class EffectEnforcementPass
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
-        var context = new InferenceContext(_catalog, _computedEffects, sccMembers, _policy, _diagnostics, function.Id);
+        var context = new InferenceContext(_catalog, _resolver, _computedEffects, sccMembers, _policy, _strictEffects, _diagnostics, function.Id);
         var inferrer = new EffectInferrer(context);
         return inferrer.InferFromStatements(function.Body);
     }
@@ -321,24 +336,30 @@ public sealed class EffectEnforcementPass
     private sealed class InferenceContext
     {
         public EffectsCatalog Catalog { get; }
+        public EffectResolver Resolver { get; }
         public Dictionary<string, EffectSet> ComputedEffects { get; }
         public HashSet<string> SccMembers { get; }
         public UnknownCallPolicy Policy { get; }
+        public bool StrictEffects { get; }
         public DiagnosticBag Diagnostics { get; }
         public string CurrentFunctionId { get; }
 
         public InferenceContext(
             EffectsCatalog catalog,
+            EffectResolver resolver,
             Dictionary<string, EffectSet> computedEffects,
             HashSet<string> sccMembers,
             UnknownCallPolicy policy,
+            bool strictEffects,
             DiagnosticBag diagnostics,
             string currentFunctionId)
         {
             Catalog = catalog;
+            Resolver = resolver;
             ComputedEffects = computedEffects;
             SccMembers = sccMembers;
             Policy = policy;
+            StrictEffects = strictEffects;
             Diagnostics = diagnostics;
             CurrentFunctionId = currentFunctionId;
         }
@@ -418,7 +439,18 @@ public sealed class EffectEnforcementPass
                 }
             }
 
-            // Build potential signatures for external call
+            // Try to resolve using the EffectResolver (manifest-based)
+            var (typeName, methodName) = ParseCallTarget(target);
+            if (!string.IsNullOrEmpty(typeName) && !string.IsNullOrEmpty(methodName))
+            {
+                var resolution = _context.Resolver.Resolve(typeName, methodName);
+                if (resolution.Status != EffectResolutionStatus.Unknown)
+                {
+                    return resolution.Effects;
+                }
+            }
+
+            // Fall back to legacy signature-based lookup
             var signatures = BuildPotentialSignatures(target);
             foreach (var sig in signatures)
             {
@@ -429,17 +461,68 @@ public sealed class EffectEnforcementPass
                 }
             }
 
-            // Unknown external call
-            if (_context.Policy == UnknownCallPolicy.Strict)
+            // Unknown external call - report diagnostic based on policy
+            ReportUnknownCall(target, span);
+            return EffectSet.Unknown;
+        }
+
+        private void ReportUnknownCall(string target, TextSpan span)
+        {
+            // Calor0411: Unknown external call
+            var severity = _context.StrictEffects
+                ? DiagnosticSeverity.Error
+                : DiagnosticSeverity.Warning;
+
+            if (_context.Policy == UnknownCallPolicy.Strict || _context.StrictEffects)
             {
                 _context.Diagnostics.Report(
                     span,
                     DiagnosticCode.UnknownExternalCall,
-                    $"Unknown external call to '{target}' in strict mode. Add stub in calor.effects.json or use a known method.",
-                    DiagnosticSeverity.Error);
+                    $"Unknown external call to '{target}'. Add effect declaration in a manifest or calor.effects.json.",
+                    severity);
+            }
+            else if (_context.Policy == UnknownCallPolicy.Warn)
+            {
+                _context.Diagnostics.Report(
+                    span,
+                    DiagnosticCode.UnknownExternalCall,
+                    $"Unknown external call to '{target}' - assuming worst-case effects. Consider adding to manifest.",
+                    DiagnosticSeverity.Warning);
+            }
+        }
+
+        private static (string TypeName, string MethodName) ParseCallTarget(string target)
+        {
+            // Handle patterns like "Console.WriteLine", "File.ReadAllText", "System.IO.File.ReadAllText"
+            var lastDot = target.LastIndexOf('.');
+            if (lastDot <= 0)
+                return ("", "");
+
+            var methodName = target[(lastDot + 1)..];
+            var typePart = target[..lastDot];
+
+            // If type part doesn't contain a dot, try common namespaces
+            if (!typePart.Contains('.'))
+            {
+                // Map common short names to full types
+                typePart = typePart switch
+                {
+                    "Console" => "System.Console",
+                    "File" => "System.IO.File",
+                    "Directory" => "System.IO.Directory",
+                    "Path" => "System.IO.Path",
+                    "Random" => "System.Random",
+                    "DateTime" => "System.DateTime",
+                    "Environment" => "System.Environment",
+                    "Process" => "System.Diagnostics.Process",
+                    "HttpClient" => "System.Net.Http.HttpClient",
+                    "Math" => "System.Math",
+                    "Guid" => "System.Guid",
+                    _ => typePart
+                };
             }
 
-            return EffectSet.Unknown;
+            return (typePart, methodName);
         }
 
         private FunctionNode? FindInternalFunctionByName(string name)
@@ -803,17 +886,44 @@ internal static class EffectSetExtensions
     {
         return (kind, value) switch
         {
+            // Console I/O
             (EffectKind.IO, "console_write") => "cw",
             (EffectKind.IO, "console_read") => "cr",
-            (EffectKind.IO, "file_write") => "fw",
-            (EffectKind.IO, "file_read") => "fr",
-            (EffectKind.IO, "network") => "net",
-            (EffectKind.IO, "http") => "http",
-            (EffectKind.IO, "database") => "db",
+
+            // Filesystem effects
+            (EffectKind.IO, "filesystem_read") => "fs:r",
+            (EffectKind.IO, "filesystem_write") => "fs:w",
+            (EffectKind.IO, "filesystem_readwrite") => "fs:rw",
+
+            // Network effects
+            (EffectKind.IO, "network_read") => "net:r",
+            (EffectKind.IO, "network_write") => "net:w",
+            (EffectKind.IO, "network_readwrite") => "net:rw",
+
+            // Database effects
+            (EffectKind.IO, "database_read") => "db:r",
+            (EffectKind.IO, "database_write") => "db:w",
+            (EffectKind.IO, "database_readwrite") => "db:rw",
+
+            // Environment effects
+            (EffectKind.IO, "environment_read") => "env:r",
+            (EffectKind.IO, "environment_write") => "env:w",
+
+            // System
+            (EffectKind.IO, "process") => "proc",
+
+            // Memory effects
+            (EffectKind.Memory, "allocation") => "alloc",
+            (EffectKind.Memory, "unsafe") => "unsafe",
+
+            // Nondeterminism
             (EffectKind.Nondeterminism, "time") => "time",
             (EffectKind.Nondeterminism, "random") => "rand",
+
+            // Mutation/Exception
             (EffectKind.Mutation, "heap_write") => "mut",
             (EffectKind.Exception, "intentional") => "throw",
+
             _ => $"{kind}:{value}"
         };
     }

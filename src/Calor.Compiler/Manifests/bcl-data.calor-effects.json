@@ -1,0 +1,238 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for System.Data namespace (DbConnection, DbCommand, SqlClient)",
+  "mappings": [
+    {
+      "type": "System.Data.Common.DbConnection",
+      "methods": {
+        "Open": ["db:rw"],
+        "OpenAsync": ["db:rw"],
+        "Close": [],
+        "CloseAsync": [],
+        "Dispose": [],
+        "DisposeAsync": [],
+        "BeginTransaction": ["db:rw"],
+        "BeginTransactionAsync": ["db:rw"],
+        "CreateCommand": []
+      },
+      "getters": {
+        "State": [],
+        "ConnectionString": [],
+        "Database": [],
+        "DataSource": []
+      }
+    },
+    {
+      "type": "System.Data.Common.DbCommand",
+      "methods": {
+        "ExecuteNonQuery": ["db:w"],
+        "ExecuteNonQueryAsync": ["db:w"],
+        "ExecuteScalar": ["db:r"],
+        "ExecuteScalarAsync": ["db:r"],
+        "ExecuteReader": ["db:r"],
+        "ExecuteReaderAsync": ["db:r"],
+        "Prepare": [],
+        "Cancel": [],
+        "Dispose": [],
+        "DisposeAsync": []
+      },
+      "getters": {
+        "CommandText": [],
+        "CommandType": [],
+        "Connection": [],
+        "Parameters": [],
+        "Transaction": []
+      },
+      "setters": {
+        "CommandText": [],
+        "CommandType": [],
+        "Connection": [],
+        "Transaction": []
+      }
+    },
+    {
+      "type": "System.Data.Common.DbDataReader",
+      "methods": {
+        "Read": ["db:r"],
+        "ReadAsync": ["db:r"],
+        "NextResult": ["db:r"],
+        "NextResultAsync": ["db:r"],
+        "GetValue": [],
+        "GetString": [],
+        "GetInt32": [],
+        "GetInt64": [],
+        "GetBoolean": [],
+        "GetDouble": [],
+        "GetDateTime": [],
+        "GetGuid": [],
+        "GetDecimal": [],
+        "IsDBNull": [],
+        "Close": [],
+        "Dispose": [],
+        "DisposeAsync": []
+      },
+      "getters": {
+        "HasRows": [],
+        "FieldCount": [],
+        "RecordsAffected": []
+      }
+    },
+    {
+      "type": "System.Data.Common.DbTransaction",
+      "methods": {
+        "Commit": ["db:w"],
+        "CommitAsync": ["db:w"],
+        "Rollback": ["db:w"],
+        "RollbackAsync": ["db:w"],
+        "Dispose": [],
+        "DisposeAsync": []
+      },
+      "getters": {
+        "Connection": [],
+        "IsolationLevel": []
+      }
+    },
+    {
+      "type": "System.Data.Common.DbParameter",
+      "defaultEffects": [],
+      "getters": {
+        "DbType": [],
+        "Direction": [],
+        "ParameterName": [],
+        "Value": [],
+        "Size": []
+      },
+      "setters": {
+        "DbType": [],
+        "Direction": [],
+        "ParameterName": [],
+        "Value": [],
+        "Size": []
+      }
+    },
+    {
+      "type": "System.Data.SqlClient.SqlConnection",
+      "methods": {
+        "Open": ["db:rw"],
+        "OpenAsync": ["db:rw"],
+        "Close": [],
+        "CloseAsync": [],
+        "Dispose": [],
+        "DisposeAsync": [],
+        "BeginTransaction": ["db:rw"],
+        "CreateCommand": []
+      },
+      "constructors": {
+        "()": [],
+        "(String)": []
+      }
+    },
+    {
+      "type": "System.Data.SqlClient.SqlCommand",
+      "methods": {
+        "ExecuteNonQuery": ["db:w"],
+        "ExecuteNonQueryAsync": ["db:w"],
+        "ExecuteScalar": ["db:r"],
+        "ExecuteScalarAsync": ["db:r"],
+        "ExecuteReader": ["db:r"],
+        "ExecuteReaderAsync": ["db:r"],
+        "ExecuteXmlReader": ["db:r"],
+        "ExecuteXmlReaderAsync": ["db:r"],
+        "Prepare": [],
+        "Cancel": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "()": [],
+        "(String)": [],
+        "(String,SqlConnection)": [],
+        "(String,SqlConnection,SqlTransaction)": []
+      }
+    },
+    {
+      "type": "System.Data.SqlClient.SqlDataReader",
+      "methods": {
+        "Read": ["db:r"],
+        "ReadAsync": ["db:r"],
+        "NextResult": ["db:r"],
+        "NextResultAsync": ["db:r"],
+        "GetSqlValue": [],
+        "GetSqlValues": [],
+        "Close": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "Microsoft.Data.SqlClient.SqlConnection",
+      "methods": {
+        "Open": ["db:rw"],
+        "OpenAsync": ["db:rw"],
+        "Close": [],
+        "CloseAsync": [],
+        "Dispose": [],
+        "DisposeAsync": [],
+        "BeginTransaction": ["db:rw"],
+        "CreateCommand": []
+      },
+      "constructors": {
+        "()": [],
+        "(String)": []
+      }
+    },
+    {
+      "type": "Microsoft.Data.SqlClient.SqlCommand",
+      "methods": {
+        "ExecuteNonQuery": ["db:w"],
+        "ExecuteNonQueryAsync": ["db:w"],
+        "ExecuteScalar": ["db:r"],
+        "ExecuteScalarAsync": ["db:r"],
+        "ExecuteReader": ["db:r"],
+        "ExecuteReaderAsync": ["db:r"],
+        "Prepare": [],
+        "Cancel": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "()": [],
+        "(String)": [],
+        "(String,SqlConnection)": [],
+        "(String,SqlConnection,SqlTransaction)": []
+      }
+    },
+    {
+      "type": "System.Data.DataTable",
+      "defaultEffects": [],
+      "methods": {
+        "Load": ["mut"],
+        "Clear": ["mut"],
+        "Clone": [],
+        "Copy": [],
+        "Select": [],
+        "NewRow": ["mut"],
+        "AcceptChanges": ["mut"],
+        "RejectChanges": ["mut"]
+      }
+    },
+    {
+      "type": "System.Data.DataSet",
+      "defaultEffects": [],
+      "methods": {
+        "Clear": ["mut"],
+        "Clone": [],
+        "Copy": [],
+        "AcceptChanges": ["mut"],
+        "RejectChanges": ["mut"],
+        "ReadXml": ["fs:r"],
+        "WriteXml": ["fs:w"]
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "System.Data": ["db:rw"],
+    "System.Data.SqlClient": ["db:rw"],
+    "Microsoft.Data.SqlClient": ["db:rw"],
+    "Npgsql": ["db:rw"],
+    "MySql.Data": ["db:rw"],
+    "Microsoft.Data.Sqlite": ["db:rw"]
+  }
+}

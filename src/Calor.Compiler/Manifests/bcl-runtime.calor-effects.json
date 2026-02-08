@@ -1,0 +1,344 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for runtime types (Random, DateTime, Environment, Process)",
+  "mappings": [
+    {
+      "type": "System.Random",
+      "methods": {
+        "Next": ["rand"],
+        "NextInt64": ["rand"],
+        "NextSingle": ["rand"],
+        "NextDouble": ["rand"],
+        "NextBytes": ["rand"]
+      },
+      "constructors": {
+        "()": ["rand"],
+        "(Int32)": []
+      }
+    },
+    {
+      "type": "System.Security.Cryptography.RandomNumberGenerator",
+      "methods": {
+        "GetBytes": ["rand"],
+        "GetNonZeroBytes": ["rand"],
+        "GetInt32": ["rand"],
+        "Create": ["rand"]
+      }
+    },
+    {
+      "type": "System.DateTime",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "TryParse": [],
+        "ToString": [],
+        "Add": [],
+        "AddDays": [],
+        "AddHours": [],
+        "AddMinutes": [],
+        "AddSeconds": [],
+        "AddMilliseconds": [],
+        "AddMonths": [],
+        "AddYears": [],
+        "AddTicks": [],
+        "Subtract": [],
+        "ToLocalTime": [],
+        "ToUniversalTime": []
+      },
+      "getters": {
+        "Now": ["time"],
+        "UtcNow": ["time"],
+        "Today": ["time"],
+        "Year": [],
+        "Month": [],
+        "Day": [],
+        "Hour": [],
+        "Minute": [],
+        "Second": [],
+        "Millisecond": [],
+        "DayOfWeek": [],
+        "DayOfYear": [],
+        "Ticks": [],
+        "Date": [],
+        "TimeOfDay": []
+      }
+    },
+    {
+      "type": "System.DateTimeOffset",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "TryParse": [],
+        "ToString": [],
+        "Add": [],
+        "AddDays": [],
+        "AddHours": [],
+        "AddMinutes": [],
+        "AddSeconds": [],
+        "AddMilliseconds": [],
+        "AddMonths": [],
+        "AddYears": [],
+        "AddTicks": [],
+        "Subtract": [],
+        "ToLocalTime": [],
+        "ToUniversalTime": []
+      },
+      "getters": {
+        "Now": ["time"],
+        "UtcNow": ["time"],
+        "Offset": []
+      }
+    },
+    {
+      "type": "System.DateOnly",
+      "defaultEffects": [],
+      "getters": {
+        "FromDateTime": []
+      }
+    },
+    {
+      "type": "System.TimeOnly",
+      "defaultEffects": [],
+      "getters": {
+        "FromDateTime": [],
+        "FromTimeSpan": []
+      }
+    },
+    {
+      "type": "System.TimeSpan",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.Guid",
+      "defaultEffects": [],
+      "methods": {
+        "NewGuid": ["rand"],
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Environment",
+      "methods": {
+        "GetEnvironmentVariable": ["env:r"],
+        "GetEnvironmentVariables": ["env:r"],
+        "SetEnvironmentVariable": ["env:w"],
+        "ExpandEnvironmentVariables": ["env:r"],
+        "GetFolderPath": ["env:r"],
+        "GetLogicalDrives": ["env:r"],
+        "GetCommandLineArgs": ["env:r"],
+        "Exit": ["proc"],
+        "FailFast": ["proc"]
+      },
+      "getters": {
+        "CurrentDirectory": ["env:r"],
+        "MachineName": ["env:r"],
+        "UserName": ["env:r"],
+        "UserDomainName": ["env:r"],
+        "OSVersion": ["env:r"],
+        "ProcessorCount": ["env:r"],
+        "SystemDirectory": ["env:r"],
+        "TickCount": ["time"],
+        "TickCount64": ["time"],
+        "CommandLine": ["env:r"],
+        "NewLine": [],
+        "StackTrace": [],
+        "Version": [],
+        "Is64BitOperatingSystem": [],
+        "Is64BitProcess": [],
+        "ProcessId": ["env:r"],
+        "ProcessPath": ["env:r"]
+      },
+      "setters": {
+        "CurrentDirectory": ["env:w"]
+      }
+    },
+    {
+      "type": "System.Diagnostics.Process",
+      "methods": {
+        "Start": ["proc"],
+        "Kill": ["proc"],
+        "WaitForExit": [],
+        "WaitForExitAsync": [],
+        "Close": [],
+        "Dispose": [],
+        "Refresh": [],
+        "GetCurrentProcess": [],
+        "GetProcessById": [],
+        "GetProcesses": [],
+        "GetProcessesByName": []
+      },
+      "getters": {
+        "StandardOutput": [],
+        "StandardError": [],
+        "StandardInput": [],
+        "ExitCode": [],
+        "HasExited": [],
+        "Id": [],
+        "ProcessName": [],
+        "MainModule": [],
+        "Modules": [],
+        "StartTime": ["time"],
+        "ExitTime": ["time"],
+        "TotalProcessorTime": [],
+        "UserProcessorTime": [],
+        "PrivilegedProcessorTime": [],
+        "WorkingSet64": [],
+        "VirtualMemorySize64": [],
+        "PrivateMemorySize64": []
+      },
+      "constructors": {
+        "()": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ProcessStartInfo",
+      "defaultEffects": [],
+      "constructors": {
+        "()": [],
+        "(String)": [],
+        "(String,String)": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Stopwatch",
+      "defaultEffects": [],
+      "methods": {
+        "Start": [],
+        "Stop": [],
+        "Reset": [],
+        "Restart": [],
+        "StartNew": [],
+        "GetTimestamp": ["time"]
+      },
+      "getters": {
+        "Elapsed": [],
+        "ElapsedMilliseconds": [],
+        "ElapsedTicks": [],
+        "IsRunning": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Debug",
+      "methods": {
+        "WriteLine": ["cw"],
+        "Write": ["cw"],
+        "WriteIf": ["cw"],
+        "WriteLineIf": ["cw"],
+        "Assert": [],
+        "Fail": ["cw"]
+      }
+    },
+    {
+      "type": "System.Diagnostics.Trace",
+      "methods": {
+        "WriteLine": ["cw"],
+        "Write": ["cw"],
+        "WriteIf": ["cw"],
+        "WriteLineIf": ["cw"],
+        "TraceInformation": ["cw"],
+        "TraceWarning": ["cw"],
+        "TraceError": ["cw"],
+        "Fail": ["cw"],
+        "Flush": []
+      }
+    },
+    {
+      "type": "System.Threading.Thread",
+      "methods": {
+        "Sleep": [],
+        "Start": [],
+        "Join": [],
+        "Abort": [],
+        "Interrupt": [],
+        "Yield": []
+      },
+      "getters": {
+        "CurrentThread": [],
+        "ManagedThreadId": [],
+        "IsAlive": [],
+        "IsBackground": [],
+        "Priority": [],
+        "Name": []
+      },
+      "setters": {
+        "IsBackground": [],
+        "Priority": [],
+        "Name": []
+      }
+    },
+    {
+      "type": "System.Threading.Tasks.Task",
+      "methods": {
+        "Delay": [],
+        "Run": [],
+        "Wait": [],
+        "WaitAll": [],
+        "WaitAny": [],
+        "WhenAll": [],
+        "WhenAny": [],
+        "FromResult": [],
+        "FromException": [],
+        "FromCanceled": [],
+        "ContinueWith": [],
+        "ConfigureAwait": []
+      },
+      "getters": {
+        "Result": [],
+        "IsCompleted": [],
+        "IsCompletedSuccessfully": [],
+        "IsFaulted": [],
+        "IsCanceled": [],
+        "Exception": [],
+        "Status": [],
+        "CompletedTask": []
+      }
+    },
+    {
+      "type": "System.Threading.Tasks.Task`1",
+      "methods": {
+        "ContinueWith": [],
+        "ConfigureAwait": []
+      },
+      "getters": {
+        "Result": []
+      }
+    },
+    {
+      "type": "System.Threading.CancellationTokenSource",
+      "defaultEffects": [],
+      "methods": {
+        "Cancel": [],
+        "CancelAfter": [],
+        "Dispose": [],
+        "CreateLinkedTokenSource": []
+      },
+      "constructors": {
+        "()": [],
+        "(TimeSpan)": [],
+        "(Int32)": []
+      }
+    },
+    {
+      "type": "System.GC",
+      "methods": {
+        "Collect": ["alloc"],
+        "WaitForPendingFinalizers": [],
+        "SuppressFinalize": [],
+        "ReRegisterForFinalize": [],
+        "GetTotalMemory": [],
+        "GetTotalAllocatedBytes": [],
+        "GetGeneration": []
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "System.Reflection": [],
+    "System.Threading": [],
+    "System.Threading.Tasks": []
+  }
+}

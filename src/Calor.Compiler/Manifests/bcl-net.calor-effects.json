@@ -1,0 +1,234 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for System.Net namespace (HttpClient, Socket, TcpClient, Dns)",
+  "mappings": [
+    {
+      "type": "System.Net.Http.HttpClient",
+      "methods": {
+        "GetAsync": ["net:rw"],
+        "GetStringAsync": ["net:r"],
+        "GetByteArrayAsync": ["net:r"],
+        "GetStreamAsync": ["net:r"],
+        "PostAsync": ["net:rw"],
+        "PutAsync": ["net:rw"],
+        "PatchAsync": ["net:rw"],
+        "DeleteAsync": ["net:rw"],
+        "SendAsync": ["net:rw"],
+        "Send": ["net:rw"],
+        "CancelPendingRequests": []
+      },
+      "getters": {
+        "BaseAddress": [],
+        "Timeout": [],
+        "DefaultRequestHeaders": []
+      },
+      "setters": {
+        "BaseAddress": [],
+        "Timeout": []
+      },
+      "constructors": {
+        "()": [],
+        "(HttpMessageHandler)": []
+      }
+    },
+    {
+      "type": "System.Net.Http.HttpRequestMessage",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.Net.Http.HttpResponseMessage",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.Net.Http.HttpContent",
+      "methods": {
+        "ReadAsStringAsync": [],
+        "ReadAsByteArrayAsync": [],
+        "ReadAsStreamAsync": [],
+        "CopyToAsync": []
+      }
+    },
+    {
+      "type": "System.Net.Http.StringContent",
+      "defaultEffects": [],
+      "constructors": {
+        "(String)": [],
+        "(String,Encoding)": [],
+        "(String,Encoding,String)": []
+      }
+    },
+    {
+      "type": "System.Net.Http.ByteArrayContent",
+      "defaultEffects": [],
+      "constructors": {
+        "(Byte[])": []
+      }
+    },
+    {
+      "type": "System.Net.Http.FormUrlEncodedContent",
+      "defaultEffects": [],
+      "constructors": {
+        "(IEnumerable{KeyValuePair{String,String}})": []
+      }
+    },
+    {
+      "type": "System.Net.Http.MultipartFormDataContent",
+      "defaultEffects": [],
+      "methods": {
+        "Add": ["mut"]
+      }
+    },
+    {
+      "type": "System.Net.Sockets.Socket",
+      "methods": {
+        "Connect": ["net:w"],
+        "ConnectAsync": ["net:w"],
+        "Bind": ["net:w"],
+        "Listen": ["net:w"],
+        "Accept": ["net:r"],
+        "AcceptAsync": ["net:r"],
+        "Send": ["net:w"],
+        "SendAsync": ["net:w"],
+        "SendTo": ["net:w"],
+        "SendToAsync": ["net:w"],
+        "Receive": ["net:r"],
+        "ReceiveAsync": ["net:r"],
+        "ReceiveFrom": ["net:r"],
+        "ReceiveFromAsync": ["net:r"],
+        "Close": [],
+        "Dispose": [],
+        "Shutdown": ["net:w"]
+      },
+      "constructors": {
+        "(AddressFamily,SocketType,ProtocolType)": []
+      }
+    },
+    {
+      "type": "System.Net.Sockets.TcpClient",
+      "methods": {
+        "Connect": ["net:w"],
+        "ConnectAsync": ["net:w"],
+        "GetStream": [],
+        "Close": [],
+        "Dispose": []
+      },
+      "getters": {
+        "Connected": [],
+        "Available": []
+      },
+      "constructors": {
+        "()": [],
+        "(String,Int32)": ["net:w"]
+      }
+    },
+    {
+      "type": "System.Net.Sockets.TcpListener",
+      "methods": {
+        "Start": ["net:w"],
+        "Stop": ["net:w"],
+        "AcceptSocket": ["net:r"],
+        "AcceptSocketAsync": ["net:r"],
+        "AcceptTcpClient": ["net:r"],
+        "AcceptTcpClientAsync": ["net:r"]
+      },
+      "constructors": {
+        "(IPEndPoint)": [],
+        "(IPAddress,Int32)": []
+      }
+    },
+    {
+      "type": "System.Net.Sockets.UdpClient",
+      "methods": {
+        "Send": ["net:w"],
+        "SendAsync": ["net:w"],
+        "Receive": ["net:r"],
+        "ReceiveAsync": ["net:r"],
+        "Connect": ["net:w"],
+        "Close": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "()": [],
+        "(Int32)": ["net:w"],
+        "(String,Int32)": ["net:w"]
+      }
+    },
+    {
+      "type": "System.Net.Dns",
+      "methods": {
+        "GetHostEntry": ["net:r"],
+        "GetHostEntryAsync": ["net:r"],
+        "GetHostAddresses": ["net:r"],
+        "GetHostAddressesAsync": ["net:r"],
+        "GetHostName": ["net:r"]
+      }
+    },
+    {
+      "type": "System.Net.WebClient",
+      "methods": {
+        "DownloadString": ["net:r"],
+        "DownloadStringAsync": ["net:r"],
+        "DownloadStringTaskAsync": ["net:r"],
+        "DownloadData": ["net:r"],
+        "DownloadDataAsync": ["net:r"],
+        "DownloadDataTaskAsync": ["net:r"],
+        "DownloadFile": ["net:r", "fs:w"],
+        "DownloadFileAsync": ["net:r", "fs:w"],
+        "DownloadFileTaskAsync": ["net:r", "fs:w"],
+        "UploadString": ["net:w"],
+        "UploadStringAsync": ["net:w"],
+        "UploadStringTaskAsync": ["net:w"],
+        "UploadData": ["net:w"],
+        "UploadDataAsync": ["net:w"],
+        "UploadDataTaskAsync": ["net:w"],
+        "UploadFile": ["net:w", "fs:r"],
+        "UploadFileAsync": ["net:w", "fs:r"],
+        "UploadFileTaskAsync": ["net:w", "fs:r"],
+        "UploadValues": ["net:w"],
+        "UploadValuesAsync": ["net:w"],
+        "UploadValuesTaskAsync": ["net:w"],
+        "OpenRead": ["net:r"],
+        "OpenReadAsync": ["net:r"],
+        "OpenReadTaskAsync": ["net:r"],
+        "OpenWrite": ["net:w"],
+        "OpenWriteAsync": ["net:w"],
+        "OpenWriteTaskAsync": ["net:w"]
+      }
+    },
+    {
+      "type": "System.Net.IPAddress",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "TryParse": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Net.IPEndPoint",
+      "defaultEffects": [],
+      "constructors": {
+        "(IPAddress,Int32)": [],
+        "(Int64,Int32)": []
+      }
+    },
+    {
+      "type": "System.Uri",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "System.Net.Http": ["net:rw"],
+    "System.Net.Sockets": ["net:rw"],
+    "System.Net.Mail": ["net:w"]
+  }
+}

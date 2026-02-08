@@ -250,30 +250,39 @@ public static class AttributeHelper
             "cw" => ("io", "console_write"),
             "cr" => ("io", "console_read"),
 
-            // File I/O
-            "fw" => ("io", "file_write"),
-            "fr" => ("io", "file_read"),
-            "fd" => ("io", "file_delete"),
+            // Filesystem effects
+            "fs:r" => ("io", "filesystem_read"),
+            "fs:w" => ("io", "filesystem_write"),
+            "fs:rw" => ("io", "filesystem_readwrite"),
 
-            // Network
-            "net" => ("io", "network"),
-            "http" => ("io", "http"),
+            // Network effects
+            "net:r" => ("io", "network_read"),
+            "net:w" => ("io", "network_write"),
+            "net:rw" => ("io", "network_readwrite"),
 
-            // Database
-            "db" => ("io", "database"),
-            "dbr" => ("io", "database_read"),
-            "dbw" => ("io", "database_write"),
+            // Database effects
+            "db:r" => ("io", "database_read"),
+            "db:w" => ("io", "database_write"),
+            "db:rw" => ("io", "database_readwrite"),
+
+            // Environment effects
+            "env:r" => ("io", "environment_read"),
+            "env:w" => ("io", "environment_write"),
 
             // System
-            "env" => ("io", "environment"),
             "proc" => ("io", "process"),
 
-            // Memory/Resources
+            // Memory
             "alloc" => ("memory", "allocation"),
+            "unsafe" => ("memory", "unsafe"),
 
             // Non-determinism
             "time" => ("nondeterminism", "time"),
             "rand" => ("nondeterminism", "random"),
+
+            // Mutation/Exception
+            "mut" => ("mutation", "heap_write"),
+            "throw" => ("exception", "intentional"),
 
             // Default: treat as io with the code as value
             _ => ("io", code)
