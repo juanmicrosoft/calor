@@ -13,26 +13,23 @@ When Calor code calls a .NET method, the compiler needs to know what effects tha
 - `cr` - Console read
 
 ### Filesystem Effects
-- `fr` / `fs:r` - File/filesystem read
-- `fw` / `fs:w` - File/filesystem write
-- `fd` - File delete
+- `fs:r` - Filesystem read
+- `fs:w` - Filesystem write
 - `fs:rw` - Filesystem read and write (encompasses `fs:r` and `fs:w`)
 
 ### Network Effects
 - `net:r` - Network read
 - `net:w` - Network write
-- `net:rw` / `net` - Network read and write (encompasses `net:r` and `net:w`)
-- `http` - HTTP-specific operations
+- `net:rw` - Network read and write (encompasses `net:r` and `net:w`)
 
 ### Database Effects
-- `db:r` / `dbr` - Database read
-- `db:w` / `dbw` - Database write
-- `db:rw` / `db` - Database read and write (encompasses `db:r` and `db:w`)
+- `db:r` - Database read
+- `db:w` - Database write
+- `db:rw` - Database read and write (encompasses `db:r` and `db:w`)
 
 ### Environment Effects
 - `env:r` - Environment variable read
 - `env:w` - Environment variable write
-- `env` - Environment read and write
 
 ### System Effects
 - `proc` - Process operations
@@ -41,7 +38,7 @@ When Calor code calls a .NET method, the compiler needs to know what effects tha
 
 ### Nondeterminism
 - `time` - Time-dependent operations
-- `rand` / `rng` - Random number generation
+- `rand` - Random number generation
 
 ### Mutation/Exception
 - `mut` - Heap mutation
@@ -54,8 +51,7 @@ Broader effects encompass narrower ones:
 - `fs:rw` encompasses `fs:r` and `fs:w`
 - `net:rw` encompasses `net:r` and `net:w`
 - `db:rw` encompasses `db:r` and `db:w`
-- `env:rw` encompasses `env:r` and `env:w`
-- `fw` encompasses `fd` (file write encompasses file delete)
+- `env:rw` encompasses `env:r` and `env:w` (if declared manually)
 
 This means if you declare `fs:rw` on a function, it can call methods that require only `fs:r` or `fs:w`.
 

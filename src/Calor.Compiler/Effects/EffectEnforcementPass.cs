@@ -890,34 +890,26 @@ internal static class EffectSetExtensions
             (EffectKind.IO, "console_write") => "cw",
             (EffectKind.IO, "console_read") => "cr",
 
-            // File I/O - legacy codes
-            (EffectKind.IO, "file_write") => "fw",
-            (EffectKind.IO, "file_read") => "fr",
-            (EffectKind.IO, "file_delete") => "fd",
-
-            // Granular filesystem effects
+            // Filesystem effects
             (EffectKind.IO, "filesystem_read") => "fs:r",
             (EffectKind.IO, "filesystem_write") => "fs:w",
             (EffectKind.IO, "filesystem_readwrite") => "fs:rw",
 
             // Network effects
-            (EffectKind.IO, "network") => "net",
             (EffectKind.IO, "network_read") => "net:r",
             (EffectKind.IO, "network_write") => "net:w",
             (EffectKind.IO, "network_readwrite") => "net:rw",
-            (EffectKind.IO, "http") => "http",
 
             // Database effects
-            (EffectKind.IO, "database") => "db",
             (EffectKind.IO, "database_read") => "db:r",
             (EffectKind.IO, "database_write") => "db:w",
             (EffectKind.IO, "database_readwrite") => "db:rw",
 
             // Environment effects
-            (EffectKind.IO, "environment") => "env",
             (EffectKind.IO, "environment_read") => "env:r",
             (EffectKind.IO, "environment_write") => "env:w",
-            (EffectKind.IO, "environment_readwrite") => "env:rw",
+
+            // System
             (EffectKind.IO, "process") => "proc",
 
             // Memory effects

@@ -283,20 +283,18 @@ public sealed class ManifestLoader
         {
             // Console
             "cw", "cr",
-            // File legacy
-            "fw", "fr", "fd",
-            // Filesystem granular
+            // Filesystem
             "fs:r", "fs:w", "fs:rw",
             // Network
-            "net", "net:r", "net:w", "net:rw", "http",
+            "net:r", "net:w", "net:rw",
             // Database
-            "db", "db:r", "db:w", "db:rw", "dbr", "dbw",
+            "db:r", "db:w", "db:rw",
             // Environment
-            "env", "env:r", "env:w",
+            "env:r", "env:w",
             // System
             "proc", "alloc", "unsafe",
             // Nondeterminism
-            "time", "rand", "rng",
+            "time", "rand",
             // Mutation/Exception
             "mut", "throw"
         };

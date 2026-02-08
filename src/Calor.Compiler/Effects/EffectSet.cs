@@ -193,34 +193,26 @@ public sealed class EffectSet : IEquatable<EffectSet>
             (EffectKind.IO, "console_write") => "cw",
             (EffectKind.IO, "console_read") => "cr",
 
-            // File I/O - legacy codes
-            (EffectKind.IO, "file_write") => "fw",
-            (EffectKind.IO, "file_read") => "fr",
-            (EffectKind.IO, "file_delete") => "fd",
-
-            // Granular filesystem effects
+            // Filesystem effects
             (EffectKind.IO, "filesystem_read") => "fs:r",
             (EffectKind.IO, "filesystem_write") => "fs:w",
             (EffectKind.IO, "filesystem_readwrite") => "fs:rw",
 
             // Network effects
-            (EffectKind.IO, "network") => "net",
             (EffectKind.IO, "network_read") => "net:r",
             (EffectKind.IO, "network_write") => "net:w",
             (EffectKind.IO, "network_readwrite") => "net:rw",
-            (EffectKind.IO, "http") => "http",
 
             // Database effects
-            (EffectKind.IO, "database") => "db",
             (EffectKind.IO, "database_read") => "db:r",
             (EffectKind.IO, "database_write") => "db:w",
             (EffectKind.IO, "database_readwrite") => "db:rw",
 
             // Environment effects
-            (EffectKind.IO, "environment") => "env",
             (EffectKind.IO, "environment_read") => "env:r",
             (EffectKind.IO, "environment_write") => "env:w",
-            (EffectKind.IO, "environment_readwrite") => "env:rw",
+
+            // System
             (EffectKind.IO, "process") => "proc",
 
             // Memory effects
@@ -250,35 +242,26 @@ public sealed class EffectSet : IEquatable<EffectSet>
             "cw" => (EffectKind.IO, "console_write"),
             "cr" => (EffectKind.IO, "console_read"),
 
-            // File I/O - legacy codes
-            "fw" => (EffectKind.IO, "file_write"),
-            "fr" => (EffectKind.IO, "file_read"),
-            "fd" => (EffectKind.IO, "file_delete"),
-
-            // Granular filesystem effects
+            // Filesystem effects
             "fs:r" => (EffectKind.IO, "filesystem_read"),
             "fs:w" => (EffectKind.IO, "filesystem_write"),
             "fs:rw" => (EffectKind.IO, "filesystem_readwrite"),
 
             // Network effects
-            "net" => (EffectKind.IO, "network_readwrite"),
             "net:r" => (EffectKind.IO, "network_read"),
             "net:w" => (EffectKind.IO, "network_write"),
             "net:rw" => (EffectKind.IO, "network_readwrite"),
-            "http" => (EffectKind.IO, "http"),
 
             // Database effects
-            "db" => (EffectKind.IO, "database_readwrite"),
             "db:r" => (EffectKind.IO, "database_read"),
             "db:w" => (EffectKind.IO, "database_write"),
             "db:rw" => (EffectKind.IO, "database_readwrite"),
-            "dbr" => (EffectKind.IO, "database_read"),
-            "dbw" => (EffectKind.IO, "database_write"),
 
             // Environment effects
-            "env" => (EffectKind.IO, "environment_readwrite"),
             "env:r" => (EffectKind.IO, "environment_read"),
             "env:w" => (EffectKind.IO, "environment_write"),
+
+            // System
             "proc" => (EffectKind.IO, "process"),
 
             // Memory effects
@@ -288,7 +271,6 @@ public sealed class EffectSet : IEquatable<EffectSet>
             // Nondeterminism
             "time" => (EffectKind.Nondeterminism, "time"),
             "rand" => (EffectKind.Nondeterminism, "random"),
-            "rng" => (EffectKind.Nondeterminism, "random"),
 
             // Mutation/Exception
             "mut" => (EffectKind.Mutation, "heap_write"),
@@ -313,7 +295,7 @@ public sealed class EffectSet : IEquatable<EffectSet>
                 "mutation" => EffectKind.Mutation,
                 "nondeterminism" => EffectKind.Nondeterminism,
                 "exception" => EffectKind.Exception,
-                "allocation" => EffectKind.Allocation,
+                "memory" => EffectKind.Memory,
                 _ => EffectKind.Unknown
             };
             return (kind, parts[1]);

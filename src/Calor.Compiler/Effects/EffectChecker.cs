@@ -21,13 +21,13 @@ public sealed class EffectChecker
         ["Console.Read"] = new EffectInfo(EffectKind.IO, "console_read"),
 
         // File I/O
-        ["File.ReadAllText"] = new EffectInfo(EffectKind.IO, "file_read"),
-        ["File.ReadAllLines"] = new EffectInfo(EffectKind.IO, "file_read"),
-        ["File.WriteAllText"] = new EffectInfo(EffectKind.IO, "file_write"),
-        ["File.WriteAllLines"] = new EffectInfo(EffectKind.IO, "file_write"),
-        ["File.AppendAllText"] = new EffectInfo(EffectKind.IO, "file_write"),
-        ["File.Delete"] = new EffectInfo(EffectKind.IO, "file_write"),
-        ["File.Exists"] = new EffectInfo(EffectKind.IO, "file_read"),
+        ["File.ReadAllText"] = new EffectInfo(EffectKind.IO, "filesystem_read"),
+        ["File.ReadAllLines"] = new EffectInfo(EffectKind.IO, "filesystem_read"),
+        ["File.WriteAllText"] = new EffectInfo(EffectKind.IO, "filesystem_write"),
+        ["File.WriteAllLines"] = new EffectInfo(EffectKind.IO, "filesystem_write"),
+        ["File.AppendAllText"] = new EffectInfo(EffectKind.IO, "filesystem_write"),
+        ["File.Delete"] = new EffectInfo(EffectKind.IO, "filesystem_write"),
+        ["File.Exists"] = new EffectInfo(EffectKind.IO, "filesystem_read"),
 
         // Network (common patterns)
         ["HttpClient.GetAsync"] = new EffectInfo(EffectKind.IO, "network_read"),
@@ -222,7 +222,7 @@ public sealed class EffectChecker
         {
             "io" => EffectKind.IO,
             "mutation" => EffectKind.Mutation,
-            "allocation" => EffectKind.Allocation,
+            "memory" => EffectKind.Memory,
             "exception" => EffectKind.Exception,
             "nondeterminism" => EffectKind.Nondeterminism,
             _ => EffectKind.Unknown
@@ -239,7 +239,6 @@ public enum EffectKind
     IO,
     Mutation,
     Memory,
-    Allocation,
     Exception,
     Nondeterminism
 }

@@ -662,19 +662,19 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void AttributeHelper_ExpandsFileReadEffect()
+    public void AttributeHelper_ExpandsFilesystemReadEffect()
     {
-        var (category, value) = AttributeHelper.ExpandEffectCode("fr");
+        var (category, value) = AttributeHelper.ExpandEffectCode("fs:r");
         Assert.Equal("io", category);
-        Assert.Equal("file_read", value);
+        Assert.Equal("filesystem_read", value);
     }
 
     [Fact]
-    public void AttributeHelper_ExpandsNetworkEffect()
+    public void AttributeHelper_ExpandsNetworkReadWriteEffect()
     {
-        var (category, value) = AttributeHelper.ExpandEffectCode("net");
+        var (category, value) = AttributeHelper.ExpandEffectCode("net:rw");
         Assert.Equal("io", category);
-        Assert.Equal("network_readwrite", value);  // Changed in effect taxonomy enhancement
+        Assert.Equal("network_readwrite", value);
     }
 
     [Fact]

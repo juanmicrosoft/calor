@@ -72,10 +72,10 @@ public class EffectSubtypingTests
     }
 
     [Fact]
-    public void FileWrite_Encompasses_FileDelete()
+    public void EnvironmentReadWrite_Encompasses_EnvironmentWrite()
     {
-        var declared = (EffectKind.IO, "file_write");
-        var required = (EffectKind.IO, "file_delete");
+        var declared = (EffectKind.IO, "environment_readwrite");
+        var required = (EffectKind.IO, "environment_write");
 
         Assert.True(EffectSubtyping.Encompasses(declared, required));
     }

@@ -39,12 +39,6 @@ public static class EffectSubtyping
         {
             (EffectKind.IO, "environment_read"),
             (EffectKind.IO, "environment_write")
-        },
-
-        // Legacy file effects: file_write encompasses file_delete
-        [(EffectKind.IO, "file_write")] = new()
-        {
-            (EffectKind.IO, "file_delete")
         }
     };
 

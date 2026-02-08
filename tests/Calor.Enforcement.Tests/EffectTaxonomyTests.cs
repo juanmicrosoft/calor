@@ -21,9 +21,16 @@ public class EffectTaxonomyTests
     [InlineData("db:rw", EffectKind.IO, "database_readwrite")]
     [InlineData("env:r", EffectKind.IO, "environment_read")]
     [InlineData("env:w", EffectKind.IO, "environment_write")]
-    [InlineData("rng", EffectKind.Nondeterminism, "random")]
     [InlineData("unsafe", EffectKind.Memory, "unsafe")]
-    public void NewGranularEffectCodes_ParseCorrectly(string code, EffectKind expectedKind, string expectedValue)
+    [InlineData("alloc", EffectKind.Memory, "allocation")]
+    [InlineData("cw", EffectKind.IO, "console_write")]
+    [InlineData("cr", EffectKind.IO, "console_read")]
+    [InlineData("time", EffectKind.Nondeterminism, "time")]
+    [InlineData("rand", EffectKind.Nondeterminism, "random")]
+    [InlineData("proc", EffectKind.IO, "process")]
+    [InlineData("mut", EffectKind.Mutation, "heap_write")]
+    [InlineData("throw", EffectKind.Exception, "intentional")]
+    public void EffectCodes_ParseCorrectly(string code, EffectKind expectedKind, string expectedValue)
     {
         // Test via AttributeHelper
         var (category, value) = AttributeHelper.ExpandEffectCode(code);
@@ -35,49 +42,6 @@ public class EffectTaxonomyTests
         var effect = effectSet.Effects.First();
         Assert.Equal(expectedKind, effect.Kind);
         Assert.Equal(expectedValue, effect.Value);
-    }
-
-    [Theory]
-    [InlineData("cw", EffectKind.IO, "console_write")]
-    [InlineData("cr", EffectKind.IO, "console_read")]
-    [InlineData("fw", EffectKind.IO, "file_write")]
-    [InlineData("fr", EffectKind.IO, "file_read")]
-    [InlineData("fd", EffectKind.IO, "file_delete")]
-    [InlineData("dbr", EffectKind.IO, "database_read")]
-    [InlineData("dbw", EffectKind.IO, "database_write")]
-    [InlineData("time", EffectKind.Nondeterminism, "time")]
-    [InlineData("rand", EffectKind.Nondeterminism, "random")]
-    [InlineData("alloc", EffectKind.Memory, "allocation")]
-    [InlineData("proc", EffectKind.IO, "process")]
-    public void LegacyEffectCodes_StillWork(string code, EffectKind expectedKind, string expectedValue)
-    {
-        var effectSet = EffectSet.From(code);
-        Assert.Single(effectSet.Effects);
-        var effect = effectSet.Effects.First();
-        Assert.Equal(expectedKind, effect.Kind);
-        Assert.Equal(expectedValue, effect.Value);
-    }
-
-    [Theory]
-    [InlineData("net", EffectKind.IO, "network_readwrite")]
-    [InlineData("db", EffectKind.IO, "database_readwrite")]
-    [InlineData("env", EffectKind.IO, "environment_readwrite")]
-    public void LegacyBroadCodes_MapToReadWrite(string code, EffectKind expectedKind, string expectedValue)
-    {
-        var effectSet = EffectSet.From(code);
-        Assert.Single(effectSet.Effects);
-        var effect = effectSet.Effects.First();
-        Assert.Equal(expectedKind, effect.Kind);
-        Assert.Equal(expectedValue, effect.Value);
-    }
-
-    [Fact]
-    public void RngAlias_MapsToRandom()
-    {
-        var rngSet = EffectSet.From("rng");
-        var randSet = EffectSet.From("rand");
-
-        Assert.Equal(rngSet, randSet);
     }
 
     [Fact]
