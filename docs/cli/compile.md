@@ -44,6 +44,11 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--input` | `-i` | Yes | Input Calor source file |
 | `--output` | `-o` | Yes | Output C# file path |
 | `--verbose` | `-v` | No | Show detailed compilation output |
+| `--verify` | | No | Enable static contract verification with Z3 |
+| `--contract-mode` | | No | Contract enforcement mode: off, debug, release (default: debug) |
+| `--strict-api` | | No | Require §BREAKING markers for public API changes |
+| `--require-docs` | | No | Require documentation on public functions |
+| `--enforce-effects` | | No | Enforce effect declarations (default: true) |
 
 ---
 
@@ -181,6 +186,36 @@ while inotifywait -e modify src/*.calr; do
   calor -i src/MyModule.calr -o src/MyModule.g.cs
 done
 ```
+
+---
+
+## Static Contract Verification
+
+Use `--verify` to enable static contract verification with the Z3 SMT solver:
+
+```bash
+calor -i MyModule.calr -o MyModule.g.cs --verify
+```
+
+When enabled, the compiler uses the Z3 theorem prover to statically verify contracts:
+
+- **Proven contracts**: Runtime checks are replaced with comments, improving performance
+- **Disproven contracts**: A warning is emitted showing a counterexample
+- **Unproven contracts**: Runtime checks are kept (Z3 timeout or complexity limit reached)
+- **Unsupported contracts**: Runtime checks are kept (contracts with function calls, strings, etc.)
+
+Example output:
+```
+Contract verification complete: 3 proven, 1 unproven, 1 potentially violated, 0 unsupported
+warning Calor0702: Postcondition may be violated in function 'BadFunction'. Counterexample: x=0, y=1
+```
+
+For proven contracts, the generated C# includes:
+```csharp
+// PROVEN: Postcondition statically verified: (result >= 0)
+```
+
+For more details, see [Static Verification](/calor/philosophy/static-verification/).
 
 ---
 

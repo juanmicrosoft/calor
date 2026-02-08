@@ -1,0 +1,194 @@
+---
+layout: default
+title: Static Contract Verification
+parent: Philosophy
+nav_order: 6
+permalink: /philosophy/static-verification/
+---
+
+# Static Contract Verification with Z3
+
+Calor supports static contract verification using Microsoft's Z3 SMT (Satisfiability Modulo Theories) solver. This enables proving contracts at compile time, potentially eliding runtime checks for proven contracts.
+
+---
+
+## Overview
+
+When you write contracts in Calor:
+
+```calor
+§F{f001:Square:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (>= x 0)
+  §S (>= result 0)
+  §R (* x x)
+§/F{f001}
+```
+
+The compiler can use Z3 to prove that the postcondition `(>= result 0)` always holds when the precondition `(>= x 0)` is satisfied. This is mathematically provable: the square of a non-negative number is always non-negative.
+
+---
+
+## Enabling Static Verification
+
+Use the `--verify` flag when compiling:
+
+```bash
+calor -i MyModule.calr -o MyModule.g.cs --verify
+```
+
+---
+
+## Verification Spectrum
+
+Contracts fall into four categories after verification:
+
+### Proven
+The contract is mathematically proven to always hold. The runtime check can be safely elided.
+
+```
+// PROVEN: Postcondition statically verified: (result >= 0)
+```
+
+### Unproven
+Z3 couldn't determine if the contract always holds (timeout, complexity limit, or non-linear arithmetic). The runtime check is preserved.
+
+### Disproven
+Z3 found a counterexample showing the contract can be violated. A warning is emitted with the counterexample, and the runtime check is preserved.
+
+```
+warning Calor0702: Postcondition may be violated in function 'BadFunc'.
+  Counterexample: x=0, b=1
+```
+
+### Unsupported
+The contract contains constructs Z3 doesn't support (function calls, strings, floating-point). The runtime check is silently preserved.
+
+---
+
+## Supported Constructs
+
+Z3 verification supports:
+
+| Calor | Z3 | Description |
+|:------|:---|:------------|
+| `(+ a b)` | `a + b` | Addition |
+| `(- a b)` | `a - b` | Subtraction |
+| `(* a b)` | `a * b` | Multiplication |
+| `(/ a b)` | `a div b` | Division |
+| `(% a b)` | `a mod b` | Modulo |
+| `(== a b)` | `a = b` | Equality |
+| `(!= a b)` | `a ≠ b` | Inequality |
+| `(< a b)` | `a < b` | Less than |
+| `(<= a b)` | `a ≤ b` | Less or equal |
+| `(> a b)` | `a > b` | Greater than |
+| `(>= a b)` | `a ≥ b` | Greater or equal |
+| `(and p q)` | `p ∧ q` | Logical and |
+| `(or p q)` | `p ∨ q` | Logical or |
+| `(not p)` | `¬p` | Logical not |
+
+**Supported types:** `i32`, `i64`, `bool`
+
+**Unsupported:** Function calls, strings, floating-point, arrays, objects
+
+---
+
+## How It Works
+
+The verification process for postconditions:
+
+1. **Declare** all parameters as symbolic Z3 variables
+2. **Assume** all preconditions hold
+3. **Assert** the negation of the postcondition
+4. **Check** satisfiability:
+   - **UNSAT**: No counterexample exists → Proven
+   - **SAT**: Found counterexample → Disproven
+   - **UNKNOWN**: Timeout or too complex → Unproven
+
+This approach proves correctness by showing there's no way for the contract to be violated when preconditions are met.
+
+---
+
+## Timeouts
+
+Z3 verification has a 5-second timeout per function. Complex contracts with non-linear arithmetic may timeout and be marked as "Unproven".
+
+---
+
+## Limitations
+
+### No Function Call Support
+Contracts referencing other functions cannot be verified:
+
+```calor
+§S (> (strlen s) 0)  ; Unsupported - function call
+```
+
+### Integer Only
+Floating-point contracts aren't verified due to Z3's floating-point theory complexity.
+
+### No Array Support
+Array operations and loop invariants are not supported.
+
+### Bounded Verification
+Z3 uses arbitrary-precision integers, so it doesn't model 32-bit overflow. A contract proven correct in Z3 could theoretically fail at runtime due to integer overflow.
+
+---
+
+## Best Practices
+
+### Keep Contracts Simple
+Simple arithmetic and comparison contracts verify quickly:
+
+```calor
+§Q (>= x 0)
+§S (>= result 0)
+```
+
+### Separate Concerns
+Split complex contracts into multiple simpler ones:
+
+```calor
+; Instead of:
+§S (and (>= result 0) (< result 100))
+
+; Use:
+§S (>= result 0)
+§S (< result 100)
+```
+
+### Accept Unproven Contracts
+Not all contracts can be statically proven. An "Unproven" result doesn't mean the code is wrong—it means Z3 couldn't prove it within time limits.
+
+---
+
+## Comparison with Runtime-Only Enforcement
+
+| Aspect | Runtime Only | Static + Runtime |
+|:-------|:-------------|:-----------------|
+| Verification cost | 0 | Compile time |
+| Runtime cost | Always | Reduced for proven |
+| Bug detection | At runtime | At compile time |
+| Coverage | All contracts | Supported constructs |
+
+Static verification complements runtime checking—it doesn't replace it. Unproven and unsupported contracts still have runtime checks.
+
+---
+
+## Z3 Installation
+
+Z3 is bundled with the Calor compiler via the `Microsoft.Z3` NuGet package. No separate installation is required.
+
+If Z3 native libraries are missing on your platform, the compiler will:
+1. Log an informational message
+2. Skip static verification
+3. Continue compilation normally with all runtime checks
+
+---
+
+## See Also
+
+- [Contracts in Calor](/calor/language/contracts/)
+- [Compile Command](/calor/cli/compile/)
+- [Z3 Prover](https://github.com/Z3Prover/z3)

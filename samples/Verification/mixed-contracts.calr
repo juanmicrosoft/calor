@@ -1,0 +1,42 @@
+§M{m001:MixedContracts}
+§DOC{Demonstrates contracts with mixed verification outcomes}
+
+§F{f001:SafeDivide:pub}
+  §DOC{Division with divisor check - postcondition about result is unproven.}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §S (!= b 0)
+  §R (/ a b)
+§/F{f001}
+
+§F{f002:SumArray:pub}
+  §DOC{Sums array - contracts with string types are unsupported.}
+  §I{i32:n}
+  §O{i32}
+  §Q (>= n 0)
+  §R 0
+§/F{f002}
+
+§F{f003:Increment:pub}
+  §DOC{Increments a value - provable postcondition.}
+  §I{i32:x}
+  §O{i32}
+  §S (== result (+ x 1))
+  §R (+ x 1)
+§/F{f003}
+
+§F{f004:ClampPositive:pub}
+  §DOC{Clamps value to non-negative - provable postcondition.}
+  §I{i32:x}
+  §O{i32}
+  §S (>= result 0)
+  §IF{if001} (< x 0)
+    §R 0
+  §ELSE{if001}
+    §R x
+  §/IF{if001}
+§/F{f004}
+
+§/M{m001}

@@ -1,0 +1,31 @@
+§M{m001:ViolationDetected}
+§DOC{Demonstrates contracts that Z3 can prove are violated}
+
+§F{f001:BadPostcondition:pub}
+  §DOC{This function has a postcondition that Z3 will prove is violated.}
+  §DOC{Postcondition claims result > x, but we return x unchanged.}
+  §I{i32:x}
+  §O{i32}
+  §S (> result x)
+  §R x
+§/F{f001}
+
+§F{f002:ImpossibleContract:pub}
+  §DOC{Postcondition claims x + 1 > x + 2, which is impossible.}
+  §I{i32:x}
+  §O{i32}
+  §S (> (+ x 1) (+ x 2))
+  §R (+ x 1)
+§/F{f002}
+
+§F{f003:DivisionBug:pub}
+  §DOC{Claims a/b > a, which is false for many inputs (e.g., a=0, b=1).}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §S (> (/ a b) a)
+  §R (/ a b)
+§/F{f003}
+
+§/M{m001}

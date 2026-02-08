@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
@@ -6,6 +7,7 @@ using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification.Z3;
 
 namespace Calor.Compiler;
 
@@ -48,6 +50,10 @@ public class Program
             description: "Contract enforcement mode: off, debug, or release (default: debug)",
             getDefaultValue: () => "debug");
 
+        var verifyOption = new Option<bool>(
+            aliases: ["--verify"],
+            description: "Enable static contract verification with Z3 SMT solver");
+
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
             inputOption,
@@ -57,11 +63,24 @@ public class Program
             requireDocsOption,
             enforceEffectsOption,
             strictEffectsOption,
-            contractModeOption
+            contractModeOption,
+            verifyOption
         };
 
         // Legacy compile handler (when --input is provided)
-        rootCommand.SetHandler(CompileAsync, inputOption, outputOption, verboseOption, strictApiOption, requireDocsOption, enforceEffectsOption, strictEffectsOption, contractModeOption);
+        rootCommand.SetHandler(async (InvocationContext ctx) =>
+        {
+            var input = ctx.ParseResult.GetValueForOption(inputOption);
+            var output = ctx.ParseResult.GetValueForOption(outputOption);
+            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
+            var strictApi = ctx.ParseResult.GetValueForOption(strictApiOption);
+            var requireDocs = ctx.ParseResult.GetValueForOption(requireDocsOption);
+            var enforceEffects = ctx.ParseResult.GetValueForOption(enforceEffectsOption);
+            var strictEffects = ctx.ParseResult.GetValueForOption(strictEffectsOption);
+            var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
+            var verify = ctx.ParseResult.GetValueForOption(verifyOption);
+            await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify);
+        });
 
         // Add subcommands
         rootCommand.AddCommand(ConvertCommand.Create());
@@ -79,7 +98,7 @@ public class Program
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode)
+    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode, bool verify)
     {
         try
         {
@@ -103,6 +122,7 @@ public class Program
                 Console.WriteLine("  --enforce-effects Enforce effect declarations (default: true)");
                 Console.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
                 Console.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
+                Console.WriteLine("  --verify          Enable static contract verification with Z3");
                 Console.WriteLine();
                 Console.WriteLine("Run 'calor --help' for more information.");
                 return;
@@ -135,6 +155,7 @@ public class Program
                 EnforceEffects = enforceEffects,
                 StrictEffects = strictEffects,
                 ContractMode = parsedContractMode,
+                VerifyContracts = verify,
                 ProjectDirectory = Path.GetDirectoryName(input.FullName)
             };
             var result = Compile(source, input.FullName, options);
@@ -265,8 +286,22 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        // Static contract verification with Z3 (optional)
+        if (options.VerifyContracts)
+        {
+            var verificationPass = new ContractVerificationPass(
+                diagnostics,
+                new VerificationOptions { Verbose = options.Verbose });
+            options.VerificationResults = verificationPass.Verify(ast);
+
+            if (options.Verbose)
+            {
+                Console.WriteLine("Contract verification completed");
+            }
+        }
+
         // Code generation
-        var emitter = new CSharpEmitter(options.ContractMode);
+        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults);
         var generatedCode = emitter.Emit(ast);
 
         if (options.Verbose)
@@ -323,6 +358,16 @@ public sealed class CompilationOptions
     /// Project directory for loading calor.effects.json stubs.
     /// </summary>
     public string? ProjectDirectory { get; init; }
+
+    /// <summary>
+    /// Enable static contract verification with Z3 SMT solver.
+    /// </summary>
+    public bool VerifyContracts { get; init; }
+
+    /// <summary>
+    /// Verification results populated after running verification pass.
+    /// </summary>
+    public ModuleVerificationResult? VerificationResults { get; internal set; }
 }
 
 /// <summary>

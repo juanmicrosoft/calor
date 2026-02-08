@@ -1,6 +1,7 @@
 using System.Text;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Verification.Z3;
 
 // Import ContractMode from Program.cs
 using ContractMode = Calor.Compiler.ContractMode;
@@ -39,12 +40,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string? _currentFunctionId;
     private string? _currentFilePath;
     private readonly EmitContractMode _contractMode;
+    private readonly ModuleVerificationResult? _verificationResults;
+
+    // Track current indices for contract emission
+    private int _currentPreconditionIndex;
+    private int _currentPostconditionIndex;
 
     public CSharpEmitter() : this(EmitContractMode.Debug)
     {
     }
 
-    public CSharpEmitter(ContractMode contractMode)
+    public CSharpEmitter(ContractMode contractMode) : this(contractMode, null)
+    {
+    }
+
+    public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults)
     {
         _contractMode = contractMode switch
         {
@@ -52,6 +62,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             ContractMode.Release => EmitContractMode.Release,
             _ => EmitContractMode.Debug
         };
+        _verificationResults = verificationResults;
     }
 
     public CSharpEmitter(EmitContractMode contractMode)
@@ -230,6 +241,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         // Track current function ID for contract emission
         _currentFunctionId = node.Id;
+
+        // Reset contract indices for this function
+        _currentPreconditionIndex = 0;
+        _currentPostconditionIndex = 0;
 
         // Emit extended metadata as documentation comments
         foreach (var issue in node.Issues)
@@ -924,11 +939,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Off mode: no contract checks
         if (_contractMode == EmitContractMode.Off)
         {
+            _currentPreconditionIndex++;
             return ""; // No check emitted
         }
 
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
+
+        // Check verification status if available
+        var verificationStatus = GetPreconditionVerificationStatus();
+        _currentPreconditionIndex++;
+
+        // Proven preconditions: emit comment instead of runtime check
+        if (verificationStatus == ContractVerificationStatus.Proven)
+        {
+            return $"// PROVEN: Precondition always satisfiable: {condition}";
+        }
 
         // Release mode: lean exception
         if (_contractMode == EmitContractMode.Release)
@@ -959,11 +985,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Off mode: no contract checks
         if (_contractMode == EmitContractMode.Off)
         {
+            _currentPostconditionIndex++;
             return ""; // No check emitted
         }
 
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
+
+        // Check verification status if available
+        var verificationStatus = GetPostconditionVerificationStatus();
+        _currentPostconditionIndex++;
+
+        // Proven postconditions: emit comment instead of runtime check
+        if (verificationStatus == ContractVerificationStatus.Proven)
+        {
+            return $"// PROVEN: Postcondition statically verified: {condition}";
+        }
 
         // Release mode: lean exception
         if (_contractMode == EmitContractMode.Release)
@@ -1027,6 +1064,30 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private static string EscapeString(string s)
     {
         return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
+    }
+
+    private ContractVerificationStatus? GetPreconditionVerificationStatus()
+    {
+        if (_verificationResults == null || _currentFunctionId == null)
+            return null;
+
+        var funcResult = _verificationResults.GetFunctionResult(_currentFunctionId);
+        if (funcResult == null || _currentPreconditionIndex >= funcResult.PreconditionResults.Count)
+            return null;
+
+        return funcResult.PreconditionResults[_currentPreconditionIndex].Status;
+    }
+
+    private ContractVerificationStatus? GetPostconditionVerificationStatus()
+    {
+        if (_verificationResults == null || _currentFunctionId == null)
+            return null;
+
+        var funcResult = _verificationResults.GetFunctionResult(_currentFunctionId);
+        if (funcResult == null || _currentPostconditionIndex >= funcResult.PostconditionResults.Count)
+            return null;
+
+        return funcResult.PostconditionResults[_currentPostconditionIndex].Status;
     }
 
     // Phase 6: Arrays and Collections
