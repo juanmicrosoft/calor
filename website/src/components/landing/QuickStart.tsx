@@ -5,9 +5,21 @@ import { Check, Copy, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const commands = [
-  { label: 'Install the compiler', command: 'dotnet tool install -g calor' },
-  { label: 'Initialize with Claude Code', command: 'calor init --ai claude' },
-  { label: 'Build your project', command: 'dotnet build' },
+  {
+    label: 'Install the compiler',
+    command: 'dotnet tool install -g calor',
+    description: 'Adds calor to your PATH. Requires .NET 8+ SDK.',
+  },
+  {
+    label: 'Initialize with Claude Code',
+    command: 'calor init --ai claude',
+    description: 'Generates CLAUDE.md with Calor syntax reference.',
+  },
+  {
+    label: 'Build your project',
+    command: 'dotnet build',
+    description: 'Compiles .calr files to C# and builds the assembly.',
+  },
 ];
 
 export function QuickStart() {
@@ -58,6 +70,7 @@ export function QuickStart() {
                       <pre className="text-sm text-zinc-100 font-mono whitespace-pre-wrap">
                         <span className="text-green-400">$</span> {cmd.command}
                       </pre>
+                      <p className="text-xs text-zinc-500">{cmd.description}</p>
                     </div>
                     <button
                       onClick={() => copyToClipboard(cmd.command, index)}

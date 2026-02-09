@@ -38,11 +38,10 @@ export function Hero() {
             Calor
           </h1>
           <p className="mt-4 text-xl font-medium text-white sm:text-2xl">
-            Coding Agent Language for Optimized Reasoning
+            When AI writes your code, the language should catch the bugs.
           </p>
           <p className="mt-6 text-lg leading-8 text-white/80">
-            A programming language designed specifically for AI coding agents,
-            compiling to .NET via C# emission.
+            Contracts, effects, and stable IDs—the guarantees agents need to write correct .NET code.
           </p>
 
           <div className="mt-10 flex items-center justify-center gap-x-4">

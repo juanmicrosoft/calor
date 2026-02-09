@@ -121,10 +121,10 @@ export function BenchmarkChart() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Benchmark Results
+            Where Explicit Semantics Pay Off
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Evaluated across {programCount} paired Calor/C# programs
+            Calor trades token efficiency for semantic explicitness. Here's where that pays off.
           </p>
           <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
@@ -192,11 +192,11 @@ export function BenchmarkChart() {
 
           {/* Key finding */}
           <div className="mt-12 p-6 rounded-lg border bg-muted/50">
-            <h3 className="font-semibold mb-2">Key Finding</h3>
+            <h3 className="font-semibold mb-2">The Tradeoff</h3>
             <p className="text-muted-foreground">
-              Calor excels in error detection through explicit contracts. C# currently leads
-              in most other metrics, reflecting ecosystem maturity and LLM training data bias.
-              The tradeoff: explicit semantics require more tokens but enable better invariant checking.
+              Calor wins where correctness matters: comprehension, error detection, and refactoring stability.
+              C# wins where familiarity matters: generation accuracy and task completion. As LLMs train on
+              more Calor code, the familiarity gap closes. The correctness advantage is structural.
             </p>
           </div>
 

@@ -5,7 +5,7 @@ const features = [
   {
     name: 'First-Class Contracts',
     description:
-      'Preconditions and postconditions are syntax, not comments. Agents see requirements and guarantees directly.',
+      'Preconditions and postconditions are syntax, not comments. Catch contract violations at compile time, not in production logs.',
     icon: Shield,
     code: '§Q (>= x 0)\n§S (>= result 0)',
     href: '/docs/philosophy/effects-contracts-enforcement/',
@@ -13,24 +13,26 @@ const features = [
   {
     name: 'Explicit Effects',
     description:
-      'Declare side effects upfront. No guessing whether a function touches the file system or network.',
+      'Effects trace through the entire call graph. Hide a database call in a helper? The compiler finds it.',
     icon: FileCode,
-    code: '§E{cw,fs:r,net:rw}',
+    code: '§E{db:rw,net:rw}',
     href: '/docs/philosophy/effects-contracts-enforcement/',
   },
   {
-    name: 'Unique Identifiers',
+    name: 'Stable Identifiers',
     description:
-      'Every element has a stable ID. Refactoring changes names, not references.',
+      'ULID-based IDs survive renaming, file moves, and refactoring. Agents reference code precisely.',
     icon: Fingerprint,
-    code: '§F{f001:Process:pub}',
+    code: '§F{f_01J5X7K9M2:Process:pub}',
+    href: '/docs/philosophy/stable-identifiers/',
   },
   {
     name: 'Explicit Structure',
     description:
-      'Matched opening and closing tags. No ambiguous scope boundaries for agents to parse.',
+      'Matched open/close tags eliminate bugs where agents miscalculate indentation or brace depth.',
     icon: Layers,
-    code: '§M{m001:App}\n  ...\n§/M{m001}',
+    code: '§M{m_01J5X7K9M2:App}\n  ...\n§/M{m_01J5X7K9M2}',
+    href: '/docs/syntax-reference/',
   },
 ];
 

@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
-const calorCode = `§F{f002:Square:pub}
+const calorCode = `§F{f_01J5X7K9M2:Square:pub}
   §I{i32:x}
   §O{i32}
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
-§/F{f002}`;
+§/F{f_01J5X7K9M2}`;
 
 const csharpCode = `public static int Square(int x)
 {
@@ -22,7 +22,7 @@ const csharpCode = `public static int Square(int x)
 }`;
 
 const calorAnnotations = [
-  { line: 0, text: 'Function ID: f002 - can reference precisely' },
+  { line: 0, text: 'Stable ID f_01J5X7K9M2 - survives renames and refactors' },
   { line: 3, text: 'Precondition (§Q): x >= 0' },
   { line: 4, text: 'Postcondition (§S): result >= 0' },
   { line: 5, text: 'No side effects (no §E declaration)' },

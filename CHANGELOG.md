@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-08
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 0.80x (C# leads overall)
+- **Metrics**: Calor wins 4, C# wins 4
+- **Highlights**:
+  - ErrorDetection: 1.55x (Calor wins, large effect)
+  - Comprehension: 1.49x (Calor wins, large effect)
+  - RefactoringStability: 1.49x (Calor wins, large effect)
+  - EditPrecision: 1.36x (Calor wins, large effect)
+- **Programs Tested**: 28
+
+### Added
+- **Z3 static contract verification** - Prove contracts at compile time with `--verify` flag; proven contracts can have runtime checks elided
+- **Manifest-based effect resolution for .NET interop** - Layered resolution from built-in BCL manifests, user manifests, and namespace defaults
+- **Granular effect taxonomy** - `fs:r/fs:w`, `net:r/net:w`, `db:r/db:w`, `env:r/env:w` with subtyping (`rw` encompasses `r` and `w`)
+- **New CLI commands**: `calor effects resolve`, `calor effects validate`, `calor effects list`
+- New CatchBugs component on homepage showing interprocedural effect analysis with compiler error demo
+
+### Changed
+- Homepage restructured from 9 to 7 sections for better focus
+- Hero updated with value-oriented messaging ("When AI writes your code, the language should catch the bugs")
+- CodeComparison updated with ULID-based stable identifiers
+- FeatureGrid updated with impact statements and "Learn more" links for all cards
+- BenchmarkChart reframed as "Where Explicit Semantics Pay Off"
+- QuickStart now includes descriptions under each command
+- ProjectStatus now compact with chip-based milestones
+
+### Removed
+- Story section from homepage
+- CompetitivePositioning section from homepage
+- VSCodeExtension section from homepage
+
 ## [0.2.0] - 2026-02-07
 
 ### Benchmark Results (Statistical: 30 runs)
