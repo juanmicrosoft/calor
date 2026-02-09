@@ -8,7 +8,7 @@ nav_order: 5
 # Edit Precision Metric
 
 **Category:** Edit Precision
-**Result:** Calor wins (1.15x)
+**Result:** Calor wins ([see current ratio](/calor/benchmarking/results/))
 **What it measures:** Targeting accuracy and change isolation
 
 ---
@@ -63,17 +63,17 @@ Base score: 0.50, cap at 0.85
 ### Calor: Unambiguous Targeting
 
 ```
-§L[for1:i:1:100:1]
-  §IF[if1] (> i 50)
+§L{for1:i:1:100:1}
+  §IF{if1} (> i 50)
     §P i
-  §/I[if1]
-§/L[for1]
+  §/I{if1}
+§/L{for1}
 
-§L[for2:j:1:50:1]
-  §IF[if2] (< j 25)
+§L{for2:j:1:50:1}
+  §IF{if2} (< j 25)
     §P j
-  §/I[if2]
-§/L[for2]
+  §/I{if2}
+§/L{for2}
 ```
 
 **Agent instruction:** "Change `for1` to start at 0"
@@ -125,8 +125,8 @@ Higher efficiency means more precise, targeted changes.
 
 **Calor edit:**
 ```diff
-- §L[for1:i:1:100:1]
-+ §L[for1:i:1:200:1]
+- §L{for1:i:1:100:1}
++ §L{for1:i:1:200:1}
 ```
 - Modified lines: 1
 - Total lines: 10
@@ -150,10 +150,10 @@ Similar for simple edits, but Calor's ID provides certainty about which loop.
 ### Calor: ID-Based
 
 ```
-"Delete function f002"     → Find §F[f002...§/F[f002], remove
-"Rename function f001"     → Update §F[f001:NewName:vis]
-"Move loop for1"           → Cut §L[for1]...§/L[for1], paste
-"Add contract to f003"     → Insert §Q after §O in §F[f003]
+"Delete function f002"     → Find §F{f002...§/F{f002}, remove
+"Rename function f001"     → Update §F{f001:NewName:vis}
+"Move loop for1"           → Cut §L{for1}...§/L{for1}, paste
+"Add contract to f003"     → Insert §Q after §O in §F{f003}
 ```
 
 ### C#: Pattern-Based
@@ -187,8 +187,8 @@ Lower `modified / total` ratio = higher precision.
 ### Scenario 1: Rename a Function
 
 **Calor:**
-1. Find `§F[f001:OldName:pub]`
-2. Replace with `§F[f001:NewName:pub]`
+1. Find `§F{f001:OldName:pub}`
+2. Replace with `§F{f001:NewName:pub}`
 3. ID `f001` unchanged, all references still valid
 
 **C#:**
@@ -202,7 +202,7 @@ Lower `modified / total` ratio = higher precision.
 **Calor:**
 ```
 // Instruction: "In for1, change start from 1 to 0"
-§L[for1:i:1:100:1] → §L[for1:i:0:100:1]
+§L{for1:i:1:100:1} → §L{for1:i:0:100:1}
 ```
 
 **C#:**
@@ -216,7 +216,7 @@ Lower `modified / total` ratio = higher precision.
 **Calor:**
 ```
 // Instruction: "Add precondition x >= 0 to f001"
-// Insert after §O line in §F[f001]:
+// Insert after §O line in §F{f001}:
 §Q (>= x 0)
 ```
 
@@ -233,20 +233,20 @@ Lower `modified / total` ratio = higher precision.
 ### Calor Code
 
 ```
-§M[m001:Calculator]
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§M{m001:Calculator}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
-§F[f002:Multiply:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§/F{f001}
+§F{f002:Multiply:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (* a b)
-§/F[f002]
-§/M[m001]
+§/F{f002}
+§/M{m001}
 ```
 
 **Score:**
@@ -285,12 +285,14 @@ namespace Calculator
 
 ## Interpretation
 
-The 1.15x advantage indicates that Calor's unique IDs provide meaningfully better targeting precision.
+Calor's edit precision advantage indicates that unique IDs provide meaningfully better targeting precision.
 
 The advantage is most significant when:
 - Multiple similar elements exist (multiple loops, conditionals)
 - Code structure changes during refactoring
 - Precise scope identification is required
+
+[See current benchmark results →](/calor/benchmarking/results/)
 
 ---
 

@@ -5,7 +5,6 @@ order: 0
 hasChildren: true
 ---
 
-# Syntax Reference
 
 Complete reference for Calor syntax. Calor uses Lisp-style expressions for all operations.
 
@@ -17,24 +16,24 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 
 | Element | Syntax | Example |
 |:--------|:-------|:--------|
-| Module | `§M[id:name]` | `§M[m001:Calculator]` |
-| Function | `§F[id:name:visibility]` | `§F[f001:Add:pub]` |
-| Input | `§I[type:name]` | `§I[i32:x]` |
-| Output | `§O[type]` | `§O[i32]` |
-| Effects | `§E[codes]` | `§E[cw,fr,net]` |
+| Module | `§M{id:name}` | `§M{m001:Calculator}` |
+| Function | `§F{id:name:visibility}` | `§F{f001:Add:pub}` |
+| Input | `§I{type:name}` | `§I{i32:x}` |
+| Output | `§O{type}` | `§O{i32}` |
+| Effects | `§E{codes}` | `§E{cw,fs:r,net:rw}` |
 | Requires | `§Q expr` | `§Q (>= x 0)` |
 | Ensures | `§S expr` | `§S (>= result 0)` |
-| For Loop | `§L[id:var:from:to:step]` | `§L[l1:i:1:100:1]` |
-| While Loop | `§WH[id] condition` | `§WH[w1] (> i 0)` |
-| Do-While Loop | `§DO[id]...§/DO[id] cond` | `§DO[d1]...§/DO[d1] (< i 10)` |
+| For Loop | `§L{id:var:from:to:step}` | `§L{l1:i:1:100:1}` |
+| While Loop | `§WH{id} condition` | `§WH{w1} (> i 0)` |
+| Do-While Loop | `§DO{id}...§/DO{id} cond` | `§DO{d1}...§/DO{d1} (< i 10)` |
 | If/ElseIf/Else | `§IF...§EI...§EL` | `§IF (> x 0) → §R x §EL → §R 0` |
-| Call | `§C[target]...§/C` | `§C[Math.Max] §A 1 §A 2 §/C` |
+| Call | `§C{target}...§/C` | `§C{Math.Max} §A 1 §A 2 §/C` |
 | C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
 | Print | `§P expr` | `§P "Hello"` |
 | Return | `§R expr` | `§R (+ a b)` |
-| Binding | `§B[name] expr` | `§B[x] (+ 1 2)` |
+| Binding | `§B{name} expr` | `§B{x} (+ 1 2)` |
 | Operations | `(op args...)` | `(+ a b)`, `(== x 0)` |
-| Close tag | `§/X[id]` | `§/F[f001]` |
+| Close tag | `§/X{id}` | `§/F{f001}` |
 
 ---
 
@@ -72,10 +71,15 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
 |:-----|:-------|:------------|
 | `cw` | Console write | `Console.WriteLine` |
 | `cr` | Console read | `Console.ReadLine` |
-| `fw` | File write | File system writes |
-| `fr` | File read | File system reads |
-| `net` | Network | HTTP, sockets, etc. |
-| `db` | Database | Database operations |
+| `fs:w` | Filesystem write | File system writes |
+| `fs:r` | Filesystem read | File system reads |
+| `fs:rw` | Filesystem read/write | File system read and write |
+| `net:r` | Network read | HTTP GET, etc. |
+| `net:w` | Network write | HTTP POST, etc. |
+| `net:rw` | Network read/write | HTTP, sockets, etc. |
+| `db:r` | Database read | Database queries |
+| `db:w` | Database write | Database mutations |
+| `db:rw` | Database read/write | Database operations |
 
 ---
 
@@ -83,29 +87,29 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
 
 | Element | Convention | Example |
 |:--------|:-----------|:--------|
-| Modules | `m001`, `m002` | `§M[m001:Calculator]` |
-| Functions | `f001`, `f002` | `§F[f001:Add:pub]` |
-| Loops | `for1`, `while1`, `do1` | `§L[for1:i:1:10:1]` |
-| Conditionals | `if1`, `if2` | `§IF[if1] condition` |
+| Modules | `m001`, `m002` | `§M{m001:Calculator}` |
+| Functions | `f001`, `f002` | `§F{f001:Add:pub}` |
+| Loops | `for1`, `while1`, `do1` | `§L{for1:i:1:10:1}` |
+| Conditionals | `if1`, `if2` | `§IF{if1} condition` |
 
 ---
 
 ## Complete Example
 
 ```
-§M[m001:FizzBuzz]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §L[for1:i:1:100:1]
-    §IF[if1] (== (% i 15) 0) → §P "FizzBuzz"
+§M{m001:FizzBuzz}
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §L{for1:i:1:100:1}
+    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
     §EI (== (% i 3) 0) → §P "Fizz"
     §EI (== (% i 5) 0) → §P "Buzz"
     §EL → §P i
-    §/I[if1]
-  §/L[for1]
-§/F[f001]
-§/M[m001]
+    §/I{if1}
+  §/L{for1}
+§/F{f001}
+§/M{m001}
 ```
 
 ---

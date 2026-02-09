@@ -1,11 +1,11 @@
 ---
 layout: default
-title: The Verification Opportunity
+title: Effects & Contracts Enforcement
 parent: Philosophy
 nav_order: 3
 ---
 
-# The Verification Opportunity
+# Effects & Contracts Enforcement
 
 Why effects and contracts enforcement is only practical in coding agent languages - and why this changes everything.
 
@@ -74,6 +74,29 @@ public void processFile(String path) throws IOException, ParseException {
 
 **Result**: Developers circumvent the system with `throws Exception` or catch-all blocks. The signal is lost.
 
+### C# Code Contracts (2008-2016)
+
+The most relevant historical parallel for Calor: Microsoft shipped Code Contracts as a first-party .NET library targeting the same ecosystem Calor compiles to.
+
+```csharp
+// System.Diagnostics.Contracts (2008-2016)
+public int Withdraw(int amount)
+{
+    Contract.Requires(amount > 0);
+    Contract.Requires(amount <= Balance);
+    Contract.Ensures(Balance == Contract.OldValue(Balance) - amount);
+
+    Balance -= amount;
+    return Balance;
+}
+```
+
+Code Contracts offered static checking (via cccheck), runtime enforcement, and documentation generation. It had Microsoft's full backing and integration into Visual Studio.
+
+**Result**: Retired in 2016. The static checker was too slow for large codebases. The annotation burden was too high — developers had to manually write and maintain every contract. When faced with deadlines, teams stopped writing contracts, and the value proposition collapsed. The project was archived without a replacement.
+
+**What Calor learned**: The verification tooling was sound; the failure was in who was expected to write the annotations. When agents generate contracts, the core problem that killed Code Contracts — annotation burden — disappears entirely.
+
 ### The Pattern is Clear
 
 Every verification system that relies on human discipline has failed to achieve mainstream adoption. The annotation burden is simply too high for the productivity demands of commercial software development.
@@ -106,11 +129,11 @@ This isn't incremental improvement. It's a phase transition that makes previousl
 §F{f001:ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
-  §E{db}                    // Declares: only database effects
+  §E{db:rw}                  // Declares: only database effects
 
-  §C{SaveOrder} order       // OK: SaveOrder has db effect
-  §C{SendEmail} order       // ERROR: SendEmail has net effect
-§/F{f001}                   //        not declared in §E{db}
+  §C{SaveOrder} order       // OK: SaveOrder has db:rw effect
+  §C{SendEmail} order       // ERROR: SendEmail has net:w effect
+§/F{f001}                   //        not declared in §E{db:rw}
 ```
 
 **The compiler catches this.** Not a linter warning. Not a code review comment. A hard error that blocks compilation.
@@ -122,12 +145,37 @@ In traditional languages, this bug ships to production. In Calor, it's impossibl
 Calor doesn't just check individual functions. It analyzes the entire call graph:
 
 ```
-error Calor0410: Function 'ProcessOrder' uses effect 'network'
+error Calor0410: Function 'ProcessOrder' uses effect 'net:w'
                  but does not declare it
   Call chain: ProcessOrder → NotifyCustomer → SendEmail → HttpClient.PostAsync
 ```
 
 The compiler traces the effect violation through any depth of calls. You can't hide a side effect by burying it in helper functions.
+
+### Effect Resolution Through .NET Interop
+
+How does the compiler know that `HttpClient.PostAsync` has a `net:w` effect? Through **effect manifests** — `.calor-effects.json` files that declare effects for external .NET code:
+
+```json
+{
+  "version": "1.0",
+  "namespace": "System.Net.Http",
+  "types": {
+    "HttpClient": {
+      "methods": {
+        "GetAsync": { "effects": ["net:r"] },
+        "PostAsync": { "effects": ["net:w"] },
+        "SendAsync": { "effects": ["net:rw"] }
+      },
+      "defaultEffects": ["net:rw"]
+    }
+  }
+}
+```
+
+Built-in manifests cover the .NET BCL. Project-local manifests handle NuGet packages. The resolution order is: specific method → type wildcard → `defaultEffects` → `namespaceDefaults` → unknown (compile error in strict mode).
+
+This means effect verification extends beyond Calor code to the entire .NET ecosystem. See the [Effect Manifests guide](/calor/guides/effect-manifests/) for details.
 
 ### Runtime Contract Verification
 
@@ -178,6 +226,33 @@ public static int Withdraw(int amount, Account account)
 }
 ```
 
+### Static Contract Verification
+
+Runtime checks catch violations when they happen. But with Z3, the compiler can go further — proving contracts correct at compile time:
+
+```
+§F{f004:ClampPositive:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (>= result 0)
+  §IF{if001} (< x 0)
+    §R 0
+  §ELSE{if001}
+    §R x
+  §/IF{if001}
+§/F{f004}
+```
+
+```
+// PROVEN: Postcondition statically verified: (result >= 0)
+//   Path 1: x < 0 → result = 0 → 0 >= 0 ✓
+//   Path 2: x >= 0 → result = x → x >= 0 ✓
+```
+
+Z3 proves both code paths satisfy the postcondition. The runtime check is elided — zero cost for verified correctness. When Z3 finds a counterexample instead, it reports the exact inputs that violate the contract.
+
+[Learn more: Static Contract Verification](/calor/philosophy/static-verification/)
+
 ---
 
 ## The Virtuous Cycle
@@ -196,10 +271,11 @@ When agents both write and verify code, a powerful feedback loop emerges:
 ```
 
 1. **Agent generates code** with effect declarations and contracts
-2. **Compiler verifies** effects are properly declared
-3. **Errors include call chains** showing exactly where violations occur
-4. **Agent fixes violations** with precise information
-5. **Repeat until verified**
+2. **Compiler verifies** effects are properly declared — including through .NET interop via built-in manifests
+3. **Z3 proves** contracts where possible, eliding runtime checks for proven contracts
+4. **Errors include call chains** showing exactly where violations occur
+5. **Agent fixes violations** with precise information
+6. **Repeat until verified**
 
 This cycle happens at machine speed. What would take a human team days of debugging completes in seconds.
 
@@ -272,6 +348,8 @@ try {
 | Invalid state transition | Integration test (if lucky) | Contract violation |
 | Effect leaking through abstraction | Production incident | Compile error with call chain |
 | Contract violation | Silent corruption | Immediate, traced exception |
+| Unknown .NET library effect | Manual documentation lookup | Manifest resolution (compile error) |
+| Contract violation provable at compile time | Unit test (if written) | Z3 proof at compile time |
 
 ### Development Velocity
 

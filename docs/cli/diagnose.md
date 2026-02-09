@@ -82,10 +82,10 @@ Calculator.calr:12:5: error: Undefined variable 'x'
        ^
 
 Calculator.calr:8:3: warning: Function 'Calculate' has no effect declaration
-  Consider adding §E[] for pure functions
+  Consider adding §E{} for pure functions
 
 Calculator.calr:15:3: info: Unused variable 'temp'
-  §B[temp] 42
+  §B{temp} 42
 
 Summary: 1 error, 1 warning, 1 info
 ```
@@ -135,7 +135,7 @@ Output:
           "suggestions": [
             {
               "message": "Add effect declaration for pure function",
-              "replacement": "  §E[]"
+              "replacement": "  §E{}"
             }
           ]
         }

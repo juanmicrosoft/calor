@@ -56,13 +56,13 @@ cd tests/Calor.Evaluation/Benchmarks/YourBenchmark
 Create `program.calr`:
 
 ```
-§M[m001:YourModule]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
+§M{m001:YourModule}
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
   // Your implementation
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 **Guidelines:**
@@ -146,24 +146,24 @@ dotnet run --project tests/Calor.Evaluation -- --output report.json
 ### Calor (`factorial.calr`)
 
 ```
-§M[m001:Math]
-§F[f001:Factorial:pub]
-  §I[i32:n]
-  §O[i32]
+§M{m001:Math}
+§F{f001:Factorial:pub}
+  §I{i32:n}
+  §O{i32}
   §Q (>= n 0)
   §Q (<= n 12)
   §S (>= result 1)
-  §IF[if1] (<= n 1) → §R 1
-  §EL → §R (* n §C[Factorial] §A (- n 1) §/C)
-  §/I[if1]
-§/F[f001]
+  §IF{if1} (<= n 1) → §R 1
+  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
+  §/I{if1}
+§/F{f001}
 
-§F[f002:Main:pub]
-  §O[void]
-  §E[cw]
-  §P §C[Factorial] §A 5 §/C
-§/F[f002]
-§/M[m001]
+§F{f002:Main:pub}
+  §O{void}
+  §E{cw}
+  §P §C{Factorial} §A 5 §/C
+§/F{f002}
+§/M{m001}
 ```
 
 ### C# (`factorial.cs`)
@@ -225,8 +225,8 @@ Both implementations must be semantically equivalent:
 - If Calor has `§S`, C# should have equivalent assertion
 
 ### Same Effects
-- If Calor has `§E[cw]`, C# should write to console
-- If Calor has `§E[fr]`, C# should read files
+- If Calor has `§E{cw}`, C# should write to console
+- If Calor has `§E{fs:r}`, C# should read files
 
 ---
 

@@ -134,6 +134,21 @@ The entity's history is continuous regardless of name or location changes.
 
 ---
 
+## Why This Matters for AI-First Development
+
+Traditional languages assume humans are the primary code authors. When AI agents become primary authors, different tradeoffs make sense.
+
+| Human-First | AI-First |
+|:------------|:---------|
+| Names are primary identifiers | Names are documentation |
+| Location matters | Identity is intrinsic |
+| Minimize syntax | Maximize precision |
+| Trust implicit conventions | Require explicit contracts |
+
+Calor's stable identifiers are part of a broader shift toward **explicit, machine-verifiable code** that agents can reliably understand, reference, and modify.
+
+---
+
 ## The Challenges
 
 Embedding IDs in code creates real challenges. Here's how Calor addresses each:
@@ -161,9 +176,17 @@ calor ids assign . --dry-run
 
 **Problem:** Agents might accidentally change IDs during edits, breaking references.
 
-**Solution:** Multi-layer protection
+**Solution:** Multi-layer protection combining shipped tooling and convention-based rules.
 
-1. **Hook validation**: Pre-write hooks detect ID modifications
+**Shipped protections:**
+
+1. **CLI validation**: `calor ids check` detects ID modifications, duplicates, and missing IDs. Run in CI to fail builds with ID issues.
+   ```bash
+   calor ids check src/
+   # Error Calor0801: ID 'f_01ABC...' was modified (expected stable)
+   ```
+
+2. **Hook validation**: Pre-write hooks detect ID modifications before they're saved:
    ```json
    {
      "hooks": {
@@ -175,15 +198,16 @@ calor ids assign . --dry-run
    }
    ```
 
-2. **Agent rules**: Skills explicitly forbid ID modification
+**Convention-based protections:**
+
+3. **Agent rules**: Skills (e.g., SKILL.md) explicitly forbid ID modification:
    ```markdown
    ## ID Integrity Rules - CRITICAL
    1. **NEVER** modify an existing ID
    2. **NEVER** copy IDs when extracting code
    3. **OMIT** IDs for new declarations
    ```
-
-3. **CI validation**: `calor ids check` fails builds with ID issues
+   These are conventions enforced by agent prompts, not by the compiler.
 
 ### Challenge 3: Duplicate IDs
 
@@ -220,6 +244,8 @@ calor ids assign . --fix-duplicates
 §F{f001:Calculate:pub}
 ```
 
+Until IDE tooling ships, full ULIDs are visible in source. This is an accepted tradeoff — agents are the primary audience. For human review, the generated C# uses readable `[CalorId("f_01ABC...")]` attributes that collapse in most editors.
+
 ### Challenge 5: New Developers
 
 **Problem:** Developers unfamiliar with IDs might create invalid ones.
@@ -239,21 +265,6 @@ calor ids assign . --fix-duplicates
 ```
 
 The tooling handles the complexity; developers just write code.
-
----
-
-## Why This Matters for AI-First Development
-
-Traditional languages assume humans are the primary code authors. When AI agents become primary authors, different tradeoffs make sense.
-
-| Human-First | AI-First |
-|:------------|:---------|
-| Names are primary identifiers | Names are documentation |
-| Location matters | Identity is intrinsic |
-| Minimize syntax | Maximize precision |
-| Trust implicit conventions | Require explicit contracts |
-
-Calor's stable identifiers are part of a broader shift toward **explicit, machine-verifiable code** that agents can reliably understand, reference, and modify.
 
 ---
 

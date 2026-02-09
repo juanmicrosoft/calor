@@ -278,7 +278,7 @@ Every complex expression is decomposed into a sequence of assignments to tempora
 
 **Source:**
 ```calor
-§R §OP[kind=ADD] §OP[kind=MUL] §REF[name=a] §REF[name=b] §REF[name=c]
+§R §OP{kind=ADD} §OP{kind=MUL} §REF{name=a} §REF{name=b} §REF{name=c}
 // return (a * b) + c
 ```
 
@@ -293,7 +293,7 @@ return t2
 
 **Source:**
 ```calor
-§C[f] §C[a] §/C §C[b] §/C §C[c] §/C §/C
+§C{f} §C{a} §/C §C{b} §/C §C{c} §/C §/C
 // f(a(), b(), c())
 ```
 
@@ -384,11 +384,11 @@ end_block:
 
 **Source:**
 ```calor
-§IF[if1]
+§IF{if1}
   §COND condition
   §THEN then_body
   §ELSE else_body
-§/IF[if1]
+§/IF{if1}
 ```
 
 **CNF:**
@@ -407,10 +407,10 @@ end_label:
 
 **Source:**
 ```calor
-§WHILE[w1]
+§WHILE{w1}
   §COND condition
   body
-§/WHILE[w1]
+§/WHILE{w1}
 ```
 
 **CNF:**
@@ -427,9 +427,9 @@ loop_exit:
 
 **Source:**
 ```calor
-§FOR[for1][var=i][from=0][to=10][step=1]
+§FOR{for1}{var=i}{from=0}{to=10}{step=1}
   body
-§/FOR[for1]
+§/FOR{for1}
 ```
 
 **CNF:**
@@ -449,11 +449,11 @@ loop_exit:
 
 **Source:**
 ```calor
-§MATCH[m1] target
+§MATCH{m1} target
   §CASE pattern1 => body1
   §CASE pattern2 => body2
   §CASE _ => default
-§/MATCH[m1]
+§/MATCH{m1}
 ```
 
 **CNF:**
@@ -485,7 +485,7 @@ match_end:
 **Source:**
 ```calor
 §F{f1:myFunc}
-  §REQUIRES[message="x must be positive"] §OP[kind=GT] x 0
+  §REQUIRES{message="x must be positive"} §OP{kind=GT} x 0
   body
 §/F{f1}
 ```
@@ -505,7 +505,7 @@ precond_ok:
 **Source:**
 ```calor
 §F{f1:myFunc}
-  §ENSURES[message="result positive"] §OP[kind=GT] result 0
+  §ENSURES{message="result positive"} §OP{kind=GT} result 0
   §R expr
 §/F{f1}
 ```
@@ -632,10 +632,10 @@ public interface ICnfVisitor<T>
 
 ```calor
 §F{f1:sumIfPositive:pub}
-  §I[i32:a] §I[i32:b]
-  §O[i32]
-  §REQUIRES §OP[kind=AND] §OP[kind=GT] a 0 §OP[kind=GT] b 0
-  §R §OP[kind=ADD] a b
+  §I{i32:a} §I{i32:b}
+  §O{i32}
+  §REQUIRES §OP{kind=AND} §OP{kind=GT} a 0 §OP{kind=GT} b 0
+  §R §OP{kind=ADD} a b
 §/F{f1}
 ```
 

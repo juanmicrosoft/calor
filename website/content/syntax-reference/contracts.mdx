@@ -4,7 +4,6 @@ section: "syntax-reference"
 order: 5
 ---
 
-# Contracts
 
 Contracts are first-class citizens in Calor. They define what a function requires (preconditions) and guarantees (postconditions).
 
@@ -18,7 +17,7 @@ Preconditions specify what must be true when calling a function.
 
 ```
 §Q condition
-§Q[message="error text"] condition
+§Q{message="error text"} condition
 ```
 
 ### Examples
@@ -26,7 +25,7 @@ Preconditions specify what must be true when calling a function.
 ```
 §Q (>= x 0)                              // x must be non-negative
 §Q (!= divisor 0)                        // divisor must not be zero
-§Q[message="Age must be positive"] (> age 0)
+§Q{message="Age must be positive"} (> age 0)
 ```
 
 ### Multiple Preconditions
@@ -34,16 +33,16 @@ Preconditions specify what must be true when calling a function.
 Functions can have multiple preconditions:
 
 ```
-§F[f001:CreateUser:pub]
-  §I[str:name]
-  §I[i32:age]
-  §O[User]
+§F{f001:CreateUser:pub}
+  §I{str:name}
+  §I{i32:age}
+  §O{User}
   §Q (!= name "")                        // name not empty
   §Q (> (len name) 2)                    // name at least 3 chars
   §Q (>= age 0)                          // age non-negative
   §Q (<= age 150)                        // age reasonable
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ---
@@ -56,7 +55,7 @@ Postconditions specify what the function guarantees when it returns.
 
 ```
 §S condition
-§S[message="error text"] condition
+§S{message="error text"} condition
 ```
 
 ### The `result` Variable
@@ -72,14 +71,14 @@ In postconditions, `result` refers to the return value:
 ### Examples
 
 ```
-§F[f001:Abs:pub]
-  §I[i32:x]
-  §O[i32]
+§F{f001:Abs:pub}
+  §I{i32:x}
+  §O{i32}
   §S (>= result 0)                       // absolute value is non-negative
-  §IF[if1] (>= x 0) → §R x
+  §IF{if1} (>= x 0) → §R x
   §EL → §R (- 0 x)
-  §/I[if1]
-§/F[f001]
+  §/I{if1}
+§/F{f001}
 ```
 
 ---
@@ -87,21 +86,21 @@ In postconditions, `result` refers to the return value:
 ## Complete Contract Example
 
 ```
-§F[f001:Divide:pub]
-  §I[i32:dividend]
-  §I[i32:divisor]
-  §O[i32]
+§F{f001:Divide:pub}
+  §I{i32:dividend}
+  §I{i32:divisor}
+  §O{i32}
 
   // Preconditions
   §Q (!= divisor 0)                      // can't divide by zero
-  §Q[message="Dividend must be non-negative"] (>= dividend 0)
+  §Q{message="Dividend must be non-negative"} (>= dividend 0)
 
   // Postconditions
   §S (>= result 0)                       // result is non-negative
   §S (<= result dividend)                // result doesn't exceed dividend
 
   §R (/ dividend divisor)
-§/F[f001]
+§/F{f001}
 ```
 
 ---
@@ -111,55 +110,55 @@ In postconditions, `result` refers to the return value:
 ### Range Validation
 
 ```
-§F[f001:Clamp:pub]
-  §I[i32:value]
-  §I[i32:min]
-  §I[i32:max]
-  §O[i32]
+§F{f001:Clamp:pub}
+  §I{i32:value}
+  §I{i32:min}
+  §I{i32:max}
+  §O{i32}
   §Q (<= min max)                        // valid range
   §S (>= result min)                     // result at least min
   §S (<= result max)                     // result at most max
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ### Non-Empty Collection
 
 ```
-§F[f001:First:pub]
-  §I[List:items]
-  §O[?Item]
+§F{f001:First:pub}
+  §I{List:items}
+  §O{?Item}
   §Q (> (count items) 0)                 // list not empty
   §S (!= result null)                    // result exists
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ### State Preservation
 
 ```
-§F[f001:Increment:pub]
-  §I[i32:x]
-  §O[i32]
+§F{f001:Increment:pub}
+  §I{i32:x}
+  §O{i32}
   §S (== result (+ x 1))                 // result is exactly x + 1
   §R (+ x 1)
-§/F[f001]
+§/F{f001}
 ```
 
 ### Balance Transfers
 
 ```
-§F[f001:Transfer:pub]
-  §I[Account:from]
-  §I[Account:to]
-  §I[i32:amount]
-  §O[void]
-  §E[db]
+§F{f001:Transfer:pub}
+  §I{Account:from}
+  §I{Account:to}
+  §I{i32:amount}
+  §O{void}
+  §E{db:rw}
   §Q (> amount 0)                        // positive amount
   §Q (>= from.balance amount)            // sufficient funds
   // Balance conservation would be expressed if Calor supported old_ values
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ---
@@ -171,14 +170,14 @@ In postconditions, `result` refers to the return value:
 An agent can understand function behavior without reading implementation:
 
 ```
-§F[f001:SquareRoot:pub]
-  §I[f64:x]
-  §O[f64]
+§F{f001:SquareRoot:pub}
+  §I{f64:x}
+  §O{f64}
   §Q (>= x 0)                            // Only works for non-negative
   §S (>= result 0)                       // Result is non-negative
   §S (<= (- (* result result) x) 0.0001) // result^2 ≈ x
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 ### 2. For Bug Detection
@@ -187,7 +186,7 @@ Contracts surface violations at call sites:
 
 ```
 // If an agent sees this call:
-§C[SquareRoot] §A -5 §/C
+§C{SquareRoot} §A -5 §/C
 
 // It can immediately flag: violates §Q (>= x 0)
 ```
@@ -206,9 +205,9 @@ Contracts provide test oracle:
 Add context to failures:
 
 ```
-§Q[message="User ID must be positive"] (> userId 0)
-§Q[message="Email cannot be empty"] (!= email "")
-§S[message="Password hash must be 64 chars"] (== (len hash) 64)
+§Q{message="User ID must be positive"} (> userId 0)
+§Q{message="Email cannot be empty"} (!= email "")
+§S{message="Password hash must be 64 chars"} (== (len hash) 64)
 ```
 
 ---
@@ -218,14 +217,14 @@ Add context to failures:
 Recommended order in function definition:
 
 ```
-§F[id:name:vis]
-  §I[...]           // 1. Inputs
-  §O[...]           // 2. Output
-  §E[...]           // 3. Effects (optional)
+§F{id:name:vis}
+  §I{...}           // 1. Inputs
+  §O{...}           // 2. Output
+  §E{...}           // 3. Effects (optional)
   §Q ...            // 4. Preconditions (0 or more)
   §S ...            // 5. Postconditions (0 or more)
   // body           // 6. Implementation
-§/F[id]
+§/F{id}
 ```
 
 ---

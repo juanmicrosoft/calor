@@ -5,7 +5,6 @@ order: 0
 hasChildren: true
 ---
 
-# Why Calor Exists
 
 AI coding agents are transforming software development, but they're forced to work with languages designed for humans. This creates a fundamental mismatch.
 
@@ -18,10 +17,10 @@ When an AI agent reads code, it needs answers to specific questions:
 | Question | Traditional Languages | Calor |
 |:---------|:---------------------|:-----|
 | What does this function **do**? | Infer from implementation | Explicit contracts (`§Q`, `§S`) |
-| What are the **side effects**? | Guess from I/O patterns | Declared with `§E[cw,fr,net]` |
+| What are the **side effects**? | Guess from I/O patterns | Declared with `§E{cw,fs:r,net:rw}` |
 | What **constraints** must hold? | Parse exception patterns | First-class preconditions/postconditions |
-| How do I **precisely reference** this? | Hope line numbers don't change | Unique IDs (`§F[f001:Main]`) |
-| Where does this **scope end**? | Count braces, handle nesting | Matched closing tags (`§/F[f001]`) |
+| How do I **precisely reference** this? | Hope line numbers don't change | Unique IDs (`§F{f001:Main}`) |
+| Where does this **scope end**? | Count braces, handle nesting | Matched closing tags (`§/F{f001}`) |
 
 Traditional languages make agents *infer* these answers through complex analysis. Calor makes them *explicit* in the syntax.
 
@@ -32,14 +31,14 @@ Traditional languages make agents *infer* these answers through complex analysis
 Calor deliberately optimizes for machine readability over human aesthetics:
 
 ```
-§M[m001:Calculator]
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§M{m001:Calculator}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 This might look unusual to human programmers, but for an AI agent:
@@ -57,23 +56,23 @@ This might look unusual to human programmers, but for an AI agent:
 
 **Hypothesis:** Explicit contracts, effects, and structure markers improve comprehension.
 
-**Result:** 1.33x improvement in comprehension benchmarks.
+**Result:** 1.46x improvement in comprehension benchmarks.
 
 ### 2. Can AI agents find bugs more effectively with first-class contracts?
 
 **Hypothesis:** Contracts surface invariant violations that would be hidden in imperative code.
 
-**Result:** 1.19x improvement in error detection benchmarks.
+**Result:** 1.45x improvement in error detection benchmarks.
 
 ### 3. Can AI agents make more precise edits with unique IDs?
 
 **Hypothesis:** Unique identifiers enable targeted modifications without collateral changes.
 
-**Result:** 1.15x improvement in edit precision benchmarks.
+**Result:** 1.36x improvement in edit precision benchmarks.
 
 ### 4. What's the cost of explicit semantics?
 
-**Honest answer:** Token efficiency. Calor uses more tokens than C# (0.67x ratio), trading brevity for explicitness.
+**Honest answer:** Token efficiency. Calor uses more tokens than C# (0.63x ratio), trading brevity for explicitness.
 
 ---
 

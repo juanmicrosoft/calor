@@ -4,7 +4,6 @@ section: "benchmarking"
 order: 1
 ---
 
-# Methodology
 
 How the Calor evaluation framework measures language effectiveness for AI agents.
 
@@ -93,10 +92,10 @@ Both implementations must:
 **Measures:** How easily an agent can understand code structure.
 
 **Calor factors:**
-- Module declarations (`§M[`)
-- Function declarations (`§F[`)
-- Input/output annotations (`§I[`, `§O[`)
-- Effect declarations (`§E[`)
+- Module declarations (`§M{`)
+- Function declarations (`§F{`)
+- Input/output annotations (`§I{`, `§O{`)
+- Effect declarations (`§E{`)
 - Contracts (`§REQ`, `§ENS`)
 - Closing tags (`§/`)
 
@@ -123,7 +122,7 @@ Both implementations must:
 - Modify return types
 
 **Calor advantages:**
-- Unique IDs enable precise targeting (`§F[f001:`)
+- Unique IDs enable precise targeting (`§F{f001:`)
 - Closing tags define clear boundaries
 - ID-based references don't break on rename
 

@@ -10,7 +10,7 @@ This document specifies how Calor enforces effects (§E) and contracts (§Q/§S)
 
 **Enforcement is enabled by default** because Calor is designed for coding agents, not humans. Agents generate annotations for free and maintain them consistently - there's no annotation burden to avoid.
 
-For the motivation behind this design, see [The Verification Opportunity](/calor/philosophy/the-verification-opportunity/).
+For the motivation behind this design, see [Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/).
 
 ---
 
@@ -20,11 +20,16 @@ For the motivation behind this design, see [The Verification Opportunity](/calor
 |--------------|------------------|-----------------|----------------------------|
 | `cw`         | IO               | console_write   | Console output             |
 | `cr`         | IO               | console_read    | Console input              |
-| `fw`         | IO               | file_write      | File write/delete          |
-| `fr`         | IO               | file_read       | File read/exists           |
-| `net`        | IO               | network         | Network operations         |
+| `fs:w`       | IO               | file_write      | File write/delete          |
+| `fs:r`       | IO               | file_read       | File read/exists           |
+| `fs:rw`      | IO               | file_readwrite  | File read + write          |
+| `net:r`      | IO               | network_read    | Network read (GET)         |
+| `net:w`      | IO               | network_write   | Network write (POST/PUT)   |
+| `net:rw`     | IO               | network         | Network read + write       |
 | `http`       | IO               | http            | HTTP requests              |
-| `db`         | IO               | database        | Database operations        |
+| `db:r`       | IO               | database_read   | Database read (SELECT)     |
+| `db:w`       | IO               | database_write  | Database write (INSERT/UPDATE/DELETE) |
+| `db:rw`      | IO               | database        | Database read + write      |
 | `time`       | Nondeterminism   | time            | System time access         |
 | `rand`       | Nondeterminism   | random          | Random number generation   |
 | `mut`        | Mutation         | heap_write      | Observable heap writes     |
@@ -127,13 +132,13 @@ System.Console::WriteLine(System.String) → cw
 System.Console::Write(System.String) → cw
 System.Console::ReadLine() → cr
 
-System.IO.File::ReadAllText(System.String) → fr
-System.IO.File::WriteAllText(System.String,System.String) → fw
-System.IO.File::Exists(System.String) → fr
-System.IO.File::Delete(System.String) → fw
+System.IO.File::ReadAllText(System.String) → fs:r
+System.IO.File::WriteAllText(System.String,System.String) → fs:w
+System.IO.File::Exists(System.String) → fs:r
+System.IO.File::Delete(System.String) → fs:w
 
-System.Net.Http.HttpClient::GetAsync(System.String) → net
-System.Net.Http.HttpClient::SendAsync(System.Net.Http.HttpRequestMessage) → net
+System.Net.Http.HttpClient::GetAsync(System.String) → net:r
+System.Net.Http.HttpClient::SendAsync(System.Net.Http.HttpRequestMessage) → net:rw
 
 System.Random::Next() → rand
 System.DateTime::get_Now() → time
@@ -149,8 +154,8 @@ Create a `calor.effects.json` file in your project directory:
 {
   "stubs": {
     "MyCompany.Logging.Logger::Log(System.String)": ["cw"],
-    "MyCompany.Data.Repository::Save(MyCompany.Data.Entity)": ["db", "mut"],
-    "MyCompany.Http.Client::Fetch(System.String)": ["net"]
+    "MyCompany.Data.Repository::Save(MyCompany.Data.Entity)": ["db:w", "mut"],
+    "MyCompany.Http.Client::Fetch(System.String)": ["net:r"]
   }
 }
 ```
@@ -239,14 +244,14 @@ Add these properties to your project file or `Directory.Build.props`:
 §F{f001:LoadUserName:pri}
   §I{i32:userId}
   §O{str}
-  §E{fr}
+  §E{fs:r}
   // ... file read implementation
 §/F{f001}
 
 §F{f002:GreetUser:pub}
   §I{i32:userId}
   §O{void}
-  §E{cw,fr}                    // Must declare both effects
+  §E{cw, fs:r}                  // Must declare both effects
   §B{name} §C{f001:LoadUserName} userId §/C
   §P name
 §/F{f002}

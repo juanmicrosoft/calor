@@ -31,11 +31,14 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 | Quality | Calor Approach | Result |
 |:--------|:--------------|:-------|
-| **Comprehension** | Explicit structure and contracts | 1.33x better than C# |
-| **Error Detection** | First-class preconditions/postconditions | 1.19x better than C# |
-| **Edit Precision** | Unique IDs for every element | 1.15x better than C# |
+| **Comprehension** | Explicit structure and contracts | Better than C# |
+| **Error Detection** | First-class preconditions/postconditions | Better than C# |
+| **Edit Precision** | Unique IDs for every element | Better than C# |
+| **Refactoring Stability** | Stable IDs across changes | Better than C# |
 | **Parseability** | Matched tags, prefix notation | Trivial to parse |
 | **Verifiability** | Contracts in syntax, not comments | Machine-checkable specs |
+
+[See current benchmark results →](/calor/benchmarking/results/)
 
 ---
 
@@ -43,8 +46,8 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 | Quality | Impact | Mitigation |
 |:--------|:-------|:-----------|
-| **Token Efficiency** | 0.67x vs C# | Lisp-style expressions minimize overhead |
-| **Information Density** | 0.22x vs C# | Acceptable for agent workflows |
+| **Token Efficiency** | Lower than C# | Lisp-style expressions minimize overhead |
+| **Information Density** | Lower than C# | Acceptable for agent workflows |
 | **Human Readability** | Unfamiliar syntax | Not the target audience |
 | **Ecosystem** | No libraries | Compiles to C#, interop possible |
 | **Tooling** | No IDE support yet | On the roadmap |
@@ -61,8 +64,10 @@ This enables:
 - **Compile-time effect verification**: Undeclared side effects are impossible
 - **Runtime contract enforcement**: Violations include function ID and source location
 - **Interprocedural analysis**: Effects traced through any depth of calls
+- **Static contract proofs via Z3**: Proven contracts have runtime checks elided
+- **Cross-boundary verification via effect manifests**: Verify effects through .NET interop
 
-[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/)
+[Learn more: Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/)
 
 ---
 
@@ -73,18 +78,18 @@ Calor's tradeoff pays off when:
 ### 1. Agents Need to Reason About Behavior
 
 ```
-§F[f001:TransferFunds:pub]
-  §I[Account:from]
-  §I[Account:to]
-  §I[i32:amount]
-  §O[bool]
-  §E[db]
+§F{f001:TransferFunds:pub}
+  §I{Account:from}
+  §I{Account:to}
+  §I{i32:amount}
+  §O{bool}
+  §E{db:rw}
   §Q (> amount 0)
   §Q (>= from.balance amount)
   §S (== from.balance (- old_from_balance amount))
   §S (== to.balance (+ old_to_balance amount))
   // ...
-§/F[f001]
+§/F{f001}
 ```
 
 An agent can reason about this function's behavior without reading the implementation:
@@ -96,17 +101,17 @@ An agent can reason about this function's behavior without reading the implement
 ### 2. Agents Need to Detect Contract Violations
 
 ```
-§F[f001:CalculateDiscount:pub]
-  §I[f64:price]
-  §I[f64:discount_percent]
-  §O[f64]
+§F{f001:CalculateDiscount:pub}
+  §I{f64:price}
+  §I{f64:discount_percent}
+  §O{f64}
   §Q (>= price 0)
   §Q (>= discount_percent 0)
   §Q (<= discount_percent 100)
   §S (>= result 0)
   §S (<= result price)
   §R (* price (- 1 (/ discount_percent 100)))
-§/F[f001]
+§/F{f001}
 ```
 
 An agent can immediately verify:
@@ -120,10 +125,10 @@ An agent can immediately verify:
 // Instruction: "Change the loop in f001 to iterate from 0 instead of 1"
 
 // Before
-§L[for1:i:1:100:1]
+§L{for1:i:1:100:1}
 
 // After - target is unambiguous
-§L[for1:i:0:100:1]
+§L{for1:i:0:100:1}
 ```
 
 No ambiguity about which loop to modify. No risk of changing the wrong one.
@@ -153,7 +158,7 @@ Calor's syntax is optimized for machine parsing:
 if (x > 0) return x;
 
 // Less familiar
-§IF[if1] (> x 0) → §R x §/I[if1]
+§IF{if1} (> x 0) → §R x §/I{if1}
 ```
 
 ### 3. You Need Library Ecosystem
@@ -164,17 +169,20 @@ Calor compiles to C#, so interop is possible, but native library support doesn't
 
 ## Measuring the Tradeoff
 
-Our evaluation framework measures both sides:
+Our evaluation framework measures both sides of the tradeoff:
 
-| Metric | Measures | Calor Result |
-|:-------|:---------|:------------|
-| Token Economics | Cost of explicitness | 0.67x (C# wins) |
-| Information Density | Semantic content per token | 0.22x (C# wins) |
-| Comprehension | Benefit of explicitness | 1.33x (Calor wins) |
-| Error Detection | Contract effectiveness | 1.19x (Calor wins) |
-| Edit Precision | ID-based targeting | 1.15x (Calor wins) |
+| Metric | Measures | Winner |
+|:-------|:---------|:-------|
+| Token Economics | Cost of explicitness | C# |
+| Information Density | Semantic content per token | C# |
+| Comprehension | Benefit of explicitness | Calor |
+| Error Detection | Contract effectiveness | Calor |
+| Edit Precision | ID-based targeting | Calor |
+| Refactoring Stability | ID-based change resilience | Calor |
 
 The question isn't "which is better" but "which matters more for your use case."
+
+[See current benchmark results →](/calor/benchmarking/results/)
 
 ---
 
@@ -182,3 +190,5 @@ The question isn't "which is better" but "which matters more for your use case."
 
 - [Benchmarking Overview](/calor/benchmarking/) - How we measure these tradeoffs
 - [Results](/calor/benchmarking/results/) - Detailed evaluation data
+- [Static Contract Verification](/calor/philosophy/static-verification/) - Proving contracts correct at compile time
+- [Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/) - Why verification is only practical with agents

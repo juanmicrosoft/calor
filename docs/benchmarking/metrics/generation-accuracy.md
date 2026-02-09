@@ -8,7 +8,7 @@ nav_order: 6
 # Generation Accuracy Metric
 
 **Category:** Generation Accuracy
-**Result:** C# wins (0.94x)
+**Result:** C# wins ([see current ratio](/calor/benchmarking/results/))
 **What it measures:** Compilation success and structural correctness
 
 ---
@@ -90,12 +90,12 @@ public static int Add(int a, int b)
 
 ```
 // Calor: Novel syntax, less exposure
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 ```
 
 ### 3. Error Recovery
@@ -106,7 +106,7 @@ C# errors often have clear fixes:
 - Wrong type → cast or convert
 
 Calor errors may be less familiar:
-- Missing `§/F[id]` → requires understanding closing tag rules
+- Missing `§/F{id}` → requires understanding closing tag rules
 - Wrong ID in closing tag → requires ID matching understanding
 
 ---
@@ -129,12 +129,12 @@ public static int Add(int a, int b)
 
 **Calor generation (typical):**
 ```
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 ```
 - Compiles: Yes
 - Structure: Complete
@@ -143,12 +143,12 @@ public static int Add(int a, int b)
 
 **Calor generation (common error):**
 ```
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f002]              // Wrong ID!
+§/F{f002}              // Wrong ID!
 ```
 - Compiles: No
 - Error: Mismatched closing tag
@@ -162,10 +162,10 @@ public static int Add(int a, int b)
 
 | Error | Cause | Example |
 |:------|:------|:--------|
-| Mismatched IDs | Wrong ID in closing tag | `§F[f001]...§/F[f002]` |
-| Missing closing tag | Forgot to close structure | `§L[for1]...` (no `§/L`) |
-| Wrong tag type | Confused closing tag | `§F[f001]...§/M[f001]` |
-| Missing module wrapper | No `§M[]...§/M[]` | Function outside module |
+| Mismatched IDs | Wrong ID in closing tag | `§F{f001}...§/F{f002}` |
+| Missing closing tag | Forgot to close structure | `§L{for1}...` (no `§/L`) |
+| Wrong tag type | Confused closing tag | `§F{f001}...§/M{f001}` |
+| Missing module wrapper | No `§M{}...§/M{}` | Function outside module |
 
 ### Common C# Errors
 
@@ -222,7 +222,7 @@ results.Add(MetricResult.CreateHigherIsBetter(
 
 ## Interpretation
 
-The 0.94x ratio indicates C# has a small advantage in generation accuracy.
+C# has an advantage in generation accuracy due to its familiarity.
 
 This is expected because:
 - C# has more training data exposure
@@ -230,6 +230,8 @@ This is expected because:
 - C# tooling provides better error feedback
 
 The gap is relatively small, suggesting Calor's explicit structure helps offset the novelty disadvantage.
+
+[See current benchmark results →](/calor/benchmarking/results/)
 
 ---
 

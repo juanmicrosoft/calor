@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { MetricCard } from './MetricCard';
 import { ProgramTable } from './ProgramTable';
 import { cn } from '@/lib/utils';
 import { BarChart3, FileCode, Trophy, Clock } from 'lucide-react';
+
+// Build-time import of benchmark data
+import benchmarkData from '../../../public/data/benchmark-results.json';
 
 interface BenchmarkData {
   version: string;
@@ -32,32 +34,8 @@ interface BenchmarkData {
   }>;
 }
 
-// Fallback data for when fetch fails
-const fallbackData: BenchmarkData = {
-  version: '1.0',
-  timestamp: new Date().toISOString(),
-  commit: 'unknown',
-  frameworkVersion: '1.0.0',
-  summary: {
-    overallAdvantage: 0.52,
-    programCount: 28,
-    metricCount: 8,
-    calorWins: 1,
-    cSharpWins: 7,
-    statisticalRunCount: 0,
-  },
-  metrics: {
-    ErrorDetection: { ratio: 1.08, winner: 'calor' },
-    TokenEconomics: { ratio: 0.63, winner: 'csharp' },
-    GenerationAccuracy: { ratio: 0.94, winner: 'csharp' },
-    Comprehension: { ratio: 0.25, winner: 'csharp' },
-    EditPrecision: { ratio: 0.73, winner: 'csharp' },
-    InformationDensity: { ratio: 0.09, winner: 'csharp' },
-    TaskCompletion: { ratio: 0.75, winner: 'csharp' },
-    RefactoringStability: { ratio: 0.64, winner: 'csharp' },
-  },
-  programs: [],
-};
+// Pre-loaded at build time
+const data = benchmarkData as BenchmarkData;
 
 function formatDate(isoString: string): string {
   try {
@@ -103,48 +81,6 @@ function SummaryCard({ icon, label, value, subtext, highlight = 'neutral' }: Sum
 }
 
 export function BenchmarkDashboard() {
-  const [data, setData] = useState<BenchmarkData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/data/benchmark-results.json');
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const json = await response.json();
-        setData(json);
-        setError(null);
-      } catch (err) {
-        console.warn('Failed to fetch benchmark data, using fallback:', err);
-        setData(fallbackData);
-        setError('Using cached data (live fetch failed)');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="py-8 text-center text-muted-foreground">
-        Loading benchmark data...
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="py-8 text-center text-red-500">
-        Failed to load benchmark data.
-      </div>
-    );
-  }
-
   // Sort metrics: Calor wins first, then by ratio descending
   const sortedMetrics = Object.entries(data.metrics).sort(([, a], [, b]) => {
     if (a.winner === 'calor' && b.winner !== 'calor') return -1;
@@ -174,12 +110,6 @@ export function BenchmarkDashboard() {
           )}
         </div>
       </div>
-
-      {error && (
-        <div className="text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded">
-          {error}
-        </div>
-      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

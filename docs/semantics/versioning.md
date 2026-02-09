@@ -54,7 +54,7 @@ Modules can declare their required semantics version:
 
 ```calor
 §M{m001:MyModule}
-  §SEMVER[1.0.0]
+  §SEMVER{1.0.0}
   ...
 §/M{m001}
 ```
@@ -63,13 +63,13 @@ Modules can declare their required semantics version:
 
 ```calor
 // Exact version
-§SEMVER[1.0.0]
+§SEMVER{1.0.0}
 
 // Minimum version (any 1.x.x compatible)
-§SEMVER[^1.0.0]
+§SEMVER{^1.0.0}
 
 // Range
-§SEMVER[>=1.0.0 <2.0.0]
+§SEMVER{>=1.0.0 <2.0.0}
 ```
 
 ---
@@ -233,9 +233,9 @@ Projects can contain modules targeting different semantics versions:
 ```
 project/
 ├── legacy/
-│   └── old_module.calr  // §SEMVER[1.0.0]
+│   └── old_module.calr  // §SEMVER{1.0.0}
 └── modern/
-    └── new_module.calr  // §SEMVER[1.1.0]
+    └── new_module.calr  // §SEMVER{1.1.0}
 ```
 
 The compiler will:
@@ -313,7 +313,7 @@ public const string SemanticsVersionIncompatible = "Calor0701"; // Error
 ```calor
 // Test: Module declares newer version than compiler supports
 §M{m1:Test}
-  §SEMVER[99.0.0]  // Future version
+  §SEMVER{99.0.0}  // Future version
 §/M{m1}
 ```
 

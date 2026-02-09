@@ -4,7 +4,6 @@ section: "semantics"
 order: 1
 ---
 
-# Core Semantics Specification
 
 Version: 1.0.0
 
@@ -276,10 +275,10 @@ Effects track side-effect capabilities of functions.
 |:-------|:-------|:------------|
 | Console Read | `cr` | Reads from console |
 | Console Write | `cw` | Writes to console |
-| File Read | `fr` | Reads from files |
-| File Write | `fw` | Writes to files |
-| Network Read | `nr` | Network input |
-| Network Write | `nw` | Network output |
+| File Read | `fs:r` | Reads from files |
+| File Write | `fs:w` | Writes to files |
+| Network Read | `net:r` | Network input |
+| Network Write | `net:w` | Network output |
 
 ### 7.2 Effect Enforcement
 

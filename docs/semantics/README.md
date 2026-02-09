@@ -143,7 +143,7 @@ Every semantic decision is backed by tests in `tests/Calor.Semantics.Tests/`:
 If you're building agents that generate Calor code:
 
 1. **Train on the spec, not the output**: Use `core.md` as the source of truth
-2. **Version your prompts**: Include `§SEMVER[1.0.0]` in generated modules
+2. **Version your prompts**: Include `§SEMVER{1.0.0}` in generated modules
 3. **Test against semantics tests**: Your generated code should pass the same tests
 4. **Don't assume C# behavior**: If it's not in the Calor spec, don't rely on it
 

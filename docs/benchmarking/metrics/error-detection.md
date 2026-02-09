@@ -8,7 +8,7 @@ nav_order: 4
 # Error Detection Metric
 
 **Category:** Error Detection
-**Result:** Calor wins (1.19x)
+**Result:** Calor wins ([see current ratio](/calor/benchmarking/results/))
 **What it measures:** Bug identification and contract violation detection
 
 ---
@@ -41,7 +41,7 @@ Explicit contracts make these violations visible without deep analysis.
 | Has `§Q` (requires) | 0.25 | Preconditions catch caller errors |
 | Has `§S` (ensures) | 0.20 | Postconditions catch implementation errors |
 | Has `§IV` (invariant) | 0.15 | Invariants catch state errors |
-| Has `§E[...]` (effects) | 0.10 | Effect tracking catches side-effect bugs |
+| Has `§E{...}` (effects) | 0.10 | Effect tracking catches side-effect bugs |
 | Has typed inputs | 0.05 | Type errors caught at compile time |
 | Has typed output | 0.05 | Return type errors caught |
 
@@ -69,15 +69,15 @@ Base score: 0.30, cap at 0.90
 ### Calor with Contracts
 
 ```
-§F[f001:Divide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §Q (!= b 0)              // Explicit: b must not be zero
   §Q (>= a 0)              // Explicit: a must be non-negative
   §S (>= result 0)         // Explicit: result is non-negative
   §R (/ a b)
-§/F[f001]
+§/F{f001}
 ```
 
 **Detection capability:**
@@ -154,11 +154,11 @@ Given this buggy call:
 
 ```
 // Calling Divide with potentially zero divisor
-§B[result] §C[Divide] §A x §A (- y y) §/C    // (y - y) = 0!
+§B{result} §C{Divide} §A x §A (- y y) §/C    // (y - y) = 0!
 ```
 
 **Calor agent detection:**
-1. See `§C[Divide]`
+1. See `§C{Divide}`
 2. Look up `Divide` contracts: `§Q (!= b 0)`
 3. Evaluate second argument: `(- y y)` = 0
 4. Report: "Precondition violation: `(!= b 0)` fails when `b = (- y y) = 0`"
@@ -178,24 +178,24 @@ Given this buggy call:
 ### Calor Code
 
 ```
-§F[f001:SafeDivide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32!str]
+§F{f001:SafeDivide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32!str}
   §Q (!= b 0)
   §S (|| (== result.IsOk true) (!= result.Error ""))
-  §IF[if1] (== b 0) → §R §ERR "Division by zero"
+  §IF{if1} (== b 0) → §R §ERR "Division by zero"
   §EL → §R §OK (/ a b)
-  §/I[if1]
-§/F[f001]
+  §/I{if1}
+§/F{f001}
 ```
 
 **Score:**
 - Base: 0.30
 - `§Q`: +0.25
 - `§S`: +0.20
-- `§I[`: +0.05
-- `§O[`: +0.05
+- `§I{`: +0.05
+- `§O{`: +0.05
 
 **Total: 0.85**
 
@@ -223,12 +223,14 @@ public static Result<int, string> SafeDivide(int a, int b)
 
 ## Interpretation
 
-The 1.19x advantage indicates that Calor's first-class contracts provide substantially better bug detection signals.
+Calor's error detection advantage indicates that first-class contracts provide substantially better bug detection signals.
 
 The advantage is highest when:
 - Functions have explicit preconditions and postconditions
 - Multiple contracts are present
 - Contracts use complex conditions
+
+[See current benchmark results →](/calor/benchmarking/results/)
 
 ---
 

@@ -30,23 +30,23 @@ Traditional languages make agents *infer* these answers through complex analysis
 
 | Principle | How Calor Implements It | Agent Benefit |
 |-----------|------------------------|---------------|
-| **Explicit over implicit** | Effects declared with `§E[cw,fr,net]` | Know side effects without reading implementation |
+| **Explicit over implicit** | Effects declared with `§E{cw, fs:r, net:rw}` | Know side effects without reading implementation |
 | **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
-| **Everything has an ID** | `§F[f001:Main]`, `§L[l001:i:1:100:1]` | Precise references that survive refactoring |
-| **Unambiguous structure** | Matched tags `§F[]...§/F[]` | Parse without semantic analysis |
+| **Everything has an ID** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` | Precise references that survive refactoring |
+| **Unambiguous structure** | Matched tags `§F{}...§/F{}` | Parse without semantic analysis |
 | **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
 
 ### Side-by-Side: What Agents See
 
 **Calor** — Everything explicit:
 ```
-§F[f002:Square:pub]
-  §I[i32:x]
-  §O[i32]
+§F{f002:Square:pub}
+  §I{i32:x}
+  §O{i32}
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
-§/F[f002]
+§/F{f002}
 ```
 
 **C#** — Contracts buried in implementation:
@@ -90,16 +90,9 @@ This tradeoff pays off when:
 
 ### Benchmark Results
 
-Evaluated across 20 paired Calor/C# programs using V2 compact syntax:
+Calor shows measurable advantages in AI agent comprehension, error detection, edit precision, and refactoring stability. C# wins on token efficiency, reflecting a fundamental tradeoff: explicit semantics require more tokens but enable better agent reasoning.
 
-| Category | Calor vs C# | Winner | Why |
-|----------|------------|--------|-----|
-| Comprehension | **1.33x** | Calor | Explicit structure aids understanding |
-| Error Detection | **1.19x** | Calor | Contracts surface invariant violations |
-| Edit Precision | **1.15x** | Calor | Unique IDs enable targeted changes |
-| Token Economics | 0.67x | C# | Calor's explicit syntax uses more tokens |
-
-**Key Finding:** Calor excels where explicitness matters — comprehension, error detection, and edit precision. C# wins on token efficiency, reflecting a fundamental tradeoff: explicit semantics require more tokens but enable better agent reasoning.
+[See benchmark methodology and results →](https://juanmicrosoft.github.io/calor/docs/benchmarking/)
 
 ## Quick Start
 
@@ -117,13 +110,13 @@ calor --input program.calr --output program.g.cs
 ### Your First Calor Program
 
 ```
-§M[m001:Hello]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
+§M{m001:Hello}
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
   §P "Hello from Calor!"
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 Save as `hello.calr`, then:
@@ -160,7 +153,7 @@ dotnet run --project samples/HelloWorld
 - [x] Effects declarations
 - [x] MSBuild SDK integration
 - [x] AI agent initialization (`calor init`)
-- [x] Evaluation framework (7 metrics, 20 benchmarks)
+- [x] Evaluation framework (8 metrics, 28 programs)
 - [ ] Direct IL emission
 - [ ] IDE language server
 

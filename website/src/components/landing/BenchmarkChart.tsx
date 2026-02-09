@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Clock } from 'lucide-react';
+
+// Build-time import of benchmark data
+import benchmarkData from '../../../public/data/benchmark-results.json';
 
 interface BenchmarkResult {
   category: string;
@@ -20,46 +22,6 @@ interface BenchmarkData {
   };
   metrics: Record<string, { ratio: number; winner: 'calor' | 'csharp' }>;
 }
-
-// Fallback hardcoded data for when fetch fails
-const fallbackResults: BenchmarkResult[] = [
-  {
-    category: 'Error Detection',
-    ratio: 1.08,
-    winner: 'calor',
-    interpretation: 'Contracts surface invariant violations',
-  },
-  {
-    category: 'Generation Accuracy',
-    ratio: 0.94,
-    winner: 'csharp',
-    interpretation: 'Mature tooling, familiar patterns',
-  },
-  {
-    category: 'Task Completion',
-    ratio: 0.75,
-    winner: 'csharp',
-    interpretation: 'Ecosystem maturity advantage',
-  },
-  {
-    category: 'Edit Precision',
-    ratio: 0.73,
-    winner: 'csharp',
-    interpretation: 'Established editing patterns',
-  },
-  {
-    category: 'Token Economics',
-    ratio: 0.63,
-    winner: 'csharp',
-    interpretation: "Calor's explicit syntax uses more tokens",
-  },
-  {
-    category: 'Comprehension',
-    ratio: 0.25,
-    winner: 'csharp',
-    interpretation: 'Familiar syntax easier to follow',
-  },
-];
 
 // Human-readable metric names and interpretations
 const metricDisplayInfo: Record<
@@ -123,6 +85,11 @@ function transformMetrics(data: BenchmarkData): BenchmarkResult[] {
     .sort((a, b) => b.ratio - a.ratio); // Sort by ratio descending
 }
 
+// Pre-computed at build time
+const results = transformMetrics(benchmarkData as BenchmarkData);
+const programCount = benchmarkData.summary.programCount;
+const lastUpdated = benchmarkData.timestamp;
+
 function formatRatio(ratio: number): string {
   return `${ratio.toFixed(2)}x`;
 }
@@ -149,32 +116,6 @@ function formatDate(isoString: string): string {
 }
 
 export function BenchmarkChart() {
-  const [results, setResults] = useState<BenchmarkResult[]>(fallbackResults);
-  const [programCount, setProgramCount] = useState<number>(28);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [isLive, setIsLive] = useState(false);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/data/benchmark-results.json');
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const data: BenchmarkData = await response.json();
-        setResults(transformMetrics(data));
-        setProgramCount(data.summary.programCount);
-        setLastUpdated(data.timestamp);
-        setIsLive(true);
-      } catch (err) {
-        console.warn('Failed to fetch benchmark data, using fallback:', err);
-        // Keep using fallback data
-      }
-    }
-
-    fetchData();
-  }, []);
-
   return (
     <section className="py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -185,17 +126,10 @@ export function BenchmarkChart() {
           <p className="mt-4 text-lg text-muted-foreground">
             Calor trades token efficiency for semantic explicitness. Here's where that pays off.
           </p>
-          {lastUpdated && (
-            <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>Last updated: {formatDate(lastUpdated)}</span>
-              {isLive && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-500/10 text-green-600">
-                  Live
-                </span>
-              )}
-            </div>
-          )}
+          <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>Last updated: {formatDate(lastUpdated)}</span>
+          </div>
         </div>
 
         <div className="mt-16 mx-auto max-w-4xl">

@@ -35,13 +35,13 @@ Calor asks: *What if we designed a language from the ground up for AI agents?*
 ### Calor - Everything Explicit
 
 ```
-§F[f002:Square:pub]
-  §I[i32:x]
-  §O[i32]
+§F{f002:Square:pub}
+  §I{i32:x}
+  §O{i32}
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
-§/F[f002]
+§/F{f002}
 ```
 
 **What Calor tells the agent directly:**
@@ -87,7 +87,7 @@ Calor is the first language to leverage this insight:
 §F{f001:ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
-  §E{db}                    // Effect declaration enforced at compile time
+  §E{db:rw}                  // Effect declaration enforced at compile time
   §Q (> order.amount 0)     // Precondition verified at runtime
   §S (!= result null)       // Postcondition verified at runtime
 
@@ -98,27 +98,17 @@ Calor is the first language to leverage this insight:
 
 The compiler catches effect violations with full call chains. The runtime catches contract violations with function ID and source location. Bugs that would ship to production in traditional languages are **impossible** in Calor.
 
-[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/){: .btn .btn-outline }
+[Learn more: Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/){: .btn .btn-outline }
 
 ---
 
 ## Benchmark Results
 
-Evaluated across 20 paired Calor/C# programs:
+Calor shows advantages in comprehension, error detection, edit precision, and refactoring stability. C# wins on token efficiency and information density, reflecting a fundamental tradeoff: explicit semantics require more tokens but enable better agent reasoning.
 
-| Category | Calor vs C# | Winner | Interpretation |
-|:---------|:-----------|:-------|:---------------|
-| Comprehension | **1.33x** | Calor | Explicit structure aids understanding |
-| Error Detection | **1.19x** | Calor | Contracts surface invariant violations |
-| Edit Precision | **1.15x** | Calor | Unique IDs enable targeted changes |
-| Generation Accuracy | 0.94x | C# | Mature tooling, familiar patterns |
-| Task Completion | 0.93x | C# | Ecosystem maturity advantage |
-| Token Economics | 0.67x | C# | Calor's explicit syntax uses more tokens |
-| Information Density | 0.22x | C# | Calor trades density for explicitness |
+Benchmark results are updated with each release. Current data reflects evaluation against 28 paired Calor/C# programs.
 
-**Key Finding:** Calor excels where explicitness matters - comprehension, error detection, and edit precision. C# wins on token efficiency, reflecting a fundamental tradeoff: explicit semantics require more tokens but enable better agent reasoning.
-
-[View detailed benchmarks](/calor/benchmarking/results/){: .btn .btn-outline }
+[View full benchmark results →](/calor/benchmarking/results/){: .btn .btn-outline }
 
 ---
 
@@ -176,7 +166,7 @@ The analyzer scores files based on patterns like null handling, error handling, 
 - [x] Effects declarations with compile-time enforcement
 - [x] Interprocedural effect analysis (SCC-based)
 - [x] MSBuild SDK integration
-- [x] Evaluation framework (7 metrics, 20 benchmarks)
+- [x] Evaluation framework (8 metrics, 28 programs)
 - [ ] Direct IL emission
 - [ ] IDE language server
 

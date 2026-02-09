@@ -69,6 +69,14 @@ jobs:
             --format html \
             --output website/public/data/dashboard
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate docs/benchmarking/results.md
+        run: node scripts/generate-results-md.js
+
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
@@ -84,7 +92,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add website/public/data/benchmark-results*.json website/public/data/dashboard.html || true
+          git add website/public/data/benchmark-results*.json website/public/data/dashboard.html docs/benchmarking/results.md || true
           git diff --staged --quiet || git commit -m "chore: Update benchmark results [skip ci]"
           git push || echo "No changes to push"
 

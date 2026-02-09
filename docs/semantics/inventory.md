@@ -36,8 +36,8 @@ Defined in `ControlFlowNodes.cs:220-248`:
 
 **Node:** `BinaryOperationNode` (`ControlFlowNodes.cs:195-215`)
 ```calor
-§OP[kind=ADD] left right
-§OP[kind=MUL] §REF[name=a] §REF[name=b]
+§OP{kind=ADD} left right
+§OP{kind=MUL} §REF{name=a} §REF{name=b}
 ```
 
 ### 2.2 Unary Operators
@@ -52,8 +52,8 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 **Node:** `UnaryOperationNode` (`ExpressionNodes.cs:122-136`)
 ```calor
-§OP[kind=NEG] expression
-§OP[kind=NOT] condition
+§OP{kind=NEG} expression
+§OP{kind=NOT} condition
 ```
 
 ---
@@ -68,37 +68,37 @@ Defined in `ExpressionNodes.cs:141-146`:
 | ElseIf Clause | `ElseIfClauseNode` | `ControlFlowNodes.cs:140-157` |
 
 ```calor
-§IF[id001]
-  §COND §OP[kind=GT] §REF[name=x] 0
+§IF{id001}
+  §COND §OP{kind=GT} §REF{name=x} 0
   §THEN
     §R INT:1
   §ELSEIF
-    §COND §OP[kind=LT] §REF[name=x] 0
+    §COND §OP{kind=LT} §REF{name=x} 0
     §THEN
       §R INT:-1
   §ELSE
     §R INT:0
-§/IF[id001]
+§/IF{id001}
 ```
 
 ### 3.2 Loops
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| For Loop | `ForStatementNode` | `§FOR[id][var][from][to][step]` | `ControlFlowNodes.cs:9-41` |
-| While Loop | `WhileStatementNode` | `§WHILE[id]` | `ControlFlowNodes.cs:47-70` |
-| Do-While Loop | `DoWhileStatementNode` | `§DO[id]...§/DO` | `ControlFlowNodes.cs:76-99` |
-| Foreach Loop | `ForeachStatementNode` | `§EACH[id:var:type]` | `ArrayNodes.cs:115-164` |
+| For Loop | `ForStatementNode` | `§FOR{id}{var}{from}{to}{step}` | `ControlFlowNodes.cs:9-41` |
+| While Loop | `WhileStatementNode` | `§WHILE{id}` | `ControlFlowNodes.cs:47-70` |
+| Do-While Loop | `DoWhileStatementNode` | `§DO{id}...§/DO` | `ControlFlowNodes.cs:76-99` |
+| Foreach Loop | `ForeachStatementNode` | `§EACH{id:var:type}` | `ArrayNodes.cs:115-164` |
 
 ```calor
-§FOR[for1][var=i][from=0][to=10][step=1]
-  §PRINT §REF[name=i]
-§/FOR[for1]
+§FOR{for1}{var=i}{from=0}{to=10}{step=1}
+  §PRINT §REF{name=i}
+§/FOR{for1}
 
-§WHILE[while1]
-  §COND §OP[kind=LT] §REF[name=i] 100
+§WHILE{while1}
+  §COND §OP{kind=LT} §REF{name=i} 100
   ...
-§/WHILE[while1]
+§/WHILE{while1}
 ```
 
 ### 3.3 Loop Control
@@ -121,14 +121,14 @@ Defined in `ExpressionNodes.cs:141-146`:
 | Match Case | `MatchCaseNode` | `PatternNodes.cs:59-75` |
 
 ```calor
-§MATCH[m001] §REF[name=shape]
-  §CASE §PATTERN[Some] §VAR[s]
-    §BODY §R §REF[name=s]
+§MATCH{m001} §REF{name=shape}
+  §CASE §PATTERN{Some} §VAR{s}
+    §BODY §R §REF{name=s}
   §/CASE
-  §CASE §PATTERN[None]
+  §CASE §PATTERN{None}
     §BODY §R STR:"none"
   §/CASE
-§/MATCH[m001]
+§/MATCH{m001}
 ```
 
 ### 4.2 Pattern Types
@@ -157,12 +157,12 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| Record | `RecordDefinitionNode` | `§RECORD[id][name]` | `TypeNodes.cs:30-47` |
-| Union | `UnionTypeDefinitionNode` | `§TYPE[id][name]` | `TypeNodes.cs:85-102` |
+| Record | `RecordDefinitionNode` | `§RECORD{id}{name}` | `TypeNodes.cs:30-47` |
+| Union | `UnionTypeDefinitionNode` | `§TYPE{id}{name}` | `TypeNodes.cs:85-102` |
 | Enum | `EnumDefinitionNode` | `§ENUM{id:Name}` | `TypeNodes.cs:317-344` |
-| Interface | `InterfaceDefinitionNode` | `§IFACE[id:Name]` | `ClassNodes.cs:25-70` |
-| Class | `ClassDefinitionNode` | `§CLASS[id:Name]` | `ClassNodes.cs:138-324` |
-| Delegate | `DelegateDefinitionNode` | `§DEL[id:Name]` | `LambdaNodes.cs:77-100` |
+| Interface | `InterfaceDefinitionNode` | `§IFACE{id:Name}` | `ClassNodes.cs:25-70` |
+| Class | `ClassDefinitionNode` | `§CLASS{id:Name}` | `ClassNodes.cs:138-324` |
+| Delegate | `DelegateDefinitionNode` | `§DEL{id:Name}` | `LambdaNodes.cs:77-100` |
 
 ### 5.2 Type Components
 
@@ -178,7 +178,7 @@ Defined in `ExpressionNodes.cs:141-146`:
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
 | Option.Some | `SomeExpressionNode` | `§SOME expr` | `TypeNodes.cs:223-235` |
-| Option.None | `NoneExpressionNode` | `§NONE[type]` | `TypeNodes.cs:241-253` |
+| Option.None | `NoneExpressionNode` | `§NONE{type}` | `TypeNodes.cs:241-253` |
 | Result.Ok | `OkExpressionNode` | `§OK expr` | `TypeNodes.cs:259-271` |
 | Result.Err | `ErrExpressionNode` | `§ERR expr` | `TypeNodes.cs:277-289` |
 
@@ -192,12 +192,12 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 ```calor
 §F{f001:add:pub}
-  §I[i32:a] §I[i32:b]
-  §O[i32]
-  §E[]
-  §REQUIRES §OP[kind=GTE] §REF[name=a] 0
-  §ENSURES §OP[kind=GT] result 0
-  §R §OP[kind=ADD] §REF[name=a] §REF[name=b]
+  §I{i32:a} §I{i32:b}
+  §O{i32}
+  §E{}
+  §REQUIRES §OP{kind=GTE} §REF{name=a} 0
+  §ENSURES §OP{kind=GT} result 0
+  §R §OP{kind=ADD} §REF{name=a} §REF{name=b}
 §/F{f001}
 ```
 
@@ -205,9 +205,9 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| Parameter | `ParameterNode` | `§I[type:name]` | `FunctionNode.cs:227-263` |
-| Output | `OutputNode` | `§O[type]` | `FunctionNode.cs:19-30` |
-| Effects | `EffectsNode` | `§E[io=cw,fr]` | `FunctionNode.cs:35-46` |
+| Parameter | `ParameterNode` | `§I{type:name}` | `FunctionNode.cs:227-263` |
+| Output | `OutputNode` | `§O{type}` | `FunctionNode.cs:19-30` |
+| Effects | `EffectsNode` | `§E{io=cw,fs:r}` | `FunctionNode.cs:35-46` |
 
 ### 6.3 Methods (OOP)
 
@@ -231,9 +231,9 @@ Defined in `ExpressionNodes.cs:141-146`:
 | Return | `ReturnStatementNode` | `§R expr` | `StatementNodes.cs` |
 | Call | `CallStatementNode` | `§CALL target args` | `StatementNodes.cs` |
 | Print | `PrintStatementNode` | `§PRINT expr` | `StatementNodes.cs` |
-| Bind | `BindStatementNode` | `§BIND[name][type]` | `ControlFlowNodes.cs:163-189` |
+| Bind | `BindStatementNode` | `§BIND{name}{type}` | `ControlFlowNodes.cs:163-189` |
 | Assignment | `AssignmentStatementNode` | `§SET target value` | `StatementNodes.cs` |
-| Compound Assignment | `CompoundAssignmentStatementNode` | `§SET[+=] target value` | `StatementNodes.cs` |
+| Compound Assignment | `CompoundAssignmentStatementNode` | `§SET{+=} target value` | `StatementNodes.cs` |
 
 ### 7.2 Using Statements
 
@@ -250,21 +250,21 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| Try Statement | `TryStatementNode` | `§TRY[id]...§/TRY` | `ExceptionNodes.cs:17-43` |
-| Catch Clause | `CatchClauseNode` | `§CATCH[Type:var]` | `ExceptionNodes.cs:50-92` |
+| Try Statement | `TryStatementNode` | `§TRY{id}...§/TRY` | `ExceptionNodes.cs:17-43` |
+| Catch Clause | `CatchClauseNode` | `§CATCH{Type:var}` | `ExceptionNodes.cs:50-92` |
 | Throw | `ThrowStatementNode` | `§THROW expr` | `ExceptionNodes.cs:98-113` |
 | Rethrow | `RethrowStatementNode` | `§RETHROW` | `ExceptionNodes.cs:119-125` |
 
 ```calor
-§TRY[try1]
-  §C[RiskyOperation] §/C
-§CA[IOException:ex]
-  §PRINT §REF[name=ex]
+§TRY{try1}
+  §C{RiskyOperation} §/C
+§CA{IOException:ex}
+  §PRINT §REF{name=ex}
 §CA
   §RETHROW
 §FI
-  §C[Cleanup] §/C
-§/TRY[try1]
+  §C{Cleanup} §/C
+§/TRY{try1}
 ```
 
 ---
@@ -275,9 +275,9 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | Description | File Reference |
 |-----------|-----------|--------|-------------|----------------|
-| Requires | `RequiresNode` | `§REQUIRES[message] expr` | Precondition | `ContractNodes.cs:9-29` |
-| Ensures | `EnsuresNode` | `§ENSURES[message] expr` | Postcondition | `ContractNodes.cs:36-56` |
-| Invariant | `InvariantNode` | `§INVARIANT[message] expr` | Type invariant | `ContractNodes.cs:62-82` |
+| Requires | `RequiresNode` | `§REQUIRES{message} expr` | Precondition | `ContractNodes.cs:9-29` |
+| Ensures | `EnsuresNode` | `§ENSURES{message} expr` | Postcondition | `ContractNodes.cs:36-56` |
+| Invariant | `InvariantNode` | `§INVARIANT{message} expr` | Type invariant | `ContractNodes.cs:62-82` |
 
 ---
 
@@ -299,7 +299,7 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| Array Creation | `ArrayCreationNode` | `§ARR[id:type:size]` | `ArrayNodes.cs:10-59` |
+| Array Creation | `ArrayCreationNode` | `§ARR{id:type:size}` | `ArrayNodes.cs:10-59` |
 | Array Access | `ArrayAccessNode` | `§IDX array index` | `ArrayNodes.cs:65-86` |
 | Array Length | `ArrayLengthNode` | `§LEN array` | `ArrayNodes.cs:92-107` |
 
@@ -318,16 +318,16 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| New Expression | `NewExpressionNode` | `§NEW[Type] args` | `ClassNodes.cs:470-506` |
+| New Expression | `NewExpressionNode` | `§NEW{Type} args` | `ClassNodes.cs:470-506` |
 | Object Initializer | `ObjectInitializerAssignment` | `{ Prop: value }` | `ClassNodes.cs:511-521` |
-| Record Creation | `RecordCreationNode` | `§RECORD[type]` | `TypeNodes.cs:161-178` |
+| Record Creation | `RecordCreationNode` | `§RECORD{type}` | `TypeNodes.cs:161-178` |
 
 ### 12.3 Member Access
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
 | Field Access | `FieldAccessNode` | `target.field` | `TypeNodes.cs:203-217` |
-| Call Expression | `CallExpressionNode` | `§C[target] args §/C` | `ClassNodes.cs:527-541` |
+| Call Expression | `CallExpressionNode` | `§C{target} args §/C` | `ClassNodes.cs:527-541` |
 | This Expression | `ThisExpressionNode` | `§THIS` | `ClassNodes.cs:547-553` |
 | Base Expression | `BaseExpressionNode` | `§BASE` | `ClassNodes.cs:559-565` |
 
@@ -354,7 +354,7 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| Lambda Expression | `LambdaExpressionNode` | `§LAM[id:params] body §/LAM` | `LambdaNodes.cs:29-69` |
+| Lambda Expression | `LambdaExpressionNode` | `§LAM{id:params} body §/LAM` | `LambdaNodes.cs:29-69` |
 | Lambda Parameter | `LambdaParameterNode` | param definition | `LambdaNodes.cs:8-22` |
 
 ---
@@ -375,7 +375,7 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | Generated C# | File Reference |
 |-----------|-----------|--------|--------------|----------------|
-| Interpolated String | `InterpolatedStringNode` | `§INTERP[...]` | `$"..."` | `ModernOperatorNodes.cs:10-25` |
+| Interpolated String | `InterpolatedStringNode` | `§INTERP{...}` | `$"..."` | `ModernOperatorNodes.cs:10-25` |
 | Null Coalesce | `NullCoalesceNode` | `§?? left right` | `left ?? right` | `ModernOperatorNodes.cs:74-95` |
 | Null Conditional | `NullConditionalNode` | `§?. target member` | `target?.member` | `ModernOperatorNodes.cs:102-123` |
 | Range | `RangeExpressionNode` | `§RANGE start end` | `start..end` | `ModernOperatorNodes.cs:130-151` |
@@ -390,7 +390,7 @@ Defined in `ExpressionNodes.cs:141-146`:
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
 | With Expression | `WithExpressionNode` | `§WITH target assignments §/WITH` | `PatternNodes.cs:86-107` |
-| Property Assignment | `WithPropertyAssignmentNode` | `§SET[prop] value` | `PatternNodes.cs:113-127` |
+| Property Assignment | `WithPropertyAssignmentNode` | `§SET{prop} value` | `PatternNodes.cs:113-127` |
 
 ---
 
@@ -427,7 +427,7 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| Calor Attribute | `CalorAttributeNode` | `[@Attribute(args)]` | `AttributeNodes.cs` |
+| Calor Attribute | `CalorAttributeNode` | `{@Attribute(args)}` | `AttributeNodes.cs` |
 
 ---
 

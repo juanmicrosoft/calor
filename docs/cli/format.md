@@ -121,11 +121,11 @@ MyModule.calr
 --- original
 +++ formatted
 @@ -5,7 +5,7 @@
- §F[f001:Calculate:pub]
-   §I[i32:a]
-   §I[i32:b]
--  §O[i32]
-+  §O[i32]
+ §F{f001:Calculate:pub}
+   §I{i32:a}
+   §I{i32:b}
+-  §O{i32}
++  §O{i32}
    §Q (> a 0)
 -§Q(>b 0)
 +  §Q (> b 0)
@@ -149,7 +149,7 @@ The Calor formatter applies these rules:
 
 ### Spacing
 
-- Single space after structure tags: `§F[f001:Name:pub]`
+- Single space after structure tags: `§F{f001:Name:pub}`
 - Single space around operators: `(+ a b)` not `(+a b)`
 - No trailing whitespace
 
@@ -168,28 +168,28 @@ The Calor formatter applies these rules:
 
 ```calor
 // Before (inconsistent)
-§M[m001:Math]
-§F[f001:Add:pub]
-§I[i32:a]
-  §I[i32:b]
-§O[i32]
+§M{m001:Math}
+§F{f001:Add:pub}
+§I{i32:a}
+  §I{i32:b}
+§O{i32}
 §R(+ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 ```calor
 // After (formatted)
-§M[m001:Math]
+§M{m001:Math}
 
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 
-§/M[m001]
+§/M{m001}
 ```
 
 ---

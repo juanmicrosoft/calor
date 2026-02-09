@@ -5,7 +5,6 @@ order: 0
 hasChildren: true
 ---
 
-# Benchmarking
 
 Calor is evaluated against C# across 7 metrics designed to measure what matters for AI coding agents.
 
@@ -27,15 +26,7 @@ Calor is evaluated against C# across 7 metrics designed to measure what matters 
 
 ## Summary Results
 
-| Category | Calor vs C# | Winner |
-|:---------|:-----------|:-------|
-| Comprehension | **1.33x** | Calor |
-| Error Detection | **1.19x** | Calor |
-| Edit Precision | **1.15x** | Calor |
-| Generation Accuracy | 0.94x | C# |
-| Task Completion | 0.93x | C# |
-| Token Economics | 0.67x | C# |
-| Information Density | 0.22x | C# |
+<BenchmarkSummaryTable />
 
 **Pattern:** Calor wins on comprehension and precision metrics. C# wins on efficiency metrics.
 
@@ -44,13 +35,13 @@ Calor is evaluated against C# across 7 metrics designed to measure what matters 
 ## Key Insight
 
 Calor excels where explicitness matters:
-- **Comprehension** (1.33x) - Explicit structure aids understanding
-- **Error Detection** (1.19x) - Contracts surface invariant violations
-- **Edit Precision** (1.15x) - Unique IDs enable targeted changes
+- **Comprehension** - Explicit structure aids understanding
+- **Error Detection** - Contracts surface invariant violations
+- **Edit Precision** - Unique IDs enable targeted changes
 
 C# wins on token efficiency:
-- **Token Economics** (0.67x) - Calor's explicit syntax uses more tokens
-- **Information Density** (0.22x) - C# packs more per token
+- **Token Economics** - Calor's explicit syntax uses more tokens
+- **Information Density** - C# packs more per token
 
 This reflects a fundamental tradeoff: **explicit semantics require more tokens but enable better agent reasoning**.
 

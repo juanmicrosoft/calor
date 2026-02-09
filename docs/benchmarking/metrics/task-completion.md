@@ -8,7 +8,7 @@ nav_order: 7
 # Task Completion Metric
 
 **Category:** Task Completion
-**Result:** C# wins (0.93x)
+**Result:** C# wins ([see current ratio](/calor/benchmarking/results/))
 **What it measures:** End-to-end task success rates
 
 ---
@@ -179,19 +179,19 @@ var task = new TaskDefinition
 ### Calor Solution
 
 ```
-§M[m001:FizzBuzz]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §L[for1:i:1:100:1]
-    §IF[if1] (== (% i 15) 0) → §P "FizzBuzz"
+§M{m001:FizzBuzz}
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §L{for1:i:1:100:1}
+    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
     §EI (== (% i 3) 0) → §P "Fizz"
     §EI (== (% i 5) 0) → §P "Buzz"
     §EL → §P i
-    §/I[if1]
-  §/L[for1]
-§/F[f001]
-§/M[m001]
+    §/I{if1}
+  §/L{for1}
+§/F{f001}
+§/M{m001}
 ```
 - Tokens: ~80
 - Compiles: Yes
@@ -233,7 +233,7 @@ Given a typical 8K context window:
 
 ## Interpretation
 
-The 0.93x ratio indicates C# has a meaningful advantage in task completion.
+C# has an advantage in task completion.
 
 This is primarily due to:
 1. **Token efficiency** - More room in context window
@@ -241,6 +241,8 @@ This is primarily due to:
 3. **Error recovery** - C# errors are easier to fix
 
 However, the gap is modest, and Calor's advantages in comprehension and precision may offset this in specific scenarios.
+
+[See current benchmark results →](/calor/benchmarking/results/)
 
 ---
 

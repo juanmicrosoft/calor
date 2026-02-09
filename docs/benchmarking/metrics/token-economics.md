@@ -8,7 +8,7 @@ nav_order: 8
 # Token Economics Metric
 
 **Category:** Token Economics
-**Result:** C# wins (0.67x)
+**Result:** C# wins ([see current ratio](/calor/benchmarking/results/))
 **What it measures:** Tokens required to represent equivalent logic
 
 ---
@@ -83,13 +83,13 @@ Geometric mean of all three ratios.
 
 **Calor:**
 ```
-§M[m001:Hello]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
+§M{m001:Hello}
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
   §P "Hello World"
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 - Tokens: ~25
 - Lines: 7
@@ -113,19 +113,19 @@ class Program
 
 **Calor:**
 ```
-§M[m001:FizzBuzz]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §L[for1:i:1:100:1]
-    §IF[if1] (== (% i 15) 0) → §P "FizzBuzz"
+§M{m001:FizzBuzz}
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §L{for1:i:1:100:1}
+    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
     §EI (== (% i 3) 0) → §P "Fizz"
     §EI (== (% i 5) 0) → §P "Buzz"
     §EL → §P i
-    §/I[if1]
-  §/L[for1]
-§/F[f001]
-§/M[m001]
+    §/I{if1}
+  §/L{for1}
+§/F{f001}
+§/M{m001}
 ```
 - Tokens: ~80
 - Lines: 13
@@ -149,14 +149,14 @@ for (int i = 1; i <= 100; i++)
 
 **Calor:**
 ```
-§F[f001:Divide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §Q (!= b 0)
   §S (>= result 0)
   §R (/ a b)
-§/F[f001]
+§/F{f001}
 ```
 - Tokens: ~40
 - Lines: 8
@@ -197,8 +197,8 @@ public static int Divide(int a, int b)
 ### 1. Explicit Tags
 
 ```
-§M[m001:Name]    // Module requires tag + ID + name
-§/M[m001]        // Closing tag required
+§M{m001:Name}    // Module requires tag + ID + name
+§/M{m001}        // Closing tag required
 
 // vs C#
 namespace Name   // Just keyword + name
@@ -207,7 +207,7 @@ namespace Name   // Just keyword + name
 ### 2. Effect Declarations
 
 ```
-§E[cw,fr,net]    // Explicit effects
+§E{cw,fs:r,net:rw}    // Explicit effects
 
 // C#: No equivalent - effects are implicit
 ```
@@ -216,9 +216,9 @@ namespace Name   // Just keyword + name
 
 Every structure requires explicit closing:
 ```
-§F[f001]...§/F[f001]
-§L[for1]...§/L[for1]
-§IF[if1]...§/I[if1]
+§F{f001}...§/F{f001}
+§L{for1}...§/L{for1}
+§IF{if1}...§/I{if1}
 ```
 
 ### 4. Contract Syntax
@@ -260,7 +260,7 @@ Token efficiency is less critical when:
 
 ## Interpretation
 
-The 0.67x ratio means Calor uses ~1.5x more tokens than C# on average.
+The ratio indicates Calor uses more tokens than C# on average.
 
 This is the price of:
 - Explicit structure
@@ -269,6 +269,8 @@ This is the price of:
 - Closing tags
 
 Lisp-style expressions help keep this ratio manageable.
+
+[See current benchmark results →](/calor/benchmarking/results/)
 
 ---
 

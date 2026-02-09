@@ -253,7 +253,7 @@ This is practical because Calor is designed for coding agents, not humans. Agent
 - Maintain perfect consistency (never forget to update)
 - Don't cut corners under deadline pressure
 
-[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/)
+[Learn more: Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/)
 
 ### Compile-Time Errors
 
@@ -305,6 +305,6 @@ Or in MSBuild:
 
 ## Next
 
-- [The Verification Opportunity](/calor/philosophy/the-verification-opportunity/) - Why this matters
+- [Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/) - Why this matters
 - [Contracts](/calor/syntax-reference/contracts/) - Preconditions and postconditions
 - [Benchmarking](/calor/benchmarking/) - See how effects help comprehension

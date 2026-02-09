@@ -181,7 +181,7 @@ T!E                 // Result: either T (success) or E (error)
 §F{f001:ReadFile:pub}
   §I{str:path}
   §O{str!str}
-  §E{fr}
+  §E{fs:r}
   // ...implementation
 §/F{f001}
 ```

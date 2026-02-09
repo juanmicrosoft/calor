@@ -28,7 +28,7 @@ Each benchmark consists of:
 
 ### Current Corpus
 
-20 paired programs covering:
+28 paired programs covering:
 - Hello World (basic I/O)
 - FizzBuzz (loops and conditionals)
 - Mathematical functions (contracts)
@@ -51,10 +51,10 @@ Both implementations must:
 **Measures:** How easily an agent can understand code structure.
 
 **Calor factors:**
-- Module declarations (`§M[`)
-- Function declarations (`§F[`)
-- Input/output annotations (`§I[`, `§O[`)
-- Effect declarations (`§E[`)
+- Module declarations (`§M{`)
+- Function declarations (`§F{`)
+- Input/output annotations (`§I{`, `§O{`)
+- Effect declarations (`§E{`)
 - Contracts (`§Q`, `§S`)
 - Closing tags (`§/`)
 
@@ -205,7 +205,7 @@ This isn't a flaw—it's the designed tradeoff of explicit semantics.
 ## Limitations
 
 1. **No LLM evaluation:** We don't test with actual AI agents (yet)
-2. **Small corpus:** 20 programs may not represent all use cases
+2. **Small corpus:** 28 programs may not represent all use cases
 3. **Structural metrics:** Comprehension is measured structurally, not semantically
 4. **C# baseline:** Other languages might perform differently
 

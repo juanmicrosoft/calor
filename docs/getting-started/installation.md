@@ -275,10 +275,10 @@ ls src/
 **"Main method not found":**
 - Ensure your Calor code has a public `Main` function:
   ```
-  §F[f001:Main:pub]
-    §O[void]
+  §F{f001:Main:pub}
+    §O{void}
     // ...
-  §/F[f001]
+  §/F{f001}
   ```
 
 ---

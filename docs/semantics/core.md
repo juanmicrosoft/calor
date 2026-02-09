@@ -143,14 +143,14 @@ left ?? right
 Calor uses **lexical scoping** with parent chain lookup. See `src/Calor.Compiler/Binding/Scope.cs:74-82`.
 
 ```calor
-§BIND[name=x][type=INT] INT:1
-§IF[if1]
+§BIND{name=x}{type=INT} INT:1
+§IF{if1}
   §COND BOOL:true
   §THEN
-    §BIND[name=x][type=INT] INT:2   // Shadows outer x
-    §PRINT §REF[name=x]              // Prints 2
-§/IF[if1]
-§PRINT §REF[name=x]                  // Prints 1 (outer x unchanged)
+    §BIND{name=x}{type=INT} INT:2   // Shadows outer x
+    §PRINT §REF{name=x}              // Prints 2
+§/IF{if1}
+§PRINT §REF{name=x}                  // Prints 1 (outer x unchanged)
 ```
 
 ### 3.2 Shadowing
@@ -176,11 +176,11 @@ Inner scope bindings **shadow** outer bindings with the same name.
 Return statements in nested scopes must correctly unwind to the function boundary.
 
 ```calor
-§IF[if1]
+§IF{if1}
   §COND BOOL:true
   §THEN
     §R INT:42   // Returns from function, not just if block
-§/IF[if1]
+§/IF{if1}
 ```
 
 **Test Reference:** `S6: ReturnFromNestedScope`
@@ -194,8 +194,8 @@ Return statements in nested scopes must correctly unwind to the function boundar
 **Default Behavior:** TRAP (throw `OverflowException`)
 
 ```calor
-§BIND[name=max][type=INT] INT:2147483647
-§BIND[name=result][type=INT] §OP[kind=ADD] §REF[name=max] INT:1
+§BIND{name=max}{type=INT} INT:2147483647
+§BIND{name=result}{type=INT} §OP{kind=ADD} §REF{name=max} INT:1
 // Throws OverflowException
 ```
 
@@ -216,9 +216,9 @@ Return statements in nested scopes must correctly unwind to the function boundar
 | Narrowing conversions | Explicit required | Data may be lost |
 
 ```calor
-§BIND[name=i][type=INT] INT:42
-§BIND[name=f][type=FLOAT] §REF[name=i]           // OK: implicit widening
-§BIND[name=j][type=INT] §CAST[INT] §REF[name=f]  // Required: explicit narrowing
+§BIND{name=i}{type=INT} INT:42
+§BIND{name=f}{type=FLOAT} §REF{name=i}           // OK: implicit widening
+§BIND{name=j}{type=INT} §CAST{INT} §REF{name=f}  // Required: explicit narrowing
 ```
 
 **Test Reference:** `S8: NumericConversion_IntToFloat`
@@ -246,7 +246,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.1 Preconditions (REQUIRES)
 
 ```calor
-§REQUIRES[message="x must be positive"] §OP[kind=GT] §REF[name=x] INT:0
+§REQUIRES{message="x must be positive"} §OP{kind=GT} §REF{name=x} INT:0
 ```
 
 **Semantics:**
@@ -263,7 +263,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.2 Postconditions (ENSURES)
 
 ```calor
-§ENSURES[message="result must be positive"] §OP[kind=GT] result INT:0
+§ENSURES{message="result must be positive"} §OP{kind=GT} result INT:0
 ```
 
 **Semantics:**
@@ -276,7 +276,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.3 Invariants
 
 ```calor
-§INVARIANT[message="balance must be non-negative"] §OP[kind=GTE] §REF[name=balance] INT:0
+§INVARIANT{message="balance must be non-negative"} §OP{kind=GTE} §REF{name=balance} INT:0
 ```
 
 **Semantics:**
@@ -299,7 +299,7 @@ Represents an optional value: either `Some(value)` or `None`.
 
 ```calor
 §SOME INT:42      // Option<INT> containing 42
-§NONE[INT]        // Option<INT> containing nothing
+§NONE{INT}        // Option<INT> containing nothing
 ```
 
 **Semantics:**
@@ -330,8 +330,8 @@ Effects track side-effect capabilities of functions.
 |--------|--------|-------------|
 | Console Read | `cr` | Reads from console |
 | Console Write | `cw` | Writes to console |
-| File Read | `fr` | Reads from files |
-| File Write | `fw` | Writes to files |
+| File Read | `fs:r` | Reads from files |
+| File Write | `fs:w` | Writes to files |
 | Network Read | `nr` | Network input |
 | Network Write | `nw` | Network output |
 | Mutation | `mut` | Mutates state |
@@ -341,9 +341,9 @@ Effects track side-effect capabilities of functions.
 
 ```calor
 §F{f001:readFile:pub}
-  §I[string:path]
-  §O[string]
-  §E[io=fr,ex=IOException]
+  §I{string:path}
+  §O{string}
+  §E{io=fs:r,ex=IOException}
   ...
 §/F{f001}
 ```
@@ -365,11 +365,11 @@ Match expressions MUST be exhaustive. The compiler emits `Calor0500: NonExhausti
 ### 8.2 Evaluation
 
 ```calor
-§MATCH[m1] expr
+§MATCH{m1} expr
   §CASE pattern1 guard1 => body1
   §CASE pattern2 => body2
   §CASE _ => default
-§/MATCH[m1]
+§/MATCH{m1}
 ```
 
 **Semantics:**
@@ -390,13 +390,13 @@ Patterns are tried in **declaration order**. First matching pattern wins.
 ### 9.1 Try/Catch/Finally
 
 ```calor
-§TRY[try1]
+§TRY{try1}
   body
-§CATCH[ExceptionType:var]
+§CATCH{ExceptionType:var}
   handler
 §FINALLY
   cleanup
-§/TRY[try1]
+§/TRY{try1}
 ```
 
 **Semantics:**
@@ -429,15 +429,15 @@ Uncaught exceptions propagate up the call stack until caught or program terminat
 By default, bindings are immutable:
 
 ```calor
-§BIND[name=x][type=INT] INT:42
-§SET §REF[name=x] INT:43  // ERROR: x is immutable
+§BIND{name=x}{type=INT} INT:42
+§SET §REF{name=x} INT:43  // ERROR: x is immutable
 ```
 
 Mutable bindings require explicit declaration:
 
 ```calor
-§BIND[name=x][type=INT][mut=true] INT:42
-§SET §REF[name=x] INT:43  // OK
+§BIND{name=x}{type=INT}{mut=true} INT:42
+§SET §REF{name=x} INT:43  // OK
 ```
 
 ---
@@ -459,7 +459,7 @@ Mutable bindings require explicit declaration:
 ### 11.2 ConfigureAwait
 
 ```calor
-§AWAIT[false] expr  // ConfigureAwait(false)
+§AWAIT{false} expr  // ConfigureAwait(false)
 ```
 
 ---
@@ -492,7 +492,7 @@ Modules can declare required semantics version:
 
 ```calor
 §M{m001:MyModule}
-  §SEMVER[1.0.0]
+  §SEMVER{1.0.0}
 ```
 
 ---

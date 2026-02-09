@@ -319,10 +319,10 @@ namespace Calor.Runtime
 
 **Calor:**
 ```calor
-§MATCH[m1] §REF[name=opt]
-  §CASE §SOME[x] => §R §REF[name=x]
+§MATCH{m1} §REF{name=opt}
+  §CASE §SOME{x} => §R §REF{name=x}
   §CASE §NONE => §R INT:0
-§/MATCH[m1]
+§/MATCH{m1}
 ```
 
 **C#:**
@@ -338,7 +338,7 @@ opt switch
 
 **Calor:**
 ```calor
-§PPROP[Person] §PMATCH[Age] §PREL[gte] 18
+§PPROP{Person} §PMATCH{Age} §PREL{gte} 18
 ```
 
 **C#:**
@@ -372,7 +372,7 @@ finally
 
 **Calor catch with filter:**
 ```calor
-§CA[IOException:ex][when=§OP[kind=EQ] §REF[name=ex.Message] STR:"Not found"]
+§CA{IOException:ex}{when=§OP{kind=EQ} §REF{name=ex.Message} STR:"Not found"}
 ```
 
 **C#:**
@@ -392,7 +392,7 @@ catch (IOException ex) when (ex.Message == "Not found")
 **Calor async function:**
 ```calor
 §F{f1:fetchData:pub:async}
-  §O[Task[string]]
+  §O{Task{string}}
   ...
 §/F{f1}
 ```
@@ -409,7 +409,7 @@ public async Task<string> FetchData()
 
 **Calor:**
 ```calor
-§AWAIT §C[client.GetStringAsync] §A url §/C
+§AWAIT §C{client.GetStringAsync} §A url §/C
 ```
 
 **C#:**
@@ -421,7 +421,7 @@ await client.GetStringAsync(url)
 
 **Calor:**
 ```calor
-§AWAIT[false] expr
+§AWAIT{false} expr
 ```
 
 **C#:**
@@ -437,14 +437,14 @@ await expr.ConfigureAwait(false)
 
 **Calor:**
 ```calor
-§CLASS[c1:Circle:seal]
-  §EXT[Shape]
-  §IMPL[IDrawable]
-  §FLD[f64:Radius:pri]
-  §METHOD[m1:Area:pub:over] §O[f64] §E[]
-    §R §OP[kind=MUL] 3.14159 §OP[kind=MUL] §REF[name=Radius] §REF[name=Radius]
-  §/METHOD[m1]
-§/CLASS[c1]
+§CLASS{c1:Circle:seal}
+  §EXT{Shape}
+  §IMPL{IDrawable}
+  §FLD{f64:Radius:pri}
+  §METHOD{m1:Area:pub:over} §O{f64} §E{}
+    §R §OP{kind=MUL} 3.14159 §OP{kind=MUL} §REF{name=Radius} §REF{name=Radius}
+  §/METHOD{m1}
+§/CLASS{c1}
 ```
 
 **C#:**
@@ -478,10 +478,10 @@ public sealed class Circle : Shape, IDrawable
 
 **Calor:**
 ```calor
-§RECORD[r1:Person]
-  §FIELD[Name][STRING]
-  §FIELD[Age][INT]
-§/RECORD[r1]
+§RECORD{r1:Person}
+  §FIELD{Name}{STRING}
+  §FIELD{Age}{INT}
+§/RECORD{r1}
 ```
 
 **C#:**
@@ -493,8 +493,8 @@ public record Person(string Name, int Age);
 
 **Calor:**
 ```calor
-§WITH §REF[name=person]
-  §SET[Age] 30
+§WITH §REF{name=person}
+  §SET{Age} 30
 §/WITH
 ```
 

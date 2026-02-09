@@ -4,7 +4,6 @@ section: "philosophy"
 order: 1
 ---
 
-# Design Principles
 
 Calor is built on five core principles that guide every language design decision.
 
@@ -14,10 +13,10 @@ Calor is built on five core principles that guide every language design decision
 
 | Principle | Implementation | Agent Benefit |
 |:----------|:---------------|:--------------|
-| **Explicit over implicit** | Effects declared with `§E[cw,fr,net]` | Know side effects without reading implementation |
+| **Explicit over implicit** | Effects declared with `§E{cw,fs:r,net:rw}` | Know side effects without reading implementation |
 | **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
-| **Everything has an ID** | `§F[f001:Main]`, `§L[l001:i:1:100:1]` | Precise references that survive refactoring |
-| **Unambiguous structure** | Matched tags `§F[]...§/F[]` | Parse without semantic analysis |
+| **Everything has an ID** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` | Precise references that survive refactoring |
+| **Unambiguous structure** | Matched tags `§F{}...§/F{}` | Parse without semantic analysis |
 | **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
 
 ---
@@ -33,12 +32,12 @@ In traditional languages, side effects are implicit. You have to read the entire
 Calor requires explicit effect declarations:
 
 ```
-§F[f001:SaveUser:pub]
-  §I[User:user]
-  §O[bool]
-  §E[db,net]        // Explicit: database and network effects
+§F{f001:SaveUser:pub}
+  §I{User:user}
+  §O{bool}
+  §E{db:rw,net:rw}        // Explicit: database and network effects
   // ... implementation
-§/F[f001]
+§/F{f001}
 ```
 
 **Agent benefit:** An agent can immediately filter functions by their effects without analyzing implementation details.
@@ -49,10 +48,15 @@ Calor requires explicit effect declarations:
 |:-----|:-------|
 | `cw` | Console write |
 | `cr` | Console read |
-| `fw` | File write |
-| `fr` | File read |
-| `net` | Network operations |
-| `db` | Database operations |
+| `fs:w` | Filesystem write |
+| `fs:r` | Filesystem read |
+| `fs:rw` | Filesystem read/write |
+| `net:r` | Network read |
+| `net:w` | Network write |
+| `net:rw` | Network read/write |
+| `db:r` | Database read |
+| `db:w` | Database write |
+| `db:rw` | Database read/write |
 
 ---
 
@@ -61,15 +65,15 @@ Calor requires explicit effect declarations:
 Preconditions and postconditions aren't comments or assertions buried in code - they're first-class syntax elements:
 
 ```
-§F[f001:Divide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §Q (!= b 0)              // Requires: b is not zero
   §Q (>= a 0)              // Requires: a is non-negative
   §S (>= result 0)         // Ensures: result is non-negative
   §R (/ a b)
-§/F[f001]
+§/F{f001}
 ```
 
 **Agent benefit:**
@@ -83,7 +87,7 @@ Preconditions and postconditions aren't comments or assertions buried in code - 
 |:----|:--------|:--------|
 | `§Q` | Precondition (requires) | `§Q (> x 0)` |
 | `§S` | Postcondition (ensures) | `§S (!= result null)` |
-| `§Q[message="..."]` | With custom error | `§Q[message="x must be positive"] (> x 0)` |
+| `§Q{message="..."}` | With custom error | `§Q{message="x must be positive"} (> x 0)` |
 
 ---
 
@@ -92,15 +96,15 @@ Preconditions and postconditions aren't comments or assertions buried in code - 
 Every structural element has a unique identifier that persists across refactoring:
 
 ```
-§M[m001:Calculator]           // Module ID: m001
-§F[f001:Add:pub]              // Function ID: f001
-  §L[for1:i:1:100:1]          // Loop ID: for1
-    §IF[if1] (> i 50)         // Conditional ID: if1
+§M{m001:Calculator}           // Module ID: m001
+§F{f001:Add:pub}              // Function ID: f001
+  §L{for1:i:1:100:1}          // Loop ID: for1
+    §IF{if1} (> i 50)         // Conditional ID: if1
     // ...
-    §/I[if1]
-  §/L[for1]
-§/F[f001]
-§/M[m001]
+    §/I{if1}
+  §/L{for1}
+§/F{f001}
+§/M{m001}
 ```
 
 **Agent benefit:**
@@ -114,10 +118,10 @@ Production code uses ULID-based IDs with kind prefixes:
 
 | Element | Prefix | Example |
 |:--------|:-------|:--------|
-| Modules | `m_` | `§M[m_01J5X7K9M2NPQRSTABWXYZ12:Calculator]` |
-| Functions | `f_` | `§F[f_01J5X7K9M2NPQRSTABWXYZ12:Add:pub]` |
-| Classes | `c_` | `§CL[c_01J5X7K9M2NPQRSTABWXYZ12:MyClass]` |
-| Methods | `mt_` | `§MT[mt_01J5X7K9M2NPQRSTABWXYZ12:Process:pub]` |
+| Modules | `m_` | `§M{m_01J5X7K9M2NPQRSTABWXYZ12:Calculator}` |
+| Functions | `f_` | `§F{f_01J5X7K9M2NPQRSTABWXYZ12:Add:pub}` |
+| Classes | `c_` | `§CL{c_01J5X7K9M2NPQRSTABWXYZ12:MyClass}` |
+| Methods | `mt_` | `§MT{mt_01J5X7K9M2NPQRSTABWXYZ12:Process:pub}` |
 
 Short test IDs (`f001`, `m001`) are allowed only in `tests/`, `docs/`, and examples.
 
@@ -130,15 +134,15 @@ Short test IDs (`f001`, `m001`) are allowed only in `tests/`, `docs/`, and examp
 Every opening tag has a matching closing tag with the same ID:
 
 ```
-§M[m001:Example]
-  §F[f001:Main:pub]
-    §L[for1:i:1:10:1]
-      §IF[if1] (> i 5)
+§M{m001:Example}
+  §F{f001:Main:pub}
+    §L{for1:i:1:10:1}
+      §IF{if1} (> i 5)
         // ...
-      §/I[if1]
-    §/L[for1]
-  §/F[f001]
-§/M[m001]
+      §/I{if1}
+    §/L{for1}
+  §/F{f001}
+§/M{m001}
 ```
 
 **Agent benefit:**
@@ -150,10 +154,10 @@ Every opening tag has a matching closing tag with the same ID:
 
 | Opening | Closing |
 |:--------|:--------|
-| `§M[id:name]` | `§/M[id]` |
-| `§F[id:name:vis]` | `§/F[id]` |
-| `§L[id:var:from:to:step]` | `§/L[id]` |
-| `§IF[id] condition` | `§/I[id]` |
+| `§M{id:name}` | `§/M{id}` |
+| `§F{id:name:vis}` | `§/F{id}` |
+| `§L{id:var:from:to:step}` | `§/L{id}` |
+| `§IF{id} condition` | `§/I{id}` |
 
 ---
 

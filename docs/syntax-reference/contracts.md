@@ -155,7 +155,7 @@ In postconditions, `result` refers to the return value:
   §I{Account:to}
   §I{i32:amount}
   §O{void}
-  §E{db}
+  §E{db:rw}
   §Q (> amount 0)                        // positive amount
   §Q (>= from.balance amount)            // sufficient funds
   // Balance conservation would be expressed if Calor supported old_ values
@@ -290,7 +290,7 @@ Calor solves this because agents:
 - Maintain contract-implementation consistency
 - Never skip verification for convenience
 
-[Learn more: The Verification Opportunity](/calor/philosophy/the-verification-opportunity/)
+[Learn more: Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/)
 
 ---
 
@@ -316,6 +316,6 @@ This function is pure (no `§E` declaration) even though the precondition might 
 
 ## Next
 
-- [The Verification Opportunity](/calor/philosophy/the-verification-opportunity/) - Why this matters
+- [Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/) - Why this matters
 - [Effects](/calor/syntax-reference/effects/) - Declaring side effects
 - [Enforcement Details](/calor/effects-and-contracts-enforcement/) - Technical specification

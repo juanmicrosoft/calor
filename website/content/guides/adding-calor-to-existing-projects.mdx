@@ -4,7 +4,6 @@ section: "guides"
 order: 1
 ---
 
-# Adding Calor to an Existing C# Project
 
 This guide walks you through adding Calor to an existing C# project, from enabling Calor to building with mixed Calor/C# code.
 
@@ -80,16 +79,16 @@ Top 10 Files for Migration:
 Create a new `.calr` file alongside your existing code:
 
 ```calor
-§M[m001:Calculator]
+§M{m001:Calculator}
 
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §R (+ a b)
-§/F[f001]
+§/F{f001}
 
-§/M[m001]
+§/M{m001}
 ```
 
 ---

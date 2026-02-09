@@ -15,7 +15,7 @@ const features = [
     description:
       'Effects trace through the entire call graph. Hide a database call in a helper? The compiler finds it.',
     icon: FileCode,
-    code: '§E[db:rw,net:rw]',
+    code: '§E{db:rw,net:rw}',
     href: '/docs/philosophy/effects-contracts-enforcement/',
   },
   {
@@ -23,7 +23,7 @@ const features = [
     description:
       'ULID-based IDs survive renaming, file moves, and refactoring. Agents reference code precisely.',
     icon: Fingerprint,
-    code: '§F[f_01J5X7K9M2:Process:pub]',
+    code: '§F{f_01J5X7K9M2:Process:pub}',
     href: '/docs/philosophy/stable-identifiers/',
   },
   {
@@ -31,7 +31,7 @@ const features = [
     description:
       'Matched open/close tags eliminate bugs where agents miscalculate indentation or brace depth.',
     icon: Layers,
-    code: '§M[m_01J5X7K9M2:App]\n  ...\n§/M[m_01J5X7K9M2]',
+    code: '§M{m_01J5X7K9M2:App}\n  ...\n§/M{m_01J5X7K9M2}',
     href: '/docs/syntax-reference/',
   },
 ];

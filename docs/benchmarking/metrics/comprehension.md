@@ -8,7 +8,7 @@ nav_order: 3
 # Comprehension Metric
 
 **Category:** Comprehension
-**Result:** Calor wins (1.33x)
+**Result:** Calor wins ([see current ratio](/calor/benchmarking/results/))
 **What it measures:** Structural clarity and semantic extractability
 
 ---
@@ -37,16 +37,16 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 
 | Factor | Points | Check |
 |:-------|:-------|:------|
-| Module declaration | 0.15 | Contains `§M[` |
-| Function declaration | 0.15 | Contains `§F[` |
-| Input parameters | 0.10 | Contains `§I[` |
-| Output type | 0.10 | Contains `§O[` |
+| Module declaration | 0.15 | Contains `§M{` |
+| Function declaration | 0.15 | Contains `§F{` |
+| Input parameters | 0.10 | Contains `§I{` |
+| Output type | 0.10 | Contains `§O{` |
 | Return statement | 0.10 | Contains `§R` |
-| Effect declaration | 0.15 | Contains `§E[` |
+| Effect declaration | 0.15 | Contains `§E{` |
 | Requires contract | 0.15 | Contains `§Q` |
 | Ensures contract | 0.10 | Contains `§S` |
-| Function closing tag | 0.05 | Contains `§/F[` |
-| Module closing tag | 0.05 | Contains `§/M[` |
+| Function closing tag | 0.05 | Contains `§/F{` |
+| Module closing tag | 0.05 | Contains `§/M{` |
 
 ### C# Clarity Factors
 
@@ -69,28 +69,28 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 ### Calor (High Clarity)
 
 ```
-§M[m001:Calculator]
-§F[f001:Divide:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
+§M{m001:Calculator}
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
   §Q (!= b 0)
   §S (>= result 0)
   §R (/ a b)
-§/F[f001]
-§/M[m001]
+§/F{f001}
+§/M{m001}
 ```
 
 **Score calculation:**
-- `§M[`: +0.15
-- `§F[`: +0.15
-- `§I[`: +0.10
-- `§O[`: +0.10
+- `§M{`: +0.15
+- `§F{`: +0.15
+- `§I{`: +0.10
+- `§O{`: +0.10
 - `§R`: +0.10
 - `§Q`: +0.15
 - `§S`: +0.10
-- `§/F[`: +0.05
-- `§/M[`: +0.05
+- `§/F{`: +0.05
+- `§/M{`: +0.05
 
 **Total: 0.95**
 
@@ -122,7 +122,7 @@ namespace Calculator
 
 **Total: 0.65**
 
-**Ratio: 0.95 / 0.65 = 1.46x** (Calor wins)
+**Ratio: 0.95 / 0.65 ≈ 1.46x** (Calor wins)
 
 ---
 
@@ -132,14 +132,14 @@ namespace Calculator
 
 | Information | Extraction Method |
 |:------------|:------------------|
-| Function name | Parse `§F[id:name:vis]` |
-| Function ID | Parse `§F[id:name:vis]` |
-| Inputs | Find all `§I[type:name]` |
-| Output type | Parse `§O[type]` |
-| Side effects | Parse `§E[codes]` |
+| Function name | Parse `§F{id:name:vis}` |
+| Function ID | Parse `§F{id:name:vis}` |
+| Inputs | Find all `§I{type:name}` |
+| Output type | Parse `§O{type}` |
+| Side effects | Parse `§E{codes}` |
 | Preconditions | Find all `§Q condition` |
 | Postconditions | Find all `§S condition` |
-| Scope boundaries | Match `§F[id]` with `§/F[id]` |
+| Scope boundaries | Match `§F{id}` with `§/F{id}` |
 
 ### From C# (Requires Inference)
 
@@ -179,9 +179,11 @@ Must analyze:
 
 ## Interpretation
 
-The 1.33x advantage indicates that Calor's explicit structure provides ~33% more structural clarity signals than equivalent C# code.
+Calor's comprehension advantage indicates that explicit structure provides more structural clarity signals than equivalent C# code.
 
 This doesn't mean C# is hard to understand—it means Calor makes structure *more explicit*, which benefits automated analysis.
+
+[See current benchmark results →](/calor/benchmarking/results/)
 
 ---
 

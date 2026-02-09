@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
-const calorCode = `§F[f_01J5X7K9M2:Square:pub]
-  §I[i32:x]
-  §O[i32]
+const calorCode = `§F{f_01J5X7K9M2:Square:pub}
+  §I{i32:x}
+  §O{i32}
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
-§/F[f_01J5X7K9M2]`;
+§/F{f_01J5X7K9M2}`;
 
 const csharpCode = `public static int Square(int x)
 {
