@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 - **Programs Tested**: 28
 
 ### Added
+- **Z3 static contract verification** - Prove contracts at compile time with `--verify` flag; proven contracts can have runtime checks elided
+- **Manifest-based effect resolution for .NET interop** - Layered resolution from built-in BCL manifests, user manifests, and namespace defaults
+- **Granular effect taxonomy** - `fs:r/fs:w`, `net:r/net:w`, `db:r/db:w`, `env:r/env:w` with subtyping (`rw` encompasses `r` and `w`)
+- **New CLI commands**: `calor effects resolve`, `calor effects validate`, `calor effects list`
 - New CatchBugs component on homepage showing interprocedural effect analysis with compiler error demo
 
 ### Changed
