@@ -1197,11 +1197,35 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         EmitCSharpAttributes(node.CSharpAttributes);
 
         var name = SanitizeIdentifier(node.Name);
+
+        // Build type parameters
+        var typeParams = "";
+        var whereClause = "";
+        if (node.TypeParameters.Count > 0)
+        {
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+
+            // Build where clauses
+            var whereClauses = new List<string>();
+            foreach (var tp in node.TypeParameters)
+            {
+                if (tp.Constraints.Count > 0)
+                {
+                    var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
+                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                }
+            }
+            if (whereClauses.Count > 0)
+            {
+                whereClause = " " + string.Join(" ", whereClauses);
+            }
+        }
+
         var baseList = node.BaseInterfaces.Count > 0
             ? " : " + string.Join(", ", node.BaseInterfaces.Select(SanitizeIdentifier))
             : "";
 
-        AppendLine($"public interface {name}{baseList}");
+        AppendLine($"public interface {name}{typeParams}{baseList}{whereClause}");
         AppendLine("{");
         Indent();
 
@@ -1225,15 +1249,31 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var methodName = SanitizeIdentifier(node.Name);
 
         var typeParams = "";
+        var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
             typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+
+            // Build where clauses
+            var whereClauses = new List<string>();
+            foreach (var tp in node.TypeParameters)
+            {
+                if (tp.Constraints.Count > 0)
+                {
+                    var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
+                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                }
+            }
+            if (whereClauses.Count > 0)
+            {
+                whereClause = " " + string.Join(" ", whereClauses);
+            }
         }
 
         var parameters = string.Join(", ", node.Parameters.Select(p =>
             $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
 
-        AppendLine($"{mappedReturnType} {methodName}{typeParams}({parameters});");
+        AppendLine($"{mappedReturnType} {methodName}{typeParams}({parameters}){whereClause};");
 
         return "";
     }

@@ -81,9 +81,10 @@ public sealed class Lexer
         ["/EACH"] = TokenKind.EndForeach,
 
         // Generics
-        ["TP"] = TokenKind.TypeParam,
-        ["WR"] = TokenKind.Where,           // §WR = Where
-        ["G"] = TokenKind.Generic,
+        // Old syntax removed: ["TP"] = TokenKind.TypeParam (use <T> suffix instead)
+        // Old syntax removed: ["G"] = TokenKind.Generic (use List<T> inline instead)
+        ["WR"] = TokenKind.Where,           // §WR = Where (legacy, still supported)
+        ["WHERE"] = TokenKind.Where,        // §WHERE = Where (new syntax)
 
         // Classes, Interfaces, Inheritance
         ["CL"] = TokenKind.Class,           // §CL = Class

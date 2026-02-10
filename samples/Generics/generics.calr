@@ -1,0 +1,77 @@
+§M{m001:Generics}
+
+§F{f001:Identity:pub}<T>
+  §I{T:value}
+  §O{T}
+  §R value
+§/F{f001}
+
+§F{f002:GetCount:pub}<T>
+  §I{List<T>:items}
+  §O{i32}
+  §R items.Count
+§/F{f002}
+
+§CL{c001:Pair:pub}<T, U>
+  §FLD{T:First:pub}
+  §FLD{U:Second:pub}
+
+  §CTOR{ct001:pub}
+    §I{T:first}
+    §I{U:second}
+    §ASSIGN First first
+    §ASSIGN Second second
+  §/CTOR{ct001}
+§/CL{c001}
+
+§CL{c002:Repository:pub}<T>
+  §WHERE T : class
+  §FLD{List<T>:_items:pri}
+
+  §CTOR{ct001:pub}
+    §ASSIGN _items §NEW{List:T}
+  §/CTOR{ct001}
+
+  §MT{m001:Add:pub}
+    §I{T:item}
+    §O{void}
+    §C{_items.Add} §A item §/C
+  §/MT{m001}
+
+  §MT{m002:GetAll:pub}
+    §O{IReadOnlyList<T>}
+    §R _items
+  §/MT{m002}
+
+  §MT{m003:Count:pub}
+    §O{i32}
+    §R _items.Count
+  §/MT{m003}
+§/CL{c002}
+
+§IFACE{i001:IRepository}<T>
+  §WHERE T : class
+
+  §MT{m001:Add}
+    §I{T:item}
+    §O{void}
+  §/MT{m001}
+
+  §MT{m002:GetAll}
+    §O{IReadOnlyList<T>}
+  §/MT{m002}
+§/IFACE{i001}
+
+§F{f003:Main:pub}
+  §O{void}
+  §E{cw}
+  §P "Generics sample - compilation test"
+  §P "Features demonstrated:"
+  §P "  - Generic functions with type parameters"
+  §P "  - Generic classes (Pair<T,U>, Repository<T>)"
+  §P "  - Generic interfaces (IRepository<T>)"
+  §P "  - WHERE constraints (T : class)"
+  §P "  - Generic type references (List<T>, IReadOnlyList<T>)"
+§/F{f003}
+
+§/M{m001}

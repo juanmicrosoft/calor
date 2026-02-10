@@ -18,9 +18,9 @@ public enum MethodModifiers
 
 /// <summary>
 /// Represents an interface definition.
-/// §IFACE[i001:IShape]
-///   §METHOD[m001:Area] §O[f64] §E[] §/METHOD[m001]
-/// §/IFACE[i001]
+/// §IFACE{i001:IShape}&lt;T&gt;
+///   §METHOD{m001:Area} §O{f64} §/METHOD{m001}
+/// §/IFACE{i001}
 /// </summary>
 public sealed class InterfaceDefinitionNode : TypeDefinitionNode
 {
@@ -35,6 +35,11 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
     public IReadOnlyList<string> BaseInterfaces { get; }
 
     /// <summary>
+    /// Type parameters if this is a generic interface.
+    /// </summary>
+    public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
+
+    /// <summary>
     /// C#-style attributes (e.g., [@Obsolete], [@ComVisible]).
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
@@ -46,7 +51,7 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<string> baseInterfaces,
         IReadOnlyList<MethodSignatureNode> methods,
         AttributeCollection attributes)
-        : this(span, id, name, baseInterfaces, methods, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, id, name, baseInterfaces, Array.Empty<TypeParameterNode>(), methods, attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -58,9 +63,23 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodSignatureNode> methods,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, id, name, baseInterfaces, Array.Empty<TypeParameterNode>(), methods, attributes, csharpAttributes)
+    {
+    }
+
+    public InterfaceDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        IReadOnlyList<string> baseInterfaces,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<MethodSignatureNode> methods,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span, id, name, attributes)
     {
         BaseInterfaces = baseInterfaces ?? throw new ArgumentNullException(nameof(baseInterfaces));
+        TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }

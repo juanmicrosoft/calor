@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Calor.Runtime/Calor.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>

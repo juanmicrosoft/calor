@@ -1387,7 +1387,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Emits §WR clauses for type parameters with constraints.
+    /// Emits §WHERE clauses for type parameters with constraints.
+    /// New format: §WHERE T : class, IComparable&lt;T&gt;
     /// </summary>
     private void EmitTypeParameterConstraints(IReadOnlyList<TypeParameterNode> typeParameters)
     {
@@ -1395,8 +1396,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             if (tp.Constraints.Count > 0)
             {
-                var constraints = string.Join(",", tp.Constraints.Select(c => Visit(c)));
-                AppendLine($"§WR{{{tp.Name}:{constraints}}}");
+                var constraints = string.Join(", ", tp.Constraints.Select(c => Visit(c)));
+                AppendLine($"§WHERE {tp.Name} : {constraints}");
             }
         }
     }

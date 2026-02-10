@@ -4,7 +4,8 @@ namespace Calor.Compiler.Ast;
 
 /// <summary>
 /// Represents a type parameter declaration.
-/// §TP[T]                                    // type parameter T
+/// New syntax: §F{id:name:pub}&lt;T&gt; or §CL{id:name:pub}&lt;T, U&gt;
+/// Legacy: §TP[T] (no longer supported in new code)
 /// </summary>
 public sealed class TypeParameterNode : AstNode
 {
@@ -80,8 +81,8 @@ public sealed class TypeConstraintNode : AstNode
 
 /// <summary>
 /// Represents a generic type instantiation.
-/// §G[List:i32]                              // List&lt;int&gt;
-/// §G[Dictionary:string:i32]                 // Dictionary&lt;string, int&gt;
+/// New syntax: Use inline generic syntax in type names: List&lt;i32&gt;, Dictionary&lt;str, i32&gt;
+/// Legacy: §G[List:i32] (no longer supported in new code)
 /// </summary>
 public sealed class GenericTypeNode : ExpressionNode
 {

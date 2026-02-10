@@ -53,6 +53,13 @@ public sealed class TypeChecker
     {
         _env.EnterScope();
 
+        // Register type parameters in scope
+        foreach (var tp in func.TypeParameters)
+        {
+            var tpType = new TypeParameterType(tp.Name, tp.Constraints);
+            _env.DefineType(tp.Name, tpType);
+        }
+
         // Add parameters to scope
         foreach (var param in func.Parameters)
         {
@@ -561,23 +568,28 @@ public sealed class TypeChecker
 public sealed class TypeEnvironment
 {
     private readonly Stack<Dictionary<string, CalorType>> _variableScopes = new();
-    private readonly Dictionary<string, CalorType> _types = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Stack<Dictionary<string, CalorType>> _typeScopes = new();
+    private readonly Dictionary<string, CalorType> _globalTypes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, FunctionType> _functions = new(StringComparer.OrdinalIgnoreCase);
 
     public TypeEnvironment()
     {
         _variableScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
+        _typeScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
     }
 
     public void EnterScope()
     {
         _variableScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
+        _typeScopes.Push(new Dictionary<string, CalorType>(StringComparer.OrdinalIgnoreCase));
     }
 
     public void ExitScope()
     {
         if (_variableScopes.Count > 1)
             _variableScopes.Pop();
+        if (_typeScopes.Count > 1)
+            _typeScopes.Pop();
     }
 
     public void DefineVariable(string name, CalorType type)
@@ -597,12 +609,27 @@ public sealed class TypeEnvironment
 
     public void DefineType(string name, CalorType type)
     {
-        _types[name] = type;
+        // Type parameters are scoped, other types are global
+        if (type is TypeParameterType)
+        {
+            _typeScopes.Peek()[name] = type;
+        }
+        else
+        {
+            _globalTypes[name] = type;
+        }
     }
 
     public CalorType? LookupType(string name)
     {
-        return _types.TryGetValue(name, out var type) ? type : null;
+        // Check scoped types first (type parameters)
+        foreach (var scope in _typeScopes)
+        {
+            if (scope.TryGetValue(name, out var type))
+                return type;
+        }
+        // Then check global types
+        return _globalTypes.TryGetValue(name, out var globalType) ? globalType : null;
     }
 
     public void DefineFunction(string name, FunctionType type)
