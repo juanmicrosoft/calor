@@ -65,9 +65,26 @@ public class WebsiteReportGenerator
     {
         var metrics = new Dictionary<string, WebsiteMetricResult>();
 
+        // Check which categories are Calor-only by looking at metric details
+        var calorOnlyCategories = new HashSet<string>();
+        foreach (var caseResult in result.CaseResults)
+        {
+            foreach (var metric in caseResult.Metrics)
+            {
+                if (metric.Details.TryGetValue("isCalorOnly", out var isCalorOnly) &&
+                    isCalorOnly is true)
+                {
+                    calorOnlyCategories.Add(metric.Category);
+                }
+            }
+        }
+
         foreach (var (category, advantage) in result.Summary.CategoryAdvantages)
         {
-            var winner = advantage > 1.0 ? "calor" : (advantage < 1.0 ? "csharp" : "tie");
+            var isCalorOnly = calorOnlyCategories.Contains(category);
+            // Calor-only metrics always show Calor as winner
+            var winner = isCalorOnly ? "calor" :
+                (advantage > 1.0 ? "calor" : (advantage < 1.0 ? "csharp" : "tie"));
 
             double[]? ci95 = null;
             if (result.Summary.CategoryConfidenceIntervals.TryGetValue(category, out var ci))
@@ -100,7 +117,8 @@ public class WebsiteReportGenerator
                 Significant = significant,
                 PValue = pValue.HasValue ? Math.Round(pValue.Value, 4) : null,
                 EffectSize = effectSize,
-                EffectInterpretation = effectInterpretation
+                EffectInterpretation = effectInterpretation,
+                IsCalorOnly = isCalorOnly ? true : null
             };
         }
 
@@ -194,6 +212,7 @@ public class WebsiteMetricResult
     public double? PValue { get; init; }
     public double? EffectSize { get; init; }
     public string? EffectInterpretation { get; init; }
+    public bool? IsCalorOnly { get; init; }
 }
 
 /// <summary>

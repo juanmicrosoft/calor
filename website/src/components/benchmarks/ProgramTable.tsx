@@ -33,6 +33,9 @@ const metricDisplayNames: Record<string, string> = {
   InformationDensity: 'Info Den',
   TaskCompletion: 'Task',
   RefactoringStability: 'Refactor',
+  ContractVerification: 'Contracts',
+  EffectSoundness: 'Effects',
+  InteropEffectCoverage: 'Interop',
 };
 
 function formatValue(value: number): string {

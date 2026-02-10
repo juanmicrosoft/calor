@@ -15,7 +15,7 @@ calor benchmark [project] [options]
 
 ## Overview
 
-The `benchmark` command measures and compares Calor against C# across seven evaluation categories designed to assess AI agent effectiveness:
+The `benchmark` command measures and compares Calor against C# across ten evaluation categories designed to assess AI agent effectiveness:
 
 1. **Token Economics** - Token count and density
 2. **Generation Accuracy** - Code correctness
@@ -24,6 +24,9 @@ The `benchmark` command measures and compares Calor against C# across seven eval
 5. **Error Detection** - Bug identification
 6. **Information Density** - Meaning per token
 7. **Task Completion** - End-to-end success
+8. **Contract Verification** - Z3 static verification (Calor only)
+9. **Effect Soundness** - Effect declaration accuracy (Calor only)
+10. **Interop Coverage** - BCL effect manifest coverage (Calor only)
 
 ---
 
@@ -86,7 +89,7 @@ Calor shows 1.27x overall advantage for AI agent tasks.
 
 ## Quick Benchmark
 
-For fast token/line comparison without the full 7-metric evaluation:
+For fast token/line comparison without the full 10-metric evaluation:
 
 ```bash
 calor benchmark --calor file.calr --csharp file.cs --quick
