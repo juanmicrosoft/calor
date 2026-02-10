@@ -264,3 +264,29 @@ public sealed class TypeVariable : CalorType
 
     public override int GetHashCode() => Id.GetHashCode();
 }
+
+/// <summary>
+/// Represents a type parameter (e.g., T in List&lt;T&gt;).
+/// Used during type checking to track type parameters declared in generic functions/classes.
+/// </summary>
+public sealed class TypeParameterType : CalorType
+{
+    public override string Name { get; }
+    public IReadOnlyList<Ast.TypeConstraintNode> Constraints { get; }
+
+    public TypeParameterType(string name, IReadOnlyList<Ast.TypeConstraintNode> constraints)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Constraints = constraints ?? Array.Empty<Ast.TypeConstraintNode>();
+    }
+
+    public TypeParameterType(string name)
+        : this(name, Array.Empty<Ast.TypeConstraintNode>())
+    {
+    }
+
+    public override bool Equals(CalorType? other)
+        => other is TypeParameterType tpt && tpt.Name == Name;
+
+    public override int GetHashCode() => Name.GetHashCode();
+}

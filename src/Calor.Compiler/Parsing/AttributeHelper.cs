@@ -195,6 +195,7 @@ public static class AttributeHelper
 
     /// <summary>
     /// Expands compact type to full type name.
+    /// Handles generic types like List&lt;T&gt;, Dictionary&lt;str, T&gt;.
     /// </summary>
     public static string ExpandType(string compactType)
     {
@@ -209,12 +210,34 @@ public static class AttributeHelper
         }
 
         // Handle Result type: T!E -> RESULT[ok=T][err=E]
-        if (compactType.Contains('!'))
+        // But be careful not to match ! inside generic brackets
+        var exclamationIndex = FindTopLevelChar(compactType, '!');
+        if (exclamationIndex >= 0)
         {
-            var parts = compactType.Split('!', 2);
-            var ok = ExpandType(parts[0]);
-            var err = parts.Length > 1 ? ExpandType(parts[1]) : "STRING";
+            var ok = ExpandType(compactType[..exclamationIndex]);
+            var err = exclamationIndex < compactType.Length - 1
+                ? ExpandType(compactType[(exclamationIndex + 1)..])
+                : "STRING";
             return $"RESULT[ok={ok}][err={err}]";
+        }
+
+        // Handle generic types: List<T>, Dictionary<str, T>
+        var genericIndex = compactType.IndexOf('<');
+        if (genericIndex > 0 && compactType.EndsWith('>'))
+        {
+            var baseName = compactType[..genericIndex];
+            var argsStr = compactType[(genericIndex + 1)..^1];
+            var args = SplitGenericArgs(argsStr);
+            var expandedArgs = string.Join(", ", args.Select(ExpandType));
+            return $"{baseName}<{expandedArgs}>";
+        }
+
+        // Handle array types: T[] or T[,]
+        if (compactType.EndsWith("[]") || compactType.EndsWith("[,]"))
+        {
+            var arrayStart = compactType.LastIndexOf('[');
+            var elementType = ExpandType(compactType[..arrayStart]);
+            return elementType + compactType[arrayStart..];
         }
 
         // Primitive type mappings
@@ -237,6 +260,52 @@ public static class AttributeHelper
             "char" => "CHAR",
             _ => compactType // Pass through unknown types preserving original casing
         };
+    }
+
+    /// <summary>
+    /// Finds the index of a character at the top level (not inside angle brackets).
+    /// Returns -1 if not found.
+    /// </summary>
+    private static int FindTopLevelChar(string str, char target)
+    {
+        var depth = 0;
+        for (int i = 0; i < str.Length; i++)
+        {
+            var c = str[i];
+            if (c == '<') depth++;
+            else if (c == '>') depth--;
+            else if (c == target && depth == 0) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Splits generic type arguments respecting nested angle brackets.
+    /// E.g., "str, List&lt;T&gt;" → ["str", "List&lt;T&gt;"]
+    /// </summary>
+    private static List<string> SplitGenericArgs(string argsStr)
+    {
+        var args = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var depth = 0;
+
+        foreach (var c in argsStr)
+        {
+            if (c == '<') depth++;
+            else if (c == '>') depth--;
+            else if (c == ',' && depth == 0)
+            {
+                args.Add(current.ToString().Trim());
+                current.Clear();
+                continue;
+            }
+            current.Append(c);
+        }
+
+        if (current.Length > 0)
+            args.Add(current.ToString().Trim());
+
+        return args;
     }
 
     /// <summary>
