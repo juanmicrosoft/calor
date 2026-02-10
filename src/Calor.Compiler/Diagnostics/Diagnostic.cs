@@ -135,6 +135,23 @@ public static class DiagnosticCode
     /// Info: Contract inheritance is valid.
     /// </summary>
     public const string ContractInheritanceValid = "Calor0814";
+
+    // Contract inheritance Z3 proving (Calor0815-0817)
+
+    /// <summary>
+    /// Info: Contract implication proven by Z3 SMT solver.
+    /// </summary>
+    public const string ImplicationProvenByZ3 = "Calor0815";
+
+    /// <summary>
+    /// Warning: Contract implication could not be determined (Z3 timeout or complexity).
+    /// </summary>
+    public const string ImplicationUnknown = "Calor0816";
+
+    /// <summary>
+    /// Info: Z3 SMT solver is unavailable, using heuristic checking only.
+    /// </summary>
+    public const string Z3UnavailableForInheritance = "Calor0817";
 }
 
 /// <summary>

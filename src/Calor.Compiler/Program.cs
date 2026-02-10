@@ -288,7 +288,7 @@ public class Program
         }
 
         // Contract inheritance checking
-        var contractInheritanceChecker = new ContractInheritanceChecker(diagnostics);
+        using var contractInheritanceChecker = new ContractInheritanceChecker(diagnostics);
         var inheritanceResult = contractInheritanceChecker.Check(ast);
 
         if (options.Verbose)
