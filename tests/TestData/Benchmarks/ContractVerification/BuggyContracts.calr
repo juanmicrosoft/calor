@@ -1,0 +1,25 @@
+§M{m001:BuggyMath}
+§F{f001:BadAbs:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (>= result 0)
+  §R x
+§/F{f001}
+
+§F{f002:BadMax:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §S (>= result a)
+  §S (>= result b)
+  §R a
+§/F{f002}
+
+§F{f003:BadDivide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §S (== result (/ a b))
+  §R 0
+§/F{f003}
+§/M{m001}

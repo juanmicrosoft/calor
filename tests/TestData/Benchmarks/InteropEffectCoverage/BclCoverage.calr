@@ -1,0 +1,44 @@
+§M{m001:BclUsage}
+§F{f001:ReadAndLog:pub}
+  §I{str:path}
+  §O{void}
+  §E{io:cw}
+  §E{io:fs:r}
+  §V{str:content} §C{File.ReadAllText} path
+  §C{Console.WriteLine} content
+§/F{f001}
+
+§F{f002:WriteFile:pub}
+  §I{str:path}
+  §I{str:content}
+  §O{void}
+  §E{io:fs:w}
+  §C{File.WriteAllText} path content
+§/F{f002}
+
+§F{f003:GetCurrentTime:pub}
+  §O{DateTime}
+  §E{time}
+  §R §C{DateTime.Now}
+§/F{f003}
+
+§F{f004:GenerateId:pub}
+  §O{str}
+  §E{rand}
+  §R §C{Guid.NewGuid}.ToString
+§/F{f004}
+
+§F{f005:FetchData:pub}
+  §I{str:url}
+  §O{str}
+  §E{io:net:r}
+  §R §C{HttpClient.GetStringAsync} url
+§/F{f005}
+
+§F{f006:GetEnvironmentVar:pub}
+  §I{str:name}
+  §O{str}
+  §E{env:r}
+  §R §C{Environment.GetEnvironmentVariable} name
+§/F{f006}
+§/M{m001}

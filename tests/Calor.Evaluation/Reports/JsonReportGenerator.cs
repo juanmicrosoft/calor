@@ -82,21 +82,28 @@ public class JsonReportGenerator
             .GroupBy(m => m.Category)
             .ToDictionary(
                 g => g.Key,
-                g => new JsonCategoryResult
+                g =>
                 {
-                    MetricCount = g.Count(),
-                    AverageAdvantage = g.Average(m => m.AdvantageRatio),
-                    CalorWins = g.Count(m => m.AdvantageRatio > 1.0),
-                    CSharpWins = g.Count(m => m.AdvantageRatio < 1.0),
-                    Ties = g.Count(m => Math.Abs(m.AdvantageRatio - 1.0) < 0.01),
-                    Metrics = g.Select(m => new JsonMetric
+                    var isCalorOnly = g.Any(m => m.Details.TryGetValue("isCalorOnly", out var v) && v is bool b && b);
+                    return new JsonCategoryResult
                     {
-                        Name = m.MetricName,
-                        CalorScore = m.CalorScore,
-                        CSharpScore = m.CSharpScore,
-                        AdvantageRatio = m.AdvantageRatio,
-                        AdvantagePercent = Math.Round(m.AdvantagePercentage, 1)
-                    }).ToList()
+                        MetricCount = g.Count(),
+                        AverageAdvantage = g.Average(m => m.AdvantageRatio),
+                        CalorWins = g.Count(m => m.AdvantageRatio > 1.0),
+                        CSharpWins = g.Count(m => m.AdvantageRatio < 1.0),
+                        Ties = g.Count(m => Math.Abs(m.AdvantageRatio - 1.0) < 0.01),
+                        IsCalorOnly = isCalorOnly,
+                        AverageScore = isCalorOnly ? g.Average(m => m.CalorScore) * 100 : null,
+                        Metrics = g.Select(m => new JsonMetric
+                        {
+                            Name = m.MetricName,
+                            CalorScore = m.CalorScore,
+                            CSharpScore = m.CSharpScore,
+                            AdvantageRatio = m.AdvantageRatio,
+                            AdvantagePercent = Math.Round(m.AdvantagePercentage, 1),
+                            IsCalorOnly = m.Details.TryGetValue("isCalorOnly", out var v) && v is bool b && b
+                        }).ToList()
+                    };
                 });
     }
 
@@ -150,6 +157,8 @@ internal class JsonCategoryResult
     public int CalorWins { get; set; }
     public int CSharpWins { get; set; }
     public int Ties { get; set; }
+    public bool IsCalorOnly { get; set; }
+    public double? AverageScore { get; set; }
     public List<JsonMetric> Metrics { get; set; } = new();
 }
 
@@ -160,6 +169,7 @@ internal class JsonMetric
     public double CSharpScore { get; set; }
     public double AdvantageRatio { get; set; }
     public double AdvantagePercent { get; set; }
+    public bool IsCalorOnly { get; set; }
 }
 
 internal class JsonCaseResult

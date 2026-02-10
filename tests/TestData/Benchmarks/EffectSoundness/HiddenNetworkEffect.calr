@@ -1,0 +1,23 @@
+§M{m001:OrderService}
+§F{f001:SaveOrder:pub}
+  §I{Order:order}
+  §O{void}
+  §E{io:db:w}
+  §C{DbContext.SaveChanges}
+§/F{f001}
+
+§F{f002:NotifyCustomer:pub}
+  §I{Order:order}
+  §O{void}
+  §E{io:net:w}
+  §C{HttpClient.PostAsync} (. order CustomerEmail) "Order shipped"
+§/F{f002}
+
+§F{f003:ProcessOrder:pub}
+  §I{Order:order}
+  §O{void}
+  §E{io:db:w}
+  §C{SaveOrder} order
+  §C{NotifyCustomer} order
+§/F{f003}
+§/M{m001}

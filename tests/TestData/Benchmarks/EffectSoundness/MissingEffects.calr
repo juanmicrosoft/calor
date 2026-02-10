@@ -1,0 +1,20 @@
+§M{m001:UnsafeService}
+§F{f001:SilentLog:pub}
+  §I{str:message}
+  §O{void}
+  §C{Console.WriteLine} message
+§/F{f001}
+
+§F{f002:UndeclaredWrite:pub}
+  §I{str:path}
+  §I{str:content}
+  §O{void}
+  §C{File.WriteAllText} path content
+§/F{f002}
+
+§F{f003:HiddenNetwork:pub}
+  §I{str:url}
+  §O{str}
+  §C{HttpClient.GetStringAsync} url
+§/F{f003}
+§/M{m001}
