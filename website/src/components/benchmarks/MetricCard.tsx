@@ -101,8 +101,8 @@ export function MetricCard({ name, ratio, winner, description }: MetricCardProps
             className={cn(
               'text-xs px-2 py-0.5 rounded-full',
               winner === 'calor'
-                ? 'bg-calor-cyan/20 text-calor-cerulean'
-                : 'bg-calor-salmon/20 text-calor-salmon'
+                ? 'bg-calor-pink/20 text-calor-pink'
+                : 'bg-calor-cerulean/20 text-calor-cerulean'
             )}
           >
             {winner === 'calor' ? 'Calor' : 'C#'} wins
@@ -116,8 +116,8 @@ export function MetricCard({ name, ratio, winner, description }: MetricCardProps
           className={cn(
             'absolute inset-y-0 left-0 rounded-full transition-all duration-500',
             winner === 'calor'
-              ? 'bg-gradient-to-r from-calor-cyan to-calor-cyan/80'
-              : 'bg-gradient-to-r from-calor-salmon to-calor-salmon/80'
+              ? 'bg-gradient-to-r from-calor-pink to-calor-pink/80'
+              : 'bg-gradient-to-r from-calor-cerulean to-calor-cerulean/80'
           )}
           style={{ width: `${getBarWidth(ratio)}%` }}
         />

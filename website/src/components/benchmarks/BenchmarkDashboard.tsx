@@ -65,8 +65,8 @@ function SummaryCard({ icon, label, value, subtext, highlight = 'neutral' }: Sum
     <div
       className={cn(
         'p-4 rounded-lg border',
-        highlight === 'calor' && 'border-calor-cyan/50 bg-calor-cyan/5',
-        highlight === 'csharp' && 'border-calor-salmon/50 bg-calor-salmon/5',
+        highlight === 'calor' && 'border-calor-pink/50 bg-calor-pink/5',
+        highlight === 'csharp' && 'border-calor-cerulean/50 bg-calor-cerulean/5',
         highlight === 'neutral' && 'border-border bg-muted/30'
       )}
     >
@@ -159,11 +159,11 @@ export function BenchmarkDashboard() {
         {/* Legend */}
         <div className="mt-6 flex items-center justify-center gap-8 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-calor-cyan" />
+            <div className="w-3 h-3 rounded-full bg-calor-pink" />
             <span>Calor better</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-calor-salmon" />
+            <div className="w-3 h-3 rounded-full bg-calor-cerulean" />
             <span>C# better</span>
           </div>
           <span className="text-xs">|</span>
