@@ -63,6 +63,11 @@ public sealed class FunctionNode : AstNode
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// True if this is an async function.
+    /// </summary>
+    public bool IsAsync { get; }
+
     // Extended Features: Inline Examples/Tests
     public IReadOnlyList<ExampleNode> Examples { get; }
     // Extended Features: Structured Issues
@@ -169,7 +174,8 @@ public sealed class FunctionNode : AstNode
         IReadOnlyList<PropertyTestNode> properties,
         LockNode? lockNode,
         AuthorNode? author,
-        TaskRefNode? taskRef)
+        TaskRefNode? taskRef,
+        bool isAsync = false)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -196,6 +202,7 @@ public sealed class FunctionNode : AstNode
         Lock = lockNode;
         Author = author;
         TaskRef = taskRef;
+        IsAsync = isAsync;
     }
 
     /// <summary>

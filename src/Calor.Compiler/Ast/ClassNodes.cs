@@ -419,6 +419,11 @@ public sealed class MethodNode : AstNode
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
+    /// <summary>
+    /// True if this is an async method.
+    /// </summary>
+    public bool IsAsync { get; }
+
     public MethodNode(
         TextSpan span,
         string id,
@@ -434,7 +439,7 @@ public sealed class MethodNode : AstNode
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
         : this(span, id, name, visibility, modifiers, typeParameters, parameters, output, effects,
-               preconditions, postconditions, body, attributes, Array.Empty<CalorAttributeNode>())
+               preconditions, postconditions, body, attributes, Array.Empty<CalorAttributeNode>(), false)
     {
     }
 
@@ -452,7 +457,8 @@ public sealed class MethodNode : AstNode
         IReadOnlyList<EnsuresNode> postconditions,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes,
-        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        bool isAsync = false)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -468,6 +474,7 @@ public sealed class MethodNode : AstNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
+        IsAsync = isAsync;
     }
 
     public bool IsVirtual => (Modifiers & MethodModifiers.Virtual) != 0;

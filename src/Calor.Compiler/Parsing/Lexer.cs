@@ -140,6 +140,10 @@ public sealed class Lexer
         // Async/Await
         ["ASYNC"] = TokenKind.Async,
         ["AWAIT"] = TokenKind.Await,
+        ["AF"] = TokenKind.AsyncFunc,
+        ["/AF"] = TokenKind.EndAsyncFunc,
+        ["AMT"] = TokenKind.AsyncMethod,
+        ["/AMT"] = TokenKind.EndAsyncMethod,
 
         // String Interpolation and Modern Operators
         ["INTERP"] = TokenKind.Interpolate,

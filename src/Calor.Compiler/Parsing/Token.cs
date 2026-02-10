@@ -176,6 +176,10 @@ public enum TokenKind
     // Phase 12: Async/Await
     Async,
     Await,
+    AsyncFunc,          // §AF - Async function
+    EndAsyncFunc,       // §/AF - End async function
+    AsyncMethod,        // §AMT - Async method
+    EndAsyncMethod,     // §/AMT - End async method
 
     // Phase 9: String Interpolation and Modern Operators
     Interpolate,

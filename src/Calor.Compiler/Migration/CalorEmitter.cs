@@ -409,7 +409,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§MT{{{node.Id}:{node.Name}{typeParams}:{visibility}{modStr}}}{attrs}");
+        // Use §AMT for async methods, §MT for regular methods
+        var methodTag = node.IsAsync ? "AMT" : "MT";
+        AppendLine($"§{methodTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}{modStr}}}{attrs}");
         Indent();
 
         // Emit type parameter constraints
@@ -450,7 +452,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/MT{{{node.Id}}}");
+        AppendLine($"§/{methodTag}{{{node.Id}}}");
 
         return "";
     }
@@ -464,7 +466,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
 
-        AppendLine($"§F{{{node.Id}:{node.Name}{typeParams}:{visibility}}}");
+        // Use §AF for async functions, §F for regular functions
+        var funcTag = node.IsAsync ? "AF" : "F";
+        AppendLine($"§{funcTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}}}");
         Indent();
 
         // Emit type parameter constraints
@@ -502,7 +506,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/F{{{node.Id}}}");
+        AppendLine($"§/{funcTag}{{{node.Id}}}");
 
         return "";
     }
