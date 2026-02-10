@@ -1,0 +1,37 @@
+§M{m001:PatternDemo}
+
+§F{f001:GetGrade:pub}
+  §I{i32:score}
+  §O{str}
+  §R §W{sw1} score
+    §K §PREL{gte} 90 → "A"
+    §K §PREL{gte} 80 → "B"
+    §K §PREL{gte} 70 → "C"
+    §K §PREL{gte} 60 → "D"
+    §K _ → "F"
+  §/W{sw1}
+§/F{f001}
+
+§F{f002:GetHttpStatus:pub}
+  §I{i32:code}
+  §O{str}
+  §R §W{sw2} code
+    §K 200 → "OK"
+    §K 404 → "Not Found"
+    §K 500 → "Server Error"
+    §K _ → "Unknown"
+  §/W{sw2}
+§/F{f002}
+
+§F{f003:Describe:pub}
+  §I{i32:x}
+  §O{str}
+  §R §W{sw3} x
+    §K §VAR{n} §WHEN (> n 100) → "large"
+    §K §VAR{n} §WHEN (< n 0) → "negative"
+    §K 0 → "zero"
+    §K _ → "normal"
+  §/W{sw3}
+§/F{f003}
+
+§/M{m001}

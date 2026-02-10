@@ -910,15 +910,29 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var pattern = EmitPattern(node.Pattern);
         var guard = node.Guard != null ? $" §WHEN {node.Guard.Accept(this)}" : "";
-        AppendLine($"§K {pattern}{guard}");
-        Indent();
 
-        foreach (var stmt in node.Body)
+        // Check if this is a single-return case suitable for arrow syntax
+        if (node.Body.Count == 1 && node.Body[0] is ReturnStatementNode returnStmt && returnStmt.Expression != null)
         {
-            stmt.Accept(this);
+            // Use arrow syntax: §K pattern → expression
+            var expr = returnStmt.Expression.Accept(this);
+            AppendLine($"§K {pattern}{guard} → {expr}");
+        }
+        else
+        {
+            // Use block syntax with §/K closing tag
+            AppendLine($"§K {pattern}{guard}");
+            Indent();
+
+            foreach (var stmt in node.Body)
+            {
+                stmt.Accept(this);
+            }
+
+            Dedent();
+            AppendLine("§/K");
         }
 
-        Dedent();
         return "";
     }
 
@@ -1255,15 +1269,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return pattern switch
         {
             WildcardPatternNode => "_",
-            VariablePatternNode vp => $"var {vp.Name}",
+            VariablePatternNode vp => $"§VAR{{{vp.Name}}}",
             LiteralPatternNode lp => lp.Literal.Accept(this),
-            SomePatternNode sp => $"some({EmitPattern(sp.InnerPattern)})",
-            NonePatternNode => "none",
-            OkPatternNode op => $"ok({EmitPattern(op.InnerPattern)})",
-            ErrPatternNode ep => $"err({EmitPattern(ep.InnerPattern)})",
-            VarPatternNode varp => $"var {varp.Name}",
+            SomePatternNode sp => $"§SM {EmitPattern(sp.InnerPattern)}",
+            NonePatternNode => "§NN",
+            OkPatternNode op => $"§OK {EmitPattern(op.InnerPattern)}",
+            ErrPatternNode ep => $"§ERR {EmitPattern(ep.InnerPattern)}",
+            VarPatternNode varp => $"§VAR{{{varp.Name}}}",
             ConstantPatternNode cp => cp.Value.Accept(this),
-            RelationalPatternNode rp => Visit(rp),
+            RelationalPatternNode rp => EmitRelationalPattern(rp),
             PropertyPatternNode pp => Visit(pp),
             PositionalPatternNode pos => Visit(pos),
             ListPatternNode lp => Visit(lp),
@@ -1271,14 +1285,33 @@ public sealed class CalorEmitter : IAstVisitor<string>
         };
     }
 
+    private string EmitRelationalPattern(RelationalPatternNode node)
+    {
+        // Map C# operator back to Calor keyword
+        var opKeyword = node.Operator switch
+        {
+            ">=" => "gte",
+            "<=" => "lte",
+            ">" => "gt",
+            "<" => "lt",
+            "gte" => "gte",
+            "lte" => "lte",
+            "gt" => "gt",
+            "lt" => "lt",
+            _ => "gte"
+        };
+        var value = node.Value.Accept(this);
+        return $"§PREL{{{opKeyword}}} {value}";
+    }
+
     public string Visit(WildcardPatternNode node) => "_";
-    public string Visit(VariablePatternNode node) => $"var {node.Name}";
+    public string Visit(VariablePatternNode node) => $"§VAR{{{node.Name}}}";
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
-    public string Visit(SomePatternNode node) => $"some({EmitPattern(node.InnerPattern)})";
-    public string Visit(NonePatternNode node) => "none";
-    public string Visit(OkPatternNode node) => $"ok({EmitPattern(node.InnerPattern)})";
-    public string Visit(ErrPatternNode node) => $"err({EmitPattern(node.InnerPattern)})";
-    public string Visit(VarPatternNode node) => $"var {node.Name}";
+    public string Visit(SomePatternNode node) => $"§SM {EmitPattern(node.InnerPattern)}";
+    public string Visit(NonePatternNode node) => "§NN";
+    public string Visit(OkPatternNode node) => $"§OK {EmitPattern(node.InnerPattern)}";
+    public string Visit(ErrPatternNode node) => $"§ERR {EmitPattern(node.InnerPattern)}";
+    public string Visit(VarPatternNode node) => $"§VAR{{{node.Name}}}";
     public string Visit(ConstantPatternNode node) => node.Value.Accept(this);
 
     // Additional pattern nodes
@@ -1302,8 +1335,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(RelationalPatternNode node)
     {
-        var value = node.Value.Accept(this);
-        return $"{node.Operator} {value}";
+        return EmitRelationalPattern(node);
     }
 
     public string Visit(ListPatternNode node)
