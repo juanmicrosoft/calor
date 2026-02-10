@@ -112,28 +112,96 @@ public class MarkdownReportGenerator
 
         foreach (var category in byCategory)
         {
+            // Check if this is a Calor-only category
+            var isCalorOnly = category.Any(m => m.Details.TryGetValue("isCalorOnly", out var v) && v is bool b && b);
+
             var avgAdvantage = category.Average(m => m.AdvantageRatio);
             var calorWins = category.Count(m => m.AdvantageRatio > 1.0);
             var csharpWins = category.Count(m => m.AdvantageRatio < 1.0);
 
             sb.AppendLine($"### {category.Key}");
+            if (isCalorOnly)
+            {
+                sb.AppendLine("*(Calor-only metric - C# has no equivalent)*");
+            }
             sb.AppendLine();
-            sb.AppendLine($"**Average Advantage:** {avgAdvantage:F2}x");
-            sb.AppendLine($"**Calor wins:** {calorWins} | **C# wins:** {csharpWins}");
+
+            if (isCalorOnly)
+            {
+                // For Calor-only metrics, show score as percentage instead of ratio
+                var avgScore = category.Average(m => m.CalorScore) * 100;
+                sb.AppendLine($"**Average Score:** {avgScore:F1}%");
+            }
+            else
+            {
+                sb.AppendLine($"**Average Advantage:** {avgAdvantage:F2}x");
+                sb.AppendLine($"**Calor wins:** {calorWins} | **C# wins:** {csharpWins}");
+            }
             sb.AppendLine();
 
             // Top metrics
             var topMetrics = category.OrderByDescending(m => m.AdvantageRatio).Take(5);
-            sb.AppendLine("| Metric | Calor | C# | Ratio |");
-            sb.AppendLine("|--------|------|-----|-------|");
 
-            foreach (var metric in topMetrics)
+            if (isCalorOnly)
             {
-                sb.AppendLine($"| {metric.MetricName} | {metric.CalorScore:F2} | {metric.CSharpScore:F2} | {metric.AdvantageRatio:F2}x |");
+                sb.AppendLine("| Metric | Score | Details |");
+                sb.AppendLine("|--------|-------|---------|");
+
+                foreach (var metric in topMetrics)
+                {
+                    var scorePercent = metric.CalorScore * 100;
+                    var details = GetCalorOnlyDetails(metric);
+                    sb.AppendLine($"| {metric.MetricName} | {scorePercent:F1}% | {details} |");
+                }
+            }
+            else
+            {
+                sb.AppendLine("| Metric | Calor | C# | Ratio |");
+                sb.AppendLine("|--------|------|-----|-------|");
+
+                foreach (var metric in topMetrics)
+                {
+                    sb.AppendLine($"| {metric.MetricName} | {metric.CalorScore:F2} | {metric.CSharpScore:F2} | {metric.AdvantageRatio:F2}x |");
+                }
             }
 
             sb.AppendLine();
         }
+    }
+
+    private static string GetCalorOnlyDetails(MetricResult metric)
+    {
+        var parts = new List<string>();
+
+        // For ContractVerification
+        if (metric.Details.TryGetValue("proven", out var proven))
+            parts.Add($"proven: {proven}");
+        if (metric.Details.TryGetValue("disproven", out var disproven))
+            parts.Add($"disproven: {disproven}");
+        if (metric.Details.TryGetValue("unproven", out var unproven))
+            parts.Add($"unproven: {unproven}");
+
+        // For EffectSoundness
+        if (metric.Details.TryGetValue("forbiddenEffectErrors", out var forbidden))
+            parts.Add($"forbidden: {forbidden}");
+        if (metric.Details.TryGetValue("unknownCallErrors", out var unknown))
+            parts.Add($"unknown: {unknown}");
+
+        // For InteropEffectCoverage
+        if (metric.Details.TryGetValue("resolved", out var resolved))
+            parts.Add($"resolved: {resolved}");
+        if (metric.Details.TryGetValue("total", out var total) && !metric.Details.ContainsKey("proven"))
+            parts.Add($"total: {total}");
+
+        // Error/skip messages
+        if (metric.Details.TryGetValue("error", out var error))
+            parts.Add($"error: {error}");
+        if (metric.Details.TryGetValue("skipped", out var skipped) && skipped is string s)
+            parts.Add($"skipped: {s}");
+        if (metric.Details.TryGetValue("noContracts", out var noContracts) && noContracts is bool nc && nc)
+            parts.Add("no contracts");
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "-";
     }
 
     private static void WriteDetailedResults(StringBuilder sb, EvaluationResult result)

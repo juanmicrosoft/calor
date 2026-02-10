@@ -18,7 +18,17 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
-    <PackageReference Include="Microsoft.Z3" Version="4.12.2" />
+  </ItemGroup>
+
+  <!-- Reference the same Z3 assembly as Calor.Compiler -->
+  <PropertyGroup>
+    <Z3Dir>$(MSBuildThisFileDirectory)..\..\src\Calor.Compiler\z3</Z3Dir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.Z3">
+      <HintPath>$(Z3Dir)\Microsoft.Z3.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>

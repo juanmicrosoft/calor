@@ -1,0 +1,26 @@
+§M{m001:LogService}
+§F{f001:LogMessage:pub}
+  §I{str:message}
+  §O{void}
+  §E{io:cw}
+  §C{Console.WriteLine} message
+§/F{f001}
+
+§F{f002:ComputeSum:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f002}
+
+§F{f003:LogAndCompute:pub}
+  §I{str:label}
+  §I{i32:x}
+  §I{i32:y}
+  §O{i32}
+  §E{io:cw}
+  §C{LogMessage} label
+  §V{i32:result} (+ x y)
+  §R result
+§/F{f003}
+§/M{m001}

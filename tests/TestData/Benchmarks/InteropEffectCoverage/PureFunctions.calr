@@ -1,0 +1,41 @@
+§M{m001:PureMath}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+
+§F{f002:Multiply:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (* a b)
+§/F{f002}
+
+§F{f003:MathAbs:pub}
+  §I{f64:x}
+  §O{f64}
+  §R §C{Math.Abs} x
+§/F{f003}
+
+§F{f004:MathMax:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R §C{Math.Max} a b
+§/F{f004}
+
+§F{f005:MathSqrt:pub}
+  §I{f64:x}
+  §O{f64}
+  §R §C{Math.Sqrt} x
+§/F{f005}
+
+§F{f006:StringConcat:pub}
+  §I{str:a}
+  §I{str:b}
+  §O{str}
+  §R §C{String.Concat} a b
+§/F{f006}
+§/M{m001}

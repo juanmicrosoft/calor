@@ -1,0 +1,219 @@
+name: Build Z3 Native Libraries
+
+# This workflow builds Z3 binaries for all platforms and uploads them
+# as release assets. It only needs to run when Z3 version changes.
+#
+# The publish-nuget workflow downloads these pre-built binaries.
+
+on:
+  workflow_dispatch:
+    inputs:
+      z3_version:
+        description: 'Z3 version to build (e.g., 4.15.7)'
+        required: true
+        default: '4.15.7'
+        type: string
+  push:
+    branches: [main]
+    paths:
+      # Only trigger when Z3 version might have changed
+      - 'src/Calor.Compiler/scripts/download-z3.sh'
+      - 'src/Calor.Compiler/scripts/download-z3.ps1'
+      - 'src/Calor.Compiler/scripts/build-z3-from-source.sh'
+
+env:
+  Z3_VERSION: ${{ github.event.inputs.z3_version || '4.15.7' }}
+
+jobs:
+  # Build Z3 on ARM64 platforms (pre-built binaries have loading issues)
+  build-z3-arm64:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04-arm64
+            rid: linux-arm64
+            lib: libz3.so
+          - os: macos-latest
+            rid: osx-arm64
+            lib: libz3.dylib
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 git
+
+      - name: Build Z3 from source
+        run: |
+          git clone --depth 1 --branch "z3-${{ env.Z3_VERSION }}" https://github.com/Z3Prover/z3.git /tmp/z3
+          cd /tmp/z3
+          python3 scripts/mk_make.py --dotnet
+          cd build
+          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          cd dotnet
+          dotnet build -p:EnableSourceLink=false -p:EnableSourceControlManagerQueries=false
+
+      - name: Verify Z3 works
+        run: |
+          mkdir -p /tmp/z3-test && cd /tmp/z3-test
+
+          cat > test.csproj << 'CSPROJ'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net8.0</TargetFramework>
+            </PropertyGroup>
+            <ItemGroup>
+              <Reference Include="Microsoft.Z3">
+                <HintPath>/tmp/z3/build/dotnet/bin/Debug/netstandard1.4/Microsoft.Z3.dll</HintPath>
+              </Reference>
+            </ItemGroup>
+          </Project>
+          CSPROJ
+
+          cat > Program.cs << 'CS'
+          using Microsoft.Z3;
+          using var ctx = new Context();
+          var x = ctx.MkIntConst("x");
+          var solver = ctx.MkSolver();
+          solver.Assert(ctx.MkGt(x, ctx.MkInt(0)));
+          if (solver.Check() != Status.SATISFIABLE) throw new System.Exception("Z3 failed");
+          System.Console.WriteLine("Z3 works!");
+          CS
+
+          # Copy native lib to output
+          dotnet build
+          cp /tmp/z3/build/${{ matrix.lib }} bin/Debug/net8.0/
+          dotnet run
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp /tmp/z3/build/dotnet/bin/Debug/netstandard1.4/Microsoft.Z3.dll artifacts/
+          cp /tmp/z3/build/${{ matrix.lib }} artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: z3-${{ matrix.rid }}-${{ env.Z3_VERSION }}
+          path: artifacts/
+
+  # Download pre-built Z3 for x64 and Windows ARM64 platforms
+  download-z3-prebuilt:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - rid: linux-x64
+            archive: x64-glibc-2.39
+            lib: libz3.so
+          - rid: osx-x64
+            archive: x64-osx-15.7.3
+            lib: libz3.dylib
+          - rid: win-x64
+            archive: x64-win
+            lib: libz3.dll
+          - rid: win-x86
+            archive: x86-win
+            lib: libz3.dll
+          - rid: win-arm64
+            archive: arm64-win
+            lib: libz3.dll
+
+    steps:
+      - name: Download Z3 binaries
+        run: |
+          BASE_URL="https://github.com/Z3Prover/z3/releases/download/z3-${{ env.Z3_VERSION }}"
+          ARCHIVE="z3-${{ env.Z3_VERSION }}-${{ matrix.archive }}"
+
+          mkdir -p artifacts
+
+          curl -L -o z3.zip "${BASE_URL}/${ARCHIVE}.zip"
+          unzip -q z3.zip
+
+          # Copy native library
+          find . -name "${{ matrix.lib }}" -path "*/bin/*" -exec cp {} artifacts/ \;
+
+          # Copy managed DLL (only need one copy, they're identical)
+          find . -name "Microsoft.Z3.dll" -exec cp {} artifacts/ \; 2>/dev/null || true
+
+          ls -la artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: z3-${{ matrix.rid }}-${{ env.Z3_VERSION }}
+          path: artifacts/
+
+  # Create/update the z3-binaries release with all artifacts
+  create-release:
+    needs: [build-z3-arm64, download-z3-prebuilt]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Organize binaries
+        run: |
+          mkdir -p release
+
+          # Get managed DLL (same for all platforms)
+          find artifacts -name "Microsoft.Z3.dll" | head -1 | xargs -I {} cp {} release/Microsoft.Z3.dll
+
+          # Organize native libraries by RID
+          for dir in artifacts/z3-*; do
+            rid=$(basename "$dir" | sed "s/z3-//" | sed "s/-${{ env.Z3_VERSION }}//")
+
+            # Find and copy native lib with RID prefix
+            if [ -f "$dir/libz3.dylib" ]; then
+              cp "$dir/libz3.dylib" "release/libz3-${rid}.dylib"
+            elif [ -f "$dir/libz3.so" ]; then
+              cp "$dir/libz3.so" "release/libz3-${rid}.so"
+            elif [ -f "$dir/libz3.dll" ]; then
+              cp "$dir/libz3.dll" "release/libz3-${rid}.dll"
+            fi
+          done
+
+          echo "Release contents:"
+          ls -la release/
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: z3-binaries-${{ env.Z3_VERSION }}
+          name: Z3 Binaries v${{ env.Z3_VERSION }}
+          body: |
+            Pre-built Z3 ${{ env.Z3_VERSION }} binaries for all supported platforms.
+
+            **Built from source (ARM64):**
+            - linux-arm64
+            - osx-arm64
+
+            **Downloaded from Z3 releases (x64/Windows):**
+            - linux-x64
+            - osx-x64
+            - win-x64
+            - win-x86
+            - win-arm64
+
+            These binaries are used by the Calor NuGet package.
+          files: release/*
+          fail_on_unmatched_files: true

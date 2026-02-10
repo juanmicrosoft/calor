@@ -1,0 +1,46 @@
+§M{m001:VerifiableMath}
+§F{f001:Abs:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (>= result 0)
+  §IF{if1} (>= x 0) → §R x
+  §EL → §R (- 0 x)
+  §/I{if1}
+§/F{f001}
+
+§F{f002:Max:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §S (>= result a)
+  §S (>= result b)
+  §IF{if1} (> a b) → §R a
+  §EL → §R b
+  §/I{if1}
+§/F{f002}
+
+§F{f003:Min:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §S (<= result a)
+  §S (<= result b)
+  §IF{if1} (< a b) → §R a
+  §EL → §R b
+  §/I{if1}
+§/F{f003}
+
+§F{f004:Clamp:pub}
+  §I{i32:value}
+  §I{i32:min}
+  §I{i32:max}
+  §O{i32}
+  §Q (<= min max)
+  §S (>= result min)
+  §S (<= result max)
+  §IF{if1} (< value min) → §R min
+  §EI (> value max) → §R max
+  §EL → §R value
+  §/I{if1}
+§/F{f004}
+§/M{m001}

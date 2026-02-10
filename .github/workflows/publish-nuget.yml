@@ -10,6 +10,9 @@ on:
         required: false
         type: string
 
+env:
+  Z3_VERSION: "4.15.7"
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -22,6 +25,35 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      # Download pre-built Z3 binaries from our z3-binaries release
+      - name: Download Z3 binaries
+        run: |
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/download/z3-binaries-${{ env.Z3_VERSION }}"
+
+          mkdir -p src/Calor.Compiler/z3
+          mkdir -p src/Calor.Compiler/runtimes/linux-x64/native
+          mkdir -p src/Calor.Compiler/runtimes/linux-arm64/native
+          mkdir -p src/Calor.Compiler/runtimes/osx-x64/native
+          mkdir -p src/Calor.Compiler/runtimes/osx-arm64/native
+          mkdir -p src/Calor.Compiler/runtimes/win-x64/native
+          mkdir -p src/Calor.Compiler/runtimes/win-x86/native
+          mkdir -p src/Calor.Compiler/runtimes/win-arm64/native
+
+          # Download managed DLL
+          curl -L -o src/Calor.Compiler/z3/Microsoft.Z3.dll "${RELEASE_URL}/Microsoft.Z3.dll"
+
+          # Download native libraries for each platform
+          curl -L -o src/Calor.Compiler/runtimes/linux-x64/native/libz3.so "${RELEASE_URL}/libz3-linux-x64.so"
+          curl -L -o src/Calor.Compiler/runtimes/linux-arm64/native/libz3.so "${RELEASE_URL}/libz3-linux-arm64.so"
+          curl -L -o src/Calor.Compiler/runtimes/osx-x64/native/libz3.dylib "${RELEASE_URL}/libz3-osx-x64.dylib"
+          curl -L -o src/Calor.Compiler/runtimes/osx-arm64/native/libz3.dylib "${RELEASE_URL}/libz3-osx-arm64.dylib"
+          curl -L -o src/Calor.Compiler/runtimes/win-x64/native/libz3.dll "${RELEASE_URL}/libz3-win-x64.dll"
+          curl -L -o src/Calor.Compiler/runtimes/win-x86/native/libz3.dll "${RELEASE_URL}/libz3-win-x86.dll"
+          curl -L -o src/Calor.Compiler/runtimes/win-arm64/native/libz3.dll "${RELEASE_URL}/libz3-win-arm64.dll"
+
+          echo "Downloaded Z3 binaries:"
+          find src/Calor.Compiler/z3 src/Calor.Compiler/runtimes -type f -ls
 
       - name: Restore dependencies
         run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj

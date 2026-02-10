@@ -4,7 +4,7 @@ using Calor.Compiler.Evaluation.Metrics;
 namespace Calor.Compiler.Evaluation.Benchmarks;
 
 /// <summary>
-/// Orchestrates benchmark execution across all 7 evaluation categories.
+/// Orchestrates benchmark execution across all evaluation categories.
 /// </summary>
 public class BenchmarkRunner
 {
@@ -15,7 +15,7 @@ public class BenchmarkRunner
     {
         _options = options ?? new BenchmarkRunnerOptions();
 
-        // Initialize all 7 calculators
+        // Initialize all calculators (7 standard + 3 Calor-only)
         _calculators = new List<IMetricCalculator>
         {
             new TokenEconomicsCalculator(),
@@ -24,7 +24,11 @@ public class BenchmarkRunner
             new EditPrecisionCalculator(),
             new ErrorDetectionCalculator(),
             new InformationDensityCalculator(),
-            new TaskCompletionCalculator()
+            new TaskCompletionCalculator(),
+            // Calor-only metrics (C# score always 0)
+            new ContractVerificationCalculator(),
+            new EffectSoundnessCalculator(),
+            new InteropEffectCoverageCalculator()
         };
     }
 

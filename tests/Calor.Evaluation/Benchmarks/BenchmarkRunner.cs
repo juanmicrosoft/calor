@@ -30,7 +30,11 @@ public class BenchmarkRunner
             new ErrorDetectionCalculator(),
             new InformationDensityCalculator(),
             new TaskCompletionCalculator(),
-            new RefactoringStabilityCalculator()
+            new RefactoringStabilityCalculator(),
+            // Calor-only metrics (C# score always 0)
+            new ContractVerificationCalculator(),
+            new EffectSoundnessCalculator(),
+            new InteropEffectCoverageCalculator()
         };
     }
 

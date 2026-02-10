@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Loader;
 
 namespace Calor.Compiler.Verification.Z3;
 
@@ -10,6 +12,83 @@ public static class Z3ContextFactory
 {
     private static bool? _isAvailable;
     private static readonly object _lock = new();
+    private static bool _resolverRegistered;
+    private static IntPtr _z3NativeHandle;
+
+    /// <summary>
+    /// Registers a custom DLL import resolver and pre-loads the Z3 native library.
+    /// Must be called before any Z3 types are accessed.
+    /// </summary>
+    private static void EnsureResolverRegistered()
+    {
+        if (_resolverRegistered)
+            return;
+
+        lock (_lock)
+        {
+            if (_resolverRegistered)
+                return;
+
+            // Pre-load the native library FIRST
+            _z3NativeHandle = TryLoadZ3Native();
+
+            // Register resolver for any future P/Invoke calls
+            AssemblyLoadContext.Default.ResolvingUnmanagedDll += OnResolvingUnmanagedDll;
+            _resolverRegistered = true;
+        }
+    }
+
+    private static IntPtr OnResolvingUnmanagedDll(Assembly assembly, string libraryName)
+    {
+        // Only handle libz3
+        if (!libraryName.Contains("z3", StringComparison.OrdinalIgnoreCase))
+            return IntPtr.Zero;
+
+        // Return the pre-loaded handle if available
+        if (_z3NativeHandle != IntPtr.Zero)
+            return _z3NativeHandle;
+
+        // Otherwise try to load it now
+        return TryLoadZ3Native();
+    }
+
+    private static IntPtr TryLoadZ3Native()
+    {
+        var basePath = AppContext.BaseDirectory;
+        var libPaths = new List<string>();
+
+        // Try output root first (where we copy the current platform's native lib)
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            libPaths.Add(Path.Combine(basePath, "libz3.dll"));
+            libPaths.Add(Path.Combine(basePath, "runtimes", "win-x64", "native", "libz3.dll"));
+            libPaths.Add(Path.Combine(basePath, "runtimes", "win-arm64", "native", "libz3.dll"));
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            libPaths.Add(Path.Combine(basePath, "libz3.dylib"));
+            if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                libPaths.Add(Path.Combine(basePath, "runtimes", "osx-arm64", "native", "libz3.dylib"));
+            else
+                libPaths.Add(Path.Combine(basePath, "runtimes", "osx-x64", "native", "libz3.dylib"));
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            libPaths.Add(Path.Combine(basePath, "libz3.so"));
+            if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                libPaths.Add(Path.Combine(basePath, "runtimes", "linux-arm64", "native", "libz3.so"));
+            else
+                libPaths.Add(Path.Combine(basePath, "runtimes", "linux-x64", "native", "libz3.so"));
+        }
+
+        foreach (var path in libPaths)
+        {
+            if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
+                return handle;
+        }
+
+        return IntPtr.Zero;
+    }
 
     /// <summary>
     /// Gets whether the Z3 native library is available on this system.
@@ -59,59 +138,22 @@ public static class Z3ContextFactory
     /// </summary>
     private static bool CheckAvailabilitySafe()
     {
+        // Try direct instantiation with explicit method impl to prevent JIT from loading Z3 types early
+        return TryCheckAvailabilityDirect();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool TryCheckAvailabilityDirect()
+    {
         try
         {
-            // First check if the assembly can even be loaded
-            Assembly? assembly;
-            try
-            {
-                assembly = Assembly.Load("Microsoft.Z3");
-            }
-            catch
-            {
-                return false;
-            }
+            // Ensure our native library resolver is registered before accessing Z3 types
+            EnsureResolverRegistered();
 
-            if (assembly == null)
-                return false;
-
-            // Use reflection to find the Context type and create an instance
-            // This avoids compile-time type references that can cause JIT failures
-            var contextType = assembly.GetType("Microsoft.Z3.Context");
-            if (contextType == null)
-                return false;
-
-            // Try to create a Context instance using reflection
-            object? context = null;
-            try
-            {
-                context = Activator.CreateInstance(contextType);
-                if (context == null)
-                    return false;
-
-                // Try to call a simple method to verify the native library is working
-                var mkIntConstMethod = contextType.GetMethod("MkIntConst", new[] { typeof(string) });
-                if (mkIntConstMethod == null)
-                    return false;
-
-                var result = mkIntConstMethod.Invoke(context, new object[] { "__z3_test__" });
-                return result != null;
-            }
-            finally
-            {
-                // Dispose the context if it implements IDisposable
-                if (context is IDisposable disposable)
-                {
-                    try { disposable.Dispose(); } catch { }
-                }
-            }
-        }
-        catch (TargetInvocationException ex) when (
-            ex.InnerException is DllNotFoundException ||
-            ex.InnerException is TypeInitializationException ||
-            ex.InnerException is FileNotFoundException)
-        {
-            return false;
+            // Simply try to create a Z3 Context - this will fail if native lib isn't available
+            using var ctx = new Microsoft.Z3.Context();
+            var testExpr = ctx.MkIntConst("__z3_test__");
+            return testExpr != null;
         }
         catch (DllNotFoundException)
         {
@@ -135,7 +177,6 @@ public static class Z3ContextFactory
         }
         catch (Exception)
         {
-            // Any other exception during initialization means Z3 isn't working
             return false;
         }
     }

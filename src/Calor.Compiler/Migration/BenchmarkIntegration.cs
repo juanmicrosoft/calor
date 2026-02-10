@@ -21,7 +21,11 @@ public sealed class BenchmarkIntegration
         "EditPrecision",
         "ErrorDetection",
         "InformationDensity",
-        "TaskCompletion"
+        "TaskCompletion",
+        // Calor-only metrics
+        "ContractVerification",
+        "EffectSoundness",
+        "InteropEffectCoverage"
     };
 
     /// <summary>

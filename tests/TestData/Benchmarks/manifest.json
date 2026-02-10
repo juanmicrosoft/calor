@@ -282,6 +282,86 @@
       "level": 4,
       "features": ["module", "function", "recursion", "contracts", "algorithm", "in_place"],
       "notes": "QuickSort algorithm with partition"
+    },
+    {
+      "id": "cv001",
+      "name": "ProvableContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/ProvableContracts.calr",
+      "csharpFile": "ContractVerification/ProvableContracts.cs",
+      "level": 2,
+      "features": ["contracts", "z3", "verification", "ensures"],
+      "notes": "Functions with provable postconditions"
+    },
+    {
+      "id": "cv002",
+      "name": "BuggyContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/BuggyContracts.calr",
+      "csharpFile": "ContractVerification/BuggyContracts.cs",
+      "level": 2,
+      "features": ["contracts", "z3", "verification", "disproven"],
+      "notes": "Functions with provably violated postconditions"
+    },
+    {
+      "id": "cv003",
+      "name": "MixedContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/MixedContracts.calr",
+      "csharpFile": "ContractVerification/MixedContracts.cs",
+      "level": 3,
+      "features": ["contracts", "z3", "verification", "mixed"],
+      "notes": "Mix of provable and unprovable contracts"
+    },
+    {
+      "id": "es001",
+      "name": "CorrectEffects",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/CorrectEffects.calr",
+      "csharpFile": "EffectSoundness/CorrectEffects.cs",
+      "level": 2,
+      "features": ["effects", "enforcement", "sound"],
+      "notes": "Functions with correctly declared effects"
+    },
+    {
+      "id": "es002",
+      "name": "MissingEffects",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/MissingEffects.calr",
+      "csharpFile": "EffectSoundness/MissingEffects.cs",
+      "level": 2,
+      "features": ["effects", "enforcement", "missing"],
+      "notes": "Functions with undeclared effects"
+    },
+    {
+      "id": "es003",
+      "name": "HiddenNetworkEffect",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/HiddenNetworkEffect.calr",
+      "csharpFile": "EffectSoundness/HiddenNetworkEffect.cs",
+      "level": 3,
+      "features": ["effects", "enforcement", "transitive"],
+      "notes": "Effect leakage through transitive calls"
+    },
+    {
+      "id": "ie001",
+      "name": "BclCoverage",
+      "category": "InteropEffectCoverage",
+      "calorFile": "InteropEffectCoverage/BclCoverage.calr",
+      "csharpFile": "InteropEffectCoverage/BclCoverage.cs",
+      "level": 2,
+      "features": ["effects", "manifest", "bcl", "interop"],
+      "notes": "Common BCL methods with effect annotations"
+    },
+    {
+      "id": "ie002",
+      "name": "PureFunctions",
+      "category": "InteropEffectCoverage",
+      "calorFile": "InteropEffectCoverage/PureFunctions.calr",
+      "csharpFile": "InteropEffectCoverage/PureFunctions.cs",
+      "level": 1,
+      "features": ["effects", "manifest", "pure"],
+      "notes": "Pure BCL methods that should resolve cleanly"
     }
   ],
   "comprehensionQuestions": {
