@@ -93,6 +93,7 @@ public enum TokenKind
     Match,
     EndMatch,
     Case,
+    EndCase,    // §/K - closing case tag for block syntax
     Some,
     None,
     Ok,

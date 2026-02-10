@@ -1671,12 +1671,30 @@ public sealed class Parser
             }
 
             var body = new List<StatementNode>();
-            while (!IsAtEnd && !Check(TokenKind.Case) && !Check(TokenKind.EndMatch))
+
+            // Check for arrow syntax: → expression (single expression case)
+            if (Check(TokenKind.Arrow))
             {
-                var stmt = ParseStatement();
-                if (stmt != null)
+                Expect(TokenKind.Arrow);
+                var expr = ParseExpression();
+                body.Add(new ReturnStatementNode(expr.Span, expr));
+            }
+            else
+            {
+                // Block syntax - parse statements until closing tag or next case
+                while (!IsAtEnd && !Check(TokenKind.Case) && !Check(TokenKind.EndMatch) && !Check(TokenKind.EndCase))
                 {
-                    body.Add(stmt);
+                    var stmt = ParseStatement();
+                    if (stmt != null)
+                    {
+                        body.Add(stmt);
+                    }
+                }
+
+                // Consume optional §/K closing tag
+                if (Check(TokenKind.EndCase))
+                {
+                    Advance();
                 }
             }
 
@@ -1689,7 +1707,37 @@ public sealed class Parser
 
     private PatternNode ParsePattern()
     {
-        // Handle relational patterns: gte, lte, gt, lt followed by a value
+        // Handle §VAR{name} pattern
+        if (Check(TokenKind.Var))
+        {
+            var varToken = Expect(TokenKind.Var);
+            var attrs = ParseAttributes();
+            var name = attrs["_pos0"] ?? attrs["name"] ?? "_";
+            return new VarPatternNode(varToken.Span, name);
+        }
+
+        // Handle §PREL{op} value pattern (relational pattern)
+        if (Check(TokenKind.RelationalPattern))
+        {
+            var relToken = Expect(TokenKind.RelationalPattern);
+            var attrs = ParseAttributes();
+            var opStr = attrs["_pos0"] ?? attrs["op"] ?? "gte";
+
+            // Map operator keyword to C# operator
+            var op = opStr switch
+            {
+                "gte" => ">=",
+                "lte" => "<=",
+                "gt" => ">",
+                "lt" => "<",
+                _ => ">="
+            };
+
+            var operand = ParseExpression();
+            return new RelationalPatternNode(relToken.Span.Union(operand.Span), op, operand);
+        }
+
+        // Handle relational patterns: gte, lte, gt, lt followed by a value (legacy syntax)
         if (Check(TokenKind.Identifier))
         {
             var token = Current;
@@ -1709,7 +1757,7 @@ public sealed class Parser
                 return new RelationalPatternNode(token.Span.Union(operand.Span), op, operand);
             }
 
-            // Handle var pattern: var name
+            // Handle var pattern: var name (legacy syntax)
             if (token.Text == "var" && Peek(1).Kind == TokenKind.Identifier)
             {
                 Advance(); // consume 'var'

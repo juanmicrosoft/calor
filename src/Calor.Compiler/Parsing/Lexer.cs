@@ -46,6 +46,7 @@ public sealed class Lexer
         ["/I"] = TokenKind.EndIf,           // §/I
         ["/L"] = TokenKind.EndFor,          // §/L
         ["/W"] = TokenKind.EndMatch,        // §/W
+        ["/K"] = TokenKind.EndCase,         // §/K - closing case tag
         ["/T"] = TokenKind.EndType,         // §/T
         ["/D"] = TokenKind.EndRecord,       // §/D
 
