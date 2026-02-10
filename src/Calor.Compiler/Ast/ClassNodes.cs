@@ -100,12 +100,19 @@ public sealed class MethodSignatureNode : AstNode
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
     public EffectsNode? Effects { get; }
+    public IReadOnlyList<RequiresNode> Preconditions { get; }
+    public IReadOnlyList<EnsuresNode> Postconditions { get; }
     public AttributeCollection Attributes { get; }
 
     /// <summary>
     /// C#-style attributes (e.g., [@Obsolete]).
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
+
+    /// <summary>
+    /// True if this method signature has any contracts (preconditions or postconditions).
+    /// </summary>
+    public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
 
     public MethodSignatureNode(
         TextSpan span,
@@ -116,7 +123,9 @@ public sealed class MethodSignatureNode : AstNode
         OutputNode? output,
         EffectsNode? effects,
         AttributeCollection attributes)
-        : this(span, id, name, typeParameters, parameters, output, effects, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, id, name, typeParameters, parameters, output, effects,
+               Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(),
+               attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -130,6 +139,24 @@ public sealed class MethodSignatureNode : AstNode
         EffectsNode? effects,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, id, name, typeParameters, parameters, output, effects,
+               Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(),
+               attributes, csharpAttributes)
+    {
+    }
+
+    public MethodSignatureNode(
+        TextSpan span,
+        string id,
+        string name,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        EffectsNode? effects,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -138,6 +165,8 @@ public sealed class MethodSignatureNode : AstNode
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;
         Effects = effects;
+        Preconditions = preconditions ?? Array.Empty<RequiresNode>();
+        Postconditions = postconditions ?? Array.Empty<EnsuresNode>();
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }

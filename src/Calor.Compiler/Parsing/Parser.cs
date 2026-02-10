@@ -3178,6 +3178,8 @@ public sealed class Parser
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
         EffectsNode? effects = null;
+        var preconditions = new List<RequiresNode>();
+        var postconditions = new List<EnsuresNode>();
 
         // Parse signature elements until END_METHOD
         while (!IsAtEnd && !Check(TokenKind.EndMethod))
@@ -3202,6 +3204,14 @@ public sealed class Parser
             {
                 effects = ParseEffects();
             }
+            else if (Check(TokenKind.Requires))
+            {
+                preconditions.Add(ParseRequires());
+            }
+            else if (Check(TokenKind.Ensures))
+            {
+                postconditions.Add(ParseEnsures());
+            }
             else
             {
                 break;
@@ -3218,7 +3228,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, attrs, csharpAttrs);
+        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, preconditions, postconditions, attrs, csharpAttrs);
     }
 
     /// <summary>

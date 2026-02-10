@@ -28,7 +28,7 @@
 §F{f003:TestNone:pri}
   §O{void}
   §E{cw}
-  §B{opt} §NN{type=INT}
+  §B{opt} §NN{INT}
   §C{Console.WriteLine}
     §A "  Created None"
   §/C

@@ -7,6 +7,7 @@ using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 
 namespace Calor.Compiler;
@@ -286,6 +287,20 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        // Contract inheritance checking
+        var contractInheritanceChecker = new ContractInheritanceChecker(diagnostics);
+        var inheritanceResult = contractInheritanceChecker.Check(ast);
+
+        if (options.Verbose)
+        {
+            Console.WriteLine("Contract inheritance checking completed");
+        }
+
+        if (diagnostics.HasErrors)
+        {
+            return new CompilationResult(diagnostics, ast, "");
+        }
+
         // Static contract verification with Z3 (optional)
         if (options.VerifyContracts)
         {
@@ -301,7 +316,7 @@ public class Program
         }
 
         // Code generation
-        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults);
+        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult);
         var generatedCode = emitter.Emit(ast);
 
         if (options.Verbose)

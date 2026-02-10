@@ -30,6 +30,9 @@ public sealed class EffectEnforcementPass
     // Reverse call graph: caller → list of callees
     private readonly Dictionary<string, List<(string Callee, TextSpan Span)>> _reverseCallGraph = new(StringComparer.Ordinal);
 
+    // Maps function name to ID for resolving internal calls
+    private readonly Dictionary<string, string> _functionNameToId = new(StringComparer.Ordinal);
+
     public EffectEnforcementPass(
         DiagnosticBag diagnostics,
         EffectsCatalog? catalog = null,
@@ -76,10 +79,11 @@ public sealed class EffectEnforcementPass
 
     private void BuildCallGraph(ModuleNode module)
     {
-        // Index all functions
+        // Index all functions by ID and name
         foreach (var function in module.Functions)
         {
             _functions[function.Id] = function;
+            _functionNameToId[function.Name] = function.Id;
             _callGraph[function.Id] = new List<string>();
             _reverseCallGraph[function.Id] = new List<(string, TextSpan)>();
         }
@@ -92,14 +96,17 @@ public sealed class EffectEnforcementPass
             {
                 _reverseCallGraph[function.Id].Add((callee, span));
 
+                // Resolve callee name to ID for internal calls
+                var calleeId = _functionNameToId.TryGetValue(callee, out var id) ? id : callee;
+
                 // Only track internal calls for SCC computation
-                if (_functions.ContainsKey(callee))
+                if (_functions.ContainsKey(calleeId))
                 {
-                    if (!_callGraph.ContainsKey(callee))
+                    if (!_callGraph.ContainsKey(calleeId))
                     {
-                        _callGraph[callee] = new List<string>();
+                        _callGraph[calleeId] = new List<string>();
                     }
-                    _callGraph[callee].Add(function.Id);
+                    _callGraph[calleeId].Add(function.Id);
                 }
             }
         }
@@ -153,20 +160,23 @@ public sealed class EffectEnforcementPass
         onStack.Add(v);
 
         // Process successors (functions that v calls)
-        foreach (var (callee, _) in _reverseCallGraph.GetValueOrDefault(v, new List<(string, TextSpan)>()))
+        foreach (var (calleeName, _) in _reverseCallGraph.GetValueOrDefault(v, new List<(string, TextSpan)>()))
         {
+            // Resolve callee name to ID for internal calls
+            var calleeId = _functionNameToId.TryGetValue(calleeName, out var id) ? id : calleeName;
+
             // Only consider internal functions for SCC
-            if (!_functions.ContainsKey(callee))
+            if (!_functions.ContainsKey(calleeId))
                 continue;
 
-            if (!indices.ContainsKey(callee))
+            if (!indices.ContainsKey(calleeId))
             {
-                Strongconnect(callee, ref index, indices, lowlinks, onStack, stack, sccs);
-                lowlinks[v] = Math.Min(lowlinks[v], lowlinks[callee]);
+                Strongconnect(calleeId, ref index, indices, lowlinks, onStack, stack, sccs);
+                lowlinks[v] = Math.Min(lowlinks[v], lowlinks[calleeId]);
             }
-            else if (onStack.Contains(callee))
+            else if (onStack.Contains(calleeId))
             {
-                lowlinks[v] = Math.Min(lowlinks[v], indices[callee]);
+                lowlinks[v] = Math.Min(lowlinks[v], indices[calleeId]);
             }
         }
 
@@ -312,24 +322,27 @@ public sealed class EffectEnforcementPass
             // Check direct effects from this function's body
             if (_reverseCallGraph.TryGetValue(currentId, out var calls))
             {
-                foreach (var (callee, span) in calls)
+                foreach (var (calleeName, span) in calls)
                 {
+                    // Resolve callee name to ID for internal calls
+                    var calleeId = _functionNameToId.TryGetValue(calleeName, out var id) ? id : calleeName;
+
                     // Check external calls
-                    if (!_functions.ContainsKey(callee))
+                    if (!_functions.ContainsKey(calleeId))
                     {
-                        var effects = _catalog.TryGetEffects(callee);
+                        var effects = _catalog.TryGetEffects(calleeName);
                         if (effects != null && effects.Contains(targetKind, targetValue))
                         {
-                            var result = new List<string>(path) { callee };
+                            var result = new List<string>(path) { calleeName };
                             return result;
                         }
                     }
                     // Check internal calls
-                    else if (!visited.Contains(callee))
+                    else if (!visited.Contains(calleeId))
                     {
-                        visited.Add(callee);
-                        var newPath = new List<string>(path) { _functions[callee].Name };
-                        queue.Enqueue((callee, newPath));
+                        visited.Add(calleeId);
+                        var newPath = new List<string>(path) { _functions[calleeId].Name };
+                        queue.Enqueue((calleeId, newPath));
                     }
                 }
             }
