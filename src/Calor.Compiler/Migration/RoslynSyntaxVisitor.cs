@@ -254,7 +254,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 var typeName = baseType.Type.ToString();
                 // First non-interface base type is the base class
-                if (baseClass == null && !typeName.StartsWith("I") || !char.IsUpper(typeName.ElementAtOrDefault(1)))
+                if (baseClass == null && (!typeName.StartsWith("I") || !char.IsUpper(typeName.ElementAtOrDefault(1))))
                 {
                     // Simple heuristic: interfaces typically start with 'I'
                     if (typeName.StartsWith("I") && typeName.Length > 1 && char.IsUpper(typeName[1]))
@@ -737,6 +737,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         foreach (var statement in block.Statements)
         {
+            // Handle local declarations with multiple variables specially
+            if (statement is LocalDeclarationStatementSyntax localDecl && localDecl.Declaration.Variables.Count > 1)
+            {
+                statements.AddRange(ConvertLocalDeclarationMultiple(localDecl));
+                continue;
+            }
+
             var converted = ConvertStatement(statement);
             if (converted != null)
             {
@@ -1036,6 +1043,34 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             isMutable,
             initializer,
             new AttributeCollection());
+    }
+
+    private IReadOnlyList<BindStatementNode> ConvertLocalDeclarationMultiple(LocalDeclarationStatementSyntax node)
+    {
+        var results = new List<BindStatementNode>();
+        var typeName = node.Declaration.Type.IsVar
+            ? null
+            : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
+        var isMutable = !node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword);
+
+        foreach (var variable in node.Declaration.Variables)
+        {
+            _context.IncrementConverted();
+            var name = variable.Identifier.Text;
+            var initializer = variable.Initializer != null
+                ? ConvertExpression(variable.Initializer.Value)
+                : null;
+
+            results.Add(new BindStatementNode(
+                GetTextSpan(node),
+                name,
+                typeName,
+                isMutable,
+                initializer,
+                new AttributeCollection()));
+        }
+
+        return results;
     }
 
     private IfStatementNode ConvertIfStatement(IfStatementSyntax node)
@@ -1543,7 +1578,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
             InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
             ConditionalAccessExpressionSyntax condAccess => ConvertConditionalAccess(condAccess),
-            CastExpressionSyntax cast => ConvertExpression(cast.Expression), // Just use inner expression
+            CastExpressionSyntax cast => ConvertCastExpression(cast),
             IsPatternExpressionSyntax isPattern => ConvertIsPatternExpression(isPattern),
             CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
             ImplicitObjectCreationExpressionSyntax implicitNew => ConvertImplicitObjectCreation(implicitNew),
@@ -1791,6 +1826,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             condition,
             whenTrue,
             whenFalse);
+    }
+
+    private ExpressionNode ConvertCastExpression(CastExpressionSyntax cast)
+    {
+        _context.RecordFeatureUsage("cast");
+        var targetType = TypeMapper.CSharpToCalor(cast.Type.ToString());
+        var innerExpr = ConvertExpression(cast.Expression);
+
+        // Represent cast as a call to a conversion function
+        return new CallExpressionNode(
+            GetTextSpan(cast),
+            targetType,
+            new List<ExpressionNode> { innerExpr });
     }
 
     private ArrayCreationNode ConvertArrayCreation(ArrayCreationExpressionSyntax arrayCreation)

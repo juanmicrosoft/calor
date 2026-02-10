@@ -112,6 +112,9 @@ public sealed class TypeChecker
             case MatchStatementNode match:
                 CheckMatchStatement(match);
                 break;
+            default:
+                // Other statement types (print, assignment, throw, etc.) are handled elsewhere or need no type checking
+                break;
         }
     }
 
@@ -360,6 +363,11 @@ public sealed class TypeChecker
                         $"Err pattern can only match Result types, got {expectedType.Name}");
                 }
                 break;
+            default:
+                // Unknown pattern type - report for safety
+                _diagnostics.ReportError(pattern.Span, DiagnosticCode.TypeMismatch,
+                    $"Unsupported pattern type: {pattern.GetType().Name}");
+                break;
         }
     }
 
@@ -421,6 +429,16 @@ public sealed class TypeChecker
         }
 
         // Arithmetic operators
+        if (!IsNumericType(leftType) || !IsNumericType(rightType))
+        {
+            if (!(leftType is ErrorType) && !(rightType is ErrorType))
+            {
+                _diagnostics.ReportError(binOp.Span, DiagnosticCode.TypeMismatch,
+                    $"Arithmetic operators require numeric operands, got {leftType.Name} and {rightType.Name}");
+            }
+            return ErrorType.Instance;
+        }
+
         if (leftType.Equals(PrimitiveType.Float) || rightType.Equals(PrimitiveType.Float))
         {
             return PrimitiveType.Float;
@@ -517,9 +535,36 @@ public sealed class TypeChecker
     {
         var targetType = InferExpressionType(match.Target);
 
-        // For now, return Unit type for match expressions
-        // A more complete implementation would unify the types of all case bodies
-        return PrimitiveType.Unit;
+        // Unify the types of all case bodies
+        CalorType? unifiedType = null;
+        foreach (var matchCase in match.Cases)
+        {
+            if (matchCase.Body.Count > 0)
+            {
+                var lastStmt = matchCase.Body[matchCase.Body.Count - 1];
+                CalorType caseType;
+                if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
+                {
+                    caseType = InferExpressionType(ret.Expression);
+                }
+                else
+                {
+                    caseType = PrimitiveType.Unit;
+                }
+
+                if (unifiedType == null)
+                {
+                    unifiedType = caseType;
+                }
+                else if (!unifiedType.Equals(caseType) && caseType is not ErrorType && unifiedType is not ErrorType)
+                {
+                    _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
+                        $"Match expression branches have incompatible types: {unifiedType.Name} and {caseType.Name}");
+                }
+            }
+        }
+
+        return unifiedType ?? PrimitiveType.Unit;
     }
 
     private CalorType ResolveTypeName(string typeName, Parsing.TextSpan span)
@@ -632,6 +677,11 @@ public sealed class TypeChecker
         if (source is ErrorType) return true; // Allow error types to be assigned anywhere
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)) return true;
         return false;
+    }
+
+    private static bool IsNumericType(CalorType type)
+    {
+        return type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float) || type is ErrorType;
     }
 }
 

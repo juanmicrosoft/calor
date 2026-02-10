@@ -21,6 +21,18 @@ public sealed class Binder
     {
         var functions = new List<BoundFunction>();
 
+        // First pass: register all function symbols in module scope
+        foreach (var func in module.Functions)
+        {
+            var parameters = func.Parameters
+                .Select(p => new VariableSymbol(p.Name, p.TypeName, isMutable: false, isParameter: true))
+                .ToList();
+            var returnType = func.Output?.TypeName ?? "VOID";
+            var funcSymbol = new FunctionSymbol(func.Name, returnType, parameters);
+            _scope.TryDeclare(funcSymbol);
+        }
+
+        // Second pass: bind function bodies
         foreach (var func in module.Functions)
         {
             functions.Add(BindFunction(func));
@@ -226,7 +238,10 @@ public sealed class Binder
             FloatLiteralNode floatLit => new BoundFloatLiteral(floatLit.Span, floatLit.Value),
             ReferenceNode refNode => BindReferenceExpression(refNode),
             BinaryOperationNode binOp => BindBinaryOperation(binOp),
-            _ => throw new InvalidOperationException($"Unknown expression type: {expr.GetType().Name}")
+            UnaryOperationNode unaryOp => BindUnaryOperation(unaryOp),
+            CallExpressionNode callExpr => BindCallExpression(callExpr),
+            ConditionalExpressionNode condExpr => BindConditionalExpression(condExpr),
+            _ => BindFallbackExpression(expr)
         };
     }
 
@@ -283,5 +298,52 @@ public sealed class Binder
         }
 
         return leftType;
+    }
+
+    private BoundUnaryExpression BindUnaryOperation(UnaryOperationNode unaryOp)
+    {
+        var operand = BindExpression(unaryOp.Operand);
+        var resultType = unaryOp.Operator switch
+        {
+            UnaryOperator.Not => "BOOL",
+            UnaryOperator.Negate => operand.TypeName,
+            UnaryOperator.BitwiseNot => operand.TypeName,
+            _ => operand.TypeName
+        };
+        return new BoundUnaryExpression(unaryOp.Span, unaryOp.Operator, operand, resultType);
+    }
+
+    private BoundCallExpression BindCallExpression(CallExpressionNode callExpr)
+    {
+        var args = new List<BoundExpression>();
+        foreach (var arg in callExpr.Arguments)
+        {
+            args.Add(BindExpression(arg));
+        }
+
+        // Look up function symbol to determine return type
+        var symbol = _scope.Lookup(callExpr.Target);
+        var returnType = symbol is FunctionSymbol funcSym ? funcSym.ReturnType : "INT";
+
+        return new BoundCallExpression(callExpr.Span, callExpr.Target, args, returnType);
+    }
+
+    private BoundExpression BindConditionalExpression(ConditionalExpressionNode condExpr)
+    {
+        var condition = BindExpression(condExpr.Condition);
+        var whenTrue = BindExpression(condExpr.WhenTrue);
+        var whenFalse = BindExpression(condExpr.WhenFalse);
+
+        // Return the type of the true branch (both should match, but we don't enforce here)
+        return whenTrue;
+    }
+
+    private BoundExpression BindFallbackExpression(ExpressionNode expr)
+    {
+        // For expression types not yet fully supported in binding,
+        // report a diagnostic and return a placeholder
+        _diagnostics.ReportError(expr.Span, DiagnosticCode.TypeMismatch,
+            $"Unsupported expression type in binding: {expr.GetType().Name}");
+        return new BoundIntLiteral(expr.Span, 0);
     }
 }

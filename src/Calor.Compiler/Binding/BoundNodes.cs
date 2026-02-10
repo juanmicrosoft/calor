@@ -298,3 +298,39 @@ public sealed class BoundFloatLiteral : BoundExpression
         Value = value;
     }
 }
+
+/// <summary>
+/// Bound unary operation.
+/// </summary>
+public sealed class BoundUnaryExpression : BoundExpression
+{
+    public Ast.UnaryOperator Operator { get; }
+    public BoundExpression Operand { get; }
+    public override string TypeName { get; }
+
+    public BoundUnaryExpression(TextSpan span, Ast.UnaryOperator op, BoundExpression operand, string resultType)
+        : base(span)
+    {
+        Operator = op;
+        Operand = operand;
+        TypeName = resultType;
+    }
+}
+
+/// <summary>
+/// Bound call expression.
+/// </summary>
+public sealed class BoundCallExpression : BoundExpression
+{
+    public string Target { get; }
+    public IReadOnlyList<BoundExpression> Arguments { get; }
+    public override string TypeName { get; }
+
+    public BoundCallExpression(TextSpan span, string target, IReadOnlyList<BoundExpression> arguments, string resultType)
+        : base(span)
+    {
+        Target = target;
+        Arguments = arguments;
+        TypeName = resultType;
+    }
+}

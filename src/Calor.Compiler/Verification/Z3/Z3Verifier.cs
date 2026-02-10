@@ -188,9 +188,10 @@ public sealed class Z3Verifier : IDisposable
                 var value = model.Evaluate(expr, true);
                 values.Add($"{name}={value}");
             }
-            catch
+            catch (Exception ex)
             {
-                // If we can't evaluate, skip this variable
+                // Record the variable with evaluation failure info for debugging
+                values.Add($"{name}=<eval failed: {ex.GetType().Name}>");
             }
         }
 

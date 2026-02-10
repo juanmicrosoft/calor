@@ -11,6 +11,7 @@ public sealed class CnfLowering
     private int _tempCounter = 0;
     private int _labelCounter = 0;
     private readonly List<CnfStatement> _statements = new();
+    private readonly Dictionary<string, CnfType> _variableTypes = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Lowers a module to CNF.
@@ -39,10 +40,17 @@ public sealed class CnfLowering
         _statements.Clear();
         _tempCounter = 0;
         _labelCounter = 0;
+        _variableTypes.Clear();
 
         var parameters = function.Parameters
             .Select(p => new CnfParameter(p.Name, MapType(p.TypeName)))
             .ToList();
+
+        // Register parameter types for reference resolution
+        foreach (var param in parameters)
+        {
+            _variableTypes[param.Name] = param.Type;
+        }
 
         // Lower preconditions
         foreach (var requires in function.Preconditions)
@@ -178,6 +186,8 @@ public sealed class CnfLowering
             var defaultValue = GetDefaultValue(type);
             _statements.Add(new CnfAssign(bind.Name, defaultValue, type));
         }
+
+        _variableTypes[bind.Name] = type;
     }
 
     private void LowerIf(IfStatementNode ifStmt)
@@ -399,8 +409,8 @@ public sealed class CnfLowering
                 return new CnfLiteral(strLit.Value, CnfType.String);
 
             case ReferenceNode refNode:
-                // For now, assume int type for references
-                return new CnfVariableRef(refNode.Name, CnfType.Int);
+                var refType = _variableTypes.TryGetValue(refNode.Name, out var tracked) ? tracked : CnfType.Object;
+                return new CnfVariableRef(refNode.Name, refType);
 
             case BinaryOperationNode binOp:
                 return LowerBinaryOp(binOp);

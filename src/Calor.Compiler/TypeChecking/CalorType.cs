@@ -51,7 +51,11 @@ public sealed class PrimitiveType : CalorType
     }
 
     public override bool Equals(CalorType? other)
-        => other is PrimitiveType pt && pt.Name == Name;
+    {
+        if (other is PrimitiveType pt) return pt.Name == Name;
+        if (other is TypeVariable tv && tv.ResolvedType != null) return tv.ResolvedType.Equals(this);
+        return false;
+    }
 
     public override int GetHashCode() => Name.GetHashCode();
 }
@@ -256,7 +260,7 @@ public sealed class TypeVariable : CalorType
     public override bool Equals(CalorType? other)
     {
         if (other is TypeVariable tv)
-            return Id == tv.Id;
+            return Id == tv.Id || (ResolvedType != null && ResolvedType.Equals(tv.ResolvedType ?? (CalorType)tv));
         if (ResolvedType != null)
             return ResolvedType.Equals(other);
         return false;

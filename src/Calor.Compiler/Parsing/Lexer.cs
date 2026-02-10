@@ -731,12 +731,13 @@ public sealed class Lexer
                     'n' => '\n',
                     'r' => '\r',
                     't' => '\t',
+                    '0' => '\0',
                     '\\' => '\\',
                     '"' => '"',
-                    _ => '\0'
+                    _ => '\x01' // sentinel for invalid escape
                 };
 
-                if (escaped == '\0')
+                if (escaped == '\x01')
                 {
                     _diagnostics.ReportInvalidEscapeSequence(CurrentSpan(), Current);
                 }

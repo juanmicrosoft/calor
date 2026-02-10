@@ -227,11 +227,19 @@ public sealed class EffectEnforcementPass
                 }
             }
         }
+
+        if (changed)
+        {
+            _diagnostics.ReportWarning(
+                _functions[scc[0]].Span,
+                "Calor0600",
+                $"Effect fixpoint iteration did not converge after {maxIterations} iterations for mutually recursive functions. Effects may be incomplete.");
+        }
     }
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
-        var context = new InferenceContext(_catalog, _resolver, _computedEffects, sccMembers, _policy, _strictEffects, _diagnostics, function.Id);
+        var context = new InferenceContext(_catalog, _resolver, _computedEffects, _functions, sccMembers, _policy, _strictEffects, _diagnostics, function.Id);
         var inferrer = new EffectInferrer(context);
         return inferrer.InferFromStatements(function.Body);
     }
@@ -338,6 +346,7 @@ public sealed class EffectEnforcementPass
         public EffectsCatalog Catalog { get; }
         public EffectResolver Resolver { get; }
         public Dictionary<string, EffectSet> ComputedEffects { get; }
+        public Dictionary<string, FunctionNode> Functions { get; }
         public HashSet<string> SccMembers { get; }
         public UnknownCallPolicy Policy { get; }
         public bool StrictEffects { get; }
@@ -348,6 +357,7 @@ public sealed class EffectEnforcementPass
             EffectsCatalog catalog,
             EffectResolver resolver,
             Dictionary<string, EffectSet> computedEffects,
+            Dictionary<string, FunctionNode> functions,
             HashSet<string> sccMembers,
             UnknownCallPolicy policy,
             bool strictEffects,
@@ -357,6 +367,7 @@ public sealed class EffectEnforcementPass
             Catalog = catalog;
             Resolver = resolver;
             ComputedEffects = computedEffects;
+            Functions = functions;
             SccMembers = sccMembers;
             Policy = policy;
             StrictEffects = strictEffects;
@@ -394,10 +405,10 @@ public sealed class EffectEnforcementPass
                 PrintStatementNode => EffectSet.From("cw"),
                 CallStatementNode call => InferFromCallStatement(call),
                 IfStatementNode ifStmt => InferFromIf(ifStmt),
-                ForStatementNode forStmt => InferFromStatements(forStmt.Body),
-                WhileStatementNode whileStmt => InferFromStatements(whileStmt.Body),
-                DoWhileStatementNode doWhile => InferFromStatements(doWhile.Body),
-                ForeachStatementNode foreach_ => InferFromStatements(foreach_.Body),
+                ForStatementNode forStmt => InferFromFor(forStmt),
+                WhileStatementNode whileStmt => InferFromExpression(whileStmt.Condition).Union(InferFromStatements(whileStmt.Body)),
+                DoWhileStatementNode doWhile => InferFromExpression(doWhile.Condition).Union(InferFromStatements(doWhile.Body)),
+                ForeachStatementNode foreach_ => InferFromExpression(foreach_.Collection).Union(InferFromStatements(foreach_.Body)),
                 MatchStatementNode matchStmt => InferFromMatch(matchStmt),
                 TryStatementNode tryStmt => InferFromTry(tryStmt),
                 ThrowStatementNode => EffectSet.From("throw"),
@@ -527,10 +538,13 @@ public sealed class EffectEnforcementPass
 
         private FunctionNode? FindInternalFunctionByName(string name)
         {
-            // This is a simplified lookup - in practice, would need proper resolution
             foreach (var kvp in _context.ComputedEffects)
             {
-                // The key is function ID, we need to match by name
+                if (_context.Functions.TryGetValue(kvp.Key, out var func) &&
+                    func.Name.Equals(name, StringComparison.Ordinal))
+                {
+                    return func;
+                }
             }
             return null;
         }
@@ -588,6 +602,18 @@ public sealed class EffectEnforcementPass
                 effects = effects.Union(InferFromStatements(ifStmt.ElseBody));
             }
 
+            return effects;
+        }
+
+        private EffectSet InferFromFor(ForStatementNode forStmt)
+        {
+            var effects = InferFromExpression(forStmt.From);
+            effects = effects.Union(InferFromExpression(forStmt.To));
+            if (forStmt.Step != null)
+            {
+                effects = effects.Union(InferFromExpression(forStmt.Step));
+            }
+            effects = effects.Union(InferFromStatements(forStmt.Body));
             return effects;
         }
 

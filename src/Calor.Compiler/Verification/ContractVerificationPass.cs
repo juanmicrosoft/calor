@@ -112,7 +112,7 @@ public sealed class ContractVerificationPass
     private void ReportDiagnostics(FunctionNode function, FunctionVerificationResult result)
     {
         // Report disproven preconditions
-        for (int i = 0; i < result.PreconditionResults.Count; i++)
+        for (int i = 0; i < result.PreconditionResults.Count && i < function.Preconditions.Count; i++)
         {
             var preResult = result.PreconditionResults[i];
             var preNode = function.Preconditions[i];
@@ -127,7 +127,7 @@ public sealed class ContractVerificationPass
         }
 
         // Report disproven postconditions
-        for (int i = 0; i < result.PostconditionResults.Count; i++)
+        for (int i = 0; i < result.PostconditionResults.Count && i < function.Postconditions.Count; i++)
         {
             var postResult = result.PostconditionResults[i];
             var postNode = function.Postconditions[i];

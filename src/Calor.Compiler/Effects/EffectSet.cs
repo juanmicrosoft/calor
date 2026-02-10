@@ -211,6 +211,7 @@ public sealed class EffectSet : IEquatable<EffectSet>
             // Environment effects
             (EffectKind.IO, "environment_read") => "env:r",
             (EffectKind.IO, "environment_write") => "env:w",
+            (EffectKind.IO, "environment_readwrite") => "env:rw",
 
             // System
             (EffectKind.IO, "process") => "proc",
@@ -260,6 +261,7 @@ public sealed class EffectSet : IEquatable<EffectSet>
             // Environment effects
             "env:r" => (EffectKind.IO, "environment_read"),
             "env:w" => (EffectKind.IO, "environment_write"),
+            "env:rw" => (EffectKind.IO, "environment_readwrite"),
 
             // System
             "proc" => (EffectKind.IO, "process"),

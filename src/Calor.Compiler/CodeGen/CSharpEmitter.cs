@@ -340,7 +340,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         // Check if this is the entry point
         var isMain = node.Name.Equals("Main", StringComparison.OrdinalIgnoreCase);
-        var staticKeyword = isMain ? "static " : "static ";
+        var staticKeyword = "static "; // All module functions are static
 
         AppendLine($"{visibility} {staticKeyword}{mappedReturnType} {methodName}{typeParams}({parameters}){whereClause}");
         AppendLine("{");
