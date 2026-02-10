@@ -43,9 +43,9 @@ function formatValue(value: number): string {
 }
 
 function getValueColor(value: number): string {
-  if (value >= 1.0) return 'text-calor-cerulean font-medium';
+  if (value >= 1.0) return 'text-calor-pink font-medium';
   if (value >= 0.8) return 'text-muted-foreground';
-  return 'text-calor-salmon';
+  return 'text-calor-cerulean';
 }
 
 export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
@@ -197,8 +197,8 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
                       className={cn(
                         'flex items-center justify-center w-5 h-5 rounded-full text-xs',
                         program.calorSuccess
-                          ? 'bg-calor-cyan/20 text-calor-cerulean'
-                          : 'bg-calor-salmon/20 text-calor-salmon'
+                          ? 'bg-calor-pink/20 text-calor-pink'
+                          : 'bg-calor-cerulean/20 text-calor-cerulean'
                       )}
                     >
                       {program.calorSuccess ? (
@@ -246,7 +246,7 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
 
       <p className="text-xs text-muted-foreground">
         Showing {sortedPrograms.length} of {programs.length} programs.
-        Values above 1.0 favor Calor (highlighted in blue), values below 1.0 favor C# (highlighted in red).
+        Values above 1.0 favor Calor (highlighted in pink), values below 1.0 favor C# (highlighted in teal).
       </p>
     </div>
   );

@@ -88,10 +88,10 @@ export function BenchmarkSummaryTable() {
                 <span
                   className={
                     metric.isCalorOnly
-                      ? 'text-calor-cerulean font-medium'
+                      ? 'text-calor-pink font-medium'
                       : metric.winner === 'calor'
-                        ? 'text-calor-cerulean font-medium'
-                        : 'text-calor-salmon'
+                        ? 'text-calor-pink font-medium'
+                        : 'text-calor-cerulean'
                   }
                 >
                   {metric.isCalorOnly ? 'Calor only' : metric.winner === 'calor' ? 'Calor' : 'C#'}

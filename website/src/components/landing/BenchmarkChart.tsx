@@ -166,10 +166,10 @@ export function BenchmarkChart() {
                       className={cn(
                         'text-xs px-2 py-0.5 rounded-full',
                         result.isCalorOnly
-                          ? 'bg-calor-cyan/20 text-calor-cerulean'
+                          ? 'bg-calor-pink/20 text-calor-pink'
                           : result.winner === 'calor'
-                            ? 'bg-calor-cyan/20 text-calor-cerulean'
-                            : 'bg-calor-salmon/20 text-calor-salmon'
+                            ? 'bg-calor-pink/20 text-calor-pink'
+                            : 'bg-calor-cerulean/20 text-calor-cerulean'
                       )}
                     >
                       {result.isCalorOnly ? 'Calor only' : result.winner === 'calor' ? 'Calor wins' : 'C# wins'}
@@ -185,10 +185,10 @@ export function BenchmarkChart() {
                     className={cn(
                       'absolute inset-y-0 left-0 rounded-full transition-all duration-500',
                       result.isCalorOnly
-                        ? 'bg-gradient-to-r from-calor-cyan to-calor-cerulean'
+                        ? 'bg-gradient-to-r from-calor-pink to-calor-pink/60'
                         : result.winner === 'calor'
-                          ? 'bg-gradient-to-r from-calor-cyan to-calor-cyan/80'
-                          : 'bg-gradient-to-r from-calor-salmon to-calor-salmon/80'
+                          ? 'bg-gradient-to-r from-calor-pink to-calor-pink/80'
+                          : 'bg-gradient-to-r from-calor-cerulean to-calor-cerulean/80'
                     )}
                     style={{ width: result.isCalorOnly ? '100%' : `${getBarWidth(result.ratio)}%` }}
                   />
@@ -208,11 +208,11 @@ export function BenchmarkChart() {
           {/* Legend */}
           <div className="mt-8 flex items-center justify-center gap-8 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-calor-cyan" />
+              <div className="w-3 h-3 rounded-full bg-calor-pink" />
               <span>Calor better</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-calor-salmon" />
+              <div className="w-3 h-3 rounded-full bg-calor-cerulean" />
               <span>C# better</span>
             </div>
             <span className="text-xs">|</span>
