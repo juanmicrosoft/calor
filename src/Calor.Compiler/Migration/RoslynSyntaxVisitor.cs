@@ -16,6 +16,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<InterfaceDefinitionNode> _interfaces = new();
     private readonly List<ClassDefinitionNode> _classes = new();
     private readonly List<EnumDefinitionNode> _enums = new();
+    private readonly List<DelegateDefinitionNode> _delegates = new();
     private readonly List<FunctionNode> _functions = new();
     private readonly List<StatementNode> _topLevelStatements = new();
 
@@ -38,6 +39,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _interfaces.Clear();
         _classes.Clear();
         _enums.Clear();
+        _delegates.Clear();
         _functions.Clear();
         _topLevelStatements.Clear();
 
@@ -73,8 +75,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _interfaces,
             _classes,
             _enums,
+            _delegates,
             functions,
-            new AttributeCollection());
+            new AttributeCollection(),
+            Array.Empty<IssueNode>(),
+            Array.Empty<AssumeNode>(),
+            Array.Empty<InvariantNode>(),
+            Array.Empty<DecisionNode>(),
+            null);
     }
 
     public override void VisitUsingDirective(UsingDirectiveSyntax node)
@@ -229,6 +237,33 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         _enums.Add(enumNode);
         _context.Stats.EnumsConverted++;
+        _context.IncrementConverted();
+    }
+
+    public override void VisitDelegateDeclaration(DelegateDeclarationSyntax node)
+    {
+        _context.RecordFeatureUsage("delegate");
+
+        var id = _context.GenerateId("del");
+        var name = node.Identifier.Text;
+
+        // Convert parameters
+        var parameters = ConvertParameters(node.ParameterList);
+
+        // Convert return type
+        var returnType = TypeMapper.CSharpToCalor(node.ReturnType.ToString());
+        var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
+
+        var delegateNode = new DelegateDefinitionNode(
+            GetTextSpan(node),
+            id,
+            name,
+            parameters,
+            output,
+            effects: null,
+            new AttributeCollection());
+
+        _delegates.Add(delegateNode);
         _context.IncrementConverted();
     }
 

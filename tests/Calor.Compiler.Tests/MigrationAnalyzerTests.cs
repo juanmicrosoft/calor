@@ -710,8 +710,9 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_LambdaExpression_DetectedAsUnsupported()
+    public void AnalyzeSource_LambdaExpression_NowSupported()
     {
+        // Lambda expressions are now supported - they should not be flagged as unsupported
         var source = """
             using System;
             public class Service
@@ -722,8 +723,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "LambdaExpression");
+        // Lambda should not be in the unsupported constructs list
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "LambdaExpression");
     }
 
     [Fact]

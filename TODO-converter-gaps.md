@@ -122,15 +122,22 @@ Action<Dictionary<string, List<int>>> handler;
 §O{Expression<Func<T, TProp>>}
 ```
 
-#### Lambda Expressions
+#### ~~Lambda Expressions~~ ✅ DONE
 ```csharp
-// Not supported (in complex contexts):
+// NOW SUPPORTED:
 var action = (T instance, object value) => { setter(instance, (V)value); };
-Expression<Func<T, bool>> predicate = x => x.IsActive;
+Func<int, int> doubler = x => x * 2;
+Action<string> logger = msg => Console.WriteLine(msg);
 ```
-**Workaround:** Use named methods instead of inline lambdas.
+**Status:** Implemented. Lambda expressions are now fully supported using the `§LAM` syntax:
+```calor
+§LAM[lam1:x:i32]
+  §OP[kind=mul] §REF[name=x] 2
+§/LAM[lam1]
+```
+Delegate definitions use `§DEL[id:name]` and events use `§EVT[id:name:visibility:delegateType]`.
 
-**Implementation Notes:** Lambda syntax needs proper Calor representation (maybe arrow functions).
+**Note:** Expression trees (`Expression<Func<T, bool>>`) are converted as lambdas but will need Expression Tree support for full round-trip.
 
 #### Throw Expressions (C# 7+)
 ```csharp

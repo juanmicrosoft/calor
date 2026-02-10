@@ -279,16 +279,7 @@ public sealed class MigrationAnalyzer
             });
         }
 
-        if (visitor.LambdaExpressionCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "LambdaExpression",
-                Description = "Lambda expressions (x => ...) not yet supported",
-                Count = visitor.LambdaExpressionCount,
-                Examples = visitor.LambdaExpressionExamples
-            });
-        }
+        // Lambda expressions are now supported - no longer tracking as unsupported
 
         if (visitor.ThrowExpressionCount > 0)
         {
@@ -558,6 +549,7 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     public int NestedGenericTypeCount { get; private set; }
     public List<string> NestedGenericTypeExamples { get; } = new();
 
+    // Lambda expressions are now supported - kept for informational purposes only
     public int LambdaExpressionCount { get; private set; }
     public List<string> LambdaExpressionExamples { get; } = new();
 
@@ -944,7 +936,7 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         base.VisitDeclarationPattern(node);
     }
 
-    // Track lambda expressions
+    // Track lambda expressions (informational only - lambdas are now supported)
     public override void VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node)
     {
         LambdaExpressionCount++;

@@ -14,6 +14,7 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<InterfaceDefinitionNode> Interfaces { get; }
     public IReadOnlyList<ClassDefinitionNode> Classes { get; }
     public IReadOnlyList<EnumDefinitionNode> Enums { get; }
+    public IReadOnlyList<DelegateDefinitionNode> Delegates { get; }
     public IReadOnlyList<FunctionNode> Functions { get; }
     public AttributeCollection Attributes { get; }
 
@@ -109,6 +110,28 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<InvariantNode> invariants,
         IReadOnlyList<DecisionNode> decisions,
         ContextNode? context)
+        : this(span, id, name, usings, interfaces, classes, enums,
+               Array.Empty<DelegateDefinitionNode>(), functions, attributes,
+               issues, assumptions, invariants, decisions, context)
+    {
+    }
+
+    public ModuleNode(
+        TextSpan span,
+        string id,
+        string name,
+        IReadOnlyList<UsingDirectiveNode> usings,
+        IReadOnlyList<InterfaceDefinitionNode> interfaces,
+        IReadOnlyList<ClassDefinitionNode> classes,
+        IReadOnlyList<EnumDefinitionNode> enums,
+        IReadOnlyList<DelegateDefinitionNode> delegates,
+        IReadOnlyList<FunctionNode> functions,
+        AttributeCollection attributes,
+        IReadOnlyList<IssueNode> issues,
+        IReadOnlyList<AssumeNode> assumptions,
+        IReadOnlyList<InvariantNode> invariants,
+        IReadOnlyList<DecisionNode> decisions,
+        ContextNode? context)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -117,6 +140,7 @@ public sealed class ModuleNode : AstNode
         Interfaces = interfaces ?? throw new ArgumentNullException(nameof(interfaces));
         Classes = classes ?? throw new ArgumentNullException(nameof(classes));
         Enums = enums ?? throw new ArgumentNullException(nameof(enums));
+        Delegates = delegates ?? throw new ArgumentNullException(nameof(delegates));
         Functions = functions ?? throw new ArgumentNullException(nameof(functions));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         Issues = issues ?? throw new ArgumentNullException(nameof(issues));

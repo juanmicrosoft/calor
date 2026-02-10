@@ -191,6 +191,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit delegates
+        foreach (var del in node.Delegates)
+        {
+            Visit(del);
+            AppendLine();
+        }
+
         // Emit classes
         foreach (var cls in node.Classes)
         {
@@ -1351,6 +1358,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             Visit(method);
             AppendLine();
+        }
+
+        // Emit events
+        foreach (var evt in node.Events)
+        {
+            Visit(evt);
         }
 
         _currentClassName = null;

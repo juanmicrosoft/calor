@@ -87,6 +87,7 @@ public sealed class Parser
         var usings = new List<UsingDirectiveNode>();
         var interfaces = new List<InterfaceDefinitionNode>();
         var classes = new List<ClassDefinitionNode>();
+        var delegates = new List<DelegateDefinitionNode>();
         var functions = new List<FunctionNode>();
 
         // Extended Features: Module-level metadata
@@ -113,6 +114,10 @@ public sealed class Parser
             else if (Check(TokenKind.Func))
             {
                 functions.Add(ParseFunction());
+            }
+            else if (Check(TokenKind.Delegate))
+            {
+                delegates.Add(ParseDelegateDefinition());
             }
             // Extended Features: Module-level metadata
             else if (Check(TokenKind.Todo))
@@ -151,7 +156,7 @@ public sealed class Parser
             }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, FUNC, or END_MODULE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, DEL, FUNC, or END_MODULE", Current.Kind);
                 Advance();
             }
         }
@@ -167,7 +172,8 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ModuleNode(span, id, moduleName, usings, interfaces, classes, functions, attrs,
+        return new ModuleNode(span, id, moduleName, usings, interfaces, classes,
+            Array.Empty<EnumDefinitionNode>(), delegates, functions, attrs,
             issues, assumptions, invariants, decisions, context);
     }
 
@@ -3055,6 +3061,7 @@ public sealed class Parser
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
+        var events = new List<EventDefinitionNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndClass))
         {
@@ -3098,9 +3105,13 @@ public sealed class Parser
             {
                 methods.Add(ParseMethodDefinition());
             }
+            else if (Check(TokenKind.Event))
+            {
+                events.Add(ParseEventDefinition());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, METHOD, or END_CLASS", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, METHOD, EVT, or END_CLASS", Current.Kind);
                 Advance();
             }
         }
@@ -3115,8 +3126,8 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, baseClass,
-            implementedInterfaces, typeParameters, fields, properties, constructors, methods, attrs, csharpAttrs);
+        return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass,
+            implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, attrs, csharpAttrs);
     }
 
     /// <summary>
@@ -3965,6 +3976,100 @@ public sealed class Parser
 
         var span = startToken.Span.Union(handler.Span);
         return new EventUnsubscribeNode(span, @event, handler);
+    }
+
+    /// <summary>
+    /// Parses a delegate definition.
+    /// §DEL[d001:Processor] §I[string:input] §O[bool] §E[fr,fw] §/DEL[d001]
+    /// </summary>
+    private DelegateDefinitionNode ParseDelegateDefinition()
+    {
+        var startToken = Expect(TokenKind.Delegate);
+        var attrs = ParseAttributes();
+
+        // Positional: [id:name]
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DEL", "id");
+        }
+        if (string.IsNullOrEmpty(name))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DEL", "name");
+        }
+
+        var parameters = new List<ParameterNode>();
+        OutputNode? output = null;
+        EffectsNode? effects = null;
+
+        // Parse parameters, output, and effects until END_DEL
+        while (!IsAtEnd && !Check(TokenKind.EndDelegate))
+        {
+            if (Check(TokenKind.In))
+            {
+                parameters.Add(ParseParameter());
+            }
+            else if (Check(TokenKind.Out))
+            {
+                output = ParseOutput();
+            }
+            else if (Check(TokenKind.Effects))
+            {
+                effects = ParseEffects();
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "I, O, E, or END_DEL", Current.Kind);
+                Advance();
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndDelegate);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "DEL", id, "END_DEL", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new DelegateDefinitionNode(span, id, name, parameters, output, effects, attrs);
+    }
+
+    /// <summary>
+    /// Parses an event definition.
+    /// §EVT[e001:Click:pub:EventHandler]
+    /// </summary>
+    private EventDefinitionNode ParseEventDefinition()
+    {
+        var startToken = Expect(TokenKind.Event);
+        var attrs = ParseAttributes();
+
+        // Positional: [id:name:visibility:delegateType]
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+        var visStr = attrs["_pos2"] ?? "private";
+        var delegateType = attrs["_pos3"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EVT", "id");
+        }
+        if (string.IsNullOrEmpty(name))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EVT", "name");
+        }
+        if (string.IsNullOrEmpty(delegateType))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EVT", "delegateType");
+        }
+
+        var visibility = ParseVisibility(visStr);
+
+        return new EventDefinitionNode(startToken.Span, id, name, visibility, delegateType, attrs);
     }
 
     // Phase 12: Async/Await
