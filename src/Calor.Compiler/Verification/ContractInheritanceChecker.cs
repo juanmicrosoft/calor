@@ -1,6 +1,8 @@
+using System.Runtime.CompilerServices;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification.Z3;
 
 namespace Calor.Compiler.Verification;
 
@@ -10,13 +12,37 @@ namespace Calor.Compiler.Verification;
 /// - Preconditions: implementer must be weaker or equal (cannot strengthen)
 /// - Postconditions: implementer must be stronger or equal (cannot weaken)
 /// </summary>
-public sealed class ContractInheritanceChecker
+public sealed class ContractInheritanceChecker : IDisposable
 {
     private readonly DiagnosticBag _diagnostics;
+    private readonly Z3ImplicationProver? _z3Prover;
+    private readonly bool _useZ3;
+    private bool _z3UnavailableReported;
+    private bool _disposed;
 
-    public ContractInheritanceChecker(DiagnosticBag diagnostics)
+    public ContractInheritanceChecker(DiagnosticBag diagnostics, bool useZ3 = true)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        _useZ3 = useZ3 && Z3ContextFactory.IsAvailable;
+
+        if (_useZ3)
+        {
+            _z3Prover = CreateZ3Prover();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Z3ImplicationProver? CreateZ3Prover()
+    {
+        try
+        {
+            var ctx = Z3ContextFactory.Create();
+            return new Z3ImplicationProver(ctx);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -93,6 +119,16 @@ public sealed class ContractInheritanceChecker
         var violations = new List<ContractViolation>();
         var key = (classNode.Name, implementingMethod.Name);
 
+        // Report Z3 unavailable once per check session
+        if (!_useZ3 && !_z3UnavailableReported)
+        {
+            _z3UnavailableReported = true;
+            _diagnostics.ReportInfo(
+                classNode.Span,
+                DiagnosticCode.Z3UnavailableForInheritance,
+                "Z3 SMT solver unavailable, using heuristic checking only for contract inheritance");
+        }
+
         // Case 1: Interface has contracts, implementer has none → inherit
         if (interfaceMethod.HasContracts && !implementingMethod.HasContracts)
         {
@@ -117,62 +153,77 @@ public sealed class ContractInheritanceChecker
         // Case 2: Both have contracts → check LSP compliance
         if (interfaceMethod.HasContracts && implementingMethod.HasContracts)
         {
-            // Check preconditions: implementer must not be stronger
+            var parameters = GetParameterList(implementingMethod.Parameters);
+
+            // Check preconditions: interface precondition must imply implementer precondition
+            // (implementer must accept at least what interface accepts)
+            // For each interface precondition, check if ANY implementer precondition satisfies it
             foreach (var interfacePrecondition in interfaceMethod.Preconditions)
             {
-                var hasMatchingOrWeaker = implementingMethod.Preconditions.Any(p =>
-                    IsWeakerOrEqual(p.Condition, interfacePrecondition.Condition));
+                bool hasValidMatch = false;
+                ContractViolation? lastViolation = null;
 
-                if (!hasMatchingOrWeaker && implementingMethod.Preconditions.Count > 0)
+                foreach (var implPrecondition in implementingMethod.Preconditions)
                 {
-                    // Implementer has preconditions but none are weaker/equal
-                    // Check if any implementer precondition is strictly stronger
-                    foreach (var implPrecondition in implementingMethod.Preconditions)
-                    {
-                        if (IsStronger(implPrecondition.Condition, interfacePrecondition.Condition))
-                        {
-                            var violation = new ContractViolation(
-                                ContractViolationType.StrongerPrecondition,
-                                interfaceNode.Name,
-                                interfaceMethod.Name,
-                                "Precondition is stronger than interface contract (LSP violation)");
-                            violations.Add(violation);
+                    var result = CheckPreconditionImplication(
+                        parameters,
+                        interfacePrecondition.Condition,
+                        implPrecondition.Condition,
+                        classNode,
+                        implementingMethod,
+                        interfaceNode,
+                        interfaceMethod,
+                        implPrecondition.Span);
 
-                            _diagnostics.ReportError(
-                                implPrecondition.Span,
-                                DiagnosticCode.StrongerPrecondition,
-                                $"LSP violation: Precondition in '{classNode.Name}.{implementingMethod.Name}' is stronger than '{interfaceNode.Name}.{interfaceMethod.Name}'");
-                        }
+                    if (result == null)  // null means valid (no violation)
+                    {
+                        hasValidMatch = true;
+                        break;  // Found a matching precondition, move to next interface precondition
                     }
+                    lastViolation = result;
+                }
+
+                // Only report violation if NO implementer precondition matched
+                if (!hasValidMatch && lastViolation != null)
+                {
+                    violations.Add(lastViolation);
                 }
             }
 
-            // Check postconditions: implementer must not be weaker
+            // Check postconditions: implementer postcondition must imply interface postcondition
+            // (implementer must guarantee at least what interface guarantees)
+            // For each interface postcondition, check if ANY implementer postcondition satisfies it
+            var outputType = implementingMethod.Output?.TypeName;
             foreach (var interfacePostcondition in interfaceMethod.Postconditions)
             {
-                var hasMatchingOrStronger = implementingMethod.Postconditions.Any(p =>
-                    IsStrongerOrEqual(p.Condition, interfacePostcondition.Condition));
+                bool hasValidMatch = false;
+                ContractViolation? lastViolation = null;
 
-                if (!hasMatchingOrStronger && implementingMethod.Postconditions.Count > 0)
+                foreach (var implPostcondition in implementingMethod.Postconditions)
                 {
-                    // Implementer has postconditions but none are stronger/equal
-                    foreach (var implPostcondition in implementingMethod.Postconditions)
-                    {
-                        if (IsWeaker(implPostcondition.Condition, interfacePostcondition.Condition))
-                        {
-                            var violation = new ContractViolation(
-                                ContractViolationType.WeakerPostcondition,
-                                interfaceNode.Name,
-                                interfaceMethod.Name,
-                                "Postcondition is weaker than interface contract (LSP violation)");
-                            violations.Add(violation);
+                    var result = CheckPostconditionImplication(
+                        parameters,
+                        outputType,
+                        interfacePostcondition.Condition,
+                        implPostcondition.Condition,
+                        classNode,
+                        implementingMethod,
+                        interfaceNode,
+                        interfaceMethod,
+                        implPostcondition.Span);
 
-                            _diagnostics.ReportError(
-                                implPostcondition.Span,
-                                DiagnosticCode.WeakerPostcondition,
-                                $"LSP violation: Postcondition in '{classNode.Name}.{implementingMethod.Name}' is weaker than '{interfaceNode.Name}.{interfaceMethod.Name}'");
-                        }
+                    if (result == null)  // null means valid (no violation)
+                    {
+                        hasValidMatch = true;
+                        break;  // Found a matching postcondition, move to next interface postcondition
                     }
+                    lastViolation = result;
+                }
+
+                // Only report violation if NO implementer postcondition matched
+                if (!hasValidMatch && lastViolation != null)
+                {
+                    violations.Add(lastViolation);
                 }
             }
 
@@ -201,6 +252,231 @@ public sealed class ContractInheritanceChecker
             implementingMethod.Name,
             ContractInheritanceStatus.NoContracts,
             violations);
+    }
+
+    private static IReadOnlyList<(string Name, string Type)> GetParameterList(IReadOnlyList<ParameterNode> parameters)
+    {
+        return parameters.Select(p => (p.Name, p.TypeName)).ToList();
+    }
+
+    /// <summary>
+    /// Checks if interface precondition implies implementer precondition.
+    /// Returns a violation if the implication fails (implementer is stronger).
+    /// </summary>
+    private ContractViolation? CheckPreconditionImplication(
+        IReadOnlyList<(string Name, string Type)> parameters,
+        ExpressionNode interfacePrecondition,
+        ExpressionNode implementerPrecondition,
+        ClassDefinitionNode classNode,
+        MethodNode implementingMethod,
+        InterfaceDefinitionNode interfaceNode,
+        MethodSignatureNode interfaceMethod,
+        TextSpan implSpan)
+    {
+        // Try Z3 first if available
+        if (_z3Prover != null)
+        {
+            var z3Result = _z3Prover.CheckPreconditionWeakening(
+                parameters,
+                interfacePrecondition,
+                implementerPrecondition);
+
+            switch (z3Result.Status)
+            {
+                case ImplicationStatus.Proven:
+                    // Implication proven - no violation
+                    _diagnostics.ReportInfo(
+                        implSpan,
+                        DiagnosticCode.ImplicationProvenByZ3,
+                        $"Precondition weakening proven by Z3 for '{classNode.Name}.{implementingMethod.Name}'");
+                    return null;
+
+                case ImplicationStatus.Disproven:
+                    // Implication disproven - this is a violation
+                    var violation = new ContractViolation(
+                        ContractViolationType.StrongerPrecondition,
+                        interfaceNode.Name,
+                        interfaceMethod.Name,
+                        $"Precondition is stronger than interface contract (LSP violation). {z3Result.CounterexampleDescription}");
+
+                    _diagnostics.ReportError(
+                        implSpan,
+                        DiagnosticCode.StrongerPrecondition,
+                        $"LSP violation: Precondition in '{classNode.Name}.{implementingMethod.Name}' is stronger than '{interfaceNode.Name}.{interfaceMethod.Name}'. {z3Result.CounterexampleDescription}");
+                    return violation;
+
+                case ImplicationStatus.Unknown:
+                    // Could not determine - fall back to heuristics
+                    _diagnostics.ReportWarning(
+                        implSpan,
+                        DiagnosticCode.ImplicationUnknown,
+                        $"Could not determine if precondition weakening is valid for '{classNode.Name}.{implementingMethod.Name}', using heuristics");
+                    break;
+
+                case ImplicationStatus.Unsupported:
+                    // Unsupported constructs - fall back to heuristics silently
+                    break;
+            }
+        }
+
+        // Fall back to heuristic checking
+        return CheckPreconditionHeuristic(
+            interfacePrecondition,
+            implementerPrecondition,
+            classNode,
+            implementingMethod,
+            interfaceNode,
+            interfaceMethod,
+            implSpan);
+    }
+
+    /// <summary>
+    /// Checks if implementer postcondition implies interface postcondition.
+    /// Returns a violation if the implication fails (implementer is weaker).
+    /// </summary>
+    private ContractViolation? CheckPostconditionImplication(
+        IReadOnlyList<(string Name, string Type)> parameters,
+        string? outputType,
+        ExpressionNode interfacePostcondition,
+        ExpressionNode implementerPostcondition,
+        ClassDefinitionNode classNode,
+        MethodNode implementingMethod,
+        InterfaceDefinitionNode interfaceNode,
+        MethodSignatureNode interfaceMethod,
+        TextSpan implSpan)
+    {
+        // Try Z3 first if available
+        if (_z3Prover != null)
+        {
+            var z3Result = _z3Prover.CheckPostconditionStrengthening(
+                parameters,
+                outputType,
+                interfacePostcondition,
+                implementerPostcondition);
+
+            switch (z3Result.Status)
+            {
+                case ImplicationStatus.Proven:
+                    // Implication proven - no violation
+                    _diagnostics.ReportInfo(
+                        implSpan,
+                        DiagnosticCode.ImplicationProvenByZ3,
+                        $"Postcondition strengthening proven by Z3 for '{classNode.Name}.{implementingMethod.Name}'");
+                    return null;
+
+                case ImplicationStatus.Disproven:
+                    // Implication disproven - this is a violation
+                    var violation = new ContractViolation(
+                        ContractViolationType.WeakerPostcondition,
+                        interfaceNode.Name,
+                        interfaceMethod.Name,
+                        $"Postcondition is weaker than interface contract (LSP violation). {z3Result.CounterexampleDescription}");
+
+                    _diagnostics.ReportError(
+                        implSpan,
+                        DiagnosticCode.WeakerPostcondition,
+                        $"LSP violation: Postcondition in '{classNode.Name}.{implementingMethod.Name}' is weaker than '{interfaceNode.Name}.{interfaceMethod.Name}'. {z3Result.CounterexampleDescription}");
+                    return violation;
+
+                case ImplicationStatus.Unknown:
+                    // Could not determine - fall back to heuristics
+                    _diagnostics.ReportWarning(
+                        implSpan,
+                        DiagnosticCode.ImplicationUnknown,
+                        $"Could not determine if postcondition strengthening is valid for '{classNode.Name}.{implementingMethod.Name}', using heuristics");
+                    break;
+
+                case ImplicationStatus.Unsupported:
+                    // Unsupported constructs - fall back to heuristics silently
+                    break;
+            }
+        }
+
+        // Fall back to heuristic checking
+        return CheckPostconditionHeuristic(
+            interfacePostcondition,
+            implementerPostcondition,
+            classNode,
+            implementingMethod,
+            interfaceNode,
+            interfaceMethod,
+            implSpan);
+    }
+
+    /// <summary>
+    /// Heuristic check for precondition weakening.
+    /// </summary>
+    private ContractViolation? CheckPreconditionHeuristic(
+        ExpressionNode interfacePrecondition,
+        ExpressionNode implementerPrecondition,
+        ClassDefinitionNode classNode,
+        MethodNode implementingMethod,
+        InterfaceDefinitionNode interfaceNode,
+        MethodSignatureNode interfaceMethod,
+        TextSpan implSpan)
+    {
+        // Check if implementer precondition is weaker or equal (valid)
+        if (IsWeakerOrEqual(implementerPrecondition, interfacePrecondition))
+        {
+            return null;
+        }
+
+        // Check if implementer precondition is strictly stronger (violation)
+        if (IsStronger(implementerPrecondition, interfacePrecondition))
+        {
+            var violation = new ContractViolation(
+                ContractViolationType.StrongerPrecondition,
+                interfaceNode.Name,
+                interfaceMethod.Name,
+                "Precondition is stronger than interface contract (LSP violation)");
+
+            _diagnostics.ReportError(
+                implSpan,
+                DiagnosticCode.StrongerPrecondition,
+                $"LSP violation: Precondition in '{classNode.Name}.{implementingMethod.Name}' is stronger than '{interfaceNode.Name}.{interfaceMethod.Name}'");
+            return violation;
+        }
+
+        // Cannot determine - assume valid (conservative)
+        return null;
+    }
+
+    /// <summary>
+    /// Heuristic check for postcondition strengthening.
+    /// </summary>
+    private ContractViolation? CheckPostconditionHeuristic(
+        ExpressionNode interfacePostcondition,
+        ExpressionNode implementerPostcondition,
+        ClassDefinitionNode classNode,
+        MethodNode implementingMethod,
+        InterfaceDefinitionNode interfaceNode,
+        MethodSignatureNode interfaceMethod,
+        TextSpan implSpan)
+    {
+        // Check if implementer postcondition is stronger or equal (valid)
+        if (IsStrongerOrEqual(implementerPostcondition, interfacePostcondition))
+        {
+            return null;
+        }
+
+        // Check if implementer postcondition is strictly weaker (violation)
+        if (IsWeaker(implementerPostcondition, interfacePostcondition))
+        {
+            var violation = new ContractViolation(
+                ContractViolationType.WeakerPostcondition,
+                interfaceNode.Name,
+                interfaceMethod.Name,
+                "Postcondition is weaker than interface contract (LSP violation)");
+
+            _diagnostics.ReportError(
+                implSpan,
+                DiagnosticCode.WeakerPostcondition,
+                $"LSP violation: Postcondition in '{classNode.Name}.{implementingMethod.Name}' is weaker than '{interfaceNode.Name}.{interfaceMethod.Name}'");
+            return violation;
+        }
+
+        // Cannot determine - assume valid (conservative)
+        return null;
     }
 
     private static bool ParametersMatch(
@@ -371,6 +647,15 @@ public sealed class ContractInheritanceChecker
             (BinaryOperator.Equal, BinaryOperator.NotEqual) => true,
             _ => false
         };
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _z3Prover?.Dispose();
+            _disposed = true;
+        }
     }
 }
 
