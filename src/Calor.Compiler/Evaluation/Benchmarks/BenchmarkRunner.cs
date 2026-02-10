@@ -140,7 +140,11 @@ public class BenchmarkRunner
         "EditPrecision",
         "ErrorDetection",
         "InformationDensity",
-        "TaskCompletion"
+        "TaskCompletion",
+        // Calor-only metrics (C# always scores 0)
+        "ContractVerification",
+        "EffectSoundness",
+        "InteropEffectCoverage"
     };
 }
 

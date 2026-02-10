@@ -6,11 +6,11 @@ hasChildren: true
 ---
 
 
-Calor is evaluated against C# across 7 metrics designed to measure what matters for AI coding agents.
+Calor is evaluated against C# across 10 metrics designed to measure what matters for AI coding agents.
 
 ---
 
-## The Seven Metrics
+## The Metrics
 
 | Category | What It Measures | Why It Matters |
 |:---------|:-----------------|:---------------|
@@ -21,6 +21,16 @@ Calor is evaluated against C# across 7 metrics designed to measure what matters 
 | [**Task Completion**](/benchmarking/metrics/task-completion/) | End-to-end success rates | Can agents complete full tasks? |
 | [**Token Economics**](/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
 | [**Information Density**](/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
+
+### Calor-Only Metrics
+
+These metrics measure capabilities unique to Calor that have no C# equivalent:
+
+| Category | What It Measures | Why It Matters |
+|:---------|:-----------------|:---------------|
+| **Contract Verification** | Z3 static contract verification rates | Are preconditions/postconditions provably correct? |
+| **Effect Soundness** | Effect declarations match actual behavior | Do declared effects accurately describe side effects? |
+| **Interop Coverage** | BCL methods covered by effect manifests | How well are .NET interop effects documented? |
 
 ---
 

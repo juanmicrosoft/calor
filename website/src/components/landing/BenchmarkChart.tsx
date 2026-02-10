@@ -11,8 +11,9 @@ import benchmarkData from '../../../public/data/benchmark-results.json';
 interface BenchmarkResult {
   category: string;
   ratio: number;
-  winner: 'calor' | 'csharp';
+  winner: 'calor' | 'csharp' | 'tie';
   interpretation: string;
+  isCalorOnly?: boolean;
 }
 
 interface BenchmarkData {
@@ -20,7 +21,7 @@ interface BenchmarkData {
   summary: {
     programCount: number;
   };
-  metrics: Record<string, { ratio: number; winner: 'calor' | 'csharp' }>;
+  metrics: Record<string, { ratio: number; winner: 'calor' | 'csharp' | 'tie'; isCalorOnly?: boolean }>;
 }
 
 // Human-readable metric names and interpretations
@@ -68,6 +69,21 @@ const metricDisplayInfo: Record<
     calorInterpretation: 'More stable during refactoring',
     csharpInterpretation: 'Better refactoring support',
   },
+  ContractVerification: {
+    name: 'Contract Verification',
+    calorInterpretation: 'Contracts verified by Z3 (C# has no equivalent)',
+    csharpInterpretation: 'N/A - no static contract verification',
+  },
+  EffectSoundness: {
+    name: 'Effect Soundness',
+    calorInterpretation: 'Effect declarations match actual behavior',
+    csharpInterpretation: 'N/A - no effect tracking',
+  },
+  InteropEffectCoverage: {
+    name: 'Interop Coverage',
+    calorInterpretation: 'BCL methods covered by effect manifests',
+    csharpInterpretation: 'N/A - no effect manifests',
+  },
 };
 
 function transformMetrics(data: BenchmarkData): BenchmarkResult[] {
@@ -80,9 +96,15 @@ function transformMetrics(data: BenchmarkData): BenchmarkResult[] {
         winner: metric.winner,
         interpretation:
           metric.winner === 'calor' ? info.calorInterpretation : info.csharpInterpretation,
+        isCalorOnly: metric.isCalorOnly,
       };
     })
-    .sort((a, b) => b.ratio - a.ratio); // Sort by ratio descending
+    .sort((a, b) => {
+      // Sort Calor-only metrics to the end, then by ratio descending
+      if (a.isCalorOnly && !b.isCalorOnly) return 1;
+      if (!a.isCalorOnly && b.isCalorOnly) return -1;
+      return b.ratio - a.ratio;
+    });
 }
 
 // Pre-computed at build time
@@ -90,7 +112,8 @@ const results = transformMetrics(benchmarkData as BenchmarkData);
 const programCount = benchmarkData.summary.programCount;
 const lastUpdated = benchmarkData.timestamp;
 
-function formatRatio(ratio: number): string {
+function formatRatio(ratio: number, isCalorOnly?: boolean): string {
+  if (isCalorOnly) return 'Calor only';
   return `${ratio.toFixed(2)}x`;
 }
 
@@ -142,16 +165,18 @@ export function BenchmarkChart() {
                     <span
                       className={cn(
                         'text-xs px-2 py-0.5 rounded-full',
-                        result.winner === 'calor'
+                        result.isCalorOnly
                           ? 'bg-calor-cyan/20 text-calor-cerulean'
-                          : 'bg-calor-salmon/20 text-calor-salmon'
+                          : result.winner === 'calor'
+                            ? 'bg-calor-cyan/20 text-calor-cerulean'
+                            : 'bg-calor-salmon/20 text-calor-salmon'
                       )}
                     >
-                      {result.winner === 'calor' ? 'Calor' : 'C#'} wins
+                      {result.isCalorOnly ? 'Calor only' : result.winner === 'calor' ? 'Calor wins' : 'C# wins'}
                     </span>
                   </div>
                   <span className="font-mono font-bold">
-                    {formatRatio(result.ratio)}
+                    {formatRatio(result.ratio, result.isCalorOnly)}
                   </span>
                 </div>
 
@@ -159,14 +184,18 @@ export function BenchmarkChart() {
                   <div
                     className={cn(
                       'absolute inset-y-0 left-0 rounded-full transition-all duration-500',
-                      result.winner === 'calor'
-                        ? 'bg-gradient-to-r from-calor-cyan to-calor-cyan/80'
-                        : 'bg-gradient-to-r from-calor-salmon to-calor-salmon/80'
+                      result.isCalorOnly
+                        ? 'bg-gradient-to-r from-calor-cyan to-calor-cerulean'
+                        : result.winner === 'calor'
+                          ? 'bg-gradient-to-r from-calor-cyan to-calor-cyan/80'
+                          : 'bg-gradient-to-r from-calor-salmon to-calor-salmon/80'
                     )}
-                    style={{ width: `${getBarWidth(result.ratio)}%` }}
+                    style={{ width: result.isCalorOnly ? '100%' : `${getBarWidth(result.ratio)}%` }}
                   />
-                  {/* Center line at 1.0 */}
-                  <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
+                  {/* Center line at 1.0 - hide for Calor-only metrics */}
+                  {!result.isCalorOnly && (
+                    <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
+                  )}
                 </div>
 
                 <p className="text-sm text-muted-foreground">

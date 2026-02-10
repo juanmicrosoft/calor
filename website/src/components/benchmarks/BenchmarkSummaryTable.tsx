@@ -5,7 +5,8 @@ import benchmarkData from '../../../public/data/benchmark-results.json';
 
 interface MetricData {
   ratio: number;
-  winner: 'calor' | 'csharp';
+  winner: 'calor' | 'csharp' | 'tie';
+  isCalorOnly?: boolean;
 }
 
 interface BenchmarkData {
@@ -22,6 +23,9 @@ const METRIC_NAMES: Record<string, string> = {
   TaskCompletion: 'Task Completion',
   TokenEconomics: 'Token Economics',
   InformationDensity: 'Information Density',
+  ContractVerification: 'Contract Verification',
+  EffectSoundness: 'Effect Soundness',
+  InteropEffectCoverage: 'Interop Coverage',
 };
 
 // Preferred display order (Calor wins first, then C# wins)
@@ -34,11 +38,15 @@ const METRIC_ORDER = [
   'TaskCompletion',
   'TokenEconomics',
   'InformationDensity',
+  'ContractVerification',
+  'EffectSoundness',
+  'InteropEffectCoverage',
 ];
 
 const data = benchmarkData as BenchmarkData;
 
-function formatRatio(ratio: number, winner: string): string {
+function formatRatio(ratio: number, winner: string, isCalorOnly?: boolean): string {
+  if (isCalorOnly) return 'N/A';
   const formatted = ratio.toFixed(2) + 'x';
   return winner === 'calor' ? `**${formatted}**` : formatted;
 }
@@ -50,6 +58,7 @@ export function BenchmarkSummaryTable() {
       key,
       name: METRIC_NAMES[key] || key,
       ...data.metrics[key],
+      isCalorOnly: data.metrics[key].isCalorOnly,
     }));
 
   return (
@@ -67,7 +76,9 @@ export function BenchmarkSummaryTable() {
             <tr key={metric.key} className="border-b border-border/50">
               <td className="py-2 px-3">{metric.name}</td>
               <td className="py-2 px-3 font-mono">
-                {metric.winner === 'calor' ? (
+                {metric.isCalorOnly ? (
+                  <span className="text-muted-foreground">N/A</span>
+                ) : metric.winner === 'calor' ? (
                   <strong>{metric.ratio.toFixed(2)}x</strong>
                 ) : (
                   <span>{metric.ratio.toFixed(2)}x</span>
@@ -76,12 +87,14 @@ export function BenchmarkSummaryTable() {
               <td className="py-2 px-3">
                 <span
                   className={
-                    metric.winner === 'calor'
+                    metric.isCalorOnly
                       ? 'text-calor-cerulean font-medium'
-                      : 'text-calor-salmon'
+                      : metric.winner === 'calor'
+                        ? 'text-calor-cerulean font-medium'
+                        : 'text-calor-salmon'
                   }
                 >
-                  {metric.winner === 'calor' ? 'Calor' : 'C#'}
+                  {metric.isCalorOnly ? 'Calor only' : metric.winner === 'calor' ? 'Calor' : 'C#'}
                 </span>
               </td>
             </tr>
