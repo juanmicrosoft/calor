@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
+using Calor.Compiler.Init;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Telemetry;
 
@@ -52,6 +53,11 @@ public static class LintCommand
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("lint");
+        if (telemetry != null && files.Length > 0)
+        {
+            var discovered = CalorConfigManager.Discover(files[0].FullName);
+            telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
+        }
         var sw = Stopwatch.StartNew();
 
         var totalFiles = 0;

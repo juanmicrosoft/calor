@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Init;
 using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
@@ -60,6 +61,11 @@ public static class DiagnoseCommand
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("diagnose");
+        if (telemetry != null && files.Length > 0)
+        {
+            var discovered = CalorConfigManager.Discover(files[0].FullName);
+            telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
+        }
         var sw = Stopwatch.StartNew();
 
         var allDiagnostics = new List<Diagnostic>();

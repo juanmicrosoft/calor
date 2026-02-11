@@ -323,4 +323,14 @@ public sealed class CalorTelemetry : IDisposable
         if (OperatingSystem.IsLinux()) return "linux";
         return "other";
     }
+
+    /// <summary>
+    /// Sets the coding agent(s) from .calor/config.json discovery.
+    /// Call after determining the working directory for the current command.
+    /// </summary>
+    public void SetAgents(string agents)
+    {
+        if (_client == null) return;
+        _client.Context.GlobalProperties["codingAgent"] = agents;
+    }
 }
