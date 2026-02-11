@@ -199,6 +199,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit enum extensions
+        foreach (var enumExt in node.EnumExtensions)
+        {
+            Visit(enumExt);
+            AppendLine();
+        }
+
         // Emit delegates
         foreach (var del in node.Delegates)
         {
@@ -800,6 +807,176 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var value = node.Value != null ? $" = {node.Value}" : "";
         AppendLine($"{memberName}{value},");
         return "";
+    }
+
+    public string Visit(EnumExtensionNode node)
+    {
+        // Generate a static extension class for the enum
+        var enumName = SanitizeIdentifier(node.EnumName);
+        var className = $"{enumName}Extensions";
+
+        AppendLine($"public static class {className}");
+        AppendLine("{");
+        Indent();
+
+        foreach (var method in node.Methods)
+        {
+            EmitExtensionMethod(method, enumName);
+            AppendLine();
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    /// <summary>
+    /// Emits an extension method for an enum.
+    /// The first parameter with the enum type becomes the 'this' parameter.
+    /// </summary>
+    private void EmitExtensionMethod(FunctionNode method, string enumName)
+    {
+        // Track current function ID for contract emission
+        _currentFunctionId = method.Id;
+        _currentPreconditionIndex = 0;
+        _currentPostconditionIndex = 0;
+
+        // Emit extended metadata as documentation comments
+        foreach (var issue in method.Issues)
+        {
+            AppendLine(Visit(issue));
+        }
+        if (method.Deprecated != null)
+        {
+            AppendLine(Visit(method.Deprecated));
+        }
+
+        var visibility = method.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            _ => "public"
+        };
+
+        var returnType = method.Output?.TypeName ?? "void";
+        var mappedReturnType = MapTypeName(returnType);
+        if (method.IsAsync)
+        {
+            mappedReturnType = WrapInTask(mappedReturnType);
+        }
+        var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+
+        // Find the 'self' parameter (the one with the enum type) and make it the 'this' parameter
+        var selfParam = method.Parameters.FirstOrDefault(p =>
+            p.TypeName.Equals(enumName, StringComparison.OrdinalIgnoreCase) ||
+            p.Name.Equals("self", StringComparison.OrdinalIgnoreCase));
+
+        var parameters = new List<string>();
+        var hasThisParam = false;
+
+        foreach (var p in method.Parameters)
+        {
+            var paramType = MapTypeName(p.TypeName);
+            var paramName = SanitizeIdentifier(p.Name);
+
+            if (p == selfParam && !hasThisParam)
+            {
+                // This is the extension method 'this' parameter
+                parameters.Add($"this {paramType} {paramName}");
+                hasThisParam = true;
+            }
+            else
+            {
+                parameters.Add($"{paramType} {paramName}");
+            }
+        }
+
+        var paramString = string.Join(", ", parameters);
+        var methodName = SanitizeIdentifier(method.Name);
+
+        // Build type parameters if present
+        var typeParams = "";
+        var whereClause = "";
+        if (method.TypeParameters.Count > 0)
+        {
+            typeParams = "<" + string.Join(", ", method.TypeParameters.Select(tp => tp.Name)) + ">";
+
+            var whereClauses = new List<string>();
+            foreach (var tp in method.TypeParameters)
+            {
+                if (tp.Constraints.Count > 0)
+                {
+                    var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
+                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                }
+            }
+            if (whereClauses.Count > 0)
+            {
+                whereClause = " " + string.Join(" ", whereClauses);
+            }
+        }
+
+        var asyncKeyword = method.IsAsync ? "async " : "";
+
+        AppendLine($"{visibility} static {asyncKeyword}{mappedReturnType} {methodName}{typeParams}({paramString}){whereClause}");
+        AppendLine("{");
+        Indent();
+
+        // Emit preconditions
+        foreach (var requires in method.Preconditions)
+        {
+            var check = Visit(requires);
+            AppendLine(check);
+        }
+
+        // If we have postconditions and a return value, we need special handling
+        if (method.Postconditions.Count > 0 && hasReturnValue)
+        {
+            AppendLine($"{mappedReturnType} __result__ = default;");
+            AppendLine();
+
+            foreach (var statement in method.Body)
+            {
+                if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
+                {
+                    var expr = returnStmt.Expression.Accept(this);
+                    AppendLine($"__result__ = {expr};");
+                }
+                else
+                {
+                    var stmtCode = statement.Accept(this);
+                    AppendLine(stmtCode);
+                }
+            }
+
+            AppendLine();
+            foreach (var ensures in method.Postconditions)
+            {
+                var check = Visit(ensures).Replace("result", "__result__");
+                AppendLine(check);
+            }
+
+            AppendLine("return __result__;");
+        }
+        else
+        {
+            foreach (var statement in method.Body)
+            {
+                var stmtCode = statement.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            foreach (var ensures in method.Postconditions)
+            {
+                var check = Visit(ensures);
+                AppendLine(check);
+            }
+        }
+
+        Dedent();
+        AppendLine("}");
     }
 
     public string Visit(RecordCreationNode node)

@@ -343,6 +343,155 @@ Emits: `public delegate void Logger(string message);`
 
 ---
 
+## Enum Definitions
+
+Enums define a set of named constants.
+
+### Syntax
+
+```
+§EN{id:Name}
+  Member1
+  Member2 = 1
+  Member3 = 2
+§/EN{id}
+```
+
+With underlying type:
+```
+§EN{id:Name:underlyingType}
+  ...
+§/EN{id}
+```
+
+### Examples
+
+**Simple enum:**
+```
+§EN{e001:Color}
+  Red
+  Green
+  Blue
+§/EN{e001}
+```
+
+Emits:
+```csharp
+public enum Color
+{
+    Red,
+    Green,
+    Blue,
+}
+```
+
+**Enum with explicit values:**
+```
+§EN{e001:StatusCode}
+  Ok = 200
+  NotFound = 404
+  Error = 500
+§/EN{e001}
+```
+
+**Enum with underlying type:**
+```
+§EN{e001:Flags:u8}
+  None = 0
+  Read = 1
+  Write = 2
+§/EN{e001}
+```
+
+Emits:
+```csharp
+public enum Flags : byte
+{
+    None = 0,
+    Read = 1,
+    Write = 2,
+}
+```
+
+---
+
+## Enum Extension Methods
+
+Extension methods can be added to enums using `§EXT`.
+
+### Syntax
+
+```
+§EXT{id:EnumName}
+  §F{f001:MethodName:pub}
+    §I{EnumName:self}
+    §O{returnType}
+    // body using self
+  §/F{f001}
+§/EXT{id}
+```
+
+The first parameter with the enum type (or named `self`) becomes the `this` parameter.
+
+### Example
+
+```
+§EN{e001:Color}
+  Red
+  Green
+  Blue
+§/EN{e001}
+
+§EXT{ext001:Color}
+  §F{f001:ToHex:pub}
+    §I{Color:self}
+    §O{str}
+    §W{sw1} self
+      §K Color.Red → §R "#FF0000"
+      §K Color.Green → §R "#00FF00"
+      §K Color.Blue → §R "#0000FF"
+    §/W{sw1}
+  §/F{f001}
+
+  §F{f002:IsPrimary:pub}
+    §I{Color:self}
+    §O{bool}
+    §R (|| (== self Color.Red) (|| (== self Color.Green) (== self Color.Blue)))
+  §/F{f002}
+§/EXT{ext001}
+```
+
+Emits:
+```csharp
+public enum Color
+{
+    Red,
+    Green,
+    Blue,
+}
+
+public static class ColorExtensions
+{
+    public static string ToHex(this Color self)
+    {
+        return self switch
+        {
+            Color.Red => "#FF0000",
+            Color.Green => "#00FF00",
+            Color.Blue => "#0000FF",
+            _ => throw new ArgumentOutOfRangeException(nameof(self))
+        };
+    }
+
+    public static bool IsPrimary(this Color self)
+    {
+        return self == Color.Red || self == Color.Green || self == Color.Blue;
+    }
+}
+```
+
+---
+
 ## Event Definitions
 
 Events allow objects to notify subscribers of state changes.

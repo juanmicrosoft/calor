@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Enum extension methods** - `§EXT{id:EnumName}` for defining extension methods on enums
+- **Shorter enum syntax** - `§EN` as shorthand for `§ENUM` (legacy syntax still supported)
+
+### Changed
+- Enum definitions now use `§EN{id:name}` instead of `§ENUM{id:name}` (both are accepted for backwards compatibility)
+
 ## [0.2.2] - 2026-02-10
 
 ### Benchmark Results (Statistical: 30 runs)

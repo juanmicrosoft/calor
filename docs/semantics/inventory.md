@@ -159,7 +159,8 @@ Defined in `ExpressionNodes.cs:141-146`:
 |-----------|-----------|--------|----------------|
 | Record | `RecordDefinitionNode` | `§RECORD{id}{name}` | `TypeNodes.cs:30-47` |
 | Union | `UnionTypeDefinitionNode` | `§TYPE{id}{name}` | `TypeNodes.cs:85-102` |
-| Enum | `EnumDefinitionNode` | `§ENUM{id:Name}` | `TypeNodes.cs:317-344` |
+| Enum | `EnumDefinitionNode` | `§EN{id:Name}` | `TypeNodes.cs:317-344` |
+| Enum Extension | `EnumExtensionNode` | `§EXT{id:EnumName}` | `EnumExtensionNode.cs` |
 | Interface | `InterfaceDefinitionNode` | `§IFACE{id:Name}` | `ClassNodes.cs:25-70` |
 | Class | `ClassDefinitionNode` | `§CLASS{id:Name}` | `ClassNodes.cs:138-324` |
 | Delegate | `DelegateDefinitionNode` | `§DEL{id:Name}` | `LambdaNodes.cs:77-100` |

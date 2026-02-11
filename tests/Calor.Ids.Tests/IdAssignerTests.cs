@@ -95,9 +95,9 @@ public class IdAssignerTests
             §/CL{}
             §IFACE{:IFace}
             §/IFACE{}
-            §ENUM{:Status}
+            §EN{:Status}
             Active
-            §/ENUM{}
+            §/EN{}
             §/M{}
             """;
 

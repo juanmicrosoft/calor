@@ -118,6 +118,15 @@ public sealed class IdScanner : IAstVisitor
         AddEntry(node.Id, IdKind.Enum, node.Name, node.Span);
     }
 
+    public void Visit(EnumExtensionNode node)
+    {
+        // Scan the extension ID, then scan methods for their IDs
+        AddEntry(node.Id, IdKind.EnumExtension, $"{node.EnumName}Extensions", node.Span);
+
+        foreach (var method in node.Methods)
+            method.Accept(this);
+    }
+
     private void AddEntry(string id, IdKind kind, string name, TextSpan span)
     {
         _entries.Add(new IdEntry(id, kind, name, span, _currentFilePath));

@@ -244,6 +244,12 @@ public enum TokenKind
     Experimental,       // §EXPERIMENTAL - Experimental feature markers
     Stable,             // §STABLE - Stability markers
 
+    // Enums and Extensions
+    Enum,               // §EN or §ENUM - Enum definition
+    EndEnum,            // §/EN or §/ENUM
+    EnumExtension,      // §EXT - Enum extension methods
+    EndEnumExtension,   // §/EXT
+
     // Extended Features Phase 4: Future Extensions
     Decision,           // §DECISION - Decision records
     EndDecision,        // §/DECISION

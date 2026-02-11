@@ -187,6 +187,14 @@ public sealed class Lexer
         ["VAR"] = TokenKind.Var,
         ["REST"] = TokenKind.Rest,
 
+        // Enums and Extensions
+        ["EN"] = TokenKind.Enum,                // §EN = Enum (short form)
+        ["ENUM"] = TokenKind.Enum,              // §ENUM = Enum (legacy)
+        ["/EN"] = TokenKind.EndEnum,            // §/EN
+        ["/ENUM"] = TokenKind.EndEnum,          // §/ENUM (legacy)
+        ["EXT"] = TokenKind.EnumExtension,      // §EXT = Enum Extension
+        ["/EXT"] = TokenKind.EndEnumExtension,  // §/EXT
+
         // Extended Features: Quick Wins
         ["EX"] = TokenKind.Example,             // §EX - Inline examples/tests
         ["TD"] = TokenKind.Todo,                // §TD = Todo

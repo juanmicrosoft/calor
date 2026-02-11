@@ -1253,6 +1253,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(UnionTypeDefinitionNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(EnumDefinitionNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(EnumMemberNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(EnumExtensionNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(MatchStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(MatchCaseNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(WildcardPatternNode node) => throw new InvalidOperationException();

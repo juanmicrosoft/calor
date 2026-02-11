@@ -38,6 +38,11 @@ public static class DiagnosticCode
     public const string TypeMismatch = "Calor0202";
     public const string InvalidReference = "Calor0203";
 
+    /// <summary>
+    /// Error: Extension method must have a parameter of the extended type.
+    /// </summary>
+    public const string MissingExtensionSelf = "Calor0204";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

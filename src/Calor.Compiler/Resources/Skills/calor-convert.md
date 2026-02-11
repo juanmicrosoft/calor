@@ -114,11 +114,11 @@ public static int Add(int a, int b) {
 public enum Color { Red, Green, Blue }
 ```
 ```calor
-§ENUM{e1:Color}
+§EN{e1:Color}
 Red
 Green
 Blue
-§/ENUM{e1}
+§/EN{e1}
 ```
 
 ```csharp
@@ -129,11 +129,39 @@ public enum StatusCode {
 }
 ```
 ```calor
-§ENUM{e1:StatusCode}
+§EN{e1:StatusCode}
 Ok = 200
 NotFound = 404
 Error = 500
-§/ENUM{e1}
+§/EN{e1}
+```
+
+### Enum Extension Methods
+```csharp
+public static class ColorExtensions {
+    public static string ToHex(this Color color) {
+        return color switch {
+            Color.Red => "#FF0000",
+            Color.Green => "#00FF00",
+            Color.Blue => "#0000FF",
+            _ => "#000000"
+        };
+    }
+}
+```
+```calor
+§EXT{ext1:Color}
+§F{f1:ToHex:pub}
+§I{Color:color}
+§O{str}
+§W{sw1} color
+  §K Color.Red → §R "#FF0000"
+  §K Color.Green → §R "#00FF00"
+  §K Color.Blue → §R "#0000FF"
+  §K _ → §R "#000000"
+§/W{sw1}
+§/F{f1}
+§/EXT{ext1}
 ```
 
 ### For Loop
