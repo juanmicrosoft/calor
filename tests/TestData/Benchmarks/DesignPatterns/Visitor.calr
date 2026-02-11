@@ -1,0 +1,113 @@
+§M{m001:DesignPatterns}
+
+§IFACE{i001:IExpressionVisitor}
+  §MT{m001:VisitNumber}
+    §I{NumberExpression:expr}
+    §O{f64}
+  §/MT{m001}
+  §MT{m002:VisitAdd}
+    §I{AddExpression:expr}
+    §O{f64}
+  §/MT{m002}
+  §MT{m003:VisitMultiply}
+    §I{MultiplyExpression:expr}
+    §O{f64}
+  §/MT{m003}
+§/IFACE{i001}
+
+§CL{c001:Expression:abs}
+  §MT{mt001:Accept:abs}
+    §I{IExpressionVisitor:visitor}
+    §O{f64}
+  §/MT{mt001}
+§/CL{c001}
+
+§CL{c002:NumberExpression:pub}
+  §EXT{Expression}
+  §FLD{f64:Value:pub}
+
+  §CTOR{ctor001:pub}
+    §I{f64:value}
+    §ASSIGN §THIS.Value value
+  §/CTOR{ctor001}
+
+  §MT{mt001:Accept:pub:over}
+    §I{IExpressionVisitor:visitor}
+    §O{f64}
+    §R §C{visitor.VisitNumber} §A §THIS §/C
+  §/MT{mt001}
+§/CL{c002}
+
+§CL{c003:AddExpression:pub}
+  §EXT{Expression}
+  §FLD{Expression:Left:pub}
+  §FLD{Expression:Right:pub}
+
+  §CTOR{ctor001:pub}
+    §I{Expression:left}
+    §I{Expression:right}
+    §ASSIGN §THIS.Left left
+    §ASSIGN §THIS.Right right
+  §/CTOR{ctor001}
+
+  §MT{mt001:Accept:pub:over}
+    §I{IExpressionVisitor:visitor}
+    §O{f64}
+    §R §C{visitor.VisitAdd} §A §THIS §/C
+  §/MT{mt001}
+§/CL{c003}
+
+§CL{c004:MultiplyExpression:pub}
+  §EXT{Expression}
+  §FLD{Expression:Left:pub}
+  §FLD{Expression:Right:pub}
+
+  §CTOR{ctor001:pub}
+    §I{Expression:left}
+    §I{Expression:right}
+    §ASSIGN §THIS.Left left
+    §ASSIGN §THIS.Right right
+  §/CTOR{ctor001}
+
+  §MT{mt001:Accept:pub:over}
+    §I{IExpressionVisitor:visitor}
+    §O{f64}
+    §R §C{visitor.VisitMultiply} §A §THIS §/C
+  §/MT{mt001}
+§/CL{c004}
+
+§CL{c005:EvaluatorVisitor:pub}
+  §IMPL{IExpressionVisitor}
+
+  §MT{mt001:VisitNumber:pub}
+    §I{NumberExpression:expr}
+    §O{f64}
+    §R expr.Value
+  §/MT{mt001}
+
+  §MT{mt002:VisitAdd:pub}
+    §I{AddExpression:expr}
+    §O{f64}
+    §R (+ §C{expr.Left.Accept} §A §THIS §/C §C{expr.Right.Accept} §A §THIS §/C)
+  §/MT{mt002}
+
+  §MT{mt003:VisitMultiply:pub}
+    §I{MultiplyExpression:expr}
+    §O{f64}
+    §R (* §C{expr.Left.Accept} §A §THIS §/C §C{expr.Right.Accept} §A §THIS §/C)
+  §/MT{mt003}
+§/CL{c005}
+
+§CL{c006:VisitorDemo:stat}
+  §MT{mt001:Evaluate:pub:stat}
+    §I{Expression:expr}
+    §O{f64}
+    §B{visitor:EvaluatorVisitor} §NEW{EvaluatorVisitor}    §R §C{expr.Accept} §A visitor §/C
+  §/MT{mt001}
+
+  §MT{mt002:BuildSampleExpression:pub:stat}
+    §O{Expression}
+    §B{two:NumberExpression} §NEW{NumberExpression} §A 2.0    §B{three:NumberExpression} §NEW{NumberExpression} §A 3.0    §B{four:NumberExpression} §NEW{NumberExpression} §A 4.0    §B{sum:AddExpression} §NEW{AddExpression} §A two §A three    §R §NEW{MultiplyExpression} §A sum §A four  §/MT{mt002}
+§/CL{c006}
+
+§/M{m001}

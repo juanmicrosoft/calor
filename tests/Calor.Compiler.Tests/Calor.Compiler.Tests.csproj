@@ -35,6 +35,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>TestData\LintScenarios\%(RecursiveDir)%(FileName)%(Extension)</Link>
     </None>
+    <None Include="..\TestData\Benchmarks\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>TestData\Benchmarks\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </None>
   </ItemGroup>
 
 </Project>

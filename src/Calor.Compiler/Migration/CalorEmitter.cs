@@ -1618,8 +1618,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EnumExtensionNode node)
     {
-        // Format: §EXT{id:EnumName}
-        AppendLine($"§EXT{{{node.Id}:{node.EnumName}}}");
+        // Format: §EEXT{id:EnumName} (note: §EXT is for class inheritance)
+        AppendLine($"§EEXT{{{node.Id}:{node.EnumName}}}");
         Indent();
 
         foreach (var method in node.Methods)
@@ -1629,7 +1629,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/EXT{{{node.Id}}}");
+        AppendLine($"§/EEXT{{{node.Id}}}");
         return "";
     }
 

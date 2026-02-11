@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **Enum extension methods** - `§EXT{id:EnumName}` for defining extension methods on enums
+- **Enum extension methods** - `§EEXT{id:EnumName}` for defining extension methods on enums
 - **Shorter enum syntax** - `§EN` as shorthand for `§ENUM` (legacy syntax still supported)
 
 ### Changed

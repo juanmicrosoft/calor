@@ -6157,13 +6157,13 @@ public sealed class Parser
 
     /// <summary>
     /// Parses an enum extension definition.
-    /// §EXT{id:EnumName}
+    /// §EEXT{id:EnumName}
     ///   §F{f001:MethodName:pub}
     ///     §I{EnumType:self}
     ///     §O{returnType}
     ///     // body
     ///   §/F{f001}
-    /// §/EXT{id}
+    /// §/EEXT{id}
     /// </summary>
     private EnumExtensionNode ParseEnumExtension()
     {

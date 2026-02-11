@@ -1,0 +1,388 @@
+---
+title: "Inheritance"
+section: "syntax-reference"
+order: 7
+---
+
+Calor supports object-oriented inheritance with abstract classes, virtual methods, and interface implementation.
+
+---
+
+## Class Modifiers
+
+Classes can be marked with modifiers to control inheritance behavior.
+
+### Syntax
+
+```
+§CL{id:Name:modifiers}
+  // class body
+§/CL{id}
+```
+
+> **Note:** Class declarations use 3 positional parts: `{id:name:modifiers}`. Visibility defaults to public.
+
+### Modifiers
+
+| Modifier | Meaning |
+|:---------|:--------|
+| `abs` | Abstract class - cannot be instantiated |
+| `seal` | Sealed class - cannot be inherited |
+| `stat` | Static class - all members must be static |
+| `partial` | Partial class - split across files |
+
+### Examples
+
+**Abstract class:**
+```
+§CL{c1:Shape:abs}
+  §MT{mt1:Area:pub:abs}
+    §O{double}
+  §/MT{mt1}
+§/CL{c1}
+```
+
+**Sealed class:**
+```
+§CL{c1:FinalService:seal}
+  §MT{mt1:Process:pub}
+    §O{void}
+  §/MT{mt1}
+§/CL{c1}
+```
+
+**Static methods** (static class modifier not fully implemented):
+```
+§CL{c1:MathUtils:pub}
+  §MT{mt1:Square:pub:stat}
+    §I{i32:x}
+    §O{i32}
+    §R (* x x)
+  §/MT{mt1}
+§/CL{c1}
+```
+
+---
+
+## Inheritance Declaration
+
+### Extending a Class (`§EXT`)
+
+Use `§EXT{ClassName}` to inherit from a base class.
+
+```
+§CL{c1:Circle:pub}
+  §EXT{Shape}
+  §FLD{f64:_radius:pri}
+  // ...
+§/CL{c1}
+```
+
+**Generated C#:**
+```csharp
+public class Circle : Shape
+{
+    private double _radius;
+}
+```
+
+### Implementing Interfaces (`§IMPL`)
+
+Use `§IMPL{InterfaceName}` to implement interfaces. Multiple interfaces can be implemented.
+
+```
+§CL{c1:GameObject:pub}
+  §IMPL{IMovable}
+  §IMPL{IDrawable}
+  §MT{mt1:Move:pub}
+    §O{void}
+  §/MT{mt1}
+  §MT{mt2:Draw:pub}
+    §O{void}
+  §/MT{mt2}
+§/CL{c1}
+```
+
+**Generated C#:**
+```csharp
+public class GameObject : IMovable, IDrawable
+{
+    public void Move() { }
+    public void Draw() { }
+}
+```
+
+### Combined Inheritance
+
+```
+§CL{c1:Dog:pub}
+  §EXT{Animal}
+  §IMPL{IPet}
+  §IMPL{ITrainable}
+  // ...
+§/CL{c1}
+```
+
+**Generated C#:**
+```csharp
+public class Dog : Animal, IPet, ITrainable { ... }
+```
+
+---
+
+## Method Modifiers
+
+Methods support modifiers for polymorphism.
+
+### Syntax
+
+```
+§MT{id:Name:visibility:modifiers}
+  §O{returnType}
+  // method body
+§/MT{id}
+```
+
+### Modifiers
+
+| Modifier | Meaning |
+|:---------|:--------|
+| `virt` | Virtual - can be overridden |
+| `over` | Override - replaces base implementation |
+| `abs` | Abstract - no implementation |
+| `seal` | Sealed - prevents further override |
+| `stat` | Static - belongs to the class |
+
+### Virtual Methods
+
+```
+§CL{c1:Animal:pub}
+  §MT{mt1:Speak:pub:virt}
+    §O{str}
+    §R "..."
+  §/MT{mt1}
+§/CL{c1}
+```
+
+**Generated C#:**
+```csharp
+public class Animal
+{
+    public virtual string Speak()
+    {
+        return "...";
+    }
+}
+```
+
+### Override Methods
+
+```
+§CL{c1:Dog:pub}
+  §EXT{Animal}
+  §MT{mt1:Speak:pub:over}
+    §O{str}
+    §R "Woof!"
+  §/MT{mt1}
+§/CL{c1}
+```
+
+**Generated C#:**
+```csharp
+public class Dog : Animal
+{
+    public override string Speak()
+    {
+        return "Woof!";
+    }
+}
+```
+
+### Abstract Methods
+
+Abstract methods have no body and must be in an abstract class.
+
+```
+§CL{c1:Shape:abs}
+  §MT{mt1:Area:pub:abs}
+    §O{double}
+  §/MT{mt1}
+§/CL{c1}
+```
+
+**Generated C#:**
+```csharp
+public abstract class Shape
+{
+    public abstract double Area();
+}
+```
+
+### Sealed Override
+
+Prevents further overriding in derived classes. Combine modifiers with spaces.
+
+```
+§MT{mt1:Compute:pub:seal over}
+  §O{i32}
+  §R 42
+§/MT{mt1}
+```
+
+**Generated C#:**
+```csharp
+public sealed override int Compute()
+{
+    return 42;
+}
+```
+
+---
+
+## Base Calls
+
+### Calling Base Methods
+
+Use `base.MethodName` (lowercase) inside `§C{...}` to call the base class implementation.
+
+> **Important:** Use `base.Method` not `§BASE.Method` inside call expressions.
+
+```
+§CL{c1:Derived:pub}
+  §EXT{Base}
+  §MT{mt1:GetValue:pub:over}
+    §O{i32}
+    §R (+ §C{base.GetValue} §/C 5)
+  §/MT{mt1}
+§/CL{c1}
+```
+
+**Generated C#:**
+```csharp
+public class Derived : Base
+{
+    public override int GetValue()
+    {
+        return base.GetValue() + 5;
+    }
+}
+```
+
+### Base Constructor Calls
+
+Use `§BASE §A args §/BASE` in a constructor to call the base constructor.
+
+```
+§CL{c1:Dog:pub}
+  §EXT{Animal}
+  §FLD{str:_breed:pri}
+
+  §CTOR{ctor1:pub}
+    §I{str:name}
+    §I{str:breed}
+    §BASE §A name §/BASE
+    §ASSIGN §THIS._breed breed
+  §/CTOR{ctor1}
+§/CL{c1}
+```
+
+**Generated C#:**
+```csharp
+public class Dog : Animal
+{
+    private string _breed;
+
+    public Dog(string name, string breed)
+        : base(name)
+    {
+        this._breed = breed;
+    }
+}
+```
+
+---
+
+## Complete Example
+
+Here's a complete example demonstrating inheritance with a Shape hierarchy.
+
+### Base Class
+
+```
+§CL{c1:Shape:abs}
+  §FLD{str:_name:pro}
+
+  §CTOR{ctor1:pro}
+    §I{str:name}
+    §ASSIGN §THIS._name name
+  §/CTOR{ctor1}
+
+  §MT{mt1:Area:pub:abs}
+    §O{double}
+  §/MT{mt1}
+
+  §MT{mt2:Describe:pub:virt}
+    §O{str}
+    §R §INTERP §THIS._name " with area " §C{this.Area} §/C §/INTERP
+  §/MT{mt2}
+§/CL{c1}
+```
+
+### Derived Class
+
+```
+§CL{c2:Circle:pub}
+  §EXT{Shape}
+  §FLD{double:_radius:pri}
+
+  §CTOR{ctor1:pub}
+    §I{double:radius}
+    §BASE §A "Circle" §/BASE
+    §ASSIGN §THIS._radius radius
+  §/CTOR{ctor1}
+
+  §MT{mt1:Area:pub:over}
+    §O{double}
+    §R (* 3.14159 (* §THIS._radius §THIS._radius))
+  §/MT{mt1}
+§/CL{c2}
+```
+
+### Usage
+
+```
+§F{f1:Demo:pub}
+  §O{str}
+  §B{shape:Shape} §NEW{Circle} §A 5.0
+  §R §C{shape.Describe} §/C
+§/F{f1}
+```
+
+---
+
+## Quick Reference
+
+| Task | Syntax | Example |
+|:-----|:-------|:--------|
+| Abstract class | `§CL{id:Name:abs}` | `§CL{c1:Shape:abs}` |
+| Sealed class | `§CL{id:Name:seal}` | `§CL{c1:Final:seal}` |
+| Public class | `§CL{id:Name:pub}` | `§CL{c1:Service:pub}` |
+| Extend class | `§EXT{BaseClass}` | `§EXT{Shape}` |
+| Implement interface | `§IMPL{Interface}` | `§IMPL{IDrawable}` |
+| Virtual method | `§MT{id:Name:vis:virt}` | `§MT{mt1:Speak:pub:virt}` |
+| Override method | `§MT{id:Name:vis:over}` | `§MT{mt1:Speak:pub:over}` |
+| Abstract method | `§MT{id:Name:vis:abs}` | `§MT{mt1:Area:pub:abs}` |
+| Sealed override | `§MT{id:Name:vis:seal over}` | `§MT{mt1:Get:pub:seal over}` |
+| Static method | `§MT{id:Name:vis:stat}` | `§MT{mt1:Create:pub:stat}` |
+| Call base method | `§C{base.Method} §/C` | `§C{base.GetValue} §/C` |
+| Call this method | `§C{this.Method} §/C` | `§C{this.Process} §/C` |
+| Base constructor | `§BASE §A args §/BASE` | `§BASE §A name §/BASE` |
+
+> **Note:** Static and partial class modifiers are not fully implemented. Use static methods within regular classes.
+
+---
+
+## Next
+
+- [Control Flow](/syntax-reference/control-flow/) - Conditionals and loops
+- [Contracts](/syntax-reference/contracts/) - Preconditions and postconditions

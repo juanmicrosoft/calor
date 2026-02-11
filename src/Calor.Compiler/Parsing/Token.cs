@@ -247,8 +247,8 @@ public enum TokenKind
     // Enums and Extensions
     Enum,               // §EN or §ENUM - Enum definition
     EndEnum,            // §/EN or §/ENUM
-    EnumExtension,      // §EXT - Enum extension methods
-    EndEnumExtension,   // §/EXT
+    EnumExtension,      // §EEXT - Enum extension methods (note: §EXT is for class inheritance)
+    EndEnumExtension,   // §/EEXT
 
     // Extended Features Phase 4: Future Extensions
     Decision,           // §DECISION - Decision records

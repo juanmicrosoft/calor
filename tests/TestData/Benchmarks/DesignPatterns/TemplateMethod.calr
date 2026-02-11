@@ -1,0 +1,117 @@
+§M{m001:DesignPatterns}
+
+§CL{c001:DataProcessor:abs}
+  §MT{mt001:Process:pub}
+    §O{str}
+    §B{data:str} §C{this.ReadData} §/C
+    §IF{if1} (== data "")
+      §R "Validation failed"
+    §/I{if1}
+    §B{processed:str} §C{this.ProcessData} §A data §/C
+    §R §C{this.SaveResults} §A processed §/C
+  §/MT{mt001}
+
+  §MT{mt002:ReadData:pro:abs}
+    §O{str}
+  §/MT{mt002}
+
+  §MT{mt003:ProcessData:pro:abs}
+    §I{str:data}
+    §O{str}
+  §/MT{mt003}
+
+  §MT{mt004:SaveResults:pro:abs}
+    §I{str:data}
+    §O{str}
+  §/MT{mt004}
+
+  §MT{mt005:ValidateData:pro:virt}
+    §I{str:data}
+    §O{bool}
+    §R (!= data "")
+  §/MT{mt005}
+§/CL{c001}
+
+§CL{c002:CsvProcessor:pub}
+  §EXT{DataProcessor}
+  §FLD{str:_inputPath:pri}
+  §FLD{str:_outputPath:pri}
+
+  §CTOR{ctor001:pub}
+    §I{str:inputPath}
+    §I{str:outputPath}
+    §ASSIGN §THIS._inputPath inputPath
+    §ASSIGN §THIS._outputPath outputPath
+  §/CTOR{ctor001}
+
+  §MT{mt001:ReadData:pro:over}
+    §O{str}
+    §R "CSV data from input"
+  §/MT{mt001}
+
+  §MT{mt002:ProcessData:pro:over}
+    §I{str:data}
+    §O{str}
+    §R §C{data.Replace} §A "," §A "|" §/C
+  §/MT{mt002}
+
+  §MT{mt003:SaveResults:pro:over}
+    §I{str:data}
+    §O{str}
+    §R "Saved CSV"
+  §/MT{mt003}
+
+  §MT{mt004:ValidateData:pro:over}
+    §I{str:data}
+    §O{bool}
+    §R (&& §C{base.ValidateData} §A data §/C §C{data.Contains} §A "CSV" §/C)
+  §/MT{mt004}
+§/CL{c002}
+
+§CL{c003:JsonProcessor:pub}
+  §EXT{DataProcessor}
+  §FLD{str:_endpoint:pri}
+  §FLD{str:_outputPath:pri}
+
+  §CTOR{ctor001:pub}
+    §I{str:endpoint}
+    §I{str:outputPath}
+    §ASSIGN §THIS._endpoint endpoint
+    §ASSIGN §THIS._outputPath outputPath
+  §/CTOR{ctor001}
+
+  §MT{mt001:ReadData:pro:over}
+    §O{str}
+    §R "JSON content"
+  §/MT{mt001}
+
+  §MT{mt002:ProcessData:pro:over}
+    §I{str:data}
+    §O{str}
+    §R §C{data.Replace} §A "JSON" §A "PROCESSED_JSON" §/C
+  §/MT{mt002}
+
+  §MT{mt003:SaveResults:pro:over}
+    §I{str:data}
+    §O{str}
+    §R "Saved JSON"
+  §/MT{mt003}
+§/CL{c003}
+
+§CL{c004:TemplateMethodDemo:stat}
+  §MT{mt001:ProcessCsv:pub:stat}
+    §I{str:input}
+    §I{str:output}
+    §O{str}
+    §B{processor:CsvProcessor} §NEW{CsvProcessor} §A input §A output    §R §C{processor.Process} §/C
+  §/MT{mt001}
+
+  §MT{mt002:ProcessJson:pub:stat}
+    §I{str:endpoint}
+    §I{str:output}
+    §O{str}
+    §B{processor:JsonProcessor} §NEW{JsonProcessor} §A endpoint §A output    §R §C{processor.Process} §/C
+  §/MT{mt002}
+§/CL{c004}
+
+§/M{m001}

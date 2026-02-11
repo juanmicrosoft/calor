@@ -160,7 +160,7 @@ Defined in `ExpressionNodes.cs:141-146`:
 | Record | `RecordDefinitionNode` | `§RECORD{id}{name}` | `TypeNodes.cs:30-47` |
 | Union | `UnionTypeDefinitionNode` | `§TYPE{id}{name}` | `TypeNodes.cs:85-102` |
 | Enum | `EnumDefinitionNode` | `§EN{id:Name}` | `TypeNodes.cs:317-344` |
-| Enum Extension | `EnumExtensionNode` | `§EXT{id:EnumName}` | `EnumExtensionNode.cs` |
+| Enum Extension | `EnumExtensionNode` | `§EEXT{id:EnumName}` | `EnumExtensionNode.cs` |
 | Interface | `InterfaceDefinitionNode` | `§IFACE{id:Name}` | `ClassNodes.cs:25-70` |
 | Class | `ClassDefinitionNode` | `§CLASS{id:Name}` | `ClassNodes.cs:138-324` |
 | Delegate | `DelegateDefinitionNode` | `§DEL{id:Name}` | `LambdaNodes.cs:77-100` |
@@ -314,8 +314,59 @@ Defined in `ExpressionNodes.cs:141-146`:
 |-----------|-----------|----------------|
 | Class Definition | `ClassDefinitionNode` | `ClassNodes.cs:138-324` |
 | Class Field | `ClassFieldNode` | `ClassNodes.cs:330-374` |
+| Interface Definition | `InterfaceDefinitionNode` | `ClassNodes.cs:25-70` |
+| Method | `MethodNode` | `ClassNodes.cs:383-463` |
+| Method Signature | `MethodSignatureNode` | `ClassNodes.cs:76-128` |
 
-### 12.2 Object Creation
+### 12.2 Inheritance
+
+| Construct | Syntax | Description | File Reference |
+|-----------|--------|-------------|----------------|
+| Base Class | `§EXT{ClassName}` | Single inheritance | `Parser.cs:3868-3872` |
+| Interface Implementation | `§IMPL{InterfaceName}` | Implement interface | `Parser.cs:3874-3883` |
+| Base Constructor Call | `§BASE §A arg §/BASE` | Call base constructor | `PropertyNodes.cs` |
+| Base Method Call | `§C{§BASE.Method} §/C` | Call base method | `ClassNodes.cs:559-565` |
+
+### 12.3 Class Modifiers
+
+| Modifier | Syntax | Description | Status |
+|----------|--------|-------------|--------|
+| Abstract | `abs` | Cannot be instantiated, may have abstract members | ✓ Implemented |
+| Sealed | `seal` | Cannot be inherited from | ✓ Implemented |
+| Static | `stat` | All members must be static | ⚠ Not implemented |
+| Partial | `partial` | Definition split across files | ⚠ Not implemented |
+
+**Syntax:** `§CL{id:Name:modifiers}` (3 positional parts)
+
+> **Note:** Static and partial class modifiers are not fully implemented in the parser.
+
+**Example:**
+```calor
+§CL{c1:Shape:abs}         // Abstract class
+§CL{c2:Final:seal}        // Sealed class
+§CL{c3:Service:pub}       // Public class
+```
+
+### 12.4 Method Modifiers
+
+| Modifier | Syntax | Description | File Reference |
+|----------|--------|-------------|----------------|
+| Virtual | `virt` | Can be overridden | `ClassNodes.cs:9-17` |
+| Override | `over` | Overrides virtual/abstract | `ClassNodes.cs:9-17` |
+| Abstract | `abs` | No implementation | `ClassNodes.cs:9-17` |
+| Sealed | `seal` | Prevents further override | `ClassNodes.cs:9-17` |
+| Static | `stat` | Belongs to class | `ClassNodes.cs:9-17` |
+
+**Syntax:** `§MT{id:Name:visibility:modifiers}`
+
+**Example:**
+```calor
+§MT{mt1:Speak:pub:virt}   // Virtual method
+§MT{mt2:Speak:pub:over}   // Override method
+§MT{mt3:Area:pub:abs}     // Abstract method
+```
+
+### 12.5 Object Creation
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
@@ -323,7 +374,7 @@ Defined in `ExpressionNodes.cs:141-146`:
 | Object Initializer | `ObjectInitializerAssignment` | `{ Prop: value }` | `ClassNodes.cs:511-521` |
 | Record Creation | `RecordCreationNode` | `§RECORD{type}` | `TypeNodes.cs:161-178` |
 
-### 12.3 Member Access
+### 12.6 Member Access
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
@@ -332,14 +383,14 @@ Defined in `ExpressionNodes.cs:141-146`:
 | This Expression | `ThisExpressionNode` | `§THIS` | `ClassNodes.cs:547-553` |
 | Base Expression | `BaseExpressionNode` | `§BASE` | `ClassNodes.cs:559-565` |
 
-### 12.4 Properties
+### 12.7 Properties
 
 | Construct | Node Type | File Reference |
 |-----------|-----------|----------------|
 | Property | `PropertyNode` | `PropertyNodes.cs` |
 | Property Accessor | `PropertyAccessorNode` | `PropertyNodes.cs` |
 
-### 12.5 Events
+### 12.8 Events
 
 | Construct | Node Type | File Reference |
 |-----------|-----------|----------------|
@@ -446,10 +497,37 @@ Defined in `ExpressionNodes.cs:141-146`:
 | Statement Types | 10 |
 | Exception Handling | 4 |
 | Contract Types | 3 |
-| OOP Constructs | 15 |
+| OOP Constructs | 24 |
+| Inheritance Constructs | 9 |
 | Modern Operators | 5 |
 | Extended Metadata | 18 |
-| **Total Unique Constructs** | **~114** |
+| **Total Unique Constructs** | **~132** |
+
+---
+
+## Known Limitations and Syntax Notes
+
+### Class Syntax
+- Classes use **3 positional parts**: `§CL{id:Name:modifiers}`
+- Visibility defaults to public for classes
+- Static (`stat`) and partial (`partial`) class modifiers are not implemented
+
+### Method Syntax
+- Methods use **4 positional parts**: `§MT{id:Name:visibility:modifiers}`
+- Multiple modifiers are **space-separated**: `§MT{mt1:Method:pub:seal over}`
+
+### Method Call Syntax
+- Inside `§C{...}` call targets, use **lowercase** `base.Method` and `this.Method`
+- The `§BASE` and `§THIS` tokens are **not supported** inside call expressions
+- Correct: `§C{base.GetValue} §/C`
+- Incorrect: `§C{§BASE.GetValue} §/C` (will not parse)
+
+### Type Mapping
+- `f64` and `f32` may not map correctly; use `double` and `float` directly
+
+### Object Creation
+- `§NEW{Type}` does not require an end tag
+- Arguments follow the `§A arg` pattern: `§NEW{Point} §A x §A y`
 
 ---
 
@@ -458,3 +536,4 @@ Defined in `ExpressionNodes.cs:141-146`:
 - AST Node Base: `src/Calor.Compiler/Ast/AstNode.cs`
 - IAstVisitor: `src/Calor.Compiler/Ast/AstNode.cs:24-159`
 - IAstVisitor<T>: `src/Calor.Compiler/Ast/AstNode.cs:164-299`
+- Inheritance Semantics: `docs/semantics/inheritance.md`

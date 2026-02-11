@@ -4,13 +4,13 @@ namespace Calor.Compiler.Ast;
 
 /// <summary>
 /// Represents an enum extension definition containing methods that extend an enum type.
-/// §EXT{id:EnumName}
+/// §EEXT{id:EnumName}
 ///   §F{f001:MethodName:pub}
 ///     §I{EnumType:self}
 ///     §O{returnType}
 ///     // body
 ///   §/F{f001}
-/// §/EXT{id}
+/// §/EEXT{id}
 /// </summary>
 public sealed class EnumExtensionNode : AstNode
 {
