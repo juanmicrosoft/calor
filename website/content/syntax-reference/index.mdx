@@ -44,6 +44,12 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Contains | `§HAS{coll} value` | `§HAS{nums} 5` |
 | Count | `§CNT{coll}` | `§CNT{nums}` |
 | Dict Foreach | `§EACHKV{id:k:v} dict` | `§EACHKV{e1:k:v} ages` |
+| Switch | `§W{id} expr` | `§W{sw1} score` |
+| Case | `§K pattern → result` | `§K 200 → "OK"` |
+| Wildcard | `§K _` | `§K _ → "default"` |
+| Relational | `§PREL{op} value` | `§PREL{gte} 90` |
+| Var Pattern | `§VAR{name}` | `§VAR{n}` |
+| Guard | `§WHEN condition` | `§WHEN (> n 0)` |
 
 ---
 
