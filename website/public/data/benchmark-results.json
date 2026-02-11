@@ -1,62 +1,150 @@
 {
   "version": "1.0",
-  "timestamp": "2026-02-10T18:15:33.108359Z",
-  "commit": "00bdea9",
+  "timestamp": "2026-02-11T02:46:41.090256Z",
+  "commit": "f3050df",
   "frameworkVersion": "1.0.0",
   "summary": {
-    "overallAdvantage": 0.86,
+    "overallAdvantage": 0.84,
     "programCount": 36,
     "metricCount": 11,
     "calorWins": 4,
     "cSharpWins": 4,
-    "statisticalRunCount": 0
+    "statisticalRunCount": 30
   },
   "metrics": {
     "TokenEconomics": {
-      "ratio": 0.66,
-      "winner": "csharp"
+      "ratio": 0.69,
+      "winner": "csharp",
+      "ci95": [
+        0.688,
+        0.688
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 0.514,
+      "effectInterpretation": "medium"
     },
     "GenerationAccuracy": {
-      "ratio": 0.95,
-      "winner": "csharp"
+      "ratio": 0.56,
+      "winner": "csharp",
+      "ci95": [
+        0.555,
+        0.555
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": -1.289,
+      "effectInterpretation": "large"
     },
     "Comprehension": {
-      "ratio": 1.53,
-      "winner": "calor"
+      "ratio": 1.57,
+      "winner": "calor",
+      "ci95": [
+        1.566,
+        1.566
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 2.415,
+      "effectInterpretation": "large"
     },
     "EditPrecision": {
       "ratio": 1.38,
-      "winner": "calor"
+      "winner": "calor",
+      "ci95": [
+        1.38,
+        1.38
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 12.259,
+      "effectInterpretation": "large"
     },
     "ErrorDetection": {
-      "ratio": 1.43,
-      "winner": "calor"
+      "ratio": 1.51,
+      "winner": "calor",
+      "ci95": [
+        1.505,
+        1.505
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 1.25,
+      "effectInterpretation": "large"
     },
     "InformationDensity": {
-      "ratio": 0.08,
-      "winner": "csharp"
+      "ratio": 0.09,
+      "winner": "csharp",
+      "ci95": [
+        0.09,
+        0.09
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": -6.075,
+      "effectInterpretation": "large"
     },
     "TaskCompletion": {
-      "ratio": 0.85,
-      "winner": "csharp"
+      "ratio": 0.86,
+      "winner": "csharp",
+      "ci95": [
+        0.856,
+        0.856
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": -1.48,
+      "effectInterpretation": "large"
     },
     "RefactoringStability": {
-      "ratio": 1.47,
-      "winner": "calor"
+      "ratio": 1.5,
+      "winner": "calor",
+      "ci95": [
+        1.499,
+        1.499
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 3.581,
+      "effectInterpretation": "large"
     },
     "ContractVerification": {
       "ratio": 1,
       "winner": "calor",
+      "ci95": [
+        1,
+        1
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 0.414,
+      "effectInterpretation": "small",
       "isCalorOnly": true
     },
     "EffectSoundness": {
       "ratio": 1,
       "winner": "calor",
+      "ci95": [
+        1,
+        1
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 1.264,
+      "effectInterpretation": "large",
       "isCalorOnly": true
     },
     "InteropEffectCoverage": {
       "ratio": 1,
       "winner": "calor",
+      "ci95": [
+        1,
+        1
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 1.58,
+      "effectInterpretation": "large",
       "isCalorOnly": true
     }
   },
@@ -1051,5 +1139,123 @@
         "InteropEffectCoverage": 1
       }
     }
-  ]
+  ],
+  "statisticalAnalysis": {
+    "runCount": 30,
+    "confidenceLevel": 0.95,
+    "significantCategories": [
+      "TokenEconomics",
+      "GenerationAccuracy",
+      "Comprehension",
+      "EditPrecision",
+      "ErrorDetection",
+      "InformationDensity",
+      "TaskCompletion",
+      "RefactoringStability",
+      "ContractVerification",
+      "EffectSoundness",
+      "InteropEffectCoverage"
+    ],
+    "categoryDetails": {
+      "TokenEconomics": {
+        "mean": 0.688,
+        "stdDev": 53.916,
+        "ci95Lower": 0.675,
+        "ci95Upper": 0.7,
+        "cohensD": 0.514,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "GenerationAccuracy": {
+        "mean": 0.555,
+        "stdDev": 0.293,
+        "ci95Lower": 0.527,
+        "ci95Upper": 0.584,
+        "cohensD": -1.289,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "Comprehension": {
+        "mean": 1.566,
+        "stdDev": 0.027,
+        "ci95Lower": 1.547,
+        "ci95Upper": 1.585,
+        "cohensD": 2.415,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "EditPrecision": {
+        "mean": 1.38,
+        "stdDev": 0.006,
+        "ci95Lower": 1.376,
+        "ci95Upper": 1.383,
+        "cohensD": 12.259,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "ErrorDetection": {
+        "mean": 1.505,
+        "stdDev": 0.087,
+        "ci95Lower": 1.474,
+        "ci95Upper": 1.536,
+        "cohensD": 1.25,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "InformationDensity": {
+        "mean": 0.09,
+        "stdDev": 0.036,
+        "ci95Lower": 0.086,
+        "ci95Upper": 0.093,
+        "cohensD": -6.075,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "TaskCompletion": {
+        "mean": 0.856,
+        "stdDev": 0.041,
+        "ci95Lower": 0.85,
+        "ci95Upper": 0.862,
+        "cohensD": -1.48,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "RefactoringStability": {
+        "mean": 1.499,
+        "stdDev": 0.019,
+        "ci95Lower": 1.48,
+        "ci95Upper": 1.518,
+        "cohensD": 3.581,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "ContractVerification": {
+        "mean": 1,
+        "stdDev": 0.165,
+        "ci95Lower": 1,
+        "ci95Upper": 1,
+        "cohensD": 0.414,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "EffectSoundness": {
+        "mean": 1,
+        "stdDev": 0.352,
+        "ci95Lower": 1,
+        "ci95Upper": 1,
+        "cohensD": 1.264,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "InteropEffectCoverage": {
+        "mean": 1,
+        "stdDev": 0.352,
+        "ci95Lower": 1,
+        "ci95Upper": 1,
+        "cohensD": 1.58,
+        "pValue": 0.0001,
+        "significant": true
+      }
+    }
+  }
 }
