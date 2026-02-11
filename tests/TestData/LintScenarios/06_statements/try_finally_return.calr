@@ -1,0 +1,35 @@
+§M{m1:FinallyReturn}
+§F{f1:WithFinally:pub}
+§I{i32:x}
+§O{i32}
+§B{~result} 0
+§TR{t1}
+§B{~result} (+ x 10)
+§R result
+§FI
+§P "cleanup"
+§/TR{t1}
+§/F{f1}
+§F{f2:FinallyNoReturn:pub}
+§I{i32:x}
+§O{i32}
+§B{~result} 0
+§TR{t1}
+§B{~result} (+ x 10)
+§CA{Exception:e}
+§B{~result} -1
+§FI
+§P "finally executed"
+§/TR{t1}
+§R result
+§/F{f2}
+§F{f3:TryOnlyFinally:pub}
+§O{void}
+§E{cw}
+§TR{t1}
+§P "try block"
+§FI
+§P "finally block"
+§/TR{t1}
+§/F{f3}
+§/M{m1}

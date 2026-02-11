@@ -1,0 +1,42 @@
+§M{m1:WhenFilter}
+§F{f1:FilteredHandler:pub}
+§I{i32:code}
+§O{str}
+§TR{t1}
+§TH "Error"
+§CA{Exception:ex} §WHEN (== code 42)
+§R "special"
+§CA{Exception:ex}
+§R "general"
+§/TR{t1}
+§/F{f1}
+§F{f2:MultipleFilters:pub}
+§I{i32:value}
+§O{str}
+§TR{t1}
+§TH "Error"
+§CA{Exception:ex} §WHEN (< value 0)
+§R "negative"
+§CA{Exception:ex} §WHEN (== value 0)
+§R "zero"
+§CA{Exception:ex} §WHEN (> value 100)
+§R "large"
+§CA{Exception:ex}
+§R "normal"
+§/TR{t1}
+§/F{f2}
+§F{f3:FilterWithLogicalOps:pub}
+§I{i32:x}
+§I{i32:y}
+§O{str}
+§TR{t1}
+§TH "Error"
+§CA{Exception:ex} §WHEN (&& (> x 0) (> y 0))
+§R "both positive"
+§CA{Exception:ex} §WHEN (|| (< x 0) (< y 0))
+§R "at least one negative"
+§CA{Exception:ex}
+§R "default"
+§/TR{t1}
+§/F{f3}
+§/M{m1}
