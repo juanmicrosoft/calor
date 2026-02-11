@@ -2,7 +2,7 @@
 
 **Calor syntax requirements:**
 - Use Lisp-style expressions: `(+ a b)`
-- Use arrow syntax for conditionals: `§IF[id] condition → action`
+- Use arrow syntax for conditionals: `§IF{id} condition → action`
 - Use `§P` for Console.WriteLine, `§B` for variable bindings
 
 ## Semantic Guarantees
@@ -15,8 +15,6 @@ When converting C# to Calor, be aware that Calor has stricter semantics:
 | Unchecked arithmetic | Overflow traps (S7) | Consider if overflow expected |
 | Implicit narrowing | Explicit required (S8) | Add `§CAST` |
 | Guard clauses | Use `§Q` contracts | Convert to preconditions |
-
-**Always add `§SEMVER[1.0.0]` to converted modules.**
 
 See `docs/semantics/core.md` for full specification.
 
@@ -60,8 +58,13 @@ Calor uses a compact format optimized for AI agents:
 | `DateOnly` | `date` |
 | `TimeOnly` | `time` |
 | `Guid` | `guid` |
+| `List<T>` | `List<T>` |
+| `Dictionary<K,V>` | `Dict<K,V>` |
+| `HashSet<T>` | `HashSet<T>` |
 | `IReadOnlyList<T>` | `ReadList<T>` |
 | `IReadOnlyDictionary<K,V>` | `ReadDict<K,V>` |
+| `Task<T>` | (unwrapped in async) |
+| `ValueTask<T>` | (unwrapped in async) |
 
 ## Operator Mappings
 
@@ -81,6 +84,10 @@ Calor uses a compact format optimized for AI agents:
 | `a && b` | `(&& a b)` |
 | `a \|\| b` | `(\|\| a b)` |
 | `!a` | `(! a)` |
+| `a ?? b` | `§?? a b` |
+| `a?.b` | `§?. a b` |
+| `a..b` | `§RANGE a b` |
+| `^n` | `§^ n` |
 
 ## Structure Conversion
 
@@ -205,6 +212,266 @@ var result = a + b;
 §B{result} (+ a b)
 ```
 
+## Async/Await Conversion
+
+### Async Method
+```csharp
+public async Task<string> GetDataAsync(string url)
+{
+    var result = await client.GetStringAsync(url);
+    return result;
+}
+```
+```calor
+§AMT{mt1:GetDataAsync:pub}
+§I{str:url}
+§O{str}
+§B{str:result} §AWAIT §C{client.GetStringAsync} §A url §/C
+§R result
+§/AMT{mt1}
+```
+
+### Async Function
+```csharp
+public static async Task<int> ComputeAsync(int x)
+{
+    await Task.Delay(100);
+    return x * 2;
+}
+```
+```calor
+§AF{f1:ComputeAsync:pub}
+§I{i32:x}
+§O{i32}
+§AWAIT §C{Task.Delay} §A 100 §/C
+§R (* x 2)
+§/AF{f1}
+```
+
+### ConfigureAwait(false)
+```csharp
+var data = await GetDataAsync().ConfigureAwait(false);
+```
+```calor
+§B{data} §AWAIT{false} §C{GetDataAsync} §/C
+```
+
+## Collection Conversion
+
+### List Initialization
+```csharp
+var numbers = new List<int> { 1, 2, 3 };
+numbers.Add(4);
+numbers.Insert(0, 0);
+numbers[1] = 10;
+numbers.Remove(3);
+numbers.Clear();
+```
+```calor
+§LIST{numbers:i32}
+  1
+  2
+  3
+§/LIST{numbers}
+§PUSH{numbers} 4
+§INS{numbers} 0 0
+§SETIDX{numbers} 1 10
+§REM{numbers} 3
+§CLR{numbers}
+```
+
+### Dictionary Initialization
+```csharp
+var ages = new Dictionary<string, int> {
+    ["alice"] = 30,
+    ["bob"] = 25
+};
+ages["charlie"] = 35;
+ages.Remove("bob");
+```
+```calor
+§DICT{ages:str:i32}
+  §KV "alice" 30
+  §KV "bob" 25
+§/DICT{ages}
+§PUT{ages} "charlie" 35
+§REM{ages} "bob"
+```
+
+### HashSet Initialization
+```csharp
+var tags = new HashSet<string> { "urgent", "review" };
+tags.Add("approved");
+tags.Remove("review");
+```
+```calor
+§HSET{tags:str}
+  "urgent"
+  "review"
+§/HSET{tags}
+§PUSH{tags} "approved"
+§REM{tags} "review"
+```
+
+### Foreach
+```csharp
+foreach (var item in collection) { ... }
+```
+```calor
+§EACH{e1:item:collection}
+...
+§/EACH{e1}
+```
+
+### Dictionary Foreach
+```csharp
+foreach (var kv in dict) {
+    Console.WriteLine($"{kv.Key}: {kv.Value}");
+}
+```
+```calor
+§EACHKV{e1:k:v:dict}
+§P k
+§P v
+§/EACHKV{e1}
+```
+
+## Exception Handling Conversion
+
+### Try/Catch
+```csharp
+try {
+    return a / b;
+}
+catch (DivideByZeroException ex) {
+    return 0;
+}
+```
+```calor
+§TR{t1}
+§R (/ a b)
+§CA{DivideByZeroException:ex}
+§R 0
+§/TR{t1}
+```
+
+### Try/Catch/Finally
+```csharp
+try {
+    Process();
+}
+catch (Exception e) {
+    Log(e);
+}
+finally {
+    Cleanup();
+}
+```
+```calor
+§TR{t1}
+§C{Process} §/C
+§CA{Exception:e}
+§C{Log} §A e §/C
+§FI
+§C{Cleanup} §/C
+§/TR{t1}
+```
+
+### Throw
+```csharp
+throw new ArgumentException("Invalid");
+```
+```calor
+§TH "Invalid"
+```
+
+### Rethrow
+```csharp
+catch (Exception ex) {
+    Log(ex);
+    throw;
+}
+```
+```calor
+§CA{Exception:ex}
+§C{Log} §A ex §/C
+§RT
+```
+
+### Exception Filter (when)
+```csharp
+catch (Exception ex) when (ex.Message.Contains("retry"))
+{
+    Retry();
+}
+```
+```calor
+§CA{Exception:ex} §WHEN (C{ex.Message.Contains} §A "retry" §/C)
+§C{Retry} §/C
+```
+
+## Lambda and Delegate Conversion
+
+### Lambda Expression
+```csharp
+Func<int, int> doubler = x => x * 2;
+```
+```calor
+§B{Func<i32,i32>:doubler} §LAM{x} (* x 2)
+```
+
+### Multi-parameter Lambda
+```csharp
+Func<int, int, int> add = (a, b) => a + b;
+```
+```calor
+§B{Func<i32,i32,i32>:add} §LAM{a:b} (+ a b)
+```
+
+### Statement Lambda
+```csharp
+Action<int> printer = x => {
+    Console.WriteLine(x);
+};
+```
+```calor
+§B{Action<i32>:printer} §LAM{x}
+§P x
+§/LAM
+```
+
+### Delegate Declaration
+```csharp
+public delegate int Calculator(int a, int b);
+```
+```calor
+§DEL{d1:Calculator:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§/DEL{d1}
+```
+
+## Event Conversion
+
+### Event Declaration
+```csharp
+public event EventHandler Click;
+```
+```calor
+§EVT{evt1:Click:pub:EventHandler}
+```
+
+### Event Subscription
+```csharp
+button.Click += OnClick;
+button.Click -= OnClick;
+```
+```calor
+§SUB{button.Click} OnClick
+§UNSUB{button.Click} OnClick
+```
+
 ## Effect Detection
 
 Add `§E{...}` based on C# calls:
@@ -247,8 +514,8 @@ Attributes are preserved using inline bracket syntax `[@Attribute]`:
 public class TestController : ControllerBase { }
 ```
 ```calor
-§CLASS{c1:TestController:ControllerBase}[@Route("api/[controller]")][@ApiController]
-§/CLASS{c1}
+§CL{c1:TestController:ControllerBase}[@Route("api/[controller]")][@ApiController]
+§/CL{c1}
 ```
 
 ### Method Attributes
@@ -258,8 +525,8 @@ public class TestController : ControllerBase { }
 public void Post() { }
 ```
 ```calor
-§METHOD{m1:Post:pub}[@HttpPost][@Authorize]
-§/METHOD{m1}
+§MT{m1:Post:pub}[@HttpPost][@Authorize]
+§/MT{m1}
 ```
 
 ### Attribute Arguments
@@ -270,19 +537,31 @@ public void Post() { }
 | `[JsonProperty(PropertyName="id")]` | `[@JsonProperty(PropertyName="id")]` |
 | `[Range(1, 100)]` | `[@Range(1, 100)]` |
 
+## String Interpolation Conversion
+
+```csharp
+var message = $"Hello, {name}! You have {count} items.";
+```
+```calor
+§B{str:message} §INTERP "Hello, {name}! You have {count} items." §/INTERP
+```
+
 ## Supported Features
 
 - Classes, interfaces, records, structs
-- Enums (with optional explicit values)
+- Enums (with optional explicit values and extension methods)
 - Methods, properties, fields, constructors
 - Control flow (for, foreach, while, do-while, if/else, switch)
-- Try/catch/finally, throw
-- Async/await
+- Try/catch/finally, throw, exception filters
+- Async/await with ConfigureAwait support
 - Lambdas and delegates
+- Events (declaration, subscribe, unsubscribe)
+- Collections (List, Dictionary, HashSet with operations)
 - Generics with constraints
-- Pattern matching (basic patterns)
+- Pattern matching (type, property, positional, relational)
 - String interpolation
 - Null-conditional and null-coalescing operators
+- Range and index-from-end operators
 - C# attributes (on classes, methods, properties, fields, parameters)
 - Contracts (preconditions, postconditions)
 
@@ -318,7 +597,6 @@ namespace Calculator {
 ### Calor Output
 ```calor
 §M{m1:Calculator}
-§SEMVER[1.0.0]
 §F{f1:Main:pub}
 §O{void}
 §E{cw}

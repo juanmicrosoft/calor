@@ -7,7 +7,7 @@ description: Convert C# code to Calor syntax with type mappings, operator conver
 
 **Calor syntax requirements:**
 - Use Lisp-style expressions: `(+ a b)`
-- Use arrow syntax for conditionals: `§IF[id] condition → action`
+- Use arrow syntax for conditionals: `§IF{id} condition → action`
 - Use `§P` for Console.WriteLine, `§B` for variable bindings
 
 ## Semantic Guarantees
@@ -21,9 +21,30 @@ When converting C# to Calor, be aware that Calor has stricter semantics:
 | Implicit narrowing | Explicit required (S8) | Add `§CAST` |
 | Guard clauses | Use `§Q` contracts | Convert to preconditions |
 
-**Always add `§SEMVER[1.0.0]` to converted modules.**
+
 
 See `docs/semantics/core.md` for full specification.
+
+## Agent-Optimized Format Rules
+
+Calor uses a compact format optimized for AI agents:
+
+| Rule | Why it helps agents | Example |
+|------|---------------------|---------|
+| No indentation | Indentation has no semantic value for agents | `§L{l1:i:1:10:1}` not `  §L{l1:i:1:10:1}` |
+| One statement per line | Clean diffs, targeted edits | Each `§X` on its own line |
+| No blank lines | Reduces token count without losing structure | No empty lines between statements |
+| Abbreviated IDs | Padding adds no value | `§M{m1:Name}` not `§M{m001:Name}` |
+| Keep expression spaces | Helps agents parse tokens | `(+ a b)` not `(+a b)` |
+| No trailing whitespace | Reduces noise in diffs | Lines end at last meaningful char |
+
+**ID Abbreviation Rules:**
+- `m001` → `m1` (module)
+- `f001` → `f1` (function)
+- `for1` → `l1` (loop)
+- `if1` → `i1` (conditional)
+- `while1` → `w1` (while loop)
+- `do1` → `d1` (do-while loop)
 
 ## Type Mappings
 
@@ -44,8 +65,13 @@ See `docs/semantics/core.md` for full specification.
 | `DateOnly` | `date` |
 | `TimeOnly` | `time` |
 | `Guid` | `guid` |
+| `List<T>` | `List<T>` |
+| `Dictionary<K,V>` | `Dict<K,V>` |
+| `HashSet<T>` | `HashSet<T>` |
 | `IReadOnlyList<T>` | `ReadList<T>` |
 | `IReadOnlyDictionary<K,V>` | `ReadDict<K,V>` |
+| `Task<T>` | (unwrapped in async) |
+| `ValueTask<T>` | (unwrapped in async) |
 
 ## Operator Mappings
 
@@ -65,6 +91,10 @@ See `docs/semantics/core.md` for full specification.
 | `a && b` | `(&& a b)` |
 | `a \|\| b` | `(\|\| a b)` |
 | `!a` | `(! a)` |
+| `a ?? b` | `§?? a b` |
+| `a?.b` | `§?. a b` |
+| `a..b` | `§RANGE a b` |
+| `^n` | `§^ n` |
 
 ## Structure Conversion
 
@@ -73,9 +103,9 @@ See `docs/semantics/core.md` for full specification.
 namespace MyApp { ... }
 ```
 ```calor
-§M[m001:MyApp]
+§M{m1:MyApp}
 ...
-§/M[m001]
+§/M{m1}
 ```
 
 ### Method → Function
@@ -85,12 +115,67 @@ public static int Add(int a, int b) {
 }
 ```
 ```calor
-§F[f001:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §R (+ a b)
-§/F[f001]
+§F{f1:Add:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§R (+ a b)
+§/F{f1}
+```
+
+### Enum
+```csharp
+public enum Color { Red, Green, Blue }
+```
+```calor
+§EN{e1:Color}
+Red
+Green
+Blue
+§/EN{e1}
+```
+
+```csharp
+public enum StatusCode {
+    Ok = 200,
+    NotFound = 404,
+    Error = 500
+}
+```
+```calor
+§EN{e1:StatusCode}
+Ok = 200
+NotFound = 404
+Error = 500
+§/EN{e1}
+```
+
+### Enum Extension Methods
+```csharp
+public static class ColorExtensions {
+    public static string ToHex(this Color color) {
+        return color switch {
+            Color.Red => "#FF0000",
+            Color.Green => "#00FF00",
+            Color.Blue => "#0000FF",
+            _ => "#000000"
+        };
+    }
+}
+```
+```calor
+§EEXT{ext1:Color}
+§F{f1:ToHex:pub}
+§I{Color:color}
+§O{str}
+§W{sw1} color
+  §K Color.Red → §R "#FF0000"
+  §K Color.Green → §R "#00FF00"
+  §K Color.Blue → §R "#0000FF"
+  §K _ → §R "#000000"
+§/W{sw1}
+§/F{f1}
+§/EEXT{ext1}
 ```
 
 ### For Loop
@@ -98,9 +183,9 @@ public static int Add(int a, int b) {
 for (int i = 1; i <= 100; i++) { ... }
 ```
 ```calor
-§L[for1:i:1:100:1]
-  ...
-§/L[for1]
+§L{l1:i:1:100:1}
+...
+§/L{l1}
 ```
 
 ### If/Else
@@ -110,10 +195,10 @@ else if (x < 0) { DoB(); }
 else { DoC(); }
 ```
 ```calor
-§IF[if1] (> x 0) → §C[DoA] §/C
-§EI (< x 0) → §C[DoB] §/C
-§EL → §C[DoC] §/C
-§/I[if1]
+§IF{i1} (> x 0) → §C{DoA} §/C
+§EI (< x 0) → §C{DoB} §/C
+§EL → §C{DoC} §/C
+§/I{i1}
 ```
 
 ### Console.WriteLine
@@ -131,12 +216,272 @@ Console.WriteLine(x);
 var result = a + b;
 ```
 ```calor
-§B[result] (+ a b)
+§B{result} (+ a b)
+```
+
+## Async/Await Conversion
+
+### Async Method
+```csharp
+public async Task<string> GetDataAsync(string url)
+{
+    var result = await client.GetStringAsync(url);
+    return result;
+}
+```
+```calor
+§AMT{mt1:GetDataAsync:pub}
+§I{str:url}
+§O{str}
+§B{str:result} §AWAIT §C{client.GetStringAsync} §A url §/C
+§R result
+§/AMT{mt1}
+```
+
+### Async Function
+```csharp
+public static async Task<int> ComputeAsync(int x)
+{
+    await Task.Delay(100);
+    return x * 2;
+}
+```
+```calor
+§AF{f1:ComputeAsync:pub}
+§I{i32:x}
+§O{i32}
+§AWAIT §C{Task.Delay} §A 100 §/C
+§R (* x 2)
+§/AF{f1}
+```
+
+### ConfigureAwait(false)
+```csharp
+var data = await GetDataAsync().ConfigureAwait(false);
+```
+```calor
+§B{data} §AWAIT{false} §C{GetDataAsync} §/C
+```
+
+## Collection Conversion
+
+### List Initialization
+```csharp
+var numbers = new List<int> { 1, 2, 3 };
+numbers.Add(4);
+numbers.Insert(0, 0);
+numbers[1] = 10;
+numbers.Remove(3);
+numbers.Clear();
+```
+```calor
+§LIST{numbers:i32}
+  1
+  2
+  3
+§/LIST{numbers}
+§PUSH{numbers} 4
+§INS{numbers} 0 0
+§SETIDX{numbers} 1 10
+§REM{numbers} 3
+§CLR{numbers}
+```
+
+### Dictionary Initialization
+```csharp
+var ages = new Dictionary<string, int> {
+    ["alice"] = 30,
+    ["bob"] = 25
+};
+ages["charlie"] = 35;
+ages.Remove("bob");
+```
+```calor
+§DICT{ages:str:i32}
+  §KV "alice" 30
+  §KV "bob" 25
+§/DICT{ages}
+§PUT{ages} "charlie" 35
+§REM{ages} "bob"
+```
+
+### HashSet Initialization
+```csharp
+var tags = new HashSet<string> { "urgent", "review" };
+tags.Add("approved");
+tags.Remove("review");
+```
+```calor
+§HSET{tags:str}
+  "urgent"
+  "review"
+§/HSET{tags}
+§PUSH{tags} "approved"
+§REM{tags} "review"
+```
+
+### Foreach
+```csharp
+foreach (var item in collection) { ... }
+```
+```calor
+§EACH{e1:item:collection}
+...
+§/EACH{e1}
+```
+
+### Dictionary Foreach
+```csharp
+foreach (var kv in dict) {
+    Console.WriteLine($"{kv.Key}: {kv.Value}");
+}
+```
+```calor
+§EACHKV{e1:k:v:dict}
+§P k
+§P v
+§/EACHKV{e1}
+```
+
+## Exception Handling Conversion
+
+### Try/Catch
+```csharp
+try {
+    return a / b;
+}
+catch (DivideByZeroException ex) {
+    return 0;
+}
+```
+```calor
+§TR{t1}
+§R (/ a b)
+§CA{DivideByZeroException:ex}
+§R 0
+§/TR{t1}
+```
+
+### Try/Catch/Finally
+```csharp
+try {
+    Process();
+}
+catch (Exception e) {
+    Log(e);
+}
+finally {
+    Cleanup();
+}
+```
+```calor
+§TR{t1}
+§C{Process} §/C
+§CA{Exception:e}
+§C{Log} §A e §/C
+§FI
+§C{Cleanup} §/C
+§/TR{t1}
+```
+
+### Throw
+```csharp
+throw new ArgumentException("Invalid");
+```
+```calor
+§TH "Invalid"
+```
+
+### Rethrow
+```csharp
+catch (Exception ex) {
+    Log(ex);
+    throw;
+}
+```
+```calor
+§CA{Exception:ex}
+§C{Log} §A ex §/C
+§RT
+```
+
+### Exception Filter (when)
+```csharp
+catch (Exception ex) when (ex.Message.Contains("retry"))
+{
+    Retry();
+}
+```
+```calor
+§CA{Exception:ex} §WHEN (C{ex.Message.Contains} §A "retry" §/C)
+§C{Retry} §/C
+```
+
+## Lambda and Delegate Conversion
+
+### Lambda Expression
+```csharp
+Func<int, int> doubler = x => x * 2;
+```
+```calor
+§B{Func<i32,i32>:doubler} §LAM{x} (* x 2)
+```
+
+### Multi-parameter Lambda
+```csharp
+Func<int, int, int> add = (a, b) => a + b;
+```
+```calor
+§B{Func<i32,i32,i32>:add} §LAM{a:b} (+ a b)
+```
+
+### Statement Lambda
+```csharp
+Action<int> printer = x => {
+    Console.WriteLine(x);
+};
+```
+```calor
+§B{Action<i32>:printer} §LAM{x}
+§P x
+§/LAM
+```
+
+### Delegate Declaration
+```csharp
+public delegate int Calculator(int a, int b);
+```
+```calor
+§DEL{d1:Calculator:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§/DEL{d1}
+```
+
+## Event Conversion
+
+### Event Declaration
+```csharp
+public event EventHandler Click;
+```
+```calor
+§EVT{evt1:Click:pub:EventHandler}
+```
+
+### Event Subscription
+```csharp
+button.Click += OnClick;
+button.Click -= OnClick;
+```
+```calor
+§SUB{button.Click} OnClick
+§UNSUB{button.Click} OnClick
 ```
 
 ## Effect Detection
 
-Add `§E[...]` based on C# calls:
+Add `§E{...}` based on C# calls:
 
 | C# Usage | Effect |
 |---|---|
@@ -176,8 +521,8 @@ Attributes are preserved using inline bracket syntax `[@Attribute]`:
 public class TestController : ControllerBase { }
 ```
 ```calor
-§CLASS[c001:TestController:ControllerBase][@Route("api/[controller]")][@ApiController]
-§/CLASS[c001]
+§CL{c1:TestController:ControllerBase}[@Route("api/[controller]")][@ApiController]
+§/CL{c1}
 ```
 
 ### Method Attributes
@@ -187,8 +532,8 @@ public class TestController : ControllerBase { }
 public void Post() { }
 ```
 ```calor
-§METHOD[m001:Post:pub][@HttpPost][@Authorize]
-§/METHOD[m001]
+§MT{m1:Post:pub}[@HttpPost][@Authorize]
+§/MT{m1}
 ```
 
 ### Attribute Arguments
@@ -199,24 +544,43 @@ public void Post() { }
 | `[JsonProperty(PropertyName="id")]` | `[@JsonProperty(PropertyName="id")]` |
 | `[Range(1, 100)]` | `[@Range(1, 100)]` |
 
+## String Interpolation Conversion
+
+```csharp
+var message = $"Hello, {name}! You have {count} items.";
+```
+```calor
+§B{str:message} §INTERP "Hello, {name}! You have {count} items." §/INTERP
+```
+
 ## Supported Features
 
-- Static methods
-- Primitive types
-- Basic control flow (for, if/else)
-- Console I/O
-- Arithmetic/comparison operators
-- Simple contracts
+- Classes, interfaces, records, structs
+- Enums (with optional explicit values and extension methods)
+- Methods, properties, fields, constructors
+- Control flow (for, foreach, while, do-while, if/else, switch)
+- Try/catch/finally, throw, exception filters
+- Async/await with ConfigureAwait support
+- Lambdas and delegates
+- Events (declaration, subscribe, unsubscribe)
+- Collections (List, Dictionary, HashSet with operations)
+- Generics with constraints
+- Pattern matching (type, property, positional, relational)
+- String interpolation
+- Null-conditional and null-coalescing operators
+- Range and index-from-end operators
 - C# attributes (on classes, methods, properties, fields, parameters)
+- Contracts (preconditions, postconditions)
+
+## Partially Supported
+
+- LINQ (method syntax works, query syntax may need review)
+- ref/out parameters (kept as-is with warning)
 
 ## Not Yet Supported
 
-- Async/await
-- LINQ
-- Generics
-- Events/delegates
-- Exception handling (try/catch)
-- Collections (List, Dictionary)
+- Unsafe code and pointers
+- goto/labeled statements
 
 ## Conversion Example
 
@@ -239,24 +603,23 @@ namespace Calculator {
 
 ### Calor Output
 ```calor
-§M[m001:Calculator]
-§SEMVER[1.0.0]
-§F[f001:Main:pub]
-  §O[void]
-  §E[cw]
-  §C[Console.WriteLine]
-    §A §C[Add] §A 5 §A 3 §/C
-  §/C
-§/F[f001]
+§M{m1:Calculator}
 
-§F[f002:Add:pub]
-  §I[i32:a]
-  §I[i32:b]
-  §O[i32]
-  §Q (&& (>= a 0) (>= b 0))
-  §R (+ a b)
-§/F[f002]
-§/M[m001]
+§F{f1:Main:pub}
+§O{void}
+§E{cw}
+§C{Console.WriteLine}
+§A §C{Add} §A 5 §A 3 §/C
+§/C
+§/F{f1}
+§F{f2:Add:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§Q (&& (>= a 0) (>= b 0))
+§R (+ a b)
+§/F{f2}
+§/M{m1}
 ```
 
 ## ID Integrity Rules

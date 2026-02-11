@@ -1,9 +1,9 @@
 ---
 name: calor-semantics
-description: Calor formal semantics reference - evaluation order, scoping, overflow, contracts. Use when writing semantically-correct Calor code.
+description: Calor formal semantics reference covering evaluation order, scoping, overflow, and contracts.
 ---
 
-# Calor Semantics - Calor Formal Semantics Reference
+# Calor-Semantics - Calor Formal Semantics Reference
 
 Calor has formal semantics (v1.0.0) that define precise runtime behavior. **These differ from C#.**
 
@@ -100,18 +100,56 @@ Contracts are checked at runtime:
 §/F{f1}
 ```
 
-## Semantic Versioning
+## S11: Exception Handling
 
-Always declare the semantics version in modules:
+Exception handling follows standard structured exception semantics:
+
+- `§TR` try blocks execute in order
+- `§CA` catch clauses are evaluated in declaration order (most specific first)
+- `§FI` finally blocks always execute (on normal exit or exception)
+- `§WHEN` filters are evaluated before entering catch block
+- `§RT` rethrow preserves original stack trace
 
 ```calor
-§M{m1:MyModule}
-  §SEMVER[1.0.0]
-§F{f1:MyFunc:pub}
-  ...
-§/F{f1}
-§/M{m1}
+§TR{t1}
+  §R (/ a b)
+§CA{DivideByZeroException:ex}
+  §R 0
+§CA{Exception:ex} §WHEN (! (== ex.Message ""))
+  §P ex.Message
+  §RT
+§FI
+  §P "cleanup"
+§/TR{t1}
 ```
+
+## S12: Async/Await
+
+Async operations follow standard async/await semantics:
+
+- `§AF`/`§AMT` declares async context (returns Task<T>)
+- `§AWAIT` suspends execution until task completes
+- Multiple awaits execute sequentially within same function
+- Exception propagation works through async boundaries
+
+```calor
+§AF{f1:ProcessAsync:pub}
+  §O{str}
+  §B{str:data} §AWAIT §C{FetchAsync} §/C    // suspends here
+  §B{str:result} §AWAIT §C{TransformAsync} §A data §/C
+  §R result
+§/AF{f1}
+```
+
+## S13: Collection Semantics
+
+Collection operations have well-defined behavior:
+
+- `§LIST`/`§DICT`/`§HSET` initialize with provided elements
+- `§PUSH` adds to end (list/set), `§PUT` adds/updates (dict)
+- `§REM` removes first occurrence (list), by key (dict), or by value (set)
+- `§HAS` returns bool for membership test
+- Iteration order: lists maintain order, dicts preserve insertion order, sets unordered
 
 ## Test Reference
 

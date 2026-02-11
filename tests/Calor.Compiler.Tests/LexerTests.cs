@@ -202,4 +202,42 @@ public class LexerTests
         Assert.Equal(1, tokens[0].Span.Column);
         Assert.Equal(4, tokens[1].Span.Column); // {
     }
+
+    [Fact]
+    public void Tokenize_NullCoalesceOperator_ReturnsCorrectToken()
+    {
+        var tokens = Tokenize("§??", out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(2, tokens.Count); // NullCoalesce + EOF
+        Assert.Equal(TokenKind.NullCoalesce, tokens[0].Kind);
+        Assert.Equal("§??", tokens[0].Text);
+    }
+
+    [Fact]
+    public void Tokenize_NullConditionalOperator_ReturnsCorrectToken()
+    {
+        var tokens = Tokenize("§?.", out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(2, tokens.Count); // NullConditional + EOF
+        Assert.Equal(TokenKind.NullConditional, tokens[0].Kind);
+        Assert.Equal("§?.", tokens[0].Text);
+    }
+
+    [Fact]
+    public void Tokenize_NullOperatorsInContext_ReturnsCorrectTokens()
+    {
+        // Test §?? and §?. in a more realistic context
+        var source = "§B result §?? defaultValue";
+        var tokens = Tokenize(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.Bind, tokens[0].Kind);
+        Assert.Equal(TokenKind.Identifier, tokens[1].Kind);
+        Assert.Equal("result", tokens[1].Text);
+        Assert.Equal(TokenKind.NullCoalesce, tokens[2].Kind);
+        Assert.Equal(TokenKind.Identifier, tokens[3].Kind);
+        Assert.Equal("defaultValue", tokens[3].Text);
+    }
 }
