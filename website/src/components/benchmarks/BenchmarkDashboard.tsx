@@ -21,7 +21,7 @@ interface BenchmarkData {
     cSharpWins: number;
     statisticalRunCount: number;
   };
-  metrics: Record<string, { ratio: number; winner: 'calor' | 'csharp' }>;
+  metrics: Record<string, { ratio: number; winner: 'calor' | 'csharp'; isCalorOnly?: boolean }>;
   programs: Array<{
     id: string;
     name: string;
@@ -83,6 +83,9 @@ function SummaryCard({ icon, label, value, subtext, highlight = 'neutral' }: Sum
 export function BenchmarkDashboard() {
   // Sort metrics: Calor wins first, then by ratio descending
   const sortedMetrics = Object.entries(data.metrics).sort(([, a], [, b]) => {
+    // Sort Calor-only metrics to the end, then Calor wins first, then by ratio descending
+    if (a.isCalorOnly && !b.isCalorOnly) return 1;
+    if (!a.isCalorOnly && b.isCalorOnly) return -1;
     if (a.winner === 'calor' && b.winner !== 'calor') return -1;
     if (a.winner !== 'calor' && b.winner === 'calor') return 1;
     return b.ratio - a.ratio;
@@ -152,6 +155,7 @@ export function BenchmarkDashboard() {
               name={name}
               ratio={metric.ratio}
               winner={metric.winner}
+              isCalorOnly={metric.isCalorOnly}
             />
           ))}
         </div>

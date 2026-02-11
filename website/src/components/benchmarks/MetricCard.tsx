@@ -7,9 +7,11 @@ interface MetricCardProps {
   ratio: number;
   winner: 'calor' | 'csharp';
   description?: string;
+  isCalorOnly?: boolean;
 }
 
-function formatRatio(ratio: number): string {
+function formatRatio(ratio: number, isCalorOnly?: boolean): string {
+  if (isCalorOnly) return 'Calor only';
   return `${ratio.toFixed(2)}x`;
 }
 
@@ -84,7 +86,7 @@ const metricInterpretations: Record<string, { calor: string; csharp: string }> =
   },
 };
 
-export function MetricCard({ name, ratio, winner, description }: MetricCardProps) {
+export function MetricCard({ name, ratio, winner, description, isCalorOnly }: MetricCardProps) {
   const displayName = metricDisplayNames[name] || name;
   const defaultInterpretation =
     winner === 'calor'
@@ -100,29 +102,35 @@ export function MetricCard({ name, ratio, winner, description }: MetricCardProps
           <span
             className={cn(
               'text-xs px-2 py-0.5 rounded-full',
-              winner === 'calor'
+              isCalorOnly
                 ? 'bg-calor-pink/20 text-calor-pink'
-                : 'bg-calor-cerulean/20 text-calor-cerulean'
+                : winner === 'calor'
+                  ? 'bg-calor-pink/20 text-calor-pink'
+                  : 'bg-calor-cerulean/20 text-calor-cerulean'
             )}
           >
-            {winner === 'calor' ? 'Calor' : 'C#'} wins
+            {isCalorOnly ? 'Calor only' : winner === 'calor' ? 'Calor wins' : 'C# wins'}
           </span>
         </div>
-        <span className="font-mono font-bold">{formatRatio(ratio)}</span>
+        <span className="font-mono font-bold">{formatRatio(ratio, isCalorOnly)}</span>
       </div>
 
       <div className="relative h-8 bg-muted rounded-full overflow-hidden">
         <div
           className={cn(
             'absolute inset-y-0 left-0 rounded-full transition-all duration-500',
-            winner === 'calor'
-              ? 'bg-gradient-to-r from-calor-pink to-calor-pink/80'
-              : 'bg-gradient-to-r from-calor-cerulean to-calor-cerulean/80'
+            isCalorOnly
+              ? 'bg-gradient-to-r from-calor-pink to-calor-pink/60'
+              : winner === 'calor'
+                ? 'bg-gradient-to-r from-calor-pink to-calor-pink/80'
+                : 'bg-gradient-to-r from-calor-cerulean to-calor-cerulean/80'
           )}
-          style={{ width: `${getBarWidth(ratio)}%` }}
+          style={{ width: isCalorOnly ? '100%' : `${getBarWidth(ratio)}%` }}
         />
-        {/* Center line at 1.0 */}
-        <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
+        {/* Center line at 1.0 - hide for Calor-only metrics */}
+        {!isCalorOnly && (
+          <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
+        )}
       </div>
 
       {interpretation && (
