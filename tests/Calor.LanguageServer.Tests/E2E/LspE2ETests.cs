@@ -26,13 +26,17 @@ public class LspE2ETests : IDisposable
 
     private async Task StartServerAsync()
     {
-        // Find the LSP server DLL
+        // Find the LSP server DLL - check both Release and Debug configurations
         var solutionDir = FindSolutionDirectory();
-        var lspServerPath = Path.Combine(solutionDir, "src", "Calor.LanguageServer", "bin", "Debug", "net8.0", "calor-lsp.dll");
+        var releasePath = Path.Combine(solutionDir, "src", "Calor.LanguageServer", "bin", "Release", "net8.0", "calor-lsp.dll");
+        var debugPath = Path.Combine(solutionDir, "src", "Calor.LanguageServer", "bin", "Debug", "net8.0", "calor-lsp.dll");
+
+        // Prefer Release (used in CI) over Debug
+        var lspServerPath = File.Exists(releasePath) ? releasePath : debugPath;
 
         if (!File.Exists(lspServerPath))
         {
-            throw new InvalidOperationException($"LSP server not found at {lspServerPath}. Please build the solution first.");
+            throw new InvalidOperationException($"LSP server not found. Checked:\n  {releasePath}\n  {debugPath}\nPlease build the solution first.");
         }
 
         var startInfo = new ProcessStartInfo
