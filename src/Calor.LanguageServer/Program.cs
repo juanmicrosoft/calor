@@ -34,6 +34,7 @@ public static class Program
                 .WithHandler<ReferencesHandler>()
                 .WithHandler<RenameHandler>()
                 .WithHandler<WorkspaceSymbolHandler>()
+                .WithHandler<SemanticTokensHandler>()
                 .OnInitialize((server, request, token) =>
                 {
                     // Register TextDocumentSyncHandler which needs the server reference
