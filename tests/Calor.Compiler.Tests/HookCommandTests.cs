@@ -353,4 +353,88 @@ public class HookCommandTests : IDisposable
     }
 
     #endregion
+
+    #region ValidateWriteWithReason Tests
+
+    [Fact]
+    public void ValidateWriteWithReason_CalrFile_ReturnsAllowWithNoReason()
+    {
+        var (exitCode, blockReason, suggestedPath) = HookCommand.ValidateWriteWithReason("{\"file_path\": \"MyClass.calr\"}");
+
+        Assert.Equal(0, exitCode);
+        Assert.Null(blockReason);
+        Assert.Null(suggestedPath);
+    }
+
+    [Fact]
+    public void ValidateWriteWithReason_CsFile_ReturnsBlockWithReasonAndSuggestion()
+    {
+        var (exitCode, blockReason, suggestedPath) = HookCommand.ValidateWriteWithReason("{\"file_path\": \"src/MyClass.cs\"}");
+
+        Assert.Equal(1, exitCode);
+        Assert.NotNull(blockReason);
+        Assert.Contains("BLOCKED", blockReason);
+        Assert.Contains("MyClass.cs", blockReason);
+        Assert.Equal("src/MyClass.calr", suggestedPath);
+    }
+
+    [Fact]
+    public void ValidateWriteWithReason_CsFile_SuggestsCalrExtension()
+    {
+        var (_, _, suggestedPath) = HookCommand.ValidateWriteWithReason("{\"file_path\": \"Services/UserService.cs\"}");
+
+        Assert.Equal("Services/UserService.calr", suggestedPath);
+    }
+
+    [Fact]
+    public void ValidateWriteWithReason_GeneratedCsFile_ReturnsAllow()
+    {
+        var (exitCode, blockReason, suggestedPath) = HookCommand.ValidateWriteWithReason("{\"file_path\": \"output/Test.g.cs\"}");
+
+        Assert.Equal(0, exitCode);
+        Assert.Null(blockReason);
+        Assert.Null(suggestedPath);
+    }
+
+    [Fact]
+    public void ValidateWriteWithReason_InvalidJson_ReturnsAllow()
+    {
+        var (exitCode, blockReason, suggestedPath) = HookCommand.ValidateWriteWithReason("not json");
+
+        Assert.Equal(0, exitCode);
+        Assert.Null(blockReason);
+        Assert.Null(suggestedPath);
+    }
+
+    [Fact]
+    public void ValidateWriteWithReason_NonCsNonCalrFile_ReturnsAllow()
+    {
+        var (exitCode, blockReason, suggestedPath) = HookCommand.ValidateWriteWithReason("{\"file_path\": \"README.md\"}");
+
+        Assert.Equal(0, exitCode);
+        Assert.Null(blockReason);
+        Assert.Null(suggestedPath);
+    }
+
+    [Fact]
+    public void ValidateWriteWithReason_BlockReason_IncludesSemanticsReminder()
+    {
+        var (_, blockReason, _) = HookCommand.ValidateWriteWithReason("{\"file_path\": \"Test.cs\"}");
+
+        Assert.NotNull(blockReason);
+        Assert.Contains("overflow", blockReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("§SEMVER", blockReason);
+    }
+
+    [Fact]
+    public void ValidateWriteWithReason_CamelCaseInput_BlocksCsFile()
+    {
+        var (exitCode, blockReason, suggestedPath) = HookCommand.ValidateWriteWithReason("{\"filePath\": \"MyClass.cs\"}");
+
+        Assert.Equal(1, exitCode);
+        Assert.NotNull(blockReason);
+        Assert.Equal("MyClass.calr", suggestedPath);
+    }
+
+    #endregion
 }

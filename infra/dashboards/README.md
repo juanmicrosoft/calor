@@ -26,6 +26,7 @@ az deployment group create \
 | **🐛 Diagnostics** | Top 20 Compiler Diagnostics, Exception Trends, Recent Exceptions |
 | **🖥️ Environment** | OS, Architecture, Calor Version, Coding Agent Distribution |
 | **🎛️ Features** | Compiler Feature Adoption (% using each flag) |
+| **🛡️ Hook Compliance** | Compliance Summary, Decisions Over Time, Per-Agent Compliance, Recent Blocks |
 | **🚨 Failures** | Last 25 Failed Commands |
 
 ### Access

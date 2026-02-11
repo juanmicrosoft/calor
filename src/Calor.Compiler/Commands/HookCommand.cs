@@ -3,7 +3,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
+using Calor.Compiler.Init;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -58,10 +60,14 @@ public static class HookCommand
         {
             var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
             var format = context.ParseResult.GetValueForOption(formatOption);
+            var isGemini = string.Equals(format, "gemini", StringComparison.OrdinalIgnoreCase);
 
             var (exitCode, blockReason, suggestedPath) = ValidateWriteWithReason(toolInputJson);
 
-            if (string.Equals(format, "gemini", StringComparison.OrdinalIgnoreCase))
+            // Track hook decision in telemetry
+            TrackHookDecision("validate-write", toolInputJson, exitCode, isGemini);
+
+            if (isGemini)
             {
                 // Gemini CLI expects JSON response via stdout
                 OutputGeminiResponse(exitCode, blockReason, suggestedPath);
@@ -208,11 +214,15 @@ public static class HookCommand
         {
             var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
             var format = context.ParseResult.GetValueForOption(formatOption);
+            var isGemini = string.Equals(format, "gemini", StringComparison.OrdinalIgnoreCase);
 
             // Edit validation uses the same logic as Write validation
             var (exitCode, blockReason, suggestedPath) = ValidateWriteWithReason(toolInputJson);
 
-            if (string.Equals(format, "gemini", StringComparison.OrdinalIgnoreCase))
+            // Track hook decision in telemetry
+            TrackHookDecision("validate-edit", toolInputJson, exitCode, isGemini);
+
+            if (isGemini)
             {
                 OutputGeminiResponse(exitCode, blockReason, suggestedPath);
             }
@@ -610,6 +620,53 @@ public static class HookCommand
         {
             // On any error, allow the operation
             return (0, null);
+        }
+    }
+
+    /// <summary>
+    /// Tracks a hook allow/block decision in telemetry.
+    /// Only tracks .calr and .cs files (skips irrelevant file types).
+    /// </summary>
+    private static void TrackHookDecision(string hookName, string toolInputJson, int exitCode, bool isGemini)
+    {
+        try
+        {
+            var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+            if (telemetry == null) return;
+
+            // Extract file path and extension
+            var input = JsonSerializer.Deserialize<WriteToolInput>(toolInputJson, JsonOptions);
+            var path = input?.FilePathSnake ?? input?.FilePathCamel ?? "";
+            var ext = Path.GetExtension(path).ToLowerInvariant();
+
+            // Only track .calr and .cs files — skip irrelevant types
+            if (ext != ".calr" && ext != ".cs")
+                return;
+
+            var agent = isGemini ? "gemini" : "claude";
+
+            // Discover project config for agent info
+            var discovered = CalorConfigManager.Discover(
+                !string.IsNullOrEmpty(path) && (File.Exists(path) || Directory.Exists(Path.GetDirectoryName(path)))
+                    ? path
+                    : Directory.GetCurrentDirectory());
+            if (discovered != null)
+                telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered.Value.Config));
+
+            var decision = exitCode == 0 ? "allow" : "block";
+            var eventName = exitCode == 0 ? "HookAllow" : "HookBlock";
+
+            telemetry.TrackEvent(eventName, new Dictionary<string, string>
+            {
+                ["hook"] = hookName,
+                ["decision"] = decision,
+                ["fileExtension"] = ext,
+                ["agent"] = agent
+            });
+        }
+        catch
+        {
+            // Never crash the hook
         }
     }
 }
