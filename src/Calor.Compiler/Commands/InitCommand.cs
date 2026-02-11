@@ -13,9 +13,12 @@ public static class InitCommand
 {
     public static Command Create()
     {
-        var aiOption = new Option<string?>(
+        var aiOption = new Option<string[]>(
             aliases: new[] { "--ai", "-a" },
-            description: $"AI agent to configure (optional): {string.Join(", ", AiInitializerFactory.SupportedAgents)}");
+            description: $"AI agent(s) to configure (can specify multiple): {string.Join(", ", AiInitializerFactory.SupportedAgents)}")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
 
         var projectOption = new Option<string?>(
             aliases: new[] { "--project", "-p" },
@@ -42,7 +45,7 @@ public static class InitCommand
         return command;
     }
 
-    private static async Task ExecuteAsync(string? ai, string? project, string? solution, bool force)
+    private static async Task ExecuteAsync(string[] ai, string? project, string? solution, bool force)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("init");
@@ -60,32 +63,37 @@ public static class InitCommand
                 return;
             }
 
-            // Validate AI agent type if provided
-            IAiInitializer? aiInitializer = null;
-            if (!string.IsNullOrEmpty(ai))
+            // Validate AI agent types and create initializers
+            var aiInitializers = new List<IAiInitializer>();
+            var agentNames = new List<string>();
+            if (ai.Length > 0)
             {
-                if (!AiInitializerFactory.IsSupported(ai))
+                foreach (var agent in ai)
                 {
-                    Console.Error.WriteLine($"Error: Unknown AI agent type: '{ai}'");
-                    Console.Error.WriteLine($"Supported types: {string.Join(", ", AiInitializerFactory.SupportedAgents)}");
-                    Environment.ExitCode = 1;
-                    return;
+                    if (!AiInitializerFactory.IsSupported(agent))
+                    {
+                        Console.Error.WriteLine($"Error: Unknown AI agent type: '{agent}'");
+                        Console.Error.WriteLine($"Supported types: {string.Join(", ", AiInitializerFactory.SupportedAgents)}");
+                        Environment.ExitCode = 1;
+                        return;
+                    }
+                    aiInitializers.Add(AiInitializerFactory.Create(agent));
+                    agentNames.Add(agent.ToLowerInvariant());
                 }
-                aiInitializer = AiInitializerFactory.Create(ai);
             }
 
             // Determine mode: solution, explicit project, or auto-detect
             if (!string.IsNullOrEmpty(solution))
             {
                 // Explicit solution mode
-                await ExecuteSolutionModeAsync(targetDirectory, solution, force, aiInitializer);
+                await ExecuteSolutionModeAsync(targetDirectory, solution, force, aiInitializers, agentNames);
                 return;
             }
 
             if (!string.IsNullOrEmpty(project))
             {
                 // Explicit project mode
-                await ExecuteProjectModeAsync(targetDirectory, project, force, aiInitializer);
+                await ExecuteProjectModeAsync(targetDirectory, project, force, aiInitializers, agentNames);
                 return;
             }
 
@@ -96,7 +104,7 @@ public static class InitCommand
             if (solutionDetection.IsSuccess)
             {
                 // Found a solution - use solution mode
-                await ExecuteSolutionModeAsync(targetDirectory, solutionDetection.SolutionPath!, force, aiInitializer);
+                await ExecuteSolutionModeAsync(targetDirectory, solutionDetection.SolutionPath!, force, aiInitializers, agentNames);
                 return;
             }
 
@@ -109,7 +117,7 @@ public static class InitCommand
             }
 
             // No solution found - fall back to project mode
-            await ExecuteProjectModeAsync(targetDirectory, null, force, aiInitializer);
+            await ExecuteProjectModeAsync(targetDirectory, null, force, aiInitializers, agentNames);
         }
         catch (Exception ex)
         {
@@ -135,7 +143,8 @@ public static class InitCommand
         string targetDirectory,
         string solutionPathOrName,
         bool force,
-        IAiInitializer? aiInitializer)
+        List<IAiInitializer> aiInitializers,
+        List<string> agentNames)
     {
         var solutionDetector = new SolutionDetector();
 
@@ -153,7 +162,31 @@ public static class InitCommand
 
         var solutionDirectory = Path.GetDirectoryName(solutionPath)!;
         var solutionInitializer = new SolutionInitializer();
-        var result = await solutionInitializer.InitializeAsync(solutionPath, force, aiInitializer);
+        var firstInitializer = aiInitializers.Count > 0 ? aiInitializers[0] : null;
+        var result = await solutionInitializer.InitializeAsync(solutionPath, force, firstInitializer);
+
+        if (!result.IsSuccess)
+        {
+            Console.Error.WriteLine($"Error: {result.ErrorMessage}");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        // Initialize remaining AI agents (solution initializer handles the first one)
+        for (var i = 1; i < aiInitializers.Count; i++)
+        {
+            var aiResult = await aiInitializers[i].InitializeAsync(solutionDirectory, force);
+            if (!aiResult.Success)
+            {
+                foreach (var message in aiResult.Messages)
+                    Console.Error.WriteLine($"Error: {message}");
+                Environment.ExitCode = 1;
+                return;
+            }
+        }
+
+        // Always create/update .calor/config.json
+        var configCreated = CalorConfigManager.AddAgents(solutionDirectory, agentNames, force);
 
         if (!result.IsSuccess)
         {
@@ -174,9 +207,9 @@ public static class InitCommand
 
         // Show success message
         var version = EmbeddedResourceHelper.GetVersion();
-        if (result.AgentName != null)
+        if (agentNames.Count > 0)
         {
-            Console.WriteLine($"Initialized Calor solution for {result.AgentName} (calor v{version})");
+            Console.WriteLine($"Initialized Calor solution for {string.Join(", ", agentNames)} (calor v{version})");
         }
         else
         {
@@ -186,9 +219,19 @@ public static class InitCommand
         Console.WriteLine();
         Console.WriteLine($"Solution: {result.SolutionName} ({result.TotalProjects} projects)");
 
-        // Build lists of created and updated files including .gitattributes
+        // Build lists of created and updated files including .gitattributes and .calor/config.json
         var createdFiles = new List<string>(result.CreatedFiles);
         var updatedFiles = new List<string>();
+
+        if (configCreated)
+        {
+            createdFiles.Add(CalorConfigManager.GetConfigPath(solutionDirectory));
+        }
+        else
+        {
+            updatedFiles.Add(CalorConfigManager.GetConfigPath(solutionDirectory));
+        }
+
         if (gitAttrCreated)
         {
             createdFiles.Add(Path.Combine(solutionDirectory, ".gitattributes"));
@@ -269,10 +312,20 @@ public static class InitCommand
         Console.WriteLine("  1. Run 'calor analyze ./src' to find migration candidates");
         Console.WriteLine("  2. Create .calr files in your projects");
         Console.WriteLine("  3. Run 'dotnet build' to compile Calor to C#");
-        if (result.AgentName == null)
+        if (agentNames.Count == 0)
         {
             Console.WriteLine();
             Console.WriteLine("Optional: Run 'calor init --ai claude' to add Claude Code skills");
+        }
+        else
+        {
+            // Show configured agents summary
+            var currentConfig = CalorConfigManager.Read(solutionDirectory);
+            if (currentConfig != null && currentConfig.Agents.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Configured agents: {string.Join(", ", currentConfig.Agents.Select(a => a.Name))}");
+            }
         }
     }
 
@@ -280,12 +333,12 @@ public static class InitCommand
         string targetDirectory,
         string? specificProject,
         bool force,
-        IAiInitializer? aiInitializer)
+        List<IAiInitializer> aiInitializers,
+        List<string> agentNames)
     {
         var createdFiles = new List<string>();
         var updatedFiles = new List<string>();
         var warnings = new List<string>();
-        string? agentName = null;
 
         // Step 1: Detect and validate .csproj file
         var detector = new ProjectDetector();
@@ -300,10 +353,9 @@ public static class InitCommand
 
         var projectPath = detection.ProjectPath!;
 
-        // Step 2: Initialize AI agent configuration (if --ai specified)
-        if (aiInitializer != null)
+        // Step 2: Initialize AI agent configurations (if --ai specified)
+        foreach (var aiInitializer in aiInitializers)
         {
-            agentName = aiInitializer.AgentName;
             var aiResult = await aiInitializer.InitializeAsync(targetDirectory, force);
 
             if (!aiResult.Success)
@@ -319,6 +371,17 @@ public static class InitCommand
             createdFiles.AddRange(aiResult.CreatedFiles);
             updatedFiles.AddRange(aiResult.UpdatedFiles);
             warnings.AddRange(aiResult.Warnings);
+        }
+
+        // Step 3: Always create/update .calor/config.json
+        var configCreated = CalorConfigManager.AddAgents(targetDirectory, agentNames, force);
+        if (configCreated)
+        {
+            createdFiles.Add(CalorConfigManager.GetConfigPath(targetDirectory));
+        }
+        else
+        {
+            updatedFiles.Add(CalorConfigManager.GetConfigPath(targetDirectory));
         }
 
         // Step 3: Initialize .csproj with Calor targets
@@ -360,9 +423,9 @@ public static class InitCommand
 
         // Show success message
         var version = EmbeddedResourceHelper.GetVersion();
-        if (agentName != null)
+        if (agentNames.Count > 0)
         {
-            Console.WriteLine($"Initialized Calor project for {agentName} (calor v{version})");
+            Console.WriteLine($"Initialized Calor project for {string.Join(", ", agentNames)} (calor v{version})");
         }
         else
         {
@@ -420,10 +483,20 @@ public static class InitCommand
         Console.WriteLine("  1. Run 'calor analyze ./src' to find migration candidates");
         Console.WriteLine("  2. Create .calr files in your project");
         Console.WriteLine("  3. Run 'dotnet build' to compile Calor to C#");
-        if (agentName == null)
+        if (agentNames.Count == 0)
         {
             Console.WriteLine();
             Console.WriteLine("Optional: Run 'calor init --ai claude' to add Claude Code skills");
+        }
+        else
+        {
+            // Show configured agents summary
+            var currentConfig = CalorConfigManager.Read(targetDirectory);
+            if (currentConfig != null && currentConfig.Agents.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Configured agents: {string.Join(", ", currentConfig.Agents.Select(a => a.Name))}");
+            }
         }
     }
 

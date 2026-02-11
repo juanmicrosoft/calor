@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics;
+using Calor.Compiler.Init;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Calor.Compiler.Telemetry;
@@ -70,6 +71,11 @@ public static class MigrateCommand
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("migrate");
+        if (telemetry != null)
+        {
+            var discovered = CalorConfigManager.Discover(path.FullName);
+            telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
+        }
         var sw = Stopwatch.StartNew();
 
         if (!path.Exists && !File.Exists(path.FullName))

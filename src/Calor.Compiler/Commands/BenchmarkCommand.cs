@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics;
+using Calor.Compiler.Init;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Telemetry;
 
@@ -77,6 +78,12 @@ public static class BenchmarkCommand
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("benchmark");
+        if (telemetry != null)
+        {
+            var searchPath = project?.FullName ?? calorFile?.FullName ?? Directory.GetCurrentDirectory();
+            var discovered = CalorConfigManager.Discover(searchPath);
+            telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
+        }
         var sw = Stopwatch.StartNew();
 
         try

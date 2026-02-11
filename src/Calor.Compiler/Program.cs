@@ -7,6 +7,7 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Init;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Telemetry;
 using Calor.Compiler.Verification;
@@ -95,6 +96,13 @@ public class Program
 
             var sw = Stopwatch.StartNew();
             var input = ctx.ParseResult.GetValueForOption(inputOption);
+
+            // Discover .calor/config.json for coding agent telemetry
+            if (telemetry != null && input != null)
+            {
+                var discovered = CalorConfigManager.Discover(input.FullName);
+                telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
+            }
             var output = ctx.ParseResult.GetValueForOption(outputOption);
             var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
             var strictApi = ctx.ParseResult.GetValueForOption(strictApiOption);

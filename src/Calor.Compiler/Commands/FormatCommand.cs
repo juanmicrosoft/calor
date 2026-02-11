@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
+using Calor.Compiler.Init;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Telemetry;
 
@@ -56,6 +57,11 @@ public static class FormatCommand
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("format");
+        if (telemetry != null && files.Length > 0)
+        {
+            var discovered = CalorConfigManager.Discover(files[0].FullName);
+            telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
+        }
         var sw = Stopwatch.StartNew();
 
         var hasUnformatted = false;

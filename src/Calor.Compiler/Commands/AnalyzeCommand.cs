@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Init;
 using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
@@ -70,6 +71,11 @@ public static class AnalyzeCommand
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("analyze");
+        if (telemetry != null)
+        {
+            var discovered = CalorConfigManager.Discover(path.FullName);
+            telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
+        }
         var sw = Stopwatch.StartNew();
         var exitCode = 0;
 
