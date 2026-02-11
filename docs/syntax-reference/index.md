@@ -18,6 +18,10 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 |:--------|:-------|:--------|
 | Module | `§M{id:name}` | `§M{m001:Calculator}` |
 | Function | `§F{id:name:visibility}` | `§F{f001:Add:pub}` |
+| Async Function | `§AF{id:name:visibility}` | `§AF{f001:FetchAsync:pub}` |
+| Method | `§MT{id:name:visibility}` | `§MT{mt001:Process:pub}` |
+| Async Method | `§AMT{id:name:visibility}` | `§AMT{mt001:ProcessAsync:pub}` |
+| Await | `§AWAIT expr` | `§AWAIT §C{GetAsync} §/C` |
 | Input | `§I{type:name}` | `§I{i32:x}` |
 | Output | `§O{type}` | `§O{i32}` |
 | Effects | `§E{codes}` | `§E{cw,fs:r,net:rw}` |
