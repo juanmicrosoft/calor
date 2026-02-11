@@ -195,6 +195,20 @@ If Z3 native libraries are missing on your platform, the compiler will:
 
 ---
 
+## Verification Caching
+
+Z3 verification results are automatically cached to disk. When you recompile a file with unchanged contracts, the compiler retrieves cached results instead of re-running Z3. This provides:
+
+- **Faster incremental builds**: Unchanged contracts verify in milliseconds instead of seconds
+- **Reduced CI load**: Build servers benefit from cached results across runs
+- **Deterministic results**: Same contract always produces same verification outcome
+
+The cache is keyed by a SHA256 hash of the contract expression and parameter types. When you modify a contract, its hash changes, and the cache misses—ensuring correctness.
+
+To disable caching (e.g., for debugging), use `--no-cache`. To clear the cache, use `--clear-cache`.
+
+---
+
 ## See Also
 
 - [Contracts in Calor](/language/contracts/)

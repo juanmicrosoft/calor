@@ -199,4 +199,28 @@ public static class Z3ContextFactory
     {
         return new Microsoft.Z3.Context();
     }
+
+    /// <summary>
+    /// Gets the Z3 library version string, or null if Z3 is unavailable.
+    /// </summary>
+    public static string? GetZ3Version()
+    {
+        if (!IsAvailable)
+            return null;
+
+        return GetZ3VersionInternal();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string? GetZ3VersionInternal()
+    {
+        try
+        {
+            return Microsoft.Z3.Version.FullVersion;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

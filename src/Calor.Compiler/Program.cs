@@ -9,6 +9,7 @@ using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
+using Calor.Compiler.Verification.Z3.Cache;
 
 namespace Calor.Compiler;
 
@@ -55,6 +56,14 @@ public class Program
             aliases: ["--verify"],
             description: "Enable static contract verification with Z3 SMT solver");
 
+        var noCacheOption = new Option<bool>(
+            aliases: ["--no-cache"],
+            description: "Disable verification result caching");
+
+        var clearCacheOption = new Option<bool>(
+            aliases: ["--clear-cache"],
+            description: "Clear verification cache before compiling");
+
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
             inputOption,
@@ -65,7 +74,9 @@ public class Program
             enforceEffectsOption,
             strictEffectsOption,
             contractModeOption,
-            verifyOption
+            verifyOption,
+            noCacheOption,
+            clearCacheOption
         };
 
         // Legacy compile handler (when --input is provided)
@@ -80,7 +91,9 @@ public class Program
             var strictEffects = ctx.ParseResult.GetValueForOption(strictEffectsOption);
             var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
             var verify = ctx.ParseResult.GetValueForOption(verifyOption);
-            await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify);
+            var noCache = ctx.ParseResult.GetValueForOption(noCacheOption);
+            var clearCache = ctx.ParseResult.GetValueForOption(clearCacheOption);
+            await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify, noCache, clearCache);
         });
 
         // Add subcommands
@@ -99,7 +112,7 @@ public class Program
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode, bool verify)
+    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode, bool verify, bool noCache, bool clearCache)
     {
         try
         {
@@ -124,6 +137,8 @@ public class Program
                 Console.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
                 Console.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
                 Console.WriteLine("  --verify          Enable static contract verification with Z3");
+                Console.WriteLine("  --no-cache        Disable verification result caching");
+                Console.WriteLine("  --clear-cache     Clear verification cache before compiling");
                 Console.WriteLine();
                 Console.WriteLine("Run 'calor --help' for more information.");
                 return;
@@ -148,6 +163,12 @@ public class Program
                 "release" => ContractMode.Release,
                 _ => ContractMode.Debug
             };
+            var cacheOptions = new VerificationCacheOptions
+            {
+                Enabled = !noCache,
+                ClearBeforeVerification = clearCache,
+                ProjectDirectory = Path.GetDirectoryName(input.FullName)
+            };
             var options = new CompilationOptions
             {
                 Verbose = verbose,
@@ -157,7 +178,8 @@ public class Program
                 StrictEffects = strictEffects,
                 ContractMode = parsedContractMode,
                 VerifyContracts = verify,
-                ProjectDirectory = Path.GetDirectoryName(input.FullName)
+                ProjectDirectory = Path.GetDirectoryName(input.FullName),
+                VerificationCacheOptions = cacheOptions
             };
             var result = Compile(source, input.FullName, options);
 
@@ -322,9 +344,12 @@ public class Program
         // Static contract verification with Z3 (optional)
         if (options.VerifyContracts)
         {
-            var verificationPass = new ContractVerificationPass(
-                diagnostics,
-                new VerificationOptions { Verbose = options.Verbose });
+            var verificationOptions = new VerificationOptions
+            {
+                Verbose = options.Verbose,
+                CacheOptions = options.VerificationCacheOptions ?? VerificationCacheOptions.Default
+            };
+            var verificationPass = new ContractVerificationPass(diagnostics, verificationOptions);
             options.VerificationResults = verificationPass.Verify(ast);
 
             if (options.Verbose)
@@ -396,6 +421,11 @@ public sealed class CompilationOptions
     /// Enable static contract verification with Z3 SMT solver.
     /// </summary>
     public bool VerifyContracts { get; init; }
+
+    /// <summary>
+    /// Options for verification result caching.
+    /// </summary>
+    public VerificationCacheOptions? VerificationCacheOptions { get; init; }
 
     /// <summary>
     /// Verification results populated after running verification pass.
