@@ -1,5 +1,8 @@
+'use client';
+
 import { FileCode, Shield, Fingerprint, Layers, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { trackFeatureLearnMore } from '@/lib/analytics';
 
 const features = [
   {
@@ -73,6 +76,7 @@ export function FeatureGrid() {
                   <Link
                     href={feature.href}
                     className="mt-4 inline-flex items-center text-sm text-calor-cyan hover:underline"
+                    onClick={() => trackFeatureLearnMore(feature.name)}
                   >
                     Learn more
                     <ChevronRight className="ml-1 h-4 w-4" />

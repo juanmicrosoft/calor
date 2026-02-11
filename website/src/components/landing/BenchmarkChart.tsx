@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Clock } from 'lucide-react';
+import { trackBenchmarkDetailClick } from '@/lib/analytics';
 
 // Build-time import of benchmark data
 import benchmarkData from '../../../public/data/benchmark-results.json';
@@ -231,7 +232,7 @@ export function BenchmarkChart() {
 
           <div className="mt-8 text-center">
             <Button variant="outline" asChild>
-              <Link href="/docs/benchmarking/results/">
+              <Link href="/docs/benchmarking/results/" onClick={() => trackBenchmarkDetailClick()}>
                 View detailed benchmarks
               </Link>
             </Button>

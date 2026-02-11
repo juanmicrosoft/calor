@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { trackTocAnchorClick } from '@/lib/analytics';
 
 interface Heading {
   id: string;
@@ -71,6 +72,7 @@ export function TableOfContents({ headings }: TableOfContentsProps) {
                 )}
                 onClick={(e) => {
                   e.preventDefault();
+                  trackTocAnchorClick(heading.text);
                   const element = document.getElementById(heading.id);
                   if (element) {
                     element.scrollIntoView({ behavior: 'smooth' });

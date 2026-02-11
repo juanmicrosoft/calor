@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, Copy, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { trackInstallCommandCopy } from '@/lib/analytics';
 
 const commands = [
   {
@@ -27,6 +28,7 @@ export function QuickStart() {
 
   const copyToClipboard = async (text: string, index: number) => {
     await navigator.clipboard.writeText(text.replace(/\\\n/g, ''));
+    trackInstallCommandCopy(commands[index].label);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };

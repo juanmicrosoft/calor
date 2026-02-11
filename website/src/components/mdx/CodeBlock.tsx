@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { trackCodeCopy } from '@/lib/analytics';
 
 interface CodeBlockProps {
   code: string;
@@ -21,6 +22,7 @@ export function CodeBlock({
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(code);
+    trackCodeCopy(language);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

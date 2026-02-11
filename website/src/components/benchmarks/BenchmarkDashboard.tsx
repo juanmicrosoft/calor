@@ -4,6 +4,8 @@ import { MetricCard } from './MetricCard';
 import { ProgramTable } from './ProgramTable';
 import { cn } from '@/lib/utils';
 import { BarChart3, FileCode, Trophy, Clock } from 'lucide-react';
+import { trackBenchmarkResultsView } from '@/lib/analytics';
+import { useEffect } from 'react';
 
 // Build-time import of benchmark data
 import benchmarkData from '../../../public/data/benchmark-results.json';
@@ -81,6 +83,10 @@ function SummaryCard({ icon, label, value, subtext, highlight = 'neutral' }: Sum
 }
 
 export function BenchmarkDashboard() {
+  useEffect(() => {
+    trackBenchmarkResultsView();
+  }, []);
+
   // Sort metrics: Calor wins first, then by ratio descending
   const sortedMetrics = Object.entries(data.metrics).sort(([, a], [, b]) => {
     // Sort Calor-only metrics to the end, then Calor wins first, then by ratio descending
