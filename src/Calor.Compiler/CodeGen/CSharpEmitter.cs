@@ -2811,6 +2811,48 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return $"(!({ante}) || ({cons}))";
     }
 
+    // Native String Operations
+
+    public string Visit(StringOperationNode node)
+    {
+        var args = node.Arguments.Select(a => a.Accept(this)).ToList();
+
+        return node.Operation switch
+        {
+            // Instance methods - Query operations
+            StringOp.Length => $"{args[0]}.Length",
+            StringOp.Contains => $"{args[0]}.Contains({args[1]})",
+            StringOp.StartsWith => $"{args[0]}.StartsWith({args[1]})",
+            StringOp.EndsWith => $"{args[0]}.EndsWith({args[1]})",
+            StringOp.IndexOf => $"{args[0]}.IndexOf({args[1]})",
+
+            // Instance methods - Transform operations
+            StringOp.Substring => $"{args[0]}.Substring({args[1]}, {args[2]})",
+            StringOp.SubstringFrom => $"{args[0]}.Substring({args[1]})",
+            StringOp.Replace => $"{args[0]}.Replace({args[1]}, {args[2]})",
+            StringOp.ToUpper => $"{args[0]}.ToUpper()",
+            StringOp.ToLower => $"{args[0]}.ToLower()",
+            StringOp.Trim => $"{args[0]}.Trim()",
+            StringOp.TrimStart => $"{args[0]}.TrimStart()",
+            StringOp.TrimEnd => $"{args[0]}.TrimEnd()",
+            StringOp.PadLeft when args.Count == 2 => $"{args[0]}.PadLeft({args[1]})",
+            StringOp.PadLeft => $"{args[0]}.PadLeft({args[1]}, {args[2]})",
+            StringOp.PadRight when args.Count == 2 => $"{args[0]}.PadRight({args[1]})",
+            StringOp.PadRight => $"{args[0]}.PadRight({args[1]}, {args[2]})",
+            StringOp.Split => $"{args[0]}.Split({args[1]})",
+            StringOp.ToString => $"{args[0]}.ToString()",
+
+            // Static methods
+            StringOp.Join => $"string.Join({args[0]}, {args[1]})",
+            StringOp.Format => $"string.Format({string.Join(", ", args)})",
+            StringOp.Concat => $"string.Concat({string.Join(", ", args)})",
+            StringOp.IsNullOrEmpty => $"string.IsNullOrEmpty({args[0]})",
+            StringOp.IsNullOrWhiteSpace => $"string.IsNullOrWhiteSpace({args[0]})",
+
+            _ => throw new NotSupportedException($"Unknown string operation: {node.Operation}")
+        };
+    }
+
     /// <summary>
     /// Represents a single variable's finite range.
     /// </summary>

@@ -1250,6 +1250,45 @@ public sealed class Parser
             }
         }
 
+        // Try string operations
+        var stringOp = StringOpExtensions.FromString(opText);
+        if (stringOp.HasValue)
+        {
+            // Handle substr disambiguation: 2 args = SubstringFrom, 3 args = Substring
+            var finalOp = stringOp.Value;
+            if (stringOp.Value == StringOp.Substring && args.Count == 2)
+            {
+                finalOp = StringOp.SubstringFrom;
+            }
+
+            // Validate argument count
+            // Special case for substr: it accepts 2 or 3 args (SubstringFrom or Substring)
+            int minArgs, maxArgs;
+            if (stringOp.Value == StringOp.Substring)
+            {
+                minArgs = 2; // substr can have 2 args (SubstringFrom)
+                maxArgs = 3; // or 3 args (Substring)
+            }
+            else
+            {
+                minArgs = finalOp.GetMinArgCount();
+                maxArgs = finalOp.GetMaxArgCount();
+            }
+
+            if (args.Count < minArgs)
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"String operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}");
+            }
+            else if (args.Count > maxArgs)
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"String operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}");
+            }
+
+            return new StringOperationNode(span, finalOp, args);
+        }
+
         // Unknown operator
         _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
             $"Unknown operator '{opText}' in Lisp expression");
