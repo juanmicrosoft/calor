@@ -247,4 +247,5 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(ForallExpressionNode node) { }
     public void Visit(ExistsExpressionNode node) { }
     public void Visit(ImplicationExpressionNode node) { }
+    public void Visit(StringOperationNode node) { }
 }

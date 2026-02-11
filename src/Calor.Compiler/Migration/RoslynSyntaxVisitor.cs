@@ -1851,13 +1851,108 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(a => ConvertExpression(a.Expression))
             .ToList();
 
+        // Try to convert common string methods to native StringOperationNode
+        if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
+        {
+            var methodName = memberAccess.Name.Identifier.Text;
+            var targetExpr = ConvertExpression(memberAccess.Expression);
+            var span = GetTextSpan(invocation);
+
+            var stringOp = TryGetStringOperation(methodName, targetExpr, args, span);
+            if (stringOp != null)
+            {
+                _context.RecordFeatureUsage("native-string-op");
+                return stringOp;
+            }
+        }
+
+        // Check for static string methods like string.IsNullOrEmpty
+        if (target.StartsWith("string."))
+        {
+            var methodName = target.Substring(7); // Remove "string." prefix
+            var span = GetTextSpan(invocation);
+            var staticStringOp = TryGetStaticStringOperation(methodName, args, span);
+            if (staticStringOp != null)
+            {
+                _context.RecordFeatureUsage("native-string-op");
+                return staticStringOp;
+            }
+        }
+
         return new CallExpressionNode(GetTextSpan(invocation), target, args);
+    }
+
+    private StringOperationNode? TryGetStringOperation(
+        string methodName,
+        ExpressionNode target,
+        List<ExpressionNode> args,
+        TextSpan span)
+    {
+        // Build argument list with target as first argument
+        var allArgs = new List<ExpressionNode> { target };
+        allArgs.AddRange(args);
+
+        return methodName switch
+        {
+            // Query operations
+            "Contains" when args.Count == 1 => new StringOperationNode(span, StringOp.Contains, allArgs),
+            "StartsWith" when args.Count == 1 => new StringOperationNode(span, StringOp.StartsWith, allArgs),
+            "EndsWith" when args.Count == 1 => new StringOperationNode(span, StringOp.EndsWith, allArgs),
+            "IndexOf" when args.Count == 1 => new StringOperationNode(span, StringOp.IndexOf, allArgs),
+
+            // Transform operations
+            "Substring" when args.Count == 1 => new StringOperationNode(span, StringOp.SubstringFrom, allArgs),
+            "Substring" when args.Count == 2 => new StringOperationNode(span, StringOp.Substring, allArgs),
+            "Replace" when args.Count == 2 => new StringOperationNode(span, StringOp.Replace, allArgs),
+            "ToUpper" when args.Count == 0 => new StringOperationNode(span, StringOp.ToUpper, new[] { target }),
+            "ToLower" when args.Count == 0 => new StringOperationNode(span, StringOp.ToLower, new[] { target }),
+            "Trim" when args.Count == 0 => new StringOperationNode(span, StringOp.Trim, new[] { target }),
+            "TrimStart" when args.Count == 0 => new StringOperationNode(span, StringOp.TrimStart, new[] { target }),
+            "TrimEnd" when args.Count == 0 => new StringOperationNode(span, StringOp.TrimEnd, new[] { target }),
+            "PadLeft" when args.Count >= 1 => new StringOperationNode(span, StringOp.PadLeft, allArgs),
+            "PadRight" when args.Count >= 1 => new StringOperationNode(span, StringOp.PadRight, allArgs),
+            "Split" when args.Count == 1 => new StringOperationNode(span, StringOp.Split, allArgs),
+            "ToString" when args.Count == 0 => new StringOperationNode(span, StringOp.ToString, new[] { target }),
+
+            _ => null
+        };
+    }
+
+    private StringOperationNode? TryGetStaticStringOperation(
+        string methodName,
+        List<ExpressionNode> args,
+        TextSpan span)
+    {
+        return methodName switch
+        {
+            "IsNullOrEmpty" when args.Count == 1 => new StringOperationNode(span, StringOp.IsNullOrEmpty, args),
+            "IsNullOrWhiteSpace" when args.Count == 1 => new StringOperationNode(span, StringOp.IsNullOrWhiteSpace, args),
+            "Join" when args.Count == 2 => new StringOperationNode(span, StringOp.Join, args),
+            "Concat" when args.Count >= 2 => new StringOperationNode(span, StringOp.Concat, args),
+            "Format" when args.Count >= 2 => new StringOperationNode(span, StringOp.Format, args),
+            _ => null
+        };
     }
 
     private ExpressionNode ConvertMemberAccessExpression(MemberAccessExpressionSyntax memberAccess)
     {
         var target = ConvertExpression(memberAccess.Expression);
         var memberName = memberAccess.Name.Identifier.Text;
+
+        // Convert string.Length to native string operation
+        // Note: We can't reliably detect if target is a string without type info,
+        // but Length is commonly used on strings so we'll optimistically convert it.
+        // The generated Calor will still work since (len s) maps to s.Length.
+        if (memberName == "Length")
+        {
+            // Check if it looks like a string context (heuristic: not array access pattern)
+            var targetStr = memberAccess.Expression.ToString();
+            if (!targetStr.Contains("["))
+            {
+                _context.RecordFeatureUsage("native-string-op");
+                return new StringOperationNode(GetTextSpan(memberAccess), StringOp.Length, new[] { target });
+            }
+        }
 
         return new FieldAccessNode(GetTextSpan(memberAccess), target, memberName);
     }

@@ -2006,4 +2006,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var cons = node.Consequent.Accept(this);
         return $"(-> {ante} {cons})";
     }
+
+    // Native String Operations
+
+    public string Visit(StringOperationNode node)
+    {
+        var opName = node.Operation.ToCalorName();
+        var args = node.Arguments.Select(a => a.Accept(this));
+        return $"({opName} {string.Join(" ", args)})";
+    }
 }

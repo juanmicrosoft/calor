@@ -175,6 +175,8 @@ public interface IAstVisitor
     void Visit(ForallExpressionNode node);
     void Visit(ExistsExpressionNode node);
     void Visit(ImplicationExpressionNode node);
+    // Native String Operations
+    void Visit(StringOperationNode node);
 }
 
 /// <summary>
@@ -334,6 +336,8 @@ public interface IAstVisitor<T>
     T Visit(ForallExpressionNode node);
     T Visit(ExistsExpressionNode node);
     T Visit(ImplicationExpressionNode node);
+    // Native String Operations
+    T Visit(StringOperationNode node);
 }
 
 /// <summary>

@@ -1328,6 +1328,12 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(AuthorNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(TaskRefNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(CalorAttributeNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(StringOperationNode node)
+    {
+        // Simplify arguments but preserve the string operation
+        var simplifiedArgs = node.Arguments.Select(a => a.Accept(this)).ToList();
+        return new StringOperationNode(node.Span, node.Operation, simplifiedArgs);
+    }
 
     #endregion
 }
