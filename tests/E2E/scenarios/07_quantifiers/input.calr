@@ -1,0 +1,33 @@
+§M{m001:QuantifierDemo}
+
+§F{f001:AllNonNegative:pub}
+  §I{i32:n}
+  §O{bool}
+  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
+  §R true
+§/F{f001}
+
+§F{f002:ExistsTarget:pub}
+  §I{i32:target}
+  §O{bool}
+  §Q (exists ((i i32)) (&& (>= i INT:0) (< i INT:10) (== i target)))
+  §S (== result true)
+  §R true
+§/F{f002}
+
+§F{f003:ImplicationTest:pub}
+  §I{i32:x}
+  §O{bool}
+  §Q (-> (> x INT:0) (>= x INT:0))
+  §R true
+§/F{f003}
+
+§F{f004:MatrixSymmetry:pub}
+  §I{i32:n}
+  §I{i32:m}
+  §O{bool}
+  §Q (forall ((i i32) (j i32)) (-> (&& (>= i INT:0) (< i n) (>= j INT:0) (< j m)) (>= i INT:0)))
+  §R true
+§/F{f004}
+
+§/M{m001}

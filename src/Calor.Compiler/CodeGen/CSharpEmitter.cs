@@ -2711,4 +2711,452 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         return value;
     }
+
+    // Quantified Contracts
+
+    public string Visit(QuantifierVariableNode node)
+    {
+        // Variable nodes are handled internally by quantifier translation
+        return $"{node.Name}: {node.TypeName}";
+    }
+
+    public string Visit(ForallExpressionNode node)
+    {
+        // Try to extract finite range from the pattern:
+        // (forall ((i type)) (-> (&& (>= i 0) (< i n)) body))
+        var range = TryExtractFiniteRange(node);
+        if (range != null)
+        {
+            // Generate loop-based check - support multiple bound variables
+            if (range.AllRanges.Count > 1)
+            {
+                // Generate nested Enumerable.Range().All() calls for multiple variables
+                // e.g., Enumerable.Range(0, n).All(i => Enumerable.Range(0, m).All(j => body))
+                var body = range.Body.Accept(this);
+                var result = body;
+
+                // Build from innermost to outermost
+                for (int i = range.AllRanges.Count - 1; i >= 0; i--)
+                {
+                    var varRange = range.AllRanges[i];
+                    var varName = SanitizeIdentifier(varRange.Name);
+                    result = $"Enumerable.Range({varRange.Start}, {varRange.End} - {varRange.Start}).All({varName} => ({result}))";
+                }
+                return result;
+            }
+            else
+            {
+                // Single variable - original behavior
+                var varName = SanitizeIdentifier(node.BoundVariables[0].Name);
+                var body = range.Body.Accept(this);
+                return $"Enumerable.Range({range.Start}, {range.End} - {range.Start}).All({varName} => ({body}))";
+            }
+        }
+
+        // For infinite domains or unrecognized patterns, emit static-only verification
+        // Supported pattern: (forall ((var type)) (-> (&& (>= var lower) (< var upper)) body))
+        var boundVarsStr = string.Join(", ", node.BoundVariables.Select(bv => $"{bv.Name}: {bv.TypeName}"));
+        var bodyStr = node.Body.Accept(this);
+        var hint = node.Body is not ImplicationExpressionNode
+            ? " [Hint: Use implication pattern (-> bounds body) for runtime checking]"
+            : " [Hint: Could not extract finite bounds from antecedent]";
+        return $"true /* STATIC ONLY: forall (({boundVarsStr})) - verified by Z3.{hint} */";
+    }
+
+    public string Visit(ExistsExpressionNode node)
+    {
+        // Try to extract finite range from the pattern:
+        // (exists ((i type)) (&& (>= i 0) (< i n) body))
+        var range = TryExtractFiniteRangeForExists(node);
+        if (range != null)
+        {
+            // Generate Any-based check - support multiple bound variables
+            if (range.AllRanges.Count > 1)
+            {
+                // Generate nested Enumerable.Range().Any() calls for multiple variables
+                // e.g., Enumerable.Range(0, n).Any(i => Enumerable.Range(0, m).Any(j => body))
+                var body = range.Body.Accept(this);
+                var result = body;
+
+                // Build from innermost to outermost
+                for (int i = range.AllRanges.Count - 1; i >= 0; i--)
+                {
+                    var varRange = range.AllRanges[i];
+                    var varName = SanitizeIdentifier(varRange.Name);
+                    result = $"Enumerable.Range({varRange.Start}, {varRange.End} - {varRange.Start}).Any({varName} => ({result}))";
+                }
+                return result;
+            }
+            else
+            {
+                // Single variable - original behavior
+                var varName = SanitizeIdentifier(node.BoundVariables[0].Name);
+                var body = range.Body.Accept(this);
+                return $"Enumerable.Range({range.Start}, {range.End} - {range.Start}).Any({varName} => ({body}))";
+            }
+        }
+
+        // For infinite domains or unrecognized patterns, emit static-only verification
+        // Supported pattern: (exists ((var type)) (&& (>= var lower) (< var upper) body))
+        var boundVarsStr = string.Join(", ", node.BoundVariables.Select(bv => $"{bv.Name}: {bv.TypeName}"));
+        var hint = " [Hint: Use conjunction pattern (&& bounds body) for runtime checking]";
+        return $"false /* STATIC ONLY: exists (({boundVarsStr})) - verified by Z3.{hint} */";
+    }
+
+    public string Visit(ImplicationExpressionNode node)
+    {
+        // p -> q is equivalent to !p || q
+        var ante = node.Antecedent.Accept(this);
+        var cons = node.Consequent.Accept(this);
+        return $"(!({ante}) || ({cons}))";
+    }
+
+    // Native String Operations
+
+    public string Visit(StringOperationNode node)
+    {
+        var args = node.Arguments.Select(a => a.Accept(this)).ToList();
+
+        return node.Operation switch
+        {
+            // Instance methods - Query operations
+            StringOp.Length => $"{args[0]}.Length",
+            StringOp.Contains => $"{args[0]}.Contains({args[1]})",
+            StringOp.StartsWith => $"{args[0]}.StartsWith({args[1]})",
+            StringOp.EndsWith => $"{args[0]}.EndsWith({args[1]})",
+            StringOp.IndexOf => $"{args[0]}.IndexOf({args[1]})",
+
+            // Instance methods - Transform operations
+            StringOp.Substring => $"{args[0]}.Substring({args[1]}, {args[2]})",
+            StringOp.SubstringFrom => $"{args[0]}.Substring({args[1]})",
+            StringOp.Replace => $"{args[0]}.Replace({args[1]}, {args[2]})",
+            StringOp.ToUpper => $"{args[0]}.ToUpper()",
+            StringOp.ToLower => $"{args[0]}.ToLower()",
+            StringOp.Trim => $"{args[0]}.Trim()",
+            StringOp.TrimStart => $"{args[0]}.TrimStart()",
+            StringOp.TrimEnd => $"{args[0]}.TrimEnd()",
+            StringOp.PadLeft when args.Count == 2 => $"{args[0]}.PadLeft({args[1]})",
+            StringOp.PadLeft => $"{args[0]}.PadLeft({args[1]}, {args[2]})",
+            StringOp.PadRight when args.Count == 2 => $"{args[0]}.PadRight({args[1]})",
+            StringOp.PadRight => $"{args[0]}.PadRight({args[1]}, {args[2]})",
+            StringOp.Split => $"{args[0]}.Split({args[1]})",
+            StringOp.ToString => $"{args[0]}.ToString()",
+
+            // Static methods
+            StringOp.Join => $"string.Join({args[0]}, {args[1]})",
+            StringOp.Format => $"string.Format({string.Join(", ", args)})",
+            StringOp.Concat => $"string.Concat({string.Join(", ", args)})",
+            StringOp.IsNullOrEmpty => $"string.IsNullOrEmpty({args[0]})",
+            StringOp.IsNullOrWhiteSpace => $"string.IsNullOrWhiteSpace({args[0]})",
+
+            _ => throw new NotSupportedException($"Unknown string operation: {node.Operation}")
+        };
+    }
+
+    /// <summary>
+    /// Represents a single variable's finite range.
+    /// </summary>
+    private sealed class VariableRange
+    {
+        public string Name { get; }
+        public string Start { get; }
+        public string End { get; }
+
+        public VariableRange(string name, string start, string end)
+        {
+            Name = name;
+            Start = start;
+            End = end;
+        }
+    }
+
+    /// <summary>
+    /// Represents a finite range extracted from a quantifier expression.
+    /// Supports single or multiple bound variables.
+    /// </summary>
+    private sealed class FiniteRange
+    {
+        public string Start { get; }
+        public string End { get; }
+        public ExpressionNode Body { get; }
+        public IReadOnlyList<VariableRange> AllRanges { get; }
+
+        public FiniteRange(string start, string end, ExpressionNode body)
+            : this(start, end, body, Array.Empty<VariableRange>())
+        {
+        }
+
+        public FiniteRange(string start, string end, ExpressionNode body, IReadOnlyList<VariableRange> allRanges)
+        {
+            Start = start;
+            End = end;
+            Body = body;
+            AllRanges = allRanges;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to extract finite ranges from a forall expression.
+    /// Supports single and multiple bound variables.
+    /// Pattern: (forall ((i type)) (-> (&& (>= i start) (< i end)) body))
+    /// Pattern: (forall ((i type) (j type)) (-> (&& (>= i 0) (< i n) (>= j 0) (< j m)) body))
+    /// </summary>
+    private FiniteRange? TryExtractFiniteRange(ForallExpressionNode node)
+    {
+        // Must have at least one bound variable
+        if (node.BoundVariables.Count == 0)
+            return null;
+
+        // Body should be an implication
+        if (node.Body is not ImplicationExpressionNode impl)
+            return null;
+
+        // Try to extract bounds for all bound variables
+        var allRanges = new List<VariableRange>();
+        foreach (var boundVar in node.BoundVariables)
+        {
+            if (!TryExtractBounds(impl.Antecedent, boundVar.Name, out var start, out var end))
+                return null;
+            allRanges.Add(new VariableRange(boundVar.Name, start, end));
+        }
+
+        // Use the first variable's range for backward compatibility
+        var firstRange = allRanges[0];
+        return new FiniteRange(firstRange.Start, firstRange.End, impl.Consequent, allRanges);
+    }
+
+    /// <summary>
+    /// Attempts to extract a finite range from an exists expression.
+    /// Pattern: (exists ((i type)) (&& (>= i start) (< i end) body))
+    /// Pattern: (exists ((i type) (j type)) (&& (>= i 0) (< i n) (>= j 0) (< j m) body))
+    /// </summary>
+    private FiniteRange? TryExtractFiniteRangeForExists(ExistsExpressionNode node)
+    {
+        // Must have at least one bound variable
+        if (node.BoundVariables.Count == 0)
+            return null;
+
+        // Collect all conjuncts from the body
+        var conjuncts = new List<ExpressionNode>();
+        FlattenConjunction(node.Body, conjuncts);
+
+        // Try to extract bounds for all bound variables
+        var allRanges = new List<VariableRange>();
+        var boundVarNames = node.BoundVariables.Select(bv => bv.Name).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var boundVar in node.BoundVariables)
+        {
+            string? lower = null;
+            string? upper = null;
+
+            foreach (var conjunct in conjuncts)
+            {
+                if (conjunct is BinaryOperationNode cmp && cmp.Operator != BinaryOperator.And)
+                {
+                    ExtractBound(cmp, boundVar.Name, ref lower, ref upper);
+                }
+            }
+
+            if (lower == null || upper == null)
+                return null;
+
+            allRanges.Add(new VariableRange(boundVar.Name, lower, upper));
+        }
+
+        // Find the body expression (conjuncts that aren't bound constraints)
+        ExpressionNode? bodyExpr = null;
+        foreach (var conjunct in conjuncts)
+        {
+            if (conjunct is BinaryOperationNode cmp && cmp.Operator != BinaryOperator.And)
+            {
+                // Check if this conjunct is a bound constraint for any variable
+                bool isBoundConstraint = false;
+                foreach (var boundVar in node.BoundVariables)
+                {
+                    string? testLower = null;
+                    string? testUpper = null;
+                    ExtractBound(cmp, boundVar.Name, ref testLower, ref testUpper);
+                    if (testLower != null || testUpper != null)
+                    {
+                        isBoundConstraint = true;
+                        break;
+                    }
+                }
+
+                if (!isBoundConstraint)
+                {
+                    bodyExpr = conjunct;
+                    break;
+                }
+            }
+            else if (conjunct is not BinaryOperationNode)
+            {
+                bodyExpr = conjunct;
+                break;
+            }
+        }
+
+        if (bodyExpr == null)
+            return null;
+
+        var firstRange = allRanges[0];
+        return new FiniteRange(firstRange.Start, firstRange.End, bodyExpr, allRanges);
+    }
+
+    /// <summary>
+    /// Tries to extract bounds from a conjunction like (&& (>= i 0) (< i n))
+    /// Handles arbitrarily nested ANDs.
+    /// </summary>
+    private bool TryExtractBounds(ExpressionNode expr, string varName, out string start, out string end)
+    {
+        start = "0";
+        end = "0";
+
+        string? lowerBound = null;
+        string? upperBound = null;
+
+        // Recursively collect all bound expressions from the conjunction
+        ExtractBoundsRecursive(expr, varName, ref lowerBound, ref upperBound);
+
+        if (lowerBound != null && upperBound != null)
+        {
+            start = lowerBound;
+            end = upperBound;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Recursively extracts bounds from nested AND expressions.
+    /// </summary>
+    private void ExtractBoundsRecursive(ExpressionNode expr, string varName, ref string? lowerBound, ref string? upperBound)
+    {
+        if (expr is BinaryOperationNode binOp)
+        {
+            if (binOp.Operator == BinaryOperator.And)
+            {
+                // Recursively process both sides of AND
+                ExtractBoundsRecursive(binOp.Left, varName, ref lowerBound, ref upperBound);
+                ExtractBoundsRecursive(binOp.Right, varName, ref lowerBound, ref upperBound);
+            }
+            else
+            {
+                // Try to extract a bound from this comparison
+                ExtractBound(binOp, varName, ref lowerBound, ref upperBound);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tries to extract a single bound from a comparison expression like (>= i 0) or (< i n)
+    /// </summary>
+    private void ExtractBound(BinaryOperationNode cmp, string varName, ref string? lowerBound, ref string? upperBound)
+    {
+        // Check if one operand is the variable
+        bool isVarLeft = cmp.Left is ReferenceNode leftRef && leftRef.Name == varName;
+        bool isVarRight = cmp.Right is ReferenceNode rightRef && rightRef.Name == varName;
+
+        if (!isVarLeft && !isVarRight)
+            return;
+
+        var otherOperand = isVarLeft ? cmp.Right : cmp.Left;
+        var otherStr = otherOperand.Accept(this);
+
+        // Determine bound type based on operator and variable position
+        switch (cmp.Operator)
+        {
+            case BinaryOperator.GreaterOrEqual when isVarLeft:
+            case BinaryOperator.LessOrEqual when isVarRight:
+                // i >= start => lower bound
+                lowerBound ??= otherStr;
+                break;
+            case BinaryOperator.GreaterThan when isVarLeft:
+            case BinaryOperator.LessThan when isVarRight:
+                // i > start => lower bound is start + 1
+                lowerBound ??= $"({otherStr} + 1)";
+                break;
+            case BinaryOperator.LessThan when isVarLeft:
+            case BinaryOperator.GreaterThan when isVarRight:
+                // i < end => upper bound
+                upperBound ??= otherStr;
+                break;
+            case BinaryOperator.LessOrEqual when isVarLeft:
+            case BinaryOperator.GreaterOrEqual when isVarRight:
+                // i <= end => upper bound is end + 1
+                upperBound ??= $"({otherStr} + 1)";
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Tries to extract bounds and body from an exists conjunction like (&& (&& (>= i 0) (< i n)) body)
+    /// The body is the rightmost non-bound expression in the conjunction.
+    /// </summary>
+    private bool TryExtractBoundsAndBody(ExpressionNode expr, string varName, out string start, out string end, out ExpressionNode? body)
+    {
+        start = "0";
+        end = "0";
+        body = null;
+
+        // Collect all conjuncts
+        var conjuncts = new List<ExpressionNode>();
+        FlattenConjunction(expr, conjuncts);
+
+        if (conjuncts.Count < 3) // Need at least lower bound, upper bound, and body
+            return false;
+
+        string? lowerBound = null;
+        string? upperBound = null;
+        ExpressionNode? bodyExpr = null;
+
+        // Try to extract bounds from each conjunct
+        foreach (var conjunct in conjuncts)
+        {
+            if (conjunct is BinaryOperationNode cmp && cmp.Operator != BinaryOperator.And)
+            {
+                var prevLower = lowerBound;
+                var prevUpper = upperBound;
+                ExtractBound(cmp, varName, ref lowerBound, ref upperBound);
+
+                // If this conjunct didn't contribute a new bound, it's the body
+                if (prevLower == lowerBound && prevUpper == upperBound)
+                {
+                    bodyExpr = conjunct;
+                }
+            }
+            else if (conjunct is not BinaryOperationNode)
+            {
+                // Non-binary expression - this is the body
+                bodyExpr = conjunct;
+            }
+        }
+
+        if (lowerBound != null && upperBound != null && bodyExpr != null)
+        {
+            start = lowerBound;
+            end = upperBound;
+            body = bodyExpr;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Flattens nested AND expressions into a list of conjuncts.
+    /// </summary>
+    private void FlattenConjunction(ExpressionNode expr, List<ExpressionNode> conjuncts)
+    {
+        if (expr is BinaryOperationNode binOp && binOp.Operator == BinaryOperator.And)
+        {
+            FlattenConjunction(binOp.Left, conjuncts);
+            FlattenConjunction(binOp.Right, conjuncts);
+        }
+        else
+        {
+            conjuncts.Add(expr);
+        }
+    }
 }

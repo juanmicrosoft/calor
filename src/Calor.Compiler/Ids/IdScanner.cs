@@ -243,4 +243,9 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(AuthorNode node) { }
     public void Visit(TaskRefNode node) { }
     public void Visit(CalorAttributeNode node) { }
+    public void Visit(QuantifierVariableNode node) { }
+    public void Visit(ForallExpressionNode node) { }
+    public void Visit(ExistsExpressionNode node) { }
+    public void Visit(ImplicationExpressionNode node) { }
+    public void Visit(StringOperationNode node) { }
 }

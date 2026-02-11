@@ -18,6 +18,16 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 |:--------|:-------|:--------|
 | Module | `§M{id:name}` | `§M{m001:Calculator}` |
 | Function | `§F{id:name:visibility}` | `§F{f001:Add:pub}` |
+| Async Function | `§AF{id:name:visibility}` | `§AF{f001:FetchAsync:pub}` |
+| Method | `§MT{id:name:visibility}` | `§MT{mt001:Process:pub}` |
+| Async Method | `§AMT{id:name:visibility}` | `§AMT{mt001:ProcessAsync:pub}` |
+| Await | `§AWAIT expr` | `§AWAIT §C{GetAsync} §/C` |
+| Lambda (inline) | `(params) → expr` | `(x) → (* x 2)` |
+| Lambda (block) | `§LAM{id:params}...§/LAM{id}` | `§LAM{l1:x:i32}...§/LAM{l1}` |
+| Delegate | `§DEL{id:name}...§/DEL{id}` | `§DEL{d1:Handler}...§/DEL{d1}` |
+| Event | `§EVT{id:name:vis:type}` | `§EVT{e1:Click:pub:EventHandler}` |
+| Subscribe | `§SUB event handler` | `§SUB btn.Click OnClick` |
+| Unsubscribe | `§UNSUB event handler` | `§UNSUB btn.Click OnClick` |
 | Input | `§I{type:name}` | `§I{i32:x}` |
 | Output | `§O{type}` | `§O{i32}` |
 | Effects | `§E{codes}` | `§E{cw,fs:r,net:rw}` |

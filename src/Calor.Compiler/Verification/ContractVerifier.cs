@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.TypeChecking;
 
 namespace Calor.Compiler.Verification;
@@ -59,6 +60,9 @@ public sealed class ContractVerifier
                 $"Precondition must be a boolean expression, got {conditionType?.Name ?? "unknown"}");
         }
 
+        // Verify quantifier variable types
+        VerifyQuantifierTypes(requires.Condition);
+
         // Verify that the condition only references parameters and constants
         var referencedNames = CollectReferences(requires.Condition);
         var parameterNames = function.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
@@ -87,6 +91,9 @@ public sealed class ContractVerifier
                 $"Postcondition must be a boolean expression, got {conditionType?.Name ?? "unknown"}");
         }
 
+        // Verify quantifier variable types
+        VerifyQuantifierTypes(ensures.Condition);
+
         // Verify that the condition only references parameters, 'result', and constants
         var referencedNames = CollectReferences(ensures.Condition);
         var validNames = function.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
@@ -114,6 +121,86 @@ public sealed class ContractVerifier
         }
     }
 
+    /// <summary>
+    /// Verifies that quantifier bound variables have integer types suitable for range iteration.
+    /// Also warns about nested quantifiers that may have O(n*m) runtime complexity.
+    /// </summary>
+    private void VerifyQuantifierTypes(ExpressionNode expr, int nestingDepth = 0)
+    {
+        switch (expr)
+        {
+            case ForallExpressionNode forall:
+                ValidateQuantifierVariableTypes(forall.BoundVariables, forall.Span);
+                // Warn about nested quantifiers (multiple variables count as nested)
+                var forallDepth = nestingDepth + forall.BoundVariables.Count;
+                if (forallDepth > 1)
+                {
+                    _diagnostics.Report(
+                        forall.Span,
+                        DiagnosticCode.QuantifierNestedComplexity,
+                        $"Nested quantifier with {forallDepth} bound variables may result in O(n^{forallDepth}) runtime checks. Consider optimizing if performance is critical.",
+                        DiagnosticSeverity.Info);
+                }
+                VerifyQuantifierTypes(forall.Body, forallDepth);
+                break;
+            case ExistsExpressionNode exists:
+                ValidateQuantifierVariableTypes(exists.BoundVariables, exists.Span);
+                var existsDepth = nestingDepth + exists.BoundVariables.Count;
+                if (existsDepth > 1)
+                {
+                    _diagnostics.Report(
+                        exists.Span,
+                        DiagnosticCode.QuantifierNestedComplexity,
+                        $"Nested quantifier with {existsDepth} bound variables may result in O(n^{existsDepth}) runtime checks. Consider optimizing if performance is critical.",
+                        DiagnosticSeverity.Info);
+                }
+                VerifyQuantifierTypes(exists.Body, existsDepth);
+                break;
+            case ImplicationExpressionNode impl:
+                VerifyQuantifierTypes(impl.Antecedent, nestingDepth);
+                VerifyQuantifierTypes(impl.Consequent, nestingDepth);
+                break;
+            case BinaryOperationNode binOp:
+                VerifyQuantifierTypes(binOp.Left, nestingDepth);
+                VerifyQuantifierTypes(binOp.Right, nestingDepth);
+                break;
+            case UnaryOperationNode unaryOp:
+                VerifyQuantifierTypes(unaryOp.Operand, nestingDepth);
+                break;
+            case ConditionalExpressionNode condExpr:
+                VerifyQuantifierTypes(condExpr.Condition, nestingDepth);
+                VerifyQuantifierTypes(condExpr.WhenTrue, nestingDepth);
+                VerifyQuantifierTypes(condExpr.WhenFalse, nestingDepth);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Validates that all bound variables in a quantifier have integer types.
+    /// </summary>
+    private void ValidateQuantifierVariableTypes(IReadOnlyList<QuantifierVariableNode> boundVariables, TextSpan span)
+    {
+        var integerTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "i8", "i16", "i32", "i64",
+            "u8", "u16", "u32", "u64",
+            "int", "long", "short", "byte",
+            "uint", "ulong", "ushort", "sbyte"
+        };
+
+        foreach (var bv in boundVariables)
+        {
+            if (!integerTypes.Contains(bv.TypeName))
+            {
+                _diagnostics.Report(
+                    span,
+                    DiagnosticCode.QuantifierNonIntegerType,
+                    $"Quantifier variable '{bv.Name}' has type '{bv.TypeName}' which may not support finite range iteration. Consider using an integer type (i32, i64, etc.).",
+                    DiagnosticSeverity.Warning);
+            }
+        }
+    }
+
     private CalorType? InferExpressionType(ExpressionNode expr)
     {
         return expr switch
@@ -123,7 +210,21 @@ public sealed class ContractVerifier
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
             BinaryOperationNode binOp => InferBinaryOperationType(binOp),
+            UnaryOperationNode unaryOp => InferUnaryOperationType(unaryOp),
+            ForallExpressionNode => PrimitiveType.Bool, // Quantifiers return bool
+            ExistsExpressionNode => PrimitiveType.Bool,
+            ImplicationExpressionNode => PrimitiveType.Bool,
             ReferenceNode => null, // Would need symbol table to determine
+            _ => null
+        };
+    }
+
+    private CalorType? InferUnaryOperationType(UnaryOperationNode unaryOp)
+    {
+        return unaryOp.Operator switch
+        {
+            UnaryOperator.Not => PrimitiveType.Bool,
+            UnaryOperator.Negate => InferExpressionType(unaryOp.Operand),
             _ => null
         };
     }
@@ -156,37 +257,70 @@ public sealed class ContractVerifier
     private HashSet<string> CollectReferences(ExpressionNode expr)
     {
         var references = new HashSet<string>(StringComparer.Ordinal);
-        CollectReferencesInternal(expr, references);
+        var boundVariables = new HashSet<string>(StringComparer.Ordinal);
+        CollectReferencesInternal(expr, references, boundVariables);
         return references;
     }
 
-    private void CollectReferencesInternal(ExpressionNode expr, HashSet<string> references)
+    private void CollectReferencesInternal(ExpressionNode expr, HashSet<string> references, HashSet<string> boundVariables)
     {
         switch (expr)
         {
             case ReferenceNode refNode:
-                references.Add(refNode.Name);
+                // Only add if not a bound variable from a quantifier
+                if (!boundVariables.Contains(refNode.Name))
+                    references.Add(refNode.Name);
                 break;
             case BinaryOperationNode binOp:
-                CollectReferencesInternal(binOp.Left, references);
-                CollectReferencesInternal(binOp.Right, references);
+                CollectReferencesInternal(binOp.Left, references, boundVariables);
+                CollectReferencesInternal(binOp.Right, references, boundVariables);
+                break;
+            case UnaryOperationNode unaryOp:
+                CollectReferencesInternal(unaryOp.Operand, references, boundVariables);
+                break;
+            case ConditionalExpressionNode condExpr:
+                CollectReferencesInternal(condExpr.Condition, references, boundVariables);
+                CollectReferencesInternal(condExpr.WhenTrue, references, boundVariables);
+                CollectReferencesInternal(condExpr.WhenFalse, references, boundVariables);
+                break;
+            case ForallExpressionNode forall:
+                // Collect bound variables, then recurse into body
+                var forallBound = new HashSet<string>(boundVariables, StringComparer.Ordinal);
+                foreach (var bv in forall.BoundVariables)
+                    forallBound.Add(bv.Name);
+                CollectReferencesInternal(forall.Body, references, forallBound);
+                break;
+            case ExistsExpressionNode exists:
+                // Collect bound variables, then recurse into body
+                var existsBound = new HashSet<string>(boundVariables, StringComparer.Ordinal);
+                foreach (var bv in exists.BoundVariables)
+                    existsBound.Add(bv.Name);
+                CollectReferencesInternal(exists.Body, references, existsBound);
+                break;
+            case ImplicationExpressionNode impl:
+                CollectReferencesInternal(impl.Antecedent, references, boundVariables);
+                CollectReferencesInternal(impl.Consequent, references, boundVariables);
+                break;
+            case ArrayAccessNode arrayAccess:
+                CollectReferencesInternal(arrayAccess.Array, references, boundVariables);
+                CollectReferencesInternal(arrayAccess.Index, references, boundVariables);
                 break;
             case SomeExpressionNode someExpr:
-                CollectReferencesInternal(someExpr.Value, references);
+                CollectReferencesInternal(someExpr.Value, references, boundVariables);
                 break;
             case OkExpressionNode okExpr:
-                CollectReferencesInternal(okExpr.Value, references);
+                CollectReferencesInternal(okExpr.Value, references, boundVariables);
                 break;
             case ErrExpressionNode errExpr:
-                CollectReferencesInternal(errExpr.Error, references);
+                CollectReferencesInternal(errExpr.Error, references, boundVariables);
                 break;
             case FieldAccessNode fieldAccess:
-                CollectReferencesInternal(fieldAccess.Target, references);
+                CollectReferencesInternal(fieldAccess.Target, references, boundVariables);
                 break;
             case RecordCreationNode recordCreate:
                 foreach (var field in recordCreate.Fields)
                 {
-                    CollectReferencesInternal(field.Value, references);
+                    CollectReferencesInternal(field.Value, references, boundVariables);
                 }
                 break;
         }

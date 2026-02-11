@@ -43,6 +43,37 @@ public static class DiagnosticCode
     public const string InvalidPostcondition = "Calor0301";
     public const string ContractViolation = "Calor0302";
 
+    // Quantifier diagnostics (Calor0320-0329)
+    /// <summary>
+    /// Error: Quantifier has no bound variables.
+    /// </summary>
+    public const string QuantifierNoBoundVars = "Calor0320";
+
+    /// <summary>
+    /// Warning: Quantifier over infinite range cannot be checked at runtime.
+    /// </summary>
+    public const string QuantifierInfiniteRange = "Calor0321";
+
+    /// <summary>
+    /// Error: Bound variable shadows an outer variable.
+    /// </summary>
+    public const string QuantifierVariableShadowing = "Calor0322";
+
+    /// <summary>
+    /// Info: Quantifier is static-only (Z3 verification, no runtime check).
+    /// </summary>
+    public const string QuantifierStaticOnly = "Calor0323";
+
+    /// <summary>
+    /// Warning: Quantifier variable has non-integer type, which may not support finite range iteration.
+    /// </summary>
+    public const string QuantifierNonIntegerType = "Calor0324";
+
+    /// <summary>
+    /// Info: Nested or multi-variable quantifier may result in O(n^k) runtime complexity.
+    /// </summary>
+    public const string QuantifierNestedComplexity = "Calor0325";
+
     // Effect errors (Calor0400-0499)
     public const string UndeclaredEffect = "Calor0400";
     public const string UnusedEffectDeclaration = "Calor0401";
@@ -152,6 +183,23 @@ public static class DiagnosticCode
     /// Info: Z3 SMT solver is unavailable, using heuristic checking only.
     /// </summary>
     public const string Z3UnavailableForInheritance = "Calor0817";
+
+    // Contract simplification (Calor0330-0339)
+
+    /// <summary>
+    /// Info: Contract expression is a tautology (always true).
+    /// </summary>
+    public const string ContractTautology = "Calor0330";
+
+    /// <summary>
+    /// Warning: Contract expression is a contradiction (always false).
+    /// </summary>
+    public const string ContractContradiction = "Calor0331";
+
+    /// <summary>
+    /// Info: Contract expression was simplified.
+    /// </summary>
+    public const string ContractSimplified = "Calor0332";
 }
 
 /// <summary>

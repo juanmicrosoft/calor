@@ -341,6 +341,9 @@ public sealed class Lexer
             // Arrow: → or ->
             '→' => ScanSingle(TokenKind.Arrow),
             '-' => ScanMinusOrArrowOrNumber(),
+            // Unicode quantifiers
+            '∀' => ScanUnicodeQuantifier("forall"),
+            '∃' => ScanUnicodeQuantifier("exists"),
             '`' => ScanBacktickIdentifier(),
             _ when char.IsLetter(Current) || Current == '_' => ScanIdentifierOrTypedLiteral(),
             _ when char.IsDigit(Current) => ScanNumber(),
@@ -468,6 +471,16 @@ public sealed class Lexer
         // Otherwise it's just minus operator
         Advance();
         return MakeToken(TokenKind.Minus);
+    }
+
+    /// <summary>
+    /// Scans a Unicode quantifier symbol (∀ or ∃) and returns it as an identifier token
+    /// with the corresponding keyword text.
+    /// </summary>
+    private Token ScanUnicodeQuantifier(string keywordText)
+    {
+        Advance(); // consume the Unicode character
+        return new Token(TokenKind.Identifier, keywordText, CurrentSpan(), keywordText);
     }
 
     private Token ScanDotOrNumber()

@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-10
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 0.84x (C# leads on token economics)
+- **Metrics**: Calor wins 7, C# wins 4
+- **Highlights**:
+  - Comprehension: 1.57x (Calor wins)
+  - ErrorDetection: 1.51x (Calor wins)
+  - RefactoringStability: 1.50x (Calor wins)
+  - EditPrecision: 1.38x (Calor wins)
+  - ContractVerification, EffectSoundness, InteropEffectCoverage: Calor-exclusive features (not available in C#)
+- **Programs Tested**: 36
+
+### Added
+- **Collection operations with semantic type checking** - `§LIST`, `§DICT`, `§HSET` literals with `§PUSH`, `§PUT`, `§SETIDX`, `§HAS`, `§CNT` operations
+- **Pattern matching with arrow syntax** - `§W`/`§K` switch expressions with relational patterns (`§PREL`), variable patterns (`§VAR`), guards (`§WHEN`)
+- **Async/await support** - `§AF`/`§AMT` for async functions/methods, `§AWAIT` expression with ConfigureAwait support
+- **Lambda expressions** - Inline `(x) → expr` and block `§LAM`/`§/LAM` syntax with async support
+- **Delegate definitions** - `§DEL`/`§/DEL` for custom delegate types with effect tracking
+- **Event support** - `§EVT` for event definitions, `§SUB`/`§UNSUB` for subscribe/unsubscribe
+- **Dictionary iteration** - `§EACHKV` for iterating key-value pairs
+
+### Fixed
+- Z3 SMT solver contract inheritance verification gaps
+- Type checker for angle bracket generic syntax
+
 ## [0.2.1] - 2026-02-08
 
 ### Benchmark Results (Statistical: 30 runs)

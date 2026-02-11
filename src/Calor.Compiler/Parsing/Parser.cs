@@ -1164,6 +1164,8 @@ public sealed class Parser
     /// <summary>
     /// Parses a Lisp-style prefix expression: (op arg1 arg2 ...)
     /// Examples: (+ 1 2), (== x 0), (% i 15), (! flag), (- x)
+    /// Also handles quantifiers: (forall ((var type)) body), (exists ((var type)) body)
+    /// And implication: (-> antecedent consequent)
     /// </summary>
     private ExpressionNode ParseLispExpression()
     {
@@ -1171,6 +1173,18 @@ public sealed class Parser
 
         // Get the operator
         var (opKind, opText) = ParseLispOperator();
+
+        // Handle quantifiers
+        if (opText == "forall" || opText == "exists")
+        {
+            return ParseQuantifierExpression(startToken, opText);
+        }
+
+        // Handle implication
+        if (opText == "->")
+        {
+            return ParseImplicationExpression(startToken);
+        }
 
         // Parse arguments until we hit CloseParen
         var args = new List<ExpressionNode>();
@@ -1234,6 +1248,45 @@ public sealed class Parser
             {
                 return new BinaryOperationNode(span, binaryOp.Value, args[0], args[1]);
             }
+        }
+
+        // Try string operations
+        var stringOp = StringOpExtensions.FromString(opText);
+        if (stringOp.HasValue)
+        {
+            // Handle substr disambiguation: 2 args = SubstringFrom, 3 args = Substring
+            var finalOp = stringOp.Value;
+            if (stringOp.Value == StringOp.Substring && args.Count == 2)
+            {
+                finalOp = StringOp.SubstringFrom;
+            }
+
+            // Validate argument count
+            // Special case for substr: it accepts 2 or 3 args (SubstringFrom or Substring)
+            int minArgs, maxArgs;
+            if (stringOp.Value == StringOp.Substring)
+            {
+                minArgs = 2; // substr can have 2 args (SubstringFrom)
+                maxArgs = 3; // or 3 args (Substring)
+            }
+            else
+            {
+                minArgs = finalOp.GetMinArgCount();
+                maxArgs = finalOp.GetMaxArgCount();
+            }
+
+            if (args.Count < minArgs)
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"String operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}");
+            }
+            else if (args.Count > maxArgs)
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"String operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}");
+            }
+
+            return new StringOperationNode(span, finalOp, args);
         }
 
         // Unknown operator
@@ -1315,6 +1368,9 @@ public sealed class Parser
             case TokenKind.Question:
                 Advance();
                 return (TokenKind.Question, "?");
+            case TokenKind.Arrow:
+                Advance();
+                return (TokenKind.Arrow, "->");
             case TokenKind.Identifier:
                 // Support word operators like "and", "or", "not", "mod"
                 Advance();
@@ -1358,6 +1414,58 @@ public sealed class Parser
     }
 
     /// <summary>
+    /// Parses a quantifier expression: (forall ((var1 type1) (var2 type2) ...) body)
+    /// or (exists ((var1 type1) ...) body)
+    /// </summary>
+    private ExpressionNode ParseQuantifierExpression(Token startToken, string kind)
+    {
+        // Parse the binding list: ((var1 type1) (var2 type2) ...)
+        Expect(TokenKind.OpenParen);
+        var boundVars = new List<QuantifierVariableNode>();
+
+        while (Check(TokenKind.OpenParen))
+        {
+            var bindingStart = Expect(TokenKind.OpenParen);
+            var nameToken = Expect(TokenKind.Identifier);
+            var typeToken = Expect(TokenKind.Identifier);
+            var bindingEnd = Expect(TokenKind.CloseParen);
+            var bindingSpan = bindingStart.Span.Union(bindingEnd.Span);
+            boundVars.Add(new QuantifierVariableNode(bindingSpan, nameToken.Text, typeToken.Text));
+        }
+
+        Expect(TokenKind.CloseParen);
+
+        if (boundVars.Count == 0)
+        {
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.QuantifierNoBoundVars,
+                $"Quantifier '{kind}' must have at least one bound variable");
+            // Create a dummy to continue parsing
+            boundVars.Add(new QuantifierVariableNode(startToken.Span, "_dummy", "i32"));
+        }
+
+        // Parse the body expression
+        var body = ParseLispArgument();
+        var endToken = Expect(TokenKind.CloseParen);
+        var span = startToken.Span.Union(endToken.Span);
+
+        return kind == "forall"
+            ? new ForallExpressionNode(span, boundVars, body)
+            : new ExistsExpressionNode(span, boundVars, body);
+    }
+
+    /// <summary>
+    /// Parses an implication expression: (-> antecedent consequent)
+    /// </summary>
+    private ExpressionNode ParseImplicationExpression(Token startToken)
+    {
+        var antecedent = ParseLispArgument();
+        var consequent = ParseLispArgument();
+        var endToken = Expect(TokenKind.CloseParen);
+        var span = startToken.Span.Union(endToken.Span);
+        return new ImplicationExpressionNode(span, antecedent, consequent);
+    }
+
+    /// <summary>
     /// Parses an argument inside a Lisp expression.
     /// Can be a literal, identifier (bare variable), or nested Lisp expression.
     /// Supports trailing member access (e.g., §C[...] §/C.Length)
@@ -1387,7 +1495,7 @@ public sealed class Parser
             {
                 // Array access: array{index}
                 Advance(); // consume '{'
-                var indexExpr = ParseExpression();
+                var indexExpr = ParseLispArgument();
                 var endToken = Expect(TokenKind.CloseBrace);
                 var span = expr.Span.Union(endToken.Span);
                 expr = new ArrayAccessNode(span, expr, indexExpr);

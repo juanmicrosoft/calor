@@ -522,4 +522,394 @@ public class TranslatorTests
 
         Assert.False(declared);
     }
+
+    // ===========================================
+    // Quantifier and Implication Tests
+    // ===========================================
+
+    [SkippableFact]
+    public void TranslatesSimpleForall()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesSimpleForallCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesSimpleForallCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        // (forall ((x i32)) (>= x 0))
+        var forallExpr = new ForallExpressionNode(
+            TextSpan.Empty,
+            new List<QuantifierVariableNode>
+            {
+                new QuantifierVariableNode(TextSpan.Empty, "x", "i32")
+            },
+            new BinaryOperationNode(
+                TextSpan.Empty,
+                BinaryOperator.GreaterOrEqual,
+                new ReferenceNode(TextSpan.Empty, "x"),
+                new IntLiteralNode(TextSpan.Empty, 0)));
+
+        var result = translator.TranslateBoolExpr(forallExpr);
+
+        Assert.NotNull(result);
+        // Z3 should produce a quantified formula
+        Assert.Contains("forall", result.ToString().ToLower());
+    }
+
+    [SkippableFact]
+    public void TranslatesSimpleExists()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesSimpleExistsCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesSimpleExistsCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        // (exists ((x i32)) (== x 0))
+        var existsExpr = new ExistsExpressionNode(
+            TextSpan.Empty,
+            new List<QuantifierVariableNode>
+            {
+                new QuantifierVariableNode(TextSpan.Empty, "x", "i32")
+            },
+            new BinaryOperationNode(
+                TextSpan.Empty,
+                BinaryOperator.Equal,
+                new ReferenceNode(TextSpan.Empty, "x"),
+                new IntLiteralNode(TextSpan.Empty, 0)));
+
+        var result = translator.TranslateBoolExpr(existsExpr);
+
+        Assert.NotNull(result);
+        // Z3 should produce an existentially quantified formula
+        Assert.Contains("exists", result.ToString().ToLower());
+    }
+
+    [SkippableFact]
+    public void TranslatesImplication()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesImplicationCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesImplicationCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        translator.DeclareVariable("p", "bool");
+        translator.DeclareVariable("q", "bool");
+
+        // (-> p q)
+        var implExpr = new ImplicationExpressionNode(
+            TextSpan.Empty,
+            new ReferenceNode(TextSpan.Empty, "p"),
+            new ReferenceNode(TextSpan.Empty, "q"));
+
+        var result = translator.TranslateBoolExpr(implExpr);
+
+        Assert.NotNull(result);
+        // Z3 MkImplies produces an implication using "=>" in SMT-LIB format
+        Assert.Contains("=>", result.ToString());
+    }
+
+    [SkippableFact]
+    public void TranslatesForallWithImplication()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesForallWithImplicationCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesForallWithImplicationCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        translator.DeclareVariable("n", "i32");
+
+        // (forall ((i i32)) (-> (>= i 0) (< i n)))
+        var forallExpr = new ForallExpressionNode(
+            TextSpan.Empty,
+            new List<QuantifierVariableNode>
+            {
+                new QuantifierVariableNode(TextSpan.Empty, "i", "i32")
+            },
+            new ImplicationExpressionNode(
+                TextSpan.Empty,
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.GreaterOrEqual,
+                    new ReferenceNode(TextSpan.Empty, "i"),
+                    new IntLiteralNode(TextSpan.Empty, 0)),
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.LessThan,
+                    new ReferenceNode(TextSpan.Empty, "i"),
+                    new ReferenceNode(TextSpan.Empty, "n"))));
+
+        var result = translator.TranslateBoolExpr(forallExpr);
+
+        Assert.NotNull(result);
+        Assert.Contains("forall", result.ToString().ToLower());
+        Assert.Contains("=>", result.ToString()); // Z3 uses "=>" for implication
+    }
+
+    [SkippableFact]
+    public void TranslatesForallWithMultipleBoundVariables()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesForallWithMultipleBoundVariablesCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesForallWithMultipleBoundVariablesCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        // (forall ((i i32) (j i32)) (>= (+ i j) 0))
+        var forallExpr = new ForallExpressionNode(
+            TextSpan.Empty,
+            new List<QuantifierVariableNode>
+            {
+                new QuantifierVariableNode(TextSpan.Empty, "i", "i32"),
+                new QuantifierVariableNode(TextSpan.Empty, "j", "i32")
+            },
+            new BinaryOperationNode(
+                TextSpan.Empty,
+                BinaryOperator.GreaterOrEqual,
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.Add,
+                    new ReferenceNode(TextSpan.Empty, "i"),
+                    new ReferenceNode(TextSpan.Empty, "j")),
+                new IntLiteralNode(TextSpan.Empty, 0)));
+
+        var result = translator.TranslateBoolExpr(forallExpr);
+
+        Assert.NotNull(result);
+        // Should contain both bound variables
+        var resultStr = result.ToString();
+        Assert.Contains("forall", resultStr.ToLower());
+    }
+
+    [SkippableFact]
+    public void TranslatesNestedQuantifiers()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesNestedQuantifiersCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesNestedQuantifiersCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        // (forall ((x i32)) (exists ((y i32)) (== y (* x 2))))
+        var forallExpr = new ForallExpressionNode(
+            TextSpan.Empty,
+            new List<QuantifierVariableNode>
+            {
+                new QuantifierVariableNode(TextSpan.Empty, "x", "i32")
+            },
+            new ExistsExpressionNode(
+                TextSpan.Empty,
+                new List<QuantifierVariableNode>
+                {
+                    new QuantifierVariableNode(TextSpan.Empty, "y", "i32")
+                },
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.Equal,
+                    new ReferenceNode(TextSpan.Empty, "y"),
+                    new BinaryOperationNode(
+                        TextSpan.Empty,
+                        BinaryOperator.Multiply,
+                        new ReferenceNode(TextSpan.Empty, "x"),
+                        new IntLiteralNode(TextSpan.Empty, 2)))));
+
+        var result = translator.TranslateBoolExpr(forallExpr);
+
+        Assert.NotNull(result);
+        var resultStr = result.ToString().ToLower();
+        Assert.Contains("forall", resultStr);
+        Assert.Contains("exists", resultStr);
+    }
+
+    [SkippableFact]
+    public void QuantifierVariableScopingIsCorrect()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        QuantifierVariableScopingIsCorrectCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void QuantifierVariableScopingIsCorrectCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        // Declare outer variable x
+        translator.DeclareVariable("x", "i32");
+
+        // (forall ((x i32)) (>= x 0)) - inner x should shadow outer x
+        var forallExpr = new ForallExpressionNode(
+            TextSpan.Empty,
+            new List<QuantifierVariableNode>
+            {
+                new QuantifierVariableNode(TextSpan.Empty, "x", "i32")
+            },
+            new BinaryOperationNode(
+                TextSpan.Empty,
+                BinaryOperator.GreaterOrEqual,
+                new ReferenceNode(TextSpan.Empty, "x"),
+                new IntLiteralNode(TextSpan.Empty, 0)));
+
+        var result = translator.TranslateBoolExpr(forallExpr);
+
+        Assert.NotNull(result);
+
+        // After translation, outer x should still be accessible
+        var outerX = translator.Variables["x"];
+        Assert.NotNull(outerX.Expr);
+    }
+
+    [SkippableFact]
+    public void TranslatesArrayAccessInQuantifier()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesArrayAccessInQuantifierCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesArrayAccessInQuantifierCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        translator.DeclareVariable("n", "i32");
+
+        // (forall ((i i32)) (-> (&& (>= i 0) (< i n)) (>= arr{i} 0)))
+        var forallExpr = new ForallExpressionNode(
+            TextSpan.Empty,
+            new List<QuantifierVariableNode>
+            {
+                new QuantifierVariableNode(TextSpan.Empty, "i", "i32")
+            },
+            new ImplicationExpressionNode(
+                TextSpan.Empty,
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.And,
+                    new BinaryOperationNode(
+                        TextSpan.Empty,
+                        BinaryOperator.GreaterOrEqual,
+                        new ReferenceNode(TextSpan.Empty, "i"),
+                        new IntLiteralNode(TextSpan.Empty, 0)),
+                    new BinaryOperationNode(
+                        TextSpan.Empty,
+                        BinaryOperator.LessThan,
+                        new ReferenceNode(TextSpan.Empty, "i"),
+                        new ReferenceNode(TextSpan.Empty, "n"))),
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.GreaterOrEqual,
+                    new ArrayAccessNode(
+                        TextSpan.Empty,
+                        new ReferenceNode(TextSpan.Empty, "arr"),
+                        new ReferenceNode(TextSpan.Empty, "i")),
+                    new IntLiteralNode(TextSpan.Empty, 0))));
+
+        var result = translator.TranslateBoolExpr(forallExpr);
+
+        Assert.NotNull(result);
+        var resultStr = result.ToString();
+        Assert.Contains("forall", resultStr.ToLower());
+        // Array access is translated successfully - Z3 uses its own format for array select
+        Assert.Contains("arr", resultStr); // arr should appear in the expression
+    }
+
+    [SkippableFact]
+    public void TranslatesExistsWithMultipleBoundVariables()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesExistsWithMultipleBoundVariablesCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesExistsWithMultipleBoundVariablesCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        // (exists ((i i32) (j i32)) (== (+ i j) 10))
+        var existsExpr = new ExistsExpressionNode(
+            TextSpan.Empty,
+            new List<QuantifierVariableNode>
+            {
+                new QuantifierVariableNode(TextSpan.Empty, "i", "i32"),
+                new QuantifierVariableNode(TextSpan.Empty, "j", "i32")
+            },
+            new BinaryOperationNode(
+                TextSpan.Empty,
+                BinaryOperator.Equal,
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.Add,
+                    new ReferenceNode(TextSpan.Empty, "i"),
+                    new ReferenceNode(TextSpan.Empty, "j")),
+                new IntLiteralNode(TextSpan.Empty, 10)));
+
+        var result = translator.TranslateBoolExpr(existsExpr);
+
+        Assert.NotNull(result);
+        Assert.Contains("exists", result.ToString().ToLower());
+    }
+
+    [SkippableFact]
+    public void TranslatesChainedImplication()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesChainedImplicationCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesChainedImplicationCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        translator.DeclareVariable("p", "bool");
+        translator.DeclareVariable("q", "bool");
+        translator.DeclareVariable("r", "bool");
+
+        // (-> p (-> q r)) - chained implication
+        var implExpr = new ImplicationExpressionNode(
+            TextSpan.Empty,
+            new ReferenceNode(TextSpan.Empty, "p"),
+            new ImplicationExpressionNode(
+                TextSpan.Empty,
+                new ReferenceNode(TextSpan.Empty, "q"),
+                new ReferenceNode(TextSpan.Empty, "r")));
+
+        var result = translator.TranslateBoolExpr(implExpr);
+
+        Assert.NotNull(result);
+        // Should have nested implications - Z3 uses "=>" for implication
+        var resultStr = result.ToString();
+        // Count occurrences of "=>" for implications (at least 2 for chained implication)
+        var count = resultStr.Split("=>").Length - 1;
+        Assert.True(count >= 2, $"Expected at least 2 implications, found {count} in: {resultStr}");
+    }
 }

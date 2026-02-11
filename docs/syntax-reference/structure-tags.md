@@ -99,6 +99,321 @@ Functions are the primary code containers.
 
 ---
 
+## Async Functions
+
+Async functions use `§AF` instead of `§F` and automatically wrap return types in `Task<T>`.
+
+### Syntax
+
+```
+§AF{id:name:visibility}
+  §I{type:param}       // inputs (0 or more)
+  §O{type}             // output (auto-wrapped to Task<T>)
+  // body with §AWAIT expressions
+§/AF{id}
+```
+
+### Examples
+
+**Simple async function:**
+```
+§AF{f001:FetchDataAsync:pub}
+  §I{str:url}
+  §O{str}
+  §B{result} §AWAIT §C{httpClient.GetStringAsync} §A url §/C
+  §R result
+§/AF{f001}
+```
+
+Emits C#:
+```csharp
+public static async Task<string> FetchDataAsync(string url)
+{
+    var result = await httpClient.GetStringAsync(url);
+    return result;
+}
+```
+
+**Async void function (returns Task):**
+```
+§AF{f001:ProcessAsync:pub}
+  §O{void}
+  §AWAIT §C{Task.Delay} §A 1000 §/C
+§/AF{f001}
+```
+
+### Automatic Task Wrapping
+
+| Declared Output | Emitted Return Type |
+|:----------------|:--------------------|
+| `§O{void}` | `Task` |
+| `§O{i32}` | `Task<int>` |
+| `§O{str}` | `Task<string>` |
+| `§O{Task<i32>}` | `Task<int>` (no double-wrap) |
+
+---
+
+## Async Methods
+
+Async methods in classes use `§AMT` instead of `§MT`.
+
+### Syntax
+
+```
+§AMT{id:name:visibility}
+  §I{type:param}
+  §O{type}
+  // body
+§/AMT{id}
+```
+
+### Example
+
+```
+§CL{c001:DataService:pub}
+  §AMT{mt001:GetUserAsync:pub}
+    §I{i32:id}
+    §O{User}
+    §B{user} §AWAIT §C{_repository.FindAsync} §A id §/C
+    §R user
+  §/AMT{mt001}
+§/CL{c001}
+```
+
+### Modifiers
+
+Async methods support the same modifiers as regular methods:
+
+```
+§AMT{mt001:ProcessAsync:pub:virt}    // public virtual async
+§AMT{mt002:HandleAsync:prot:ovr}     // protected override async
+§AMT{mt003:ComputeAsync:pub:stat}    // public static async
+```
+
+---
+
+## Await Expression
+
+Use `§AWAIT` to await async operations.
+
+### Syntax
+
+```
+§AWAIT expression                    // Simple await
+§AWAIT{false} expression             // await with ConfigureAwait(false)
+§AWAIT{true} expression              // await with ConfigureAwait(true)
+```
+
+### Examples
+
+**Simple await:**
+```
+§B{data} §AWAIT §C{client.GetAsync} §A url §/C
+```
+
+**With ConfigureAwait(false) for library code:**
+```
+§B{data} §AWAIT{false} §C{client.GetAsync} §A url §/C
+```
+
+Emits: `var data = await client.GetAsync(url).ConfigureAwait(false);`
+
+### Using Await in Conditions and Expressions
+
+```
+§IF{if1} §AWAIT §C{IsValidAsync} §A id §/C
+  §P "Valid"
+§/I{if1}
+
+§R §AWAIT §C{ComputeAsync} §A x §/C
+```
+
+---
+
+## Lambda Expressions
+
+Lambda expressions create anonymous functions.
+
+### Inline Lambda Syntax
+
+For simple expression-body lambdas:
+
+```
+(param) → expression
+(param1, param2) → expression
+() → expression
+```
+
+### Examples
+
+**Single parameter:**
+```
+§B{doubler} (x) → (* x 2)
+```
+
+Emits: `var doubler = x => x * 2;`
+
+**Multiple parameters:**
+```
+§B{add} (a, b) → (+ a b)
+```
+
+Emits: `var add = (a, b) => a + b;`
+
+**No parameters:**
+```
+§B{getTime} () → §C{DateTime.Now} §/C
+```
+
+### Block Lambda Syntax
+
+For statement-body lambdas, use `§LAM`/`§/LAM`:
+
+```
+§LAM{id:param1:type1:param2:type2}
+  // statements
+§/LAM{id}
+```
+
+**Example:**
+```
+§B{printer} §LAM{lam1:x:i32}
+  §P x
+  §P (* x 2)
+§/LAM{lam1}
+```
+
+### Async Lambdas
+
+Add `async` before parameters:
+
+```
+§LAM{lam1:async:x:i32}
+  §B{result} §AWAIT §C{ProcessAsync} §A x §/C
+  §R result
+§/LAM{lam1}
+```
+
+---
+
+## Delegate Definitions
+
+Delegates define function signatures that can be passed as values.
+
+### Syntax
+
+```
+§DEL{id:name}
+  §I{type:param}       // parameters (0 or more)
+  §O{type}             // return type (optional for void)
+  §E{effects}          // effects (optional)
+§/DEL{id}
+```
+
+### Examples
+
+**Calculator delegate:**
+```
+§DEL{d001:Calculator}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+§/DEL{d001}
+```
+
+Emits: `public delegate int Calculator(int a, int b);`
+
+**Void delegate:**
+```
+§DEL{d001:Logger}
+  §I{str:message}
+§/DEL{d001}
+```
+
+Emits: `public delegate void Logger(string message);`
+
+**Delegate with effects:**
+```
+§DEL{d001:FileProcessor}
+  §I{str:path}
+  §O{bool}
+  §E{fs:rw}
+§/DEL{d001}
+```
+
+---
+
+## Event Definitions
+
+Events allow objects to notify subscribers of state changes.
+
+### Syntax
+
+```
+§EVT{id:name:visibility:delegateType}
+```
+
+| Part | Description |
+|:-----|:------------|
+| `id` | Unique identifier |
+| `name` | Event name |
+| `visibility` | `pub`, `pri`, `prot` |
+| `delegateType` | Delegate type for handlers |
+
+### Example
+
+```
+§CL{c001:Button:pub}
+  §EVT{e001:Click:pub:EventHandler}
+  §EVT{e002:ValueChanged:pub:EventHandler<ValueChangedEventArgs>}
+§/CL{c001}
+```
+
+Emits:
+```csharp
+public class Button
+{
+    public event EventHandler Click;
+    public event EventHandler<ValueChangedEventArgs> ValueChanged;
+}
+```
+
+---
+
+## Event Subscribe/Unsubscribe
+
+Use `§SUB` and `§UNSUB` to add or remove event handlers.
+
+### Syntax
+
+```
+§SUB eventRef handlerRef      // Subscribe
+§UNSUB eventRef handlerRef    // Unsubscribe
+```
+
+### Examples
+
+**Subscribe to event:**
+```
+§SUB button.Click OnButtonClick
+```
+
+Emits: `button.Click += OnButtonClick;`
+
+**Unsubscribe from event:**
+```
+§UNSUB button.Click OnButtonClick
+```
+
+Emits: `button.Click -= OnButtonClick;`
+
+**Subscribe with lambda:**
+```
+§SUB button.Click (sender, e) → §P "Clicked!"
+```
+
+---
+
 ## Input Parameters
 
 Input parameters define function arguments.
@@ -238,6 +553,12 @@ Every structural element must be closed with a matching tag.
 |:--------|:--------|:--------|
 | `§M{id:name}` | `§/M{id}` | Module |
 | `§F{id:name:vis}` | `§/F{id}` | Function |
+| `§AF{id:name:vis}` | `§/AF{id}` | Async function |
+| `§MT{id:name:vis}` | `§/MT{id}` | Method |
+| `§AMT{id:name:vis}` | `§/AMT{id}` | Async method |
+| `§DEL{id:name}` | `§/DEL{id}` | Delegate definition |
+| `§LAM{id:params}` | `§/LAM{id}` | Lambda (block body) |
+| `§EVT{id:name:vis:type}` | - | Event definition |
 | `§L{id:var:from:to:step}` | `§/L{id}` | For loop |
 | `§WH{id} cond` | `§/WH{id}` | While loop |
 | `§DO{id}` | `§/DO{id} cond` | Do-while loop |

@@ -301,6 +301,24 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        // Contract semantic verification (type checking, reference validation for quantifiers, etc.)
+        var contractVerifier = new ContractVerifier(diagnostics);
+        contractVerifier.Verify(ast);
+
+        if (options.Verbose)
+        {
+            Console.WriteLine("Contract semantic verification completed");
+        }
+
+        // Contract simplification pass
+        var simplificationPass = new ContractSimplificationPass(diagnostics);
+        ast = simplificationPass.Simplify(ast);
+
+        if (options.Verbose)
+        {
+            Console.WriteLine("Contract simplification completed");
+        }
+
         // Static contract verification with Z3 (optional)
         if (options.VerifyContracts)
         {

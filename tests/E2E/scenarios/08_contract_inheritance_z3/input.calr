@@ -1,0 +1,34 @@
+§M{m001:ContractZ3Test}
+
+§IFACE{i001:IService}
+  §MT{m001:Process}
+    §I{i32:value}
+    §O{i32}
+    §Q (>= value INT:0)
+    §S (> result INT:0)
+  §/MT{m001}
+§/IFACE{i001}
+
+§CL{c001:ValidService:pub}
+  §IMPL{IService}
+  §MT{mt001:Process:pub}
+    §I{i32:value}
+    §O{i32}
+    §Q (>= value INT:-10)
+    §S (>= result INT:1)
+    §R (+ value INT:1)
+  §/MT{mt001}
+§/CL{c001}
+
+§CL{c002:AnotherValidService:pub}
+  §IMPL{IService}
+  §MT{mt002:Process:pub}
+    §I{i32:value}
+    §O{i32}
+    §Q (>= value INT:0)
+    §S (>= result INT:10)
+    §R (+ value INT:10)
+  §/MT{mt002}
+§/CL{c002}
+
+§/M{m001}
