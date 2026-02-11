@@ -1254,9 +1254,30 @@ public sealed class Parser
         var stringOp = StringOpExtensions.FromString(opText);
         if (stringOp.HasValue)
         {
+            // Extract keyword arguments (comparison modes) from the end of the args list
+            StringComparisonMode? comparisonMode = null;
+            var nonKeywordArgs = args;
+
+            if (args.Count > 0 && args[^1] is KeywordArgNode keywordArg)
+            {
+                comparisonMode = StringComparisonModeExtensions.FromKeyword(keywordArg.Name);
+                if (comparisonMode == null)
+                {
+                    _diagnostics.ReportError(keywordArg.Span, DiagnosticCode.UnexpectedToken,
+                        $"Unknown comparison mode ':{keywordArg.Name}'. Valid modes: ordinal, ignore-case, invariant, invariant-ignore-case");
+                }
+                else if (!StringOperationNode.SupportsComparisonMode(stringOp.Value))
+                {
+                    _diagnostics.ReportError(keywordArg.Span, DiagnosticCode.UnexpectedToken,
+                        $"Operation '{opText}' does not support comparison modes");
+                    comparisonMode = null;
+                }
+                nonKeywordArgs = args.Take(args.Count - 1).ToList();
+            }
+
             // Handle substr disambiguation: 2 args = SubstringFrom, 3 args = Substring
             var finalOp = stringOp.Value;
-            if (stringOp.Value == StringOp.Substring && args.Count == 2)
+            if (stringOp.Value == StringOp.Substring && nonKeywordArgs.Count == 2)
             {
                 finalOp = StringOp.SubstringFrom;
             }
@@ -1275,18 +1296,60 @@ public sealed class Parser
                 maxArgs = finalOp.GetMaxArgCount();
             }
 
+            if (nonKeywordArgs.Count < minArgs)
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"String operation '{opText}' requires at least {minArgs} argument(s), got {nonKeywordArgs.Count}");
+            }
+            else if (nonKeywordArgs.Count > maxArgs)
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"String operation '{opText}' accepts at most {maxArgs} argument(s), got {nonKeywordArgs.Count}");
+            }
+
+            return new StringOperationNode(span, finalOp, nonKeywordArgs, comparisonMode);
+        }
+
+        // Try char operations
+        var charOp = CharOpExtensions.FromString(opText);
+        if (charOp.HasValue)
+        {
+            var minArgs = charOp.Value.GetMinArgCount();
+            var maxArgs = charOp.Value.GetMaxArgCount();
+
             if (args.Count < minArgs)
             {
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                    $"String operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}");
+                    $"Char operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}");
             }
             else if (args.Count > maxArgs)
             {
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                    $"String operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}");
+                    $"Char operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}");
             }
 
-            return new StringOperationNode(span, finalOp, args);
+            return new CharOperationNode(span, charOp.Value, args);
+        }
+
+        // Try StringBuilder operations
+        var sbOp = StringBuilderOpExtensions.FromString(opText);
+        if (sbOp.HasValue)
+        {
+            var minArgs = sbOp.Value.GetMinArgCount();
+            var maxArgs = sbOp.Value.GetMaxArgCount();
+
+            if (args.Count < minArgs)
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"StringBuilder operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}");
+            }
+            else if (args.Count > maxArgs)
+            {
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"StringBuilder operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}");
+            }
+
+            return new StringBuilderOperationNode(span, sbOp.Value, args);
         }
 
         // Unknown operator
@@ -1373,8 +1436,19 @@ public sealed class Parser
                 return (TokenKind.Arrow, "->");
             case TokenKind.Identifier:
                 // Support word operators like "and", "or", "not", "mod"
+                // Also support hyphenated identifiers like "char-at", "is-letter", "sb-new", "regex-test"
                 Advance();
-                return (TokenKind.Identifier, text.ToLowerInvariant() switch
+
+                // Check for hyphenated identifier (e.g., char-at, is-letter, sb-new)
+                var opName = text;
+                while (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.Identifier)
+                {
+                    Advance(); // consume '-'
+                    opName += "-" + Current.Text;
+                    Advance(); // consume the next identifier part
+                }
+
+                return (TokenKind.Identifier, opName.ToLowerInvariant() switch
                 {
                     "and" => "&&",
                     "or" => "||",
@@ -1386,7 +1460,7 @@ public sealed class Parser
                     "le" or "lte" => "<=",
                     "gt" => ">",
                     "ge" or "gte" => ">=",
-                    _ => text
+                    _ => opName
                 });
             default:
                 _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
@@ -1473,6 +1547,34 @@ public sealed class Parser
     /// </summary>
     private ExpressionNode ParseLispArgument()
     {
+        // Handle keyword argument syntax: :keyword or :hyphenated-keyword
+        if (Check(TokenKind.Colon))
+        {
+            var colonToken = Advance();
+            if (Check(TokenKind.Identifier))
+            {
+                var identToken = Advance();
+                var keywordName = identToken.Text;
+                var endSpan = identToken.Span;
+
+                // Handle hyphenated keywords (e.g., :ignore-case, :invariant-ignore-case)
+                while (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.Identifier)
+                {
+                    Advance(); // consume '-'
+                    var nextIdent = Advance();
+                    keywordName += "-" + nextIdent.Text;
+                    endSpan = nextIdent.Span;
+                }
+
+                var span = colonToken.Span.Union(endSpan);
+                return new KeywordArgNode(span, keywordName);
+            }
+            // Standalone colon - error
+            _diagnostics.ReportError(colonToken.Span, DiagnosticCode.UnexpectedToken,
+                "Expected identifier after ':' for keyword argument");
+            return new IntLiteralNode(colonToken.Span, 0);
+        }
+
         ExpressionNode expr = Current.Kind switch
         {
             TokenKind.IntLiteral => ParseIntLiteral(),

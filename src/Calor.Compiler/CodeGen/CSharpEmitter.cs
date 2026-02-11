@@ -2816,15 +2816,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(StringOperationNode node)
     {
         var args = node.Arguments.Select(a => a.Accept(this)).ToList();
+        var compMode = node.ComparisonMode?.ToCSharpName();
 
         return node.Operation switch
         {
-            // Instance methods - Query operations
+            // Instance methods - Query operations (with optional comparison mode)
             StringOp.Length => $"{args[0]}.Length",
+            StringOp.Contains when compMode != null => $"{args[0]}.Contains({args[1]}, {compMode})",
             StringOp.Contains => $"{args[0]}.Contains({args[1]})",
+            StringOp.StartsWith when compMode != null => $"{args[0]}.StartsWith({args[1]}, {compMode})",
             StringOp.StartsWith => $"{args[0]}.StartsWith({args[1]})",
+            StringOp.EndsWith when compMode != null => $"{args[0]}.EndsWith({args[1]}, {compMode})",
             StringOp.EndsWith => $"{args[0]}.EndsWith({args[1]})",
+            StringOp.IndexOf when compMode != null => $"{args[0]}.IndexOf({args[1]}, {compMode})",
             StringOp.IndexOf => $"{args[0]}.IndexOf({args[1]})",
+            StringOp.Equals when compMode != null => $"{args[0]}.Equals({args[1]}, {compMode})",
+            StringOp.Equals => $"{args[0]}.Equals({args[1]})",
 
             // Instance methods - Transform operations
             StringOp.Substring => $"{args[0]}.Substring({args[1]}, {args[2]})",
@@ -2849,7 +2856,68 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             StringOp.IsNullOrEmpty => $"string.IsNullOrEmpty({args[0]})",
             StringOp.IsNullOrWhiteSpace => $"string.IsNullOrWhiteSpace({args[0]})",
 
+            // Regex operations
+            StringOp.RegexTest => $"System.Text.RegularExpressions.Regex.IsMatch({args[0]}, {args[1]})",
+            StringOp.RegexMatch => $"System.Text.RegularExpressions.Regex.Match({args[0]}, {args[1]})",
+            StringOp.RegexReplace => $"System.Text.RegularExpressions.Regex.Replace({args[0]}, {args[1]}, {args[2]})",
+            StringOp.RegexSplit => $"System.Text.RegularExpressions.Regex.Split({args[0]}, {args[1]})",
+
             _ => throw new NotSupportedException($"Unknown string operation: {node.Operation}")
+        };
+    }
+
+    // Native Char Operations
+
+    public string Visit(CharOperationNode node)
+    {
+        var args = node.Arguments.Select(a => a.Accept(this)).ToList();
+
+        return node.Operation switch
+        {
+            // Extraction
+            CharOp.CharAt => $"{args[0]}[{args[1]}]",
+            CharOp.CharCode => $"(int){args[0]}",
+            CharOp.CharFromCode => $"(char){args[0]}",
+
+            // Classification
+            CharOp.IsLetter => $"char.IsLetter({args[0]})",
+            CharOp.IsDigit => $"char.IsDigit({args[0]})",
+            CharOp.IsWhiteSpace => $"char.IsWhiteSpace({args[0]})",
+            CharOp.IsUpper => $"char.IsUpper({args[0]})",
+            CharOp.IsLower => $"char.IsLower({args[0]})",
+
+            // Transformation
+            CharOp.ToUpperChar => $"char.ToUpper({args[0]})",
+            CharOp.ToLowerChar => $"char.ToLower({args[0]})",
+
+            _ => throw new NotSupportedException($"Unknown char operation: {node.Operation}")
+        };
+    }
+
+    // Native StringBuilder Operations
+
+    public string Visit(StringBuilderOperationNode node)
+    {
+        var args = node.Arguments.Select(a => a.Accept(this)).ToList();
+
+        return node.Operation switch
+        {
+            // Creation
+            StringBuilderOp.New when args.Count == 0 => "new System.Text.StringBuilder()",
+            StringBuilderOp.New => $"new System.Text.StringBuilder({args[0]})",
+
+            // Modification
+            StringBuilderOp.Append => $"{args[0]}.Append({args[1]})",
+            StringBuilderOp.AppendLine => $"{args[0]}.AppendLine({args[1]})",
+            StringBuilderOp.Insert => $"{args[0]}.Insert({args[1]}, {args[2]})",
+            StringBuilderOp.Remove => $"{args[0]}.Remove({args[1]}, {args[2]})",
+            StringBuilderOp.Clear => $"{args[0]}.Clear()",
+
+            // Query
+            StringBuilderOp.ToString => $"{args[0]}.ToString()",
+            StringBuilderOp.Length => $"{args[0]}.Length",
+
+            _ => throw new NotSupportedException($"Unknown StringBuilder operation: {node.Operation}")
         };
     }
 

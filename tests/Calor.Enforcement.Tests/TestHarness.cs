@@ -104,6 +104,7 @@ public static class TestHarness
             // Add additional runtime references
             var runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
             references.Add(MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Collections.dll")));
+            references.Add(MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Text.RegularExpressions.dll")));
 
             var compilation = CSharpCompilation.Create(
                 "TestAssembly",

@@ -1856,13 +1856,34 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var methodName = memberAccess.Name.Identifier.Text;
             var targetExpr = ConvertExpression(memberAccess.Expression);
+            var targetStr = memberAccess.Expression.ToString();
             var span = GetTextSpan(invocation);
+
+            // Try StringBuilder instance methods first (heuristic: target looks like StringBuilder)
+            // This prevents sb.ToString() from matching StringOp.ToString
+            if (targetStr.Contains("StringBuilder") || targetStr.StartsWith("sb") || targetStr.StartsWith("_sb"))
+            {
+                var sbOp = TryGetStringBuilderOperation(methodName, targetExpr, args, span);
+                if (sbOp != null)
+                {
+                    _context.RecordFeatureUsage("native-stringbuilder-op");
+                    return sbOp;
+                }
+            }
 
             var stringOp = TryGetStringOperation(methodName, targetExpr, args, span);
             if (stringOp != null)
             {
                 _context.RecordFeatureUsage("native-string-op");
                 return stringOp;
+            }
+
+            // Try StringBuilder instance methods (for other naming patterns)
+            var sbOp2 = TryGetStringBuilderOperation(methodName, targetExpr, args, span);
+            if (sbOp2 != null)
+            {
+                _context.RecordFeatureUsage("native-stringbuilder-op");
+                return sbOp2;
             }
         }
 
@@ -1879,10 +1900,71 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
+        // Check for static Regex methods like Regex.IsMatch
+        if (target.StartsWith("Regex.") || target.StartsWith("System.Text.RegularExpressions.Regex."))
+        {
+            var methodName = target.Contains(".") ? target.Substring(target.LastIndexOf('.') + 1) : target;
+            var span = GetTextSpan(invocation);
+            var regexOp = TryGetRegexOperation(methodName, args, span);
+            if (regexOp != null)
+            {
+                _context.RecordFeatureUsage("native-regex-op");
+                return regexOp;
+            }
+        }
+
+        // Check for static char methods like char.IsLetter
+        if (target.StartsWith("char.") || target.StartsWith("Char."))
+        {
+            var methodName = target.Substring(target.IndexOf('.') + 1);
+            var span = GetTextSpan(invocation);
+            var charOp = TryGetStaticCharOperation(methodName, args, span);
+            if (charOp != null)
+            {
+                _context.RecordFeatureUsage("native-char-op");
+                return charOp;
+            }
+        }
+
         return new CallExpressionNode(GetTextSpan(invocation), target, args);
     }
 
-    private StringOperationNode? TryGetStringOperation(
+    private StringOperationNode? TryGetRegexOperation(
+        string methodName,
+        List<ExpressionNode> args,
+        TextSpan span)
+    {
+        return methodName switch
+        {
+            "IsMatch" when args.Count == 2 => new StringOperationNode(span, StringOp.RegexTest, args),
+            "Match" when args.Count == 2 => new StringOperationNode(span, StringOp.RegexMatch, args),
+            "Replace" when args.Count == 3 => new StringOperationNode(span, StringOp.RegexReplace, args),
+            "Split" when args.Count == 2 => new StringOperationNode(span, StringOp.RegexSplit, args),
+            _ => null
+        };
+    }
+
+    private CharOperationNode? TryGetStaticCharOperation(
+        string methodName,
+        List<ExpressionNode> args,
+        TextSpan span)
+    {
+        if (args.Count != 1) return null;
+
+        return methodName switch
+        {
+            "IsLetter" => new CharOperationNode(span, CharOp.IsLetter, args),
+            "IsDigit" => new CharOperationNode(span, CharOp.IsDigit, args),
+            "IsWhiteSpace" => new CharOperationNode(span, CharOp.IsWhiteSpace, args),
+            "IsUpper" => new CharOperationNode(span, CharOp.IsUpper, args),
+            "IsLower" => new CharOperationNode(span, CharOp.IsLower, args),
+            "ToUpper" => new CharOperationNode(span, CharOp.ToUpperChar, args),
+            "ToLower" => new CharOperationNode(span, CharOp.ToLowerChar, args),
+            _ => null
+        };
+    }
+
+    private StringBuilderOperationNode? TryGetStringBuilderOperation(
         string methodName,
         ExpressionNode target,
         List<ExpressionNode> args,
@@ -1894,11 +1976,62 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         return methodName switch
         {
-            // Query operations
-            "Contains" when args.Count == 1 => new StringOperationNode(span, StringOp.Contains, allArgs),
-            "StartsWith" when args.Count == 1 => new StringOperationNode(span, StringOp.StartsWith, allArgs),
-            "EndsWith" when args.Count == 1 => new StringOperationNode(span, StringOp.EndsWith, allArgs),
-            "IndexOf" when args.Count == 1 => new StringOperationNode(span, StringOp.IndexOf, allArgs),
+            "Append" when args.Count == 1 => new StringBuilderOperationNode(span, StringBuilderOp.Append, allArgs),
+            "AppendLine" when args.Count == 1 => new StringBuilderOperationNode(span, StringBuilderOp.AppendLine, allArgs),
+            "Insert" when args.Count == 2 => new StringBuilderOperationNode(span, StringBuilderOp.Insert, allArgs),
+            "Remove" when args.Count == 2 => new StringBuilderOperationNode(span, StringBuilderOp.Remove, allArgs),
+            "Clear" when args.Count == 0 => new StringBuilderOperationNode(span, StringBuilderOp.Clear, new[] { target }),
+            "ToString" when args.Count == 0 => new StringBuilderOperationNode(span, StringBuilderOp.ToString, new[] { target }),
+            _ => null
+        };
+    }
+
+    private StringOperationNode? TryGetStringOperation(
+        string methodName,
+        ExpressionNode target,
+        List<ExpressionNode> args,
+        TextSpan span)
+    {
+        // Build argument list with target as first argument (excluding StringComparison arg)
+        var allArgs = new List<ExpressionNode> { target };
+
+        // Check for StringComparison overloads
+        StringComparisonMode? comparisonMode = null;
+        var regularArgs = args;
+        if (args.Count >= 1)
+        {
+            // Check if last arg is a StringComparison enum
+            var lastArg = args[^1];
+            // Handle StringComparison as ReferenceNode or FieldAccessNode
+            string? comparisonName = lastArg switch
+            {
+                ReferenceNode refNode when refNode.Name.StartsWith("StringComparison.") => refNode.Name,
+                FieldAccessNode fieldAccess when fieldAccess.FieldName is "Ordinal" or "OrdinalIgnoreCase"
+                    or "InvariantCulture" or "InvariantCultureIgnoreCase" =>
+                    $"StringComparison.{fieldAccess.FieldName}",
+                _ => null
+            };
+
+            if (comparisonName != null)
+            {
+                comparisonMode = ParseStringComparisonFromRef(comparisonName);
+                if (comparisonMode != null)
+                {
+                    regularArgs = args.Take(args.Count - 1).ToList();
+                }
+            }
+        }
+
+        allArgs.AddRange(regularArgs);
+
+        return methodName switch
+        {
+            // Query operations (with optional comparison mode)
+            "Contains" when regularArgs.Count == 1 => new StringOperationNode(span, StringOp.Contains, allArgs, comparisonMode),
+            "StartsWith" when regularArgs.Count == 1 => new StringOperationNode(span, StringOp.StartsWith, allArgs, comparisonMode),
+            "EndsWith" when regularArgs.Count == 1 => new StringOperationNode(span, StringOp.EndsWith, allArgs, comparisonMode),
+            "IndexOf" when regularArgs.Count == 1 => new StringOperationNode(span, StringOp.IndexOf, allArgs, comparisonMode),
+            "Equals" when regularArgs.Count == 1 => new StringOperationNode(span, StringOp.Equals, allArgs, comparisonMode),
 
             // Transform operations
             "Substring" when args.Count == 1 => new StringOperationNode(span, StringOp.SubstringFrom, allArgs),
@@ -1918,11 +2051,50 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         };
     }
 
+    private StringComparisonMode? ParseStringComparisonFromRef(string refName)
+    {
+        return refName switch
+        {
+            "StringComparison.Ordinal" => StringComparisonMode.Ordinal,
+            "StringComparison.OrdinalIgnoreCase" => StringComparisonMode.IgnoreCase,
+            "StringComparison.InvariantCulture" => StringComparisonMode.Invariant,
+            "StringComparison.InvariantCultureIgnoreCase" => StringComparisonMode.InvariantIgnoreCase,
+            // CurrentCulture variants are not supported - return null to skip native conversion
+            _ => null
+        };
+    }
+
     private StringOperationNode? TryGetStaticStringOperation(
         string methodName,
         List<ExpressionNode> args,
         TextSpan span)
     {
+        // Check for StringComparison overloads on static methods
+        StringComparisonMode? comparisonMode = null;
+        var regularArgs = args;
+        if (args.Count >= 1)
+        {
+            var lastArg = args[^1];
+            // Handle StringComparison as ReferenceNode or FieldAccessNode
+            string? comparisonName = lastArg switch
+            {
+                ReferenceNode refNode when refNode.Name.StartsWith("StringComparison.") => refNode.Name,
+                FieldAccessNode fieldAccess when fieldAccess.FieldName is "Ordinal" or "OrdinalIgnoreCase"
+                    or "InvariantCulture" or "InvariantCultureIgnoreCase" =>
+                    $"StringComparison.{fieldAccess.FieldName}",
+                _ => null
+            };
+
+            if (comparisonName != null)
+            {
+                comparisonMode = ParseStringComparisonFromRef(comparisonName);
+                if (comparisonMode != null)
+                {
+                    regularArgs = args.Take(args.Count - 1).ToList();
+                }
+            }
+        }
+
         return methodName switch
         {
             "IsNullOrEmpty" when args.Count == 1 => new StringOperationNode(span, StringOp.IsNullOrEmpty, args),
@@ -1930,6 +2102,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             "Join" when args.Count == 2 => new StringOperationNode(span, StringOp.Join, args),
             "Concat" when args.Count >= 2 => new StringOperationNode(span, StringOp.Concat, args),
             "Format" when args.Count >= 2 => new StringOperationNode(span, StringOp.Format, args),
+            "Equals" when regularArgs.Count == 2 => new StringOperationNode(span, StringOp.Equals, regularArgs, comparisonMode),
             _ => null
         };
     }
@@ -1938,6 +2111,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var target = ConvertExpression(memberAccess.Expression);
         var memberName = memberAccess.Name.Identifier.Text;
+        var span = GetTextSpan(memberAccess);
 
         // Convert string.Length to native string operation
         // Note: We can't reliably detect if target is a string without type info,
@@ -1949,12 +2123,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var targetStr = memberAccess.Expression.ToString();
             if (!targetStr.Contains("["))
             {
+                // Heuristic: if the target looks like a StringBuilder (contains "StringBuilder" or starts with "sb")
+                // use sb-length, otherwise use len (string length)
+                if (targetStr.Contains("StringBuilder") || targetStr.StartsWith("sb"))
+                {
+                    _context.RecordFeatureUsage("native-stringbuilder-op");
+                    return new StringBuilderOperationNode(span, StringBuilderOp.Length, new[] { target });
+                }
                 _context.RecordFeatureUsage("native-string-op");
-                return new StringOperationNode(GetTextSpan(memberAccess), StringOp.Length, new[] { target });
+                return new StringOperationNode(span, StringOp.Length, new[] { target });
             }
         }
 
-        return new FieldAccessNode(GetTextSpan(memberAccess), target, memberName);
+        return new FieldAccessNode(span, target, memberName);
     }
 
     private ExpressionNode ConvertObjectCreation(ObjectCreationExpressionSyntax objCreation)
@@ -1987,6 +2168,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var args = objCreation.ArgumentList?.Arguments
             .Select(a => ConvertExpression(a.Expression))
             .ToList() ?? new List<ExpressionNode>();
+
+        // Convert StringBuilder to native operations
+        if (typeName == "StringBuilder" || typeName == "System.Text.StringBuilder")
+        {
+            _context.RecordFeatureUsage("native-stringbuilder-op");
+            return new StringBuilderOperationNode(GetTextSpan(objCreation), StringBuilderOp.New, args);
+        }
 
         // Handle object initializer
         var initializers = new List<ObjectInitializerAssignment>();
@@ -2117,14 +2305,88 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode ConvertCastExpression(CastExpressionSyntax cast)
     {
         _context.RecordFeatureUsage("cast");
-        var targetType = TypeMapper.CSharpToCalor(cast.Type.ToString());
+        var targetType = cast.Type.ToString();
         var innerExpr = ConvertExpression(cast.Expression);
+        var span = GetTextSpan(cast);
 
-        // Represent cast as a call to a conversion function
+        // Convert char casts to native char operations
+        // Use heuristics to avoid incorrect conversions:
+        // - (int)c where c is a single character variable → char-code
+        // - (char)n where n is a numeric variable/literal → char-from-code
+        var sourceExprStr = cast.Expression.ToString();
+
+        if (targetType == "int" || targetType == "Int32")
+        {
+            // Only convert to char-code if the source looks like a char:
+            // - Single character variable names (c, ch, character, etc.)
+            // - Char literals ('a')
+            // - String indexer (s[0])
+            // - Explicitly typed char expressions
+            if (LooksLikeCharExpression(cast.Expression, sourceExprStr))
+            {
+                _context.RecordFeatureUsage("native-char-op");
+                return new CharOperationNode(span, CharOp.CharCode, new[] { innerExpr });
+            }
+        }
+        else if (targetType == "char" || targetType == "Char")
+        {
+            // Only convert to char-from-code if the source looks like an int:
+            // - Numeric literals (65)
+            // - Variables with numeric-sounding names (n, num, code, charCode, etc.)
+            // - Arithmetic expressions
+            if (LooksLikeIntExpression(cast.Expression, sourceExprStr))
+            {
+                _context.RecordFeatureUsage("native-char-op");
+                return new CharOperationNode(span, CharOp.CharFromCode, new[] { innerExpr });
+            }
+        }
+
+        // Fall back to generic cast call for ambiguous cases
+        var calorType = TypeMapper.CSharpToCalor(targetType);
         return new CallExpressionNode(
-            GetTextSpan(cast),
-            targetType,
+            span,
+            calorType,
             new List<ExpressionNode> { innerExpr });
+    }
+
+    private static bool LooksLikeCharExpression(ExpressionSyntax expr, string exprStr)
+    {
+        // Char literals
+        if (expr is LiteralExpressionSyntax literal && literal.IsKind(SyntaxKind.CharacterLiteralExpression))
+            return true;
+
+        // String indexer: s[0], str[i], etc.
+        if (expr is ElementAccessExpressionSyntax)
+            return true;
+
+        // Common char variable names
+        var lowerExpr = exprStr.ToLowerInvariant();
+        if (lowerExpr is "c" or "ch" or "char" or "character" or "letter" or "digit")
+            return true;
+
+        // Variables starting with 'c' followed by uppercase (cChar, cValue, etc.)
+        if (exprStr.Length >= 2 && exprStr[0] == 'c' && char.IsUpper(exprStr[1]))
+            return true;
+
+        return false;
+    }
+
+    private static bool LooksLikeIntExpression(ExpressionSyntax expr, string exprStr)
+    {
+        // Numeric literals
+        if (expr is LiteralExpressionSyntax literal && literal.IsKind(SyntaxKind.NumericLiteralExpression))
+            return true;
+
+        // Arithmetic expressions
+        if (expr is BinaryExpressionSyntax)
+            return true;
+
+        // Common int variable names
+        var lowerExpr = exprStr.ToLowerInvariant();
+        if (lowerExpr is "n" or "i" or "num" or "code" or "charcode" or "ascii" or "value" or "index")
+            return true;
+
+        return false;
     }
 
     private ArrayCreationNode ConvertArrayCreation(ArrayCreationExpressionSyntax arrayCreation)
@@ -2155,12 +2417,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new ArrayCreationNode(GetTextSpan(arrayCreation), id, name, elementType, size, initializer, new AttributeCollection());
     }
 
-    private ArrayAccessNode ConvertElementAccess(ElementAccessExpressionSyntax elementAccess)
+    private ExpressionNode ConvertElementAccess(ElementAccessExpressionSyntax elementAccess)
     {
         var array = ConvertExpression(elementAccess.Expression);
         var index = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
+        var span = GetTextSpan(elementAccess);
 
-        return new ArrayAccessNode(GetTextSpan(elementAccess), array, index);
+        // Convert string indexing s[i] to (char-at s i)
+        // Heuristic: if the target is a simple identifier that looks like a string variable,
+        // or if it's a string method result, convert to char-at
+        var targetStr = elementAccess.Expression.ToString();
+        // Don't convert if it looks like an array/list pattern with "[]" or "<>"
+        if (!targetStr.Contains("[]") && !targetStr.Contains("<"))
+        {
+            _context.RecordFeatureUsage("native-char-op");
+            return new CharOperationNode(span, CharOp.CharAt, new List<ExpressionNode> { array, index });
+        }
+
+        return new ArrayAccessNode(span, array, index);
     }
 
     private LambdaExpressionNode ConvertLambdaExpression(LambdaExpressionSyntax lambda)

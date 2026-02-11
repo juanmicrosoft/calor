@@ -934,6 +934,87 @@ public class StringOperationTests
         Assert.Equal(StringOp.Format, strOp!.Operation);
     }
 
+    [Theory]
+    [InlineData("s.Contains(\"x\", StringComparison.OrdinalIgnoreCase)", StringOp.Contains, StringComparisonMode.IgnoreCase)]
+    [InlineData("s.Contains(\"x\", StringComparison.Ordinal)", StringOp.Contains, StringComparisonMode.Ordinal)]
+    [InlineData("s.StartsWith(\"x\", StringComparison.OrdinalIgnoreCase)", StringOp.StartsWith, StringComparisonMode.IgnoreCase)]
+    [InlineData("s.EndsWith(\"x\", StringComparison.OrdinalIgnoreCase)", StringOp.EndsWith, StringComparisonMode.IgnoreCase)]
+    [InlineData("s.IndexOf(\"x\", StringComparison.OrdinalIgnoreCase)", StringOp.IndexOf, StringComparisonMode.IgnoreCase)]
+    [InlineData("s.Equals(\"x\", StringComparison.OrdinalIgnoreCase)", StringOp.Equals, StringComparisonMode.IgnoreCase)]
+    [InlineData("s.Contains(\"x\", StringComparison.InvariantCulture)", StringOp.Contains, StringComparisonMode.Invariant)]
+    [InlineData("s.Contains(\"x\", StringComparison.InvariantCultureIgnoreCase)", StringOp.Contains, StringComparisonMode.InvariantIgnoreCase)]
+    public void Migration_StringMethodWithComparison_ConvertsWithMode(string csharpExpr, StringOp expectedOp, StringComparisonMode expectedMode)
+    {
+        var csharp = $"public class Test {{ public object M(string s) => {csharpExpr}; }}";
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, string.Join(", ", result.Issues));
+        var strOp = FindStringOperationInResult(result);
+        Assert.NotNull(strOp);
+        Assert.Equal(expectedOp, strOp!.Operation);
+        Assert.Equal(expectedMode, strOp.ComparisonMode);
+    }
+
+    [Fact]
+    public void Migration_StringEqualsStatic_ConvertsToEqualsOp()
+    {
+        // The C# to Calor converter converts string.Equals(a, b, comparison) to equals with mode
+        var csharp = "public class Test { public bool M(string a, string b) { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); } }";
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, string.Join(", ", result.Issues));
+
+        // Check via round-trip - the emitted Calor should contain equals with ignore-case
+        var calorEmitter = new CalorEmitter();
+        var calor = calorEmitter.Emit(result.Ast!);
+        Assert.Contains("equals", calor);
+        Assert.Contains(":ignore-case", calor);
+    }
+
+    [Theory]
+    [InlineData("s.Contains(\"x\", StringComparison.OrdinalIgnoreCase)", ":ignore-case")]
+    [InlineData("s.StartsWith(\"x\", StringComparison.OrdinalIgnoreCase)", ":ignore-case")]
+    [InlineData("s.Contains(\"x\", StringComparison.Ordinal)", ":ordinal")]
+    [InlineData("s.Contains(\"x\", StringComparison.InvariantCulture)", ":invariant")]
+    [InlineData("s.Contains(\"x\", StringComparison.InvariantCultureIgnoreCase)", ":invariant-ignore-case")]
+    public void Migration_StringComparisonMode_RoundTripsToCalor(string csharpExpr, string expectedKeyword)
+    {
+        var csharp = $"public class Test {{ public object M(string s) => {csharpExpr}; }}";
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, string.Join(", ", result.Issues));
+
+        var calorEmitter = new CalorEmitter();
+        var calor = calorEmitter.Emit(result.Ast!);
+
+        Assert.Contains(expectedKeyword, calor);
+    }
+
+    [Theory]
+    [InlineData("s.Contains(\"x\", StringComparison.CurrentCulture)")]
+    [InlineData("s.Contains(\"x\", StringComparison.CurrentCultureIgnoreCase)")]
+    public void Migration_UnsupportedStringComparison_DoesNotConvertToNative(string csharpExpr)
+    {
+        // CurrentCulture modes are not supported - should fall back to interop
+        var csharp = $"public class Test {{ public bool M(string s) {{ return {csharpExpr}; }} }}";
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, string.Join(", ", result.Issues));
+
+        // The emitted Calor should NOT contain native string operation keywords
+        var calorEmitter = new CalorEmitter();
+        var calor = calorEmitter.Emit(result.Ast!);
+
+        // Should not have native contains with comparison mode
+        Assert.DoesNotContain(":ignore-case", calor);
+        Assert.DoesNotContain(":ordinal", calor);
+        Assert.DoesNotContain(":invariant", calor);
+    }
+
     #endregion
 
     #region Phase 10: Token Economics Tests
@@ -1085,6 +1166,220 @@ public class StringOperationTests
         var code = emitter.Emit(module);
 
         Assert.Contains("string.Concat(a, b, c, d, e)", code);
+    }
+
+    #endregion
+
+    #region Phase 12: StringComparison Mode Tests
+
+    [Fact]
+    public void Parse_Contains_WithIgnoreCase_ReturnsStringOperationNodeWithMode()
+    {
+        var source = WrapInFunction("§R (contains s \"hello\" :ignore-case)");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var strOp = GetReturnExpression(module);
+        Assert.Equal(StringOp.Contains, strOp.Operation);
+        Assert.Equal(2, strOp.Arguments.Count);
+        Assert.Equal(StringComparisonMode.IgnoreCase, strOp.ComparisonMode);
+    }
+
+    [Fact]
+    public void Parse_StartsWith_WithOrdinal_ReturnsStringOperationNodeWithMode()
+    {
+        var source = WrapInFunction("§R (starts s \"prefix\" :ordinal)");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var strOp = GetReturnExpression(module);
+        Assert.Equal(StringOp.StartsWith, strOp.Operation);
+        Assert.Equal(StringComparisonMode.Ordinal, strOp.ComparisonMode);
+    }
+
+    [Fact]
+    public void Parse_EndsWith_WithInvariant_ReturnsStringOperationNodeWithMode()
+    {
+        var source = WrapInFunction("§R (ends s \"suffix\" :invariant)");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var strOp = GetReturnExpression(module);
+        Assert.Equal(StringOp.EndsWith, strOp.Operation);
+        Assert.Equal(StringComparisonMode.Invariant, strOp.ComparisonMode);
+    }
+
+    [Fact]
+    public void Parse_IndexOf_WithInvariantIgnoreCase_ReturnsStringOperationNodeWithMode()
+    {
+        var source = WrapInFunction("§R (indexof s \"x\" :invariant-ignore-case)");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var strOp = GetReturnExpression(module);
+        Assert.Equal(StringOp.IndexOf, strOp.Operation);
+        Assert.Equal(StringComparisonMode.InvariantIgnoreCase, strOp.ComparisonMode);
+    }
+
+    [Fact]
+    public void Parse_Equals_WithIgnoreCase_ReturnsStringOperationNodeWithMode()
+    {
+        var source = WrapInFunction("§R (equals s \"YES\" :ignore-case)");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var strOp = GetReturnExpression(module);
+        Assert.Equal(StringOp.Equals, strOp.Operation);
+        Assert.Equal(StringComparisonMode.IgnoreCase, strOp.ComparisonMode);
+    }
+
+    [Theory]
+    [InlineData("(contains s \"x\" :ignore-case)", "s.Contains(\"x\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData("(contains s \"x\" :ordinal)", "s.Contains(\"x\", StringComparison.Ordinal)")]
+    [InlineData("(starts s \"x\" :ignore-case)", "s.StartsWith(\"x\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData("(ends s \"x\" :ignore-case)", "s.EndsWith(\"x\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData("(indexof s \"x\" :ignore-case)", "s.IndexOf(\"x\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData("(equals s \"x\" :ignore-case)", "s.Equals(\"x\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData("(contains s \"x\" :invariant)", "s.Contains(\"x\", StringComparison.InvariantCulture)")]
+    [InlineData("(contains s \"x\" :invariant-ignore-case)", "s.Contains(\"x\", StringComparison.InvariantCultureIgnoreCase)")]
+    public void Emit_StringOperationWithMode_ProducesCorrectCSharp(string calor, string expectedCSharp)
+    {
+        var source = WrapInFunction($"§R {calor}");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+
+        var emitter = new CSharpEmitter();
+        var code = emitter.Emit(module);
+
+        Assert.Contains(expectedCSharp, code);
+    }
+
+    [Theory]
+    [InlineData("(contains s \"x\" :ignore-case)")]
+    [InlineData("(starts s \"x\" :ordinal)")]
+    [InlineData("(ends s \"x\" :invariant)")]
+    [InlineData("(equals s \"x\" :invariant-ignore-case)")]
+    public void RoundTrip_StringOpWithMode_ProducesValidCalor(string op)
+    {
+        var source = WrapInFunction($"§R {op}");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+
+        var calorEmitter = new CalorEmitter();
+        var roundTripped = calorEmitter.Emit(module);
+
+        // Check the keyword is preserved
+        var keyword = op.Split(':')[1].TrimEnd(')');
+        Assert.Contains($":{keyword}", roundTripped);
+    }
+
+    [Fact]
+    public void Parse_Upper_WithComparisonMode_ReportsError()
+    {
+        var source = WrapInFunction("§R (upper s :ignore-case)");
+        Parse(source, out var diagnostics);
+
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics, d => d.Message.Contains("does not support comparison modes"));
+    }
+
+    [Fact]
+    public void Parse_InvalidKeyword_ReportsError()
+    {
+        var source = WrapInFunction("§R (contains s \"x\" :invalid-mode)");
+        Parse(source, out var diagnostics);
+
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics, d => d.Message.Contains("Unknown comparison mode"));
+    }
+
+    [Theory]
+    [InlineData("ordinal", StringComparisonMode.Ordinal)]
+    [InlineData("ignore-case", StringComparisonMode.IgnoreCase)]
+    [InlineData("invariant", StringComparisonMode.Invariant)]
+    [InlineData("invariant-ignore-case", StringComparisonMode.InvariantIgnoreCase)]
+    public void StringComparisonMode_FromKeyword_ReturnsCorrectMode(string keyword, StringComparisonMode expected)
+    {
+        var result = StringComparisonModeExtensions.FromKeyword(keyword);
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData(StringComparisonMode.Ordinal, "ordinal")]
+    [InlineData(StringComparisonMode.IgnoreCase, "ignore-case")]
+    [InlineData(StringComparisonMode.Invariant, "invariant")]
+    [InlineData(StringComparisonMode.InvariantIgnoreCase, "invariant-ignore-case")]
+    public void StringComparisonMode_ToKeyword_ReturnsCorrectKeyword(StringComparisonMode mode, string expected)
+    {
+        var result = mode.ToKeyword();
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData(StringComparisonMode.Ordinal, "StringComparison.Ordinal")]
+    [InlineData(StringComparisonMode.IgnoreCase, "StringComparison.OrdinalIgnoreCase")]
+    [InlineData(StringComparisonMode.Invariant, "StringComparison.InvariantCulture")]
+    [InlineData(StringComparisonMode.InvariantIgnoreCase, "StringComparison.InvariantCultureIgnoreCase")]
+    public void StringComparisonMode_ToCSharpName_ReturnsCorrectName(StringComparisonMode mode, string expected)
+    {
+        var result = mode.ToCSharpName();
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData(StringOp.Contains, true)]
+    [InlineData(StringOp.StartsWith, true)]
+    [InlineData(StringOp.EndsWith, true)]
+    [InlineData(StringOp.IndexOf, true)]
+    [InlineData(StringOp.Equals, true)]
+    [InlineData(StringOp.ToUpper, false)]
+    [InlineData(StringOp.ToLower, false)]
+    [InlineData(StringOp.Trim, false)]
+    [InlineData(StringOp.Replace, false)]
+    public void SupportsComparisonMode_ReturnsCorrectValue(StringOp op, bool expected)
+    {
+        var result = StringOperationNode.SupportsComparisonMode(op);
+        Assert.Equal(expected, result);
+    }
+
+    #endregion
+
+    #region Phase 13: Equals Operation Tests
+
+    [Fact]
+    public void Parse_Equals_ReturnsStringOperationNode()
+    {
+        var source = WrapInFunction("§R (equals s \"hello\")");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        var strOp = GetReturnExpression(module);
+        Assert.Equal(StringOp.Equals, strOp.Operation);
+        Assert.Equal(2, strOp.Arguments.Count);
+    }
+
+    [Fact]
+    public void Emit_Equals_ProducesCorrectCSharp()
+    {
+        var source = WrapInFunction("§R (equals s \"hello\")");
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+
+        var emitter = new CSharpEmitter();
+        var code = emitter.Emit(module);
+
+        Assert.Contains("s.Equals(\"hello\")", code);
+    }
+
+    [Theory]
+    [InlineData(StringOp.Equals, 2, 2)]
+    public void ArgCount_Equals_HasCorrectBounds(StringOp op, int expectedMin, int expectedMax)
+    {
+        Assert.Equal(expectedMin, op.GetMinArgCount());
+        Assert.Equal(expectedMax, op.GetMaxArgCount());
     }
 
     #endregion

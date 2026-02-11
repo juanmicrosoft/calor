@@ -2013,6 +2013,30 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var opName = node.Operation.ToCalorName();
         var args = node.Arguments.Select(a => a.Accept(this));
+        var argsStr = string.Join(" ", args);
+
+        // Append comparison mode keyword if present
+        if (node.ComparisonMode.HasValue)
+        {
+            var keyword = node.ComparisonMode.Value.ToKeyword();
+            return $"({opName} {argsStr} :{keyword})";
+        }
+
+        return $"({opName} {argsStr})";
+    }
+
+    public string Visit(CharOperationNode node)
+    {
+        var opName = node.Operation.ToCalorName();
+        var args = node.Arguments.Select(a => a.Accept(this));
         return $"({opName} {string.Join(" ", args)})";
+    }
+
+    public string Visit(StringBuilderOperationNode node)
+    {
+        var opName = node.Operation.ToCalorName();
+        var args = node.Arguments.Select(a => a.Accept(this));
+        var argsStr = string.Join(" ", args);
+        return args.Any() ? $"({opName} {argsStr})" : $"({opName})";
     }
 }
