@@ -1,5 +1,7 @@
 using System.CommandLine;
+using System.Diagnostics;
 using Calor.Compiler.Init;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -42,6 +44,10 @@ public static class InitCommand
 
     private static async Task ExecuteAsync(string? ai, string? project, string? solution, bool force)
     {
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        telemetry?.SetCommand("init");
+        var sw = Stopwatch.StartNew();
+
         try
         {
             var targetDirectory = Directory.GetCurrentDirectory();
@@ -108,7 +114,20 @@ public static class InitCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
+            telemetry?.TrackException(ex);
             Environment.ExitCode = 1;
+        }
+        finally
+        {
+            sw.Stop();
+            telemetry?.TrackCommand("init", Environment.ExitCode, new Dictionary<string, string>
+            {
+                ["durationMs"] = sw.ElapsedMilliseconds.ToString()
+            });
+            if (Environment.ExitCode != 0)
+            {
+                IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "init", "Init failed");
+            }
         }
     }
 

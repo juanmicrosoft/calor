@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Diagnostics;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
@@ -7,9 +8,11 @@ using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Telemetry;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
+using Microsoft.ApplicationInsights.DataContracts;
 
 namespace Calor.Compiler;
 
@@ -64,6 +67,10 @@ public class Program
             aliases: ["--clear-cache"],
             description: "Clear verification cache before compiling");
 
+        var noTelemetryOption = new Option<bool>(
+            aliases: ["--no-telemetry"],
+            description: "Disable anonymous usage telemetry");
+
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
             inputOption,
@@ -76,12 +83,17 @@ public class Program
             contractModeOption,
             verifyOption,
             noCacheOption,
-            clearCacheOption
+            clearCacheOption,
+            noTelemetryOption
         };
 
         // Legacy compile handler (when --input is provided)
         rootCommand.SetHandler(async (InvocationContext ctx) =>
         {
+            var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+            telemetry?.SetCommand("compile");
+
+            var sw = Stopwatch.StartNew();
             var input = ctx.ParseResult.GetValueForOption(inputOption);
             var output = ctx.ParseResult.GetValueForOption(outputOption);
             var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
@@ -93,7 +105,41 @@ public class Program
             var verify = ctx.ParseResult.GetValueForOption(verifyOption);
             var noCache = ctx.ParseResult.GetValueForOption(noCacheOption);
             var clearCache = ctx.ParseResult.GetValueForOption(clearCacheOption);
-            await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify, noCache, clearCache);
+
+            telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
+            {
+                ["strictApi"] = strictApi.ToString(),
+                ["requireDocs"] = requireDocs.ToString(),
+                ["enforceEffects"] = enforceEffects.ToString(),
+                ["strictEffects"] = strictEffects.ToString(),
+                ["contractMode"] = contractMode,
+                ["verify"] = verify.ToString(),
+                ["noCache"] = noCache.ToString()
+            });
+
+            try
+            {
+                await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify, noCache, clearCache);
+            }
+            catch (Exception ex)
+            {
+                telemetry?.TrackException(ex);
+                throw;
+            }
+            finally
+            {
+                sw.Stop();
+                telemetry?.TrackCommand("compile", Environment.ExitCode, new Dictionary<string, string>
+                {
+                    ["durationMs"] = sw.ElapsedMilliseconds.ToString()
+                });
+
+                if (Environment.ExitCode != 0)
+                {
+                    IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "compile",
+                        "Compilation failed (see errors above)");
+                }
+            }
         });
 
         // Add subcommands
@@ -109,7 +155,22 @@ public class Program
         rootCommand.AddCommand(IdsCommand.Create());
         rootCommand.AddCommand(EffectsCommand.Create());
 
-        return await rootCommand.InvokeAsync(args);
+        // Initialize telemetry for subcommands
+        // Parse --no-telemetry early from args
+        var noTelemetryEarly = args.Contains("--no-telemetry");
+        if (!CalorTelemetry.IsInitialized)
+        {
+            CalorTelemetry.Initialize(noTelemetryEarly);
+        }
+
+        var result = await rootCommand.InvokeAsync(args);
+
+        if (CalorTelemetry.IsInitialized)
+        {
+            CalorTelemetry.Instance.Flush();
+        }
+
+        return result;
     }
 
     private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode, bool verify, bool noCache, bool clearCache)
@@ -235,10 +296,16 @@ public class Program
     {
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath(filePath);
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        var phaseSw = new Stopwatch();
 
         // Lexical analysis
+        phaseSw.Restart();
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAll();
+        phaseSw.Stop();
+        telemetry?.TrackPhase("Lexer", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors,
+            new Dictionary<string, string> { ["tokenCount"] = tokens.Count.ToString() });
 
         if (options.Verbose)
         {
@@ -247,12 +314,16 @@ public class Program
 
         if (diagnostics.HasErrors)
         {
+            TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, null, "");
         }
 
         // Parsing
+        phaseSw.Restart();
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
+        phaseSw.Stop();
+        telemetry?.TrackPhase("Parser", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
         if (options.Verbose)
         {
@@ -261,16 +332,21 @@ public class Program
 
         if (diagnostics.HasErrors)
         {
+            TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
         }
 
         // Pattern exhaustiveness checking
+        phaseSw.Restart();
         var patternChecker = new PatternChecker(diagnostics);
         patternChecker.Check(ast);
+        phaseSw.Stop();
+        telemetry?.TrackPhase("PatternChecker", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
         // API strictness checking
         if (options.StrictApi || options.RequireDocs)
         {
+            phaseSw.Restart();
             var apiOptions = new ApiStrictnessOptions
             {
                 StrictApi = options.StrictApi,
@@ -278,6 +354,8 @@ public class Program
             };
             var apiChecker = new ApiStrictnessChecker(diagnostics, apiOptions);
             apiChecker.Check(ast);
+            phaseSw.Stop();
+            telemetry?.TrackPhase("ApiStrictness", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
             if (options.Verbose)
             {
@@ -288,6 +366,7 @@ public class Program
         // Effect enforcement checking
         if (options.EnforceEffects)
         {
+            phaseSw.Restart();
             var catalog = EffectsCatalog.CreateWithProjectStubs(options.ProjectDirectory);
             var enforcementPass = new EffectEnforcementPass(
                 diagnostics,
@@ -297,6 +376,8 @@ public class Program
                 strictEffects: options.StrictEffects,
                 projectDirectory: options.ProjectDirectory);
             enforcementPass.Enforce(ast);
+            phaseSw.Stop();
+            telemetry?.TrackPhase("EffectEnforcement", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
             if (options.Verbose)
             {
@@ -306,12 +387,16 @@ public class Program
 
         if (diagnostics.HasErrors)
         {
+            TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
         }
 
         // Contract inheritance checking
+        phaseSw.Restart();
         using var contractInheritanceChecker = new ContractInheritanceChecker(diagnostics);
         var inheritanceResult = contractInheritanceChecker.Check(ast);
+        phaseSw.Stop();
+        telemetry?.TrackPhase("ContractInheritance", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
         if (options.Verbose)
         {
@@ -320,12 +405,16 @@ public class Program
 
         if (diagnostics.HasErrors)
         {
+            TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
         }
 
         // Contract semantic verification (type checking, reference validation for quantifiers, etc.)
+        phaseSw.Restart();
         var contractVerifier = new ContractVerifier(diagnostics);
         contractVerifier.Verify(ast);
+        phaseSw.Stop();
+        telemetry?.TrackPhase("ContractVerifier", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
         if (options.Verbose)
         {
@@ -333,8 +422,11 @@ public class Program
         }
 
         // Contract simplification pass
+        phaseSw.Restart();
         var simplificationPass = new ContractSimplificationPass(diagnostics);
         ast = simplificationPass.Simplify(ast);
+        phaseSw.Stop();
+        telemetry?.TrackPhase("ContractSimplification", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
         if (options.Verbose)
         {
@@ -344,6 +436,7 @@ public class Program
         // Static contract verification with Z3 (optional)
         if (options.VerifyContracts)
         {
+            phaseSw.Restart();
             var verificationOptions = new VerificationOptions
             {
                 Verbose = options.Verbose,
@@ -351,6 +444,8 @@ public class Program
             };
             var verificationPass = new ContractVerificationPass(diagnostics, verificationOptions);
             options.VerificationResults = verificationPass.Verify(ast);
+            phaseSw.Stop();
+            telemetry?.TrackPhase("Z3Verification", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
             if (options.Verbose)
             {
@@ -359,15 +454,34 @@ public class Program
         }
 
         // Code generation
+        phaseSw.Restart();
         var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult);
         var generatedCode = emitter.Emit(ast);
+        phaseSw.Stop();
+        telemetry?.TrackPhase("CodeGen", phaseSw.ElapsedMilliseconds, true);
 
         if (options.Verbose)
         {
             Console.WriteLine("Code generation completed successfully");
         }
 
+        TrackDiagnostics(telemetry, diagnostics);
         return new CompilationResult(diagnostics, ast, generatedCode);
+    }
+
+    private static void TrackDiagnostics(CalorTelemetry? telemetry, DiagnosticBag diagnostics)
+    {
+        if (telemetry == null) return;
+
+        foreach (var diag in diagnostics.Errors)
+        {
+            telemetry.TrackDiagnostic(diag.Code, diag.Message, SeverityLevel.Error);
+        }
+
+        foreach (var diag in diagnostics.Warnings)
+        {
+            telemetry.TrackDiagnostic(diag.Code, diag.Message, SeverityLevel.Warning);
+        }
     }
 }
 

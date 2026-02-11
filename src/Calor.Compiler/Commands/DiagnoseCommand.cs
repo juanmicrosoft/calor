@@ -1,5 +1,7 @@
 using System.CommandLine;
+using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -56,6 +58,10 @@ public static class DiagnoseCommand
         bool strictApi,
         bool requireDocs)
     {
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        telemetry?.SetCommand("diagnose");
+        var sw = Stopwatch.StartNew();
+
         var allDiagnostics = new List<Diagnostic>();
 
         foreach (var file in files)
@@ -110,6 +116,17 @@ public static class DiagnoseCommand
         if (allDiagnostics.Any(d => d.IsError))
         {
             Environment.ExitCode = 1;
+        }
+
+        sw.Stop();
+        telemetry?.TrackCommand("diagnose", Environment.ExitCode, new Dictionary<string, string>
+        {
+            ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
+            ["diagnosticCount"] = allDiagnostics.Count.ToString()
+        });
+        if (Environment.ExitCode != 0)
+        {
+            IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "diagnose", "Diagnostics found errors");
         }
     }
 }

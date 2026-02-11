@@ -1,8 +1,10 @@
 using System.CommandLine;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -66,6 +68,11 @@ public static class AnalyzeCommand
         bool verbose,
         int top)
     {
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        telemetry?.SetCommand("analyze");
+        var sw = Stopwatch.StartNew();
+        var exitCode = 0;
+
         if (!path.Exists)
         {
             Console.Error.WriteLine($"Error: Directory not found: {path.FullName}");
@@ -123,12 +130,27 @@ public static class AnalyzeCommand
             }
 
             // Return exit code based on findings
-            return result.HasHighPriorityFiles ? 1 : 0;
+            exitCode = result.HasHighPriorityFiles ? 1 : 0;
+            return exitCode;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
-            return 2;
+            telemetry?.TrackException(ex);
+            exitCode = 2;
+            return exitCode;
+        }
+        finally
+        {
+            sw.Stop();
+            telemetry?.TrackCommand("analyze", exitCode, new Dictionary<string, string>
+            {
+                ["durationMs"] = sw.ElapsedMilliseconds.ToString()
+            });
+            if (exitCode != 0)
+            {
+                IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "analyze", "Analysis failed");
+            }
         }
     }
 

@@ -1,6 +1,8 @@
 using System.CommandLine;
+using System.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -66,6 +68,10 @@ public static class MigrateCommand
         FileInfo? reportPath,
         bool verbose)
     {
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        telemetry?.SetCommand("migrate");
+        var sw = Stopwatch.StartNew();
+
         if (!path.Exists && !File.Exists(path.FullName))
         {
             Console.Error.WriteLine($"Error: Path not found: {path.FullName}");
@@ -204,7 +210,20 @@ public static class MigrateCommand
             {
                 Console.Error.WriteLine(ex.StackTrace);
             }
+            telemetry?.TrackException(ex);
             Environment.ExitCode = 1;
+        }
+        finally
+        {
+            sw.Stop();
+            telemetry?.TrackCommand("migrate", Environment.ExitCode, new Dictionary<string, string>
+            {
+                ["durationMs"] = sw.ElapsedMilliseconds.ToString()
+            });
+            if (Environment.ExitCode != 0)
+            {
+                IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "migrate", "Migration failed");
+            }
         }
     }
 
