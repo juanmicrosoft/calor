@@ -112,6 +112,28 @@ public sealed class TypeChecker
             case MatchStatementNode match:
                 CheckMatchStatement(match);
                 break;
+            // Collection mutation statements
+            case CollectionPushNode push:
+                CheckCollectionPushStatement(push);
+                break;
+            case DictionaryPutNode put:
+                CheckDictionaryPutStatement(put);
+                break;
+            case CollectionRemoveNode remove:
+                CheckCollectionRemoveStatement(remove);
+                break;
+            case CollectionSetIndexNode setIndex:
+                CheckCollectionSetIndexStatement(setIndex);
+                break;
+            case CollectionClearNode clear:
+                CheckCollectionClearStatement(clear);
+                break;
+            case CollectionInsertNode insert:
+                CheckCollectionInsertStatement(insert);
+                break;
+            case DictionaryForeachNode dictForeach:
+                CheckDictionaryForeachStatement(dictForeach);
+                break;
             default:
                 // Other statement types (print, assignment, throw, etc.) are handled elsewhere or need no type checking
                 break;
@@ -299,6 +321,243 @@ public sealed class TypeChecker
         }
     }
 
+    private void CheckCollectionPushStatement(CollectionPushNode push)
+    {
+        var collectionType = _env.LookupVariable(push.CollectionName);
+        if (collectionType == null)
+        {
+            _diagnostics.ReportError(push.Span, DiagnosticCode.UndefinedReference,
+                $"Undefined collection '{push.CollectionName}'");
+            return;
+        }
+
+        var valueType = InferExpressionType(push.Value);
+
+        // Check if it's a List<T> or HashSet<T>
+        if (collectionType is GenericInstanceType git)
+        {
+            if ((git.BaseName == "List" || git.BaseName == "HashSet") && git.TypeArguments.Count == 1)
+            {
+                var elementType = git.TypeArguments[0];
+                if (!IsAssignable(elementType, valueType))
+                {
+                    _diagnostics.ReportError(push.Value.Span, DiagnosticCode.TypeMismatch,
+                        $"Cannot add {valueType.Name} to {collectionType.Name}, expected {elementType.Name}");
+                }
+            }
+            else
+            {
+                _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
+                    $"PUSH operation requires List or HashSet, got {collectionType.Name}");
+            }
+        }
+        else
+        {
+            _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
+                $"PUSH operation requires a collection type, got {collectionType.Name}");
+        }
+    }
+
+    private void CheckDictionaryPutStatement(DictionaryPutNode put)
+    {
+        var dictType = _env.LookupVariable(put.DictionaryName);
+        if (dictType == null)
+        {
+            _diagnostics.ReportError(put.Span, DiagnosticCode.UndefinedReference,
+                $"Undefined dictionary '{put.DictionaryName}'");
+            return;
+        }
+
+        var keyType = InferExpressionType(put.Key);
+        var valueType = InferExpressionType(put.Value);
+
+        if (dictType is GenericInstanceType git && git.BaseName == "Dictionary" && git.TypeArguments.Count == 2)
+        {
+            var expectedKeyType = git.TypeArguments[0];
+            var expectedValueType = git.TypeArguments[1];
+
+            if (!IsAssignable(expectedKeyType, keyType))
+            {
+                _diagnostics.ReportError(put.Key.Span, DiagnosticCode.TypeMismatch,
+                    $"Dictionary key type mismatch: expected {expectedKeyType.Name}, got {keyType.Name}");
+            }
+
+            if (!IsAssignable(expectedValueType, valueType))
+            {
+                _diagnostics.ReportError(put.Value.Span, DiagnosticCode.TypeMismatch,
+                    $"Dictionary value type mismatch: expected {expectedValueType.Name}, got {valueType.Name}");
+            }
+        }
+        else
+        {
+            _diagnostics.ReportError(put.Span, DiagnosticCode.TypeMismatch,
+                $"PUT operation requires a Dictionary, got {dictType?.Name ?? "unknown"}");
+        }
+    }
+
+    private void CheckCollectionRemoveStatement(CollectionRemoveNode remove)
+    {
+        var collectionType = _env.LookupVariable(remove.CollectionName);
+        if (collectionType == null)
+        {
+            _diagnostics.ReportError(remove.Span, DiagnosticCode.UndefinedReference,
+                $"Undefined collection '{remove.CollectionName}'");
+            return;
+        }
+
+        var removeType = InferExpressionType(remove.KeyOrValue);
+
+        if (collectionType is GenericInstanceType git)
+        {
+            CalorType? expectedType = null;
+
+            if ((git.BaseName == "List" || git.BaseName == "HashSet") && git.TypeArguments.Count == 1)
+            {
+                expectedType = git.TypeArguments[0];
+            }
+            else if (git.BaseName == "Dictionary" && git.TypeArguments.Count == 2)
+            {
+                expectedType = git.TypeArguments[0]; // Remove by key
+            }
+
+            if (expectedType != null && !IsAssignable(expectedType, removeType))
+            {
+                _diagnostics.ReportError(remove.KeyOrValue.Span, DiagnosticCode.TypeMismatch,
+                    $"Cannot remove {removeType.Name} from {collectionType.Name}, expected {expectedType.Name}");
+            }
+        }
+        else
+        {
+            _diagnostics.ReportError(remove.Span, DiagnosticCode.TypeMismatch,
+                $"REM operation requires a collection type, got {collectionType.Name}");
+        }
+    }
+
+    private void CheckCollectionSetIndexStatement(CollectionSetIndexNode setIndex)
+    {
+        var collectionType = _env.LookupVariable(setIndex.CollectionName);
+        if (collectionType == null)
+        {
+            _diagnostics.ReportError(setIndex.Span, DiagnosticCode.UndefinedReference,
+                $"Undefined collection '{setIndex.CollectionName}'");
+            return;
+        }
+
+        var indexType = InferExpressionType(setIndex.Index);
+        var valueType = InferExpressionType(setIndex.Value);
+
+        // Index must be numeric
+        if (!IsNumeric(indexType))
+        {
+            _diagnostics.ReportError(setIndex.Index.Span, DiagnosticCode.TypeMismatch,
+                $"List index must be numeric, got {indexType.Name}");
+        }
+
+        if (collectionType is GenericInstanceType git && git.BaseName == "List" && git.TypeArguments.Count == 1)
+        {
+            var elementType = git.TypeArguments[0];
+            if (!IsAssignable(elementType, valueType))
+            {
+                _diagnostics.ReportError(setIndex.Value.Span, DiagnosticCode.TypeMismatch,
+                    $"Cannot assign {valueType.Name} to list element of type {elementType.Name}");
+            }
+        }
+        else
+        {
+            _diagnostics.ReportError(setIndex.Span, DiagnosticCode.TypeMismatch,
+                $"SETIDX operation requires a List, got {collectionType.Name}");
+        }
+    }
+
+    private void CheckCollectionClearStatement(CollectionClearNode clear)
+    {
+        var collectionType = _env.LookupVariable(clear.CollectionName);
+        if (collectionType == null)
+        {
+            _diagnostics.ReportError(clear.Span, DiagnosticCode.UndefinedReference,
+                $"Undefined collection '{clear.CollectionName}'");
+            return;
+        }
+
+        // Clear works on any collection type
+        if (collectionType is not GenericInstanceType git ||
+            (git.BaseName != "List" && git.BaseName != "Dictionary" && git.BaseName != "HashSet"))
+        {
+            _diagnostics.ReportError(clear.Span, DiagnosticCode.TypeMismatch,
+                $"CLR operation requires a collection type, got {collectionType.Name}");
+        }
+    }
+
+    private void CheckCollectionInsertStatement(CollectionInsertNode insert)
+    {
+        var collectionType = _env.LookupVariable(insert.CollectionName);
+        if (collectionType == null)
+        {
+            _diagnostics.ReportError(insert.Span, DiagnosticCode.UndefinedReference,
+                $"Undefined collection '{insert.CollectionName}'");
+            return;
+        }
+
+        var indexType = InferExpressionType(insert.Index);
+        var valueType = InferExpressionType(insert.Value);
+
+        // Index must be numeric
+        if (!IsNumeric(indexType))
+        {
+            _diagnostics.ReportError(insert.Index.Span, DiagnosticCode.TypeMismatch,
+                $"List index must be numeric, got {indexType.Name}");
+        }
+
+        if (collectionType is GenericInstanceType git && git.BaseName == "List" && git.TypeArguments.Count == 1)
+        {
+            var elementType = git.TypeArguments[0];
+            if (!IsAssignable(elementType, valueType))
+            {
+                _diagnostics.ReportError(insert.Value.Span, DiagnosticCode.TypeMismatch,
+                    $"Cannot insert {valueType.Name} into list of type {elementType.Name}");
+            }
+        }
+        else
+        {
+            _diagnostics.ReportError(insert.Span, DiagnosticCode.TypeMismatch,
+                $"INS operation requires a List, got {collectionType.Name}");
+        }
+    }
+
+    private void CheckDictionaryForeachStatement(DictionaryForeachNode dictForeach)
+    {
+        var dictType = InferExpressionType(dictForeach.Dictionary);
+
+        _env.EnterScope();
+
+        if (dictType is GenericInstanceType git && git.BaseName == "Dictionary" && git.TypeArguments.Count == 2)
+        {
+            var keyType = git.TypeArguments[0];
+            var valueType = git.TypeArguments[1];
+
+            // Define loop variables with their types
+            _env.DefineVariable(dictForeach.KeyName, keyType);
+            _env.DefineVariable(dictForeach.ValueName, valueType);
+        }
+        else
+        {
+            _diagnostics.ReportError(dictForeach.Dictionary.Span, DiagnosticCode.TypeMismatch,
+                $"EACHKV requires a Dictionary, got {dictType.Name}");
+
+            // Define variables with error type to allow body checking to continue
+            _env.DefineVariable(dictForeach.KeyName, ErrorType.Instance);
+            _env.DefineVariable(dictForeach.ValueName, ErrorType.Instance);
+        }
+
+        // Check body statements
+        foreach (var stmt in dictForeach.Body)
+        {
+            CheckStatement(stmt);
+        }
+
+        _env.ExitScope();
+    }
+
     private void CheckPattern(PatternNode pattern, CalorType expectedType)
     {
         switch (pattern)
@@ -388,8 +647,208 @@ public sealed class TypeChecker
             RecordCreationNode rec => InferRecordCreationType(rec),
             FieldAccessNode field => InferFieldAccessType(field),
             MatchExpressionNode match => InferMatchExpressionType(match),
+            // Collection expression types
+            ListCreationNode list => InferListCreationType(list),
+            DictionaryCreationNode dict => InferDictionaryCreationType(dict),
+            SetCreationNode set => InferSetCreationType(set),
+            CollectionContainsNode contains => InferCollectionContainsType(contains),
+            CollectionCountNode count => InferCollectionCountType(count),
+            ArrayAccessNode arrayAccess => InferArrayAccessType(arrayAccess),
             _ => ErrorType.Instance
         };
+    }
+
+    private CalorType InferListCreationType(ListCreationNode list)
+    {
+        var elementType = ResolveTypeName(list.ElementType, list.Span);
+
+        // Validate that all elements match the declared type
+        foreach (var element in list.Elements)
+        {
+            var actualType = InferExpressionType(element);
+            if (!IsAssignable(elementType, actualType))
+            {
+                _diagnostics.ReportError(element.Span, DiagnosticCode.TypeMismatch,
+                    $"List element type mismatch: expected {elementType.Name}, got {actualType.Name}");
+            }
+        }
+
+        // Define the variable in the current scope
+        var listType = new GenericInstanceType("List", new[] { elementType });
+        _env.DefineVariable(list.Name, listType);
+
+        return listType;
+    }
+
+    private CalorType InferDictionaryCreationType(DictionaryCreationNode dict)
+    {
+        var keyType = ResolveTypeName(dict.KeyType, dict.Span);
+        var valueType = ResolveTypeName(dict.ValueType, dict.Span);
+
+        // Validate that all entries match the declared types
+        foreach (var entry in dict.Entries)
+        {
+            var actualKeyType = InferExpressionType(entry.Key);
+            var actualValueType = InferExpressionType(entry.Value);
+
+            if (!IsAssignable(keyType, actualKeyType))
+            {
+                _diagnostics.ReportError(entry.Key.Span, DiagnosticCode.TypeMismatch,
+                    $"Dictionary key type mismatch: expected {keyType.Name}, got {actualKeyType.Name}");
+            }
+
+            if (!IsAssignable(valueType, actualValueType))
+            {
+                _diagnostics.ReportError(entry.Value.Span, DiagnosticCode.TypeMismatch,
+                    $"Dictionary value type mismatch: expected {valueType.Name}, got {actualValueType.Name}");
+            }
+        }
+
+        // Define the variable in the current scope
+        var dictType = new GenericInstanceType("Dictionary", new[] { keyType, valueType });
+        _env.DefineVariable(dict.Name, dictType);
+
+        return dictType;
+    }
+
+    private CalorType InferSetCreationType(SetCreationNode set)
+    {
+        var elementType = ResolveTypeName(set.ElementType, set.Span);
+
+        // Validate that all elements match the declared type
+        foreach (var element in set.Elements)
+        {
+            var actualType = InferExpressionType(element);
+            if (!IsAssignable(elementType, actualType))
+            {
+                _diagnostics.ReportError(element.Span, DiagnosticCode.TypeMismatch,
+                    $"Set element type mismatch: expected {elementType.Name}, got {actualType.Name}");
+            }
+        }
+
+        // Define the variable in the current scope
+        var setType = new GenericInstanceType("HashSet", new[] { elementType });
+        _env.DefineVariable(set.Name, setType);
+
+        return setType;
+    }
+
+    private CalorType InferCollectionContainsType(CollectionContainsNode contains)
+    {
+        var collectionType = _env.LookupVariable(contains.CollectionName);
+        if (collectionType == null)
+        {
+            _diagnostics.ReportError(contains.Span, DiagnosticCode.UndefinedReference,
+                $"Undefined collection '{contains.CollectionName}'");
+            return PrimitiveType.Bool; // Contains always returns bool
+        }
+
+        var checkType = InferExpressionType(contains.KeyOrValue);
+
+        if (collectionType is GenericInstanceType git)
+        {
+            CalorType? expectedType = null;
+
+            switch (contains.Mode)
+            {
+                case ContainsMode.Value:
+                    // List.Contains or HashSet.Contains
+                    if ((git.BaseName == "List" || git.BaseName == "HashSet") && git.TypeArguments.Count == 1)
+                    {
+                        expectedType = git.TypeArguments[0];
+                    }
+                    break;
+
+                case ContainsMode.Key:
+                    // Dictionary.ContainsKey
+                    if (git.BaseName == "Dictionary" && git.TypeArguments.Count == 2)
+                    {
+                        expectedType = git.TypeArguments[0];
+                    }
+                    break;
+
+                case ContainsMode.DictValue:
+                    // Dictionary.ContainsValue
+                    if (git.BaseName == "Dictionary" && git.TypeArguments.Count == 2)
+                    {
+                        expectedType = git.TypeArguments[1];
+                    }
+                    break;
+            }
+
+            if (expectedType != null && !IsAssignable(expectedType, checkType))
+            {
+                _diagnostics.ReportError(contains.KeyOrValue.Span, DiagnosticCode.TypeMismatch,
+                    $"Contains check type mismatch: expected {expectedType.Name}, got {checkType.Name}");
+            }
+        }
+
+        return PrimitiveType.Bool;
+    }
+
+    private CalorType InferCollectionCountType(CollectionCountNode count)
+    {
+        var collectionType = InferExpressionType(count.Collection);
+
+        // Validate it's a collection type
+        if (collectionType is GenericInstanceType git)
+        {
+            if (git.BaseName != "List" && git.BaseName != "Dictionary" && git.BaseName != "HashSet")
+            {
+                _diagnostics.ReportError(count.Collection.Span, DiagnosticCode.TypeMismatch,
+                    $"CNT requires a collection type, got {collectionType.Name}");
+            }
+        }
+        else if (collectionType is not ErrorType)
+        {
+            _diagnostics.ReportError(count.Collection.Span, DiagnosticCode.TypeMismatch,
+                $"CNT requires a collection type, got {collectionType.Name}");
+        }
+
+        return PrimitiveType.Int;
+    }
+
+    private CalorType InferArrayAccessType(ArrayAccessNode arrayAccess)
+    {
+        var arrayType = InferExpressionType(arrayAccess.Array);
+        var indexType = InferExpressionType(arrayAccess.Index);
+
+        // Index should be numeric for arrays/lists
+        if (!IsNumeric(indexType) && indexType is not ErrorType)
+        {
+            // Could be a dictionary with non-numeric key
+            if (arrayType is GenericInstanceType git && git.BaseName == "Dictionary" && git.TypeArguments.Count == 2)
+            {
+                // For dictionaries, check the key type
+                var expectedKeyType = git.TypeArguments[0];
+                if (!IsAssignable(expectedKeyType, indexType))
+                {
+                    _diagnostics.ReportError(arrayAccess.Index.Span, DiagnosticCode.TypeMismatch,
+                        $"Dictionary key type mismatch: expected {expectedKeyType.Name}, got {indexType.Name}");
+                }
+                return git.TypeArguments[1]; // Return value type
+            }
+            else
+            {
+                _diagnostics.ReportError(arrayAccess.Index.Span, DiagnosticCode.TypeMismatch,
+                    $"Array/List index must be numeric, got {indexType.Name}");
+            }
+        }
+
+        // Determine element type based on collection type
+        if (arrayType is GenericInstanceType git2)
+        {
+            if (git2.BaseName == "List" && git2.TypeArguments.Count == 1)
+            {
+                return git2.TypeArguments[0];
+            }
+            if (git2.BaseName == "Dictionary" && git2.TypeArguments.Count == 2)
+            {
+                return git2.TypeArguments[1];
+            }
+        }
+
+        return ErrorType.Instance;
     }
 
     private CalorType InferReferenceType(ReferenceNode refNode)

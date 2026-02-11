@@ -1,0 +1,89 @@
+§M{m001:Collections}
+
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine}
+    §A "=== Calor Collections Demo ==="
+  §/C
+  §C{Console.WriteLine}
+    §A ""
+  §/C
+
+  §C{Console.WriteLine}
+    §A "--- List Operations ---"
+  §/C
+  §LIST{numbers:i32}
+    10
+    20
+    30
+  §/LIST{numbers}
+  §C{Console.WriteLine}
+    §A "Created list: [10, 20, 30]"
+  §/C
+  §PUSH{numbers} 40
+  §C{Console.WriteLine}
+    §A "After push(40): [10, 20, 30, 40]"
+  §/C
+  §INS{numbers} 0 5
+  §C{Console.WriteLine}
+    §A "After insert(0, 5): [5, 10, 20, 30, 40]"
+  §/C
+  §SETIDX{numbers} 2 25
+  §C{Console.WriteLine}
+    §A "After setIndex(2, 25): [5, 10, 25, 30, 40]"
+  §/C
+  §C{Console.WriteLine}
+    §A ""
+  §/C
+
+  §C{Console.WriteLine}
+    §A "--- Dictionary Operations ---"
+  §/C
+  §DICT{scores:str:i32}
+    §KV "Alice" 95
+    §KV "Bob" 87
+  §/DICT{scores}
+  §C{Console.WriteLine}
+    §A "Created dict: {Alice: 95, Bob: 87}"
+  §/C
+  §PUT{scores} "Charlie" 92
+  §C{Console.WriteLine}
+    §A "After put(Charlie, 92): {Alice: 95, Bob: 87, Charlie: 92}"
+  §/C
+  §PUT{scores} "Bob" 90
+  §C{Console.WriteLine}
+    §A "After put(Bob, 90): {Alice: 95, Bob: 90, Charlie: 92}"
+  §/C
+  §C{Console.WriteLine}
+    §A ""
+  §/C
+
+  §C{Console.WriteLine}
+    §A "--- HashSet Operations ---"
+  §/C
+  §HSET{tags:str}
+    "important"
+    "urgent"
+  §/HSET{tags}
+  §C{Console.WriteLine}
+    §A "Created set: {important, urgent}"
+  §/C
+  §PUSH{tags} "review"
+  §C{Console.WriteLine}
+    §A "After add(review): {important, urgent, review}"
+  §/C
+  §REM{tags} "urgent"
+  §C{Console.WriteLine}
+    §A "After remove(urgent): {important, review}"
+  §/C
+  §C{Console.WriteLine}
+    §A ""
+  §/C
+
+  §C{Console.WriteLine}
+    §A "=== Demo Complete ==="
+  §/C
+§/F{f001}
+
+§/M{m001}

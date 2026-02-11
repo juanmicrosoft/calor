@@ -41,8 +41,8 @@ public sealed class PrimitiveType : CalorType
         return name.ToUpperInvariant() switch
         {
             "VOID" => Void,
-            "INT" or "INT32" => Int,
-            "FLOAT" or "FLOAT64" or "DOUBLE" => Float,
+            "INT" or "INT32" or "I32" or "I64" or "INT64" => Int,
+            "FLOAT" or "FLOAT64" or "DOUBLE" or "F64" or "F32" => Float,
             "BOOL" or "BOOLEAN" => Bool,
             "STRING" or "STR" => String,
             "UNIT" => Unit,

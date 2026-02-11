@@ -170,6 +170,20 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(ArrayAccessNode node) { }
     public void Visit(ArrayLengthNode node) { }
     public void Visit(ForeachStatementNode node) { }
+    // Phase 6 Extended: Collections
+    public void Visit(ListCreationNode node) { }
+    public void Visit(DictionaryCreationNode node) { }
+    public void Visit(KeyValuePairNode node) { }
+    public void Visit(SetCreationNode node) { }
+    public void Visit(CollectionPushNode node) { }
+    public void Visit(DictionaryPutNode node) { }
+    public void Visit(CollectionRemoveNode node) { }
+    public void Visit(CollectionSetIndexNode node) { }
+    public void Visit(CollectionClearNode node) { }
+    public void Visit(CollectionInsertNode node) { }
+    public void Visit(CollectionContainsNode node) { }
+    public void Visit(DictionaryForeachNode node) { }
+    public void Visit(CollectionCountNode node) { }
     public void Visit(TypeParameterNode node) { }
     public void Visit(TypeConstraintNode node) { }
     public void Visit(GenericTypeNode node) { }

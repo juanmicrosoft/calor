@@ -872,6 +872,42 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Handle assignment expressions
         if (expr is AssignmentExpressionSyntax assignment)
         {
+            // Handle element access assignments (indexer assignments) - convert to collection operations
+            if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                assignment.Left is ElementAccessExpressionSyntax elementAccess)
+            {
+                var collectionName = elementAccess.Expression.ToString();
+                if (elementAccess.ArgumentList.Arguments.Count == 1)
+                {
+                    var indexOrKey = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
+                    var value = ConvertExpression(assignment.Right);
+
+                    // Determine if this is a list (numeric index) or dictionary (key-based)
+                    var firstArg = elementAccess.ArgumentList.Arguments[0].Expression;
+                    if (firstArg is LiteralExpressionSyntax literal &&
+                        literal.Kind() == SyntaxKind.NumericLiteralExpression)
+                    {
+                        // Numeric index - use CollectionSetIndexNode (§SETIDX)
+                        _context.RecordFeatureUsage("collection-setindex");
+                        return new CollectionSetIndexNode(
+                            GetTextSpan(node),
+                            collectionName,
+                            indexOrKey,
+                            value);
+                    }
+                    else
+                    {
+                        // String or other key - use DictionaryPutNode (§PUT)
+                        _context.RecordFeatureUsage("dictionary-put");
+                        return new DictionaryPutNode(
+                            GetTextSpan(node),
+                            collectionName,
+                            indexOrKey,
+                            value);
+                    }
+                }
+            }
+
             // Check if this looks like an event subscription vs compound assignment
             // Event handlers typically use method references or lambdas, while compound
             // assignments use numeric/value expressions
@@ -1826,7 +1862,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new FieldAccessNode(GetTextSpan(memberAccess), target, memberName);
     }
 
-    private NewExpressionNode ConvertObjectCreation(ObjectCreationExpressionSyntax objCreation)
+    private ExpressionNode ConvertObjectCreation(ObjectCreationExpressionSyntax objCreation)
     {
         var typeName = objCreation.Type.ToString();
         var typeArgs = new List<string>();
@@ -1837,6 +1873,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             typeArgs = genericName.TypeArgumentList.Arguments
                 .Select(a => TypeMapper.CSharpToCalor(a.ToString()))
                 .ToList();
+
+            // Check for collection types and convert to appropriate nodes
+            if (typeName == "List" && typeArgs.Count == 1)
+            {
+                return ConvertListCreation(objCreation, typeArgs[0]);
+            }
+            else if (typeName == "Dictionary" && typeArgs.Count == 2)
+            {
+                return ConvertDictionaryCreation(objCreation, typeArgs[0], typeArgs[1]);
+            }
+            else if (typeName == "HashSet" && typeArgs.Count == 1)
+            {
+                return ConvertHashSetCreation(objCreation, typeArgs[0]);
+            }
         }
 
         var args = objCreation.ArgumentList?.Arguments
@@ -1860,6 +1910,99 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers);
+    }
+
+    private ListCreationNode ConvertListCreation(ObjectCreationExpressionSyntax objCreation, string elementType)
+    {
+        var id = _context.GenerateId("list");
+        var elements = new List<ExpressionNode>();
+
+        if (objCreation.Initializer != null)
+        {
+            _context.RecordFeatureUsage("list-initializer");
+            foreach (var expr in objCreation.Initializer.Expressions)
+            {
+                elements.Add(ConvertExpression(expr));
+            }
+        }
+
+        return new ListCreationNode(
+            GetTextSpan(objCreation),
+            id,
+            id,
+            elementType,
+            elements,
+            new AttributeCollection());
+    }
+
+    private DictionaryCreationNode ConvertDictionaryCreation(ObjectCreationExpressionSyntax objCreation, string keyType, string valueType)
+    {
+        var id = _context.GenerateId("dict");
+        var entries = new List<KeyValuePairNode>();
+
+        if (objCreation.Initializer != null)
+        {
+            _context.RecordFeatureUsage("dictionary-initializer");
+            foreach (var expr in objCreation.Initializer.Expressions)
+            {
+                if (expr is InitializerExpressionSyntax kvInit &&
+                    kvInit.Expressions.Count == 2)
+                {
+                    // { key, value } syntax
+                    var key = ConvertExpression(kvInit.Expressions[0]);
+                    var value = ConvertExpression(kvInit.Expressions[1]);
+                    entries.Add(new KeyValuePairNode(GetTextSpan(expr), key, value));
+                }
+                else if (expr is AssignmentExpressionSyntax assignment)
+                {
+                    // [key] = value syntax
+                    ExpressionNode key;
+                    if (assignment.Left is ImplicitElementAccessSyntax implicitAccess &&
+                        implicitAccess.ArgumentList.Arguments.Count > 0)
+                    {
+                        key = ConvertExpression(implicitAccess.ArgumentList.Arguments[0].Expression);
+                    }
+                    else
+                    {
+                        key = ConvertExpression(assignment.Left);
+                    }
+                    var value = ConvertExpression(assignment.Right);
+                    entries.Add(new KeyValuePairNode(GetTextSpan(expr), key, value));
+                }
+            }
+        }
+
+        return new DictionaryCreationNode(
+            GetTextSpan(objCreation),
+            id,
+            id,
+            keyType,
+            valueType,
+            entries,
+            new AttributeCollection());
+    }
+
+    private SetCreationNode ConvertHashSetCreation(ObjectCreationExpressionSyntax objCreation, string elementType)
+    {
+        var id = _context.GenerateId("set");
+        var elements = new List<ExpressionNode>();
+
+        if (objCreation.Initializer != null)
+        {
+            _context.RecordFeatureUsage("hashset-initializer");
+            foreach (var expr in objCreation.Initializer.Expressions)
+            {
+                elements.Add(ConvertExpression(expr));
+            }
+        }
+
+        return new SetCreationNode(
+            GetTextSpan(objCreation),
+            id,
+            id,
+            elementType,
+            elements,
+            new AttributeCollection());
     }
 
     private ExpressionNode ConvertConditionalExpression(ConditionalExpressionSyntax conditional)

@@ -153,6 +153,21 @@ public sealed class EffectChecker
                     InferEffectsFromStatements(matchCase.Body, effects);
                 }
                 break;
+            case ForeachStatementNode foreachStmt:
+                InferEffectsFromStatements(foreachStmt.Body, effects);
+                break;
+            // Collection mutations
+            case CollectionPushNode:
+            case DictionaryPutNode:
+            case CollectionRemoveNode:
+            case CollectionSetIndexNode:
+            case CollectionClearNode:
+            case CollectionInsertNode:
+                effects.Add(new EffectInfo(EffectKind.Mutation, "collection"));
+                break;
+            case DictionaryForeachNode dictForeach:
+                InferEffectsFromStatements(dictForeach.Body, effects);
+                break;
         }
     }
 

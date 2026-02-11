@@ -81,6 +81,27 @@ public sealed class Lexer
         ["EACH"] = TokenKind.Foreach,
         ["/EACH"] = TokenKind.EndForeach,
 
+        // Collections (List, Dictionary, HashSet)
+        ["LIST"] = TokenKind.List,
+        ["/LIST"] = TokenKind.EndList,
+        ["DICT"] = TokenKind.Dict,
+        ["/DICT"] = TokenKind.EndDict,
+        ["HSET"] = TokenKind.HashSet,
+        ["/HSET"] = TokenKind.EndHashSet,
+        ["KV"] = TokenKind.KeyValue,
+        ["PUSH"] = TokenKind.Push,
+        ["PUT"] = TokenKind.Put,
+        ["REM"] = TokenKind.Remove,
+        ["SETIDX"] = TokenKind.SetIndex,
+        ["CLR"] = TokenKind.Clear,
+        ["INS"] = TokenKind.Insert,
+        ["HAS"] = TokenKind.Has,
+        ["KEY"] = TokenKind.Key,
+        ["VAL"] = TokenKind.Val,
+        ["EACHKV"] = TokenKind.EachKV,
+        ["/EACHKV"] = TokenKind.EndEachKV,
+        ["CNT"] = TokenKind.Count,
+
         // Generics
         // Old syntax removed: ["TP"] = TokenKind.TypeParam (use <T> suffix instead)
         // Old syntax removed: ["G"] = TokenKind.Generic (use List<T> inline instead)

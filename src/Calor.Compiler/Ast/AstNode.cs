@@ -78,6 +78,20 @@ public interface IAstVisitor
     void Visit(ArrayAccessNode node);
     void Visit(ArrayLengthNode node);
     void Visit(ForeachStatementNode node);
+    // Phase 6 Extended: Collections (List, Dictionary, HashSet)
+    void Visit(ListCreationNode node);
+    void Visit(DictionaryCreationNode node);
+    void Visit(KeyValuePairNode node);
+    void Visit(SetCreationNode node);
+    void Visit(CollectionPushNode node);
+    void Visit(DictionaryPutNode node);
+    void Visit(CollectionRemoveNode node);
+    void Visit(CollectionSetIndexNode node);
+    void Visit(CollectionClearNode node);
+    void Visit(CollectionInsertNode node);
+    void Visit(CollectionContainsNode node);
+    void Visit(DictionaryForeachNode node);
+    void Visit(CollectionCountNode node);
     // Phase 7: Generics
     void Visit(TypeParameterNode node);
     void Visit(TypeConstraintNode node);
@@ -218,6 +232,20 @@ public interface IAstVisitor<T>
     T Visit(ArrayAccessNode node);
     T Visit(ArrayLengthNode node);
     T Visit(ForeachStatementNode node);
+    // Phase 6 Extended: Collections (List, Dictionary, HashSet)
+    T Visit(ListCreationNode node);
+    T Visit(DictionaryCreationNode node);
+    T Visit(KeyValuePairNode node);
+    T Visit(SetCreationNode node);
+    T Visit(CollectionPushNode node);
+    T Visit(DictionaryPutNode node);
+    T Visit(CollectionRemoveNode node);
+    T Visit(CollectionSetIndexNode node);
+    T Visit(CollectionClearNode node);
+    T Visit(CollectionInsertNode node);
+    T Visit(CollectionContainsNode node);
+    T Visit(DictionaryForeachNode node);
+    T Visit(CollectionCountNode node);
     // Phase 7: Generics
     T Visit(TypeParameterNode node);
     T Visit(TypeConstraintNode node);

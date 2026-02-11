@@ -773,6 +773,47 @@ public sealed class Parser
         {
             return ParsePrintStatement(isWriteLine: false);
         }
+        // Collection operations (statements)
+        else if (Check(TokenKind.List))
+        {
+            return ParseListCreationStatement();
+        }
+        else if (Check(TokenKind.Dict))
+        {
+            return ParseDictionaryCreationStatement();
+        }
+        else if (Check(TokenKind.HashSet))
+        {
+            return ParseSetCreationStatement();
+        }
+        else if (Check(TokenKind.Push))
+        {
+            return ParseCollectionPush();
+        }
+        else if (Check(TokenKind.Put))
+        {
+            return ParseDictionaryPut();
+        }
+        else if (Check(TokenKind.Remove))
+        {
+            return ParseCollectionRemove();
+        }
+        else if (Check(TokenKind.SetIndex))
+        {
+            return ParseCollectionSetIndex();
+        }
+        else if (Check(TokenKind.Clear))
+        {
+            return ParseCollectionClear();
+        }
+        else if (Check(TokenKind.Insert))
+        {
+            return ParseCollectionInsert();
+        }
+        else if (Check(TokenKind.EachKV))
+        {
+            return ParseDictionaryForeach();
+        }
 
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
@@ -881,6 +922,12 @@ public sealed class Parser
             or TokenKind.Array
             or TokenKind.Index
             or TokenKind.Length
+            // Phase 6 Extended: Collections
+            or TokenKind.List
+            or TokenKind.Dict
+            or TokenKind.HashSet
+            or TokenKind.Has
+            or TokenKind.Count
             // Phase 7: Generics
             or TokenKind.Generic
             // Phase 8: Classes
@@ -926,6 +973,12 @@ public sealed class Parser
             TokenKind.Array => ParseArrayCreation(),
             TokenKind.Index => ParseArrayAccess(),
             TokenKind.Length => ParseArrayLength(),
+            // Phase 6 Extended: Collections
+            TokenKind.List => ParseListCreation(),
+            TokenKind.Dict => ParseDictionaryCreation(),
+            TokenKind.HashSet => ParseSetCreation(),
+            TokenKind.Has => ParseCollectionContains(),
+            TokenKind.Count => ParseCollectionCount(),
             // Phase 7: Generics
             TokenKind.Generic => ParseGenericType(),
             // Phase 8: Classes
@@ -2799,6 +2852,402 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new ForeachStatementNode(span, id, variableName, variableType, collection, body, attrs);
+    }
+
+    // Phase 6 Extended: Collections (List, Dictionary, HashSet)
+
+    /// <summary>
+    /// Parses list creation.
+    /// §LIST{list1:i32}        // List&lt;int&gt;
+    ///   1
+    ///   2
+    /// §/LIST{list1}
+    /// </summary>
+    private ListCreationNode ParseListCreation()
+    {
+        var startToken = Expect(TokenKind.List);
+        var attrs = ParseAttributes();
+
+        // Positional: {id:type}
+        var id = attrs["_pos0"] ?? "";
+        var elementType = attrs["_pos1"] ?? "i32";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "LIST", "id");
+        }
+
+        var elements = new List<ExpressionNode>();
+
+        // Parse elements until §/LIST
+        while (!IsAtEnd && !Check(TokenKind.EndList) && IsExpressionStart())
+        {
+            elements.Add(ParseExpression());
+        }
+
+        var endToken = Expect(TokenKind.EndList);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "LIST", id, "END_LIST", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new ListCreationNode(span, id, id, elementType, elements, attrs);
+    }
+
+    /// <summary>
+    /// Parses list creation as a statement (emits as var declaration).
+    /// </summary>
+    private BindStatementNode ParseListCreationStatement()
+    {
+        var listNode = ParseListCreation();
+        // Wrap in bind statement: §B{type:name} = list
+        return new BindStatementNode(
+            listNode.Span,
+            listNode.Name,
+            $"List<{listNode.ElementType}>",
+            isMutable: false,
+            listNode,
+            new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Parses dictionary creation.
+    /// §DICT{dict1:str:i32}    // Dictionary&lt;string, int&gt;
+    ///   §KV "one" 1
+    ///   §KV "two" 2
+    /// §/DICT{dict1}
+    /// </summary>
+    private DictionaryCreationNode ParseDictionaryCreation()
+    {
+        var startToken = Expect(TokenKind.Dict);
+        var attrs = ParseAttributes();
+
+        // Positional: {id:keyType:valueType}
+        var id = attrs["_pos0"] ?? "";
+        var keyType = attrs["_pos1"] ?? "str";
+        var valueType = attrs["_pos2"] ?? "i32";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "DICT", "id");
+        }
+
+        var entries = new List<KeyValuePairNode>();
+
+        // Parse key-value pairs until §/DICT
+        while (!IsAtEnd && !Check(TokenKind.EndDict) && Check(TokenKind.KeyValue))
+        {
+            entries.Add(ParseKeyValuePair());
+        }
+
+        var endToken = Expect(TokenKind.EndDict);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "DICT", id, "END_DICT", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new DictionaryCreationNode(span, id, id, keyType, valueType, entries, attrs);
+    }
+
+    /// <summary>
+    /// Parses dictionary creation as a statement.
+    /// </summary>
+    private BindStatementNode ParseDictionaryCreationStatement()
+    {
+        var dictNode = ParseDictionaryCreation();
+        return new BindStatementNode(
+            dictNode.Span,
+            dictNode.Name,
+            $"Dictionary<{dictNode.KeyType},{dictNode.ValueType}>",
+            isMutable: false,
+            dictNode,
+            new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Parses a key-value pair.
+    /// §KV key value
+    /// </summary>
+    private KeyValuePairNode ParseKeyValuePair()
+    {
+        var startToken = Expect(TokenKind.KeyValue);
+        var key = ParseExpression();
+        var value = ParseExpression();
+        var span = startToken.Span.Union(value.Span);
+        return new KeyValuePairNode(span, key, value);
+    }
+
+    /// <summary>
+    /// Parses set creation.
+    /// §HSET{set1:str}          // HashSet&lt;string&gt;
+    ///   "apple"
+    ///   "banana"
+    /// §/HSET{set1}
+    /// </summary>
+    private SetCreationNode ParseSetCreation()
+    {
+        var startToken = Expect(TokenKind.HashSet);
+        var attrs = ParseAttributes();
+
+        // Positional: {id:type}
+        var id = attrs["_pos0"] ?? "";
+        var elementType = attrs["_pos1"] ?? "str";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "HSET", "id");
+        }
+
+        var elements = new List<ExpressionNode>();
+
+        // Parse elements until §/HSET
+        while (!IsAtEnd && !Check(TokenKind.EndHashSet) && IsExpressionStart())
+        {
+            elements.Add(ParseExpression());
+        }
+
+        var endToken = Expect(TokenKind.EndHashSet);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "HSET", id, "END_HSET", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new SetCreationNode(span, id, id, elementType, elements, attrs);
+    }
+
+    /// <summary>
+    /// Parses set creation as a statement.
+    /// </summary>
+    private BindStatementNode ParseSetCreationStatement()
+    {
+        var setNode = ParseSetCreation();
+        return new BindStatementNode(
+            setNode.Span,
+            setNode.Name,
+            $"HashSet<{setNode.ElementType}>",
+            isMutable: false,
+            setNode,
+            new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Parses collection push (add).
+    /// §PUSH{list1} value      // list.Add(value)
+    /// </summary>
+    private CollectionPushNode ParseCollectionPush()
+    {
+        var startToken = Expect(TokenKind.Push);
+        var attrs = ParseAttributes();
+        var collectionName = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(collectionName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PUSH", "collection name");
+        }
+
+        var value = ParseExpression();
+        var span = startToken.Span.Union(value.Span);
+        return new CollectionPushNode(span, collectionName, value);
+    }
+
+    /// <summary>
+    /// Parses dictionary put (add/update).
+    /// §PUT{dict1} key value   // dict[key] = value
+    /// </summary>
+    private DictionaryPutNode ParseDictionaryPut()
+    {
+        var startToken = Expect(TokenKind.Put);
+        var attrs = ParseAttributes();
+        var dictionaryName = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(dictionaryName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PUT", "dictionary name");
+        }
+
+        var key = ParseExpression();
+        var value = ParseExpression();
+        var span = startToken.Span.Union(value.Span);
+        return new DictionaryPutNode(span, dictionaryName, key, value);
+    }
+
+    /// <summary>
+    /// Parses collection remove.
+    /// §REM{coll} keyOrValue   // coll.Remove(keyOrValue)
+    /// </summary>
+    private CollectionRemoveNode ParseCollectionRemove()
+    {
+        var startToken = Expect(TokenKind.Remove);
+        var attrs = ParseAttributes();
+        var collectionName = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(collectionName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "REM", "collection name");
+        }
+
+        var keyOrValue = ParseExpression();
+        var span = startToken.Span.Union(keyOrValue.Span);
+        return new CollectionRemoveNode(span, collectionName, keyOrValue);
+    }
+
+    /// <summary>
+    /// Parses collection set index.
+    /// §SETIDX{list1} index value  // list[index] = value
+    /// </summary>
+    private CollectionSetIndexNode ParseCollectionSetIndex()
+    {
+        var startToken = Expect(TokenKind.SetIndex);
+        var attrs = ParseAttributes();
+        var collectionName = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(collectionName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "SETIDX", "collection name");
+        }
+
+        var index = ParseExpression();
+        var value = ParseExpression();
+        var span = startToken.Span.Union(value.Span);
+        return new CollectionSetIndexNode(span, collectionName, index, value);
+    }
+
+    /// <summary>
+    /// Parses collection clear.
+    /// §CLR{coll}              // coll.Clear()
+    /// </summary>
+    private CollectionClearNode ParseCollectionClear()
+    {
+        var startToken = Expect(TokenKind.Clear);
+        var attrs = ParseAttributes();
+        var collectionName = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(collectionName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CLR", "collection name");
+        }
+
+        return new CollectionClearNode(startToken.Span, collectionName);
+    }
+
+    /// <summary>
+    /// Parses collection insert.
+    /// §INS{list1} index value // list.Insert(index, value)
+    /// </summary>
+    private CollectionInsertNode ParseCollectionInsert()
+    {
+        var startToken = Expect(TokenKind.Insert);
+        var attrs = ParseAttributes();
+        var collectionName = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(collectionName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "INS", "collection name");
+        }
+
+        var index = ParseExpression();
+        var value = ParseExpression();
+        var span = startToken.Span.Union(value.Span);
+        return new CollectionInsertNode(span, collectionName, index, value);
+    }
+
+    /// <summary>
+    /// Parses collection contains check.
+    /// §HAS{list1} value           // list.Contains(value)
+    /// §HAS{dict1} §KEY key        // dict.ContainsKey(key)
+    /// §HAS{dict1} §VAL value      // dict.ContainsValue(value)
+    /// </summary>
+    private CollectionContainsNode ParseCollectionContains()
+    {
+        var startToken = Expect(TokenKind.Has);
+        var attrs = ParseAttributes();
+        var collectionName = attrs["_pos0"] ?? "";
+
+        if (string.IsNullOrEmpty(collectionName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "HAS", "collection name");
+        }
+
+        // Check for §KEY or §VAL modifier
+        var mode = ContainsMode.Value;
+        if (Check(TokenKind.Key))
+        {
+            Advance();
+            mode = ContainsMode.Key;
+        }
+        else if (Check(TokenKind.Val))
+        {
+            Advance();
+            mode = ContainsMode.DictValue;
+        }
+
+        var keyOrValue = ParseExpression();
+        var span = startToken.Span.Union(keyOrValue.Span);
+        return new CollectionContainsNode(span, collectionName, keyOrValue, mode);
+    }
+
+    /// <summary>
+    /// Parses collection count.
+    /// §CNT collection                   // collection.Count
+    /// </summary>
+    private CollectionCountNode ParseCollectionCount()
+    {
+        var startToken = Expect(TokenKind.Count);
+        var collection = ParseExpression();
+        var span = startToken.Span.Union(collection.Span);
+        return new CollectionCountNode(span, collection);
+    }
+
+    /// <summary>
+    /// Parses dictionary foreach.
+    /// §EACHKV{e2:key:value} dict1  // foreach (var (key, value) in dict1)
+    ///   §P (+ key ": " value)
+    /// §/EACHKV{e2}
+    /// </summary>
+    private DictionaryForeachNode ParseDictionaryForeach()
+    {
+        var startToken = Expect(TokenKind.EachKV);
+        var attrs = ParseAttributes();
+
+        // Positional: {id:keyName:valueName}
+        var id = attrs["_pos0"] ?? "";
+        var keyName = attrs["_pos1"] ?? "key";
+        var valueName = attrs["_pos2"] ?? "value";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EACHKV", "id");
+        }
+
+        // Parse dictionary expression
+        var dictionary = ParseExpression();
+
+        // Parse body statements
+        var body = ParseStatementBlock(TokenKind.EndEachKV);
+
+        var endToken = Expect(TokenKind.EndEachKV);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "EACHKV", id, "END_EACHKV", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new DictionaryForeachNode(span, id, keyName, valueName, dictionary, body, attrs);
     }
 
     // Phase 7: Generics

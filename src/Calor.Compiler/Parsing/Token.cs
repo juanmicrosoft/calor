@@ -116,6 +116,27 @@ public enum TokenKind
     Foreach,
     EndForeach,
 
+    // Phase 6 Extended: Collections (List, Dictionary, HashSet)
+    List,           // §LIST - List<T>
+    EndList,        // §/LIST
+    Dict,           // §DICT - Dictionary<K,V>
+    EndDict,        // §/DICT
+    HashSet,        // §HSET - HashSet<T>
+    EndHashSet,     // §/HSET
+    KeyValue,       // §KV - Dictionary key-value pair
+    Push,           // §PUSH - Add to list/set
+    Put,            // §PUT - Add/update dictionary entry
+    Remove,         // §REM - Remove from collection
+    SetIndex,       // §SETIDX - Set list element by index
+    Clear,          // §CLR - Clear collection
+    Insert,         // §INS - Insert at index
+    Has,            // §HAS - Contains check
+    Key,            // §KEY - ContainsKey mode
+    Val,            // §VAL - ContainsValue mode
+    EachKV,         // §EACHKV - Dictionary iteration
+    EndEachKV,      // §/EACHKV
+    Count,          // §CNT - Collection .Count property
+
     // Phase 7: Generics
     TypeParam,
     Where,

@@ -1,0 +1,45 @@
+§M{m001:Collections}
+
+§F{f001:Main:pub}
+  §O{void}
+  §E{cw}
+
+  §LIST{numbers:i32}
+    1
+    2
+    3
+  §/LIST{numbers}
+  §C{Console.WriteLine}
+    §A "Created list with elements"
+  §/C
+  §PUSH{numbers} 4
+
+  §DICT{ages:str:i32}
+    §KV "alice" 30
+    §KV "bob" 25
+  §/DICT{ages}
+  §C{Console.WriteLine}
+    §A "Created dictionary with entries"
+  §/C
+  §PUT{ages} "charlie" 35
+
+  §HSET{fruits:str}
+    "apple"
+    "banana"
+  §/HSET{fruits}
+  §C{Console.WriteLine}
+    §A "Created set with fruits"
+  §/C
+  §PUSH{fruits} "cherry"
+
+  §INS{numbers} 0 0
+  §SETIDX{numbers} 1 10
+  §REM{fruits} "apple"
+  §CLR{ages}
+
+  §C{Console.WriteLine}
+    §A "All collection tests passed!"
+  §/C
+§/F{f001}
+
+§/M{m001}

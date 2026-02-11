@@ -1,0 +1,35 @@
+§M{m006:Collections}
+  §U{System}
+  §U{Calor.Runtime}
+
+  §CL{c001:CollectionsModule:static}
+    §MT{m002:Main:pub:static}
+      §LIST{numbers:i32}
+        1
+        2
+        3
+      §/LIST{numbers}
+      §P "Created list with elements"
+      §C{numbers.Add} §A 4 §/C
+      §DICT{ages:str:i32}
+        §KV "alice" 30
+        §KV "bob" 25
+      §/DICT{ages}
+      §P "Created dictionary with entries"
+      §PUT{ages} "charlie" 35
+      §HSET{fruits:str}
+        "apple"
+        "banana"
+      §/HSET{fruits}
+      §P "Created set with fruits"
+      §C{fruits.Add} §A "cherry" §/C
+      §C{numbers.Insert} §A 0 §A 0 §/C
+      §SETIDX{numbers} 1 10
+      §C{fruits.Remove} §A "apple" §/C
+      §C{ages.Clear} §/C
+      §P "All collection tests passed!"
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m006}

@@ -89,24 +89,25 @@ public class BypassTests
         Assert.False(result.HasErrors, $"Should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
 
-    [Fact(Skip = "Lambda effects not yet supported")]
+    [Fact]
     public void NestedLambda_ContributesEffects()
     {
         // Lambda with print should contribute effect to enclosing function
-        // This test documents expected future behavior
+        // Function does NOT declare cw effect, but lambda inside has §P (print)
         var source = @"
 §M{m001:Test}
 §F{f001:WithLambda:pub}
   §O{void}
-  §B{i32:x} INT:0
-  §R
+  §B{action:Action<i32>} §LAM{lam1:x:i32}
+    §P x
+  §/LAM{lam1}
 §/F{f001}
 §/M{m001}
 ";
         var result = TestHarness.Compile(source);
 
-        // Lambda print should require effect declaration
-        Assert.True(result.HasErrors, "Should fail - lambda has print effect");
+        // Lambda print should require effect declaration on enclosing function
+        Assert.True(result.HasErrors, "Should fail - lambda has print effect but function doesn't declare cw");
     }
 
     [Fact]
