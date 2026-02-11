@@ -1,0 +1,33 @@
+§M{m1:NestedTry}
+§F{f1:OuterHandler:pub}
+§I{i32:x}
+§O{i32}
+§TR{t1}
+§TR{t2}
+§R (/ 100 x)
+§CA{DivideByZeroException:inner}
+§R -1
+§/TR{t2}
+§CA{Exception:outer}
+§R -2
+§/TR{t1}
+§/F{f1}
+§F{f2:DeepNesting:pub}
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§TR{t1}
+§TR{t2}
+§TR{t3}
+§R (/ (/ a b) b)
+§CA{DivideByZeroException:e3}
+§R -3
+§/TR{t3}
+§CA{ArithmeticException:e2}
+§R -2
+§/TR{t2}
+§CA{Exception:e1}
+§R -1
+§/TR{t1}
+§/F{f2}
+§/M{m1}

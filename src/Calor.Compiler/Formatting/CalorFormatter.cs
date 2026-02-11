@@ -220,11 +220,14 @@ public sealed class CalorFormatter
                 break;
 
             case TryStatementNode tryStmt:
-                AppendLine("§TR");
+                var tryId = AbbreviateId(tryStmt.Id);
+                AppendLine($"§TR{{{tryId}}}");
                 foreach (var s in tryStmt.TryBody) FormatStatement(s);
                 foreach (var catchClause in tryStmt.CatchClauses)
                 {
-                    AppendLine($"§CA{{{catchClause.ExceptionType}:{catchClause.VariableName}}}");
+                    var catchAttrs = FormatCatchAttributes(catchClause);
+                    var whenClause = catchClause.Filter != null ? $" §WHEN {FormatExpression(catchClause.Filter)}" : "";
+                    AppendLine($"§CA{catchAttrs}{whenClause}");
                     foreach (var s in catchClause.Body) FormatStatement(s);
                 }
                 if (tryStmt.FinallyBody != null && tryStmt.FinallyBody.Count > 0)
@@ -232,11 +235,18 @@ public sealed class CalorFormatter
                     AppendLine("§FI");
                     foreach (var s in tryStmt.FinallyBody) FormatStatement(s);
                 }
-                AppendLine("§/TR");
+                AppendLine($"§/TR{{{tryId}}}");
                 break;
 
             case ThrowStatementNode throwStmt:
-                AppendLine($"§TH {FormatExpression(throwStmt.Exception!)}");
+                if (throwStmt.Exception != null)
+                    AppendLine($"§TH {FormatExpression(throwStmt.Exception)}");
+                else
+                    AppendLine("§TH"); // Bare throw (rethrow)
+                break;
+
+            case RethrowStatementNode:
+                AppendLine("§RT");
                 break;
 
             case PrintStatementNode print:
@@ -315,6 +325,20 @@ public sealed class CalorFormatter
     {
         var size = arr.Size != null ? FormatExpression(arr.Size) : "";
         return $"§ARR{{{arr.ElementType}}} {size}".TrimEnd();
+    }
+
+    private static string FormatCatchAttributes(CatchClauseNode catchClause)
+    {
+        // Catch-all: §CA (no attributes)
+        if (string.IsNullOrEmpty(catchClause.ExceptionType))
+            return "";
+
+        // Exception type only: §CA{ExceptionType}
+        if (string.IsNullOrEmpty(catchClause.VariableName))
+            return $"{{{catchClause.ExceptionType}}}";
+
+        // Exception type with variable: §CA{ExceptionType:varName}
+        return $"{{{catchClause.ExceptionType}:{catchClause.VariableName}}}";
     }
 
     private static string FormatOperator(BinaryOperator op) => op switch

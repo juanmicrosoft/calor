@@ -305,6 +305,10 @@ public class LintRegressionTests
     [InlineData("06_statements/return_void.calr")]
     [InlineData("06_statements/try_catch.calr")]
     [InlineData("06_statements/throw_statement.calr")]
+    [InlineData("06_statements/try_catch_nested.calr")]
+    [InlineData("06_statements/try_finally_return.calr")]
+    [InlineData("06_statements/try_multi_catch_finally.calr")]
+    [InlineData("06_statements/try_catch_when.calr")]
     public void Lint_Statements_ParsesSuccessfully(string file)
     {
         var source = LintTestDataLoader.LoadTestFile(file);

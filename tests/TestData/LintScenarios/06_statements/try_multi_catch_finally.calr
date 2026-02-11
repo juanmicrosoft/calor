@@ -1,0 +1,47 @@
+§M{m1:MultiCatch}
+§F{f1:MultiHandler:pub}
+§I{str:input}
+§O{i32}
+§E{cw}
+§TR{t1}
+§R §C{Int32.Parse} §A input §/C
+§CA{ArgumentNullException:e1}
+§R -1
+§CA{FormatException:e2}
+§R -2
+§CA{OverflowException:e3}
+§R -3
+§CA
+§R -99
+§FI
+§P "Done"
+§/TR{t1}
+§/F{f1}
+§F{f2:OrderedCatches:pub}
+§I{i32:x}
+§O{str}
+§TR{t1}
+§R (/ 100 x)
+§CA{DivideByZeroException:e1}
+§R "divide by zero"
+§CA{ArithmeticException:e2}
+§R "arithmetic error"
+§CA{SystemException:e3}
+§R "system error"
+§CA{Exception:e4}
+§R "general error"
+§/TR{t1}
+§/F{f2}
+§F{f3:CatchAllWithFinally:pub}
+§O{void}
+§E{cw}
+§TR{t1}
+§TH "error"
+§CA
+§P "caught"
+§RT
+§FI
+§P "finally"
+§/TR{t1}
+§/F{f3}
+§/M{m1}
