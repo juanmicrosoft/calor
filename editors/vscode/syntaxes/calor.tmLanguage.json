@@ -6,8 +6,8 @@
     { "include": "#comment" },
     { "include": "#string" },
     { "include": "#closing-tags" },
-    { "include": "#opening-tags" },
-    { "include": "#keywords" },
+    { "include": "#opening-tags-with-braces" },
+    { "include": "#standalone-tags" },
     { "include": "#operators" },
     { "include": "#types" },
     { "include": "#constants" },
@@ -32,125 +32,726 @@
     "closing-tags": {
       "patterns": [
         {
-          "name": "keyword.control.module.close.calor",
-          "match": "\u00a7/M\\{[^}]+\\}"
+          "comment": "Module/Function closing tags",
+          "name": "keyword.control.close.calor",
+          "match": "§/(M|F|AF)\\{[^}]*\\}"
         },
         {
-          "name": "keyword.control.function.close.calor",
-          "match": "\u00a7/F\\{[^}]+\\}"
+          "comment": "Class/Interface/Enum closing tags",
+          "name": "storage.type.close.calor",
+          "match": "§/(CL|IFACE|EN|ENUM|EXT)\\{[^}]*\\}"
         },
         {
-          "name": "keyword.control.loop.close.calor",
-          "match": "\u00a7/L\\{[^}]+\\}"
+          "comment": "Method/Property/Constructor closing tags",
+          "name": "entity.name.function.close.calor",
+          "match": "§/(MT|AMT|PROP|CTOR|GET|SET)\\{[^}]*\\}"
         },
         {
-          "name": "keyword.control.conditional.close.calor",
-          "match": "\u00a7/I\\{[^}]+\\}"
+          "comment": "Control flow closing tags",
+          "name": "keyword.control.close.calor",
+          "match": "§/(I|L|WH|DO|W|K|TR|WITH)\\{[^}]*\\}"
         },
         {
+          "comment": "Collection closing tags",
+          "name": "storage.type.collection.close.calor",
+          "match": "§/(ARR|LIST|DICT|HSET|EACH|EACHKV)\\{[^}]*\\}"
+        },
+        {
+          "comment": "Type/Record closing tags",
+          "name": "storage.type.close.calor",
+          "match": "§/(T|D)\\{[^}]*\\}"
+        },
+        {
+          "comment": "Lambda/Delegate closing tags",
+          "name": "entity.name.function.close.calor",
+          "match": "§/(LAM|DEL)\\{[^}]*\\}"
+        },
+        {
+          "comment": "Metadata closing tags",
+          "name": "comment.block.documentation.close.calor",
+          "match": "§/(US|UB|DC|CT|VS|HD)\\{[^}]*\\}"
+        },
+        {
+          "comment": "Interpolation closing tag",
+          "name": "string.interpolated.close.calor",
+          "match": "§/INTERP\\{[^}]*\\}"
+        },
+        {
+          "comment": "Call closing tag (no braces)",
           "name": "keyword.control.call.close.calor",
-          "match": "\u00a7/C"
+          "match": "§/C(?![a-zA-Z0-9_])"
+        },
+        {
+          "comment": "This/Base closing tags (no braces)",
+          "name": "variable.language.close.calor",
+          "match": "§/(THIS|BASE)(?![a-zA-Z0-9_])"
         }
       ]
     },
-    "opening-tags": {
+    "opening-tags-with-braces": {
       "patterns": [
         {
+          "comment": "Module definition",
           "name": "keyword.control.module.calor",
-          "match": "\u00a7M\\{[^}]+\\}"
+          "match": "§M\\{[^}]*\\}"
         },
         {
+          "comment": "Function definitions (sync and async)",
           "name": "keyword.control.function.calor",
-          "match": "\u00a7F\\{[^}]+\\}"
+          "match": "§(F|AF)\\{[^}]*\\}"
         },
         {
-          "name": "keyword.other.input.calor",
-          "match": "\u00a7I\\{[^}]+\\}"
+          "comment": "Input/Output parameters",
+          "name": "variable.parameter.calor",
+          "match": "§(I|O)\\{[^}]*\\}"
         },
         {
-          "name": "keyword.other.output.calor",
-          "match": "\u00a7O\\{[^}]+\\}"
-        },
-        {
+          "comment": "Effects declaration",
           "name": "keyword.other.effects.calor",
-          "match": "\u00a7E\\{[^}]+\\}"
+          "match": "§E\\{[^}]*\\}"
         },
         {
-          "name": "keyword.other.binding.calor",
-          "match": "\u00a7B\\{[^}]+\\}"
+          "comment": "Variable binding",
+          "name": "variable.other.binding.calor",
+          "match": "§B\\{[^}]*\\}"
         },
         {
-          "name": "keyword.control.call.calor",
-          "match": "\u00a7C\\{[^}]+\\}"
+          "comment": "Function/method call",
+          "name": "entity.name.function.call.calor",
+          "match": "§C\\{[^}]*\\}"
         },
         {
+          "comment": "Loop (for)",
           "name": "keyword.control.loop.calor",
-          "match": "\u00a7L\\{[^}]+\\}"
+          "match": "§L\\{[^}]*\\}"
         },
         {
+          "comment": "Conditional (if)",
           "name": "keyword.control.conditional.calor",
-          "match": "\u00a7IF\\{[^}]+\\}"
+          "match": "§IF\\{[^}]*\\}"
         },
         {
+          "comment": "While loop",
+          "name": "keyword.control.loop.calor",
+          "match": "§WH\\{[^}]*\\}"
+        },
+        {
+          "comment": "Do-while loop",
+          "name": "keyword.control.loop.calor",
+          "match": "§DO\\{[^}]*\\}"
+        },
+        {
+          "comment": "Match/Switch",
+          "name": "keyword.control.switch.calor",
+          "match": "§(W|SW)\\{[^}]*\\}"
+        },
+        {
+          "comment": "Case",
+          "name": "keyword.control.case.calor",
+          "match": "§K\\{[^}]*\\}"
+        },
+        {
+          "comment": "Contract: Requires (precondition)",
           "name": "keyword.other.contract.requires.calor",
-          "match": "\u00a7Q\\{[^}]+\\}"
+          "match": "§Q\\{[^}]*\\}"
         },
         {
-          "name": "keyword.other.contract.requires.calor",
-          "match": "\u00a7Q(?!\\{)"
+          "comment": "Type definition",
+          "name": "storage.type.calor",
+          "match": "§T\\{[^}]*\\}"
         },
         {
-          "name": "keyword.other.contract.ensures.calor",
-          "match": "\u00a7S"
+          "comment": "Record (data) definition",
+          "name": "storage.type.record.calor",
+          "match": "§D\\{[^}]*\\}"
         },
         {
-          "name": "keyword.control.conditional.elseif.calor",
-          "match": "\u00a7EI"
+          "comment": "Using directive",
+          "name": "keyword.control.import.calor",
+          "match": "§U\\{[^}]*\\}"
         },
         {
-          "name": "keyword.control.conditional.else.calor",
-          "match": "\u00a7EL"
+          "comment": "Class definition",
+          "name": "storage.type.class.calor",
+          "match": "§CL\\{[^}]*\\}"
         },
         {
-          "name": "keyword.other.argument.calor",
-          "match": "\u00a7A"
+          "comment": "Interface definition",
+          "name": "storage.type.interface.calor",
+          "match": "§IFACE\\{[^}]*\\}"
         },
         {
-          "name": "keyword.control.return.calor",
-          "match": "\u00a7R"
+          "comment": "Enum definition",
+          "name": "storage.type.enum.calor",
+          "match": "§(EN|ENUM)\\{[^}]*\\}"
         },
         {
-          "name": "keyword.other.print.calor",
-          "match": "\u00a7P"
+          "comment": "Enum extension methods",
+          "name": "storage.type.extension.calor",
+          "match": "§EXT\\{[^}]*\\}"
         },
         {
-          "name": "constant.language.option.some.calor",
-          "match": "\u00a7SOME"
+          "comment": "Method definition (sync and async)",
+          "name": "entity.name.function.method.calor",
+          "match": "§(MT|AMT)\\{[^}]*\\}"
         },
         {
+          "comment": "Property definition",
+          "name": "entity.name.function.property.calor",
+          "match": "§PROP\\{[^}]*\\}"
+        },
+        {
+          "comment": "Constructor definition",
+          "name": "entity.name.function.constructor.calor",
+          "match": "§CTOR\\{[^}]*\\}"
+        },
+        {
+          "comment": "Property getter",
+          "name": "entity.name.function.accessor.calor",
+          "match": "§GET\\{[^}]*\\}"
+        },
+        {
+          "comment": "Property setter",
+          "name": "entity.name.function.accessor.calor",
+          "match": "§SET\\{[^}]*\\}"
+        },
+        {
+          "comment": "Try block",
+          "name": "keyword.control.exception.calor",
+          "match": "§TR\\{[^}]*\\}"
+        },
+        {
+          "comment": "Lambda expression",
+          "name": "entity.name.function.lambda.calor",
+          "match": "§LAM\\{[^}]*\\}"
+        },
+        {
+          "comment": "Delegate definition",
+          "name": "storage.type.delegate.calor",
+          "match": "§DEL\\{[^}]*\\}"
+        },
+        {
+          "comment": "Array declaration",
+          "name": "storage.type.array.calor",
+          "match": "§ARR\\{[^}]*\\}"
+        },
+        {
+          "comment": "List declaration",
+          "name": "storage.type.list.calor",
+          "match": "§LIST\\{[^}]*\\}"
+        },
+        {
+          "comment": "Dictionary declaration",
+          "name": "storage.type.dict.calor",
+          "match": "§DICT\\{[^}]*\\}"
+        },
+        {
+          "comment": "HashSet declaration",
+          "name": "storage.type.hashset.calor",
+          "match": "§HSET\\{[^}]*\\}"
+        },
+        {
+          "comment": "Foreach iteration",
+          "name": "keyword.control.loop.foreach.calor",
+          "match": "§EACH\\{[^}]*\\}"
+        },
+        {
+          "comment": "Dictionary iteration",
+          "name": "keyword.control.loop.eachkv.calor",
+          "match": "§EACHKV\\{[^}]*\\}"
+        },
+        {
+          "comment": "Pattern with clause",
+          "name": "keyword.control.pattern.calor",
+          "match": "§WITH\\{[^}]*\\}"
+        },
+        {
+          "comment": "String interpolation",
+          "name": "string.interpolated.calor",
+          "match": "§INTERP\\{[^}]*\\}"
+        },
+        {
+          "comment": "Field definition",
+          "name": "variable.other.field.calor",
+          "match": "§(FL|FLD)\\{[^}]*\\}"
+        },
+        {
+          "comment": "Option None with type",
           "name": "constant.language.option.none.calor",
-          "match": "\u00a7NONE\\{[^}]+\\}"
+          "match": "§(NN|NONE)\\{[^}]*\\}"
         },
         {
-          "name": "constant.language.result.ok.calor",
-          "match": "\u00a7OK"
+          "comment": "Decision record",
+          "name": "comment.block.documentation.decision.calor",
+          "match": "§DC\\{[^}]*\\}"
         },
         {
-          "name": "constant.language.result.err.calor",
-          "match": "\u00a7ERR"
+          "comment": "Context block",
+          "name": "comment.block.documentation.context.calor",
+          "match": "§CT\\{[^}]*\\}"
+        },
+        {
+          "comment": "Visible section",
+          "name": "comment.block.documentation.visible.calor",
+          "match": "§VS\\{[^}]*\\}"
+        },
+        {
+          "comment": "Hidden section",
+          "name": "comment.block.documentation.hidden.calor",
+          "match": "§HD\\{[^}]*\\}"
+        },
+        {
+          "comment": "Uses dependency",
+          "name": "keyword.other.dependency.calor",
+          "match": "§US\\{[^}]*\\}"
+        },
+        {
+          "comment": "UsedBy dependency",
+          "name": "keyword.other.dependency.calor",
+          "match": "§UB\\{[^}]*\\}"
         }
       ]
     },
-    "keywords": {
+    "standalone-tags": {
       "patterns": [
         {
-          "name": "keyword.operator.arrow.calor",
-          "match": "\u2192|->"
+          "comment": "Contract: Requires without braces",
+          "name": "keyword.other.contract.requires.calor",
+          "match": "§Q(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Contract: Ensures",
+          "name": "keyword.other.contract.ensures.calor",
+          "match": "§S(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Contract: Invariant",
+          "name": "keyword.other.contract.invariant.calor",
+          "match": "§IV(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Else-if",
+          "name": "keyword.control.conditional.elseif.calor",
+          "match": "§EI(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Else",
+          "name": "keyword.control.conditional.else.calor",
+          "match": "§EL(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Argument",
+          "name": "variable.parameter.argument.calor",
+          "match": "§A(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Return",
+          "name": "keyword.control.return.calor",
+          "match": "§R(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Print (Console.WriteLine)",
+          "name": "support.function.builtin.calor",
+          "match": "§P(?!f)(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "PrintF (Console.Write)",
+          "name": "support.function.builtin.calor",
+          "match": "§Pf(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Break",
+          "name": "keyword.control.flow.break.calor",
+          "match": "§BK(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Continue",
+          "name": "keyword.control.flow.continue.calor",
+          "match": "§CN(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Body start",
+          "name": "keyword.control.body.calor",
+          "match": "§BODY(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Body end",
+          "name": "keyword.control.body.calor",
+          "match": "§END_BODY(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Option Some",
+          "name": "constant.language.option.some.calor",
+          "match": "§(SM|SOME)(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Option None",
+          "name": "constant.language.option.none.calor",
+          "match": "§(NN|NONE)(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Result Ok",
+          "name": "constant.language.result.ok.calor",
+          "match": "§OK(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Result Err",
+          "name": "constant.language.result.err.calor",
+          "match": "§ERR(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Variant",
+          "name": "storage.type.variant.calor",
+          "match": "§V(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Implements",
+          "name": "storage.modifier.implements.calor",
+          "match": "§IMPL(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Virtual modifier",
+          "name": "storage.modifier.virtual.calor",
+          "match": "§VR(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Override modifier",
+          "name": "storage.modifier.override.calor",
+          "match": "§OV(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Abstract modifier",
+          "name": "storage.modifier.abstract.calor",
+          "match": "§AB(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Sealed modifier",
+          "name": "storage.modifier.sealed.calor",
+          "match": "§SD(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "This reference",
+          "name": "variable.language.this.calor",
+          "match": "§THIS(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Base reference",
+          "name": "variable.language.base.calor",
+          "match": "§BASE(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "New instance",
+          "name": "keyword.operator.new.calor",
+          "match": "§NEW(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Init expression",
+          "name": "keyword.other.init.calor",
+          "match": "§INIT(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Assignment",
+          "name": "keyword.operator.assignment.calor",
+          "match": "§ASSIGN(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Default value",
+          "name": "keyword.other.default.calor",
+          "match": "§DEFAULT(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Catch",
+          "name": "keyword.control.exception.catch.calor",
+          "match": "§CA(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Finally",
+          "name": "keyword.control.exception.finally.calor",
+          "match": "§FI(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Throw",
+          "name": "keyword.control.exception.throw.calor",
+          "match": "§TH(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Rethrow",
+          "name": "keyword.control.exception.rethrow.calor",
+          "match": "§RT(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "When condition",
+          "name": "keyword.control.when.calor",
+          "match": "§WHEN(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Event declaration",
+          "name": "keyword.other.event.calor",
+          "match": "§EVT(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Subscribe to event",
+          "name": "keyword.other.subscribe.calor",
+          "match": "§SUB(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Unsubscribe from event",
+          "name": "keyword.other.unsubscribe.calor",
+          "match": "§UNSUB(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Async modifier",
+          "name": "storage.modifier.async.calor",
+          "match": "§ASYNC(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Await expression",
+          "name": "keyword.control.await.calor",
+          "match": "§AWAIT(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Push",
+          "name": "keyword.other.collection.push.calor",
+          "match": "§PUSH(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Put",
+          "name": "keyword.other.collection.put.calor",
+          "match": "§PUT(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Remove",
+          "name": "keyword.other.collection.remove.calor",
+          "match": "§REM(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Insert",
+          "name": "keyword.other.collection.insert.calor",
+          "match": "§INS(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Has",
+          "name": "keyword.other.collection.has.calor",
+          "match": "§HAS(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Clear",
+          "name": "keyword.other.collection.clear.calor",
+          "match": "§CLR(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Count",
+          "name": "keyword.other.collection.count.calor",
+          "match": "§CNT(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Index",
+          "name": "keyword.other.collection.index.calor",
+          "match": "§IDX(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: SetIndex",
+          "name": "keyword.other.collection.setindex.calor",
+          "match": "§SETIDX(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Length",
+          "name": "keyword.other.collection.length.calor",
+          "match": "§LEN(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Key",
+          "name": "keyword.other.collection.key.calor",
+          "match": "§KEY(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: Val",
+          "name": "keyword.other.collection.val.calor",
+          "match": "§VAL(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Collection operations: KeyValue",
+          "name": "keyword.other.collection.keyvalue.calor",
+          "match": "§KV(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Generics: Where constraint",
+          "name": "keyword.other.constraint.where.calor",
+          "match": "§(WR|WHERE)(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Null coalesce operator",
+          "name": "keyword.operator.null-coalesce.calor",
+          "match": "§\\?\\?(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Null conditional operator",
+          "name": "keyword.operator.null-conditional.calor",
+          "match": "§\\?\\.(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Range operator",
+          "name": "keyword.operator.range.calor",
+          "match": "§RANGE(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Index from end operator",
+          "name": "keyword.operator.index-end.calor",
+          "match": "§\\^(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Expression",
+          "name": "keyword.other.expression.calor",
+          "match": "§EXP(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Pattern: Positional",
+          "name": "keyword.other.pattern.positional.calor",
+          "match": "§PPOS(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Pattern: Property",
+          "name": "keyword.other.pattern.property.calor",
+          "match": "§PPROP(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Pattern: Match",
+          "name": "keyword.other.pattern.match.calor",
+          "match": "§PMATCH(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Pattern: Relational",
+          "name": "keyword.other.pattern.relational.calor",
+          "match": "§PREL(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Pattern: List",
+          "name": "keyword.other.pattern.list.calor",
+          "match": "§PLIST(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Pattern: Var",
+          "name": "keyword.other.pattern.var.calor",
+          "match": "§VAR(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Pattern: Rest",
+          "name": "keyword.other.pattern.rest.calor",
+          "match": "§REST(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Documentation: Example",
+          "name": "comment.block.documentation.example.calor",
+          "match": "§EX(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Documentation: Todo",
+          "name": "comment.block.documentation.todo.calor",
+          "match": "§TD(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Documentation: Fixme",
+          "name": "comment.block.documentation.fixme.calor",
+          "match": "§FX(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Documentation: Hack",
+          "name": "comment.block.documentation.hack.calor",
+          "match": "§HK(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Assumption",
+          "name": "keyword.other.assume.calor",
+          "match": "§AS(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Complexity annotation",
+          "name": "keyword.other.complexity.calor",
+          "match": "§CX(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "API: Since version",
+          "name": "keyword.other.api.since.calor",
+          "match": "§SN(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "API: Deprecated",
+          "name": "keyword.other.api.deprecated.calor",
+          "match": "§DP(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "API: Breaking change",
+          "name": "keyword.other.api.breaking.calor",
+          "match": "§BR(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "API: Experimental",
+          "name": "keyword.other.api.experimental.calor",
+          "match": "§XP(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "API: Stable",
+          "name": "keyword.other.api.stable.calor",
+          "match": "§SB(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Decision: Chosen",
+          "name": "comment.block.documentation.chosen.calor",
+          "match": "§CHOSEN(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Decision: Rejected",
+          "name": "comment.block.documentation.rejected.calor",
+          "match": "§REJECTED(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Decision: Reason",
+          "name": "comment.block.documentation.reason.calor",
+          "match": "§REASON(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Focus marker",
+          "name": "keyword.other.focus.calor",
+          "match": "§FC(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "File reference",
+          "name": "keyword.other.file.calor",
+          "match": "§FILE(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Property test",
+          "name": "keyword.other.property-test.calor",
+          "match": "§PT(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Lock",
+          "name": "keyword.other.lock.calor",
+          "match": "§LK(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Agent author",
+          "name": "comment.block.documentation.author.calor",
+          "match": "§AU(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Task reference",
+          "name": "keyword.other.task.calor",
+          "match": "§TASK(?![{a-zA-Z0-9_])"
+        },
+        {
+          "comment": "Date marker",
+          "name": "keyword.other.date.calor",
+          "match": "§DATE(?![{a-zA-Z0-9_])"
         }
       ]
     },
     "operators": {
       "patterns": [
+        {
+          "name": "keyword.operator.arrow.calor",
+          "match": "→|->"
+        },
         {
           "name": "keyword.operator.arithmetic.calor",
           "match": "\\(\\s*[+\\-*/%](?=\\s)"
@@ -162,6 +763,18 @@
         {
           "name": "keyword.operator.logical.calor",
           "match": "\\(\\s*(&&|\\|\\||!)(?=\\s)"
+        },
+        {
+          "name": "keyword.operator.null.calor",
+          "match": "\\?\\?|\\?\\."
+        },
+        {
+          "name": "keyword.operator.exponent.calor",
+          "match": "\\*\\*"
+        },
+        {
+          "name": "keyword.operator.bitwise.calor",
+          "match": "<<|>>|&|\\||\\^"
         }
       ]
     },
@@ -169,11 +782,15 @@
       "patterns": [
         {
           "name": "storage.type.primitive.calor",
-          "match": "\\b(i32|i64|str|bool|void)\\b"
+          "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|str|bool|void|never|char|byte|decimal|object)\\b"
         },
         {
           "name": "storage.modifier.visibility.calor",
-          "match": "\\b(pub|pri|prot)\\b"
+          "match": "\\b(pub|pri|prot|internal)\\b"
+        },
+        {
+          "name": "storage.type.generic.calor",
+          "match": "\\b(List|Dictionary|HashSet|Option|Result|Task|Func|Action)\\b"
         }
       ]
     },
@@ -184,12 +801,20 @@
           "match": "\\b(true|false)\\b"
         },
         {
+          "name": "constant.language.null.calor",
+          "match": "\\b(null|unit)\\b"
+        },
+        {
           "name": "variable.language.result.calor",
           "match": "\\bresult\\b"
         },
         {
           "name": "constant.other.effect-code.calor",
-          "match": "\\b(cw|cr|fw|fr|net|db)\\b"
+          "match": "\\b(cw|cr|fw|fr|net|db|env|proc|alloc|unsafe|time|random|heap_write|exception)\\b"
+        },
+        {
+          "name": "variable.language.quantifier.calor",
+          "match": "\\b(forall|exists)\\b|∀|∃"
         }
       ]
     },
@@ -197,7 +822,7 @@
       "patterns": [
         {
           "name": "constant.numeric.float.calor",
-          "match": "-?\\d+\\.\\d+"
+          "match": "-?\\d+\\.\\d+([eE][+-]?\\d+)?"
         },
         {
           "name": "constant.numeric.integer.calor",

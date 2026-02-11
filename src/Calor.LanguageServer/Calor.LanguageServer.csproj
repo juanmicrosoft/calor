@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>calor-lsp</AssemblyName>
+    <RootNamespace>Calor.LanguageServer</RootNamespace>
+    <Description>Calor Language Server Protocol implementation</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Calor.Compiler\Calor.Compiler.csproj" />
+  </ItemGroup>
+
+</Project>

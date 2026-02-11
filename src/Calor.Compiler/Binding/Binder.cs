@@ -251,8 +251,28 @@ public sealed class Binder
 
         if (symbol == null)
         {
-            _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
-                $"Undefined variable '{refNode.Name}'");
+            var similarName = _scope.FindSimilarName(refNode.Name);
+            if (similarName != null)
+            {
+                // Create a fix to replace the undefined reference with the similar name
+                var fix = new SuggestedFix(
+                    $"Change to '{similarName}'",
+                    TextEdit.Replace(
+                        "", // File path will be set from DiagnosticBag._currentFilePath
+                        refNode.Span.Line,
+                        refNode.Span.Column,
+                        refNode.Span.Line,
+                        refNode.Span.Column + refNode.Name.Length,
+                        similarName));
+
+                _diagnostics.ReportErrorWithFix(refNode.Span, DiagnosticCode.UndefinedReference,
+                    $"Undefined variable '{refNode.Name}'. Did you mean '{similarName}'?", fix);
+            }
+            else
+            {
+                _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
+                    $"Undefined variable '{refNode.Name}'");
+            }
             // Return a dummy variable to continue analysis
             return new BoundVariableExpression(refNode.Span,
                 new VariableSymbol(refNode.Name, "INT", false));
