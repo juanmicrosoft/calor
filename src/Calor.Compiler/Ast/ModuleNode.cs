@@ -14,6 +14,7 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<InterfaceDefinitionNode> Interfaces { get; }
     public IReadOnlyList<ClassDefinitionNode> Classes { get; }
     public IReadOnlyList<EnumDefinitionNode> Enums { get; }
+    public IReadOnlyList<EnumExtensionNode> EnumExtensions { get; }
     public IReadOnlyList<DelegateDefinitionNode> Delegates { get; }
     public IReadOnlyList<FunctionNode> Functions { get; }
     public AttributeCollection Attributes { get; }
@@ -38,6 +39,7 @@ public sealed class ModuleNode : AstNode
         AttributeCollection attributes)
         : this(span, id, name, usings, Array.Empty<InterfaceDefinitionNode>(),
                Array.Empty<ClassDefinitionNode>(), Array.Empty<EnumDefinitionNode>(),
+               Array.Empty<EnumExtensionNode>(), Array.Empty<DelegateDefinitionNode>(),
                functions, attributes,
                Array.Empty<IssueNode>(), Array.Empty<AssumeNode>(),
                Array.Empty<InvariantNode>(), Array.Empty<DecisionNode>(), null)
@@ -54,6 +56,7 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<FunctionNode> functions,
         AttributeCollection attributes)
         : this(span, id, name, usings, interfaces, classes, Array.Empty<EnumDefinitionNode>(),
+               Array.Empty<EnumExtensionNode>(), Array.Empty<DelegateDefinitionNode>(),
                functions, attributes,
                Array.Empty<IssueNode>(), Array.Empty<AssumeNode>(),
                Array.Empty<InvariantNode>(), Array.Empty<DecisionNode>(), null)
@@ -70,7 +73,9 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<EnumDefinitionNode> enums,
         IReadOnlyList<FunctionNode> functions,
         AttributeCollection attributes)
-        : this(span, id, name, usings, interfaces, classes, enums, functions, attributes,
+        : this(span, id, name, usings, interfaces, classes, enums,
+               Array.Empty<EnumExtensionNode>(), Array.Empty<DelegateDefinitionNode>(),
+               functions, attributes,
                Array.Empty<IssueNode>(), Array.Empty<AssumeNode>(),
                Array.Empty<InvariantNode>(), Array.Empty<DecisionNode>(), null)
     {
@@ -91,6 +96,7 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<DecisionNode> decisions,
         ContextNode? context)
         : this(span, id, name, usings, interfaces, classes, Array.Empty<EnumDefinitionNode>(),
+               Array.Empty<EnumExtensionNode>(), Array.Empty<DelegateDefinitionNode>(),
                functions, attributes, issues, assumptions, invariants, decisions, context)
     {
     }
@@ -111,7 +117,8 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<DecisionNode> decisions,
         ContextNode? context)
         : this(span, id, name, usings, interfaces, classes, enums,
-               Array.Empty<DelegateDefinitionNode>(), functions, attributes,
+               Array.Empty<EnumExtensionNode>(), Array.Empty<DelegateDefinitionNode>(),
+               functions, attributes,
                issues, assumptions, invariants, decisions, context)
     {
     }
@@ -132,6 +139,30 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<InvariantNode> invariants,
         IReadOnlyList<DecisionNode> decisions,
         ContextNode? context)
+        : this(span, id, name, usings, interfaces, classes, enums,
+               Array.Empty<EnumExtensionNode>(), delegates,
+               functions, attributes,
+               issues, assumptions, invariants, decisions, context)
+    {
+    }
+
+    public ModuleNode(
+        TextSpan span,
+        string id,
+        string name,
+        IReadOnlyList<UsingDirectiveNode> usings,
+        IReadOnlyList<InterfaceDefinitionNode> interfaces,
+        IReadOnlyList<ClassDefinitionNode> classes,
+        IReadOnlyList<EnumDefinitionNode> enums,
+        IReadOnlyList<EnumExtensionNode> enumExtensions,
+        IReadOnlyList<DelegateDefinitionNode> delegates,
+        IReadOnlyList<FunctionNode> functions,
+        AttributeCollection attributes,
+        IReadOnlyList<IssueNode> issues,
+        IReadOnlyList<AssumeNode> assumptions,
+        IReadOnlyList<InvariantNode> invariants,
+        IReadOnlyList<DecisionNode> decisions,
+        ContextNode? context)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -140,6 +171,7 @@ public sealed class ModuleNode : AstNode
         Interfaces = interfaces ?? throw new ArgumentNullException(nameof(interfaces));
         Classes = classes ?? throw new ArgumentNullException(nameof(classes));
         Enums = enums ?? throw new ArgumentNullException(nameof(enums));
+        EnumExtensions = enumExtensions ?? throw new ArgumentNullException(nameof(enumExtensions));
         Delegates = delegates ?? throw new ArgumentNullException(nameof(delegates));
         Functions = functions ?? throw new ArgumentNullException(nameof(functions));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));

@@ -309,10 +309,10 @@ public sealed class EnumMemberNode : AstNode
 
 /// <summary>
 /// Represents an enum type definition.
-/// §ENUM{id:Name} or §ENUM{id:Name:underlyingType}
+/// §EN{id:Name} or §EN{id:Name:underlyingType}
 ///   Red
 ///   Green = 1
-/// §/ENUM{id}
+/// §/EN{id}
 /// </summary>
 public sealed class EnumDefinitionNode : TypeDefinitionNode
 {

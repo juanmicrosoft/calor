@@ -86,6 +86,11 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         => ReportError(span, DiagnosticCode.ExpectedClosingTag,
             $"Expected '{expectedCloseTag}' to close '{openTag}'");
 
+    // Semantic diagnostics
+    public void ReportMissingExtensionSelf(TextSpan span, string methodName, string enumName)
+        => ReportError(span, DiagnosticCode.MissingExtensionSelf,
+            $"Extension method '{methodName}' must have a parameter of type '{enumName}'");
+
     public void AddRange(IEnumerable<Diagnostic> diagnostics)
     {
         _diagnostics.AddRange(diagnostics);

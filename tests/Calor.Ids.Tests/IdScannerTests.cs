@@ -178,9 +178,9 @@ public class IdScannerTests
             §/CL{c001}
             §IFACE{i001:ITest}
             §/IFACE{i001}
-            §ENUM{e001:Status}
+            §EN{e001:Status}
             Active
-            §/ENUM{e001}
+            §/EN{e001}
             §/M{m001}
             """;
         var module = Parse(source);

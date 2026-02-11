@@ -102,6 +102,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit enum extensions
+        foreach (var enumExt in node.EnumExtensions)
+        {
+            Visit(enumExt);
+            AppendLine();
+        }
+
         // Emit classes
         foreach (var cls in node.Classes)
         {
@@ -1583,10 +1590,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EnumDefinitionNode node)
     {
-        // Format: §ENUM{id:Name} or §ENUM{id:Name:underlyingType}
+        // Format: §EN{id:Name} or §EN{id:Name:underlyingType}
         var header = node.UnderlyingType != null
-            ? $"§ENUM{{{node.Id}:{node.Name}:{node.UnderlyingType}}}"
-            : $"§ENUM{{{node.Id}:{node.Name}}}";
+            ? $"§EN{{{node.Id}:{node.Name}:{node.UnderlyingType}}}"
+            : $"§EN{{{node.Id}:{node.Name}}}";
         AppendLine(header);
         Indent();
 
@@ -1596,7 +1603,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/ENUM{{{node.Id}}}");
+        AppendLine($"§/EN{{{node.Id}}}");
         return "";
     }
 
@@ -1606,6 +1613,23 @@ public sealed class CalorEmitter : IAstVisitor<string>
             ? $"{node.Name} = {node.Value}"
             : node.Name;
         AppendLine(line);
+        return "";
+    }
+
+    public string Visit(EnumExtensionNode node)
+    {
+        // Format: §EEXT{id:EnumName} (note: §EXT is for class inheritance)
+        AppendLine($"§EEXT{{{node.Id}:{node.EnumName}}}");
+        Indent();
+
+        foreach (var method in node.Methods)
+        {
+            Visit(method);
+            AppendLine();
+        }
+
+        Dedent();
+        AppendLine($"§/EEXT{{{node.Id}}}");
         return "";
     }
 

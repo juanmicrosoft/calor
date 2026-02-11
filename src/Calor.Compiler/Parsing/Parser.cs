@@ -87,6 +87,8 @@ public sealed class Parser
         var usings = new List<UsingDirectiveNode>();
         var interfaces = new List<InterfaceDefinitionNode>();
         var classes = new List<ClassDefinitionNode>();
+        var enums = new List<EnumDefinitionNode>();
+        var enumExtensions = new List<EnumExtensionNode>();
         var delegates = new List<DelegateDefinitionNode>();
         var functions = new List<FunctionNode>();
 
@@ -122,6 +124,14 @@ public sealed class Parser
             else if (Check(TokenKind.Delegate))
             {
                 delegates.Add(ParseDelegateDefinition());
+            }
+            else if (Check(TokenKind.Enum))
+            {
+                enums.Add(ParseEnumDefinition());
+            }
+            else if (Check(TokenKind.EnumExtension))
+            {
+                enumExtensions.Add(ParseEnumExtension());
             }
             // Extended Features: Module-level metadata
             else if (Check(TokenKind.Todo))
@@ -177,7 +187,7 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new ModuleNode(span, id, moduleName, usings, interfaces, classes,
-            Array.Empty<EnumDefinitionNode>(), delegates, functions, attrs,
+            enums, enumExtensions, delegates, functions, attrs,
             issues, assumptions, invariants, decisions, context);
     }
 
@@ -6052,6 +6062,173 @@ public sealed class Parser
             or TokenKind.Invariant
             or TokenKind.Decision
             or TokenKind.Context;
+    }
+
+    #endregion
+
+    #region Enum and Enum Extensions
+
+    /// <summary>
+    /// Parses an enum definition.
+    /// §EN{id:Name} or §EN{id:Name:underlyingType}
+    ///   Red
+    ///   Green = 1
+    ///   Blue = 2
+    /// §/EN{id}
+    /// </summary>
+    private EnumDefinitionNode ParseEnumDefinition()
+    {
+        var startToken = Expect(TokenKind.Enum);
+        var attrs = ParseAttributes();
+
+        // Positional: [id:name] or [id:name:underlyingType]
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+        var underlyingType = attrs["_pos2"]; // optional
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EN", "id");
+        }
+        if (string.IsNullOrEmpty(name))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EN", "name");
+        }
+
+        var members = new List<EnumMemberNode>();
+
+        // Parse enum members until we hit the closing tag
+        while (!IsAtEnd && !Check(TokenKind.EndEnum))
+        {
+            // Each enum member is an identifier optionally followed by = value
+            if (Check(TokenKind.Identifier))
+            {
+                var memberStartToken = Current;
+                var memberName = Advance().Text;
+                string? memberValue = null;
+
+                // Check for = value
+                if (Check(TokenKind.Equals))
+                {
+                    Advance(); // consume =
+                    // Value can be an integer literal or identifier
+                    if (Check(TokenKind.IntLiteral))
+                    {
+                        var valueToken = Advance();
+                        memberValue = valueToken.Value?.ToString();
+                    }
+                    else if (Check(TokenKind.Identifier))
+                    {
+                        // Could be a reference to another enum member or expression
+                        var valueToken = Advance();
+                        memberValue = valueToken.Text;
+                    }
+                    else if (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral)
+                    {
+                        // Negative value
+                        Advance(); // consume -
+                        var valueToken = Advance();
+                        memberValue = $"-{valueToken.Value}";
+                    }
+                }
+
+                var memberSpan = memberStartToken.Span.Union(Current.Span);
+                members.Add(new EnumMemberNode(memberSpan, memberName, memberValue));
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "enum member name", Current.Kind);
+                Advance();
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndEnum);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "EN", id, "END_EN", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new EnumDefinitionNode(span, id, name, underlyingType, members, attrs);
+    }
+
+    /// <summary>
+    /// Parses an enum extension definition.
+    /// §EEXT{id:EnumName}
+    ///   §F{f001:MethodName:pub}
+    ///     §I{EnumType:self}
+    ///     §O{returnType}
+    ///     // body
+    ///   §/F{f001}
+    /// §/EEXT{id}
+    /// </summary>
+    private EnumExtensionNode ParseEnumExtension()
+    {
+        var startToken = Expect(TokenKind.EnumExtension);
+        var attrs = ParseAttributes();
+
+        // Positional: [id:enumName]
+        var id = attrs["_pos0"] ?? "";
+        var enumName = attrs["_pos1"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EXT", "id");
+        }
+        if (string.IsNullOrEmpty(enumName))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EXT", "enumName");
+        }
+
+        var methods = new List<FunctionNode>();
+
+        // Parse extension methods until we hit the closing tag
+        while (!IsAtEnd && !Check(TokenKind.EndEnumExtension))
+        {
+            if (Check(TokenKind.Func))
+            {
+                methods.Add(ParseFunction());
+            }
+            else if (Check(TokenKind.AsyncFunc))
+            {
+                methods.Add(ParseAsyncFunction());
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedToken(Current.Span, "F or AF (function definition)", Current.Kind);
+                Advance();
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndEnumExtension);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedId(endToken.Span, "EXT", id, "END_EXT", endId);
+        }
+
+        // Validate that each extension method has a parameter of the enum type
+        if (!string.IsNullOrEmpty(enumName))
+        {
+            foreach (var method in methods)
+            {
+                var hasEnumParam = method.Parameters.Any(p =>
+                    string.Equals(p.TypeName, enumName, StringComparison.OrdinalIgnoreCase));
+
+                if (!hasEnumParam)
+                {
+                    _diagnostics.ReportMissingExtensionSelf(method.Span, method.Name, enumName);
+                }
+            }
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new EnumExtensionNode(span, id, enumName, methods, attrs);
     }
 
     #endregion

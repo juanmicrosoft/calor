@@ -51,6 +51,7 @@ public interface IAstVisitor
     void Visit(UnionTypeDefinitionNode node);
     void Visit(EnumDefinitionNode node);
     void Visit(EnumMemberNode node);
+    void Visit(EnumExtensionNode node);
     void Visit(RecordCreationNode node);
     void Visit(FieldAccessNode node);
     void Visit(SomeExpressionNode node);
@@ -216,6 +217,7 @@ public interface IAstVisitor<T>
     T Visit(UnionTypeDefinitionNode node);
     T Visit(EnumDefinitionNode node);
     T Visit(EnumMemberNode node);
+    T Visit(EnumExtensionNode node);
     T Visit(RecordCreationNode node);
     T Visit(FieldAccessNode node);
     T Visit(SomeExpressionNode node);

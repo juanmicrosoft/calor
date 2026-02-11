@@ -257,17 +257,17 @@ Example with class and method:
 ## Enums
 
 ```
-§ENUM{id:Name}              Simple enum
+§EN{id:Name}              Simple enum
   Red
   Green
   Blue
-§/ENUM{id}
+§/EN{id}
 
-§ENUM{id:Name:underlyingType}  Enum with underlying type
+§EN{id:Name:underlyingType}  Enum with underlying type
   Ok = 200
   NotFound = 404
   Error = 500
-§/ENUM{id}
+§/EN{id}
 ```
 
 Underlying types: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
@@ -276,11 +276,47 @@ Underlying types: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
 
 ```calor
 §M{m001:Api}
-§ENUM{e001:StatusCode}
+§EN{e001:StatusCode}
   Ok = 200
   NotFound = 404
   ServerError = 500
-§/ENUM{e001}
+§/EN{e001}
+§/M{m001}
+```
+
+## Enum Extension Methods
+
+```
+§EEXT{id:EnumName}          Extension methods for enum
+  §F{f001:MethodName:pub}
+    §I{EnumType:self}       First param becomes 'this'
+    §O{returnType}
+    // body
+  §/F{f001}
+§/EEXT{id}
+```
+
+### Template: Color with ToHex Extension
+
+```calor
+§M{m001:Colors}
+§EN{e001:Color}
+  Red
+  Green
+  Blue
+§/EN{e001}
+
+§EEXT{ext001:Color}
+  §F{f001:ToHex:pub}
+    §I{Color:self}
+    §O{str}
+    §W{sw1} self
+      §K Color.Red → §R "#FF0000"
+      §K Color.Green → §R "#00FF00"
+      §K Color.Blue → §R "#0000FF"
+    §/W{sw1}
+  §/F{f001}
+§/EEXT{ext001}
 §/M{m001}
 ```
 

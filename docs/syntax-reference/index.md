@@ -54,6 +54,8 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Contains | `§HAS{coll} value` | `§HAS{nums} 5` |
 | Count | `§CNT{coll}` | `§CNT{nums}` |
 | Dict Foreach | `§EACHKV{id:k:v} dict` | `§EACHKV{e1:k:v} ages` |
+| Enum | `§EN{id:name}` | `§EN{e001:Color}` |
+| Enum Extension | `§EXT{id:enumName}` | `§EXT{ext001:Color}` |
 | Switch | `§W{id} expr` | `§W{sw1} score` |
 | Case | `§K pattern → result` | `§K 200 → "OK"` |
 | Wildcard | `§K _` | `§K _ → "default"` |

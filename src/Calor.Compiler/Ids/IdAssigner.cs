@@ -63,6 +63,7 @@ public static partial class IdAssigner
     private static readonly Regex MethodPattern = MethodPatternRegex();
     private static readonly Regex ConstructorPattern = ConstructorPatternRegex();
     private static readonly Regex EnumPattern = EnumPatternRegex();
+    private static readonly Regex EnumExtensionPattern = EnumExtensionPatternRegex();
 
     /// <summary>
     /// Assigns IDs to declarations in a file.
@@ -110,6 +111,9 @@ public static partial class IdAssigner
             if (assignment != null) { lines[i] = newLine; assignments.Add(assignment); continue; }
 
             (newLine, assignment) = TryAssignId(line, filePath, lineNum, IdKind.Enum, EnumPattern, existingIds, fixDuplicates);
+            if (assignment != null) { lines[i] = newLine; assignments.Add(assignment); continue; }
+
+            (newLine, assignment) = TryAssignId(line, filePath, lineNum, IdKind.EnumExtension, EnumExtensionPattern, existingIds, fixDuplicates);
             if (assignment != null) { lines[i] = newLine; assignments.Add(assignment); continue; }
         }
 
@@ -207,7 +211,8 @@ public static partial class IdAssigner
                 IdKind.Property => $@"§/PROP\{{{Regex.Escape(assignment.OldId)}\}}",
                 IdKind.Method => $@"§/MT\{{{Regex.Escape(assignment.OldId)}\}}",
                 IdKind.Constructor => $@"§/CTOR\{{{Regex.Escape(assignment.OldId)}\}}",
-                IdKind.Enum => $@"§/(EN|ENUM)\{{{Regex.Escape(assignment.OldId)}\}}",
+                IdKind.Enum => $@"§/(?:EN|ENUM)\{{{Regex.Escape(assignment.OldId)}\}}",
+                IdKind.EnumExtension => $@"§/EXT\{{{Regex.Escape(assignment.OldId)}\}}",
                 _ => null
             };
 
@@ -222,7 +227,8 @@ public static partial class IdAssigner
                     IdKind.Property => $"§/PROP{{{assignment.NewId}}}",
                     IdKind.Method => $"§/MT{{{assignment.NewId}}}",
                     IdKind.Constructor => $"§/CTOR{{{assignment.NewId}}}",
-                    IdKind.Enum => $"§/ENUM{{{assignment.NewId}}}",
+                    IdKind.Enum => $"§/EN{{{assignment.NewId}}}",
+                    IdKind.EnumExtension => $"§/EXT{{{assignment.NewId}}}",
                     _ => ""
                 };
 
@@ -265,4 +271,8 @@ public static partial class IdAssigner
     // §EN{id:name} or §ENUM{id:name}
     [GeneratedRegex(@"§(?:EN|ENUM)\{(?<id>[^:}]*):(?<name>[^:}]+)(?::[^}]*)?\}", RegexOptions.IgnoreCase)]
     private static partial Regex EnumPatternRegex();
+
+    // §EXT{id:enumName}
+    [GeneratedRegex(@"§EXT\{(?<id>[^:}]*):(?<name>[^:}]+)(?::[^}]*)?\}", RegexOptions.IgnoreCase)]
+    private static partial Regex EnumExtensionPatternRegex();
 }

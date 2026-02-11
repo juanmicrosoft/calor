@@ -70,6 +70,36 @@ public sealed class CalorFormatter
             AppendLine(FormatUsing(u));
         }
 
+        // Interfaces
+        foreach (var iface in module.Interfaces)
+        {
+            FormatInterface(iface);
+        }
+
+        // Classes
+        foreach (var cls in module.Classes)
+        {
+            FormatClass(cls);
+        }
+
+        // Enums
+        foreach (var en in module.Enums)
+        {
+            FormatEnum(en);
+        }
+
+        // Enum Extensions
+        foreach (var ext in module.EnumExtensions)
+        {
+            FormatEnumExtension(ext);
+        }
+
+        // Delegates
+        foreach (var del in module.Delegates)
+        {
+            FormatDelegate(del);
+        }
+
         // Functions
         foreach (var func in module.Functions)
         {
@@ -147,6 +177,204 @@ public sealed class CalorFormatter
         }
 
         AppendLine($"§/F{{{funcId}}}");
+    }
+
+    private void FormatInterface(InterfaceDefinitionNode iface)
+    {
+        var ifaceId = AbbreviateId(iface.Id);
+        var baseList = iface.BaseInterfaces.Count > 0
+            ? $":{string.Join(",", iface.BaseInterfaces)}"
+            : "";
+        AppendLine($"§IFACE{{{ifaceId}:{iface.Name}{baseList}}}");
+
+        foreach (var method in iface.Methods)
+        {
+            FormatMethodSignature(method);
+        }
+
+        AppendLine($"§/IFACE{{{ifaceId}}}");
+    }
+
+    private void FormatMethodSignature(MethodSignatureNode method)
+    {
+        var methodId = AbbreviateId(method.Id);
+        var output = method.Output != null ? CompactTypeName(method.Output.TypeName) : "void";
+        var paramList = string.Join(",", method.Parameters.Select(p =>
+            $"{CompactTypeName(p.TypeName)}:{p.Name}"));
+        AppendLine($"§SIG{{{methodId}:{method.Name}}} ({paramList}) → {output}");
+    }
+
+    private void FormatClass(ClassDefinitionNode cls)
+    {
+        var clsId = AbbreviateId(cls.Id);
+        var modifiers = new List<string>();
+        if (cls.IsAbstract) modifiers.Add("abs");
+        if (cls.IsSealed) modifiers.Add("sealed");
+        if (cls.IsPartial) modifiers.Add("partial");
+        if (cls.IsStatic) modifiers.Add("static");
+
+        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        var baseStr = cls.BaseClass != null ? $":{cls.BaseClass}" : "";
+
+        AppendLine($"§CL{{{clsId}:{cls.Name}{baseStr}{modStr}}}");
+
+        // Implemented interfaces
+        foreach (var impl in cls.ImplementedInterfaces)
+        {
+            AppendLine($"§IMPL{{{impl}}}");
+        }
+
+        // Fields
+        foreach (var field in cls.Fields)
+        {
+            FormatField(field);
+        }
+
+        // Properties
+        foreach (var prop in cls.Properties)
+        {
+            FormatProperty(prop);
+        }
+
+        // Constructors
+        foreach (var ctor in cls.Constructors)
+        {
+            FormatConstructor(ctor);
+        }
+
+        // Methods
+        foreach (var method in cls.Methods)
+        {
+            FormatMethod(method);
+        }
+
+        AppendLine($"§/CL{{{clsId}}}");
+    }
+
+    private void FormatField(ClassFieldNode field)
+    {
+        var visibility = field.Visibility == Visibility.Public ? "pub" : "priv";
+        var typeName = CompactTypeName(field.TypeName);
+        var defaultVal = field.DefaultValue != null ? $" = {FormatExpression(field.DefaultValue)}" : "";
+        AppendLine($"§FLD{{{typeName}:{field.Name}:{visibility}}}{defaultVal}");
+    }
+
+    private void FormatProperty(PropertyNode prop)
+    {
+        var propId = AbbreviateId(prop.Id);
+        var visibility = prop.Visibility == Visibility.Public ? "pub" : "priv";
+        var typeName = CompactTypeName(prop.TypeName);
+        AppendLine($"§PROP{{{propId}:{prop.Name}:{typeName}:{visibility}}}");
+
+        if (prop.Getter != null)
+        {
+            var getVis = prop.Getter.Visibility == Visibility.Public ? "pub" : "priv";
+            AppendLine($"§GET{{{getVis}}}");
+            foreach (var stmt in prop.Getter.Body)
+            {
+                FormatStatement(stmt);
+            }
+            AppendLine("§/GET");
+        }
+
+        if (prop.Setter != null)
+        {
+            var setVis = prop.Setter.Visibility == Visibility.Public ? "pub" : "priv";
+            AppendLine($"§SET{{{setVis}}}");
+            foreach (var stmt in prop.Setter.Body)
+            {
+                FormatStatement(stmt);
+            }
+            AppendLine("§/SET");
+        }
+
+        AppendLine($"§/PROP{{{propId}}}");
+    }
+
+    private void FormatConstructor(ConstructorNode ctor)
+    {
+        var ctorId = AbbreviateId(ctor.Id);
+        var visibility = ctor.Visibility == Visibility.Public ? "pub" : "priv";
+        AppendLine($"§CTOR{{{ctorId}:{visibility}}}");
+
+        foreach (var param in ctor.Parameters)
+        {
+            var typeName = CompactTypeName(param.TypeName);
+            AppendLine($"§I{{{typeName}:{param.Name}}}");
+        }
+
+        foreach (var stmt in ctor.Body)
+        {
+            FormatStatement(stmt);
+        }
+
+        AppendLine($"§/CTOR{{{ctorId}}}");
+    }
+
+    private void FormatMethod(MethodNode method)
+    {
+        var methodId = AbbreviateId(method.Id);
+        var visibility = method.Visibility == Visibility.Public ? "pub" : "priv";
+        AppendLine($"§MT{{{methodId}:{method.Name}:{visibility}}}");
+
+        foreach (var param in method.Parameters)
+        {
+            var typeName = CompactTypeName(param.TypeName);
+            AppendLine($"§I{{{typeName}:{param.Name}}}");
+        }
+
+        if (method.Output != null)
+        {
+            var typeName = CompactTypeName(method.Output.TypeName);
+            AppendLine($"§O{{{typeName}}}");
+        }
+
+        foreach (var stmt in method.Body)
+        {
+            FormatStatement(stmt);
+        }
+
+        AppendLine($"§/MT{{{methodId}}}");
+    }
+
+    private void FormatEnum(EnumDefinitionNode en)
+    {
+        var enumId = AbbreviateId(en.Id);
+        var header = en.UnderlyingType != null
+            ? $"§EN{{{enumId}:{en.Name}:{en.UnderlyingType}}}"
+            : $"§EN{{{enumId}:{en.Name}}}";
+        AppendLine(header);
+
+        foreach (var member in en.Members)
+        {
+            var line = member.Value != null
+                ? $"{member.Name} = {member.Value}"
+                : member.Name;
+            AppendLine(line);
+        }
+
+        AppendLine($"§/EN{{{enumId}}}");
+    }
+
+    private void FormatEnumExtension(EnumExtensionNode ext)
+    {
+        var extId = AbbreviateId(ext.Id);
+        AppendLine($"§EEXT{{{extId}:{ext.EnumName}}}");
+
+        foreach (var method in ext.Methods)
+        {
+            FormatFunction(method);
+        }
+
+        AppendLine($"§/EEXT{{{extId}}}");
+    }
+
+    private void FormatDelegate(DelegateDefinitionNode del)
+    {
+        var output = del.Output != null ? CompactTypeName(del.Output.TypeName) : "void";
+        var paramList = string.Join(", ", del.Parameters.Select(p =>
+            $"{CompactTypeName(p.TypeName)}:{p.Name}"));
+        AppendLine($"§DEL{{{del.Name}}} ({paramList}) → {output}");
     }
 
     private void FormatStatement(StatementNode stmt)
