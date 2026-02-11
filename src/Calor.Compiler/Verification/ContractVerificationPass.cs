@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Verification.Z3.Cache;
 using System.Runtime.CompilerServices;
 
 namespace Calor.Compiler.Verification.Z3;
@@ -52,13 +53,14 @@ public sealed class ContractVerificationPass
 
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx, _options.TimeoutMs);
+        using var cache = new VerificationCache(_options.CacheOptions);
 
         foreach (var function in module.Functions)
         {
             if (!function.HasContracts)
                 continue;
 
-            var result = VerifyFunction(verifier, function);
+            var result = VerifyFunction(verifier, cache, function);
             results.Add(result);
             ReportDiagnostics(function, result);
         }
@@ -68,12 +70,28 @@ public sealed class ContractVerificationPass
         {
             var summary = new ModuleVerificationResult(results).GetSummary();
             ReportSummary(module, summary);
+
+            // Report cache statistics in verbose mode
+            if (_options.Verbose && cache.IsEnabled)
+            {
+                var stats = cache.GetStatistics();
+                if (stats.TotalLookups > 0)
+                {
+                    _diagnostics.ReportInfo(
+                        module.Span,
+                        "Calor0705",
+                        $"Verification cache: {stats.Hits} hits, {stats.Misses} misses ({stats.HitRate:F1}% hit rate)");
+                }
+            }
         }
 
         return new ModuleVerificationResult(results);
     }
 
-    private FunctionVerificationResult VerifyFunction(Z3Verifier verifier, FunctionNode function)
+    private FunctionVerificationResult VerifyFunction(
+        Z3Verifier verifier,
+        VerificationCache cache,
+        FunctionNode function)
     {
         // Extract parameter information
         var parameters = function.Parameters
@@ -82,23 +100,41 @@ public sealed class ContractVerificationPass
 
         var outputType = function.Output?.TypeName;
 
-        // Verify preconditions
+        // Verify preconditions with cache
         var preconditionResults = new List<ContractVerificationResult>();
         foreach (var pre in function.Preconditions)
         {
+            // Try cache first
+            if (cache.TryGetPreconditionResult(parameters, pre, out var cached))
+            {
+                preconditionResults.Add(cached!);
+                continue;
+            }
+
+            // Cache miss - run Z3 verification
             var result = verifier.VerifyPrecondition(parameters, pre);
+            cache.CachePreconditionResult(parameters, pre, result);
             preconditionResults.Add(result);
         }
 
-        // Verify postconditions
+        // Verify postconditions with cache
         var postconditionResults = new List<ContractVerificationResult>();
         foreach (var post in function.Postconditions)
         {
+            // Try cache first
+            if (cache.TryGetPostconditionResult(parameters, outputType, function.Preconditions, post, out var cached))
+            {
+                postconditionResults.Add(cached!);
+                continue;
+            }
+
+            // Cache miss - run Z3 verification
             var result = verifier.VerifyPostcondition(
                 parameters,
                 outputType,
                 function.Preconditions,
                 post);
+            cache.CachePostconditionResult(parameters, outputType, function.Preconditions, post, result);
             postconditionResults.Add(result);
         }
 

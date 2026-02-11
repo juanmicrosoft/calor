@@ -1,3 +1,5 @@
+using Calor.Compiler.Verification.Z3.Cache;
+
 namespace Calor.Compiler.Verification.Z3;
 
 /// <summary>
@@ -20,6 +22,12 @@ public sealed class VerificationOptions
     /// Whether to emit verbose diagnostic output during verification.
     /// </summary>
     public bool Verbose { get; init; }
+
+    /// <summary>
+    /// Cache options for verification results.
+    /// Default: caching enabled.
+    /// </summary>
+    public VerificationCacheOptions CacheOptions { get; init; } = VerificationCacheOptions.Default;
 
     /// <summary>
     /// Default verification options.

@@ -45,6 +45,8 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--output` | `-o` | Yes | Output C# file path |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable static contract verification with Z3 |
+| `--no-cache` | | No | Disable verification result caching |
+| `--clear-cache` | | No | Clear verification cache before compiling |
 | `--contract-mode` | | No | Contract enforcement mode: off, debug, release (default: debug) |
 | `--strict-api` | | No | Require §BREAKING markers for public API changes |
 | `--require-docs` | | No | Require documentation on public functions |
@@ -216,6 +218,35 @@ For proven contracts, the generated C# includes:
 ```
 
 For more details, see [Static Verification](/calor/philosophy/static-verification/).
+
+---
+
+## Verification Caching
+
+When using `--verify`, the compiler caches Z3 verification results to avoid redundant SMT solver invocations on subsequent compilations. This can dramatically improve compile times for projects with stable contracts.
+
+### How It Works
+
+- **Cache key**: SHA256 hash of the contract expression and parameter types
+- **Cache location**: `~/.calor/cache/z3/` (user-level) or `.calor/verification-cache/` (project-level)
+- **Cache invalidation**: Automatic when contract expression changes
+
+### Cache Options
+
+```bash
+# Default: caching enabled
+calor -i MyModule.calr -o MyModule.g.cs --verify
+
+# Disable caching (useful for CI or debugging)
+calor -i MyModule.calr -o MyModule.g.cs --verify --no-cache
+
+# Clear cache before verification
+calor -i MyModule.calr -o MyModule.g.cs --verify --clear-cache
+```
+
+### Performance Impact
+
+First compilation runs Z3 for each contract (can take seconds per complex contract). Subsequent compilations with unchanged contracts return cached results in milliseconds.
 
 ---
 
