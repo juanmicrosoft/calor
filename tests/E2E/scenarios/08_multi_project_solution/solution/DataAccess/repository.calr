@@ -1,0 +1,17 @@
+§M{m001:Repository}
+
+§F{f001:GetById:pub}
+  §I{i32:id}
+  §O{i32}
+  §Q (> id 0)
+  §S (>= result 0)
+  §R (* id 10)
+§/F{f001}
+
+§F{f002:Count:pub}
+  §O{i32}
+  §S (>= result 0)
+  §R 42
+§/F{f002}
+
+§/M{m001}

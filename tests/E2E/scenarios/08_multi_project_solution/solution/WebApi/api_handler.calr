@@ -1,0 +1,21 @@
+§M{m001:ApiHandler}
+
+§F{f001:HandleRequest:pub}
+  §I{i32:statusCode}
+  §O{i32}
+  §Q (>= statusCode 100)
+  §S (>= result 0)
+  §E{cw}
+  §C{Console.WriteLine}
+    §A "Handling request..."
+  §/C
+  §R (+ statusCode 1)
+§/F{f001}
+
+§F{f002:ValidateStatus:pub}
+  §I{i32:code}
+  §O{bool}
+  §R (and (>= code 200) (< code 300))
+§/F{f002}
+
+§/M{m001}

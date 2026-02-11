@@ -1,0 +1,23 @@
+§M{m001:Utils}
+
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+
+§F{f002:IsPositive:pub}
+  §I{i32:x}
+  §O{bool}
+  §R (> x 0)
+§/F{f002}
+
+§F{f003:Clamp:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (>= result 0)
+  §R (* x x)
+§/F{f003}
+
+§/M{m001}

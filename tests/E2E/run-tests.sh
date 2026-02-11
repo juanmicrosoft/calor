@@ -45,21 +45,31 @@ run_scenario() {
     scenario_name=$(basename "$scenario_dir")
 
     local input_file="$scenario_dir/input.calr"
+    local run_script="$scenario_dir/run.sh"
     local verify_script="$scenario_dir/verify.sh"
     local output_file="$scenario_dir/output.g.cs"
 
     # Check for required files
-    if [[ ! -f "$input_file" ]]; then
-        skip "$scenario_name - no input.calr"
+    if [[ ! -f "$input_file" && ! -f "$run_script" ]]; then
+        skip "$scenario_name - no input.calr or run.sh"
         return 0
     fi
 
     echo -e "${BLUE}Running: $scenario_name${NC}"
 
-    # Compile Calor to C#
-    if ! "$COMPILER" --input "$input_file" --output "$output_file"; then
-        fail "$scenario_name - compilation failed"
-        return 0
+    # Use custom run.sh if present, otherwise default compile
+    if [[ -f "$run_script" ]]; then
+        chmod +x "$run_script"
+        if ! "$run_script" "$scenario_dir" "$COMPILER"; then
+            fail "$scenario_name - run.sh failed"
+            return 0
+        fi
+    elif [[ -f "$input_file" ]]; then
+        # Compile Calor to C#
+        if ! "$COMPILER" --input "$input_file" --output "$output_file"; then
+            fail "$scenario_name - compilation failed"
+            return 0
+        fi
     fi
 
     # Run verification script if present
@@ -78,6 +88,7 @@ run_scenario() {
 cleanup() {
     info "Cleaning up generated files..."
     find "$SCENARIOS_DIR" -name "*.g.cs" -delete 2>/dev/null || true
+    find "$SCENARIOS_DIR" -name ".workdir" -delete 2>/dev/null || true
     find "$SCENARIOS_DIR" -name "bin" -type d -exec rm -rf {} + 2>/dev/null || true
     find "$SCENARIOS_DIR" -name "obj" -type d -exec rm -rf {} + 2>/dev/null || true
 }

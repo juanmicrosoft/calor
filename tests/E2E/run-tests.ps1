@@ -36,25 +36,39 @@ function Invoke-Scenario {
 
     $scenarioName = Split-Path -Leaf $ScenarioDir
     $inputFile = Join-Path $ScenarioDir "input.calr"
+    $runScript = Join-Path $ScenarioDir "run.ps1"
     $verifyScript = Join-Path $ScenarioDir "verify.ps1"
     $outputFile = Join-Path $ScenarioDir "output.g.cs"
 
     # Check for required files
-    if (-not (Test-Path $inputFile)) {
-        Write-Skip "$scenarioName - no input.calr"
+    if (-not (Test-Path $inputFile) -and -not (Test-Path $runScript)) {
+        Write-Skip "$scenarioName - no input.calr or run.ps1"
         return
     }
 
     Write-Host "Running: $scenarioName" -ForegroundColor Blue
 
-    # Compile Calor to C#
-    try {
-        & $Compiler --input $inputFile --output $outputFile 2>$null
-        if (-not $?) { throw "Compilation failed" }
+    # Use custom run.ps1 if present, otherwise default compile
+    if (Test-Path $runScript) {
+        try {
+            & $runScript $ScenarioDir $Compiler
+            if (-not $?) { throw "run.ps1 failed" }
+        }
+        catch {
+            Write-Fail "$scenarioName - run.ps1 failed"
+            return
+        }
     }
-    catch {
-        Write-Fail "$scenarioName - compilation failed"
-        return
+    elseif (Test-Path $inputFile) {
+        # Compile Calor to C#
+        try {
+            & $Compiler --input $inputFile --output $outputFile 2>$null
+            if (-not $?) { throw "Compilation failed" }
+        }
+        catch {
+            Write-Fail "$scenarioName - compilation failed"
+            return
+        }
     }
 
     # Run verification script if present
@@ -75,6 +89,7 @@ function Invoke-Scenario {
 function Clear-GeneratedFiles {
     Write-Info "Cleaning up generated files..."
     Get-ChildItem -Path $ScenariosDir -Filter "*.g.cs" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $ScenariosDir -Filter ".workdir" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
     Get-ChildItem -Path $ScenariosDir -Directory -Filter "bin" -Recurse | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     Get-ChildItem -Path $ScenariosDir -Directory -Filter "obj" -Recurse | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
