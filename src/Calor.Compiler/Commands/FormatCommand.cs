@@ -1,7 +1,9 @@
 using System.CommandLine;
+using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -52,6 +54,10 @@ public static class FormatCommand
 
     private static async Task ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose)
     {
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        telemetry?.SetCommand("format");
+        var sw = Stopwatch.StartNew();
+
         var hasUnformatted = false;
         var totalFiles = 0;
         var formattedFiles = 0;
@@ -151,6 +157,18 @@ public static class FormatCommand
         else if (check && hasUnformatted)
         {
             Environment.ExitCode = 1;
+        }
+
+        sw.Stop();
+        telemetry?.TrackCommand("format", Environment.ExitCode, new Dictionary<string, string>
+        {
+            ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
+            ["fileCount"] = totalFiles.ToString(),
+            ["errorCount"] = errorFiles.ToString()
+        });
+        if (Environment.ExitCode != 0)
+        {
+            IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "format", "Format check failed");
         }
     }
 

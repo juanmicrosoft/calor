@@ -1,5 +1,7 @@
 using System.CommandLine;
+using System.Diagnostics;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -73,6 +75,10 @@ public static class BenchmarkCommand
         bool verbose,
         bool quick)
     {
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        telemetry?.SetCommand("benchmark");
+        var sw = Stopwatch.StartNew();
+
         try
         {
             // Validate category if provided
@@ -136,7 +142,20 @@ public static class BenchmarkCommand
             {
                 Console.Error.WriteLine(ex.StackTrace);
             }
+            telemetry?.TrackException(ex);
             Environment.ExitCode = 1;
+        }
+        finally
+        {
+            sw.Stop();
+            telemetry?.TrackCommand("benchmark", Environment.ExitCode, new Dictionary<string, string>
+            {
+                ["durationMs"] = sw.ElapsedMilliseconds.ToString()
+            });
+            if (Environment.ExitCode != 0)
+            {
+                IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "benchmark", "Benchmark failed");
+            }
         }
     }
 

@@ -1,8 +1,10 @@
 using System.CommandLine;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -48,6 +50,10 @@ public static class LintCommand
 
     private static async Task ExecuteAsync(FileInfo[] files, bool fix, bool check, bool verbose)
     {
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        telemetry?.SetCommand("lint");
+        var sw = Stopwatch.StartNew();
+
         var totalFiles = 0;
         var filesWithIssues = 0;
         var fixedFiles = 0;
@@ -147,6 +153,18 @@ public static class LintCommand
         else if ((check || !fix) && filesWithIssues > 0)
         {
             Environment.ExitCode = 1;
+        }
+
+        sw.Stop();
+        telemetry?.TrackCommand("lint", Environment.ExitCode, new Dictionary<string, string>
+        {
+            ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
+            ["fileCount"] = totalFiles.ToString(),
+            ["issueCount"] = totalIssues.ToString()
+        });
+        if (Environment.ExitCode != 0)
+        {
+            IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "lint", "Lint check failed");
         }
     }
 

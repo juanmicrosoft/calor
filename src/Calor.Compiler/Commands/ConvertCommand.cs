@@ -1,5 +1,7 @@
 using System.CommandLine;
+using System.Diagnostics;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
 
@@ -41,6 +43,9 @@ public static class ConvertCommand
 
     private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose)
     {
+        var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
+        telemetry?.SetCommand("convert");
+        var sw = Stopwatch.StartNew();
         if (!input.Exists)
         {
             Console.Error.WriteLine($"Error: Input file not found: {input.FullName}");
@@ -79,7 +84,20 @@ public static class ConvertCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
+            telemetry?.TrackException(ex);
             Environment.ExitCode = 1;
+        }
+        finally
+        {
+            sw.Stop();
+            telemetry?.TrackCommand("convert", Environment.ExitCode, new Dictionary<string, string>
+            {
+                ["durationMs"] = sw.ElapsedMilliseconds.ToString()
+            });
+            if (Environment.ExitCode != 0)
+            {
+                IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "convert", "Conversion failed");
+            }
         }
     }
 
