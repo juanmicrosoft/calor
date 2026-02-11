@@ -195,6 +195,111 @@ See [Structure Tags - Generics](/syntax-reference/structure-tags/#generics) for 
 
 ---
 
+## Collection Types
+
+Calor provides built-in syntax for creating and manipulating collections with type-safe operations.
+
+### List Creation
+
+```
+§LIST{name:elementType}
+  element1
+  element2
+§/LIST{name}
+```
+
+| Part | Description |
+|:-----|:------------|
+| `name` | Variable name for the list |
+| `elementType` | Type of elements (`i32`, `str`, etc.) |
+
+**Example:**
+```
+§LIST{numbers:i32}
+  1
+  2
+  3
+§/LIST{numbers}
+```
+
+### Dictionary Creation
+
+```
+§DICT{name:keyType:valueType}
+  §KV key1 value1
+  §KV key2 value2
+§/DICT{name}
+```
+
+| Part | Description |
+|:-----|:------------|
+| `name` | Variable name for the dictionary |
+| `keyType` | Type of keys |
+| `valueType` | Type of values |
+| `§KV` | Key-value pair entry |
+
+**Example:**
+```
+§DICT{ages:str:i32}
+  §KV "alice" 30
+  §KV "bob" 25
+§/DICT{ages}
+```
+
+### HashSet Creation
+
+```
+§HSET{name:elementType}
+  element1
+  element2
+§/HSET{name}
+```
+
+**Example:**
+```
+§HSET{tags:str}
+  "urgent"
+  "review"
+§/HSET{tags}
+```
+
+### Collection Operations
+
+| Operation | Syntax | Description |
+|:----------|:-------|:------------|
+| Add to list/set | `§PUSH{coll} value` | `collection.Add(value)` |
+| Set dictionary entry | `§PUT{dict} key value` | `dict[key] = value` |
+| Set list index | `§SETIDX{list} idx value` | `list[index] = value` |
+| Insert at index | `§C{list.Insert} §A idx §A val §/C` | `list.Insert(idx, val)` |
+| Remove element | `§C{coll.Remove} §A val §/C` | `collection.Remove(val)` |
+| Clear collection | `§C{coll.Clear} §/C` | `collection.Clear()` |
+
+**Example:**
+```
+§PUSH{numbers} 4              // numbers.Add(4)
+§PUT{ages} "charlie" 35       // ages["charlie"] = 35
+§SETIDX{numbers} 0 10         // numbers[0] = 10
+```
+
+### Collection Queries
+
+| Query | Syntax | Returns |
+|:------|:-------|:--------|
+| Contains element | `§HAS{coll} value` | `bool` |
+| Contains key | `§HAS{dict} §KEY key` | `bool` |
+| Contains value | `§HAS{dict} §VAL value` | `bool` |
+| Collection count | `§CNT{coll}` | `i32` |
+
+**Example:**
+```
+§IF{if1} §HAS{numbers} 5 → §P "Found 5"
+§/I{if1}
+
+§B{count} §CNT{ages}
+```
+
+---
+
 ## Type Annotations in Contracts
 
 Types matter in contracts for proper comparisons:

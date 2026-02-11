@@ -161,6 +161,74 @@ Loop bounds can be expressions:
 
 ---
 
+## Collection Expressions
+
+Calor provides expressions for querying collections.
+
+### Contains Check (`§HAS`)
+
+Check if a collection contains an element.
+
+| Syntax | Description | C# Equivalent |
+|:-------|:------------|:--------------|
+| `§HAS{coll} value` | Element in list/set | `coll.Contains(value)` |
+| `§HAS{dict} §KEY key` | Key in dictionary | `dict.ContainsKey(key)` |
+| `§HAS{dict} §VAL value` | Value in dictionary | `dict.ContainsValue(value)` |
+
+**Examples:**
+```
+// Check if list contains element
+§IF{if1} §HAS{numbers} 5
+  §P "Found 5"
+§/I{if1}
+
+// Check if key exists in dictionary
+§IF{if2} §HAS{ages} §KEY "alice"
+  §P "Alice found"
+§/I{if2}
+
+// Use in binding
+§B{hasItem} §HAS{inventory} "sword"
+```
+
+### Collection Count (`§CNT`)
+
+Get the number of elements in a collection.
+
+| Syntax | Returns | C# Equivalent |
+|:-------|:--------|:--------------|
+| `§CNT{coll}` | `i32` | `coll.Count` |
+
+**Examples:**
+```
+// Get count
+§B{size} §CNT{items}
+
+// Use in condition
+§IF{if1} (> §CNT{queue} 0)
+  §P "Queue not empty"
+§/I{if1}
+
+// Use in loop bound
+§L{for1:i:0:(- §CNT{list} 1):1}
+  §P list[i]
+§/L{for1}
+```
+
+### Using Collection Expressions in Contracts
+
+```
+§F{f001:ProcessItems:pub}
+  §I{List<i32>:items}
+  §O{i32}
+  §Q (> §CNT{items} 0)           // Requires: items not empty
+  §S (>= result 0)
+  // ...
+§/F{f001}
+```
+
+---
+
 ## Why Prefix Notation?
 
 ### 1. No Precedence Ambiguity

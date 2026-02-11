@@ -148,6 +148,67 @@ The condition is placed at the end to match the semantics: the body always execu
 
 ---
 
+## Dictionary Iteration
+
+Use `§EACHKV` to iterate over key-value pairs in a dictionary.
+
+### Syntax
+
+```
+§EACHKV{id:keyVar:valueVar} dictName
+  // body uses keyVar and valueVar
+§/EACHKV{id}
+```
+
+| Part | Description |
+|:-----|:------------|
+| `id` | Unique loop identifier |
+| `keyVar` | Variable name for the current key |
+| `valueVar` | Variable name for the current value |
+| `dictName` | Name of the dictionary to iterate |
+
+### Examples
+
+**Print all entries:**
+```
+§DICT{ages:str:i32}
+  §KV "alice" 30
+  §KV "bob" 25
+§/DICT{ages}
+
+§EACHKV{e1:name:age} ages
+  §P name
+  §P age
+§/EACHKV{e1}
+```
+
+**Sum all values:**
+```
+§B{total} 0
+§EACHKV{e1:k:v} scores
+  §ASSIGN total (+ total v)
+§/EACHKV{e1}
+```
+
+**Conditional processing:**
+```
+§EACHKV{e1:key:val} data
+  §IF{if1} (> val 100)
+    §P key
+  §/I{if1}
+§/EACHKV{e1}
+```
+
+### Comparison with §FOREACH
+
+| Loop Type | Use Case |
+|:----------|:---------|
+| `§L{id:var:from:to:step}` | Numeric ranges |
+| `§FOREACH{id:var} collection` | Lists, arrays, sets |
+| `§EACHKV{id:k:v} dict` | Dictionaries (key-value pairs) |
+
+---
+
 ## Conditionals
 
 ### Single Line (Arrow Syntax)
