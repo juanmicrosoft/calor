@@ -570,6 +570,26 @@ public sealed class Lexer
             return MakeToken(TokenKind.Error);
         }
 
+        // Check for special operators that start with '?'
+        // §?? = NullCoalesce, §?. = NullConditional
+        if (Current == '?')
+        {
+            Advance(); // consume first '?'
+            if (Current == '?')
+            {
+                Advance(); // consume second '?'
+                return MakeToken(TokenKind.NullCoalesce);
+            }
+            if (Current == '.')
+            {
+                Advance(); // consume '.'
+                return MakeToken(TokenKind.NullConditional);
+            }
+            // Unknown §? pattern - report error
+            _diagnostics.ReportUnexpectedCharacter(CurrentSpan(), '?');
+            return MakeToken(TokenKind.Error);
+        }
+
         // Read the keyword that follows
         while (char.IsLetterOrDigit(Current) || Current == '_')
         {
