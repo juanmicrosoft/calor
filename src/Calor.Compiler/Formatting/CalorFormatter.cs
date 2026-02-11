@@ -359,14 +359,14 @@ public sealed class CalorFormatter
     private void FormatEnumExtension(EnumExtensionNode ext)
     {
         var extId = AbbreviateId(ext.Id);
-        AppendLine($"§EXT{{{extId}:{ext.EnumName}}}");
+        AppendLine($"§EEXT{{{extId}:{ext.EnumName}}}");
 
         foreach (var method in ext.Methods)
         {
             FormatFunction(method);
         }
 
-        AppendLine($"§/EXT{{{extId}}}");
+        AppendLine($"§/EEXT{{{extId}}}");
     }
 
     private void FormatDelegate(DelegateDefinitionNode del)

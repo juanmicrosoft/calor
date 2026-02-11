@@ -417,18 +417,18 @@ public enum Flags : byte
 
 ## Enum Extension Methods
 
-Extension methods can be added to enums using `§EXT`.
+Extension methods can be added to enums using `§EEXT` (Enum EXTension).
 
 ### Syntax
 
 ```
-§EXT{id:EnumName}
+§EEXT{id:EnumName}
   §F{f001:MethodName:pub}
     §I{EnumName:self}
     §O{returnType}
     // body using self
   §/F{f001}
-§/EXT{id}
+§/EEXT{id}
 ```
 
 The first parameter with the enum type (or named `self`) becomes the `this` parameter.
@@ -442,7 +442,7 @@ The first parameter with the enum type (or named `self`) becomes the `this` para
   Blue
 §/EN{e001}
 
-§EXT{ext001:Color}
+§EEXT{ext001:Color}
   §F{f001:ToHex:pub}
     §I{Color:self}
     §O{str}
@@ -458,7 +458,7 @@ The first parameter with the enum type (or named `self`) becomes the `this` para
     §O{bool}
     §R (|| (== self Color.Red) (|| (== self Color.Green) (== self Color.Blue)))
   §/F{f002}
-§/EXT{ext001}
+§/EEXT{ext001}
 ```
 
 Emits:

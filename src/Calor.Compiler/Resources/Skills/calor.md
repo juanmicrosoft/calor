@@ -287,13 +287,13 @@ Underlying types: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
 ## Enum Extension Methods
 
 ```
-§EXT{id:EnumName}           Extension methods for enum
+§EEXT{id:EnumName}          Extension methods for enum
   §F{f001:MethodName:pub}
     §I{EnumType:self}       First param becomes 'this'
     §O{returnType}
     // body
   §/F{f001}
-§/EXT{id}
+§/EEXT{id}
 ```
 
 ### Template: Color with ToHex Extension
@@ -306,7 +306,7 @@ Underlying types: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
   Blue
 §/EN{e001}
 
-§EXT{ext001:Color}
+§EEXT{ext001:Color}
   §F{f001:ToHex:pub}
     §I{Color:self}
     §O{str}
@@ -316,7 +316,7 @@ Underlying types: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
       §K Color.Blue → §R "#0000FF"
     §/W{sw1}
   §/F{f001}
-§/EXT{ext001}
+§/EEXT{ext001}
 §/M{m001}
 ```
 

@@ -150,7 +150,7 @@ public static class ColorExtensions {
 }
 ```
 ```calor
-§EXT{ext1:Color}
+§EEXT{ext1:Color}
 §F{f1:ToHex:pub}
 §I{Color:color}
 §O{str}
@@ -161,7 +161,7 @@ public static class ColorExtensions {
   §K _ → §R "#000000"
 §/W{sw1}
 §/F{f1}
-§/EXT{ext1}
+§/EEXT{ext1}
 ```
 
 ### For Loop
