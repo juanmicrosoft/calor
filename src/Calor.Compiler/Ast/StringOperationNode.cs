@@ -3,6 +3,93 @@ using Calor.Compiler.Parsing;
 namespace Calor.Compiler.Ast;
 
 /// <summary>
+/// String comparison mode for string operations.
+/// Maps to System.StringComparison enum values.
+/// </summary>
+public enum StringComparisonMode
+{
+    /// <summary>Ordinal comparison (default). Maps to StringComparison.Ordinal.</summary>
+    Ordinal,
+    /// <summary>Case-insensitive ordinal comparison. Maps to StringComparison.OrdinalIgnoreCase.</summary>
+    IgnoreCase,
+    /// <summary>Invariant culture comparison. Maps to StringComparison.InvariantCulture.</summary>
+    Invariant,
+    /// <summary>Case-insensitive invariant culture comparison. Maps to StringComparison.InvariantCultureIgnoreCase.</summary>
+    InvariantIgnoreCase,
+}
+
+/// <summary>
+/// Helper methods for StringComparisonMode enum.
+/// </summary>
+public static class StringComparisonModeExtensions
+{
+    /// <summary>
+    /// Parses a keyword string to StringComparisonMode.
+    /// </summary>
+    public static StringComparisonMode? FromKeyword(string? keyword)
+    {
+        return keyword?.ToLowerInvariant() switch
+        {
+            "ordinal" => StringComparisonMode.Ordinal,
+            "ignore-case" => StringComparisonMode.IgnoreCase,
+            "invariant" => StringComparisonMode.Invariant,
+            "invariant-ignore-case" => StringComparisonMode.InvariantIgnoreCase,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Converts a StringComparisonMode to its Calor keyword representation.
+    /// </summary>
+    public static string ToKeyword(this StringComparisonMode mode)
+    {
+        return mode switch
+        {
+            StringComparisonMode.Ordinal => "ordinal",
+            StringComparisonMode.IgnoreCase => "ignore-case",
+            StringComparisonMode.Invariant => "invariant",
+            StringComparisonMode.InvariantIgnoreCase => "invariant-ignore-case",
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown comparison mode")
+        };
+    }
+
+    /// <summary>
+    /// Converts a StringComparisonMode to its C# StringComparison enum member name.
+    /// </summary>
+    public static string ToCSharpName(this StringComparisonMode mode)
+    {
+        return mode switch
+        {
+            StringComparisonMode.Ordinal => "StringComparison.Ordinal",
+            StringComparisonMode.IgnoreCase => "StringComparison.OrdinalIgnoreCase",
+            StringComparisonMode.Invariant => "StringComparison.InvariantCulture",
+            StringComparisonMode.InvariantIgnoreCase => "StringComparison.InvariantCultureIgnoreCase",
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown comparison mode")
+        };
+    }
+}
+
+/// <summary>
+/// Represents a keyword argument like :ordinal or :ignore-case.
+/// Only valid as arguments to operations that support them.
+/// This is an internal node type used during parsing and is not visitable.
+/// </summary>
+public sealed class KeywordArgNode : ExpressionNode
+{
+    public string Name { get; }
+
+    public KeywordArgNode(TextSpan span, string name) : base(span)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+    }
+
+    // KeywordArgNode is internal to parsing - it should be consumed by the parser
+    // and not appear in the final AST. These methods should never be called.
+    public override void Accept(IAstVisitor visitor) { }
+    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
+}
+
+/// <summary>
 /// String operations supported by Calor native string expressions.
 /// </summary>
 public enum StringOp
@@ -15,6 +102,7 @@ public enum StringOp
     IndexOf,            // (indexof s t)     → s.IndexOf(t)
     IsNullOrEmpty,      // (isempty s)       → string.IsNullOrEmpty(s)
     IsNullOrWhiteSpace, // (isblank s)       → string.IsNullOrWhiteSpace(s)
+    Equals,             // (equals s t)      → s.Equals(t)
 
     // Transform operations (return string)
     Substring,          // (substr s i n)    → s.Substring(i, n)
@@ -34,29 +122,51 @@ public enum StringOp
     Concat,             // (concat a b c)    → string.Concat(a, b, c)
     Split,              // (split s sep)     → s.Split(sep)
     ToString,           // (str x)           → x.ToString()
+
+    // Regex operations
+    RegexTest,          // (regex-test s p)        → Regex.IsMatch(s, p)
+    RegexMatch,         // (regex-match s p)       → Regex.Match(s, p)
+    RegexReplace,       // (regex-replace s p r)   → Regex.Replace(s, p, r)
+    RegexSplit,         // (regex-split s p)       → Regex.Split(s, p)
 }
 
 /// <summary>
 /// Represents a native string operation.
-/// Examples: (upper s), (contains text "hello"), (substr s 0 5)
+/// Examples: (upper s), (contains text "hello"), (substr s 0 5), (contains s "x" :ignore-case)
 /// </summary>
 public sealed class StringOperationNode : ExpressionNode
 {
     public StringOp Operation { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
+    /// <summary>
+    /// Optional string comparison mode for operations that support it.
+    /// Supported by: Contains, StartsWith, EndsWith, IndexOf, Equals
+    /// </summary>
+    public StringComparisonMode? ComparisonMode { get; }
 
     public StringOperationNode(
         TextSpan span,
         StringOp operation,
-        IReadOnlyList<ExpressionNode> arguments)
+        IReadOnlyList<ExpressionNode> arguments,
+        StringComparisonMode? comparisonMode = null)
         : base(span)
     {
         Operation = operation;
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        ComparisonMode = comparisonMode;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
+    /// <summary>
+    /// Returns true if this operation supports string comparison modes.
+    /// </summary>
+    public static bool SupportsComparisonMode(StringOp op)
+    {
+        return op is StringOp.Contains or StringOp.StartsWith or StringOp.EndsWith
+            or StringOp.IndexOf or StringOp.Equals;
+    }
 }
 
 /// <summary>
@@ -80,6 +190,7 @@ public static class StringOpExtensions
             "indexof" => StringOp.IndexOf,
             "isempty" => StringOp.IsNullOrEmpty,
             "isblank" => StringOp.IsNullOrWhiteSpace,
+            "equals" => StringOp.Equals,
 
             // Transform operations
             "substr" => StringOp.Substring, // Disambiguate by arg count later
@@ -98,6 +209,12 @@ public static class StringOpExtensions
             "concat" => StringOp.Concat,
             "split" => StringOp.Split,
             "str" => StringOp.ToString,
+
+            // Regex operations
+            "regex-test" => StringOp.RegexTest,
+            "regex-match" => StringOp.RegexMatch,
+            "regex-replace" => StringOp.RegexReplace,
+            "regex-split" => StringOp.RegexSplit,
 
             _ => null
         };
@@ -118,6 +235,7 @@ public static class StringOpExtensions
             StringOp.IndexOf => "indexof",
             StringOp.IsNullOrEmpty => "isempty",
             StringOp.IsNullOrWhiteSpace => "isblank",
+            StringOp.Equals => "equals",
 
             // Transform operations
             StringOp.Substring => "substr",
@@ -137,6 +255,12 @@ public static class StringOpExtensions
             StringOp.Concat => "concat",
             StringOp.Split => "split",
             StringOp.ToString => "str",
+
+            // Regex operations
+            StringOp.RegexTest => "regex-test",
+            StringOp.RegexMatch => "regex-match",
+            StringOp.RegexReplace => "regex-replace",
+            StringOp.RegexSplit => "regex-split",
 
             _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown string operation")
         };
@@ -165,17 +289,22 @@ public static class StringOpExtensions
             StringOp.StartsWith or
             StringOp.EndsWith or
             StringOp.IndexOf or
+            StringOp.Equals or
             StringOp.SubstringFrom or
             StringOp.Split or
             StringOp.Join or
             StringOp.PadLeft or
             StringOp.PadRight or
             StringOp.Concat or
-            StringOp.Format => 2,
+            StringOp.Format or
+            StringOp.RegexTest or
+            StringOp.RegexMatch or
+            StringOp.RegexSplit => 2,
 
             // Three argument operations
             StringOp.Substring or
-            StringOp.Replace => 3,
+            StringOp.Replace or
+            StringOp.RegexReplace => 3,
 
             _ => 1
         };
@@ -205,9 +334,13 @@ public static class StringOpExtensions
             StringOp.StartsWith or
             StringOp.EndsWith or
             StringOp.IndexOf or
+            StringOp.Equals or
             StringOp.SubstringFrom or
             StringOp.Split or
-            StringOp.Join => 2,
+            StringOp.Join or
+            StringOp.RegexTest or
+            StringOp.RegexMatch or
+            StringOp.RegexSplit => 2,
 
             // Two or three argument operations
             StringOp.PadLeft or
@@ -215,7 +348,8 @@ public static class StringOpExtensions
 
             // Three argument operations
             StringOp.Substring or
-            StringOp.Replace => 3,
+            StringOp.Replace or
+            StringOp.RegexReplace => 3,
 
             // Variadic operations
             StringOp.Concat or

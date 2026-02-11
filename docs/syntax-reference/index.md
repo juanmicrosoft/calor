@@ -86,8 +86,12 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Arithmetic | `+`, `-`, `*`, `/`, `%` |
 | Comparison | `==`, `!=`, `<`, `<=`, `>`, `>=` |
 | Logical | `&&`, `\|\|`, `!` |
+| String | `len`, `upper`, `lower`, `trim`, `contains`, `starts`, `ends`, `indexof`, `substr`, `replace`, `concat`, `equals` |
+| Char | `char-at`, `char-code`, `char-from-code`, `is-letter`, `is-digit`, `is-whitespace`, `is-upper`, `is-lower`, `char-upper`, `char-lower` |
+| Regex | `regex-test`, `regex-match`, `regex-replace`, `regex-split` |
+| StringBuilder | `sb-new`, `sb-append`, `sb-appendline`, `sb-insert`, `sb-remove`, `sb-clear`, `sb-tostring`, `sb-length` |
 
-All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
+All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`, `(upper s)`
 
 ---
 
@@ -143,3 +147,4 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
 - [Control Flow](/calor/syntax-reference/control-flow/) - Loops, conditionals
 - [Contracts](/calor/syntax-reference/contracts/) - Requires, ensures
 - [Effects](/calor/syntax-reference/effects/) - Effect declarations
+- [String Operations](/calor/syntax-reference/string-operations/) - String, char, regex, StringBuilder operations

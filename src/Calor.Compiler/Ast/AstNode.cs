@@ -177,6 +177,10 @@ public interface IAstVisitor
     void Visit(ImplicationExpressionNode node);
     // Native String Operations
     void Visit(StringOperationNode node);
+    // Native Char Operations
+    void Visit(CharOperationNode node);
+    // Native StringBuilder Operations
+    void Visit(StringBuilderOperationNode node);
 }
 
 /// <summary>
@@ -338,6 +342,10 @@ public interface IAstVisitor<T>
     T Visit(ImplicationExpressionNode node);
     // Native String Operations
     T Visit(StringOperationNode node);
+    // Native Char Operations
+    T Visit(CharOperationNode node);
+    // Native StringBuilder Operations
+    T Visit(StringBuilderOperationNode node);
 }
 
 /// <summary>
