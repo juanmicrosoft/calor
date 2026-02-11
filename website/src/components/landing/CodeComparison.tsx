@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { trackCodeComparisonTab } from '@/lib/analytics';
 
 const calorCode = `§F{f_01J5X7K9M2:Square:pub}
   §I{i32:x}
@@ -54,7 +55,7 @@ export function CodeComparison() {
           <div className="flex justify-center mb-6">
             <div className="inline-flex rounded-lg border p-1 bg-background">
               <button
-                onClick={() => setActiveTab('calor')}
+                onClick={() => { setActiveTab('calor'); trackCodeComparisonTab('calor'); }}
                 className={cn(
                   'px-4 py-2 rounded-md text-sm font-medium transition-colors',
                   activeTab === 'calor'
@@ -65,7 +66,7 @@ export function CodeComparison() {
                 Calor - Everything Explicit
               </button>
               <button
-                onClick={() => setActiveTab('csharp')}
+                onClick={() => { setActiveTab('csharp'); trackCodeComparisonTab('csharp'); }}
                 className={cn(
                   'px-4 py-2 rounded-md text-sm font-medium transition-colors',
                   activeTab === 'csharp'

@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronUp, ChevronDown, Check, X } from 'lucide-react';
+import { trackProgramTableSort, trackProgramTableFilter } from '@/lib/analytics';
 
 interface ProgramData {
   id: string;
@@ -54,6 +55,7 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
 
   const handleSort = (field: SortField) => {
+    trackProgramTableSort(field);
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -143,7 +145,7 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
               ? 'bg-primary text-primary-foreground'
               : 'bg-muted hover:bg-muted/80'
           )}
-          onClick={() => setLevelFilter(null)}
+          onClick={() => { trackProgramTableFilter('all'); setLevelFilter(null); }}
         >
           All
         </button>
@@ -156,7 +158,7 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted hover:bg-muted/80'
             )}
-            onClick={() => setLevelFilter(level)}
+            onClick={() => { trackProgramTableFilter(`L${level}`); setLevelFilter(level); }}
           >
             L{level}
           </button>

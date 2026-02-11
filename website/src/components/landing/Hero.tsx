@@ -1,8 +1,11 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Github, ArrowRight } from 'lucide-react';
 import { getBasePath } from '@/lib/utils';
+import { trackCtaClick, trackOutboundLink } from '@/lib/analytics';
 
 const basePath = getBasePath();
 
@@ -46,7 +49,7 @@ export function Hero() {
 
           <div className="mt-10 flex items-center justify-center gap-x-4">
             <Button asChild size="lg" className="bg-calor-pink hover:bg-calor-pink/90 text-white">
-              <Link href="/docs/getting-started/">
+              <Link href="/docs/getting-started/" onClick={() => trackCtaClick('get_started')}>
                 Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -56,6 +59,7 @@ export function Hero() {
                 href="https://github.com/juanmicrosoft/calor"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => { trackCtaClick('github'); trackOutboundLink('https://github.com/juanmicrosoft/calor'); }}
               >
                 <Github className="mr-2 h-4 w-4" />
                 GitHub

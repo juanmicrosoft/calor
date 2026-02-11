@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { cn, getBasePath } from '@/lib/utils';
+import { trackSidebarSectionExpand } from '@/lib/analytics';
 import type { DocSection } from '@/lib/docs';
 
 // basePath is needed for pathname comparison since usePathname returns full path
@@ -29,6 +30,7 @@ export function Sidebar({ sections }: SidebarProps) {
         next.delete(slug);
       } else {
         next.add(slug);
+        trackSidebarSectionExpand(slug);
       }
       return next;
     });

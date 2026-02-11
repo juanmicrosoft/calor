@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, Copy, FileCode, Palette, Settings, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { trackVSCodeExtensionClick, trackOutboundLink } from '@/lib/analytics';
 
 const features = [
   {
@@ -30,6 +31,7 @@ export function VSCodeExtension() {
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(INSTALL_COMMAND);
+    trackVSCodeExtensionClick('copy_command');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -82,6 +84,7 @@ export function VSCodeExtension() {
               href={MARKETPLACE_URL}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => { trackVSCodeExtensionClick('marketplace'); trackOutboundLink(MARKETPLACE_URL); }}
               className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-calor-navy px-6 py-3 font-medium text-white hover:bg-calor-navy/90 transition-colors"
             >
               <ExternalLink className="h-4 w-4" />

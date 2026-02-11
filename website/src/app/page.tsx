@@ -5,10 +5,12 @@ import { FeatureGrid } from '@/components/landing/FeatureGrid';
 import { BenchmarkChart } from '@/components/landing/BenchmarkChart';
 import { QuickStart } from '@/components/landing/QuickStart';
 import { ProjectStatus } from '@/components/landing/ProjectStatus';
+import { ScrollDepthTracker } from '@/components/landing/ScrollDepthTracker';
 
 export default function HomePage() {
   return (
     <div className="flex flex-col">
+      <ScrollDepthTracker />
       <Hero />
       <CodeComparison />
       <CatchBugs />

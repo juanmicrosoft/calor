@@ -12,6 +12,7 @@ import { Sidebar } from '@/components/docs/Sidebar';
 import { TableOfContents } from '@/components/docs/TableOfContents';
 import { Pagination } from '@/components/docs/Pagination';
 import { MobileSidebar } from '@/components/docs/MobileSidebar';
+import { DocsPageTracker } from '@/components/docs/DocsPageTracker';
 import { mdxComponents } from '@/components/mdx';
 
 interface DocPageProps {
@@ -61,6 +62,7 @@ export default async function DocPage({ params }: DocPageProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
+      <DocsPageTracker slug={slugPath} />
       <div className="flex gap-8">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">

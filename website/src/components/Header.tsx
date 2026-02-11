@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Menu, X, Github, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, getBasePath } from '@/lib/utils';
+import { trackDarkModeToggle, trackOutboundLink } from '@/lib/analytics';
 
 // basePath needed for pathname comparison since usePathname returns full path
 const basePath = getBasePath();
@@ -23,8 +24,10 @@ export function Header() {
   const [isDark, setIsDark] = useState(false);
 
   const toggleDarkMode = () => {
+    const newMode = isDark ? 'light' : 'dark';
     setIsDark(!isDark);
     document.documentElement.classList.toggle('dark');
+    trackDarkModeToggle(newMode);
   };
 
   return (
@@ -86,6 +89,7 @@ export function Header() {
                 href="https://github.com/juanmicrosoft/calor"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackOutboundLink('https://github.com/juanmicrosoft/calor')}
               >
                 <Github className="h-5 w-5" />
                 <span className="sr-only">GitHub</span>
@@ -150,6 +154,7 @@ export function Header() {
                       href="https://github.com/juanmicrosoft/calor"
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackOutboundLink('https://github.com/juanmicrosoft/calor')}
                     >
                       <Github className="h-5 w-5" />
                     </a>
