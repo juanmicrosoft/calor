@@ -31,6 +31,9 @@ public static class Program
                 .WithHandler<CompletionHandler>()
                 .WithHandler<CodeActionHandler>()
                 .WithHandler<SignatureHelpHandler>()
+                .WithHandler<ReferencesHandler>()
+                .WithHandler<RenameHandler>()
+                .WithHandler<WorkspaceSymbolHandler>()
                 .OnInitialize((server, request, token) =>
                 {
                     // Register TextDocumentSyncHandler which needs the server reference
