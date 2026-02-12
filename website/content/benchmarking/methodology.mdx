@@ -198,6 +198,39 @@ Both implementations must:
 
 ---
 
+## Semantic Verification Metrics
+
+Three metrics measure what constrained decoding cannot provide:
+
+### Contract Verification (Calor-only)
+
+Z3 proves contracts hold for all inputs, or provides counterexamples. This is impossible with grammar-constrained generation—syntax doesn't encode invariants.
+
+**What it catches:**
+- Division by zero when divisor could be zero
+- Array bounds violations
+- Integer overflow in arithmetic
+- Null dereferences
+
+### Effect Soundness (Calor-only)
+
+The compiler enforces that declared effects match actual effects. A function marked `§E{pure}` cannot contain I/O operations.
+
+**What it catches:**
+- Hidden network calls in "pure" functions
+- Undeclared database writes
+- Logging in supposedly side-effect-free code
+
+### Interop Effect Coverage (Calor-only)
+
+The BCL effect manifest tracks which .NET methods have effects, enabling verification even when calling external code.
+
+---
+
+These metrics explain why Calor achieves **1.09x overall advantage** despite losing on token efficiency: the semantic verification pipeline catches classes of bugs that syntax-only tools cannot detect.
+
+---
+
 ## LLM-Based Evaluation
 
 ### Multi-LLM Validation

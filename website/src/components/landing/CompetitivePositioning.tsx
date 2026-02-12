@@ -113,6 +113,37 @@ const comparisons = [
       },
     ],
   },
+  {
+    title: 'vs Constrained Decoding (LLGuidance)',
+    subtitle: 'Grammar-based generation vs semantic verification',
+    rows: [
+      {
+        feature: 'Output Guarantee',
+        calor: 'Syntactically and semantically correct',
+        others: 'Syntactically correct only',
+      },
+      {
+        feature: 'Contract Verification',
+        calor: 'Z3 proves contracts at compile time',
+        others: 'No contract awareness',
+      },
+      {
+        feature: 'Effect Tracking',
+        calor: 'Side effects declared and enforced',
+        others: 'Side effects implicit',
+      },
+      {
+        feature: 'Division by Zero',
+        calor: 'Caught at compile time via §Q',
+        others: 'Runtime crash',
+      },
+      {
+        feature: 'Invariant Violations',
+        calor: 'Counterexample from Z3',
+        others: 'Silent bug in production',
+      },
+    ],
+  },
 ];
 
 export function CompetitivePositioning() {

@@ -44,7 +44,7 @@ export function Hero() {
             When AI writes your code, the language should catch the bugs.
           </p>
           <p className="mt-6 text-lg leading-8 text-white/80">
-            Contracts, effects, and stable IDs—the guarantees agents need to write correct .NET code.
+            Contracts verified by Z3, effects enforced by the compiler, semantic bugs caught before runtime.
           </p>
 
           <div className="mt-10 flex items-center justify-center gap-x-4">

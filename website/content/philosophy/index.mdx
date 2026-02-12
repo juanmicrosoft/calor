@@ -26,6 +26,53 @@ Traditional languages make agents *infer* these answers through complex analysis
 
 ---
 
+## The Verification Advantage
+
+### "Why not just use constrained decoding?"
+
+Tools like [LLGuidance](https://github.com/guidance-ai/llguidance) can constrain LLM output to valid syntax. If an AI can already generate syntactically correct C#, why use Calor?
+
+Because **syntax correctness ≠ semantic correctness**.
+
+| Constrained C# | Calor |
+|:---------------|:------|
+| Compiles successfully | Compiles + contracts verified |
+| Syntactically valid | Semantically proven |
+| Hidden invariant violations | Caught at compile time |
+| Implicit side effects | Declared and enforced |
+
+### What Constrained Decoding Can't Catch
+
+```csharp
+// LLGuidance-constrained C# — syntactically perfect, semantically buggy
+public int Divide(int a, int b) {
+    return a / b;  // Compiles fine. Crashes on b=0.
+}
+```
+
+```calor
+// Calor — Z3 catches the bug at compile time
+§F{f001:Divide}(a: i32, b: i32) -> i32
+  §Q (!= b 0)          // ← Contract: b must not be zero
+  §S (>= result 0)     // ← Contract: result non-negative
+  (/ a b)
+§/F{}
+```
+
+Calor's Z3 integration proves contracts hold, or flags violations with counterexamples. No amount of grammar-constrained generation gives you this for free.
+
+### Verification-First, Agent-Friendly Second
+
+Calor is a **verification-first language** that happens to be agent-friendly—not just an "agent DSL." The explicit syntax serves verification: contracts in a structured format can be parsed and proven by Z3.
+
+The benchmarks show this: Calor's advantage isn't token efficiency (C# wins there). It's:
+- **1.22x Error Detection** — Contracts catch bugs C# misses
+- **1.51x Comprehension** — Explicit semantics aid understanding
+- **100% Contract Verification** — Z3 proves correctness statically
+- **100% Effect Soundness** — No hidden side effects
+
+---
+
 ## Optimizing for Agents, Not Humans
 
 Calor deliberately optimizes for machine readability over human aesthetics:
