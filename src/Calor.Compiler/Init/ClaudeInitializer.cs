@@ -107,6 +107,7 @@ public class ClaudeInitializer : IAiInitializer
             if (allModifiedFiles.Count > 0)
             {
                 messages.Add($"Initialized Calor project for Claude Code (calor v{version})");
+                messages.Add("  - MCP server 'calor-lsp' configured for language features");
             }
             else
             {
@@ -245,13 +246,21 @@ public class ClaudeInitializer : IAiInitializer
 
         if (!File.Exists(settingsPath))
         {
-            // Create new settings file with hook configuration
+            // Create new settings file with hook and MCP server configuration
             var settings = new ClaudeSettings
             {
                 Hooks = new ClaudeHooksConfig
                 {
                     PreToolUse = new[] { writePreHookConfig, editPreHookConfig },
                     PostToolUse = new[] { writePostHookConfig }
+                },
+                McpServers = new Dictionary<string, McpServerConfig>
+                {
+                    ["calor-lsp"] = new McpServerConfig
+                    {
+                        Command = "calor",
+                        Args = new[] { "lsp" }
+                    }
                 }
             };
 
@@ -278,6 +287,14 @@ public class ClaudeInitializer : IAiInitializer
                     {
                         PreToolUse = new[] { writePreHookConfig, editPreHookConfig },
                         PostToolUse = new[] { writePostHookConfig }
+                    },
+                    McpServers = new Dictionary<string, McpServerConfig>
+                    {
+                        ["calor-lsp"] = new McpServerConfig
+                        {
+                            Command = "calor",
+                            Args = new[] { "lsp" }
+                        }
                     }
                 };
                 await File.WriteAllTextAsync(settingsPath, JsonSerializer.Serialize(settings, JsonOptions));
@@ -334,6 +351,18 @@ public class ClaudeInitializer : IAiInitializer
 
         existingSettings.Hooks.PostToolUse = existingPostHooks.ToArray();
 
+        // Configure MCP server for language server
+        existingSettings.McpServers ??= new Dictionary<string, McpServerConfig>();
+        if (!existingSettings.McpServers.ContainsKey("calor-lsp"))
+        {
+            existingSettings.McpServers["calor-lsp"] = new McpServerConfig
+            {
+                Command = "calor",
+                Args = new[] { "lsp" }
+            };
+            updated = true;
+        }
+
         if (!updated)
         {
             return HookSettingsResult.Unchanged;
@@ -358,6 +387,9 @@ internal class ClaudeSettings
 {
     [JsonPropertyName("hooks")]
     public ClaudeHooksConfig? Hooks { get; set; }
+
+    [JsonPropertyName("mcpServers")]
+    public Dictionary<string, McpServerConfig>? McpServers { get; set; }
 }
 
 internal class ClaudeHooksConfig
@@ -385,4 +417,13 @@ internal class ClaudeHook
 
     [JsonPropertyName("command")]
     public string? Command { get; set; }
+}
+
+internal class McpServerConfig
+{
+    [JsonPropertyName("command")]
+    public string? Command { get; set; }
+
+    [JsonPropertyName("args")]
+    public string[]? Args { get; set; }
 }

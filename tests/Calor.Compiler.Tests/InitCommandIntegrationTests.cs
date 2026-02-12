@@ -300,4 +300,142 @@ public class InitCommandIntegrationTests : IDisposable
         }
         return count;
     }
+
+    [Fact]
+    public async Task ClaudeInit_CreatesSettingsWithMcpServer()
+    {
+        // Arrange
+        await CreateTestCsproj();
+
+        // Act
+        var claudeInitializer = new ClaudeInitializer();
+        var result = await claudeInitializer.InitializeAsync(_testDirectory, force: false);
+
+        // Assert
+        Assert.True(result.Success);
+
+        var settingsPath = Path.Combine(_testDirectory, ".claude", "settings.json");
+        Assert.True(File.Exists(settingsPath));
+
+        var content = await File.ReadAllTextAsync(settingsPath);
+        Assert.Contains("mcpServers", content);
+        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"command\": \"calor\"", content);
+        Assert.Contains("\"args\"", content);
+        Assert.Contains("\"lsp\"", content);
+    }
+
+    [Fact]
+    public async Task ClaudeInit_PreservesExistingMcpServers()
+    {
+        // Arrange
+        await CreateTestCsproj();
+
+        // Create existing settings with another MCP server
+        var claudeDir = Path.Combine(_testDirectory, ".claude");
+        Directory.CreateDirectory(claudeDir);
+        var existingSettings = """
+            {
+              "mcpServers": {
+                "existing-server": {
+                  "command": "existing-command",
+                  "args": ["arg1", "arg2"]
+                }
+              }
+            }
+            """;
+        await File.WriteAllTextAsync(Path.Combine(claudeDir, "settings.json"), existingSettings);
+
+        // Act
+        var claudeInitializer = new ClaudeInitializer();
+        var result = await claudeInitializer.InitializeAsync(_testDirectory, force: false);
+
+        // Assert
+        Assert.True(result.Success);
+
+        var content = await File.ReadAllTextAsync(Path.Combine(claudeDir, "settings.json"));
+
+        // Both servers should exist
+        Assert.Contains("existing-server", content);
+        Assert.Contains("existing-command", content);
+        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"command\": \"calor\"", content);
+    }
+
+    [Fact]
+    public async Task ClaudeInit_WithExistingHooksButNoMcp_AddsMcpServer()
+    {
+        // Arrange
+        await CreateTestCsproj();
+
+        // Create existing settings with hooks but no MCP servers
+        var claudeDir = Path.Combine(_testDirectory, ".claude");
+        Directory.CreateDirectory(claudeDir);
+        var existingSettings = """
+            {
+              "hooks": {
+                "PreToolUse": [
+                  {
+                    "matcher": "CustomMatcher",
+                    "hooks": [{"type": "command", "command": "custom-command"}]
+                  }
+                ]
+              }
+            }
+            """;
+        await File.WriteAllTextAsync(Path.Combine(claudeDir, "settings.json"), existingSettings);
+
+        // Act
+        var claudeInitializer = new ClaudeInitializer();
+        var result = await claudeInitializer.InitializeAsync(_testDirectory, force: false);
+
+        // Assert
+        Assert.True(result.Success);
+
+        var content = await File.ReadAllTextAsync(Path.Combine(claudeDir, "settings.json"));
+
+        // Existing hooks should be preserved
+        Assert.Contains("CustomMatcher", content);
+        Assert.Contains("custom-command", content);
+
+        // MCP server should be added
+        Assert.Contains("mcpServers", content);
+        Assert.Contains("calor-lsp", content);
+    }
+
+    [Fact]
+    public async Task ClaudeInit_MultipleRuns_DoesNotDuplicateMcpServer()
+    {
+        // Arrange
+        await CreateTestCsproj();
+        var claudeInitializer = new ClaudeInitializer();
+
+        // Act - Run init 3 times
+        await claudeInitializer.InitializeAsync(_testDirectory, force: false);
+        await claudeInitializer.InitializeAsync(_testDirectory, force: false);
+        await claudeInitializer.InitializeAsync(_testDirectory, force: false);
+
+        // Assert
+        var settingsPath = Path.Combine(_testDirectory, ".claude", "settings.json");
+        var content = await File.ReadAllTextAsync(settingsPath);
+
+        // calor-lsp should only appear once
+        var count = CountOccurrences(content, "calor-lsp");
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task ClaudeInit_ResultMessagesIncludeMcpInfo()
+    {
+        // Arrange
+        await CreateTestCsproj();
+
+        // Act
+        var claudeInitializer = new ClaudeInitializer();
+        var result = await claudeInitializer.InitializeAsync(_testDirectory, force: false);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Contains(result.Messages, m => m.Contains("MCP server") || m.Contains("calor-lsp"));
+    }
 }

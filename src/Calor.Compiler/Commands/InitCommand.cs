@@ -289,6 +289,14 @@ public static class InitCommand
             Console.WriteLine($"  - Added Calor compilation targets to {result.InitializedCount} projects");
         }
 
+        // Show agent-specific configuration
+        if (agentNames.Any(a => a == "claude"))
+        {
+            Console.WriteLine();
+            Console.WriteLine("Agent configuration:");
+            Console.WriteLine("  - MCP server 'calor-lsp' configured for language features");
+        }
+
         // Show skipped/already initialized info
         if (result.AlreadyInitializedCount > 0)
         {
@@ -354,6 +362,7 @@ public static class InitCommand
         var projectPath = detection.ProjectPath!;
 
         // Step 2: Initialize AI agent configurations (if --ai specified)
+        var agentConfigMessages = new List<string>();
         foreach (var aiInitializer in aiInitializers)
         {
             var aiResult = await aiInitializer.InitializeAsync(targetDirectory, force);
@@ -371,6 +380,12 @@ public static class InitCommand
             createdFiles.AddRange(aiResult.CreatedFiles);
             updatedFiles.AddRange(aiResult.UpdatedFiles);
             warnings.AddRange(aiResult.Warnings);
+
+            // Collect agent-specific configuration messages (skip the first "Initialized..." message)
+            foreach (var message in aiResult.Messages.Skip(1))
+            {
+                agentConfigMessages.Add(message);
+            }
         }
 
         // Step 3: Always create/update .calor/config.json
@@ -464,6 +479,17 @@ public static class InitCommand
             foreach (var change in csprojResult.Changes)
             {
                 Console.WriteLine($"  - {change}");
+            }
+        }
+
+        // Show agent-specific configuration
+        if (agentConfigMessages.Count > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Agent configuration:");
+            foreach (var message in agentConfigMessages)
+            {
+                Console.WriteLine(message);
             }
         }
 
