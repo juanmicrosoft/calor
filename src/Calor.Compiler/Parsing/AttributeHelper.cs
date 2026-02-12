@@ -168,15 +168,34 @@ public static class AttributeHelper
 
     /// <summary>
     /// Interprets attributes for EFFECTS/§E: effect codes
+    /// Handles effect codes that may have been split by the colon-based attribute parser.
+    /// E.g., §E{fs:r} gets parsed as _pos0="fs", _pos1="r" instead of _pos0="fs:r"
     /// </summary>
     public static Dictionary<string, string> InterpretEffectsAttributes(AttributeCollection attrs)
     {
         var effects = new Dictionary<string, string>();
 
+        // Known effect prefixes that use colon-based modifiers
+        var effectPrefixes = new HashSet<string> { "fs", "net", "db", "env" };
+        var effectModifiers = new HashSet<string> { "r", "w", "rw" };
+
         for (int i = 0; ; i++)
         {
             var code = attrs[$"_pos{i}"];
             if (string.IsNullOrEmpty(code)) break;
+
+            // Check if this is an effect prefix that was split from its modifier
+            // E.g., "fs" followed by "r" should become "fs:r"
+            if (effectPrefixes.Contains(code.ToLowerInvariant()))
+            {
+                var nextCode = attrs[$"_pos{i + 1}"];
+                if (!string.IsNullOrEmpty(nextCode) && effectModifiers.Contains(nextCode.ToLowerInvariant()))
+                {
+                    // Combine the split effect code
+                    code = $"{code}:{nextCode}";
+                    i++; // Skip the next positional since we consumed it
+                }
+            }
 
             var (category, value) = ExpandEffectCode(code);
             if (effects.ContainsKey(category))
