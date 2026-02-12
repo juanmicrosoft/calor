@@ -1,0 +1,49 @@
+§M{m001:OverflowUnsafe}
+§F{f001:IncrementUnsafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (> result x)
+  §R (+ x 1)
+§/F{f001}
+
+§F{f002:DecrementUnsafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (< result x)
+  §R (- x 1)
+§/F{f002}
+
+§F{f003:DoubleUnsafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (> x 0)
+  §S (> result x)
+  §R (* x 2)
+§/F{f003}
+
+§F{f004:SquareUnsafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (>= x 0)
+  §S (>= result 0)
+  §R (* x x)
+§/F{f004}
+
+§F{f005:NegateUnsafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (< x 0)
+  §S (> result 0)
+  §R (- 0 x)
+§/F{f005}
+
+§F{f006:AddPositivesUnsafe:pub}
+  §I{i32:x}
+  §I{i32:y}
+  §O{i32}
+  §Q (> x 0)
+  §Q (> y 0)
+  §S (> result 0)
+  §R (+ x y)
+§/F{f006}
+§/M{m001}
