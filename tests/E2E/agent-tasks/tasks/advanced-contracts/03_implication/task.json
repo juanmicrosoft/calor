@@ -1,0 +1,12 @@
+{
+  "id": "ac-003",
+  "name": "Implication in contract",
+  "category": "advanced-contracts",
+  "fixture": "contracts-project",
+  "prompt": "Add a public function called SafeIncrement to Contracts.calr that increments a positive number. Use implication in the postcondition to express that if x > 0, then result > x.\n\nUse this exact Calor implication syntax:\n§F{f001:SafeIncrement:pub}\n  §I{i32:x}\n  §O{i32}\n  §S (-> (> x 0) (> result x))\n  §R (+ x 1)\n§/F{f001}\n\nThe (-> antecedent consequent) syntax expresses implication:\n- Reads as: if antecedent then consequent\n- The contract only constrains when the antecedent is true\n- Useful for conditional postconditions",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

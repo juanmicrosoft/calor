@@ -1,0 +1,12 @@
+{
+  "id": "cf-001",
+  "name": "For loop printing numbers",
+  "category": "control-flow",
+  "fixture": "effects-project",
+  "prompt": "Add a public function called PrintNumbers to Effects.calr that prints numbers from 1 to 5 using a for loop. The function takes no parameters and returns void. It needs the console write effect (cw).\n\nUse this exact Calor for-loop syntax:\n§F{f001:PrintNumbers:pub}\n  §O{void}\n  §E{cw}\n  §L{l001:i:1:5:1}\n    §C{Console.WriteLine}\n      §A i\n    §/C\n  §/L{l001}\n§/F{f001}\n\nThe §L{id:var:from:to:step} syntax creates a for loop where:\n- id is a unique loop identifier (l001)\n- var is the loop variable name (i)\n- from is the start value (1)\n- to is the end value (5)\n- step is the increment (1)",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

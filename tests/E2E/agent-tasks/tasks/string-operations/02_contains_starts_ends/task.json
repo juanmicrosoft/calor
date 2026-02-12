@@ -1,0 +1,12 @@
+{
+  "id": "str-002",
+  "name": "String contains/starts/ends",
+  "category": "string-operations",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called StringContains to Calculator.calr that checks if a string contains a substring. It takes str parameters s and sub and returns bool.\n\nUse this exact Calor string operation syntax:\n§F{f003:StringContains:pub}\n  §I{str:s}\n  §I{str:sub}\n  §O{bool}\n  §R (contains s sub)\n§/F{f003}\n\nThe string search functions:\n- (contains s sub) - returns true if s contains sub\n- (starts-with s prefix) - returns true if s starts with prefix\n- (ends-with s suffix) - returns true if s ends with suffix",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

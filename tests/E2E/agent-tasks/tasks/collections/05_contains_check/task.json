@@ -1,0 +1,12 @@
+{
+  "id": "coll-005",
+  "name": "Contains check",
+  "category": "collections",
+  "fixture": "collections-project",
+  "prompt": "Add a public function called HasValue to Collections.calr that creates a list and checks if it contains a specific value. It takes i32 parameter value and returns bool.\n\nUse this exact Calor contains check syntax:\n§F{f001:HasValue:pub}\n  §I{i32:value}\n  §O{bool}\n  §LIST{items:i32}\n    10\n    20\n    30\n  §/LIST{items}\n  §R §HAS{items} value\n§/F{f001}\n\nThe §HAS{collection} value syntax checks if the collection contains the value:\n- Returns true if found, false otherwise\n- Works with List, HashSet, Dictionary (checks keys)",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

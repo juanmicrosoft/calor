@@ -1,0 +1,12 @@
+{
+  "id": "coll-002",
+  "name": "Dictionary with KV pairs",
+  "category": "collections",
+  "fixture": "collections-project",
+  "prompt": "Add a public function called CreateScores to Collections.calr that creates a dictionary mapping names to scores using §PUT and returns the count. The function takes no parameters and returns i32.\n\nUse this exact Calor dictionary syntax:\n§F{f001:CreateScores:pub}\n  §O{i32}\n  §DICT{scores:str:i32}\n  §/DICT{scores}\n  §PUT{scores} \"Alice\" 95\n  §PUT{scores} \"Bob\" 87\n  §PUT{scores} \"Carol\" 92\n  §R §CNT{scores}\n§/F{f001}\n\nThe dictionary syntax:\n- §DICT{id:keytype:valuetype} §/DICT{id} creates an empty dictionary\n- §PUT{id} key value adds or updates a key-value pair\n- §CNT{id} returns the count of items",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

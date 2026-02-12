@@ -1,0 +1,12 @@
+{
+  "id": "gen-003",
+  "name": "Type constraints",
+  "category": "generics",
+  "fixture": "generics-project",
+  "prompt": "Add a public generic class called Repository to Generic.calr with a type constraint requiring T to be a class (reference type).\n\nUse this exact Calor type constraint syntax:\n§CL{c001:Repository:pub}<T>\n  §WHERE T : class\n  §FLD{List<T>:_items:priv}\n  §MT{m001:Add:pub}\n    §I{T:item}\n    §O{void}\n    §PUSH{_items} item\n  §/MT{m001}\n§/CL{c001}\n\nThe §WHERE T : constraint syntax adds type constraints:\n- class - T must be a reference type\n- struct - T must be a value type\n- new() - T must have a parameterless constructor\n- IInterface - T must implement the interface",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

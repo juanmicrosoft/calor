@@ -1,0 +1,12 @@
+{
+  "id": "pm-004",
+  "name": "Option Some matching",
+  "category": "pattern-matching",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called UnwrapOrDefault to Calculator.calr that unwraps an Option<i32> or returns a default value. It takes Option<i32> parameter opt and i32 parameter defaultVal and returns i32.\n\nUse this exact Calor Option matching syntax:\n§F{f003:UnwrapOrDefault:pub}\n  §I{Option<i32>:opt}\n  §I{i32:defaultVal}\n  §O{i32}\n  §R §W{w001} opt\n    §K §SM §VAR{v} → v\n    §K §NN → defaultVal\n  §/W{w001}\n§/F{f003}\n\nThe Option pattern matching syntax:\n- §SM §VAR{v} matches Some and binds the inner value to v\n- §NN matches None\n- Use these with §K in a switch expression\n- §R §W{...} returns the result of the switch expression",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

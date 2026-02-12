@@ -1,0 +1,12 @@
+{
+  "id": "ref-006",
+  "name": "Fix contract violation",
+  "category": "refactoring",
+  "fixture": "buggy-contracts",
+  "prompt": "The Abs function in BuggyContracts.calr has a bug: the postcondition states (> result 0) but when x=0, the result is 0 which is NOT > 0. Fix the postcondition to correctly state (>= result 0).\n\nFix the postcondition:\n§F{f001:Abs:pub}\n  §I{i32:x}\n  §O{i32}\n  §S (>= result 0)\n  §R (? (< x 0) (- 0 x) x)\n§/F{f001}\n\nThe fix: change §S (> result 0) to §S (>= result 0). This is contract correctness - the contract must match what the implementation actually guarantees.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

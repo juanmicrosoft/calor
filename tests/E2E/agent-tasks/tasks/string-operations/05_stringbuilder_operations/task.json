@@ -1,0 +1,12 @@
+{
+  "id": "str-005",
+  "name": "StringBuilder operations",
+  "category": "string-operations",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called BuildGreeting to Calculator.calr that uses StringBuilder to efficiently build a greeting string. It takes str parameter name and returns str.\n\nUse this exact Calor StringBuilder syntax:\n§F{f003:BuildGreeting:pub}\n  §I{str:name}\n  §O{str}\n  §B{sb} (sb-new)\n  (sb-append sb \"Hello, \")\n  (sb-append sb name)\n  (sb-append sb \"!\")\n  §R (sb-to-string sb)\n§/F{f003}\n\nThe StringBuilder operations:\n- (sb-new) - creates a new StringBuilder\n- (sb-append sb text) - appends text to the builder\n- (sb-to-string sb) - converts builder to string",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

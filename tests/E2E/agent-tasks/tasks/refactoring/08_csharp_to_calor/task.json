@@ -1,0 +1,12 @@
+{
+  "id": "ref-008",
+  "name": "Convert C# idiom to Calor pattern",
+  "category": "refactoring",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a function called TryParse to Calculator.calr that mimics the C# TryParse pattern but in Calor's idiomatic way. Instead of returning bool and using an out parameter, return Option<i32>.\n\nCreate using Calor's Option pattern:\n§F{f003:TryParseDigit:pub}\n  §I{char:c}\n  §O{Option<i32>}\n  §IF{if001} (and (>= c '0') (<= c '9'))\n    §R §SM (- (i32 c) (i32 '0'))\n  §EL{if001}\n    §R §NN\n  §/I{if001}\n§/F{f003}\n\nC# pattern: bool TryParse(string s, out int result)\nCalor pattern: Option<i32> TryParse(string s)\n\nCalor uses Option types instead of out parameters for cleaner, safer code. This demonstrates converting C# idioms to Calor patterns.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

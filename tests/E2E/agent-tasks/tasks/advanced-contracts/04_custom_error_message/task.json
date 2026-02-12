@@ -1,0 +1,12 @@
+{
+  "id": "ac-004",
+  "name": "Custom error message",
+  "category": "advanced-contracts",
+  "fixture": "contracts-project",
+  "prompt": "Add a public function called Divide to Contracts.calr that divides two numbers with a custom error message for the precondition. It takes i32 parameters a and b and returns i32.\n\nUse this exact Calor custom error message syntax:\n§F{f001:Divide:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §Q{\"Divisor must not be zero\"} (!= b 0)\n  §R (/ a b)\n§/F{f001}\n\nThe §Q{\"message\"} (condition) syntax adds a custom error message:\n- The message in quotes is shown when the contract fails\n- Helps with debugging and documentation\n- Works for both §Q (precondition) and §S (postcondition)",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

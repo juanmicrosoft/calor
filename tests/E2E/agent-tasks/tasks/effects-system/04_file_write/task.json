@@ -1,0 +1,12 @@
+{
+  "id": "eff-004",
+  "name": "File write effect",
+  "category": "effects-system",
+  "fixture": "effects-project",
+  "prompt": "Add a public function called WriteFile to Effects.calr that writes content to a file. It takes str parameters path and content and returns void. The function must declare the file system write effect.\n\nUse this exact Calor file write syntax:\n§F{f001:WriteFile:pub}\n  §I{str:path}\n  §I{str:content}\n  §O{void}\n  §E{fs:w}\n  §C{File.WriteAllText}\n    §A path\n    §A content\n  §/C\n§/F{f001}\n\nThe §E{fs:w} declares the file system write effect:\n- fs:w = file system write access\n- Required for File.WriteAllText, File.WriteAllLines, etc.\n- Distinct from read effect to enable minimal privilege",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

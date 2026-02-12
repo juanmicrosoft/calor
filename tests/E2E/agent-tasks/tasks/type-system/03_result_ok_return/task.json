@@ -1,0 +1,12 @@
+{
+  "id": "type-003",
+  "name": "Result Ok return",
+  "category": "type-system",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called SafeDivide to Calculator.calr that divides two numbers and returns a Result. It takes i32 parameters a and b, returns Result<i32,str>. If b is not zero, return Ok with the result; otherwise return Err.\n\nUse this exact Calor Result Ok return syntax:\n§F{f003:SafeDivide:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{Result<i32,str>}\n  §IF{if001} (!= b 0)\n    §R §OK (/ a b)\n  §EL{if001}\n    §R §ERR \"Division by zero\"\n  §/I{if001}\n§/F{f003}\n\nThe Result type syntax:\n- §R §OK value - returns Ok(value)\n- §OK wraps a success value\n- Result<T,E> for operations that can fail",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

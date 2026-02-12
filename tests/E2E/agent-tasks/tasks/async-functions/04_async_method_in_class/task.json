@@ -1,0 +1,12 @@
+{
+  "id": "async-004",
+  "name": "Async method in class",
+  "category": "async-functions",
+  "fixture": "oop-project",
+  "prompt": "Add a public class called DataService to Domain.calr with an async method LoadAsync that returns Task<i32>.\n\nUse this exact Calor async method in class syntax:\n§CL{c001:DataService:pub}\n  §AMT{m001:LoadAsync:pub}\n    §O{Task<i32>}\n    §E{net:r}\n    §B{data} §AWAIT §C{HttpClient.GetAsync}§/C\n    §R 100\n  §/AMT{m001}\n§/CL{c001}\n\nThe §AMT{id:name:visibility} syntax defines an async method in a class:\n- Similar to §AF but inside a class\n- id is the method identifier\n- name is the method name\n- visibility is pub/priv/prot",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

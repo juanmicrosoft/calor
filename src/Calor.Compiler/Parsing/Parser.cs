@@ -796,7 +796,7 @@ public sealed class Parser
         {
             return ParseSetCreationStatement();
         }
-        else if (Check(TokenKind.Push))
+        else if (Check(TokenKind.Push) || Check(TokenKind.Add))
         {
             return ParseCollectionPush();
         }
@@ -2112,27 +2112,51 @@ public sealed class Parser
         ExpressionNode to;
         ExpressionNode? step = null;
 
-        if (!string.IsNullOrEmpty(fromStr) && int.TryParse(fromStr, out var fromVal))
+        if (!string.IsNullOrEmpty(fromStr))
         {
-            from = new IntLiteralNode(startToken.Span, fromVal);
+            if (int.TryParse(fromStr, out var fromVal))
+            {
+                from = new IntLiteralNode(startToken.Span, fromVal);
+            }
+            else
+            {
+                // Variable reference in attributes
+                from = new ReferenceNode(startToken.Span, fromStr);
+            }
         }
         else
         {
             from = ParseExpression();
         }
 
-        if (!string.IsNullOrEmpty(toStr) && int.TryParse(toStr, out var toVal))
+        if (!string.IsNullOrEmpty(toStr))
         {
-            to = new IntLiteralNode(startToken.Span, toVal);
+            if (int.TryParse(toStr, out var toVal))
+            {
+                to = new IntLiteralNode(startToken.Span, toVal);
+            }
+            else
+            {
+                // Variable reference in attributes
+                to = new ReferenceNode(startToken.Span, toStr);
+            }
         }
         else
         {
             to = ParseExpression();
         }
 
-        if (!string.IsNullOrEmpty(stepStr) && int.TryParse(stepStr, out var stepVal))
+        if (!string.IsNullOrEmpty(stepStr))
         {
-            step = new IntLiteralNode(startToken.Span, stepVal);
+            if (int.TryParse(stepStr, out var stepVal))
+            {
+                step = new IntLiteralNode(startToken.Span, stepVal);
+            }
+            else
+            {
+                // Variable reference in attributes
+                step = new ReferenceNode(startToken.Span, stepStr);
+            }
         }
 
         // Parse body statements
@@ -3265,16 +3289,19 @@ public sealed class Parser
     /// <summary>
     /// Parses collection push (add).
     /// §PUSH{list1} value      // list.Add(value)
+    /// §ADD{set1} value        // set.Add(value) - alias for PUSH, idiomatic for HashSet
     /// </summary>
     private CollectionPushNode ParseCollectionPush()
     {
-        var startToken = Expect(TokenKind.Push);
+        // Accept either PUSH or ADD token
+        var startToken = Check(TokenKind.Push) ? Expect(TokenKind.Push) : Expect(TokenKind.Add);
+        var tokenName = startToken.Kind == TokenKind.Push ? "PUSH" : "ADD";
         var attrs = ParseAttributes();
         var collectionName = attrs["_pos0"] ?? "";
 
         if (string.IsNullOrEmpty(collectionName))
         {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PUSH", "collection name");
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, tokenName, "collection name");
         }
 
         var value = ParseExpression();
@@ -3420,12 +3447,32 @@ public sealed class Parser
 
     /// <summary>
     /// Parses collection count.
-    /// §CNT collection                   // collection.Count
+    /// §CNT{collection}                  // collection.Count
+    /// §CNT collection                   // collection.Count (legacy)
     /// </summary>
     private CollectionCountNode ParseCollectionCount()
     {
         var startToken = Expect(TokenKind.Count);
-        var collection = ParseExpression();
+
+        // Support both §CNT{collection} and §CNT collection syntaxes
+        ExpressionNode collection;
+        if (Check(TokenKind.OpenBrace))
+        {
+            var attrs = ParseAttributes();
+            var collectionName = attrs["_pos0"] ?? "";
+
+            if (string.IsNullOrEmpty(collectionName))
+            {
+                _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CNT", "collection name");
+            }
+
+            collection = new ReferenceNode(startToken.Span, collectionName);
+        }
+        else
+        {
+            collection = ParseExpression();
+        }
+
         var span = startToken.Span.Union(collection.Span);
         return new CollectionCountNode(span, collection);
     }

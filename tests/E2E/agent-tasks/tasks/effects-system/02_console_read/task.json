@@ -1,0 +1,12 @@
+{
+  "id": "eff-002",
+  "name": "Console read effect",
+  "category": "effects-system",
+  "fixture": "effects-project",
+  "prompt": "Add a public function called ReadInput to Effects.calr that reads a line from the console and returns it. It takes no parameters and returns str. The function must declare the console read effect.\n\nUse this exact Calor console read syntax:\n§F{f001:ReadInput:pub}\n  §O{str}\n  §E{cr}\n  §B{input} §C{Console.ReadLine}§/C\n  §R input\n§/F{f001}\n\nThe §E{cr} declares the console read effect:\n- cr = console read (Console.ReadLine, Console.Read, etc.)\n- This effect indicates the function reads from stdin\n- Must be declared for any console input operations",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

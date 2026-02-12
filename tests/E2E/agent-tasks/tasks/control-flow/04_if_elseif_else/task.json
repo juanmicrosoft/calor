@@ -1,0 +1,12 @@
+{
+  "id": "cf-004",
+  "name": "If-ElseIf-Else block",
+  "category": "control-flow",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called Classify to Calculator.calr that classifies a number as negative, zero, or positive. It takes i32 parameter x and returns i32 (-1 for negative, 0 for zero, 1 for positive).\n\nUse this exact Calor if-elseif-else syntax:\n§F{f003:Classify:pub}\n  §I{i32:x}\n  §O{i32}\n  §IF{if001} (< x 0)\n    §R (- 0 1)\n  §EI (== x 0)\n    §R 0\n  §EL\n    §R 1\n  §/I{if001}\n§/F{f003}\n\nThe §IF{id}/§EI/§EL/§/I{id} syntax creates conditional blocks where:\n- §IF{id} starts the if branch with an identifier\n- §EI (condition) is else-if (can have multiple) - no identifier needed\n- §EL is else - no identifier needed\n- §/I{id} closes the block with matching identifier",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

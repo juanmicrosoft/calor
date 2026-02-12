@@ -1,0 +1,12 @@
+{
+  "id": "oop-001",
+  "name": "Class definition",
+  "category": "oop-features",
+  "fixture": "oop-project",
+  "prompt": "Add a public class called Person to Domain.calr with a simple structure. The class should be empty for now (we'll add members in other tests).\n\nUse this exact Calor class definition syntax:\n§CL{c001:Person:pub}\n§/CL{c001}\n\nThe §CL{id:name:visibility} syntax defines a class:\n- id is a unique class identifier (c001, c002, etc.)\n- name is the class name\n- visibility is pub (public), priv (private), or int (internal)\n- §/CL{id} closes the class definition",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

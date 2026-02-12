@@ -1,0 +1,12 @@
+{
+  "id": "type-006",
+  "name": "Variable assignment",
+  "category": "type-system",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called Accumulate to Calculator.calr that demonstrates mutable variable assignment. It takes i32 parameter n and returns i32. Initialize an accumulator to 0, then add n to it three times.\n\nUse this exact Calor variable assignment syntax:\n§F{f003:Accumulate:pub}\n  §I{i32:n}\n  §O{i32}\n  §B{acc} 0\n  §ASSIGN acc (+ acc n)\n  §ASSIGN acc (+ acc n)\n  §ASSIGN acc (+ acc n)\n  §R acc\n§/F{f003}\n\nThe §ASSIGN name expression syntax assigns to a mutable variable:\n- name must have been declared with §B first\n- expression is evaluated and assigned\n- Enables imperative programming patterns when needed",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

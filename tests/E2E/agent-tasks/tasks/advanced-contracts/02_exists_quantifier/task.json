@@ -1,0 +1,12 @@
+{
+  "id": "ac-002",
+  "name": "Exists quantifier",
+  "category": "advanced-contracts",
+  "fixture": "contracts-project",
+  "prompt": "Add a public function called HasNegative to Contracts.calr that takes an array of i32 and returns bool. Use an exists quantifier in the postcondition to express that if the result is true, there exists at least one negative element.\n\nUse this exact Calor exists quantifier syntax:\n§F{f001:HasNegative:pub}\n  §I{i32[]:arr}\n  §O{bool}\n  §S (-> result (exists ((i i32)) (and (>= i 0) (< i (len arr)) (< (at arr i) 0))))\n  §B{hasNeg} false\n  §L{l001:i:0:(len arr):1}\n    §IF{if001} (< (at arr i) 0)\n      §ASSIGN hasNeg true\n    §/I{if001}\n  §/L{l001}\n  §R hasNeg\n§/F{f001}\n\nThe (exists ((var type)) body) syntax:\n- Declares an existentially quantified variable\n- States that at least one value satisfies the condition\n- Often used with conjunction (and) to bound the variable",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

@@ -125,6 +125,7 @@ public enum TokenKind
     EndHashSet,     // §/HSET
     KeyValue,       // §KV - Dictionary key-value pair
     Push,           // §PUSH - Add to list/set
+    Add,            // §ADD - Add to set (alias for PUSH, idiomatic for HashSet)
     Put,            // §PUT - Add/update dictionary entry
     Remove,         // §REM - Remove from collection
     SetIndex,       // §SETIDX - Set list element by index

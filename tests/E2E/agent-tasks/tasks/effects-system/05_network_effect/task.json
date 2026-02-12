@@ -1,0 +1,12 @@
+{
+  "id": "eff-005",
+  "name": "Network effect",
+  "category": "effects-system",
+  "fixture": "effects-project",
+  "prompt": "Add a public function called FetchUrl to Effects.calr that represents a network request. It takes str parameter url and returns str. The function must declare the network effect.\n\nUse this exact Calor network effect syntax:\n§F{f001:FetchUrl:pub}\n  §I{str:url}\n  §O{str}\n  §E{net:rw}\n  §B{client} §C{HttpClient.new}§/C\n  §B{response} §C{client.GetStringAsync}\n    §A url\n  §/C\n  §R response\n§/F{f001}\n\nThe §E{net:rw} declares the network effect:\n- net:rw = network read/write access\n- net:r = read only (GET requests)\n- net:w = write only (POST/PUT requests)\n- Required for any HTTP client operations",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

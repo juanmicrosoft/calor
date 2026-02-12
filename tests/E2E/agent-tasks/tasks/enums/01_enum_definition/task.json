@@ -1,0 +1,12 @@
+{
+  "id": "enum-001",
+  "name": "Enum definition",
+  "category": "enums",
+  "fixture": "enums-project",
+  "prompt": "Add a public enum called Status to Enums.calr with values Pending, InProgress, and Completed.\n\nUse this exact Calor enum definition syntax:\n§EN{e001:Status:pub}\n  Pending\n  InProgress\n  Completed\n§/EN{e001}\n\nThe §EN{id:name:visibility} syntax defines an enum:\n- id is a unique enum identifier\n- name is the enum type name\n- visibility is pub/priv/int\n- Each line inside is an enum member\n- Members get automatic integer values starting from 0",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

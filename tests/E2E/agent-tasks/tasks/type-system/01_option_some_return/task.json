@@ -1,0 +1,12 @@
+{
+  "id": "type-001",
+  "name": "Option Some return",
+  "category": "type-system",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called TryDouble to Calculator.calr that takes an i32 and returns Option<i32>. If the input is positive, return Some with the doubled value; otherwise return None.\n\nUse this exact Calor Option Some return syntax:\n§F{f003:TryDouble:pub}\n  §I{i32:x}\n  §O{Option<i32>}\n  §IF{if001} (> x 0)\n    §R §SM (* x 2)\n  §EL{if001}\n    §R §NN\n  §/I{if001}\n§/F{f003}\n\nThe Option type syntax:\n- §R §SM value - returns Some(value)\n- §SM wraps a value in the Some constructor\n- Option<T> represents optional values in Calor",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

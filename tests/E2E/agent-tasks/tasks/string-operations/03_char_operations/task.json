@@ -1,0 +1,12 @@
+{
+  "id": "str-003",
+  "name": "Character operations",
+  "category": "string-operations",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called GetFirstChar to Calculator.calr that returns the first character of a string as a char. It takes str parameter s and returns char.\n\nUse this exact Calor character operation syntax:\n§F{f003:GetFirstChar:pub}\n  §I{str:s}\n  §O{char}\n  §Q (> (len s) 0)\n  §R (char-at s 0)\n§/F{f003}\n\nThe character operations:\n- (char-at s index) - returns the character at position index\n- char is the character type in Calor\n- Index is 0-based like in C#",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

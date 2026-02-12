@@ -1,0 +1,12 @@
+{
+  "id": "cf-008",
+  "name": "Foreach over dictionary",
+  "category": "control-flow",
+  "fixture": "collections-project",
+  "prompt": "Add a public function called PrintDictionary to Collections.calr that iterates over a dictionary and prints each key-value pair. The function takes a Dictionary<string, int> parameter and returns void.\n\nUse this exact Calor foreach-kv syntax:\n§F{f001:PrintDictionary:pub}\n  §I{Dictionary<str,i32>:dict}\n  §O{void}\n  §E{cw}\n  §EACHKV{e001:k:v} dict\n    §C{Console.WriteLine}\n      §A k\n    §/C\n    §C{Console.WriteLine}\n      §A v\n    §/C\n  §/EACHKV{e001}\n§/F{f001}\n\nThe §EACHKV{id:keyVar:valueVar} collection syntax creates a foreach loop for key-value pairs where:\n- id is a unique loop identifier (e001)\n- keyVar is the variable name for the key (k)\n- valueVar is the variable name for the value (v)\n- collection is the dictionary to iterate",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

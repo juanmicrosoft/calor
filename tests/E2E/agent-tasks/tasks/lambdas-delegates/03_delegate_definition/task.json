@@ -1,0 +1,12 @@
+{
+  "id": "lam-003",
+  "name": "Delegate definition",
+  "category": "lambdas-delegates",
+  "fixture": "oop-project",
+  "prompt": "Add a public delegate called MathOperation to Domain.calr that takes two i32 parameters and returns i32.\n\nUse this exact Calor delegate definition syntax:\n§DEL{d001:MathOperation:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n§/DEL{d001}\n\nThe §DEL{id:name:visibility} syntax defines a delegate type:\n- id is a unique delegate identifier\n- name is the delegate type name\n- §I defines the parameter types\n- §O defines the return type\n- Delegates are function type signatures",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

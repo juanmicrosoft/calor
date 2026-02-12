@@ -1,0 +1,12 @@
+{
+  "id": "pm-003",
+  "name": "Variable with guard",
+  "category": "pattern-matching",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called DescribeNumber to Calculator.calr that describes a number using pattern matching with guards. It takes i32 parameter n and returns i32 (1 if positive, -1 if negative, 0 if zero).\n\nUse this exact Calor variable pattern with guard syntax:\n§F{f003:DescribeNumber:pub}\n  §I{i32:n}\n  §O{i32}\n  §R §W{w001} n\n    §K §VAR{x} §WHEN (> x 0) → 1\n    §K §VAR{x} §WHEN (< x 0) → (- 0 1)\n    §K _ → 0\n  §/W{w001}\n§/F{f003}\n\nThe §VAR{name} §WHEN (condition) syntax creates a variable pattern with guard where:\n- §VAR{name} binds the matched value to a variable\n- §WHEN (condition) adds a guard condition\n- The guard can reference the bound variable\n- §R §W{...} returns the result of the switch expression",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

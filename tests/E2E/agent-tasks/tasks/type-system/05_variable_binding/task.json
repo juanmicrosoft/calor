@@ -1,0 +1,12 @@
+{
+  "id": "type-005",
+  "name": "Variable binding",
+  "category": "type-system",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called ComputeWithTemp to Calculator.calr that uses local variable bindings in a computation. It takes i32 parameters a and b and returns i32. Compute (a + b) * (a - b) using intermediate variables.\n\nUse this exact Calor variable binding syntax:\n§F{f003:ComputeWithTemp:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §B{sum} (+ a b)\n  §B{diff} (- a b)\n  §R (* sum diff)\n§/F{f003}\n\nThe §B{name} expression syntax creates an immutable variable binding:\n- name is the variable identifier\n- expression is evaluated and bound to the name\n- The variable can be used in subsequent expressions",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

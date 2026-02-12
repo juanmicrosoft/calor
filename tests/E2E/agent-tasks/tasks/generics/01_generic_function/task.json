@@ -1,0 +1,12 @@
+{
+  "id": "gen-001",
+  "name": "Generic function",
+  "category": "generics",
+  "fixture": "generics-project",
+  "prompt": "Add a public generic function called Identity to Generic.calr that takes a value of any type and returns it unchanged.\n\nUse this exact Calor generic function syntax:\n§F{f001:Identity:pub}<T>\n  §I{T:value}\n  §O{T}\n  §R value\n§/F{f001}\n\nThe <T> syntax after the function name declares a type parameter:\n- T is the type parameter name\n- Use T in input and output types\n- Caller specifies the actual type\n- Multiple type params: <T, U>",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

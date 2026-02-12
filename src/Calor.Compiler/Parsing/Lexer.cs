@@ -90,6 +90,7 @@ public sealed class Lexer
         ["/HSET"] = TokenKind.EndHashSet,
         ["KV"] = TokenKind.KeyValue,
         ["PUSH"] = TokenKind.Push,
+        ["ADD"] = TokenKind.Add,
         ["PUT"] = TokenKind.Put,
         ["REM"] = TokenKind.Remove,
         ["SETIDX"] = TokenKind.SetIndex,

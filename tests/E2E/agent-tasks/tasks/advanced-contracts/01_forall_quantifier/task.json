@@ -1,0 +1,12 @@
+{
+  "id": "ac-001",
+  "name": "Forall quantifier",
+  "category": "advanced-contracts",
+  "fixture": "contracts-project",
+  "prompt": "Add a public function called AllPositive to Contracts.calr that takes an array of i32 and returns bool. Use a forall quantifier in the postcondition to express that if the result is true, all elements are positive.\n\nUse this exact Calor forall quantifier syntax:\n§F{f001:AllPositive:pub}\n  §I{i32[]:arr}\n  §O{bool}\n  §S (-> result (forall ((i i32)) (-> (and (>= i 0) (< i (len arr))) (> (at arr i) 0))))\n  §B{allPos} true\n  §L{l001:i:0:(len arr):1}\n    §IF{if001} (<= (at arr i) 0)\n      §ASSIGN allPos false\n    §/I{if001}\n  §/L{l001}\n  §R allPos\n§/F{f001}\n\nThe (forall ((var type)) body) syntax:\n- Declares a universally quantified variable\n- var:type binds the variable with its type\n- body is the condition that must hold for all values\n- Use (-> p q) for implication (if p then q)",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

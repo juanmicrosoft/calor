@@ -1,0 +1,12 @@
+{
+  "id": "pm-001",
+  "name": "Switch with literals",
+  "category": "pattern-matching",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called DayName to Calculator.calr that converts a day number (1-7) to a descriptive integer. It takes i32 parameter day and returns i32 (returns 100 for weekdays Mon-Fri, 200 for weekend Sat-Sun, 0 for invalid).\n\nUse this exact Calor switch syntax:\n§F{f003:DayName:pub}\n  §I{i32:day}\n  §O{i32}\n  §R §W{w001} day\n    §K 1 → 100\n    §K 2 → 100\n    §K 3 → 100\n    §K 4 → 100\n    §K 5 → 100\n    §K 6 → 200\n    §K 7 → 200\n    §K _ → 0\n  §/W{w001}\n§/F{f003}\n\nThe §W{id} expr syntax creates a switch expression where:\n- id is a unique switch identifier\n- §K pattern → expr defines cases (the arrow automatically returns the expression)\n- §K _ is the default/wildcard case\n- §R §W{...} returns the result of the switch expression",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

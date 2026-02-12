@@ -1,0 +1,12 @@
+{
+  "id": "coll-003",
+  "name": "HashSet creation",
+  "category": "collections",
+  "fixture": "collections-project",
+  "prompt": "Add a public function called UniqueCount to Collections.calr that creates a HashSet of integers, uses §ADD to add some values (including duplicates), and returns the unique count. The function takes no parameters and returns i32.\n\nUse this exact Calor HashSet syntax:\n§F{f001:UniqueCount:pub}\n  §O{i32}\n  §HSET{nums:i32}\n  §/HSET{nums}\n  §ADD{nums} 1\n  §ADD{nums} 2\n  §ADD{nums} 2\n  §ADD{nums} 3\n  §ADD{nums} 3\n  §ADD{nums} 3\n  §R §CNT{nums}\n§/F{f001}\n\nThe HashSet syntax:\n- §HSET{id:type} §/HSET{id} creates an empty HashSet\n- §ADD{id} value adds a value to the HashSet (duplicates ignored)\n- §CNT{id} returns the count of unique items",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

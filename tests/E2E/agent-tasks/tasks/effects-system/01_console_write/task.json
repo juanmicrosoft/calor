@@ -1,0 +1,12 @@
+{
+  "id": "eff-001",
+  "name": "Console write effect",
+  "category": "effects-system",
+  "fixture": "effects-project",
+  "prompt": "Add a public function called SayHello to Effects.calr that prints a greeting to the console. It takes str parameter name and returns void. The function must declare the console write effect.\n\nUse this exact Calor console write syntax:\n§F{f001:SayHello:pub}\n  §I{str:name}\n  §O{void}\n  §E{cw}\n  §C{Console.WriteLine}\n    §A name\n  §/C\n§/F{f001}\n\nThe §E{cw} declares the console write effect:\n- cw = console write (Console.WriteLine, Console.Write, etc.)\n- Functions with side effects MUST declare them\n- The compiler enforces effect declarations",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

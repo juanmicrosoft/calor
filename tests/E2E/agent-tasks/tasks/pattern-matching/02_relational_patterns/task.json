@@ -1,0 +1,12 @@
+{
+  "id": "pm-002",
+  "name": "Relational patterns",
+  "category": "pattern-matching",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a public function called ScoreCategory to Calculator.calr that categorizes a score using relational patterns. It takes i32 parameter score and returns i32 (3 for score >= 90, 2 for score >= 70, 1 for score >= 50, 0 otherwise).\n\nUse this exact Calor relational pattern syntax:\n§F{f003:ScoreCategory:pub}\n  §I{i32:score}\n  §O{i32}\n  §R §W{w001} score\n    §K §PREL{gte} 90 → 3\n    §K §PREL{gte} 70 → 2\n    §K §PREL{gte} 50 → 1\n    §K _ → 0\n  §/W{w001}\n§/F{f003}\n\nThe §PREL{op} value syntax creates relational patterns where:\n- op is the comparison operator: gte (>=), gt (>), lte (<=), lt (<)\n- value is the comparison value\n- Patterns are matched in order, first match wins\n- §R §W{...} returns the result of the switch expression",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

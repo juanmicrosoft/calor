@@ -1,0 +1,12 @@
+{
+  "id": "enum-002",
+  "name": "Enum with explicit values",
+  "category": "enums",
+  "fixture": "enums-project",
+  "prompt": "Add a public enum called Color to Enums.calr with explicit integer values: Red = 1, Green = 2, Blue = 4 (for flags-style usage).\n\nUse this exact Calor enum with explicit values syntax:\n§EN{e001:Color:pub}\n  Red = 1\n  Green = 2\n  Blue = 4\n§/EN{e001}\n\nExplicit enum values:\n- Use name = value syntax to assign specific values\n- Values are integers\n- Useful for flags enums (powers of 2)\n- Can skip values for gaps",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}
