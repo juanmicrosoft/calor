@@ -41,10 +41,15 @@ public class ClaudeInitializer : IAiInitializer
             var semanticsSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "calor-semantics");
             Directory.CreateDirectory(semanticsSkillDir);
 
+            // Create .claude/skills/calor-analyze/ directory
+            var analyzeSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "calor-analyze");
+            Directory.CreateDirectory(analyzeSkillDir);
+
             // Write skill files (Claude uses SKILL.md format with YAML frontmatter)
             var calorSkillPath = Path.Combine(calorSkillDir, "SKILL.md");
             var convertSkillPath = Path.Combine(convertSkillDir, "SKILL.md");
             var semanticsSkillPath = Path.Combine(semanticsSkillDir, "SKILL.md");
+            var analyzeSkillPath = Path.Combine(analyzeSkillDir, "SKILL.md");
 
             if (await WriteFileIfNeeded(calorSkillPath, EmbeddedResourceHelper.ReadSkill("claude-calor-SKILL.md"), force))
             {
@@ -71,6 +76,15 @@ public class ClaudeInitializer : IAiInitializer
             else
             {
                 warnings.Add($"Skipped existing file: {semanticsSkillPath}");
+            }
+
+            if (await WriteFileIfNeeded(analyzeSkillPath, EmbeddedResourceHelper.ReadSkill("claude-calor-analyze-SKILL.md"), force))
+            {
+                createdFiles.Add(analyzeSkillPath);
+            }
+            else
+            {
+                warnings.Add($"Skipped existing file: {analyzeSkillPath}");
             }
 
             // Create or update CLAUDE.md from template with section-aware handling

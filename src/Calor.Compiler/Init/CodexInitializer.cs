@@ -28,9 +28,14 @@ public class CodexInitializer : IAiInitializer
             var convertSkillDir = Path.Combine(targetDirectory, ".codex", "skills", "calor-convert");
             Directory.CreateDirectory(convertSkillDir);
 
+            // Create .codex/skills/calor-analyze/ directory
+            var analyzeSkillDir = Path.Combine(targetDirectory, ".codex", "skills", "calor-analyze");
+            Directory.CreateDirectory(analyzeSkillDir);
+
             // Write skill files (Codex uses SKILL.md format with YAML frontmatter)
             var calorSkillPath = Path.Combine(calorSkillDir, "SKILL.md");
             var convertSkillPath = Path.Combine(convertSkillDir, "SKILL.md");
+            var analyzeSkillPath = Path.Combine(analyzeSkillDir, "SKILL.md");
 
             if (await WriteFileIfNeeded(calorSkillPath, EmbeddedResourceHelper.ReadSkill("codex-calor-SKILL.md"), force))
             {
@@ -48,6 +53,15 @@ public class CodexInitializer : IAiInitializer
             else
             {
                 warnings.Add($"Skipped existing file: {convertSkillPath}");
+            }
+
+            if (await WriteFileIfNeeded(analyzeSkillPath, EmbeddedResourceHelper.ReadSkill("codex-calor-analyze-SKILL.md"), force))
+            {
+                createdFiles.Add(analyzeSkillPath);
+            }
+            else
+            {
+                warnings.Add($"Skipped existing file: {analyzeSkillPath}");
             }
 
             // Create or update AGENTS.md from template with section-aware handling

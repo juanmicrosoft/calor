@@ -34,11 +34,13 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 #### Available Skills
 - `@calor` - Write Calor code with v2+ syntax
 - `@calor-convert` - Convert C# to Calor
+- `@calor-analyze` - Deep security and bug analysis (taint, Z3 verification)
 
 #### Key Commands
 ```bash
 calor analyze <path>                 # Score files for Calor migration potential
 calor --input file.calr -o file.g.cs # Compile Calor to C#
+calor --input file.calr --verify --analyze -v  # Deep analysis (security, bugs, contracts)
 calor convert file.cs                # Convert C# to Calor
 calor convert file.calr              # Convert Calor to C#
 ```

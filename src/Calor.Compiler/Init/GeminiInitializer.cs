@@ -29,9 +29,14 @@ public class GeminiInitializer : IAiInitializer
             var convertSkillDir = Path.Combine(targetDirectory, ".gemini", "skills", "calor-convert");
             Directory.CreateDirectory(convertSkillDir);
 
+            // Create .gemini/skills/calor-analyze/ directory
+            var analyzeSkillDir = Path.Combine(targetDirectory, ".gemini", "skills", "calor-analyze");
+            Directory.CreateDirectory(analyzeSkillDir);
+
             // Write skill files (Gemini uses SKILL.md format with YAML frontmatter)
             var calorSkillPath = Path.Combine(calorSkillDir, "SKILL.md");
             var convertSkillPath = Path.Combine(convertSkillDir, "SKILL.md");
+            var analyzeSkillPath = Path.Combine(analyzeSkillDir, "SKILL.md");
 
             if (await WriteFileIfNeeded(calorSkillPath, EmbeddedResourceHelper.ReadSkill("gemini-calor-SKILL.md"), force))
             {
@@ -49,6 +54,15 @@ public class GeminiInitializer : IAiInitializer
             else
             {
                 warnings.Add($"Skipped existing file: {convertSkillPath}");
+            }
+
+            if (await WriteFileIfNeeded(analyzeSkillPath, EmbeddedResourceHelper.ReadSkill("gemini-calor-analyze-SKILL.md"), force))
+            {
+                createdFiles.Add(analyzeSkillPath);
+            }
+            else
+            {
+                warnings.Add($"Skipped existing file: {analyzeSkillPath}");
             }
 
             // Create or update GEMINI.md from template with section-aware handling
