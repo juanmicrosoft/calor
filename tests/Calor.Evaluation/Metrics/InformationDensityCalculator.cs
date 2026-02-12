@@ -112,11 +112,30 @@ public class InformationDensityCalculator : IMetricCalculator
         counts.Modules = CountPattern(source, @"§M\{");
         counts.Functions = CountPattern(source, @"§F\{") + CountPattern(source, @"§AF\{") + CountPattern(source, @"§MT\{") + CountPattern(source, @"§AMT\{");
         counts.Variables = CountPattern(source, @"§B\{");
+
+        // Type annotations: count markers AND actual type names for parity with C# TypeSyntax counting
         counts.TypeAnnotations = CountPattern(source, @"§I\{") + CountPattern(source, @"§O\{");
-        counts.Contracts = CountPattern(source, @"§Q\s") + CountPattern(source, @"§S\s");
-        counts.Effects = CountPattern(source, @"§E\{");
+        counts.TypeAnnotations += CountPattern(source, @"\b(i32|i64|f32|f64|str|bool|unit)\b");
+
+        // Contracts (weight higher - unique to Calor)
+        counts.Contracts = (CountPattern(source, @"§Q\s") + CountPattern(source, @"§S\s")) * 2;
+
+        // Effects (weight higher - unique to Calor)
+        counts.Effects = CountPattern(source, @"§E\{") * 2;
+
+        // Control flow: include return statements, else branches, else-if branches
         counts.ControlFlow = CountPattern(source, @"§IF") + CountPattern(source, @"§L\{") + CountPattern(source, @"§WH\{") + CountPattern(source, @"§W\{");
+        counts.ControlFlow += CountPattern(source, @"§R\s");    // Return statements
+        counts.ControlFlow += CountPattern(source, @"§EL\s");   // Else branches
+        counts.ControlFlow += CountPattern(source, @"§EI\{");   // Else-if branches
+
         counts.Expressions = CountPattern(source, @"§C\{") + CountPattern(source, @"\([\+\-\*/]");
+
+        // Closing tags as scope markers (indicates structure)
+        counts.ClosingTags = CountPattern(source, @"§/");
+
+        // Mutable binding markers (unique to Calor - explicit mutability intent)
+        counts.MutabilityMarkers = CountPattern(source, @"§B\{~");
 
         // If compilation succeeded, use AST for more accurate counts
         if (compilation.Success && compilation.Module != null)
@@ -153,24 +172,41 @@ public class InformationDensityCalculator : IMetricCalculator
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.BaseNamespaceDeclarationSyntax>()
             .Count();
 
-        counts.Functions = root.DescendantNodes()
+        var methodCount = root.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
             .Count();
 
-        counts.Functions += root.DescendantNodes()
+        var constructorCount = root.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorDeclarationSyntax>()
             .Count();
+
+        counts.Functions = methodCount + constructorCount;
 
         counts.Variables = root.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclarationSyntax>()
             .Count();
 
-        counts.Variables += root.DescendantNodes()
+        var parameterCount = root.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ParameterSyntax>()
             .Count();
 
-        counts.TypeAnnotations = root.DescendantNodes()
-            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax>()
+        counts.Variables += parameterCount;
+
+        // Count only meaningful type annotations (not ALL TypeSyntax nodes):
+        // - Method return types (one per method)
+        // - Parameter types (one per parameter)
+        // - Field types
+        // - Property types
+        // This is more fair than counting every TypeSyntax (which includes generics, casts, etc.)
+        counts.TypeAnnotations = methodCount; // Return type per method
+        counts.TypeAnnotations += parameterCount; // One type per parameter
+
+        counts.TypeAnnotations += root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax>()
+            .Count();
+
+        counts.TypeAnnotations += root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax>()
             .Count();
 
         // C# doesn't have built-in contracts - count assertions as approximation
@@ -197,6 +233,15 @@ public class InformationDensityCalculator : IMetricCalculator
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.SwitchStatementSyntax>()
             .Count();
 
+        // Add return statements and else branches for parity with Calor counting
+        counts.ControlFlow += root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ReturnStatementSyntax>()
+            .Count();
+
+        counts.ControlFlow += root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ElseClauseSyntax>()
+            .Count();
+
         counts.Expressions = root.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
             .Count();
@@ -210,13 +255,28 @@ public class InformationDensityCalculator : IMetricCalculator
 
     /// <summary>
     /// Counts tokens in source code using simple tokenization.
+    /// For Calor, treats section markers (§M{, §F{, §/F{, etc.) as single tokens
+    /// rather than counting each character separately.
     /// </summary>
     private static int CountTokens(string source)
     {
+        // Pre-process Calor: Replace section markers with single-token placeholders
+        // This prevents §M{ from being counted as 3 tokens (§, M, {)
+        var processed = System.Text.RegularExpressions.Regex.Replace(
+            source,
+            @"§/?[A-Z]+\{",
+            " _MARKER_ ");
+
+        // Also handle markers without braces (§Q, §S, §R, §EL followed by space)
+        processed = System.Text.RegularExpressions.Regex.Replace(
+            processed,
+            @"§[A-Z]+\s",
+            " _MARKER_ ");
+
         var tokens = 0;
         var inToken = false;
 
-        foreach (var ch in source)
+        foreach (var ch in processed)
         {
             if (char.IsWhiteSpace(ch))
             {
@@ -266,7 +326,10 @@ public class SemanticElementCounts
     public int Effects { get; set; }
     public int ControlFlow { get; set; }
     public int Expressions { get; set; }
+    public int ClosingTags { get; set; }
+    public int MutabilityMarkers { get; set; }
 
     public int Total => Modules + Functions + Variables + TypeAnnotations +
-                       Contracts + Effects + ControlFlow + Expressions;
+                       Contracts + Effects + ControlFlow + Expressions +
+                       ClosingTags + MutabilityMarkers;
 }

@@ -18,8 +18,8 @@ public class InformationDensityCalculator : IMetricCalculator
         var calorDensity = CalculateCalorDensity(context);
         var csharpDensity = CalculateCSharpDensity(context);
 
-        var calorTokens = TokenizeSource(context.CalorSource).Count;
-        var csharpTokens = TokenizeSource(context.CSharpSource).Count;
+        var calorTokens = CountTokens(context.CalorSource);
+        var csharpTokens = CountTokens(context.CSharpSource);
 
         var details = new Dictionary<string, object>
         {
@@ -42,7 +42,7 @@ public class InformationDensityCalculator : IMetricCalculator
     private static double CalculateCalorDensity(EvaluationContext context)
     {
         var source = context.CalorSource;
-        var tokenCount = TokenizeSource(source).Count;
+        var tokenCount = CountTokens(source);
 
         if (tokenCount == 0)
             return 0;
@@ -57,7 +57,7 @@ public class InformationDensityCalculator : IMetricCalculator
     private static double CalculateCSharpDensity(EvaluationContext context)
     {
         var source = context.CSharpSource;
-        var tokenCount = TokenizeSource(source).Count;
+        var tokenCount = CountTokens(source);
 
         if (tokenCount == 0)
             return 0;
@@ -73,35 +73,81 @@ public class InformationDensityCalculator : IMetricCalculator
     {
         var elements = new Dictionary<string, int>
         {
-            // Structural elements
-            ["modules"] = CountOccurrences(source, "§M["),
-            ["functions"] = CountOccurrences(source, "§F["),
-            ["variables"] = CountOccurrences(source, "§V["),
-            ["parameters"] = CountOccurrences(source, "§I[") + CountOccurrences(source, "§O["),
+            // Structural elements (using correct curly brace syntax)
+            ["modules"] = CountOccurrences(source, "§M{"),
+            ["functions"] = CountOccurrences(source, "§F{") + CountOccurrences(source, "§AF{") +
+                           CountOccurrences(source, "§MT{") + CountOccurrences(source, "§AMT{"),
+            ["variables"] = CountOccurrences(source, "§B{"),
+            ["parameters"] = CountOccurrences(source, "§I{") + CountOccurrences(source, "§O{"),
 
-            // Contract elements (high semantic value)
-            ["requires"] = CountOccurrences(source, "§REQ") * 2, // Weight contracts higher
-            ["ensures"] = CountOccurrences(source, "§ENS") * 2,
-            ["invariants"] = CountOccurrences(source, "§INV") * 2,
+            // Contract elements (high semantic value - weight 2x)
+            // Using correct syntax: §Q and §S followed by space
+            ["requires"] = CountOccurrences(source, "§Q ") * 2,
+            ["ensures"] = CountOccurrences(source, "§S ") * 2,
+            ["invariants"] = CountOccurrences(source, "§INV{") * 2,
 
-            // Effect declarations (high semantic value)
-            ["effects"] = CountOccurrences(source, "§E[") * 2,
+            // Effect declarations (high semantic value - weight 2x)
+            ["effects"] = CountOccurrences(source, "§E{") * 2,
 
             // Control flow
-            ["conditionals"] = CountOccurrences(source, "§IF") + CountOccurrences(source, "§ELSE"),
-            ["loops"] = CountOccurrences(source, "§LOOP") + CountOccurrences(source, "§FOR") +
-                       CountOccurrences(source, "§WHILE"),
-            ["matches"] = CountOccurrences(source, "§MATCH") * 2, // Pattern matching is semantic-rich
+            ["conditionals"] = CountOccurrences(source, "§IF") + CountOccurrences(source, "§EL ") +
+                              CountOccurrences(source, "§EI{"),
+            ["loops"] = CountOccurrences(source, "§L{") + CountOccurrences(source, "§WH{") +
+                       CountOccurrences(source, "§W{"),
+            ["matches"] = CountOccurrences(source, "§MA{") * 2, // Pattern matching is semantic-rich
 
-            // Calls and returns
-            ["calls"] = CountOccurrences(source, "§C["),
-            ["returns"] = CountOccurrences(source, "§RET"),
+            // Returns
+            ["returns"] = CountOccurrences(source, "§R "),
 
-            // Type annotations
-            ["types"] = CountOccurrences(source, ":") // Approximate type annotations
+            // Calls
+            ["calls"] = CountOccurrences(source, "§C{"),
+
+            // Type annotations - count actual type names for parity with C# TypeSyntax counting
+            ["types"] = CountTypeNames(source),
+
+            // Closing tags as scope markers
+            ["closingTags"] = CountOccurrences(source, "§/"),
+
+            // Mutability markers (unique to Calor)
+            ["mutability"] = CountOccurrences(source, "§B{~")
         };
 
         return elements;
+    }
+
+    private static int CountTypeNames(string source)
+    {
+        // Count input/output markers
+        var count = CountOccurrences(source, "§I{") + CountOccurrences(source, "§O{");
+
+        // Count actual type name occurrences
+        var typePatterns = new[] { "i32", "i64", "f32", "f64", "str", "bool", "unit" };
+        foreach (var pattern in typePatterns)
+        {
+            count += CountWordOccurrences(source, pattern);
+        }
+
+        return count;
+    }
+
+    private static int CountWordOccurrences(string source, string word)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = source.IndexOf(word, index, StringComparison.Ordinal)) != -1)
+        {
+            // Check word boundaries
+            var before = index > 0 ? source[index - 1] : ' ';
+            var after = index + word.Length < source.Length ? source[index + word.Length] : ' ';
+
+            if (!char.IsLetterOrDigit(before) && before != '_' &&
+                !char.IsLetterOrDigit(after) && after != '_')
+            {
+                count++;
+            }
+            index += word.Length;
+        }
+        return count;
     }
 
     private static Dictionary<string, int> CountCSharpSemanticElements(string source)
@@ -122,6 +168,9 @@ public class InformationDensityCalculator : IMetricCalculator
                        CountOccurrences(source, "while (") + CountOccurrences(source, "while(") +
                        CountOccurrences(source, "foreach (") + CountOccurrences(source, "foreach("),
             ["switches"] = CountOccurrences(source, "switch (") + CountOccurrences(source, "switch("),
+
+            // Returns
+            ["returns"] = CountOccurrences(source, "return ") + CountOccurrences(source, "return;"),
 
             // Error handling
             ["exceptions"] = CountOccurrences(source, "throw ") + CountOccurrences(source, "try") +
@@ -183,12 +232,30 @@ public class InformationDensityCalculator : IMetricCalculator
         return count;
     }
 
-    private static List<string> TokenizeSource(string source)
+    /// <summary>
+    /// Counts tokens in source code using simple tokenization.
+    /// For Calor, treats section markers (§M{, §F{, §/F{, etc.) as single tokens
+    /// rather than counting each character separately.
+    /// </summary>
+    private static int CountTokens(string source)
     {
+        // Pre-process Calor: Replace section markers with single-token placeholders
+        // This prevents §M{ from being counted as 3 tokens (§, M, {)
+        var processed = System.Text.RegularExpressions.Regex.Replace(
+            source,
+            @"§/?[A-Z]+\{",
+            " _MARKER_ ");
+
+        // Also handle markers without braces (§Q, §S, §R, §EL followed by space)
+        processed = System.Text.RegularExpressions.Regex.Replace(
+            processed,
+            @"§[A-Z]+\s",
+            " _MARKER_ ");
+
         var tokens = new List<string>();
         var currentToken = "";
 
-        foreach (var ch in source)
+        foreach (var ch in processed)
         {
             if (char.IsWhiteSpace(ch))
             {
@@ -218,7 +285,7 @@ public class InformationDensityCalculator : IMetricCalculator
             tokens.Add(currentToken);
         }
 
-        return tokens;
+        return tokens.Count;
     }
 
     private static int CountOccurrences(string source, string pattern)
