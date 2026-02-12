@@ -407,9 +407,11 @@ public class KInductionTests
 
     #region Loop Analysis Runner Tests
 
-    [Fact]
+    [SkippableFact]
     public void LoopAnalysisRunner_SimpleFunction_NoLoops_NoOutput()
     {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
         var source = @"
 §M{m001:Test}
 §F{f001:NoLoop:pub}
