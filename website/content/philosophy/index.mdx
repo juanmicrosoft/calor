@@ -125,57 +125,67 @@ This might look unusual to human programmers, but for an AI agent:
 
 ## Not a General-Purpose Language
 
-Calor is not trying to replace C#, Python, or any other language. It's a research project exploring whether language design can be optimized for AI agent workflows.
+Calor is not trying to replace C#, Python, or any other language. It's a research project exploring whether language design can be optimized for AI agent workflows—where the AI writes the code and humans define the outcomes.
 
 Use Calor when:
-- You're building AI-powered code analysis or generation tools
-- You want to experiment with agent-friendly language design
-- You need explicit contracts and effects for verification
+- You want AI agents to write verifiable, contract-checked code
+- You prefer defining *what* software should do over *how* it does it
+- You need mathematical guarantees about program behavior
+- You want to shift from code review to requirements review
 
 Use traditional languages when:
-- Human readability is the priority
-- You need ecosystem libraries and tooling
-- Token efficiency matters more than semantic explicitness
+- You prefer writing code yourself
+- Human readability of source is the priority
+- You need ecosystem libraries without interop overhead
 
 ---
 
 ## Frequently Asked Questions
 
-### "Why should I learn a new language?"
+### "Do I need to learn Calor?"
 
-Calor isn't about replacing your existing skills—it's about augmenting them. Your C#, Python, or TypeScript expertise remains valuable. Calor compiles to standard .NET assemblies, so everything you know about debugging, profiling, and deploying .NET applications still applies. You're adding a tool to your toolbox, not replacing it.
+**No.** You don't write Calor—your AI coding agent does. Calor is designed for AI agents to read and write, not humans. Your role shifts from writing code to **defining outcomes**: what should the software accomplish, what constraints must it satisfy, what behaviors are acceptable. The AI agent translates your requirements into Calor, and the compiler verifies the contracts are satisfied.
 
-### "Is this just for AI? What's in it for me?"
+Think of it this way: you don't need to learn assembly language to write software, and you don't need to learn Calor to benefit from it. The AI handles the language; you handle the intent.
 
-Even if you're writing Calor by hand (rather than generating it with AI), you benefit from:
-- **Contracts that catch bugs at compile time** instead of runtime crashes
-- **Explicit effects** that make code review easier—you know at a glance what a function does
-- **Unique IDs** that prevent the classic "I edited the wrong function" mistake during refactoring
+### "Do I still need to do code reviews?"
+
+**Not in the traditional sense.** Instead of reviewing implementation details line-by-line, you focus on:
+- **Defining outcomes**: What should this function guarantee? What preconditions must callers satisfy?
+- **Specifying contracts**: The AI writes the code, but you approve the contracts (`§Q` preconditions, `§S` postconditions)
+- **Reviewing verification results**: Did Z3 prove the contracts? Are there counterexamples?
+
+The compiler and verifier do the tedious work of checking implementation correctness. Your job is ensuring the *requirements* are correct. If the contracts pass verification, the implementation is mathematically guaranteed to satisfy them.
+
+### "What if I want to understand the code?"
+
+Calor compiles to readable C# code. If you need to inspect implementation details, look at the generated `.cs` files—they're standard, idiomatic C# that any .NET developer can understand. The Calor source is the "agent-facing" representation; the C# output is the "human-facing" representation.
 
 ### "This seems verbose compared to C#"
 
-Yes, Calor uses more tokens than equivalent C#. But that verbosity carries meaning—every extra character serves a purpose for AI comprehension. The Lisp-style expressions keep the syntax compact while maintaining clarity.
+Yes, Calor uses more tokens than equivalent C#. But you're not the one writing it—the AI is. The verbosity serves the AI: every extra character carries semantic meaning that helps the agent understand and modify code correctly. The Lisp-style expressions are directly manipulable without parsing precedence rules.
 
 ### "My team will never adopt this"
 
-Start small. Calor interoperates with existing C# code through standard .NET assemblies. You can:
-1. Use Calor for a single critical module with complex invariants
-2. Let AI agents generate Calor while humans review the compiled C#
-3. Adopt gradually as the team sees benefits
+Adoption is gradual and low-risk:
+1. **Start with AI-generated modules**—let your coding agent write Calor for new features
+2. **Review contracts, not code**—approve what the software should do, not how it does it
+3. **Interoperate seamlessly**—Calor compiles to standard .NET assemblies that work with existing C# code
+4. **Fall back anytime**—the generated C# is always available if you need to maintain it manually
 
 ### "What about tooling? IDE support?"
 
 Calor compiles to standard .NET assemblies. That means:
-- Your existing debugger works
+- Your existing debugger works (on the generated C#)
 - Your existing profiler works
 - Your existing CI/CD pipeline works
 - NuGet packages work
 
-IDE syntax highlighting and language server support are on the roadmap, but the compiled output works with all existing .NET tooling today.
+The Calor CLI includes a language server for IDE integration. VS Code extension is available for syntax highlighting and diagnostics.
 
 ### "Is this production-ready?"
 
-Calor is a research project exploring AI-native language design. The compiler produces correct, strongly-typed C# code. There are no experimental runtime features—just standard .NET. Whether it's "production-ready" depends on your risk tolerance and use case. We recommend starting with non-critical modules and expanding as you gain confidence.
+Calor is a research project exploring AI-native language design. The compiler produces correct, strongly-typed C# code with Z3-verified contracts. There are no experimental runtime features—just standard .NET. Whether it's "production-ready" depends on your risk tolerance and use case. We recommend starting with AI-generated modules for new features and expanding as you gain confidence in the workflow.
 
 ---
 
