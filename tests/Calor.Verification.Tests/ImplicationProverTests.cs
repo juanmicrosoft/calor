@@ -512,22 +512,40 @@ public class ImplicationProverTests
         using var ctx = Z3ContextFactory.Create();
         using var prover = new Z3ImplicationProver(ctx);
 
-        // (&& (> x 0) (> y 0)) → (> (+ x y) 0) should be PROVEN
+        // With bit-vector semantics, we need bounds to prevent overflow
+        // (&& (> x 0) (< x 1000000000) (> y 0) (< y 1000000000)) → (> (+ x y) 0) should be PROVEN
         var parameters = new List<(string Name, string Type)> { ("x", "i32"), ("y", "i32") };
 
+        // (x > 0 && x < 1000000000 && y > 0 && y < 1000000000)
         var antecedent = new BinaryOperationNode(
             TextSpan.Empty,
             BinaryOperator.And,
             new BinaryOperationNode(
                 TextSpan.Empty,
-                BinaryOperator.GreaterThan,
-                new ReferenceNode(TextSpan.Empty, "x"),
-                new IntLiteralNode(TextSpan.Empty, 0)),
+                BinaryOperator.And,
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.And,
+                    new BinaryOperationNode(
+                        TextSpan.Empty,
+                        BinaryOperator.GreaterThan,
+                        new ReferenceNode(TextSpan.Empty, "x"),
+                        new IntLiteralNode(TextSpan.Empty, 0)),
+                    new BinaryOperationNode(
+                        TextSpan.Empty,
+                        BinaryOperator.LessThan,
+                        new ReferenceNode(TextSpan.Empty, "x"),
+                        new IntLiteralNode(TextSpan.Empty, 1000000000))),
+                new BinaryOperationNode(
+                    TextSpan.Empty,
+                    BinaryOperator.GreaterThan,
+                    new ReferenceNode(TextSpan.Empty, "y"),
+                    new IntLiteralNode(TextSpan.Empty, 0))),
             new BinaryOperationNode(
                 TextSpan.Empty,
-                BinaryOperator.GreaterThan,
+                BinaryOperator.LessThan,
                 new ReferenceNode(TextSpan.Empty, "y"),
-                new IntLiteralNode(TextSpan.Empty, 0)));
+                new IntLiteralNode(TextSpan.Empty, 1000000000)));
 
         var consequent = new BinaryOperationNode(
             TextSpan.Empty,
