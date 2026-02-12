@@ -1,0 +1,261 @@
+---
+title: "Effect Soundness"
+section: "benchmarking"
+order: 11
+---
+
+
+**Category:** Effect Soundness (Calor-only)
+**Result:** N/A (no C# equivalent)
+**What it measures:** Effect declarations match actual behavior
+
+---
+
+## Overview
+
+Calor's compiler enforces that declared effects match actual effects through interprocedural analysis. A function marked `§E{}` (pure) cannot contain I/O operations, and a function calling code with effects must declare those effects.
+
+This catches hidden side effects at compile time—something impossible with constrained decoding or traditional type systems.
+
+---
+
+## Why It Matters
+
+Hidden side effects cause real bugs:
+
+- **Testing failures** - "Pure" functions that secretly log make tests non-deterministic
+- **Concurrency bugs** - Functions assumed safe for parallel execution have hidden state
+- **Performance surprises** - What looks like a calculation actually hits the network
+- **Security issues** - Code assumed side-effect-free modifies databases
+
+Effect soundness means:
+- You can trust effect declarations
+- Refactoring is safe (move "pure" code anywhere)
+- Testing strategy follows directly from effects
+
+---
+
+## How It's Measured
+
+The compiler traces effect violations through the entire call graph:
+
+1. **Direct effects** - Does the function body contain effectful operations?
+2. **Transitive effects** - Do called functions have effects?
+3. **Declaration match** - Are all effects properly declared in `§E{...}`?
+
+Violations produce compile errors with full call chains:
+
+```
+error Calor0410: Function 'ProcessOrder' uses effect 'network'
+                 but does not declare it
+  Call chain: ProcessOrder → NotifyCustomer → SendEmail → HttpClient.PostAsync
+```
+
+---
+
+## Example
+
+A function declared with only database effects:
+
+```calor
+§F{f001:ProcessOrder:pub}
+  §I{Order:order}
+  §O{bool}
+  §E{db:rw}                    // Declares: only database effects
+
+  §C{SaveOrder} order          // OK: SaveOrder has db effect
+  §C{SendConfirmation} order   // ERROR: has network effect!
+  §R true
+§/F{f001}
+```
+
+The compiler catches this:
+
+```
+error Calor0410: Function 'ProcessOrder' uses effect 'net:w'
+                 but does not declare it
+  Call chain: ProcessOrder → SendConfirmation → EmailService.Send → HttpClient.PostAsync
+```
+
+To fix, either:
+1. Add the effect: `§E{db:rw,net:w}`
+2. Remove the effectful call
+3. Use a different implementation without network effects
+
+---
+
+## What It Catches
+
+### Hidden Network Calls
+
+```calor
+§F{f001:Calculate:pub}
+  §O{i32}
+  §E{}                         // Claims to be pure
+
+  §V{v001:i32:rate} §C{FetchExchangeRate} §/C  // ERROR: network!
+  §R (* 100 rate)
+§/F{f001}
+```
+
+### Undeclared Database Writes
+
+```calor
+§F{f001:GetUser:pub}
+  §I{i32:id}
+  §O{User}
+  §E{db:r}                     // Claims read-only
+
+  §V{v001:User:user} §C{Repository.GetById} id §/C
+  §C{AuditLog.Write} id        // ERROR: this is db:w!
+  §R user
+§/F{f001}
+```
+
+### Logging in "Pure" Functions
+
+```calor
+§F{f001:ValidateEmail:pub}
+  §I{str:email}
+  §O{bool}
+  §E{}                         // Claims no effects
+
+  §C{Logger.Debug} email       // ERROR: console write!
+  §R §C{IsValidFormat} email §/C
+§/F{f001}
+```
+
+---
+
+## Effect Propagation
+
+Callers must include all effects of their callees:
+
+```calor
+// Callee has console write effect
+§F{f002:LogMessage:pri}
+  §I{str:msg}
+  §O{void}
+  §E{cw}
+  §P msg
+§/F{f002}
+
+// Caller MUST include cw effect
+§F{f001:ProcessAndLog:pub}
+  §I{Data:data}
+  §O{void}
+  §E{db:rw,cw}                 // Must include cw because we call LogMessage
+
+  §C{SaveData} data
+  §C{f002:LogMessage} "Saved"
+§/F{f001}
+```
+
+If `ProcessAndLog` declared only `§E{db:rw}`, the compiler would error:
+
+```
+error Calor0410: Function 'ProcessAndLog' uses effect 'cw'
+                 but does not declare it
+  Call chain: ProcessAndLog → LogMessage → Console.WriteLine
+```
+
+---
+
+## Effect Checking Modes
+
+### Default Mode (Warnings)
+
+Unknown external calls produce warnings:
+
+```bash
+calor -i app.calr -o app.g.cs
+```
+
+```
+warning Calor0411: Unknown effects for call to 'ThirdParty.DoSomething'
+```
+
+### Strict Mode (Errors)
+
+Promote unknown effects to errors:
+
+```bash
+calor -i app.calr -o app.g.cs --strict-effects
+```
+
+```
+error Calor0411: Unknown effects for call to 'ThirdParty.DoSomething'
+  Add effect declaration to manifest or declare pessimistic effects
+```
+
+---
+
+## Comparison with Implicit Effects
+
+| Aspect | C# (Implicit) | Calor (Explicit) |
+|:-------|:--------------|:-----------------|
+| Side effects visible? | No - must read implementation | Yes - in function signature |
+| Compiler enforcement | None | Full interprocedural analysis |
+| "Pure" guarantee | Convention only | Compiler-verified |
+| Refactoring safety | Must manually verify | Compiler catches violations |
+| Testing strategy | Guesswork | Follows from effects |
+
+### C# Example
+
+```csharp
+// C#: What effects does this have?
+public async Task<User> GetUser(int id)
+{
+    var user = await _repository.GetById(id);  // Database? Memory?
+    _logger.Log($"Retrieved user {id}");        // Console? File? Network?
+    await _cache.Set(user);                      // Memory? Redis?
+    return user;
+}
+// Answer: You have NO IDEA without reading every dependency
+```
+
+### Calor Equivalent
+
+```calor
+§F{f001:GetUser:pub}
+  §I{i32:id}
+  §O{User}
+  §E{db:r,cw,net:rw}           // EXPLICIT: database read, console, network
+
+  §V{v001:User:user} §C{GetById} id §/C
+  §C{Log} (concat "Retrieved user " (str id))
+  §C{CacheSet} user
+  §R user
+§/F{f001}
+```
+
+---
+
+## Benefits for AI Agents
+
+### 1. Filtering by Effect
+
+Find all functions that access the database:
+```
+// Agent searches for §E{..db..}
+```
+
+### 2. Refactoring Safety
+
+Move pure functions anywhere without side-effect concerns:
+```
+// If §E{} is declared, the function is provably safe to parallelize
+```
+
+### 3. Test Planning
+
+- `§E{}` - Unit test directly
+- `§E{cw}` - Mock console
+- `§E{db:rw}` - Mock database
+- `§E{net:rw}` - Mock HTTP
+
+---
+
+## Next
+
+- [Interop Effect Coverage](/benchmarking/metrics/interop-effect-coverage/) - BCL methods covered by effect manifests

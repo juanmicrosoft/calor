@@ -1,0 +1,187 @@
+---
+title: "Contract Verification"
+section: "benchmarking"
+order: 10
+---
+
+
+**Category:** Contract Verification (Calor-only)
+**Result:** N/A (no C# equivalent)
+**What it measures:** Z3 static contract verification rates
+
+---
+
+## Overview
+
+Calor uses Microsoft's Z3 SMT solver to prove contracts at compile time. When you write a precondition or postcondition, the compiler can mathematically verify that it holds for all possible inputs—catching bugs before the code ever runs.
+
+This is fundamentally different from constrained decoding approaches, which only ensure syntactic validity. Z3 verification proves semantic correctness.
+
+---
+
+## Why It Matters
+
+Static contract verification catches entire categories of bugs at compile time:
+
+- **Division by zero** - Z3 proves divisors are never zero
+- **Bounds violations** - Array indices proven within range
+- **Integer overflow** - Arithmetic proven to stay within bounds
+- **Null dereferences** - References proven non-null before use
+- **Invalid state** - Invariants proven to hold
+
+These bugs cannot be caught by grammar-constrained generation—syntax doesn't encode invariants.
+
+---
+
+## How It's Measured
+
+Contracts fall into four categories after verification:
+
+| Result | Meaning | Runtime Check |
+|:-------|:--------|:--------------|
+| **Proven** | Z3 mathematically proved the contract always holds | Elided (optional) |
+| **Unproven** | Z3 couldn't determine (timeout or complexity) | Preserved |
+| **Disproven** | Z3 found a counterexample | Preserved + Warning |
+| **Unsupported** | Contract uses unsupported constructs | Preserved |
+
+The metric tracks the distribution across these categories.
+
+---
+
+## Example
+
+Consider a division function with a precondition:
+
+```calor
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)              // Precondition: b must not be zero
+  §R (/ a b)
+§/F{f001}
+```
+
+When compiled with `--verify`, Z3 checks whether the division can ever fail:
+
+```bash
+calor -i math.calr -o math.g.cs --verify
+```
+
+If code calls `Divide` with a potentially-zero argument:
+
+```calor
+§V{v001:i32:result} §C{Divide} x (- y y) §/C    // (y - y) = 0!
+```
+
+Z3 detects this at compile time:
+
+```
+warning Calor0702: Precondition may be violated in call to 'Divide'.
+  Counterexample: y=5 (b = y - y = 0)
+```
+
+---
+
+## Verification Categories
+
+### What Z3 Catches
+
+| Bug Category | Contract | Detection |
+|:-------------|:---------|:----------|
+| Division by zero | `§Q (!= divisor 0)` | Proven safe or counterexample |
+| Negative index | `§Q (>= index 0)` | Proven safe or counterexample |
+| Out of bounds | `§Q (< index len)` | Proven safe or counterexample |
+| Invalid range | `§S (>= result 0)` | Postcondition verified |
+| Integer overflow | `§S (< result MAX_INT)` | Arithmetic bounds checked |
+
+### Postcondition Verification
+
+Z3 can prove that implementations satisfy their postconditions:
+
+```calor
+§F{f001:Square:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (>= x 0)
+  §S (>= result 0)         // Z3 proves: x² ≥ 0 when x ≥ 0
+  §R (* x x)
+§/F{f001}
+```
+
+```
+// PROVEN: Postcondition statically verified: (result >= 0)
+```
+
+---
+
+## Supported Constructs
+
+Z3 verification supports:
+
+| Calor | Z3 | Description |
+|:------|:---|:------------|
+| `(+ a b)` | `a + b` | Addition |
+| `(- a b)` | `a - b` | Subtraction |
+| `(* a b)` | `a * b` | Multiplication |
+| `(/ a b)` | `a div b` | Division |
+| `(% a b)` | `a mod b` | Modulo |
+| `(== a b)` | `a = b` | Equality |
+| `(!= a b)` | `a ≠ b` | Inequality |
+| `(< a b)` | `a < b` | Less than |
+| `(<= a b)` | `a ≤ b` | Less or equal |
+| `(> a b)` | `a > b` | Greater than |
+| `(>= a b)` | `a ≥ b` | Greater or equal |
+| `(and p q)` | `p ∧ q` | Logical and |
+| `(or p q)` | `p ∨ q` | Logical or |
+| `(not p)` | `¬p` | Logical not |
+
+**Supported types:** `i32`, `i64`, `bool`
+
+**Unsupported:** Function calls, strings, floating-point, arrays, objects
+
+---
+
+## Comparison with Runtime-Only
+
+| Aspect | Runtime Only | Static + Runtime |
+|:-------|:-------------|:-----------------|
+| When bugs found | At runtime | At compile time |
+| Verification cost | None | Compile time (cached) |
+| Runtime overhead | Always | Reduced for proven contracts |
+| Coverage | All contracts | Supported constructs |
+
+Static verification complements runtime checking—it doesn't replace it. Unproven and unsupported contracts still have runtime checks.
+
+---
+
+## Why C# Cannot Do This
+
+C# Code Contracts (2008-2015) attempted similar verification but was abandoned:
+
+- Static analyzer was slow and unreliable
+- Developers didn't write contracts consistently
+- No integration with the language syntax
+
+Calor's advantage: when AI agents write code, they generate contracts for free. The annotation burden that killed C# Code Contracts doesn't exist.
+
+---
+
+## Configuration
+
+```bash
+# Enable verification (recommended)
+calor -i app.calr -o app.g.cs --verify
+
+# Custom timeout (default: 5 seconds per contract)
+calor -i app.calr -o app.g.cs --verify --verification-timeout 10
+
+# Skip caching (for debugging)
+calor -i app.calr -o app.g.cs --verify --no-cache
+```
+
+---
+
+## Next
+
+- [Effect Soundness](/benchmarking/metrics/effect-soundness/) - Verifying declared effects match actual behavior
