@@ -155,17 +155,28 @@ public class BenchmarkRunner
             statisticalSummaries.Add(summary);
         }
 
-        // Create aggregated result using means
-        var aggregatedMetrics = metricGroups.Select(g => new MetricResult(
-            g.Key.Category,
-            g.Key.MetricName,
-            StatisticalAnalysis.Mean(g.Value.Select(m => m.CalorScore)),
-            StatisticalAnalysis.Mean(g.Value.Select(m => m.CSharpScore)),
-            StatisticalAnalysis.Mean(g.Value.Select(m => m.AdvantageRatio)),
-            new Dictionary<string, object>
+        // Create aggregated result using means, preserving isCalorOnly flag
+        var aggregatedMetrics = metricGroups.Select(g =>
+        {
+            var details = new Dictionary<string, object>
             {
                 ["statisticalSampleCount"] = g.Value.Count
-            })).ToList();
+            };
+
+            // Preserve isCalorOnly flag from original metrics
+            if (g.Value.Any(m => m.IsCalorOnly))
+            {
+                details["isCalorOnly"] = true;
+            }
+
+            return new MetricResult(
+                g.Key.Category,
+                g.Key.MetricName,
+                StatisticalAnalysis.Mean(g.Value.Select(m => m.CalorScore)),
+                StatisticalAnalysis.Mean(g.Value.Select(m => m.CSharpScore)),
+                StatisticalAnalysis.Mean(g.Value.Select(m => m.AdvantageRatio)),
+                details);
+        }).ToList();
 
         var result = new EvaluationResult
         {
