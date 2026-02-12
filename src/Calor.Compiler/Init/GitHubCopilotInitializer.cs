@@ -28,9 +28,14 @@ public class GitHubCopilotInitializer : IAiInitializer
             var convertSkillDir = Path.Combine(targetDirectory, ".github", "copilot", "skills", "calor-convert");
             Directory.CreateDirectory(convertSkillDir);
 
+            // Create .github/copilot/skills/calor-analyze/ directory
+            var analyzeSkillDir = Path.Combine(targetDirectory, ".github", "copilot", "skills", "calor-analyze");
+            Directory.CreateDirectory(analyzeSkillDir);
+
             // Write skill files (GitHub Copilot uses SKILL.md format with YAML frontmatter)
             var calorSkillPath = Path.Combine(calorSkillDir, "SKILL.md");
             var convertSkillPath = Path.Combine(convertSkillDir, "SKILL.md");
+            var analyzeSkillPath = Path.Combine(analyzeSkillDir, "SKILL.md");
 
             if (await WriteFileIfNeeded(calorSkillPath, EmbeddedResourceHelper.ReadSkill("github-calor-SKILL.md"), force))
             {
@@ -48,6 +53,15 @@ public class GitHubCopilotInitializer : IAiInitializer
             else
             {
                 warnings.Add($"Skipped existing file: {convertSkillPath}");
+            }
+
+            if (await WriteFileIfNeeded(analyzeSkillPath, EmbeddedResourceHelper.ReadSkill("github-calor-analyze-SKILL.md"), force))
+            {
+                createdFiles.Add(analyzeSkillPath);
+            }
+            else
+            {
+                warnings.Add($"Skipped existing file: {analyzeSkillPath}");
             }
 
             // Create or update copilot-instructions.md from template with section-aware handling

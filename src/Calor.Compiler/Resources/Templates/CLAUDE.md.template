@@ -56,12 +56,14 @@ All tasks must pass (2/3 runs succeed). If tests fail, investigate before procee
 #### Available Skills
 - `/calor` - Write Calor code with v2+ syntax
 - `/calor-convert` - Convert C# to Calor
+- `/calor-analyze` - Deep security and bug analysis (taint, Z3 verification)
 
 #### Key Commands
 ```bash
 calor analyze <path>                 # Score files for Calor migration potential
 calor diagnose <file.calr>           # Validate syntax - shows ALL errors at once
 calor --input file.calr -o file.g.cs # Compile Calor to C#
+calor --input file.calr --verify --analyze -v  # Deep analysis (security, bugs, contracts)
 calor convert file.cs                # Convert C# to Calor
 calor convert file.calr              # Convert Calor to C#
 ```
