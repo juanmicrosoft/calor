@@ -35,6 +35,8 @@ public record MetricResult(
     /// <summary>
     /// Creates a metric result where higher values are better (e.g., accuracy).
     /// Advantage ratio is calculated as CalorScore / CSharpScore.
+    /// For Calor-only metrics (C# score is 0, Calor score > 0), ratio is set to 1.0
+    /// but IsCalorOnly will be true.
     /// </summary>
     public static MetricResult CreateHigherIsBetter(
         string category,
@@ -48,12 +50,28 @@ public record MetricResult(
     }
 
     /// <summary>
-    /// Returns true if Calor has an advantage (ratio > 1).
+    /// Returns true if Calor has an advantage (ratio > 1) or this is a Calor-only metric.
     /// </summary>
-    public bool CalorHasAdvantage => AdvantageRatio > 1.0;
+    public bool CalorHasAdvantage => AdvantageRatio > 1.0 || IsCalorOnly;
 
     /// <summary>
     /// Returns the percentage advantage for Calor (positive) or C# (negative).
     /// </summary>
     public double AdvantagePercentage => (AdvantageRatio - 1.0) * 100;
+
+    /// <summary>
+    /// Returns true if this is a Calor-only metric (C# has no equivalent capability).
+    /// Calor-only metrics should be counted as Calor wins when Calor has a positive score.
+    /// </summary>
+    public bool IsCalorOnly => Details.TryGetValue("isCalorOnly", out var value) && value is bool b && b;
+
+    /// <summary>
+    /// Returns true if Calor wins this metric (has advantage or is Calor-only with positive score).
+    /// </summary>
+    public bool CalorWins => AdvantageRatio > 1.0 || (IsCalorOnly && CalorScore > 0);
+
+    /// <summary>
+    /// Returns true if C# wins this metric.
+    /// </summary>
+    public bool CSharpWins => AdvantageRatio < 1.0 && !IsCalorOnly;
 }

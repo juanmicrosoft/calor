@@ -349,15 +349,22 @@ public class BenchmarkRunner
         summary.CalorPassCount = result.CaseResults.Count(c => c.CalorSuccess);
         summary.CSharpPassCount = result.CaseResults.Count(c => c.CSharpSuccess);
 
-        // Identify top categories (all categories where Calor wins)
+        // Identify Calor-only categories (where C# has no equivalent)
+        var calorOnlyCategories = result.Metrics
+            .Where(m => m.IsCalorOnly)
+            .Select(m => m.Category)
+            .Distinct()
+            .ToHashSet();
+
+        // Identify top categories (all categories where Calor wins, including Calor-only)
         summary.TopCalorCategories = summary.CategoryAdvantages
-            .Where(kv => kv.Value > 1.0)
+            .Where(kv => kv.Value > 1.0 || calorOnlyCategories.Contains(kv.Key))
             .OrderByDescending(kv => kv.Value)
             .Select(kv => kv.Key)
             .ToList();
 
         summary.CSharpAdvantageCategories = summary.CategoryAdvantages
-            .Where(kv => kv.Value < 1.0)
+            .Where(kv => kv.Value < 1.0 && !calorOnlyCategories.Contains(kv.Key))
             .OrderBy(kv => kv.Value)
             .Select(kv => kv.Key)
             .ToList();

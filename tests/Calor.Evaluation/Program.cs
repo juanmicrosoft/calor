@@ -230,17 +230,27 @@ public static class Program
             Console.WriteLine($"  Statistical runs: {result.StatisticalRunCount}");
         }
 
+        // Identify Calor-only categories
+        var calorOnlyCategories = result.Metrics
+            .Where(m => m.IsCalorOnly)
+            .Select(m => m.Category)
+            .Distinct()
+            .ToHashSet();
+
         Console.WriteLine();
         Console.WriteLine("  Category Advantages:");
         foreach (var (category, advantage) in result.Summary.CategoryAdvantages.OrderByDescending(kv => kv.Value))
         {
-            var indicator = advantage > 1.0 ? "+" : (advantage < 1.0 ? "-" : "=");
+            // Calor-only categories are always Calor wins (when they have any score)
+            var isCalorOnly = calorOnlyCategories.Contains(category);
+            var indicator = (advantage > 1.0 || isCalorOnly) ? "+" : (advantage < 1.0 ? "-" : "=");
             var ciStr = "";
             if (result.Summary.CategoryConfidenceIntervals.TryGetValue(category, out var ci))
             {
                 ciStr = $" (95% CI: [{ci.Lower:F2}, {ci.Upper:F2}])";
             }
-            Console.WriteLine($"    {indicator} {category}: {advantage:F2}x{ciStr}");
+            var suffix = isCalorOnly ? " (Calor-only)" : "";
+            Console.WriteLine($"    {indicator} {category}: {advantage:F2}x{ciStr}{suffix}");
         }
 
         // Print statistical significance if available
@@ -259,7 +269,9 @@ public static class Program
                 foreach (var cat in significantCategories)
                 {
                     var summary = result.StatisticalSummaries.First(s => s.Category == cat);
-                    var winner = summary.AdvantageRatioMean > 1.0 ? "Calor" : "C#";
+                    // Calor-only categories are always Calor wins
+                    var isCalorOnly = calorOnlyCategories.Contains(cat);
+                    var winner = (summary.AdvantageRatioMean > 1.0 || isCalorOnly) ? "Calor" : "C#";
                     Console.WriteLine($"    * {cat}: {winner} wins (d={summary.CohensD:F2}, {summary.EffectSizeInterpretation} effect)");
                 }
             }
@@ -476,11 +488,19 @@ public static class Program
     {
         var rows = new System.Text.StringBuilder();
 
+        // Identify Calor-only categories
+        var calorOnlyCategories = result.Metrics
+            .Where(m => m.IsCalorOnly)
+            .Select(m => m.Category)
+            .Distinct()
+            .ToHashSet();
+
         foreach (var (category, advantage) in result.Summary.CategoryAdvantages.OrderByDescending(kv => kv.Value))
         {
-            var winner = advantage > 1.0 ? "Calor" : (advantage < 1.0 ? "C#" : "Tie");
-            var winnerClass = advantage > 1.0 ? "winner-calor" : (advantage < 1.0 ? "winner-csharp" : "");
-            var badgeClass = advantage > 1.0 ? "badge-calor" : "badge-csharp";
+            var isCalorOnly = calorOnlyCategories.Contains(category);
+            var winner = (advantage > 1.0 || isCalorOnly) ? "Calor" : (advantage < 1.0 ? "C#" : "Tie");
+            var winnerClass = (advantage > 1.0 || isCalorOnly) ? "winner-calor" : (advantage < 1.0 ? "winner-csharp" : "");
+            var badgeClass = (advantage > 1.0 || isCalorOnly) ? "badge-calor" : "badge-csharp";
 
             var ciStr = "";
             if (result.Summary.CategoryConfidenceIntervals.TryGetValue(category, out var ci))

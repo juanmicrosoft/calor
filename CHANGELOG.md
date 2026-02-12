@@ -8,13 +8,13 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark Results (Statistical: 30 runs)
 - **Overall Advantage**: 0.84x (C# leads on token economics)
-- **Metrics**: Calor wins 4, C# wins 4, Tie 3
+- **Metrics**: Calor wins 7, C# wins 4
 - **Highlights**:
   - Comprehension: 1.57x (Calor wins, large effect)
   - ErrorDetection: 1.51x (Calor wins, large effect)
   - RefactoringStability: 1.50x (Calor wins, large effect)
   - EditPrecision: 1.38x (Calor wins, large effect)
-  - ContractVerification, EffectSoundness, InteropEffectCoverage: Calor-exclusive features
+  - ContractVerification, EffectSoundness, InteropEffectCoverage: Calor-only features (C# has no equivalent)
 - **Programs Tested**: 36
 
 ### Added
@@ -26,6 +26,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Enum definitions now use `§EN{id:name}` instead of `§ENUM{id:name}` (both are accepted for backwards compatibility)
 - CI workflow now builds 6 platform-specific VSIX packages in parallel
+
+### Fixed
+- Benchmark framework now correctly counts Calor-only metrics (ContractVerification, EffectSoundness, InteropEffectCoverage) as Calor wins instead of ties
 
 ## [0.2.2] - 2026-02-10
 

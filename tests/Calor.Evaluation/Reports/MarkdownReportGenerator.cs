@@ -16,7 +16,7 @@ public class MarkdownReportGenerator
         var sb = new StringBuilder();
 
         WriteHeader(sb, result);
-        WriteSummary(sb, result.Summary);
+        WriteSummary(sb, result);
         WriteCategoryBreakdown(sb, result);
         WriteDetailedResults(sb, result);
         WriteConclusions(sb, result);
@@ -32,7 +32,7 @@ public class MarkdownReportGenerator
         var sb = new StringBuilder();
 
         WriteHeader(sb, result);
-        WriteSummary(sb, result.Summary);
+        WriteSummary(sb, result);
 
         return sb.ToString();
     }
@@ -58,8 +58,10 @@ public class MarkdownReportGenerator
         sb.AppendLine();
     }
 
-    private static void WriteSummary(StringBuilder sb, EvaluationSummary summary)
+    private static void WriteSummary(StringBuilder sb, EvaluationResult result)
     {
+        var summary = result.Summary;
+
         sb.AppendLine("## Executive Summary");
         sb.AppendLine();
 
@@ -84,11 +86,20 @@ public class MarkdownReportGenerator
         sb.AppendLine("| Category | Advantage Ratio | Winner |");
         sb.AppendLine("|----------|-----------------|--------|");
 
+        // Identify Calor-only categories for proper winner determination
+        var calorOnlyCategories = result.Metrics
+            .Where(m => m.IsCalorOnly)
+            .Select(m => m.Category)
+            .Distinct()
+            .ToHashSet();
+
         foreach (var (category, ratio) in summary.CategoryAdvantages.OrderByDescending(kv => kv.Value))
         {
-            var catWinner = ratio > 1.0 ? "Calor" : (ratio < 1.0 ? "C#" : "Tie");
-            var emoji = ratio > 1.2 ? "🟢" : (ratio < 0.8 ? "🔴" : "🟡");
-            sb.AppendLine($"| {category} | {ratio:F2}x | {emoji} {catWinner} |");
+            var isCalorOnly = calorOnlyCategories.Contains(category);
+            var catWinner = (ratio > 1.0 || isCalorOnly) ? "Calor" : (ratio < 1.0 ? "C#" : "Tie");
+            var emoji = (ratio > 1.2 || isCalorOnly) ? "🟢" : (ratio < 0.8 ? "🔴" : "🟡");
+            var suffix = isCalorOnly ? " (Calor-only)" : "";
+            sb.AppendLine($"| {category} | {ratio:F2}x | {emoji} {catWinner}{suffix} |");
         }
 
         sb.AppendLine();
