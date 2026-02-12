@@ -1,0 +1,50 @@
+§M{m001:StringContracts}
+§F{f001:NonEmptyLength:pub}
+  §I{str:s}
+  §O{i32}
+  §Q (! (isempty s))
+  §S (> result 0)
+  §R (len s)
+§/F{f001}
+
+§F{f002:EmptyStringLength:pub}
+  §I{str:s}
+  §O{bool}
+  §S (== result (== (len s) 0))
+  §R (isempty s)
+§/F{f002}
+
+§F{f003:ConcatLonger:pub}
+  §I{str:a}
+  §I{str:b}
+  §O{str}
+  §Q (! (isempty a))
+  §S (> (len result) (len b))
+  §R (concat a b)
+§/F{f003}
+
+§F{f004:ContainsImpliesLength:pub}
+  §I{str:haystack}
+  §I{str:needle}
+  §O{bool}
+  §Q (! (isempty needle))
+  §S (|| (! result) (>= (len haystack) (len needle)))
+  §R (contains haystack needle)
+§/F{f004}
+
+§F{f005:PrefixLength:pub}
+  §I{str:s}
+  §I{str:prefix}
+  §O{bool}
+  §S (|| (! result) (>= (len s) (len prefix)))
+  §R (starts s prefix)
+§/F{f005}
+
+§F{f006:SuffixLength:pub}
+  §I{str:s}
+  §I{str:suffix}
+  §O{bool}
+  §S (|| (! result) (>= (len s) (len suffix)))
+  §R (ends s suffix)
+§/F{f006}
+§/M{m001}

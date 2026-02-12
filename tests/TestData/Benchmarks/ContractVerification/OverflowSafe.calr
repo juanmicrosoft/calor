@@ -1,0 +1,63 @@
+§M{m001:OverflowSafe}
+§F{f001:IncrementSafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (< x 2147483647)
+  §S (> result x)
+  §R (+ x 1)
+§/F{f001}
+
+§F{f002:DecrementSafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (> x -2147483648)
+  §S (< result x)
+  §R (- x 1)
+§/F{f002}
+
+§F{f003:DoubleSafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (> x 0)
+  §Q (< x 1073741824)
+  §S (> result x)
+  §R (* x 2)
+§/F{f003}
+
+§F{f004:SquareSafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (>= x 0)
+  §Q (<= x 46340)
+  §S (>= result 0)
+  §R (* x x)
+§/F{f004}
+
+§F{f005:NegateSafe:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (< x 0)
+  §Q (> x -2147483648)
+  §S (> result 0)
+  §R (- 0 x)
+§/F{f005}
+
+§F{f006:AddPositivesSafe:pub}
+  §I{i32:x}
+  §I{i32:y}
+  §O{i32}
+  §Q (> x 0)
+  §Q (< x 1073741824)
+  §Q (> y 0)
+  §Q (< y 1073741824)
+  §S (> result 0)
+  §R (+ x y)
+§/F{f006}
+
+§F{f007:UnsignedNonNegative:pub}
+  §I{u32:x}
+  §O{bool}
+  §S (== result true)
+  §R (>= x 0)
+§/F{f007}
+§/M{m001}

@@ -1,0 +1,62 @@
+§M{m001:ArrayContracts}
+§F{f001:ValidIndex:pub}
+  §I{i32:length}
+  §I{i32:index}
+  §O{bool}
+  §Q (> length 0)
+  §S (== result (&& (>= index 0) (< index length)))
+  §R (&& (>= index 0) (< index length))
+§/F{f001}
+
+§F{f002:LastValidIndex:pub}
+  §I{i32:length}
+  §O{i32}
+  §Q (> length 0)
+  §S (>= result 0)
+  §S (< result length)
+  §R (- length 1)
+§/F{f002}
+
+§F{f003:LengthNonNegative:pub}
+  §I{i32:length}
+  §O{bool}
+  §Q (>= length 0)
+  §S (== result true)
+  §R (>= length 0)
+§/F{f003}
+
+§F{f004:SafeIndexRange:pub}
+  §I{i32:length}
+  §I{i32:start}
+  §I{i32:count}
+  §O{bool}
+  §Q (> length 0)
+  §Q (>= start 0)
+  §Q (> count 0)
+  §S (== result (<= (+ start count) length))
+  §R (<= (+ start count) length)
+§/F{f004}
+
+§F{f005:MidpointIndex:pub}
+  §I{i32:low}
+  §I{i32:high}
+  §O{i32}
+  §Q (>= low 0)
+  §Q (> high low)
+  §S (>= result low)
+  §S (< result high)
+  §R (+ low (/ (- high low) 2))
+§/F{f005}
+
+§F{f006:BinarySearchBounds:pub}
+  §I{i32:length}
+  §I{i32:low}
+  §I{i32:high}
+  §O{bool}
+  §Q (> length 0)
+  §Q (>= low 0)
+  §Q (<= high length)
+  §S (== result (<= low high))
+  §R (<= low high)
+§/F{f006}
+§/M{m001}

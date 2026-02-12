@@ -314,6 +314,46 @@
       "notes": "Mix of provable and unprovable contracts"
     },
     {
+      "id": "cv004",
+      "name": "OverflowUnsafe",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/OverflowUnsafe.calr",
+      "csharpFile": "ContractVerification/OverflowUnsafe.cs",
+      "level": 3,
+      "features": ["contracts", "z3", "verification", "overflow", "bit-vectors", "disproven"],
+      "notes": "Contracts that must be DISPROVEN due to integer overflow (validates bit-vector soundness)"
+    },
+    {
+      "id": "cv005",
+      "name": "OverflowSafe",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/OverflowSafe.calr",
+      "csharpFile": "ContractVerification/OverflowSafe.cs",
+      "level": 3,
+      "features": ["contracts", "z3", "verification", "overflow", "bit-vectors", "proven"],
+      "notes": "Contracts with proper bounds that CAN be proven (no overflow possible)"
+    },
+    {
+      "id": "cv006",
+      "name": "StringContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/StringContracts.calr",
+      "csharpFile": "ContractVerification/StringContracts.cs",
+      "level": 3,
+      "features": ["contracts", "z3", "verification", "strings", "string-theory"],
+      "notes": "String operation contracts using Z3 string theory (length, contains, startswith, etc.)"
+    },
+    {
+      "id": "cv007",
+      "name": "ArrayContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/ArrayContracts.calr",
+      "csharpFile": "ContractVerification/ArrayContracts.cs",
+      "level": 3,
+      "features": ["contracts", "z3", "verification", "arrays", "bounds-checking"],
+      "notes": "Array index and bounds contracts (valid index, safe ranges, binary search invariants)"
+    },
+    {
       "id": "es001",
       "name": "CorrectEffects",
       "category": "EffectSoundness",
