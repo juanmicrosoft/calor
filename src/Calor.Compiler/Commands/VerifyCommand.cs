@@ -40,8 +40,16 @@ public static class VerifyCommand
 
         var timeoutOption = new Option<int>(
             aliases: ["--timeout", "-t"],
-            getDefaultValue: () => 5000,
-            description: "Z3 solver timeout per contract in milliseconds");
+            getDefaultValue: () => (int)VerificationOptions.DefaultTimeoutMs,
+            description: "Z3 solver timeout per contract in milliseconds (default: 5000)");
+        timeoutOption.AddValidator(result =>
+        {
+            var value = result.GetValueOrDefault<int>();
+            if (value <= 0)
+            {
+                result.ErrorMessage = "Timeout must be a positive integer";
+            }
+        });
 
         var noCacheOption = new Option<bool>(
             aliases: ["--no-cache"],
@@ -182,7 +190,8 @@ public static class VerifyCommand
             Verbose = verbose,
             VerifyContracts = true,
             ProjectDirectory = Path.GetDirectoryName(file.FullName),
-            VerificationCacheOptions = cacheOptions
+            VerificationCacheOptions = cacheOptions,
+            VerificationTimeoutMs = (uint)timeout
         };
 
         var result = Program.Compile(source, file.FullName, options);

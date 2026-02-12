@@ -68,6 +68,19 @@ public class Program
             aliases: ["--clear-cache"],
             description: "Clear verification cache before compiling");
 
+        var verificationTimeoutOption = new Option<int>(
+            aliases: ["--verification-timeout"],
+            getDefaultValue: () => (int)VerificationOptions.DefaultTimeoutMs,
+            description: "Z3 solver timeout per contract in milliseconds (default: 5000)");
+        verificationTimeoutOption.AddValidator(result =>
+        {
+            var value = result.GetValueOrDefault<int>();
+            if (value <= 0)
+            {
+                result.ErrorMessage = "Verification timeout must be a positive integer";
+            }
+        });
+
         var noTelemetryOption = new Option<bool>(
             aliases: ["--no-telemetry"],
             description: "Disable anonymous usage telemetry");
@@ -85,6 +98,7 @@ public class Program
             verifyOption,
             noCacheOption,
             clearCacheOption,
+            verificationTimeoutOption,
             noTelemetryOption
         };
 
@@ -113,6 +127,7 @@ public class Program
             var verify = ctx.ParseResult.GetValueForOption(verifyOption);
             var noCache = ctx.ParseResult.GetValueForOption(noCacheOption);
             var clearCache = ctx.ParseResult.GetValueForOption(clearCacheOption);
+            var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
 
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
             {
@@ -122,12 +137,13 @@ public class Program
                 ["strictEffects"] = strictEffects.ToString(),
                 ["contractMode"] = contractMode,
                 ["verify"] = verify.ToString(),
-                ["noCache"] = noCache.ToString()
+                ["noCache"] = noCache.ToString(),
+                ["verificationTimeout"] = verificationTimeout.ToString()
             });
 
             try
             {
-                await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify, noCache, clearCache);
+                await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify, noCache, clearCache, verificationTimeout);
             }
             catch (Exception ex)
             {
@@ -183,7 +199,7 @@ public class Program
         return result;
     }
 
-    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode, bool verify, bool noCache, bool clearCache)
+    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout)
     {
         try
         {
@@ -208,6 +224,7 @@ public class Program
                 Console.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
                 Console.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
                 Console.WriteLine("  --verify          Enable static contract verification with Z3");
+                Console.WriteLine("  --verification-timeout  Z3 solver timeout per contract in ms (default: 5000)");
                 Console.WriteLine("  --no-cache        Disable verification result caching");
                 Console.WriteLine("  --clear-cache     Clear verification cache before compiling");
                 Console.WriteLine();
@@ -250,7 +267,8 @@ public class Program
                 ContractMode = parsedContractMode,
                 VerifyContracts = verify,
                 ProjectDirectory = Path.GetDirectoryName(input.FullName),
-                VerificationCacheOptions = cacheOptions
+                VerificationCacheOptions = cacheOptions,
+                VerificationTimeoutMs = (uint)verificationTimeout
             };
             var result = Compile(source, input.FullName, options);
 
@@ -403,7 +421,10 @@ public class Program
 
         // Contract inheritance checking
         phaseSw.Restart();
-        using var contractInheritanceChecker = new ContractInheritanceChecker(diagnostics);
+        using var contractInheritanceChecker = new ContractInheritanceChecker(
+            diagnostics,
+            useZ3: true,
+            timeoutMs: options.VerificationTimeoutMs);
         var inheritanceResult = contractInheritanceChecker.Check(ast);
         phaseSw.Stop();
         telemetry?.TrackPhase("ContractInheritance", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
@@ -450,6 +471,7 @@ public class Program
             var verificationOptions = new VerificationOptions
             {
                 Verbose = options.Verbose,
+                TimeoutMs = options.VerificationTimeoutMs,
                 CacheOptions = options.VerificationCacheOptions ?? VerificationCacheOptions.Default
             };
             var verificationPass = new ContractVerificationPass(diagnostics, verificationOptions);
@@ -550,6 +572,12 @@ public sealed class CompilationOptions
     /// Options for verification result caching.
     /// </summary>
     public VerificationCacheOptions? VerificationCacheOptions { get; init; }
+
+    /// <summary>
+    /// Z3 solver timeout per contract in milliseconds.
+    /// Default: 5000ms (5 seconds).
+    /// </summary>
+    public uint VerificationTimeoutMs { get; init; } = VerificationOptions.DefaultTimeoutMs;
 
     /// <summary>
     /// Verification results populated after running verification pass.

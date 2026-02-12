@@ -17,27 +17,32 @@ public sealed class ContractInheritanceChecker : IDisposable
     private readonly DiagnosticBag _diagnostics;
     private readonly Z3ImplicationProver? _z3Prover;
     private readonly bool _useZ3;
+    private readonly uint _timeoutMs;
     private bool _z3UnavailableReported;
     private bool _disposed;
 
-    public ContractInheritanceChecker(DiagnosticBag diagnostics, bool useZ3 = true)
+    public ContractInheritanceChecker(
+        DiagnosticBag diagnostics,
+        bool useZ3 = true,
+        uint timeoutMs = VerificationOptions.DefaultTimeoutMs)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _useZ3 = useZ3 && Z3ContextFactory.IsAvailable;
+        _timeoutMs = timeoutMs;
 
         if (_useZ3)
         {
-            _z3Prover = CreateZ3Prover();
+            _z3Prover = CreateZ3Prover(_timeoutMs);
         }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static Z3ImplicationProver? CreateZ3Prover()
+    private static Z3ImplicationProver? CreateZ3Prover(uint timeoutMs)
     {
         try
         {
             var ctx = Z3ContextFactory.Create();
-            return new Z3ImplicationProver(ctx);
+            return new Z3ImplicationProver(ctx, timeoutMs);
         }
         catch
         {
