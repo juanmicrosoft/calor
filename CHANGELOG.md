@@ -4,12 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-02-12
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 0.84x (C# leads on token economics)
+- **Metrics**: Calor wins 4, C# wins 4, Tie 3
+- **Highlights**:
+  - Comprehension: 1.57x (Calor wins, large effect)
+  - ErrorDetection: 1.51x (Calor wins, large effect)
+  - RefactoringStability: 1.50x (Calor wins, large effect)
+  - EditPrecision: 1.38x (Calor wins, large effect)
+  - ContractVerification, EffectSoundness, InteropEffectCoverage: Calor-exclusive features
+- **Programs Tested**: 36
+
 ### Added
+- **Platform-specific VS Code extension bundles** - Each platform (Windows x64/ARM64, macOS x64/ARM64, Linux x64/ARM64) gets its own VSIX with bundled language server binary (~40 MB each)
+- **Bundled language server discovery** - Extension automatically uses bundled `calor-lsp` binary, no separate installation needed
 - **Enum extension methods** - `§EEXT{id:EnumName}` for defining extension methods on enums
 - **Shorter enum syntax** - `§EN` as shorthand for `§ENUM` (legacy syntax still supported)
 
 ### Changed
 - Enum definitions now use `§EN{id:name}` instead of `§ENUM{id:name}` (both are accepted for backwards compatibility)
+- CI workflow now builds 6 platform-specific VSIX packages in parallel
 
 ## [0.2.2] - 2026-02-10
 
