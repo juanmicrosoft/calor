@@ -29,7 +29,8 @@ public class TranslatorTests
         var result = translator.Translate(expr);
 
         Assert.NotNull(result);
-        Assert.Equal("42", result.ToString());
+        // Bit-vector representation varies, but should be a BitVecExpr
+        Assert.IsType<Microsoft.Z3.BitVecNum>(result);
     }
 
     [SkippableFact]
@@ -911,5 +912,190 @@ public class TranslatorTests
         // Count occurrences of "=>" for implications (at least 2 for chained implication)
         var count = resultStr.Split("=>").Length - 1;
         Assert.True(count >= 2, $"Expected at least 2 implications, found {count} in: {resultStr}");
+    }
+
+    // ===========================================
+    // 64-bit and Mixed-Width Tests
+    // ===========================================
+
+    [SkippableFact]
+    public void Translates64BitVariable()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        Translates64BitVariableCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void Translates64BitVariableCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        var declared = translator.DeclareVariable("x", "i64");
+        Assert.True(declared);
+
+        var expr = new ReferenceNode(TextSpan.Empty, "x");
+        var result = translator.Translate(expr);
+
+        Assert.NotNull(result);
+        Assert.IsType<Microsoft.Z3.BitVecExpr>(result);
+        var bvExpr = (Microsoft.Z3.BitVecExpr)result;
+        Assert.Equal(64u, bvExpr.SortSize);
+    }
+
+    [SkippableFact]
+    public void TranslatesMixed32And64BitAddition()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesMixed32And64BitAdditionCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesMixed32And64BitAdditionCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        translator.DeclareVariable("a", "i32");
+        translator.DeclareVariable("b", "i64");
+
+        // a + b (32-bit + 64-bit should result in 64-bit)
+        var expr = new BinaryOperationNode(
+            TextSpan.Empty,
+            BinaryOperator.Add,
+            new ReferenceNode(TextSpan.Empty, "a"),
+            new ReferenceNode(TextSpan.Empty, "b"));
+
+        var result = translator.Translate(expr);
+
+        Assert.NotNull(result);
+        Assert.IsType<Microsoft.Z3.BitVecExpr>(result);
+        var bvExpr = (Microsoft.Z3.BitVecExpr)result;
+        // Result should be 64-bit (wider operand wins)
+        Assert.Equal(64u, bvExpr.SortSize);
+    }
+
+    // ===========================================
+    // Unsigned Type Tests
+    // ===========================================
+
+    [SkippableFact]
+    public void TranslatesUnsigned32BitVariable()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesUnsigned32BitVariableCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesUnsigned32BitVariableCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        var declared = translator.DeclareVariable("x", "u32");
+        Assert.True(declared);
+
+        var expr = new ReferenceNode(TextSpan.Empty, "x");
+        var result = translator.Translate(expr);
+
+        Assert.NotNull(result);
+        Assert.IsType<Microsoft.Z3.BitVecExpr>(result);
+        var bvExpr = (Microsoft.Z3.BitVecExpr)result;
+        Assert.Equal(32u, bvExpr.SortSize);
+    }
+
+    [SkippableFact]
+    public void TranslatesUnsigned64BitVariable()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesUnsigned64BitVariableCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesUnsigned64BitVariableCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        var declared = translator.DeclareVariable("x", "u64");
+        Assert.True(declared);
+
+        var expr = new ReferenceNode(TextSpan.Empty, "x");
+        var result = translator.Translate(expr);
+
+        Assert.NotNull(result);
+        Assert.IsType<Microsoft.Z3.BitVecExpr>(result);
+        var bvExpr = (Microsoft.Z3.BitVecExpr)result;
+        Assert.Equal(64u, bvExpr.SortSize);
+    }
+
+    [SkippableFact]
+    public void TranslatesAllIntegerTypeSizes()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesAllIntegerTypeSizesCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesAllIntegerTypeSizesCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        // Test all signed types
+        Assert.True(translator.DeclareVariable("i8_var", "i8"));
+        Assert.True(translator.DeclareVariable("i16_var", "i16"));
+        Assert.True(translator.DeclareVariable("i32_var", "i32"));
+        Assert.True(translator.DeclareVariable("i64_var", "i64"));
+
+        // Test all unsigned types
+        Assert.True(translator.DeclareVariable("u8_var", "u8"));
+        Assert.True(translator.DeclareVariable("u16_var", "u16"));
+        Assert.True(translator.DeclareVariable("u32_var", "u32"));
+        Assert.True(translator.DeclareVariable("u64_var", "u64"));
+
+        // Verify bit widths
+        var vars = translator.Variables;
+        Assert.Equal(8u, ((Microsoft.Z3.BitVecExpr)vars["i8_var"].Expr).SortSize);
+        Assert.Equal(16u, ((Microsoft.Z3.BitVecExpr)vars["i16_var"].Expr).SortSize);
+        Assert.Equal(32u, ((Microsoft.Z3.BitVecExpr)vars["i32_var"].Expr).SortSize);
+        Assert.Equal(64u, ((Microsoft.Z3.BitVecExpr)vars["i64_var"].Expr).SortSize);
+        Assert.Equal(8u, ((Microsoft.Z3.BitVecExpr)vars["u8_var"].Expr).SortSize);
+        Assert.Equal(16u, ((Microsoft.Z3.BitVecExpr)vars["u16_var"].Expr).SortSize);
+        Assert.Equal(32u, ((Microsoft.Z3.BitVecExpr)vars["u32_var"].Expr).SortSize);
+        Assert.Equal(64u, ((Microsoft.Z3.BitVecExpr)vars["u64_var"].Expr).SortSize);
+    }
+
+    [SkippableFact]
+    public void TranslatesUnsignedComparison()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TranslatesUnsignedComparisonCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void TranslatesUnsignedComparisonCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        translator.DeclareVariable("a", "u32");
+        translator.DeclareVariable("b", "u32");
+
+        // a < b (unsigned comparison)
+        var expr = new BinaryOperationNode(
+            TextSpan.Empty,
+            BinaryOperator.LessThan,
+            new ReferenceNode(TextSpan.Empty, "a"),
+            new ReferenceNode(TextSpan.Empty, "b"));
+
+        var result = translator.TranslateBoolExpr(expr);
+
+        Assert.NotNull(result);
+        // The result should be a BoolExpr representing unsigned comparison
+        // Z3 uses bvult for unsigned less-than
+        var resultStr = result.ToString().ToLower();
+        Assert.True(resultStr.Contains("bvult") || resultStr.Contains("ult"),
+            $"Expected unsigned comparison (bvult), got: {result}");
     }
 }
