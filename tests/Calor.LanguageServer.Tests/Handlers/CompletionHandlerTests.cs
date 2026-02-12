@@ -1,6 +1,8 @@
 using Calor.Compiler.Ast;
+using Calor.LanguageServer.Handlers;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Xunit;
 
 namespace Calor.LanguageServer.Tests.Handlers;
@@ -1004,6 +1006,419 @@ public class CompletionHandlerTests
         var ifStmt = func.Body[1] as IfStatementNode;
         Assert.NotNull(ifStmt);
         Assert.NotEmpty(ifStmt.ThenBody);
+    }
+
+    #endregion
+
+    #region End-to-End Scope Completion Tests
+
+    [Fact]
+    public void ExpressionCompletions_IncludesParameters()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §I{i32:myParam}
+            §I{str:otherParam}
+            §O{i32}
+            §R _CURSOR_
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        Assert.Contains(completions, c => c.Label == "myParam");
+        Assert.Contains(completions, c => c.Label == "otherParam");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_IncludesLocalBindings()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{i32}
+            §B{localVar:i32} 42
+            §B{anotherVar:str} "hello"
+            §R _CURSOR_
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        Assert.Contains(completions, c => c.Label == "localVar");
+        Assert.Contains(completions, c => c.Label == "anotherVar");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_IncludesFunctions()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Helper:pub}
+            §O{i32}
+            §R 42
+            §/F{f001}
+            §F{f002:Main:pub}
+            §O{i32}
+            §R _CURSOR_
+            §/F{f002}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        Assert.Contains(completions, c => c.Label == "Helper");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_IncludesBooleanLiterals()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{bool}
+            §R _CURSOR_
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        Assert.Contains(completions, c => c.Label == "true");
+        Assert.Contains(completions, c => c.Label == "false");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_ShowsParameterTypes()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §I{i32:count}
+            §O{i32}
+            §R _CURSOR_
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        var countCompletion = completions.FirstOrDefault(c => c.Label == "count");
+        Assert.NotNull(countCompletion);
+        Assert.Contains("parameter", countCompletion.Detail ?? "");
+        Assert.Contains("INT", countCompletion.Detail ?? "");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_ShowsBindingTypes()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{str}
+            §B{name:str} "test"
+            §R _CURSOR_
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        var nameCompletion = completions.FirstOrDefault(c => c.Label == "name");
+        Assert.NotNull(nameCompletion);
+        Assert.Contains("STRING", nameCompletion.Detail ?? "");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_ForLoopVariable()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{i32}
+            §B{~sum:i32} 0
+            §L{l001:i:0:10}
+            §ASSIGN sum (+ sum _CURSOR_)
+            §/L{l001}
+            §R sum
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        // Loop variable 'i' should be in scope
+        Assert.Contains(completions, c => c.Label == "i");
+        // Outer binding 'sum' should also be visible
+        Assert.Contains(completions, c => c.Label == "sum");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_ForeachVariable()
+    {
+        // Syntax: §EACH{id:variable:type} collection
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §I{List<str>:items}
+            §O{void}
+            §EACH{e001:item:str} items
+            §P _CURSOR_
+            §/EACH{e001}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        // Foreach variable 'item' should be in scope
+        Assert.Contains(completions, c => c.Label == "item");
+        // Parameter 'items' should also be visible
+        Assert.Contains(completions, c => c.Label == "items");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_MethodContext_HasThisAndFields()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §CL{c001:Counter}
+            §FLD{i32:count}
+            §FLD{str:name}
+            §MT{m001:Increment}
+            §O{i32}
+            §R _CURSOR_
+            §/MT{m001}
+            §/CL{c001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        // 'this' keyword should be available
+        Assert.Contains(completions, c => c.Label == "this");
+        // Fields should be available
+        Assert.Contains(completions, c => c.Label == "count");
+        Assert.Contains(completions, c => c.Label == "name");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_MethodContext_HasMethodParameters()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §CL{c001:Calculator}
+            §MT{m001:Add}
+            §I{i32:a}
+            §I{i32:b}
+            §O{i32}
+            §R _CURSOR_
+            §/MT{m001}
+            §/CL{c001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        Assert.Contains(completions, c => c.Label == "a");
+        Assert.Contains(completions, c => c.Label == "b");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_MutableVsImmutableBindings()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{i32}
+            §B{immutable:i32} 10
+            §B{~mutable:i32} 20
+            §R _CURSOR_
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        var immutableCompletion = completions.FirstOrDefault(c => c.Label == "immutable");
+        var mutableCompletion = completions.FirstOrDefault(c => c.Label == "mutable");
+
+        Assert.NotNull(immutableCompletion);
+        Assert.NotNull(mutableCompletion);
+
+        // Immutable should be marked as Constant
+        Assert.Equal(CompletionItemKind.Constant, immutableCompletion.Kind);
+        // Mutable should be marked as Variable
+        Assert.Equal(CompletionItemKind.Variable, mutableCompletion.Kind);
+    }
+
+    [Fact]
+    public void ExpressionCompletions_DoWhileLoop()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{i32}
+            §B{~counter:i32} 0
+            §DO{d001}
+            §ASSIGN counter (+ counter _CURSOR_)
+            §/DO{d001} (< counter 10)
+            §R counter
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        // 'counter' should be visible inside do-while body
+        Assert.Contains(completions, c => c.Label == "counter");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_DictionaryForeach_KeyAndValue()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §I{Dict<str,i32>:scores}
+            §O{void}
+            §EACHKV{e001:name:score} scores
+            §P _CURSOR_
+            §/EACHKV{e001}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        // Both key and value variables should be in scope
+        Assert.Contains(completions, c => c.Label == "name");
+        Assert.Contains(completions, c => c.Label == "score");
+        // Parameter should also be visible
+        Assert.Contains(completions, c => c.Label == "scores");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_MatchStatement_PatternVariable()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §I{i32:value}
+            §O{str}
+            §W{w001} value
+            §K §VAR{x} §WHEN (> x 0) → _CURSOR_
+            §K _ → "other"
+            §/W{w001}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        Assert.Contains(completions, c => c.Label == "x");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_ConstructorBody()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §CL{c001:Person}
+            §FLD{str:_name}
+            §FLD{i32:_age}
+            §CTOR{ctor001:pub}
+            §I{str:name}
+            §I{i32:age}
+            §ASSIGN §THIS._name _CURSOR_
+            §/CTOR{ctor001}
+            §/CL{c001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        Assert.Contains(completions, c => c.Label == "name");
+        Assert.Contains(completions, c => c.Label == "age");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_NestedScopes_AllVisible()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §I{i32:param}
+            §O{i32}
+            §B{outer:i32} 1
+            §IF{if001} (> param 0)
+            §B{inner:i32} 2
+            §L{l001:i:0:10}
+            §B{deepest:i32} _CURSOR_
+            §/L{l001}
+            §/I{if001}
+            §R outer
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        // All variables from enclosing scopes should be visible
+        Assert.Contains(completions, c => c.Label == "param");
+        Assert.Contains(completions, c => c.Label == "outer");
+        Assert.Contains(completions, c => c.Label == "inner");
+        Assert.Contains(completions, c => c.Label == "i");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_TryCatch_ExceptionVariable()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{str}
+            §TR{t001}
+            §R "success"
+            §CA{Exception:ex}
+            §R _CURSOR_
+            §/TR{t001}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        // Exception variable 'ex' should be in scope in catch block
+        Assert.Contains(completions, c => c.Label == "ex");
+    }
+
+    [Fact]
+    public void ExpressionCompletions_ClassProperties()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §CL{c001:Rectangle}
+            §FLD{f64:_width}
+            §FLD{f64:_height}
+            §PROP{f64:Area:pub}
+            §GET
+            §R _CURSOR_
+            §/GET
+            §/PROP
+            §/CL{c001}
+            §/M{m001}
+            """;
+
+        var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
+
+        // Fields should be accessible from property getter
+        Assert.Contains(completions, c => c.Label == "_width");
+        Assert.Contains(completions, c => c.Label == "_height");
+        Assert.Contains(completions, c => c.Label == "this");
     }
 
     #endregion

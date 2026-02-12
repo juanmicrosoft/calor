@@ -1352,7 +1352,29 @@ public sealed class CompletionHandler : CompletionHandlerBase
             if (containingMethod.HasValue)
             {
                 items.AddRange(GetMethodVariables(containingMethod.Value.Item1, containingMethod.Value.Item2, offset));
+                return items;
             }
+
+            // Check if we're in a constructor
+            var containingCtor = FindContainingConstructor(ast, offset);
+            if (containingCtor.HasValue)
+            {
+                items.AddRange(GetConstructorVariables(containingCtor.Value.Item1, containingCtor.Value.Item2, offset));
+                return items;
+            }
+
+            // Check if we're in a property accessor (getter/setter/init)
+            var containingAccessor = FindContainingPropertyAccessor(ast, offset);
+            if (containingAccessor.HasValue)
+            {
+                items.AddRange(GetPropertyAccessorVariables(
+                    containingAccessor.Value.Item1,
+                    containingAccessor.Value.Item2,
+                    containingAccessor.Value.Item3,
+                    offset));
+                return items;
+            }
+
             return items;
         }
 
@@ -1421,6 +1443,72 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return null;
     }
 
+    private static (ClassDefinitionNode, ConstructorNode)? FindContainingConstructor(ModuleNode ast, int offset)
+    {
+        foreach (var cls in ast.Classes)
+        {
+            foreach (var ctor in cls.Constructors)
+            {
+                // Check constructor span
+                if (offset >= ctor.Span.Start && offset < ctor.Span.End)
+                {
+                    return (cls, ctor);
+                }
+                // Also check body statements (constructor body may have separate spans)
+                foreach (var stmt in ctor.Body)
+                {
+                    if (offset >= stmt.Span.Start && offset < stmt.Span.End)
+                    {
+                        return (cls, ctor);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static (ClassDefinitionNode, PropertyNode, PropertyAccessorNode)? FindContainingPropertyAccessor(ModuleNode ast, int offset)
+    {
+        foreach (var cls in ast.Classes)
+        {
+            foreach (var prop in cls.Properties)
+            {
+                // Check getter - include body statements in span check
+                if (prop.Getter != null && IsOffsetInAccessor(prop.Getter, offset))
+                {
+                    return (cls, prop, prop.Getter);
+                }
+                // Check setter - include body statements in span check
+                if (prop.Setter != null && IsOffsetInAccessor(prop.Setter, offset))
+                {
+                    return (cls, prop, prop.Setter);
+                }
+                // Check init accessor - include body statements in span check
+                if (prop.Initer != null && IsOffsetInAccessor(prop.Initer, offset))
+                {
+                    return (cls, prop, prop.Initer);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static bool IsOffsetInAccessor(PropertyAccessorNode accessor, int offset)
+    {
+        // Check if in the accessor tag span itself
+        if (offset >= accessor.Span.Start && offset < accessor.Span.End)
+            return true;
+
+        // Check if in any body statement (accessor body may have separate spans)
+        foreach (var stmt in accessor.Body)
+        {
+            if (offset >= stmt.Span.Start && offset < stmt.Span.End)
+                return true;
+        }
+
+        return false;
+    }
+
     private static IEnumerable<CompletionItem> GetMethodVariables(ClassDefinitionNode cls, MethodNode method, int offset)
     {
         var items = new List<CompletionItem>();
@@ -1476,6 +1564,162 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
         // Add local variables (bindings, loops, catch variables)
         foreach (var variable in CollectVisibleVariables(method.Body, offset))
+        {
+            var kindLabel = variable.Kind switch
+            {
+                "binding" => variable.IsMutable ? "var" : "let",
+                "loop" => "for",
+                "foreach" => "foreach",
+                "catch" => "catch",
+                _ => "var"
+            };
+
+            items.Add(new CompletionItem
+            {
+                Label = variable.Name,
+                Kind = variable.IsMutable ? CompletionItemKind.Variable : CompletionItemKind.Constant,
+                Detail = $"({kindLabel}) {variable.Name}: {variable.TypeName ?? "inferred"}",
+                InsertText = variable.Name,
+                SortText = "2" + variable.Name
+            });
+        }
+
+        return items;
+    }
+
+    private static IEnumerable<CompletionItem> GetConstructorVariables(ClassDefinitionNode cls, ConstructorNode ctor, int offset)
+    {
+        var items = new List<CompletionItem>();
+
+        // Add 'this' keyword
+        items.Add(new CompletionItem
+        {
+            Label = "this",
+            Kind = CompletionItemKind.Keyword,
+            Detail = $"(this) {cls.Name}",
+            InsertText = "this",
+            SortText = "0this"
+        });
+
+        // Add class fields
+        foreach (var field in cls.Fields)
+        {
+            items.Add(new CompletionItem
+            {
+                Label = field.Name,
+                Kind = CompletionItemKind.Field,
+                Detail = $"(field) {field.Name}: {field.TypeName}",
+                InsertText = field.Name,
+                SortText = "0" + field.Name
+            });
+        }
+
+        // Add class properties
+        foreach (var prop in cls.Properties)
+        {
+            items.Add(new CompletionItem
+            {
+                Label = prop.Name,
+                Kind = CompletionItemKind.Property,
+                Detail = $"(property) {prop.Name}: {prop.TypeName}",
+                InsertText = prop.Name,
+                SortText = "0" + prop.Name
+            });
+        }
+
+        // Add constructor parameters
+        foreach (var param in ctor.Parameters)
+        {
+            items.Add(new CompletionItem
+            {
+                Label = param.Name,
+                Kind = CompletionItemKind.Variable,
+                Detail = $"(parameter) {param.Name}: {param.TypeName}",
+                InsertText = param.Name,
+                SortText = "1" + param.Name
+            });
+        }
+
+        // Add local variables from constructor body
+        foreach (var variable in CollectVisibleVariables(ctor.Body, offset))
+        {
+            var kindLabel = variable.Kind switch
+            {
+                "binding" => variable.IsMutable ? "var" : "let",
+                "loop" => "for",
+                "foreach" => "foreach",
+                "catch" => "catch",
+                _ => "var"
+            };
+
+            items.Add(new CompletionItem
+            {
+                Label = variable.Name,
+                Kind = variable.IsMutable ? CompletionItemKind.Variable : CompletionItemKind.Constant,
+                Detail = $"({kindLabel}) {variable.Name}: {variable.TypeName ?? "inferred"}",
+                InsertText = variable.Name,
+                SortText = "2" + variable.Name
+            });
+        }
+
+        return items;
+    }
+
+    private static IEnumerable<CompletionItem> GetPropertyAccessorVariables(ClassDefinitionNode cls, PropertyNode prop, PropertyAccessorNode accessor, int offset)
+    {
+        var items = new List<CompletionItem>();
+
+        // Add 'this' keyword
+        items.Add(new CompletionItem
+        {
+            Label = "this",
+            Kind = CompletionItemKind.Keyword,
+            Detail = $"(this) {cls.Name}",
+            InsertText = "this",
+            SortText = "0this"
+        });
+
+        // Add class fields
+        foreach (var field in cls.Fields)
+        {
+            items.Add(new CompletionItem
+            {
+                Label = field.Name,
+                Kind = CompletionItemKind.Field,
+                Detail = $"(field) {field.Name}: {field.TypeName}",
+                InsertText = field.Name,
+                SortText = "0" + field.Name
+            });
+        }
+
+        // Add other class properties (not the current one to avoid self-reference in getter)
+        foreach (var otherProp in cls.Properties.Where(p => p.Name != prop.Name))
+        {
+            items.Add(new CompletionItem
+            {
+                Label = otherProp.Name,
+                Kind = CompletionItemKind.Property,
+                Detail = $"(property) {otherProp.Name}: {otherProp.TypeName}",
+                InsertText = otherProp.Name,
+                SortText = "0" + otherProp.Name
+            });
+        }
+
+        // Add 'value' keyword for setters and init accessors
+        if (accessor.Kind == PropertyAccessorNode.AccessorKind.Set || accessor.Kind == PropertyAccessorNode.AccessorKind.Init)
+        {
+            items.Add(new CompletionItem
+            {
+                Label = "value",
+                Kind = CompletionItemKind.Keyword,
+                Detail = $"(value) {prop.TypeName}",
+                InsertText = "value",
+                SortText = "1value"
+            });
+        }
+
+        // Add local variables from accessor body
+        foreach (var variable in CollectVisibleVariables(accessor.Body, offset))
         {
             var kindLabel = variable.Kind switch
             {
@@ -1584,9 +1828,86 @@ public sealed class CompletionHandler : CompletionHandlerBase
                     variables.AddRange(CollectVisibleVariables(tryStmt.TryBody, offset));
                 }
             }
+            else if (stmt is DoWhileStatementNode doWhileStmt && offset >= doWhileStmt.Span.Start && offset < doWhileStmt.Span.End)
+            {
+                variables.AddRange(CollectVisibleVariables(doWhileStmt.Body, offset));
+            }
+            else if (stmt is DictionaryForeachNode dictForeach && offset >= dictForeach.Span.Start && offset < dictForeach.Span.End)
+            {
+                // Add key and value variables
+                variables.Add(new ScopeVariable(dictForeach.KeyName, null, false, "dictkey"));
+                variables.Add(new ScopeVariable(dictForeach.ValueName, null, false, "dictvalue"));
+                variables.AddRange(CollectVisibleVariables(dictForeach.Body, offset));
+            }
+            else if (stmt is MatchStatementNode matchStmt && offset >= matchStmt.Span.Start && offset < matchStmt.Span.End)
+            {
+                // Find which case we're in and add pattern variables
+                foreach (var caseNode in matchStmt.Cases)
+                {
+                    if (offset >= caseNode.Span.Start && offset < caseNode.Span.End)
+                    {
+                        CollectPatternVariables(caseNode.Pattern, variables);
+                        variables.AddRange(CollectVisibleVariables(caseNode.Body, offset));
+                        break;
+                    }
+                }
+            }
         }
 
         return variables;
+    }
+
+    private static void CollectPatternVariables(PatternNode? pattern, List<ScopeVariable> variables)
+    {
+        if (pattern == null) return;
+
+        switch (pattern)
+        {
+            case VariablePatternNode varPat:
+                variables.Add(new ScopeVariable(varPat.Name, null, false, "pattern"));
+                break;
+
+            case VarPatternNode vPat:
+                variables.Add(new ScopeVariable(vPat.Name, null, false, "pattern"));
+                break;
+
+            case SomePatternNode somePat:
+                CollectPatternVariables(somePat.InnerPattern, variables);
+                break;
+
+            case OkPatternNode okPat:
+                CollectPatternVariables(okPat.InnerPattern, variables);
+                break;
+
+            case ErrPatternNode errPat:
+                CollectPatternVariables(errPat.InnerPattern, variables);
+                break;
+
+            case PositionalPatternNode posPat:
+                foreach (var inner in posPat.Patterns)
+                {
+                    CollectPatternVariables(inner, variables);
+                }
+                break;
+
+            case PropertyPatternNode propPat:
+                foreach (var match in propPat.Matches)
+                {
+                    CollectPatternVariables(match.Pattern, variables);
+                }
+                break;
+
+            case ListPatternNode listPat:
+                foreach (var inner in listPat.Patterns)
+                {
+                    CollectPatternVariables(inner, variables);
+                }
+                if (listPat.SlicePattern != null)
+                {
+                    CollectPatternVariables(listPat.SlicePattern, variables);
+                }
+                break;
+        }
     }
 
     protected override CompletionRegistrationOptions CreateRegistrationOptions(

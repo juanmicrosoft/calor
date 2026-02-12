@@ -196,4 +196,52 @@ public static class LspTestHarness
             return Enumerable.Empty<CompletionItem>();
         }
     }
+
+    /// <summary>
+    /// Gets expression completions (variables in scope) at a specific offset.
+    /// </summary>
+    public static IEnumerable<CompletionItem> GetExpressionCompletions(string source, int offset)
+    {
+        var state = CreateDocument(source);
+        if (state.Ast == null)
+        {
+            return Enumerable.Empty<CompletionItem>();
+        }
+
+        var handlerType = typeof(CompletionHandler);
+        var getExpressionCompletions = handlerType.GetMethod("GetExpressionCompletions",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        if (getExpressionCompletions == null)
+        {
+            return Enumerable.Empty<CompletionItem>();
+        }
+
+        try
+        {
+            var result = getExpressionCompletions.Invoke(null, new object[] { state, offset });
+            return result as IEnumerable<CompletionItem> ?? Enumerable.Empty<CompletionItem>();
+        }
+        catch
+        {
+            return Enumerable.Empty<CompletionItem>();
+        }
+    }
+
+    /// <summary>
+    /// Gets expression completions at the position of a marker pattern.
+    /// Uses the position AT the start of the pattern (where the cursor would be when typing).
+    /// </summary>
+    public static IEnumerable<CompletionItem> GetExpressionCompletionsAt(string source, string pattern)
+    {
+        var patternIndex = source.IndexOf(pattern, StringComparison.Ordinal);
+        if (patternIndex < 0)
+        {
+            return Enumerable.Empty<CompletionItem>();
+        }
+
+        // Use the position AT the pattern start, not after it
+        // This simulates where the cursor would be when requesting completions
+        return GetExpressionCompletions(source, patternIndex);
+    }
 }
