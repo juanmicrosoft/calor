@@ -154,11 +154,10 @@ public class TypeSystemTests
     [Fact]
     public void Parser_ParsesSomeExpression()
     {
-        // Note: Using simple return type since generic syntax Option[INT] is not yet supported in attributes
         var source = @"
 §M{m001:Test}
 §F{f001:GetValue:pub}
-  §O{i32}
+  §O{?i32}
   §R §SM INT:42
 §/F{f001}
 §/M{m001}
@@ -181,11 +180,10 @@ public class TypeSystemTests
     [Fact]
     public void Parser_ParsesNoneExpression()
     {
-        // Note: Using simple return type since generic syntax Option[INT] is not yet supported in attributes
         var source = @"
 §M{m001:Test}
 §F{f001:GetNothing:pub}
-  §O{i32}
+  §O{?i32}
   §R §NN{i32}
 §/F{f001}
 §/M{m001}
@@ -209,11 +207,10 @@ public class TypeSystemTests
     [Fact]
     public void Parser_ParsesOkExpression()
     {
-        // Note: Using simple return type since generic syntax Result[INT,STRING] is not yet supported in attributes
         var source = @"
 §M{m001:Test}
 §F{f001:GetResult:pub}
-  §O{i32}
+  §O{i32!str}
   §R §OK INT:100
 §/F{f001}
 §/M{m001}
@@ -233,11 +230,10 @@ public class TypeSystemTests
     [Fact]
     public void Parser_ParsesErrExpression()
     {
-        // Note: Using simple return type since generic syntax Result[INT,STRING] is not yet supported in attributes
         var source = @"
 §M{m001:Test}
 §F{f001:GetError:pub}
-  §O{str}
+  §O{str!str}
   §R §ERR STR:""Something went wrong""
 §/F{f001}
 §/M{m001}
@@ -677,6 +673,217 @@ public class TypeSystemTests
 
         Assert.True(result.IsErr);
         Assert.Equal("failed", result.UnwrapErr());
+    }
+
+    #endregion
+
+    #region TypeMapper - Expanded Format Tests
+
+    [Theory]
+    [InlineData("OPTION[inner=INT]", "int?")]
+    [InlineData("OPTION[inner=STRING]", "string?")]
+    [InlineData("OPTION[inner=BOOL]", "bool?")]
+    [InlineData("OPTION[inner=FLOAT]", "double?")]
+    public void CalorToCSharp_ExpandedOptionFormat_MapsCorrectly(string input, string expected)
+    {
+        var result = Migration.TypeMapper.CalorToCSharp(input);
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void CalorToCSharp_NestedOptionFormat_MapsCorrectly()
+    {
+        // OPTION[inner=OPTION[inner=INT]] -> int??
+        var result = Migration.TypeMapper.CalorToCSharp("OPTION[inner=OPTION[inner=INT]]");
+        Assert.Equal("int??", result);
+    }
+
+    [Theory]
+    [InlineData("INT[bits=8][signed=true]", "sbyte")]
+    [InlineData("INT[bits=8][signed=false]", "byte")]
+    [InlineData("INT[bits=16][signed=true]", "short")]
+    [InlineData("INT[bits=16][signed=false]", "ushort")]
+    [InlineData("INT[bits=32][signed=false]", "uint")]
+    [InlineData("INT[bits=64][signed=true]", "long")]
+    [InlineData("INT[bits=64][signed=false]", "ulong")]
+    public void CalorToCSharp_ExpandedIntFormat_MapsCorrectly(string input, string expected)
+    {
+        var result = Migration.TypeMapper.CalorToCSharp(input);
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("FLOAT[bits=32]", "float")]
+    [InlineData("FLOAT[bits=64]", "double")]
+    public void CalorToCSharp_ExpandedFloatFormat_MapsCorrectly(string input, string expected)
+    {
+        var result = Migration.TypeMapper.CalorToCSharp(input);
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void CalorToCSharp_ExpandedResultFormat_MapsCorrectly()
+    {
+        var result = Migration.TypeMapper.CalorToCSharp("RESULT[ok=INT][err=STRING]");
+        Assert.Equal("Calor.Runtime.Result<int, string>", result);
+    }
+
+    [Fact]
+    public void CalorToCSharp_ExpandedResultWithComplexTypes_MapsCorrectly()
+    {
+        var result = Migration.TypeMapper.CalorToCSharp("RESULT[ok=OPTION[inner=INT]][err=STRING]");
+        Assert.Equal("Calor.Runtime.Result<int?, string>", result);
+    }
+
+    [Fact]
+    public void CalorToCSharp_OptionWithExpandedIntInner_MapsCorrectly()
+    {
+        // ?i64 expands to OPTION[inner=INT[bits=64][signed=true]]
+        var result = Migration.TypeMapper.CalorToCSharp("OPTION[inner=INT[bits=64][signed=true]]");
+        Assert.Equal("long?", result);
+    }
+
+    #endregion
+
+    #region End-to-End: Option/Result Return Types
+
+    [Fact]
+    public void Emitter_OptionReturnType_EmitsNullable()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:FindValue:pub}
+              §I{i32:id}
+              §O{?i32}
+              §R §SM INT:42
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, FormatDiagnostics(diagnostics));
+
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("int?", csharp);
+        Assert.DoesNotContain("OPTION", csharp);
+    }
+
+    [Fact]
+    public void Emitter_OptionStringReturnType_EmitsNullable()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:FindName:pub}
+              §O{?str}
+              §R §SM STR:"hello"
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, FormatDiagnostics(diagnostics));
+
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("string?", csharp);
+        Assert.DoesNotContain("OPTION", csharp);
+    }
+
+    [Fact]
+    public void Emitter_OptionParameter_EmitsNullable()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Process:pub}
+              §I{?i32:value}
+              §O{void}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, FormatDiagnostics(diagnostics));
+
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("int? value", csharp);
+        Assert.DoesNotContain("OPTION", csharp);
+    }
+
+    [Fact]
+    public void Emitter_ResultReturnType_EmitsResultGeneric()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:TryParse:pub}
+              §I{str:input}
+              §O{i32!str}
+              §R §OK INT:42
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, FormatDiagnostics(diagnostics));
+
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("Calor.Runtime.Result<int, string>", csharp);
+        Assert.DoesNotContain("RESULT[", csharp);
+    }
+
+    [Fact]
+    public void Emitter_SizedIntReturnType_EmitsCorrectType()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:GetLong:pub}
+              §O{i64}
+              §R INT:100
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, FormatDiagnostics(diagnostics));
+
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("long", csharp);
+        Assert.DoesNotContain("INT[", csharp);
+    }
+
+    [Fact]
+    public void Emitter_SizedFloatReturnType_EmitsFloat()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:GetFloat:pub}
+              §O{f32}
+              §R FLOAT:1.5
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, FormatDiagnostics(diagnostics));
+
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("float", csharp);
+        Assert.DoesNotContain("FLOAT[", csharp);
+    }
+
+    private static string FormatDiagnostics(DiagnosticBag diagnostics)
+    {
+        return string.Join("\n", diagnostics.Select(d => $"{d.Code}: {d.Message}"));
     }
 
     #endregion

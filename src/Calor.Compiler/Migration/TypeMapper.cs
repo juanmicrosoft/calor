@@ -301,6 +301,48 @@ public static class TypeMapper
         if (string.IsNullOrEmpty(calorType))
             return calorType;
 
+        // Handle expanded OPTION format: OPTION[inner=T] -> T?
+        if (calorType.StartsWith("OPTION[inner=", StringComparison.Ordinal))
+        {
+            var innerType = ExtractBracketValue(calorType, "OPTION[inner=");
+            if (innerType != null)
+            {
+                var mappedInner = CalorToCSharp(innerType);
+                return $"{mappedInner}?";
+            }
+        }
+
+        // Handle expanded RESULT format: RESULT[ok=T][err=E] -> Calor.Runtime.Result<T, E>
+        if (calorType.StartsWith("RESULT[ok=", StringComparison.Ordinal))
+        {
+            var (okType, errType) = ExtractResultTypes(calorType);
+            if (okType != null && errType != null)
+            {
+                var mappedOk = CalorToCSharp(okType);
+                var mappedErr = CalorToCSharp(errType);
+                return $"Calor.Runtime.Result<{mappedOk}, {mappedErr}>";
+            }
+        }
+
+        // Handle expanded INT format: INT[bits=N][signed=B] -> sbyte/short/int/long/byte/ushort/uint/ulong
+        if (calorType.StartsWith("INT[", StringComparison.Ordinal))
+        {
+            return MapExpandedIntType(calorType);
+        }
+
+        // Handle expanded FLOAT format: FLOAT[bits=N] -> float/double
+        if (calorType.StartsWith("FLOAT[", StringComparison.Ordinal))
+        {
+            return MapExpandedFloatType(calorType);
+        }
+
+        // Handle bare expanded FLOAT (from ExpandType for f64/float) -> double
+        // Must be before dictionary lookup since case-insensitive "FLOAT" matches "float" -> "float"
+        if (calorType == "FLOAT")
+        {
+            return "double";
+        }
+
         // Handle Option types ?T -> T?
         if (calorType.StartsWith("?"))
         {
@@ -435,5 +477,98 @@ public static class TypeMapper
             _ when calorType.StartsWith("?") => "none",
             _ => "default"
         };
+    }
+
+    /// <summary>
+    /// Extracts the value from a bracket-annotated type like "PREFIX[key=VALUE]".
+    /// Returns the value or null if the format doesn't match.
+    /// </summary>
+    private static string? ExtractBracketValue(string type, string prefix)
+    {
+        if (!type.StartsWith(prefix, StringComparison.Ordinal))
+            return null;
+
+        var valueStart = prefix.Length;
+        // Find matching closing bracket, respecting nested brackets
+        var depth = 1;
+        var i = valueStart;
+        while (i < type.Length && depth > 0)
+        {
+            if (type[i] == '[') depth++;
+            else if (type[i] == ']') depth--;
+            i++;
+        }
+
+        if (depth != 0)
+            return null;
+
+        // Value is between prefix end and closing bracket (exclusive)
+        return type[valueStart..(i - 1)];
+    }
+
+    /// <summary>
+    /// Extracts ok and err types from expanded RESULT format: RESULT[ok=T][err=E]
+    /// </summary>
+    private static (string? OkType, string? ErrType) ExtractResultTypes(string type)
+    {
+        var okType = ExtractBracketValue(type, "RESULT[ok=");
+        if (okType == null)
+            return (null, null);
+
+        // Find the [err=...] portion after the [ok=...] bracket
+        var errPrefix = $"RESULT[ok={okType}][err=";
+        var errType = ExtractBracketValue(type, errPrefix);
+        return (okType, errType);
+    }
+
+    /// <summary>
+    /// Maps expanded INT format (INT[bits=N][signed=B]) to C# type.
+    /// </summary>
+    private static string MapExpandedIntType(string type)
+    {
+        var bits = 32;
+        var signed = true;
+
+        // Extract bits value
+        var bitsStr = ExtractBracketValue(type, "INT[bits=");
+        if (bitsStr != null && int.TryParse(bitsStr, out var b))
+            bits = b;
+
+        // Extract signed value
+        if (type.Contains("[signed=false]", StringComparison.Ordinal))
+            signed = false;
+        else if (type.Contains("[signed=true]", StringComparison.Ordinal))
+            signed = true;
+
+        return (bits, signed) switch
+        {
+            (8, true) => "sbyte",
+            (8, false) => "byte",
+            (16, true) => "short",
+            (16, false) => "ushort",
+            (32, true) => "int",
+            (32, false) => "uint",
+            (64, true) => "long",
+            (64, false) => "ulong",
+            _ => "int"
+        };
+    }
+
+    /// <summary>
+    /// Maps expanded FLOAT format (FLOAT[bits=N]) to C# type.
+    /// </summary>
+    private static string MapExpandedFloatType(string type)
+    {
+        var bitsStr = ExtractBracketValue(type, "FLOAT[bits=");
+        if (bitsStr != null && int.TryParse(bitsStr, out var bits))
+        {
+            return bits switch
+            {
+                32 => "float",
+                64 => "double",
+                _ => "double"
+            };
+        }
+        return "double";
     }
 }
