@@ -1,0 +1,10 @@
+§M{m001:BuggyContracts}
+
+§F{f001:Abs:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (> result 0)
+  §R (? (< x 0) (- 0 x) x)
+§/F{f001}
+
+§/M{m001}

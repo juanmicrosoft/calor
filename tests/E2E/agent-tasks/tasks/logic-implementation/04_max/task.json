@@ -1,0 +1,16 @@
+{
+  "id": "logic-004",
+  "name": "Implement Max with postcondition",
+  "category": "logic-implementation",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a new public function called Max to Calculator.calr that takes two i32 parameters (a and b) and returns i32. Add postconditions: result >= a AND result >= b AND (or (== result a) (== result b)). Implementation: if a >= b return a, else return b. Use ternary operator. Use function ID f003.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": {
+      "enabled": false,
+      "minProvenContracts": 0,
+      "maxDisprovenContracts": 0
+    }
+  },
+  "timeout": 120
+}

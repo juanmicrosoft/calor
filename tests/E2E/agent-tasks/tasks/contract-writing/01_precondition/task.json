@@ -1,0 +1,16 @@
+{
+  "id": "contract-001",
+  "name": "Add precondition with REQ",
+  "category": "contract-writing",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a new public function called SquareRoot to Calculator.calr that takes an i32 parameter x and returns i32. Add a precondition (using section Q) requiring x >= 0. For the implementation, just return x (we're testing the contract, not the math). Use function ID f003.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": {
+      "enabled": false,
+      "minProvenContracts": 0,
+      "maxDisprovenContracts": 0
+    }
+  },
+  "timeout": 120
+}

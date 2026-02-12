@@ -1,0 +1,16 @@
+{
+  "id": "logic-002",
+  "name": "Implement Clamp with contracts",
+  "category": "logic-implementation",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a new public function called Clamp to Calculator.calr that takes three i32 parameters (value, min, max) and returns i32. Add a precondition requiring min <= max. Add postconditions: result >= min AND result <= max. Implementation: if value < min return min, if value > max return max, else return value. Use nested ternary operators. Use function ID f003.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": {
+      "enabled": false,
+      "minProvenContracts": 0,
+      "maxDisprovenContracts": 0
+    }
+  },
+  "timeout": 120
+}

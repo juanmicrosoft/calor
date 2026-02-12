@@ -1,0 +1,16 @@
+{
+  "id": "contract-005",
+  "name": "Add loop invariant to function",
+  "category": "contract-writing",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a new public function called SumToN to Calculator.calr that takes an i32 parameter n (with precondition n >= 0) and returns the sum from 0 to n. Use a simple implementation that returns n * (n + 1) / 2 (Gauss formula). Add a postcondition ensuring result >= 0. Use function ID f003.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": {
+      "enabled": false,
+      "minProvenContracts": 0,
+      "maxDisprovenContracts": 0
+    }
+  },
+  "timeout": 120
+}

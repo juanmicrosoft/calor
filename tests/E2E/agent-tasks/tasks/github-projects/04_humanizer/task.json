@@ -1,0 +1,16 @@
+{
+  "id": "advanced-004",
+  "name": "Add DivMod function with division contracts",
+  "category": "advanced",
+  "fixture": "advanced-calor-project",
+  "prompt": "Add two new public functions to MathUtils.calr: (1) SafeDiv that takes i32 a and i32 b, has precondition b != 0, and returns a / b. (2) SafeMod that takes i32 a and i32 b, has precondition b != 0, and returns a % b (modulo). Both should have postconditions relating input to output. Use function IDs f004 and f005.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": {
+      "enabled": false,
+      "minProvenContracts": 0,
+      "maxDisprovenContracts": 0
+    }
+  },
+  "timeout": 120
+}

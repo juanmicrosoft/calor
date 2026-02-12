@@ -9,10 +9,16 @@ namespace Calor.Compiler.Diagnostics;
 public sealed class DiagnosticBag : IEnumerable<Diagnostic>
 {
     private readonly List<Diagnostic> _diagnostics = [];
+    private readonly List<DiagnosticWithFix> _diagnosticsWithFixes = [];
     private string? _currentFilePath;
 
     public int Count => _diagnostics.Count;
     public bool HasErrors => _diagnostics.Any(d => d.IsError);
+
+    /// <summary>
+    /// Diagnostics that have associated fixes.
+    /// </summary>
+    public IReadOnlyList<DiagnosticWithFix> DiagnosticsWithFixes => _diagnosticsWithFixes;
 
     public IReadOnlyList<Diagnostic> Errors
         => _diagnostics.Where(d => d.IsError).ToList();
@@ -91,6 +97,106 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         => ReportError(span, DiagnosticCode.MissingExtensionSelf,
             $"Extension method '{methodName}' must have a parameter of type '{enumName}'");
 
+    // Diagnostics with fixes
+    /// <summary>
+    /// Reports a diagnostic with an associated suggested fix.
+    /// </summary>
+    public void ReportWithFix(TextSpan span, string code, string message, SuggestedFix fix,
+        DiagnosticSeverity severity = DiagnosticSeverity.Error)
+    {
+        // Add to regular diagnostics for normal display
+        _diagnostics.Add(new Diagnostic(code, message, span, severity, _currentFilePath));
+        // Also add to fix list for code actions
+        _diagnosticsWithFixes.Add(new DiagnosticWithFix(code, message, span, fix, severity, _currentFilePath));
+    }
+
+    /// <summary>
+    /// Reports an error diagnostic with an associated suggested fix.
+    /// </summary>
+    public void ReportErrorWithFix(TextSpan span, string code, string message, SuggestedFix fix)
+        => ReportWithFix(span, code, message, fix, DiagnosticSeverity.Error);
+
+    /// <summary>
+    /// Reports a warning diagnostic with an associated suggested fix.
+    /// </summary>
+    public void ReportWarningWithFix(TextSpan span, string code, string message, SuggestedFix fix)
+        => ReportWithFix(span, code, message, fix, DiagnosticSeverity.Warning);
+
+    /// <summary>
+    /// Reports a mismatched ID error with a fix to correct the closing tag ID.
+    /// </summary>
+    public void ReportMismatchedIdWithFix(TextSpan span, string openTag, string openId,
+        string closeTag, string closeId)
+    {
+        var message = $"{closeTag} id '{closeId}' does not match {openTag} id '{openId}'";
+
+        // Create fix to replace the wrong ID with the correct one
+        // The edit position is calculated based on where the ID appears in the close tag
+        // Format: §/TAG{closeId} - the ID starts after {
+        var filePath = _currentFilePath ?? "";
+        var fix = new SuggestedFix(
+            $"Change '{closeId}' to '{openId}'",
+            TextEdit.Replace(filePath, span.Line, span.Column, span.Line, span.Column + closeId.Length, openId));
+
+        ReportErrorWithFix(span, DiagnosticCode.MismatchedId, message, fix);
+    }
+
+    /// <summary>
+    /// Reports an expected closing tag error with a fix to insert the closing tag.
+    /// </summary>
+    public void ReportExpectedClosingTagWithFix(TextSpan span, string openTag,
+        string expectedCloseTag, int insertLine, int insertColumn)
+    {
+        var message = $"Expected '{expectedCloseTag}' to close '{openTag}'";
+
+        // Create fix to insert the missing closing tag
+        var filePath = _currentFilePath ?? "";
+        var fix = new SuggestedFix(
+            $"Insert '{expectedCloseTag}'",
+            TextEdit.Insert(filePath, insertLine, insertColumn, $"\n{expectedCloseTag}"));
+
+        ReportErrorWithFix(span, DiagnosticCode.ExpectedClosingTag, message, fix);
+    }
+
+    /// <summary>
+    /// Reports an error when a function is used where a variable is expected,
+    /// with a fix to call the function.
+    /// </summary>
+    public void ReportNotAVariableWithFix(TextSpan span, string name, bool isFunction)
+    {
+        if (isFunction)
+        {
+            var message = $"'{name}' is a function, not a variable. Did you mean to call it?";
+            var filePath = _currentFilePath ?? "";
+
+            // Create fix to add parentheses to call the function
+            var fix = new SuggestedFix(
+                $"Call '{name}()'",
+                TextEdit.Replace(filePath, span.Line, span.Column, span.Line, span.Column + name.Length, $"§C{{{name}}} §/C"));
+
+            ReportErrorWithFix(span, DiagnosticCode.TypeMismatch, message, fix);
+        }
+        else
+        {
+            ReportError(span, DiagnosticCode.TypeMismatch, $"'{name}' is not a variable");
+        }
+    }
+
+    /// <summary>
+    /// Reports a duplicate definition error with a fix to rename the symbol.
+    /// </summary>
+    public void ReportDuplicateDefinitionWithFix(TextSpan span, string name, string suggestedName)
+    {
+        var message = $"'{name}' is already defined. Consider using a different name.";
+        var filePath = _currentFilePath ?? "";
+
+        var fix = new SuggestedFix(
+            $"Rename to '{suggestedName}'",
+            TextEdit.Replace(filePath, span.Line, span.Column, span.Line, span.Column + name.Length, suggestedName));
+
+        ReportErrorWithFix(span, DiagnosticCode.DuplicateDefinition, message, fix);
+    }
+
     public void AddRange(IEnumerable<Diagnostic> diagnostics)
     {
         _diagnostics.AddRange(diagnostics);
@@ -99,6 +205,7 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
     public void Clear()
     {
         _diagnostics.Clear();
+        _diagnosticsWithFixes.Clear();
     }
 
     public IEnumerator<Diagnostic> GetEnumerator() => _diagnostics.GetEnumerator();

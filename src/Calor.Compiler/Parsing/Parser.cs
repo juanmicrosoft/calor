@@ -182,7 +182,7 @@ public sealed class Parser
         // Validate ID matching
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "MODULE", id, "END_MODULE", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MODULE", id, "END_MODULE", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -403,7 +403,7 @@ public sealed class Parser
         // Validate ID matching
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "FUNC", id, "END_FUNC", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "FUNC", id, "END_FUNC", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -576,7 +576,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "AF", id, "END_AF", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "AF", id, "END_AF", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -1880,7 +1880,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "MATCH", id, "END_MATCH", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MATCH", id, "END_MATCH", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -1911,7 +1911,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "MATCH", id, "END_MATCH", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MATCH", id, "END_MATCH", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -2145,7 +2145,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "FOR", id, "END_FOR", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "FOR", id, "END_FOR", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -2177,7 +2177,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "WHILE", id, "END_WHILE", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "WHILE", id, "END_WHILE", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -2206,7 +2206,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "DO", id, "END_DO", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DO", id, "END_DO", endId);
         }
 
         // Parse condition expression (comes after §/DO[id])
@@ -2312,7 +2312,7 @@ public sealed class Parser
 
             if (endId != id)
             {
-                _diagnostics.ReportMismatchedId(endToken.Span, "IF", id, "END_IF", endId);
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IF", id, "END_IF", endId);
             }
 
             var span = startToken.Span.Union(endToken.Span);
@@ -2371,7 +2371,7 @@ public sealed class Parser
 
         if (endId2 != id)
         {
-            _diagnostics.ReportMismatchedId(endToken2.Span, "IF", id, "END_IF", endId2);
+            _diagnostics.ReportMismatchedIdWithFix(endToken2.Span, "IF", id, "END_IF", endId2);
         }
 
         var span2 = startToken.Span.Union(endToken2.Span);
@@ -2996,7 +2996,7 @@ public sealed class Parser
 
             if (endId != id)
             {
-                _diagnostics.ReportMismatchedId(endToken.Span, "ARR", id, "END_ARR", endId);
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "ARR", id, "END_ARR", endId);
             }
             endSpan = endToken.Span;
         }
@@ -3067,7 +3067,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "EACH", id, "END_EACH", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EACH", id, "END_EACH", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -3111,7 +3111,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "LIST", id, "END_LIST", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "LIST", id, "END_LIST", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -3170,7 +3170,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "DICT", id, "END_DICT", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DICT", id, "END_DICT", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -3240,7 +3240,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "HSET", id, "END_HSET", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "HSET", id, "END_HSET", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -3463,7 +3463,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "EACHKV", id, "END_EACHKV", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EACHKV", id, "END_EACHKV", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -3816,7 +3816,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "IFACE", id, "END_IFACE", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IFACE", id, "END_IFACE", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -3893,7 +3893,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "METHOD", id, "END_METHOD", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -4030,7 +4030,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "CLASS", id, "END_CLASS", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "CLASS", id, "END_CLASS", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -4185,7 +4185,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "METHOD", id, "END_METHOD", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -4303,7 +4303,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "AMT", id, "END_AMT", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "AMT", id, "END_AMT", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -4542,7 +4542,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "PROP", id, "END_PROP", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "PROP", id, "END_PROP", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -4679,7 +4679,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "CTOR", id, "END_CTOR", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "CTOR", id, "END_CTOR", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -4791,7 +4791,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "TRY", id, "END_TRY", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "TRY", id, "END_TRY", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -4967,7 +4967,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "LAM", id, "END_LAM", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "LAM", id, "END_LAM", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -5058,7 +5058,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "DEL", id, "END_DEL", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DEL", id, "END_DEL", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -5778,7 +5778,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "DECISION", id, "END_DECISION", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DECISION", id, "END_DECISION", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -6148,7 +6148,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "EN", id, "END_EN", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EN", id, "END_EN", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -6209,7 +6209,7 @@ public sealed class Parser
 
         if (endId != id)
         {
-            _diagnostics.ReportMismatchedId(endToken.Span, "EXT", id, "END_EXT", endId);
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EXT", id, "END_EXT", endId);
         }
 
         // Validate that each extension method has a parameter of the enum type

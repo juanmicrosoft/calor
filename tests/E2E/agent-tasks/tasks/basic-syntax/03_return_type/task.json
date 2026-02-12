@@ -1,0 +1,12 @@
+{
+  "id": "basic-003",
+  "name": "Add function with explicit return type",
+  "category": "basic-syntax",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a new public function called IsPositive to Calculator.calr that takes an i32 parameter x and returns a bool indicating whether x is greater than 0. Use the ternary operator (? condition true-expr false-expr) in Calor. Use function ID f003.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": { "enabled": false }
+  },
+  "timeout": 120
+}

@@ -1,0 +1,16 @@
+{
+  "id": "contract-004",
+  "name": "Add both precondition and postcondition to SafeDivide",
+  "category": "contract-writing",
+  "fixture": "basic-calor-project",
+  "prompt": "Add a new public function called SafeDivide to Calculator.calr that takes two i32 parameters (a and b) and returns i32. Add a precondition (section Q) requiring b != 0 (divisor not zero). Add a postcondition (section S) that result * b == a (only valid for integer division when a is divisible by b, so also add precondition a mod b == 0). Return a / b. Use function ID f003.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": {
+      "enabled": false,
+      "minProvenContracts": 0,
+      "maxDisprovenContracts": 0
+    }
+  },
+  "timeout": 120
+}

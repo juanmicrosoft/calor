@@ -1,8 +1,8 @@
 {
   "name": "calor",
   "displayName": "Calor Language",
-  "description": "Syntax highlighting for the Calor programming language",
-  "version": "0.2.2",
+  "description": "Language support for the Calor programming language",
+  "version": "0.3.0",
   "publisher": "calor-dev",
   "license": "Apache-2.0",
   "icon": "icons/calor-icon.png",
@@ -16,6 +16,10 @@
   "categories": [
     "Programming Languages"
   ],
+  "activationEvents": [
+    "onLanguage:calor"
+  ],
+  "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
@@ -40,6 +44,35 @@
         "scopeName": "source.calor",
         "path": "./syntaxes/calor.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Calor",
+      "properties": {
+        "calor.languageServer.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the calor-lsp executable. If empty, uses 'calor-lsp' from PATH."
+        },
+        "calor.languageServer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Calor language server for diagnostics, completions, and other features."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
   }
 }

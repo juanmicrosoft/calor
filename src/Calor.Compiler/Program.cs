@@ -162,6 +162,7 @@ public class Program
         rootCommand.AddCommand(HookCommand.Create());
         rootCommand.AddCommand(IdsCommand.Create());
         rootCommand.AddCommand(EffectsCommand.Create());
+        rootCommand.AddCommand(VerifyCommand.Create());
 
         // Initialize telemetry for subcommands
         // Parse --no-telemetry early from args

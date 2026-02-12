@@ -1,0 +1,22 @@
+§M{m001:MathUtils}
+
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+
+§F{f002:Negate:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (- 0 x)
+§/F{f002}
+
+§F{f003:IsEven:pub}
+  §I{i32:x}
+  §O{bool}
+  §R (== (% x 2) 0)
+§/F{f003}
+
+§/M{m001}

@@ -101,4 +101,87 @@ public sealed class Scope
     {
         return new Scope(this);
     }
+
+    /// <summary>
+    /// Gets all symbols visible from this scope (including parent scopes).
+    /// </summary>
+    public IEnumerable<Symbol> GetAllVisibleSymbols()
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        var current = this;
+        while (current != null)
+        {
+            foreach (var symbol in current._symbols.Values)
+            {
+                if (seen.Add(symbol.Name))
+                {
+                    yield return symbol;
+                }
+            }
+            current = current.Parent;
+        }
+    }
+
+    /// <summary>
+    /// Finds the most similar symbol name using Levenshtein distance.
+    /// Returns null if no sufficiently similar name is found.
+    /// </summary>
+    public string? FindSimilarName(string name, int maxDistance = 2)
+    {
+        string? bestMatch = null;
+        var bestDistance = int.MaxValue;
+
+        foreach (var symbol in GetAllVisibleSymbols())
+        {
+            var distance = LevenshteinDistance(name, symbol.Name);
+            if (distance <= maxDistance && distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestMatch = symbol.Name;
+            }
+        }
+
+        return bestMatch;
+    }
+
+    /// <summary>
+    /// Calculates the Levenshtein distance between two strings.
+    /// </summary>
+    private static int LevenshteinDistance(string s1, string s2)
+    {
+        if (string.IsNullOrEmpty(s1))
+            return string.IsNullOrEmpty(s2) ? 0 : s2.Length;
+        if (string.IsNullOrEmpty(s2))
+            return s1.Length;
+
+        var m = s1.Length;
+        var n = s2.Length;
+
+        // Use two rows instead of full matrix for memory efficiency
+        var prev = new int[n + 1];
+        var curr = new int[n + 1];
+
+        // Initialize first row
+        for (var j = 0; j <= n; j++)
+            prev[j] = j;
+
+        for (var i = 1; i <= m; i++)
+        {
+            curr[0] = i;
+
+            for (var j = 1; j <= n; j++)
+            {
+                var cost = s1[i - 1] == s2[j - 1] ? 0 : 1;
+                curr[j] = Math.Min(
+                    Math.Min(curr[j - 1] + 1, prev[j] + 1),
+                    prev[j - 1] + cost);
+            }
+
+            // Swap rows
+            (prev, curr) = (curr, prev);
+        }
+
+        return prev[n];
+    }
 }

@@ -1,0 +1,16 @@
+{
+  "id": "advanced-003",
+  "name": "Add Min function with symmetric contracts",
+  "category": "advanced",
+  "fixture": "advanced-calor-project",
+  "prompt": "Add a new public function called Min to MathUtils.calr that takes two i32 parameters (a and b) and returns i32. Add postconditions: (1) result <= a, (2) result <= b, (3) result equals either a or b. Implementation should use ternary operator to return a if a <= b, else b. Use function ID f004.",
+  "verification": {
+    "compilation": { "mustSucceed": true },
+    "z3": {
+      "enabled": false,
+      "minProvenContracts": 0,
+      "maxDisprovenContracts": 0
+    }
+  },
+  "timeout": 120
+}

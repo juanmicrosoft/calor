@@ -38,6 +38,16 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 4. **Modify existing `.cs` file?** → Convert to `.calr` first
 5. **After any .calr change** → Run `calor diagnose` to validate
 
+### Pre-PR Agent Testing
+
+Before creating a PR that modifies Calor compiler, parser, or verification:
+
+```bash
+./tests/E2E/agent-tasks/run-agent-tests.sh
+```
+
+All tasks must pass (2/3 runs succeed). If tests fail, investigate before proceeding.
+
 ### File Types
 - `.calr` - Calor source files (**use this for all code**)
 - `.g.cs` - Generated C# files (never edit)

@@ -56,8 +56,8 @@ public sealed class Binder
                 var paramSymbol = new VariableSymbol(param.Name, param.TypeName, isMutable: false, isParameter: true);
                 if (!_scope.TryDeclare(paramSymbol))
                 {
-                    _diagnostics.ReportError(param.Span, DiagnosticCode.DuplicateDefinition,
-                        $"Parameter '{param.Name}' is already defined");
+                    var suggestedName = GenerateUniqueName(param.Name);
+                    _diagnostics.ReportDuplicateDefinitionWithFix(param.Span, param.Name, suggestedName);
                 }
                 parameters.Add(paramSymbol);
             }
@@ -251,8 +251,28 @@ public sealed class Binder
 
         if (symbol == null)
         {
-            _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
-                $"Undefined variable '{refNode.Name}'");
+            var similarName = _scope.FindSimilarName(refNode.Name);
+            if (similarName != null)
+            {
+                // Create a fix to replace the undefined reference with the similar name
+                var fix = new SuggestedFix(
+                    $"Change to '{similarName}'",
+                    TextEdit.Replace(
+                        "", // File path will be set from DiagnosticBag._currentFilePath
+                        refNode.Span.Line,
+                        refNode.Span.Column,
+                        refNode.Span.Line,
+                        refNode.Span.Column + refNode.Name.Length,
+                        similarName));
+
+                _diagnostics.ReportErrorWithFix(refNode.Span, DiagnosticCode.UndefinedReference,
+                    $"Undefined variable '{refNode.Name}'. Did you mean '{similarName}'?", fix);
+            }
+            else
+            {
+                _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
+                    $"Undefined variable '{refNode.Name}'");
+            }
             // Return a dummy variable to continue analysis
             return new BoundVariableExpression(refNode.Span,
                 new VariableSymbol(refNode.Name, "INT", false));
@@ -263,8 +283,8 @@ public sealed class Binder
             return new BoundVariableExpression(refNode.Span, variable);
         }
 
-        _diagnostics.ReportError(refNode.Span, DiagnosticCode.TypeMismatch,
-            $"'{refNode.Name}' is not a variable");
+        // Symbol exists but is not a variable - provide helpful fix
+        _diagnostics.ReportNotAVariableWithFix(refNode.Span, refNode.Name, symbol is FunctionSymbol);
         return new BoundVariableExpression(refNode.Span,
             new VariableSymbol(refNode.Name, "INT", false));
     }
@@ -345,5 +365,20 @@ public sealed class Binder
         _diagnostics.ReportError(expr.Span, DiagnosticCode.TypeMismatch,
             $"Unsupported expression type in binding: {expr.GetType().Name}");
         return new BoundIntLiteral(expr.Span, 0);
+    }
+
+    /// <summary>
+    /// Generates a unique name by appending a number suffix.
+    /// </summary>
+    private string GenerateUniqueName(string baseName)
+    {
+        var suffix = 2;
+        var candidate = $"{baseName}{suffix}";
+        while (_scope.Lookup(candidate) != null)
+        {
+            suffix++;
+            candidate = $"{baseName}{suffix}";
+        }
+        return candidate;
     }
 }
