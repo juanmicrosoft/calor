@@ -286,14 +286,27 @@ public sealed class EffectEnforcementPass
             return EffectSet.Empty;
         }
 
-        // Effects dictionary is key:value like {"io": "console_write"}
-        // Convert to legacy format "io:console_write" or use the value directly if it's a surface code like "cw"
-        var surfaceCodes = function.Effects.Effects
-            .Select(kv => kv.Key.Contains(':') || IsSurfaceCode(kv.Value)
-                ? kv.Value
-                : $"{kv.Key}:{kv.Value}")
-            .ToArray();
-        return EffectSet.From(surfaceCodes);
+        // Effects dictionary is key:value like {"io": "console_write"} or {"io": "console_write,filesystem_write"}
+        // Values can be comma-separated if multiple effects were declared in the same category
+        var surfaceCodes = new List<string>();
+        foreach (var kv in function.Effects.Effects)
+        {
+            // Split comma-separated values
+            var values = kv.Value.Split(',');
+            foreach (var value in values)
+            {
+                var trimmedValue = value.Trim();
+                if (kv.Key.Contains(':') || IsSurfaceCode(trimmedValue))
+                {
+                    surfaceCodes.Add(trimmedValue);
+                }
+                else
+                {
+                    surfaceCodes.Add($"{kv.Key}:{trimmedValue}");
+                }
+            }
+        }
+        return EffectSet.From(surfaceCodes.ToArray());
     }
 
     private static bool IsSurfaceCode(string code)

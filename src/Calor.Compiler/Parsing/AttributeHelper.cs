@@ -170,6 +170,7 @@ public static class AttributeHelper
     /// Interprets attributes for EFFECTS/§E: effect codes
     /// Handles effect codes that may have been split by the colon-based attribute parser.
     /// E.g., §E{fs:r} gets parsed as _pos0="fs", _pos1="r" instead of _pos0="fs:r"
+    /// Also handles comma-separated effects like §E{cw,fs:w} which becomes _pos0="cw,fs", _pos1="w"
     /// </summary>
     public static Dictionary<string, string> InterpretEffectsAttributes(AttributeCollection attrs)
     {
@@ -179,24 +180,96 @@ public static class AttributeHelper
         var effectPrefixes = new HashSet<string> { "fs", "net", "db", "env" };
         var effectModifiers = new HashSet<string> { "r", "w", "rw" };
 
+        // First, reconstruct all effect codes from the split positional attributes
+        var effectCodes = new List<string>();
+
         for (int i = 0; ; i++)
         {
             var code = attrs[$"_pos{i}"];
             if (string.IsNullOrEmpty(code)) break;
 
-            // Check if this is an effect prefix that was split from its modifier
-            // E.g., "fs" followed by "r" should become "fs:r"
-            if (effectPrefixes.Contains(code.ToLowerInvariant()))
+            // Check if this contains comma-separated effects (e.g., "cw,fs" from §E{cw,fs:w})
+            if (code.Contains(','))
             {
-                var nextCode = attrs[$"_pos{i + 1}"];
-                if (!string.IsNullOrEmpty(nextCode) && effectModifiers.Contains(nextCode.ToLowerInvariant()))
+                var parts = code.Split(',');
+                // Add all but the last part as complete effect codes
+                for (int j = 0; j < parts.Length - 1; j++)
                 {
-                    // Combine the split effect code
-                    code = $"{code}:{nextCode}";
-                    i++; // Skip the next positional since we consumed it
+                    effectCodes.Add(parts[j]);
+                }
+                // The last part might be a prefix that needs combining with next positional
+                var lastPart = parts[parts.Length - 1];
+                if (effectPrefixes.Contains(lastPart.ToLowerInvariant()))
+                {
+                    var nextCode = attrs[$"_pos{i + 1}"];
+                    if (!string.IsNullOrEmpty(nextCode))
+                    {
+                        // Check if nextCode is a modifier or contains comma-separated values
+                        var nextParts = nextCode.Split(',');
+                        if (effectModifiers.Contains(nextParts[0].ToLowerInvariant()))
+                        {
+                            // Combine: "fs" + "w" -> "fs:w"
+                            effectCodes.Add($"{lastPart}:{nextParts[0]}");
+                            // If there were more parts after the modifier, add them
+                            for (int k = 1; k < nextParts.Length; k++)
+                            {
+                                effectCodes.Add(nextParts[k]);
+                            }
+                            i++; // Skip the next positional since we consumed it
+                        }
+                        else
+                        {
+                            effectCodes.Add(lastPart);
+                        }
+                    }
+                    else
+                    {
+                        effectCodes.Add(lastPart);
+                    }
+                }
+                else
+                {
+                    effectCodes.Add(lastPart);
                 }
             }
+            // Check if this is an effect prefix that was split from its modifier
+            // E.g., "fs" followed by "r" should become "fs:r"
+            else if (effectPrefixes.Contains(code.ToLowerInvariant()))
+            {
+                var nextCode = attrs[$"_pos{i + 1}"];
+                if (!string.IsNullOrEmpty(nextCode))
+                {
+                    var nextParts = nextCode.Split(',');
+                    if (effectModifiers.Contains(nextParts[0].ToLowerInvariant()))
+                    {
+                        // Combine the split effect code
+                        effectCodes.Add($"{code}:{nextParts[0]}");
+                        // Add any remaining comma-separated parts
+                        for (int k = 1; k < nextParts.Length; k++)
+                        {
+                            effectCodes.Add(nextParts[k]);
+                        }
+                        i++; // Skip the next positional since we consumed it
+                    }
+                    else
+                    {
+                        effectCodes.Add(code);
+                    }
+                }
+                else
+                {
+                    effectCodes.Add(code);
+                }
+            }
+            else
+            {
+                effectCodes.Add(code);
+            }
+        }
 
+        // Now process all the reconstructed effect codes
+        foreach (var code in effectCodes)
+        {
             var (category, value) = ExpandEffectCode(code);
             if (effects.ContainsKey(category))
             {
