@@ -39,6 +39,9 @@
   <PropertyGroup>
     <Z3Dir>$(MSBuildThisFileDirectory)z3</Z3Dir>
     <Z3RuntimesDir>$(MSBuildThisFileDirectory)runtimes</Z3RuntimesDir>
+    <!-- CS8012: Microsoft.Z3.dll reports a processor target but is a managed wrapper;
+         native Z3 libs are in runtimes/{rid}/native/. Suppress for cross-compilation. -->
+    <NoWarn>$(NoWarn);CS8012</NoWarn>
   </PropertyGroup>
 
   <!-- Reference the downloaded Microsoft.Z3.dll directly -->
