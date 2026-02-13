@@ -2112,52 +2112,21 @@ public sealed class Parser
         ExpressionNode to;
         ExpressionNode? step = null;
 
+        // FROM bound - can be int literal, variable reference, or S-expression like (- n 1)
         if (!string.IsNullOrEmpty(fromStr))
-        {
-            if (int.TryParse(fromStr, out var fromVal))
-            {
-                from = new IntLiteralNode(startToken.Span, fromVal);
-            }
-            else
-            {
-                // Variable reference in attributes
-                from = new ReferenceNode(startToken.Span, fromStr);
-            }
-        }
+            from = ParseExpressionFromAttributeString(fromStr, startToken.Span);
         else
-        {
             from = ParseExpression();
-        }
 
+        // TO bound - can be int literal, variable reference, or S-expression like (- n 1)
         if (!string.IsNullOrEmpty(toStr))
-        {
-            if (int.TryParse(toStr, out var toVal))
-            {
-                to = new IntLiteralNode(startToken.Span, toVal);
-            }
-            else
-            {
-                // Variable reference in attributes
-                to = new ReferenceNode(startToken.Span, toStr);
-            }
-        }
+            to = ParseExpressionFromAttributeString(toStr, startToken.Span);
         else
-        {
             to = ParseExpression();
-        }
 
+        // STEP bound - can be int literal, variable reference, or S-expression
         if (!string.IsNullOrEmpty(stepStr))
-        {
-            if (int.TryParse(stepStr, out var stepVal))
-            {
-                step = new IntLiteralNode(startToken.Span, stepVal);
-            }
-            else
-            {
-                // Variable reference in attributes
-                step = new ReferenceNode(startToken.Span, stepStr);
-            }
-        }
+            step = ParseExpressionFromAttributeString(stepStr, startToken.Span);
 
         // Parse body statements
         var body = ParseStatementBlock(TokenKind.EndFor);
@@ -2174,6 +2143,25 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new ForStatementNode(span, id, varName, from, to, step, body, attrs);
+    }
+
+    /// <summary>
+    /// Parses an expression from an attribute string, supporting S-expressions like (- n 1),
+    /// integer literals, and variable references.
+    /// </summary>
+    private ExpressionNode ParseExpressionFromAttributeString(string attrStr, TextSpan span)
+    {
+        if (attrStr.StartsWith("("))
+        {
+            // S-expression: create a temporary lexer/parser to parse it
+            var tempLexer = new Lexer(attrStr, _diagnostics);
+            var tokens = tempLexer.Tokenize().ToList();
+            var tempParser = new Parser(tokens, _diagnostics);
+            return tempParser.ParseExpression();
+        }
+        if (int.TryParse(attrStr, out var intVal))
+            return new IntLiteralNode(span, intVal);
+        return new ReferenceNode(span, attrStr);
     }
 
     private WhileStatementNode ParseWhileStatement()
@@ -2720,8 +2708,11 @@ public sealed class Parser
             }
 
             // Handle common expression tokens
+            // Add space before identifiers if there's content before them (to separate from operators/other tokens)
             if (Check(TokenKind.Identifier))
             {
+                if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
+                    sb.Append(' ');
                 sb.Append(Advance().Text);
             }
             else if (Current.Text == ".")
@@ -2759,13 +2750,115 @@ public sealed class Parser
             }
             else if (Check(TokenKind.IntLiteral))
             {
+                // Add space before integers if there's content before them (to separate from identifiers)
+                if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
+                    sb.Append(' ');
                 sb.Append(Advance().Value?.ToString() ?? "");
+            }
+            else if (Check(TokenKind.FloatLiteral))
+            {
+                // Add space before floats if there's content before them
+                if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
+                    sb.Append(' ');
+                sb.Append(Advance().Value?.ToString() ?? "");
+            }
+            else if (Check(TokenKind.BoolLiteral))
+            {
+                // Add space before booleans if there's content before them
+                if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
+                    sb.Append(' ');
+                sb.Append(Advance().Value?.ToString()?.ToLowerInvariant() ?? "");
             }
             else if (Check(TokenKind.StrLiteral))
             {
+                // Add space before strings if there's content before them
+                if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
+                    sb.Append(' ');
                 sb.Append('"');
                 sb.Append(Advance().Value as string ?? "");
                 sb.Append('"');
+            }
+            // Handle arithmetic operators for S-expressions in attributes
+            // Add spaces around operators to preserve token boundaries when re-lexed
+            else if (Check(TokenKind.Plus))
+            {
+                sb.Append(" + ");
+                Advance();
+            }
+            else if (Check(TokenKind.Minus))
+            {
+                sb.Append(" - ");
+                Advance();
+            }
+            else if (Check(TokenKind.Star))
+            {
+                sb.Append(" * ");
+                Advance();
+            }
+            else if (Check(TokenKind.Slash))
+            {
+                sb.Append(" / ");
+                Advance();
+            }
+            else if (Check(TokenKind.Percent))
+            {
+                sb.Append(" % ");
+                Advance();
+            }
+            // Comparison operators
+            else if (Check(TokenKind.EqualEqual))
+            {
+                sb.Append(" == ");
+                Advance();
+            }
+            else if (Check(TokenKind.BangEqual))
+            {
+                sb.Append(" != ");
+                Advance();
+            }
+            else if (Check(TokenKind.LessEqual))
+            {
+                sb.Append(" <= ");
+                Advance();
+            }
+            else if (Check(TokenKind.GreaterEqual))
+            {
+                sb.Append(" >= ");
+                Advance();
+            }
+            // Note: Less and Greater are already handled above for generic types
+            // but we need them for comparisons too - they get special handling
+            // Logical operators
+            else if (Check(TokenKind.AmpAmp))
+            {
+                sb.Append(" && ");
+                Advance();
+            }
+            else if (Check(TokenKind.PipePipe))
+            {
+                sb.Append(" || ");
+                Advance();
+            }
+            else if (Check(TokenKind.Exclamation))
+            {
+                sb.Append("!");
+                Advance();
+            }
+            // Bitwise operators
+            else if (Check(TokenKind.Amp))
+            {
+                sb.Append(" & ");
+                Advance();
+            }
+            else if (Check(TokenKind.Pipe))
+            {
+                sb.Append(" | ");
+                Advance();
+            }
+            else if (Check(TokenKind.Caret))
+            {
+                sb.Append(" ^ ");
+                Advance();
             }
             else
             {

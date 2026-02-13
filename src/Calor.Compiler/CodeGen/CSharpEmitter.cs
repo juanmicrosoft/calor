@@ -48,6 +48,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private int _currentPreconditionIndex;
     private int _currentPostconditionIndex;
 
+    // Track declared variables in current function scope for reassignment detection
+    private readonly HashSet<string> _declaredVariablesInCurrentScope = new(StringComparer.Ordinal);
+
     public CSharpEmitter() : this(EmitContractMode.Debug)
     {
     }
@@ -267,6 +270,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Reset contract indices for this function
         _currentPreconditionIndex = 0;
         _currentPostconditionIndex = 0;
+
+        // Clear declared variables tracking for new function scope
+        _declaredVariablesInCurrentScope.Clear();
 
         // Emit extended metadata as documentation comments
         foreach (var issue in node.Issues)
@@ -676,6 +682,24 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var varName = SanitizeIdentifier(node.Name);
         var typeName = node.TypeName != null ? MapTypeName(node.TypeName) : "var";
+
+        // Only emit assignment (not declaration) if:
+        // 1. The variable is marked as mutable (§B{~name:type})
+        // 2. AND it was already declared in this scope
+        // This preserves Calor's shadowing semantics (S5-S6): immutable binds in inner
+        // scopes create new shadowing variables, while mutable binds reassign.
+        if (node.IsMutable && _declaredVariablesInCurrentScope.Contains(varName))
+        {
+            // Mutable rebind - emit assignment only
+            if (node.Initializer != null)
+            {
+                var initExpr = node.Initializer.Accept(this);
+                return $"{varName} = {initExpr};";
+            }
+            return "";
+        }
+
+        _declaredVariablesInCurrentScope.Add(varName);
 
         if (node.Initializer != null)
         {
@@ -1761,6 +1785,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(MethodNode node)
     {
+        // Clear declared variables tracking for new method scope
+        _declaredVariablesInCurrentScope.Clear();
+
         EmitCSharpAttributes(node.CSharpAttributes);
 
         var visibility = node.Visibility switch
@@ -2052,6 +2079,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
+            // Clear declared variables tracking for new accessor scope
+            _declaredVariablesInCurrentScope.Clear();
+
             AppendLine($"{visibilityPrefix}{accessorKeyword}");
             AppendLine("{");
             Indent();
@@ -2075,6 +2105,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ConstructorNode node)
     {
+        // Clear declared variables tracking for new constructor scope
+        _declaredVariablesInCurrentScope.Clear();
+
         EmitCSharpAttributes(node.CSharpAttributes);
 
         var visibility = node.Visibility switch
