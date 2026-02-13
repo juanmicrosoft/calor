@@ -23,16 +23,16 @@ const csharpCode = `public static int Square(int x)
 }`;
 
 const calorAnnotations = [
-  { line: 0, text: 'Stable ID f_01J5X7K9M2 - survives renames and refactors' },
-  { line: 3, text: 'Precondition (§Q): x >= 0' },
-  { line: 4, text: 'Postcondition (§S): result >= 0' },
-  { line: 5, text: 'No side effects (no §E declaration)' },
+  { line: 0, text: 'Permanent ID means AI can find this function even after you rename it' },
+  { line: 3, text: 'Rule: input must be >= 0. Compiler enforces this automatically.' },
+  { line: 4, text: 'Rule: output must be >= 0. No way to return invalid results.' },
+  { line: 5, text: 'No database or network calls—guaranteed by the compiler.' },
 ];
 
 const csharpAnnotations = [
-  { line: 2, text: 'Must parse exception patterns to find contracts' },
-  { line: 5, text: 'Assertions are implementation detail, not syntax' },
-  { line: 0, text: 'Hope line numbers don\'t change across edits' },
+  { line: 2, text: 'AI has to read the exception message to understand the rule' },
+  { line: 5, text: 'Rules are buried in code—easy for AI to miss or misunderstand' },
+  { line: 0, text: 'If you rename this function, AI references break' },
 ];
 
 export function CodeComparison() {
@@ -43,10 +43,10 @@ export function CodeComparison() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            What Agents See
+            Why AI Makes Fewer Mistakes in Calor
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Calor makes semantics explicit. C# requires inference.
+            When the rules are visible in the code, AI doesn't have to guess them.
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export function CodeComparison() {
                     : 'hover:bg-muted'
                 )}
               >
-                Calor - Everything Explicit
+                Calor - Rules Are Visible
               </button>
               <button
                 onClick={() => { setActiveTab('csharp'); trackCodeComparisonTab('csharp'); }}
@@ -74,7 +74,7 @@ export function CodeComparison() {
                     : 'hover:bg-muted'
                 )}
               >
-                C# - Requires Inference
+                C# - Rules Are Hidden
               </button>
             </div>
           </div>
@@ -99,8 +99,8 @@ export function CodeComparison() {
             <div className="space-y-4">
               <h3 className="font-semibold text-lg">
                 {activeTab === 'calor'
-                  ? 'What Calor tells the agent directly:'
-                  : 'What C# requires the agent to infer:'}
+                  ? 'What your AI sees immediately:'
+                  : 'What your AI has to figure out:'}
               </h3>
               <ul className="space-y-3">
                 {(activeTab === 'calor' ? calorAnnotations : csharpAnnotations).map(

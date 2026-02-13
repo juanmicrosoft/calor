@@ -31,59 +31,59 @@ const metricDisplayInfo: Record<
   { name: string; calorInterpretation: string; csharpInterpretation: string }
 > = {
   TokenEconomics: {
-    name: 'Token Economics',
-    calorInterpretation: 'More compact representation',
-    csharpInterpretation: "Calor's explicit syntax uses more tokens",
+    name: 'Code Size',
+    calorInterpretation: 'Calor code is more compact',
+    csharpInterpretation: 'Calor\'s explicit rules add some overhead',
   },
   GenerationAccuracy: {
-    name: 'Generation Accuracy',
-    calorInterpretation: 'Better code generation from prompts',
-    csharpInterpretation: 'Mature tooling, familiar patterns',
+    name: 'First-Try Success',
+    calorInterpretation: 'AI generates correct code more often',
+    csharpInterpretation: 'AI knows C# better (for now)',
   },
   Comprehension: {
-    name: 'Comprehension',
-    calorInterpretation: 'Explicit structure aids understanding',
-    csharpInterpretation: 'Familiar syntax easier to follow',
+    name: 'Understanding Code',
+    calorInterpretation: 'AI understands Calor code 1.5x better',
+    csharpInterpretation: 'C# familiarity helps AI follow along',
   },
   EditPrecision: {
-    name: 'Edit Precision',
-    calorInterpretation: 'Unique IDs enable targeted changes',
-    csharpInterpretation: 'Established editing patterns',
+    name: 'Accurate Edits',
+    calorInterpretation: 'AI makes precise changes without breaking things',
+    csharpInterpretation: 'C# editing patterns are well-established',
   },
   ErrorDetection: {
-    name: 'Error Detection',
-    calorInterpretation: 'Contracts surface invariant violations',
-    csharpInterpretation: 'Mature error handling ecosystem',
+    name: 'Finding Bugs',
+    calorInterpretation: 'AI spots 22% more bugs in Calor code',
+    csharpInterpretation: 'C# has mature debugging tools',
   },
   InformationDensity: {
-    name: 'Information Density',
-    calorInterpretation: 'More semantic content per token',
-    csharpInterpretation: 'Calor trades density for explicitness',
+    name: 'Meaning Per Line',
+    calorInterpretation: 'Each line carries more information',
+    csharpInterpretation: 'Calor trades brevity for clarity',
   },
   TaskCompletion: {
-    name: 'Task Completion',
-    calorInterpretation: 'Better task completion rate',
-    csharpInterpretation: 'Ecosystem maturity advantage',
+    name: 'Finishing Tasks',
+    calorInterpretation: 'AI completes more tasks successfully',
+    csharpInterpretation: 'More libraries and examples help AI',
   },
   RefactoringStability: {
-    name: 'Refactoring Stability',
-    calorInterpretation: 'More stable during refactoring',
-    csharpInterpretation: 'Better refactoring support',
+    name: 'Safe Refactoring',
+    calorInterpretation: 'Code stays correct after restructuring',
+    csharpInterpretation: 'C# has better refactoring tools',
   },
   ContractVerification: {
-    name: 'Contract Verification',
-    calorInterpretation: 'Contracts verified by Z3 (C# has no equivalent)',
-    csharpInterpretation: 'N/A - no static contract verification',
+    name: 'Rule Checking',
+    calorInterpretation: 'Compiler proves rules are followed (unique to Calor)',
+    csharpInterpretation: 'C# can\'t check rules automatically',
   },
   EffectSoundness: {
-    name: 'Effect Soundness',
-    calorInterpretation: 'Effect declarations match actual behavior',
-    csharpInterpretation: 'N/A - no effect tracking',
+    name: 'Side Effect Tracking',
+    calorInterpretation: 'All side effects are accounted for (unique to Calor)',
+    csharpInterpretation: 'C# doesn\'t track side effects',
   },
   InteropEffectCoverage: {
-    name: 'Interop Coverage',
-    calorInterpretation: 'BCL methods covered by effect manifests',
-    csharpInterpretation: 'N/A - no effect manifests',
+    name: '.NET Library Coverage',
+    calorInterpretation: 'Most .NET methods have effect information',
+    csharpInterpretation: 'N/A for C#',
   },
 };
 
@@ -145,10 +145,10 @@ export function BenchmarkChart() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Where Explicit Semantics Pay Off
+            Measured Against Real AI Tasks
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Calor trades token efficiency for semantic explicitness. Here's where that pays off.
+            We tested how well AI agents work with Calor vs C#. Here's what we found.
           </p>
           <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
@@ -222,11 +222,11 @@ export function BenchmarkChart() {
 
           {/* Key finding */}
           <div className="mt-12 p-6 rounded-lg border bg-muted/50">
-            <h3 className="font-semibold mb-2">The Tradeoff</h3>
+            <h3 className="font-semibold mb-2">The Bottom Line</h3>
             <p className="text-muted-foreground">
-              Calor wins where correctness matters: comprehension, error detection, and refactoring stability.
-              C# wins where familiarity matters: generation accuracy and task completion. As LLMs train on
-              more Calor code, the familiarity gap closes. The correctness advantage is structural.
+              <strong>Calor wins where bugs hurt most:</strong> AI understands code better, catches more errors, and makes safer changes.
+              <strong> C# wins on familiarity:</strong> AI has seen more C# code, so it generates it faster. But as AI learns Calor,
+              the familiarity gap shrinks—the safety advantage doesn't.
             </p>
           </div>
 

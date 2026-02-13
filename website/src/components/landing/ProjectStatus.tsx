@@ -1,17 +1,17 @@
 import { Check } from 'lucide-react';
 
 const completedMilestones = [
-  'Core compiler',
-  'Control flow',
-  'Type system',
-  'Contracts',
-  'Effects',
-  'MSBuild SDK',
-  'Benchmarks',
-  'VS Code Extension',
+  'Compiler',
+  'Type checking',
+  'Rule enforcement',
+  'Side effect tracking',
+  'VS Code support',
+  'Build integration',
+  'Performance tests',
+  'AI agent guides',
 ];
 
-const currentFocus = 'Direct IL emission';
+const currentFocus = 'Faster compilation';
 
 export function ProjectStatus() {
   return (
@@ -42,7 +42,7 @@ export function ProjectStatus() {
             </div>
           </div>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Currently working on: <span className="font-medium text-foreground">{currentFocus}</span>
+            Active development. Currently working on: <span className="font-medium text-foreground">{currentFocus}</span>
           </p>
         </div>
       </div>

@@ -41,10 +41,10 @@ export function Hero() {
             Calor
           </h1>
           <p className="mt-4 text-xl font-medium text-white sm:text-2xl">
-            When AI writes your code, the language should catch the bugs.
+            Stop debugging AI-generated code.
           </p>
           <p className="mt-6 text-lg leading-8 text-white/80">
-            Contracts verified by Z3, effects enforced by the compiler, semantic bugs caught before runtime.
+            A programming language that catches bugs your AI agent misses—before you run a single test.
           </p>
 
           <div className="mt-10 flex items-center justify-center gap-x-4">

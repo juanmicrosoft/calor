@@ -27,10 +27,10 @@ export function CatchBugs() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Catch Bugs C# Can't
+            Your AI Forgot a Network Call. The Compiler Didn't.
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            The compiler traces effects through your entire call graph.
+            See exactly what your code does—even when side effects hide in helper functions.
           </p>
         </div>
 
@@ -60,8 +60,9 @@ export function CatchBugs() {
           {/* Explanation */}
           <div className="mt-8 p-6 rounded-lg border bg-muted/50">
             <p className="text-muted-foreground">
-              The compiler traced through 3 layers of function calls and found a network effect
-              hiding behind a helper function. In C#, this bug ships to production.
+              <strong>What happened:</strong> Your AI wrote code that calls <code className="text-sm bg-muted px-1 rounded">NotifyCustomer</code>, which
+              calls <code className="text-sm bg-muted px-1 rounded">SendEmail</code>, which makes a network request. The compiler caught that
+              you didn't declare the network access—before you ran anything. In most languages, this bug ships to production.
             </p>
           </div>
         </div>

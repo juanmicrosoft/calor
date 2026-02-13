@@ -7,19 +7,19 @@ import { trackInstallCommandCopy } from '@/lib/analytics';
 
 const commands = [
   {
-    label: 'Install the compiler',
+    label: 'Install Calor',
     command: 'dotnet tool install -g calor',
-    description: 'Adds calor to your PATH. Requires .NET 8+ SDK.',
+    description: 'One command. Works on Windows, Mac, and Linux. Requires .NET 8+.',
   },
   {
-    label: 'Initialize with Claude Code',
+    label: 'Set up your AI agent',
     command: 'calor init --ai claude',
-    description: 'Generates CLAUDE.md with Calor syntax reference.',
+    description: 'Teaches Claude Code the Calor syntax so it can start writing code.',
   },
   {
-    label: 'Build your project',
+    label: 'Build and check',
     command: 'dotnet build',
-    description: 'Compiles .calr files to C# and builds the assembly.',
+    description: 'Compiles your code and catches bugs—before you run anything.',
   },
 ];
 
@@ -38,10 +38,10 @@ export function QuickStart() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Quick Start
+            Try It Now
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Get up and running in minutes
+            Three commands to start writing safer code with your AI agent
           </p>
         </div>
 

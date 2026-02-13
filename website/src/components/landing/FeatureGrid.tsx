@@ -6,33 +6,33 @@ import { trackFeatureLearnMore } from '@/lib/analytics';
 
 const features = [
   {
-    name: 'First-Class Contracts',
+    name: 'Rules That Enforce Themselves',
     description:
-      'Preconditions and postconditions are syntax, not comments. Catch contract violations at compile time, not in production logs.',
+      'Define what your function should do—like "input must be positive." The compiler proves it, not your tests.',
     icon: Shield,
     code: '§Q (>= x 0)\n§S (>= result 0)',
     href: '/docs/philosophy/effects-contracts-enforcement/',
   },
   {
-    name: 'Explicit Effects',
+    name: 'No Hidden Side Effects',
     description:
-      'Effects trace through the entire call graph. Hide a database call in a helper? The compiler finds it.',
+      'Database calls? Network requests? The compiler tells you exactly where they happen—even buried 5 layers deep.',
     icon: FileCode,
     code: '§E{db:rw,net:rw}',
     href: '/docs/philosophy/effects-contracts-enforcement/',
   },
   {
-    name: 'Stable Identifiers',
+    name: 'Rename Without Breaking',
     description:
-      'ULID-based IDs survive renaming, file moves, and refactoring. Agents reference code precisely.',
+      'Every function has a permanent ID. Rename files, move code around—AI agents still find exactly what they need.',
     icon: Fingerprint,
     code: '§F{f_01J5X7K9M2:Process:pub}',
     href: '/docs/philosophy/stable-identifiers/',
   },
   {
-    name: 'Explicit Structure',
+    name: 'No More Missing Braces',
     description:
-      'Matched open/close tags eliminate bugs where agents miscalculate indentation or brace depth.',
+      'Explicit start/end tags mean AI can\'t generate malformed code. No more "unexpected token" from bad indentation.',
     icon: Layers,
     code: '§M{m_01J5X7K9M2:App}\n  ...\n§/M{m_01J5X7K9M2}',
     href: '/docs/syntax-reference/',
@@ -45,10 +45,10 @@ export function FeatureGrid() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Designed for Agent Reasoning
+            Built for How AI Actually Writes Code
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Every design decision optimizes for machine comprehension
+            Four features that make AI-generated code reliable
           </p>
         </div>
 
