@@ -407,6 +407,138 @@ Example:
 §/I{id}
 ```
 
+### Collections
+
+**List creation and operations:**
+```
+§LIST{numbers:i32}      // Create List<int> named numbers
+  10                    // Initial values (optional)
+  20
+  30
+§/LIST{numbers}         // Close list declaration
+§PUSH{numbers} 40       // Add 40 to end of list
+§CNT{numbers}           // Get count (returns 4)
+§HAS{numbers} 20        // Check if contains 20
+```
+
+**Dictionary creation and operations:**
+```
+§DICT{scores:str:i32}   // Create Dictionary<string, int>
+  §KV "alice" 95        // Key-value pairs
+  §KV "bob" 87
+§/DICT{scores}          // Close dictionary declaration
+§PUT{scores} "charlie" 92  // Add or update entry
+§HAS{scores} "alice"    // Check if key exists
+```
+
+**HashSet creation:**
+```
+§HSET{tags:str}         // Create HashSet<string>
+  "urgent"
+  "review"
+§/HSET{tags}            // Close set declaration
+§PUSH{tags} "approved"  // Add to set
+§HAS{tags} "urgent"     // Check membership
+```
+
+**Iteration (foreach):**
+```
+§EACH{e1:item} numbers  // Foreach item in numbers
+  §P item               // Print current item
+§/EACH{e1}              // Close foreach
+
+§EACHKV{e2:k:v} scores  // Foreach key-value in dictionary
+  §P k
+  §P v
+§/EACHKV{e2}            // Close foreach
+```
+
+### Async Functions
+
+**Async function definition:**
+```
+§AF{af1:FetchDataAsync:pub}
+  §I{str:url}
+  §O{Task<str>}
+  §E{net}
+  §AWAIT (HttpClient.GetStringAsync url)
+§/AF{af1}
+```
+
+**Await expression:**
+```
+§AWAIT expression       // Await an async operation
+```
+
+### Lambdas and Delegates
+
+**Inline arrow lambda:**
+```
+(x) → (* x 2)           // Lambda that doubles x
+```
+
+**Block lambda (multi-statement):**
+```
+§LM{lm1:i32:i32}        // Lambda: i32 -> i32
+  §R (* x 2)
+§/LM{lm1}
+```
+
+**Delegate definition:**
+```
+§DG{dg1:MathOp}
+  §I{i32:x}
+  §I{i32:y}
+  §O{i32}
+§/DG{dg1}
+```
+
+### Class Methods
+
+**Method in a class:**
+```
+§CL{cl1:Calculator:pub}
+  §MT{mt1:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+  §/MT{mt1}
+§/CL{cl1}
+```
+
+### File System Effects
+
+**File read:**
+```
+§E{fs:r}                // or §E{fs} for file read effect
+```
+
+**File write:**
+```
+§E{fs:w}                // File write effect
+```
+
+**Multiple effects (comma-separated):**
+```
+§E{cw,fs:w}             // Console write AND file write
+§E{net,cw}              // Network AND console write
+```
+
+### Quantifiers (for contracts)
+
+**Forall quantifier:**
+```
+§Q (forall i (and (>= i 0) (< i (len arr))) (> (at arr i) 0))
+```
+Meaning: For all indices i in array, element at i > 0
+
+**Exists quantifier:**
+```
+§S (exists i (and (>= i 0) (< i (len arr))) (== (at arr i) target))
+```
+Meaning: There exists an index i where element equals target
+
 CALOR_REFERENCE
 
     log_debug "Created CLAUDE.md in workspace"
