@@ -3,7 +3,7 @@
   "name": "Add Sign function with nested ternary",
   "category": "advanced",
   "fixture": "advanced-calor-project",
-  "prompt": "Add a new public function called Sign to MathUtils.calr that returns the sign of an integer: -1 for negative, 0 for zero, 1 for positive. It takes i32 parameter x and returns i32. Use nested ternary operators. Use function ID f004.\n\nUse this exact pattern:\n§F{f004:Sign:pub}\n  §I{i32:x}\n  §O{i32}\n  §S (or (== result (- 1)) (or (== result 0) (== result 1)))\n  §R (? (< x 0) (- 1) (? (== x 0) 0 1))\n§/F{f004}\n\nNote: (- 1) represents negative 1 in Calor, and the postcondition ensures result is -1, 0, or 1.",
+  "prompt": "Add a public function called Sign to MathUtils.calr that returns the sign of an integer: -1 for negative, 0 for zero, 1 for positive. Takes integer x, returns integer. Use nested conditional expressions. Add a postcondition ensuring result is one of -1, 0, or 1.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

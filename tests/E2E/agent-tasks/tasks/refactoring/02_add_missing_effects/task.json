@@ -3,7 +3,7 @@
   "name": "Add missing effects to function",
   "category": "refactoring",
   "fixture": "effects-project",
-  "prompt": "Add a function called ProcessAndLog to Effects.calr that reads from a file, processes the content, and writes to console. The function should properly declare all required effects.\n\nCreate this function with proper effect declarations:\n§F{f001:ProcessAndLog:pub}\n  §I{str:path}\n  §O{void}\n  §E{fs:r,cw}\n  §B{content} §C{File.ReadAllText}\n    §A path\n  §/C\n  §C{Console.WriteLine}\n    §A content\n  §/C\n§/F{f001}\n\nKey point: The function uses both file read (fs:r) and console write (cw) effects, so both must be declared in §E{fs:r,cw}. Calor's effect system enforces this.",
+  "prompt": "Add a function called ProcessAndLog to Effects.calr that takes a path string parameter, reads content from a file using File.ReadAllText, and prints it using Console.WriteLine. Returns void. Declare all required effects (file read and console write).",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

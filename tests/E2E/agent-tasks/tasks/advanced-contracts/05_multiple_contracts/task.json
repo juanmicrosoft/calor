@@ -3,7 +3,7 @@
   "name": "Multiple pre/post contracts",
   "category": "advanced-contracts",
   "fixture": "contracts-project",
-  "prompt": "Add a public function called ClampValue to Contracts.calr that clamps a value between min and max. It takes i32 parameters min, max, and value and returns i32. Use multiple preconditions and postconditions.\n\nUse this exact Calor multiple contracts syntax:\n§F{f001:ClampValue:pub}\n  §I{i32:min}\n  §I{i32:max}\n  §I{i32:value}\n  §O{i32}\n  §Q (<= min max)\n  §Q (>= max min)\n  §S (>= result min)\n  §S (<= result max)\n  §S (-> (and (>= value min) (<= value max)) (== result value))\n  §R (? (< value min) min (? (> value max) max value))\n§/F{f001}\n\nMultiple contracts:\n- Multiple §Q lines define multiple preconditions (all must hold)\n- Multiple §S lines define multiple postconditions (all must hold)\n- Each contract focuses on one aspect of correctness",
+  "prompt": "Add a public function called ClampValue to Contracts.calr that clamps a value between min and max. Takes three integer parameters: min, max, and value. Returns the clamped integer. Add multiple preconditions: min <= max and max >= min. Add multiple postconditions: result >= min, result <= max, and if the value was already in range then result equals value.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

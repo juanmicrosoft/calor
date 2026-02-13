@@ -3,7 +3,7 @@
   "name": "Generic class",
   "category": "generics",
   "fixture": "generics-project",
-  "prompt": "Add a public generic class called Container to Generic.calr that holds a value of any type with Get and Set methods.\n\nUse this exact Calor generic class syntax:\n§CL{c001:Container:pub}<T>\n  §FLD{T:_value:priv}\n  §MT{m001:Get:pub}\n    §O{T}\n    §R _value\n  §/MT{m001}\n  §MT{m002:Set:pub}\n    §I{T:value}\n    §O{void}\n    §ASSIGN _value value\n  §/MT{m002}\n§/CL{c001}\n\nGeneric class syntax:\n- §CL{...}<T> declares a generic class\n- Use T for field types, method parameters, and returns\n- Instances are created with specific types: Container<i32>",
+  "prompt": "Add a public generic class called Container to Generic.calr with type parameter T. It should have a private field of type T, a Get method that returns the stored value, and a Set method that updates it.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

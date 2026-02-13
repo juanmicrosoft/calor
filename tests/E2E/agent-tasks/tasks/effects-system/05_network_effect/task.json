@@ -3,7 +3,7 @@
   "name": "Network effect",
   "category": "effects-system",
   "fixture": "effects-project",
-  "prompt": "Add a public function called FetchUrl to Effects.calr that simulates a network request. It takes str parameter url and returns str. The function must declare the network read effect.\n\nUse this exact Calor network effect syntax:\n§F{f001:FetchUrl:pub}\n  §I{str:url}\n  §O{str}\n  §E{net:r}\n  §B{result} \"Response from: \"\n  §R (+ result url)\n§/F{f001}\n\nThe §E{net:r} declares the network read effect:\n- net:r = network read access (GET requests)\n- net:w = network write access (POST/PUT requests)\n- net:rw = network read/write access\n\nNote: This is a stub implementation. In real code, you would use HttpClient, but the important part is correctly declaring the effect.",
+  "prompt": "Add a public function called FetchUrl to Effects.calr that simulates a network request. It takes a string parameter url and returns a string. For this test, just return a concatenation of \"Response from: \" and the url. Since the function conceptually performs network reads, declare the network read effect.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

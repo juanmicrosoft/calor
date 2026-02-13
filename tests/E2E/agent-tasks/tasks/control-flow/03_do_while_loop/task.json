@@ -3,7 +3,7 @@
   "name": "Do-while loop",
   "category": "control-flow",
   "fixture": "effects-project",
-  "prompt": "Add a public function called DoWhileDemo to Effects.calr that demonstrates a do-while loop. The function takes no parameters and returns void. It should print at least once before checking the condition.\n\nUse this exact Calor do-while syntax:\n§F{f001:DoWhileDemo:pub}\n  §O{void}\n  §E{cw}\n  §B{x} 0\n  §DO{d001}\n    §C{Console.WriteLine}\n      §A x\n    §/C\n    §ASSIGN x (+ x 1)\n  §/DO{d001} (< x 3)\n§/F{f001}\n\nThe §DO{id}...§/DO{id} (condition) syntax creates a do-while loop where:\n- id is a unique loop identifier (d001)\n- The body executes at least once\n- condition is checked at the end",
+  "prompt": "Add a public function called DoWhileDemo to Effects.calr that demonstrates a do-while loop. Start with a variable x = 0, print it, increment by 1, and continue while x < 3. The body should execute at least once before checking the condition. The function takes no parameters and returns void. Declare the console write effect.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

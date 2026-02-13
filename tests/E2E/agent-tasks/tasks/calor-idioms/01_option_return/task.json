@@ -3,7 +3,7 @@
   "name": "Implement Clamp function with contracts",
   "category": "calor-idioms",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called Clamp to Calculator.calr that clamps a value between min and max. It takes i32 parameters min, max, and value. Returns i32. The result should be min if value < min, max if value > max, otherwise value. Use function ID f003.\n\nUse this exact pattern:\n§F{f003:Clamp:pub}\n  §I{i32:min}\n  §I{i32:max}\n  §I{i32:value}\n  §O{i32}\n  §Q (<= min max)\n  §S (>= result min)\n  §S (<= result max)\n  §R (? (< value min) min (? (> value max) max value))\n§/F{f003}\n\nThe precondition ensures min <= max, and postconditions ensure result is within [min, max].",
+  "prompt": "Add a new public function called Clamp to Calculator.calr that clamps a value between min and max. It takes three integer parameters: min, max, and value. Returns an integer. The result should be min if value < min, max if value > max, otherwise value. Add a precondition requiring min <= max, and postconditions ensuring the result is between min and max (inclusive).",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

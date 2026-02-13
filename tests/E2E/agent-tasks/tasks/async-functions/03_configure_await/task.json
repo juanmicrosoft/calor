@@ -3,7 +3,7 @@
   "name": "ConfigureAwait false",
   "category": "async-functions",
   "fixture": "async-project",
-  "prompt": "Add a public async function called BackgroundProcessAsync to AsyncOps.calr that uses ConfigureAwait(false) for better performance in library code. It returns Task<i32>.\n\nUse this exact Calor ConfigureAwait syntax:\n§AF{f001:BackgroundProcessAsync:pub}\n  §O{Task<i32>}\n  §E{net:r}\n  §B{result} §AWAIT{false} §C{SlowOperationAsync}§/C\n  §R result\n§/AF{f001}\n\nThe §AWAIT{false} syntax specifies ConfigureAwait:\n- §AWAIT{false} = ConfigureAwait(false), doesn't capture context\n- §AWAIT{true} or §AWAIT = ConfigureAwait(true), captures context\n- Use false in library code for better performance",
+  "prompt": "Add a public async function called BackgroundProcessAsync to AsyncOps.calr that calls SlowOperationAsync with ConfigureAwait(false) for better performance in library code. Return the awaited result as Task<int>. Declare the network read effect.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

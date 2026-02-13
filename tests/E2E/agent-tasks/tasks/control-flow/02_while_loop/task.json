@@ -3,7 +3,7 @@
   "name": "While loop countdown",
   "category": "control-flow",
   "fixture": "effects-project",
-  "prompt": "Add a public function called Countdown to Effects.calr that counts down from 5 to 1 using a while loop. The function takes no parameters and returns void. It needs the console write effect.\n\nUse this exact Calor while-loop syntax:\n§F{f001:Countdown:pub}\n  §O{void}\n  §E{cw}\n  §B{count} 5\n  §WH{w001} (> count 0)\n    §C{Console.WriteLine}\n      §A count\n    §/C\n    §ASSIGN count (- count 1)\n  §/WH{w001}\n§/F{f001}\n\nThe §WH{id} (condition) syntax creates a while loop where:\n- id is a unique loop identifier (w001)\n- condition is evaluated each iteration\n- §B{name} expr creates a variable binding\n- §ASSIGN name expr assigns a new value",
+  "prompt": "Add a public function called Countdown to Effects.calr that counts down from 5 to 1 using a while loop. Start with a variable initialized to 5, print it, decrement, and continue while it's greater than 0. The function takes no parameters and returns void. Declare the console write effect.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

@@ -3,7 +3,7 @@
   "name": "Nested conditionals",
   "category": "control-flow",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called GradeToLetter to Calculator.calr that converts a numeric grade (0-100) to a letter grade category. It takes i32 parameter grade and returns i32 (4 for A: 90+, 3 for B: 80-89, 2 for C: 70-79, 1 for D: 60-69, 0 for F: below 60).\n\nUse nested if statements with unique IDs:\n§F{f003:GradeToLetter:pub}\n  §I{i32:grade}\n  §O{i32}\n  §Q (>= grade 0)\n  §Q (<= grade 100)\n  §IF{if001} (>= grade 90)\n    §R 4\n  §EL\n    §IF{if002} (>= grade 80)\n      §R 3\n    §EL\n      §IF{if003} (>= grade 70)\n        §R 2\n      §EL\n        §IF{if004} (>= grade 60)\n          §R 1\n        §EL\n          §R 0\n        §/I{if004}\n      §/I{if003}\n    §/I{if002}\n  §/I{if001}\n§/F{f003}\n\nNote: Each nested if block must have a unique ID (if001, if002, etc.). §EL (else) does not take an ID.",
+  "prompt": "Add a public function called GradeToLetter to Calculator.calr that converts a numeric grade (0-100) to a letter grade category. It takes an integer parameter grade and returns an integer: 4 for A (90+), 3 for B (80-89), 2 for C (70-79), 1 for D (60-69), 0 for F (below 60). Add preconditions requiring grade >= 0 and grade <= 100. Use nested conditionals to check each grade range.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

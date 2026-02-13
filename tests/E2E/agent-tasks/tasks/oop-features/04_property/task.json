@@ -3,7 +3,7 @@
   "name": "Property with getter/setter",
   "category": "oop-features",
   "fixture": "oop-project",
-  "prompt": "Add a public class called Product to Domain.calr with a public property called Price of type i32.\n\nUse this exact Calor property syntax:\n§CL{c001:Product:pub}\n  §PROP{Price:i32:pub}\n§/CL{c001}\n\nThe §PROP{name:type:visibility} syntax defines an auto-property:\n- name is the property name\n- type is the property type\n- visibility is pub/priv/prot\n- Auto-properties have default getter and setter",
+  "prompt": "Add a public class called Product to Domain.calr with a public auto-property called Price of type integer.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

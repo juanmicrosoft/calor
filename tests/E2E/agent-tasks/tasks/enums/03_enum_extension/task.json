@@ -3,7 +3,7 @@
   "name": "Enum extension",
   "category": "enums",
   "fixture": "enums-project",
-  "prompt": "Add a public enum called Priority to Enums.calr, and then add an extension method IsUrgent that checks if the priority is High or Critical.\n\nUse this exact Calor enum extension syntax:\n§EN{e001:Priority:pub}\n  Low\n  Medium\n  High\n  Critical\n§/EN{e001}\n\n§EEXT{x001:Priority:pub}\n  §MT{m001:IsUrgent:pub}\n    §O{bool}\n    §R (or (== this Priority.High) (== this Priority.Critical))\n  §/MT{m001}\n§/EEXT{x001}\n\nThe §EEXT{id:enumName:visibility} syntax creates enum extensions:\n- id is the extension identifier\n- enumName is the enum being extended\n- 'this' refers to the enum value being extended\n- Enables adding methods to enums",
+  "prompt": "Add a public enum called Priority to Enums.calr with values Low, Medium, High, and Critical. Then add an enum extension with a public method IsUrgent that returns true if the priority is High or Critical.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

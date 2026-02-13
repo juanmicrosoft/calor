@@ -3,7 +3,7 @@
   "name": "Option None return",
   "category": "type-system",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called GetNothing to Calculator.calr that always returns None. It takes no parameters and returns Option<i32>.\n\nUse this exact Calor Option None return syntax:\n§F{f003:GetNothing:pub}\n  §O{Option<i32>}\n  §R §NN\n§/F{f003}\n\nThe Option type syntax:\n- §R §NN - returns None\n- §NN represents the absence of a value\n- Safer alternative to null in C#",
+  "prompt": "Add a public function called GetNothing to Calculator.calr that always returns None. Takes no parameters and returns Option<int>.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

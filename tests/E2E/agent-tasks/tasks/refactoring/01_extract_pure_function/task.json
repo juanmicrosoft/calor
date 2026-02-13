@@ -3,7 +3,7 @@
   "name": "Extract pure function from impure",
   "category": "refactoring",
   "fixture": "refactoring-impure",
-  "prompt": "The LogAndDouble function in Impure.calr mixes pure computation with logging. Refactor it by extracting the pure computation into a separate function called DoubleValue that has no effects, while keeping LogAndDouble to do the logging and call the pure function.\n\nAfter refactoring, you should have:\n1. DoubleValue - a pure function (no §E{} declaration) that just returns (* x 2)\n2. LogAndDouble - keeps the §E{cw} effect, logs, and calls DoubleValue\n\nExpected result:\n§F{f001:DoubleValue:pub}\n  §I{i32:x}\n  §O{i32}\n  §R (* x 2)\n§/F{f001}\n\n§F{f002:LogAndDouble:pub}\n  §I{i32:x}\n  §O{i32}\n  §E{cw}\n  §C{Console.WriteLine}\n    §A x\n  §/C\n  §R §C{DoubleValue}\n    §A x\n  §/C\n§/F{f002}\n\nThis demonstrates Calor's effect system helping identify and isolate pure computations.",
+  "prompt": "The LogAndDouble function in Impure.calr mixes pure computation with logging. Refactor it by extracting the pure computation into a separate function called DoubleValue that has no effects (just returns x * 2), while keeping LogAndDouble to do the logging and call DoubleValue. This demonstrates separating pure and impure code.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

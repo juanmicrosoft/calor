@@ -1,3 +1,17 @@
 §M{m001:Collections}
 
+§F{f001:SumList:pub}
+  §O{i32}
+  §LIST{numbers:i32}
+  §/LIST{numbers}
+  §PUSH{numbers} 10
+  §PUSH{numbers} 20
+  §PUSH{numbers} 30
+  §B{~sum} 0
+  §EACH{e1:n} numbers
+    §B{~sum} (+ sum n)
+  §/EACH{e1}
+  §R sum
+§/F{f001}
+
 §/M{m001}

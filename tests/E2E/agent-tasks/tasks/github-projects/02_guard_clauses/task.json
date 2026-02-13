@@ -3,7 +3,7 @@
   "name": "Add InRange function with boundary contracts",
   "category": "advanced",
   "fixture": "advanced-calor-project",
-  "prompt": "Add a new public function called InRange to MathUtils.calr that takes three i32 parameters (value, min, max) and returns bool. Add a precondition requiring min <= max. Add a postcondition that captures the semantics: result == true if and only if value >= min AND value <= max. Use function ID f004.",
+  "prompt": "Add a public function called InRange to MathUtils.calr that takes three integer parameters (value, min, max) and returns a boolean. Add a precondition requiring min <= max. Add a postcondition expressing that result is true if and only if value is in the range [min, max].",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": {

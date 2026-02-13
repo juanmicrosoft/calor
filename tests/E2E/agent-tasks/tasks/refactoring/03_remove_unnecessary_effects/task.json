@@ -3,7 +3,7 @@
   "name": "Remove unnecessary effects",
   "category": "refactoring",
   "fixture": "refactoring-impure",
-  "prompt": "Look at the ComputeWithLogging function in Impure.calr. It logs and computes. Your task: create a new pure function called JustCompute that does only the computation (add a and b) WITHOUT any effects.\n\nCreate this pure function:\n§F{f004:JustCompute:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n§/F{f004}\n\nNotice: NO §E{} line! This function is pure - it only computes with no side effects. Calor makes purity explicit by requiring effect declarations only when effects are used.",
+  "prompt": "Create a new pure function called JustCompute in Impure.calr that takes two integer parameters (a and b) and returns their sum. The function should have NO effects - it is a pure computation with no side effects.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

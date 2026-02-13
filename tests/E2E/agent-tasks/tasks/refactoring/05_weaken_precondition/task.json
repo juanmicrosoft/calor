@@ -3,7 +3,7 @@
   "name": "Weaken precondition",
   "category": "refactoring",
   "fixture": "basic-calor-project",
-  "prompt": "Add a function called SafeMultiply to Calculator.calr that multiplies two numbers. Instead of restricting inputs to positive numbers, weaken the precondition to accept any integers but add a postcondition about the sign of the result.\n\nCreate with weakened (more general) precondition:\n§F{f003:SafeMultiply:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §S (-> (and (> a 0) (> b 0)) (> result 0))\n  §S (-> (and (< a 0) (< b 0)) (> result 0))\n  §R (* a b)\n§/F{f003}\n\nNotice: NO precondition (§Q)! The function accepts any integers. The postconditions describe the output based on input properties. Weaker preconditions make functions more reusable.",
+  "prompt": "Add a function called SafeMultiply to Calculator.calr that multiplies two integers (a and b). Do NOT add preconditions (accept any integers). Add postconditions using implication: if both inputs are positive then result is positive, if both are negative then result is positive. Weaker preconditions make functions more reusable.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

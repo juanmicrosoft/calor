@@ -3,7 +3,7 @@
   "name": "Inline arrow lambda",
   "category": "lambdas-delegates",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called ApplyDouble to Calculator.calr that takes an i32 parameter and applies a doubling lambda to it. Use inline arrow lambda syntax.\n\nUse this exact Calor inline lambda syntax:\n§F{f003:ApplyDouble:pub}\n  §I{i32:x}\n  §O{i32}\n  §B{doubler} (n) → (* n 2)\n  §R §C{doubler}\n    §A x\n  §/C\n§/F{f003}\n\nThe (param) → expr syntax creates an inline lambda:\n- (n) → (* n 2) is a lambda that doubles its input\n- Multiple params: (a, b) → (+ a b)\n- Can be bound to a variable and called later",
+  "prompt": "Add a public function called ApplyDouble to Calculator.calr that takes an integer x, creates an inline lambda that doubles its input, binds it to a variable, calls the lambda with x, and returns the result.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

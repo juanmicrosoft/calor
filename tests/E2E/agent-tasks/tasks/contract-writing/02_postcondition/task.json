@@ -3,7 +3,7 @@
   "name": "Add postcondition with ENS",
   "category": "contract-writing",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called Abs to Calculator.calr that takes an i32 parameter x and returns i32. Add a postcondition (using section S) ensuring result >= 0. Implement it correctly: if x < 0 return -x, otherwise return x. Use the ternary operator (? condition true-expr false-expr). Use function ID f003.",
+  "prompt": "Add a new public function called Abs to Calculator.calr that takes an integer parameter x and returns its absolute value. Add a postcondition ensuring the result is >= 0. Implement it correctly: return the negation of x if x is negative, otherwise return x.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": {

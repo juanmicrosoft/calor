@@ -3,7 +3,7 @@
   "name": "Field declaration",
   "category": "oop-features",
   "fixture": "oop-project",
-  "prompt": "Add a public class called Counter to Domain.calr with a private field called _count of type i32.\n\nUse this exact Calor field syntax:\n§CL{c001:Counter:pub}\n  §FLD{i32:_count:priv}\n§/CL{c001}\n\nThe §FLD{type:name:visibility} syntax defines a field:\n- type is the field type\n- name is the field name (private fields often start with _)\n- visibility is pub/priv/prot\n- Fields are direct storage, unlike properties",
+  "prompt": "Add a public class called Counter to Domain.calr with a private integer field called _count.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

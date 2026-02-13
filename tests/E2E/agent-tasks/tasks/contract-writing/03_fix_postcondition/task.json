@@ -3,7 +3,7 @@
   "name": "Fix failing postcondition (Abs function)",
   "category": "contract-writing",
   "fixture": "buggy-contracts",
-  "prompt": "The Abs function in BuggyContracts.calr has a postcondition bug. The postcondition says (> result 0) but this fails when x is 0 (since Abs(0) = 0, which is NOT > 0). Fix the postcondition to use >= instead of >. Change the line '§S (> result 0)' to '§S (>= result 0)'.",
+  "prompt": "The Abs function in BuggyContracts.calr has a postcondition bug. The postcondition incorrectly requires result > 0, but this fails when x is 0 (since Abs(0) = 0, which is NOT > 0). Fix the postcondition to require result >= 0 instead.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": {

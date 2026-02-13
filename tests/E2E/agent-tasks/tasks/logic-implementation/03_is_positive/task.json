@@ -3,7 +3,7 @@
   "name": "Implement IsPositive with postcondition",
   "category": "logic-implementation",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called IsPositive to Calculator.calr that takes an i32 parameter x and returns bool. Add a postcondition: (or (and (> x 0) (== result true)) (and (<= x 0) (== result false))). This ensures the result correctly reflects whether x > 0. Implementation: return true if x > 0, false otherwise. Use function ID f003.",
+  "prompt": "Add a public function called IsPositive to Calculator.calr that takes an integer x and returns a boolean. Return true if x > 0, false otherwise. Add a postcondition ensuring the result correctly reflects whether x is positive (result is true if and only if x > 0).",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": {

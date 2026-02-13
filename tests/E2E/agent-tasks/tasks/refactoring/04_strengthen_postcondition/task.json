@@ -3,7 +3,7 @@
   "name": "Strengthen postcondition",
   "category": "refactoring",
   "fixture": "basic-calor-project",
-  "prompt": "Add a function called AbsoluteValue to Calculator.calr that computes the absolute value of a number. Add a postcondition that the result is always >= 0, AND that if x was positive, result equals x.\n\nCreate with strengthened postconditions:\n§F{f003:AbsoluteValue:pub}\n  §I{i32:x}\n  §O{i32}\n  §S (>= result 0)\n  §S (-> (>= x 0) (== result x))\n  §S (-> (< x 0) (== result (- 0 x)))\n  §R (? (< x 0) (- 0 x) x)\n§/F{f003}\n\nMultiple postconditions strengthen the contract:\n1. result >= 0 (always non-negative)\n2. if x >= 0 then result == x\n3. if x < 0 then result == -x\n\nStronger contracts provide more guarantees to callers.",
+  "prompt": "Add a function called AbsoluteValue to Calculator.calr that computes the absolute value of an integer x. Add multiple postconditions: result >= 0, if x >= 0 then result == x, if x < 0 then result == -x. These strengthened postconditions fully specify the behavior.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

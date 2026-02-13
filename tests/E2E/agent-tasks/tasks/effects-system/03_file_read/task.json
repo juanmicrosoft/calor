@@ -3,7 +3,7 @@
   "name": "File read effect",
   "category": "effects-system",
   "fixture": "effects-project",
-  "prompt": "Add a public function called ReadFile to Effects.calr that reads content from a file and returns it. It takes str parameter path and returns str. The function must declare the file system read effect.\n\nUse this exact Calor file read syntax:\n§F{f001:ReadFile:pub}\n  §I{str:path}\n  §O{str}\n  §E{fs:r}\n  §B{content} §C{File.ReadAllText}\n    §A path\n  §/C\n  §R content\n§/F{f001}\n\nThe §E{fs:r} declares the file system read effect:\n- fs:r = file system read access\n- Required for File.ReadAllText, File.ReadAllLines, etc.\n- Separate from write effect for fine-grained control",
+  "prompt": "Add a public function called ReadFile to Effects.calr that reads content from a file using File.ReadAllText and returns it as a string. It takes a string parameter path. Since the function reads from the file system, declare the file read effect.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

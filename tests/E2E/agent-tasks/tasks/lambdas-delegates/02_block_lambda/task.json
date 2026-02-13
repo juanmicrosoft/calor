@@ -3,7 +3,7 @@
   "name": "Block lambda",
   "category": "lambdas-delegates",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called ApplyComplex to Calculator.calr that uses a block lambda with multiple statements. The lambda should take an i32, check if it's positive, and return doubled value or 0.\n\nUse this exact Calor block lambda syntax:\n§F{f003:ApplyComplex:pub}\n  §I{i32:x}\n  §O{i32}\n  §LAM{l001:n:i32}\n    §IF{if001} (> n 0)\n      §R (* n 2)\n    §EL{if001}\n      §R 0\n    §/I{if001}\n  §/LAM{l001}\n  §R §C{l001}\n    §A x\n  §/C\n§/F{f003}\n\nThe §LAM{id:param:type}...§/LAM{id} syntax creates a block lambda:\n- id is the lambda identifier (used to call it)\n- param is the parameter name\n- type is the parameter type\n- Can contain multiple statements",
+  "prompt": "Add a public function called ApplyComplex to Calculator.calr that uses a block lambda with multiple statements. The lambda takes an integer, checks if it's positive (return doubled value) or not (return 0). Apply the lambda to parameter x and return the result.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

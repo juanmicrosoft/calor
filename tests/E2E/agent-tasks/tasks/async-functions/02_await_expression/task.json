@@ -3,7 +3,7 @@
   "name": "Await expression",
   "category": "async-functions",
   "fixture": "async-project",
-  "prompt": "Add a public async function called ProcessAsync to AsyncOps.calr that calls another async method and awaits the result. It takes no parameters and returns Task<i32>.\n\nUse this exact Calor await syntax:\n§AF{f001:ProcessAsync:pub}\n  §O{Task<i32>}\n  §E{net:r}\n  §B{data} §AWAIT §C{FetchDataAsync}§/C\n  §R (* data 2)\n§/AF{f001}\n\nThe §AWAIT expr syntax awaits an async expression:\n- §AWAIT goes before the async call\n- The result is unwrapped from the Task\n- Must be used inside an async function (§AF)",
+  "prompt": "Add a public async function called ProcessAsync to AsyncOps.calr that calls FetchDataAsync, awaits the result, doubles it, and returns that value. Returns Task<int>. Declare the network read effect since the function involves async network operations.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

@@ -3,7 +3,7 @@
   "name": "String length/upper/lower",
   "category": "string-operations",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called StringLength to Calculator.calr that returns the length of a string. It takes str parameter s and returns i32.\n\nUse this exact Calor string operation syntax:\n§F{f003:StringLength:pub}\n  §I{str:s}\n  §O{i32}\n  §R (len s)\n§/F{f003}\n\nThe string operation functions:\n- (len s) - returns the length of string s\n- (upper s) - converts to uppercase\n- (lower s) - converts to lowercase\n- These are built-in Calor functions for string manipulation",
+  "prompt": "Add a public function called StringLength to Calculator.calr that returns the length of a string. Takes a string parameter s and returns an integer. Use the built-in string length function.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

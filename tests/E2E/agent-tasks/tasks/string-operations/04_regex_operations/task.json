@@ -3,7 +3,7 @@
   "name": "Regex operations",
   "category": "string-operations",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called IsValidEmail to Calculator.calr that checks if a string matches a simple email pattern. It takes str parameter email and returns bool.\n\nUse this exact Calor regex operation syntax:\n§F{f003:IsValidEmail:pub}\n  §I{str:email}\n  §O{bool}\n  §R (regex-test email \"@\")\n§/F{f003}\n\nThe regex operations:\n- (regex-test s pattern) - returns true if s matches the regex pattern\n- (regex-match s pattern) - returns the first match or null\n- (regex-replace s pattern replacement) - replaces matches",
+  "prompt": "Add a public function called IsValidEmail to Calculator.calr that checks if a string contains an @ symbol using regex. Takes a string parameter email and returns a boolean. Use the built-in regex-test function with the pattern \"@\".",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

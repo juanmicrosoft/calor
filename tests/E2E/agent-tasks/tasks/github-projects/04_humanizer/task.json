@@ -3,7 +3,7 @@
   "name": "Add DivMod function with division contracts",
   "category": "advanced",
   "fixture": "advanced-calor-project",
-  "prompt": "Add two new public functions to MathUtils.calr: (1) SafeDiv that takes i32 a and i32 b, has precondition b != 0, and returns a / b. (2) SafeMod that takes i32 a and i32 b, has precondition b != 0, and returns a % b (modulo). Both should have postconditions relating input to output. Use function IDs f004 and f005.",
+  "prompt": "Add two public functions to MathUtils.calr: (1) SafeDiv that takes integers a and b with precondition b != 0 and returns a / b. (2) SafeMod that takes integers a and b with precondition b != 0 and returns a modulo b. Add appropriate postconditions relating result to inputs.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": {

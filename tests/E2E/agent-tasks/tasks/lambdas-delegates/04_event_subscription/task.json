@@ -3,7 +3,7 @@
   "name": "Event subscription",
   "category": "lambdas-delegates",
   "fixture": "oop-project",
-  "prompt": "Add a public class called EventPublisher to Domain.calr with an event and a method to subscribe a handler to it.\n\nUse this exact Calor event subscription syntax:\n§CL{c001:EventPublisher:pub}\n  §EVT{OnDataReceived:EventHandler:pub}\n  §MT{m001:Subscribe:pub}\n    §I{EventHandler:handler}\n    §O{void}\n    §SUB OnDataReceived handler\n  §/MT{m001}\n§/CL{c001}\n\nThe event syntax:\n- §EVT{name:type:visibility} declares an event\n- §SUB eventName handler subscribes a handler to an event\n- Events use delegates for handler types",
+  "prompt": "Add a public class called EventPublisher to Domain.calr with a public event called OnDataReceived of type EventHandler. Add a public method Subscribe that takes an EventHandler parameter and subscribes it to the event.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

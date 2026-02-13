@@ -3,7 +3,7 @@
   "name": "Result Ok/Err matching",
   "category": "pattern-matching",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called HandleResult to Calculator.calr that processes a Result<i32, str> and returns the value or -1 on error. It takes Result<i32,str> parameter res and returns i32.\n\nUse this exact Calor Result matching syntax:\n§F{f003:HandleResult:pub}\n  §I{Result<i32,str>:res}\n  §O{i32}\n  §R §W{w001} res\n    §K §OK §VAR{v} → v\n    §K §ERR §VAR{e} → (- 0 1)\n  §/W{w001}\n§/F{f003}\n\nThe Result pattern matching syntax:\n- §OK §VAR{v} matches Ok and binds the success value to v\n- §ERR §VAR{e} matches Err and binds the error value to e\n- Use these with §K in a switch expression\n- §R §W{...} returns the result of the switch expression",
+  "prompt": "Add a public function called HandleResult to Calculator.calr that processes a Result<int, string> and returns the value or -1 on error. Takes Result<int,string> parameter res and returns an integer. Use a switch expression to pattern match: if it's Ok, return the inner value; if it's Err, return -1.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

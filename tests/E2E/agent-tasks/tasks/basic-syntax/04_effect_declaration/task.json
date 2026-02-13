@@ -3,7 +3,7 @@
   "name": "Add function with effect declaration",
   "category": "basic-syntax",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called PrintNumber to Calculator.calr that prints an i32 parameter x to the console and returns void. Use the exact syntax from CLAUDE.md for effects. The function should: (1) have §O{void} return type, (2) have §E{cw} effect declaration for console write, (3) use §C{Console.WriteLine} with §A x to print. Use function ID f003. Here's the exact pattern:\n\n§F{f003:PrintNumber:pub}\n  §I{i32:x}\n  §O{void}\n  §E{cw}\n  §C{Console.WriteLine}\n    §A x\n  §/C\n§/F{f003}",
+  "prompt": "Add a new public function called PrintNumber to Calculator.calr that takes an integer parameter x, prints it to the console, and returns void. The function performs console output, so it must declare the appropriate effect.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

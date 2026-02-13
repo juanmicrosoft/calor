@@ -3,7 +3,7 @@
   "name": "Loop with conditional",
   "category": "control-flow",
   "fixture": "effects-project",
-  "prompt": "Add a public function called PrintEvenNumbers to Effects.calr that prints only even numbers from 1 to 10 using a for loop with an if condition inside. The function takes no parameters and returns void.\n\nUse this pattern combining loop and conditional:\n§F{f001:PrintEvenNumbers:pub}\n  §O{void}\n  §E{cw}\n  §L{l001:i:1:10:1}\n    §IF{if001} (== (% i 2) 0)\n      §C{Console.WriteLine}\n        §A i\n      §/C\n    §/I{if001}\n  §/L{l001}\n§/F{f001}\n\nThis combines a for loop with an if statement to filter which iterations produce output.",
+  "prompt": "Add a public function called PrintEvenNumbers to Effects.calr that prints only even numbers from 1 to 10. Use a for loop and inside it check if the number is even (divisible by 2) before printing. The function takes no parameters and returns void. Declare the console write effect.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

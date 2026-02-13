@@ -3,7 +3,7 @@
   "name": "Multiple combined effects",
   "category": "effects-system",
   "fixture": "effects-project",
-  "prompt": "Add a public function called LogToFileAndConsole to Effects.calr that writes a message to both a file and the console. It takes str parameters path and message and returns void. The function must declare multiple effects.\n\nUse this exact Calor multiple effects syntax:\n§F{f001:LogToFileAndConsole:pub}\n  §I{str:path}\n  §I{str:message}\n  §O{void}\n  §E{cw,fs:w}\n  §C{Console.WriteLine}\n    §A message\n  §/C\n  §C{File.AppendAllText}\n    §A path\n    §A message\n  §/C\n§/F{f001}\n\nThe §E{effect1,effect2,...} syntax declares multiple effects:\n- Separate effects with commas\n- Examples: §E{cw,fs:w} §E{db:rw,cw,net:r}\n- All declared effects must be used, no extras allowed",
+  "prompt": "Add a public function called LogToFileAndConsole to Effects.calr that writes a message to both a file and the console. It takes string parameters path and message, and returns void. Use Console.WriteLine to print the message and File.AppendAllText to append it to the file. Since the function has multiple side effects, declare both the console write effect and the file write effect.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

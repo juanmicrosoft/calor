@@ -3,7 +3,7 @@
   "name": "Result Err return",
   "category": "type-system",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called AlwaysFail to Calculator.calr that always returns an error Result. It takes no parameters and returns Result<i32,str>.\n\nUse this exact Calor Result Err return syntax:\n§F{f003:AlwaysFail:pub}\n  §O{Result<i32,str>}\n  §R §ERR \"Operation not supported\"\n§/F{f003}\n\nThe Result type syntax:\n- §R §ERR message - returns Err(message)\n- §ERR wraps an error value\n- Use for explicit error handling without exceptions",
+  "prompt": "Add a public function called AlwaysFail to Calculator.calr that always returns an error Result. Takes no parameters, returns Result<int, string>. Return Err with message \"Operation not supported\".",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

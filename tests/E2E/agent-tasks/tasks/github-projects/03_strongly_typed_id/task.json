@@ -3,7 +3,7 @@
   "name": "Add Min function with symmetric contracts",
   "category": "advanced",
   "fixture": "advanced-calor-project",
-  "prompt": "Add a new public function called Min to MathUtils.calr that takes two i32 parameters (a and b) and returns i32. Add postconditions: (1) result <= a, (2) result <= b, (3) result equals either a or b. Implementation should use ternary operator to return a if a <= b, else b. Use function ID f004.",
+  "prompt": "Add a public function called Min to MathUtils.calr that returns the minimum of two integers. Takes parameters a and b, returns integer. Add postconditions: result <= a, result <= b, and result equals either a or b. Return a if a <= b, otherwise b.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": {

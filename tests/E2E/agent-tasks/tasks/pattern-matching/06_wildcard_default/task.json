@@ -3,7 +3,7 @@
   "name": "Wildcard default",
   "category": "pattern-matching",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called IsSingleDigit to Calculator.calr that checks if a number is a single digit (0-9). It takes i32 parameter n and returns bool (true for 0-9, false otherwise).\n\nUse this exact Calor switch with wildcard syntax:\n§F{f003:IsSingleDigit:pub}\n  §I{i32:n}\n  §O{bool}\n  §R §W{w001} n\n    §K 0 → true\n    §K 1 → true\n    §K 2 → true\n    §K 3 → true\n    §K 4 → true\n    §K 5 → true\n    §K 6 → true\n    §K 7 → true\n    §K 8 → true\n    §K 9 → true\n    §K _ → false\n  §/W{w001}\n§/F{f003}\n\nThe §K _ pattern is the wildcard/default case that matches anything not matched by previous patterns. The arrow (→) automatically creates a return for switch expressions.",
+  "prompt": "Add a public function called IsSingleDigit to Calculator.calr that checks if a number is a single digit (0-9). Takes an integer parameter n and returns a boolean. Use a switch expression with literal cases for each digit 0-9 returning true, and a wildcard default case returning false.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

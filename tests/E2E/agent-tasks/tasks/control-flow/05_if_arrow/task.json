@@ -3,7 +3,7 @@
   "name": "If with arrow syntax",
   "category": "control-flow",
   "fixture": "basic-calor-project",
-  "prompt": "Add a public function called Max to Calculator.calr that returns the maximum of two numbers using the arrow if syntax. It takes i32 parameters a and b and returns i32.\n\nUse this exact Calor arrow if syntax:\n§F{f003:Max:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §IF{if001} (>= a b) → §R a\n  §/I{if001}\n  §R b\n§/F{f003}\n\nThe §IF{id} (condition) → statement syntax is a shorthand for single-statement if blocks. If the condition is true, the statement after → is executed. Otherwise, execution continues to the next statement. The §/I{id} closes the if block.",
+  "prompt": "Add a public function called Max to Calculator.calr that returns the maximum of two integers. It takes parameters a and b and returns an integer. If a >= b, return a, otherwise return b.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

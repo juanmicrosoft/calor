@@ -3,7 +3,7 @@
   "name": "Collection count",
   "category": "collections",
   "fixture": "collections-project",
-  "prompt": "Add a public function called GetListLength to Collections.calr that creates a list, adds items, and returns the count. It takes i32 parameter n (number of items to add) and returns i32.\n\nUse this exact Calor count syntax:\n§F{f001:GetListLength:pub}\n  §I{i32:n}\n  §O{i32}\n  §Q (>= n 0)\n  §LIST{items:i32}\n  §/LIST{items}\n  §L{l001:i:1:n:1}\n    §PUSH{items} i\n  §/L{l001}\n  §R §CNT{items}\n§/F{f001}\n\nThe syntax:\n- §LIST{id:type} ... §/LIST{id} creates an empty or initialized list\n- §PUSH{id} value adds to the list dynamically\n- §CNT{collection} returns the count/length of a collection",
+  "prompt": "Add a public function called GetListLength to Collections.calr that creates an empty integer list, loops from 1 to n adding each value to the list, and returns the count. Takes an integer parameter n with a precondition n >= 0, returns an integer.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

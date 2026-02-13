@@ -3,7 +3,7 @@
   "name": "Add simple function with no parameters",
   "category": "basic-syntax",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called GetZero to Calculator.calr that takes no parameters and returns the i32 value 0. Use the Calor syntax with function IDs (e.g., f003 since f001 and f002 exist). Make sure the function compiles correctly.",
+  "prompt": "Add a new public function called GetZero to Calculator.calr that takes no parameters and returns the integer value 0.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

@@ -3,7 +3,7 @@
   "name": "Add contracts to uncontracted code",
   "category": "refactoring",
   "fixture": "refactoring-impure",
-  "prompt": "The NoContractAdd function in Impure.calr has no contracts. Add appropriate preconditions and postconditions to make it a well-specified function.\n\nAdd contracts to NoContractAdd:\n§F{f003:NoContractAdd:pub}\n  §I{i32:x}\n  §I{i32:y}\n  §O{i32}\n  §Q (and (> x (- 0 1000000)) (< x 1000000))\n  §Q (and (> y (- 0 1000000)) (< y 1000000))\n  §S (== result (+ x y))\n  §R (+ x y)\n§/F{f003}\n\nContracts added:\n- Preconditions bound x and y to prevent overflow\n- Postcondition specifies exact relationship between inputs and output\n\nAdding contracts improves documentation and enables verification.",
+  "prompt": "The NoContractAdd function in Impure.calr has no contracts. Add appropriate preconditions bounding x and y to safe ranges (between -1000000 and 1000000 to prevent overflow) and a postcondition ensuring result == x + y. This makes the function well-specified.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

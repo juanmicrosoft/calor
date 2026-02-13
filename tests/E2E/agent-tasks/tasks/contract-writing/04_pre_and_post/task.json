@@ -3,7 +3,7 @@
   "name": "Add both precondition and postcondition to SafeDivide",
   "category": "contract-writing",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called SafeDivide to Calculator.calr that takes two i32 parameters (a and b) and returns i32. Add a precondition (section Q) requiring b != 0 (divisor not zero). Add a postcondition (section S) that result * b == a (only valid for integer division when a is divisible by b, so also add precondition a mod b == 0). Return a / b. Use function ID f003.",
+  "prompt": "Add a new public function called SafeDivide to Calculator.calr that takes two integer parameters (a and b) and returns an integer. Add preconditions requiring b != 0 (divisor not zero) and a mod b == 0 (exact division). Add a postcondition ensuring result * b == a. Return a divided by b.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": {

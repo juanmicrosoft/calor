@@ -3,7 +3,7 @@
   "name": "Async function definition",
   "category": "async-functions",
   "fixture": "async-project",
-  "prompt": "Add a public async function called GetDataAsync to AsyncOps.calr that returns a Task<i32>. The function should return a simple value asynchronously.\n\nUse this exact Calor async function syntax:\n§AF{f001:GetDataAsync:pub}\n  §O{Task<i32>}\n  §R 42\n§/AF{f001}\n\nThe §AF{id:name:visibility} syntax defines an async function:\n- id is a unique function identifier\n- name is the function name (async functions often end in 'Async')\n- The return type should be Task<T>\n- Use §/AF{id} to close the function",
+  "prompt": "Add a public async function called GetDataAsync to AsyncOps.calr that returns a Task<int>. The function should return the value 42 asynchronously.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

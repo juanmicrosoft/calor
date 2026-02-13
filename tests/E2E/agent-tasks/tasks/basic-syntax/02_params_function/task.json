@@ -3,7 +3,7 @@
   "name": "Add function with two i32 parameters",
   "category": "basic-syntax",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called Multiply to Calculator.calr that takes two i32 parameters (a and b) and returns their product (a * b). Use Calor syntax: define inputs with section I, output with section O, and return with section R. Use function ID f003.",
+  "prompt": "Add a new public function called Multiply to Calculator.calr that takes two integer parameters (a and b) and returns their product.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

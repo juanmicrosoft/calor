@@ -3,7 +3,7 @@
   "name": "Constructor",
   "category": "oop-features",
   "fixture": "oop-project",
-  "prompt": "Add a public class called Point to Domain.calr with a constructor that takes x and y coordinates (i32) and stores them in fields.\n\nUse this exact Calor constructor syntax:\n§CL{c001:Point:pub}\n  §FLD{i32:_x:priv}\n  §FLD{i32:_y:priv}\n  §CTOR{pub}\n    §I{i32:x}\n    §I{i32:y}\n    §ASSIGN _x x\n    §ASSIGN _y y\n  §/CTOR\n§/CL{c001}\n\nThe §CTOR{visibility}...§/CTOR syntax defines a constructor:\n- visibility is pub/priv/prot\n- §I{type:name} defines constructor parameters\n- Use §ASSIGN to set field values",
+  "prompt": "Add a public class called Point to Domain.calr with private integer fields _x and _y, and a public constructor that takes x and y parameters and assigns them to the fields.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }

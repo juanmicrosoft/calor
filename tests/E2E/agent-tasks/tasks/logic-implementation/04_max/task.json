@@ -3,7 +3,7 @@
   "name": "Implement Max with postcondition",
   "category": "logic-implementation",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called Max to Calculator.calr that takes two i32 parameters (a and b) and returns i32. Add postconditions: result >= a AND result >= b AND (or (== result a) (== result b)). Implementation: if a >= b return a, else return b. Use ternary operator. Use function ID f003.",
+  "prompt": "Add a public function called Max to Calculator.calr that returns the maximum of two integers. Takes parameters a and b, returns integer. Add postconditions: result >= a, result >= b, and result equals either a or b. Return a if a >= b, otherwise b.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": {

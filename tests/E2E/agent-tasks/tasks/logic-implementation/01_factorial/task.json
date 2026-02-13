@@ -3,7 +3,7 @@
   "name": "Implement simple Factorial",
   "category": "logic-implementation",
   "fixture": "basic-calor-project",
-  "prompt": "Add a new public function called Factorial to Calculator.calr. Since Calor doesn't support recursion or loops in expressions, implement a simplified version that handles small inputs using nested ternary. It takes i32 parameter n (with precondition 0 <= n <= 5) and returns i32. Use function ID f003.\n\nUse this pattern:\n§F{f003:Factorial:pub}\n  §I{i32:n}\n  §O{i32}\n  §Q (>= n 0)\n  §Q (<= n 5)\n  §S (>= result 1)\n  §R (? (<= n 1) 1 (? (== n 2) 2 (? (== n 3) 6 (? (== n 4) 24 120))))\n§/F{f003}\n\nThis returns: 1 for n<=1, 2 for n=2, 6 for n=3, 24 for n=4, 120 for n=5.",
+  "prompt": "Add a public function called Factorial to Calculator.calr. It takes an integer n with preconditions n >= 0 and n <= 5, and returns an integer. Implement using nested conditionals for the small input range: return 1 for n <= 1, 2 for n=2, 6 for n=3, 24 for n=4, 120 for n=5. Add a postcondition ensuring result >= 1.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }
