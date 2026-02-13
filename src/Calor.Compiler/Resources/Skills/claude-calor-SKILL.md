@@ -3,126 +3,184 @@ name: calor
 description: Write Calor code with Lisp-style expressions, contracts, and effects. Use for all new code in Calor-first projects.
 ---
 
-# /calor - Write Calor Code
+# /calor - Calor Language Reference
 
-Calor (Optimized Programming for Agents Language) compiles to C# via .NET.
+Calor compiles to C# via .NET. It combines:
+- **§-tags** for structure (functions, classes, control flow)
+- **Lisp S-expressions** for operations `(+ a b)`, `(== x 0)`
+- **Contracts** for preconditions/postconditions
+- **Effects** for tracking side effects
 
-**Calor syntax:**
-- Use Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
-- Use arrow syntax for conditionals: `§IF{id} condition → action`
-- Use `§P` for print, `§B` for bindings, `§R` for return
+---
 
-## Semantic Guarantees
+## 1. MODULES AND FUNCTIONS
 
-Calor has formal semantics (v1.0.0) that differ from C#. **Do not assume C# behavior.**
-
-| Rule | Calor Behavior | Test |
-|------|----------------|------|
-| Evaluation Order | Strictly left-to-right for all expressions | S1, S2 |
-| Short-Circuit | `&&`/`||` always short-circuit | S3, S4 |
-| Scoping | Lexical with shadowing; inner scope does NOT mutate outer | S5 |
-| Integer Overflow | TRAP by default (throws `OverflowException`) | S7 |
-| Type Coercion | Explicit for narrowing; implicit only for widening | S8 |
-| Contracts | `§Q` before body, `§S` after body | S10 |
-
-See `docs/semantics/core.md` for full specification.
-
-## Structure Tags
-
+### Module
 ```
-§M{id:Name}           Module (namespace)
-§F{id:Name:vis}       Function (pub|pri)
-§I{type:name}         Input parameter
-§O{type}              Output/return type
-§E{effects}           Side effects: cw,cr,fs:r,fs:w,net:rw,db:rw
-§/M{id} §/F{id}       Close tags (ID must match)
+§M{id:Name}                   Module (namespace)
+  ...contents...
+§/M{id}                       Close module
 ```
 
-## Types
-
+### Function
 ```
-i32, i64, f32, f64    Numbers
-u8, u16, u32, u64     Unsigned integers
-str, bool, void       String, boolean, unit
-?T                    Option<T> (nullable)
-T!E                   Result<T,E> (fallible)
-[T]                   Array of T (e.g., [u8], [i32], [str])
-[[T]]                 Nested array (e.g., [[i32]] for int[][])
-
-datetime              DateTime
-datetimeoffset        DateTimeOffset
-timespan              TimeSpan
-date                  DateOnly
-time                  TimeOnly
-guid                  Guid
-
-List<T>               List<T>
-Dict<K,V>             Dictionary<K,V>
-ReadList<T>           IReadOnlyList<T>
-ReadDict<K,V>         IReadOnlyDictionary<K,V>
+§F{id:Name:vis}               Function (vis: pub|pri|prot|int)
+  §I{type:name}               Input parameter
+  §O{type}                    Output/return type
+  §E{effects}                 Side effects
+  §Q condition                Precondition (requires)
+  §S condition                Postcondition (ensures)
+  ...body...
+  §R expr                     Return value
+§/F{id}                       Close function
 ```
 
-### Array Type Examples
-
-```
-[u8]                  byte[]
-[i32]                 int[]
-[str]                 string[]
-[[i32]]               int[][] (jagged array)
-```
-
-### Array Operations
-
-```
-§ARR elem1 elem2 §/ARR    Array literal
-§IDX{array} index         Array access (array[index])
-§IDX{array} §^ n          Index from end (array[^n])
-§LEN array                Array length (array.Length)
+### Template: Basic Function
+```calor
+§M{m001:Calculator}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§/M{m001}
 ```
 
-### Type Casting
-
-```
-§AS{targetType} expr      Safe cast (as operator)
-§CAST{targetType} expr    Explicit cast
-```
-
-## Lisp-Style Expressions
-
-```
-(+ a b)               Add
-(- a b)               Subtract
-(* a b)               Multiply
-(/ a b)               Divide
-(% a b)               Modulo
-(== a b)              Equal
-(!= a b)              Not equal
-(< a b) (> a b)       Less/greater
-(<= a b) (>= a b)     Less-equal/greater-equal
-(&& a b) (|| a b)     Logical and/or
-(! a)                 Logical not
+### Template: Function with Contracts
+```calor
+§F{f001:SafeDivide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §S (>= result 0)
+  §R (/ a b)
+§/F{f001}
 ```
 
-## Statements
+---
 
-```
-§B{name} expr         Bind variable
-§B{type:name} expr    Bind with explicit type
-§R expr               Return value
-§P expr               Print line (Console.WriteLine)
-§Pf expr              Print without newline (Console.Write)
-§ASSIGN target val    Assignment statement
-```
+## 2. TYPES
 
-### Explicit Body Markers
-
+### Primitive Types
 ```
-§BODY                 Start function body (optional)
-...statements...
-§END_BODY             End function body (optional)
+i8, i16, i32, i64             Signed integers
+u8, u16, u32, u64             Unsigned integers
+f32, f64                      Floating point
+str, char, bool, void         String, character, boolean, unit
 ```
 
-## Control Flow
+### Collection Types
+```
+[T]                           Array (e.g., [i32], [str])
+[[T]]                         Nested array (e.g., [[i32]])
+List<T>                       List<T>
+Dict<K,V>                     Dictionary<K,V>
+HashSet<T>                    HashSet<T>
+```
+
+### Optional/Result Types
+```
+?T                            Option<T> (shorthand)
+Option<T>                     Option<T> (explicit)
+T!E                           Result<T,E> (e.g., i32!str)
+```
+
+### DateTime Types
+```
+datetime                      DateTime
+datetimeoffset                DateTimeOffset
+timespan                      TimeSpan
+date                          DateOnly
+time                          TimeOnly
+guid                          Guid
+```
+
+### Async Return Types
+```
+Task<T>                       Async return type
+```
+
+---
+
+## 3. LISP-STYLE EXPRESSIONS
+
+### Arithmetic
+```
+(+ a b)                       Add
+(- a b)                       Subtract
+(* a b)                       Multiply
+(/ a b)                       Divide
+(% a b)                       Modulo
+(** a b)                      Power
+```
+
+### Comparison
+```
+(== a b)                      Equal
+(!= a b)                      Not equal
+(< a b)                       Less than
+(<= a b)                      Less or equal
+(> a b)                       Greater than
+(>= a b)                      Greater or equal
+```
+
+### Logical
+```
+(&& a b)                      Logical AND
+(|| a b)                      Logical OR
+(! a)                         Logical NOT
+```
+
+### Bitwise
+```
+(& a b)                       Bitwise AND
+(| a b)                       Bitwise OR
+(^ a b)                       Bitwise XOR
+(~ a)                         Bitwise NOT
+(<< a n)                      Left shift
+(>> a n)                      Right shift
+```
+
+### Ternary
+```
+(? condition then else)       Conditional expression
+```
+
+---
+
+## 4. STATEMENTS
+
+### Variable Binding
+```
+§B{name} expr                 Bind immutable variable
+§B{type:name} expr            Bind with explicit type
+§B{type:name:mut} expr        Bind mutable variable
+```
+
+### Assignment
+```
+§ASSIGN target value          Assign to mutable variable
+§ASSIGN §THIS.field value     Assign to instance field
+```
+
+### Return
+```
+§R expr                       Return value
+```
+
+### Print/Debug
+```
+§P expr                       Console.WriteLine
+§Pf expr                      Console.Write (no newline)
+§G                            Console.ReadLine
+§D expr                       Debug.WriteLine
+```
+
+---
+
+## 5. CONTROL FLOW
 
 ### For Loop
 ```
@@ -141,25 +199,25 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 ### Do-While Loop
 ```
 §DO{id}
-  ...body (executes at least once)...
+  ...body...
 §/DO{id} condition
 ```
 
-### Break and Continue
+### Break/Continue
 ```
-§BK                       Break out of loop
-§CN                       Continue to next iteration
+§BK                           Break
+§CN                           Continue
 ```
 
-### Conditionals (arrow syntax)
+### If/ElseIf/Else (Arrow Syntax)
 ```
 §IF{id} condition → action
-§EI condition → action        ElseIf
-§EL → action                  Else
+§EI condition → action
+§EL → action
 §/I{id}
 ```
 
-Multi-line form:
+### If/ElseIf/Else (Block Syntax)
 ```
 §IF{id} condition
   ...body...
@@ -170,68 +228,9 @@ Multi-line form:
 §/I{id}
 ```
 
-## Contracts
-
-```
-§Q condition                  Requires (precondition)
-§Q{message="err"} condition   With custom error
-§S condition                  Ensures (postcondition)
-```
-
-## Option/Result
-
-```
-§SM value             Some(value)
-§NN{type=T}           None of type T
-§OK value             Ok(value)
-§ERR "message"        Err(message)
-```
-
-## Calls
-
-```
-§C{Target}
-  §A arg1
-  §A arg2
-§/C
-```
-
-## C# Attributes
-
-Attributes attach inline after structural braces using `[@...]` syntax:
-
-```
-[@AttributeName]              No arguments
-[@Route("api/test")]          Positional argument
-[@JsonProperty(Name="id")]    Named argument
-```
-
-Example with class and method:
-```
-§CL{c001:TestController:ControllerBase}[@Route("api/[controller]")][@ApiController]
-  §MT{m001:Get:pub}[@HttpGet]
-  §/MT{m001}
-§/CL{c001}
-```
-
-## Fields and Properties
-
-```
-§FLD{[u8]:_buffer:priv}       Private byte[] field
-§FLD{i32:_count:priv}         Private int field
-
-§PROP{p001:Buffer:[u8]:pub}   Public byte[] property
-  §GET{pub}
-    §R _buffer
-  §/GET
-§/PROP{p001}
-```
-
-## Template: FizzBuzz
-
+### Template: FizzBuzz
 ```calor
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
+§F{f001:FizzBuzz:pub}
   §O{void}
   §E{cw}
   §L{for1:i:1:100:1}
@@ -242,93 +241,671 @@ Example with class and method:
     §/I{if1}
   §/L{for1}
 §/F{f001}
-§/M{m001}
 ```
 
-## Template: Function with Contracts
+---
 
+## 6. CONTRACTS
+
+### Preconditions and Postconditions
+```
+§Q condition                  Requires (precondition)
+§Q{message="err"} condition   With custom error message
+§S condition                  Ensures (postcondition)
+§S{message="err"} condition   With custom error message
+```
+
+### Quantifiers
+```
+(forall ((var type)) body)    Universal: true for ALL values
+(exists ((var type)) body)    Existential: true for SOME value
+(-> antecedent consequent)    Implication: if A then B
+(implies a b)                 Implication (alias)
+```
+
+Use `arr{i}` to access array element at index `i` in quantifier body.
+
+### Template: Forall Quantifier
 ```calor
-§M{m001:Math}
-  §F{f001:SafeDivide:pub}
+§F{f001:AllPositive:pub}
+  §I{[i32]:arr}
+  §O{bool}
+  §S (-> result (forall ((i i32)) (> arr{i} 0)))
+  §B{bool:allPos} true
+  §L{for1:i:0:(- (len arr) 1):1}
+    §IF{if1} (<= arr{i} 0) → §ASSIGN allPos false
+    §/I{if1}
+  §/L{for1}
+  §R allPos
+§/F{f001}
+```
+
+### Template: Exists Quantifier
+```calor
+§F{f001:HasNegative:pub}
+  §I{[i32]:arr}
+  §O{bool}
+  §S (== result (exists ((i i32)) (< arr{i} 0)))
+  §L{for1:i:0:(- (len arr) 1):1}
+    §IF{if1} (< arr{i} 0) → §R true
+    §/I{if1}
+  §/L{for1}
+  §R false
+§/F{f001}
+```
+
+---
+
+## 7. EFFECTS SYSTEM
+
+Declare side effects using `§E{codes}`:
+
+```
+cw                            Console write
+cr                            Console read
+fs:r                          File system read
+fs:w                          File system write
+net:r                         Network read
+net:w                         Network write
+db:r                          Database read
+db:w                          Database write
+```
+
+Combine with commas: `§E{cw,fs:r,fs:w}`
+
+### Template: File Read
+```calor
+§F{f001:ReadFile:pub}
+  §I{str:path}
+  §O{str}
+  §E{fs:r}
+  §R §C{File.ReadAllText} §A path §/C
+§/F{f001}
+```
+
+### Template: File Write
+```calor
+§F{f001:WriteFile:pub}
+  §I{str:path}
+  §I{str:content}
+  §O{void}
+  §E{fs:w}
+  §C{File.WriteAllText} §A path §A content §/C
+§/F{f001}
+```
+
+### Template: Multiple Effects
+```calor
+§F{f001:ProcessFile:pub}
+  §I{str:inputPath}
+  §I{str:outputPath}
+  §O{void}
+  §E{fs:r,fs:w,cw}
+  §B{str:content} §C{File.ReadAllText} §A inputPath §/C
+  §B{str:processed} §C{content.ToUpper} §/C
+  §C{File.WriteAllText} §A outputPath §A processed §/C
+  §P "File processed"
+§/F{f001}
+```
+
+---
+
+## 8. OPTION AND RESULT TYPES
+
+### Option Constructors
+```
+§SM value                     Some(value)
+§NN                           None (type inferred)
+§NN{type=T}                   None of explicit type
+```
+
+### Result Constructors
+```
+§OK value                     Ok(value)
+§ERR "message"                Err(message)
+§ERR expr                     Err with expression
+```
+
+### Template: Option Some/None
+```calor
+§F{f001:TryDouble:pub}
+  §I{i32:x}
+  §O{Option<i32>}
+  §IF{if1} (> x 0) → §R §SM (* x 2)
+  §EL → §R §NN
+  §/I{if1}
+§/F{f001}
+
+§F{f002:GetNothing:pub}
+  §O{Option<i32>}
+  §R §NN
+§/F{f002}
+```
+
+### Template: Result Ok/Err
+```calor
+§F{f003:SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §S (>= result 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §O{i32!str}
+  §IF{if1} (!= b 0) → §R §OK (/ a b)
+  §EL → §R §ERR "Division by zero"
+  §/I{if1}
+§/F{f003}
+
+§F{f004:TryParse:pub}
+  §I{str:input}
+  §O{i32!str}
+  §R §OK 42
+§/F{f004}
+
+§F{f005:AlwaysFail:pub}
+  §O{i32!str}
+  §R §ERR "This always fails"
+§/F{f005}
 ```
 
-## Template: Class with Array Fields
+---
 
+## 9. FUNCTION CALLS
+
+```
+§C{Target}                    Call function/method
+  §A arg1                     Argument
+  §A arg2
+§/C                           Close call
+```
+
+Inline form: `§C{Target} §A arg §/C`
+
+### Template: Method Call Chain
 ```calor
-§M{m001:DataProcessor}
-  §CL{c001:DataProcessor}
-  §FLD{[u8]:_buffer:priv}
-  §FLD{[i32]:_indices:priv}
+§B{str:upper} §C{input.ToUpper} §/C
+§B{str:trimmed} §C{upper.Trim} §/C
+```
 
-  §PROP{p001:Buffer:[u8]:pub}
-    §GET{pub}
-      §R _buffer
-    §/GET
-  §/PROP{p001}
+---
 
-  §MT{m001:ProcessData:pub}
-    §I{[str]:args}
+## 10. STRING OPERATIONS
+
+### Query Operations (return non-string)
+```
+(len s)                       s.Length → int
+(contains s text)             s.Contains(text) → bool
+(starts s prefix)             s.StartsWith(prefix) → bool
+(ends s suffix)               s.EndsWith(suffix) → bool
+(indexof s substr)            s.IndexOf(substr) → int
+(isempty s)                   string.IsNullOrEmpty(s) → bool
+(isblank s)                   string.IsNullOrWhiteSpace(s) → bool
+(equals s t)                  s.Equals(t) → bool
+```
+
+### Transform Operations (return string)
+```
+(upper s)                     s.ToUpper()
+(lower s)                     s.ToLower()
+(trim s)                      s.Trim()
+(ltrim s)                     s.TrimStart()
+(rtrim s)                     s.TrimEnd()
+(substr s start len)          s.Substring(start, len)
+(substr s start)              s.Substring(start)
+(replace s old new)           s.Replace(old, new)
+(lpad s width)                s.PadLeft(width)
+(rpad s width)                s.PadRight(width)
+```
+
+### Static Operations
+```
+(concat a b c)                string.Concat(a, b, c)
+(join sep items)              string.Join(sep, items)
+(split s delim)               s.Split(delim)
+(fmt template args...)        string.Format(template, args)
+(str x)                       x.ToString()
+```
+
+### Regex Operations
+```
+(regex-test s pattern)        Regex.IsMatch(s, pattern) → bool
+(regex-match s pattern)       Regex.Match(s, pattern) → Match
+(regex-replace s pat rep)     Regex.Replace(s, pat, rep) → string
+(regex-split s pattern)       Regex.Split(s, pattern) → string[]
+```
+
+---
+
+## 11. CHARACTER OPERATIONS
+
+### Extraction
+```
+(char-at s index)             s[index] → char
+(char-code c)                 (int)c → int
+(char-from-code n)            (char)n → char
+```
+
+### Classification (return bool)
+```
+(is-letter c)                 char.IsLetter(c)
+(is-digit c)                  char.IsDigit(c)
+(is-whitespace c)             char.IsWhiteSpace(c)
+(is-upper c)                  char.IsUpper(c)
+(is-lower c)                  char.IsLower(c)
+```
+
+### Transformation (return char)
+```
+(char-upper c)                char.ToUpper(c)
+(char-lower c)                char.ToLower(c)
+```
+
+### Template: String Length
+```calor
+§F{f001:StringLength:pub}
+  §I{str:s}
+  §O{i32}
+  §R (len s)
+§/F{f001}
+```
+
+### Template: Get First Character
+```calor
+§F{f002:GetFirstChar:pub}
+  §I{str:s}
+  §O{char}
+  §Q (> (len s) 0)
+  §R (char-at s 0)
+§/F{f002}
+```
+
+---
+
+## 12. ARRAYS
+
+### Array Creation
+```
+§ARR elem1 elem2 §/ARR        Array literal
+§ARR{name:type:size}          Sized array declaration
+```
+
+### Array Operations
+```
+§IDX{array} index             Array access: array[index]
+§IDX{array} §^ n              Index from end: array[^n]
+§LEN array                    Array length: array.Length
+```
+
+### Template: Array Sum
+```calor
+§F{f001:Sum:pub}
+  §I{[i32]:arr}
+  §O{i32}
+  §B{i32:total} 0
+  §L{for1:i:0:(- (len arr) 1):1}
+    §ASSIGN total (+ total §IDX{arr} i)
+  §/L{for1}
+  §R total
+§/F{f001}
+```
+
+---
+
+## 13. COLLECTIONS
+
+### List
+```
+§LIST{name:type}              Create list
+  value1
+  value2
+§/LIST{name}
+
+§PUSH{list} value             Add to end
+§INS{list} index value        Insert at index
+§SETIDX{list} index value     Set at index
+§REM{list} value              Remove first occurrence
+§CLR{list}                    Clear all
+§CNT{list}                    Count
+§HAS{list} value              Contains check
+```
+
+### Dictionary
+```
+§DICT{name:keyType:valType}   Create dictionary
+  §KV key1 value1
+  §KV key2 value2
+§/DICT{name}
+
+§PUT{dict} key value          Add or update
+§REM{dict} key                Remove by key
+§HAS{dict} key                Contains key
+§CLR{dict}                    Clear all
+```
+
+### HashSet
+```
+§HSET{name:type}              Create hash set
+  value1
+  value2
+§/HSET{name}
+
+§ADD{set} value               Add to set (idiomatic)
+§PUSH{set} value              Add to set (alias)
+§REM{set} value               Remove from set
+§HAS{set} value               Contains check
+§CLR{set}                     Clear all
+```
+
+### Iteration
+```
+§EACH{id:var} collection      Foreach over collection
+  ...body...
+§/EACH{id}
+
+§EACHKV{id:key:val} dict      Foreach over dictionary
+  ...body...
+§/EACHKV{id}
+```
+
+### Template: List Operations
+```calor
+§F{f001:SumList:pub}
+  §O{i32}
+  §LIST{numbers:i32}
+    1
+    2
+    3
+  §/LIST{numbers}
+  §PUSH{numbers} 4
+  §PUSH{numbers} 5
+  §B{i32:total} 0
+  §EACH{e1:n} numbers
+    §ASSIGN total (+ total n)
+  §/EACH{e1}
+  §R total
+§/F{f001}
+```
+
+### Template: HashSet Operations
+```calor
+§F{f001:UniqueCount:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §I{i32:c}
+  §O{i32}
+  §HSET{unique:i32}
+  §/HSET{unique}
+  §ADD{unique} a
+  §ADD{unique} b
+  §ADD{unique} c
+  §R §CNT{unique}
+§/F{f001}
+```
+
+---
+
+## 14. CLASSES
+
+### Class Definition
+```
+§CL{id:Name:modifiers}        Class (modifiers: pub, pri, abs, seal)
+  §FLD{type:name:vis}         Field
+  §PROP{id:Name:type:vis}     Property
+  §CTOR{id:vis}               Constructor
+  §MT{id:Name:vis:mods}       Method (mods: abs, virt, over, seal, stat)
+§/CL{id}
+```
+
+### Inheritance and Interfaces
+```
+§EXT{BaseClass}               Extends base class
+§IMPL{IInterface}             Implements interface
+```
+
+### Template: Simple Class with Method
+```calor
+§CL{c001:Calculator:pub}
+  §MT{m001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
     §O{i32}
-    §R args.Length
+    §R (+ a b)
   §/MT{m001}
 §/CL{c001}
-§/M{m001}
 ```
 
-## Generics
+### Template: Class with Auto-Property
+```calor
+§CL{c002:Product:pub}
+  §PROP{p001:Price:i32:pub}
+    §GET
+    §SET
+  §/PROP{p001}
+§/CL{c002}
+```
+
+### Template: Class with Constructor
+```calor
+§CL{c003:Person:pub}
+  §FLD{str:_name:pri}
+  §FLD{i32:_age:pri}
+
+  §CTOR{ctor001:pub}
+    §I{str:name}
+    §I{i32:age}
+    §ASSIGN §THIS._name name
+    §ASSIGN §THIS._age age
+  §/CTOR{ctor001}
+
+  §MT{m001:GetName:pub}
+    §O{str}
+    §R _name
+  §/MT{m001}
+§/CL{c003}
+```
+
+### Template: Inheritance
+```calor
+§CL{c001:Animal:pub}
+  §FLD{str:_name:pro}
+  §MT{m001:Speak:pub:virt}
+    §O{str}
+    §R "..."
+  §/MT{m001}
+§/CL{c001}
+
+§CL{c002:Dog:pub}
+  §EXT{Animal}
+  §MT{m001:Speak:pub:over}
+    §O{str}
+    §R "Woof!"
+  §/MT{m001}
+§/CL{c002}
+```
+
+---
+
+## 15. INTERFACES
+
+```
+§IFACE{id:Name:vis}           Interface definition
+  §MT{id:MethodName}          Method signature
+    §I{type:param}
+    §O{returnType}
+  §/MT{id}
+§/IFACE{id}
+```
+
+### Template: Interface
+```calor
+§IFACE{i001:IShape:pub}
+  §MT{m001:Area}
+    §O{f64}
+  §/MT{m001}
+  §MT{m002:Perimeter}
+    §O{f64}
+  §/MT{m002}
+§/IFACE{i001}
+```
+
+---
+
+## 16. PROPERTIES
+
+```
+§PROP{id:Name:type:vis}       Property definition
+  §GET                        Getter (expression or block)
+    expr or ...body...
+  §/GET
+  §SET                        Setter
+    ...body...
+  §/SET
+  §INIT                       Init-only setter
+§/PROP{id}
+```
+
+### Template: Property with Getter/Setter
+```calor
+§CL{c001:Product:pub}
+  §FLD{f64:_price:pri}
+
+  §PROP{p001:Price:f64:pub}
+    §GET
+      §R _price
+    §/GET
+    §SET
+      §Q (>= value 0)
+      §ASSIGN _price value
+    §/SET
+  §/PROP{p001}
+§/CL{c001}
+```
+
+---
+
+## 17. CONSTRUCTORS
+
+```
+§CTOR{id:vis}                 Constructor
+  §I{type:param}              Parameters
+  §BASE §A arg §/BASE         Call base constructor
+  §THIS §A arg §/THIS         Call this constructor
+  §ASSIGN target value        Field assignment
+§/CTOR{id}
+```
+
+### Template: Constructor with Base Call
+```calor
+§CL{c001:Manager:pub}
+  §EXT{Employee}
+  §FLD{i32:_teamSize:pri}
+
+  §CTOR{ctor001:pub}
+    §I{str:name}
+    §I{i32:teamSize}
+    §BASE §A name §/BASE
+    §ASSIGN §THIS._teamSize teamSize
+  §/CTOR{ctor001}
+§/CL{c001}
+```
+
+---
+
+## 18. OBJECT CREATION
+
+```
+§NEW{TypeName}                Create instance
+  §A arg1                     Constructor arguments
+  §A arg2
+§/NEW
+```
+
+### Template: Object Creation
+```calor
+§B{Person:person} §NEW{Person} §A "Alice" §A 30 §/NEW
+§B{List<i32>:numbers} §NEW{List<i32>} §/NEW
+```
+
+---
+
+## 19. ENUMS
+
+```
+§EN{id:Name}                  Simple enum
+  Value1
+  Value2 = 5
+  Value3
+§/EN{id}
+
+§EN{id:Name:type}             Enum with underlying type
+  Value1 = 0
+  Value2 = 1
+§/EN{id}
+```
+
+Underlying types: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
+
+### Template: Enum with Explicit Values
+```calor
+§EN{e001:Color}
+  Red = 1
+  Green = 2
+  Blue = 4
+§/EN{e001}
+```
+
+### Enum Extension Methods
+```
+§EEXT{id:EnumName}            Extension methods for enum
+  §F{...}...§/F{...}
+§/EEXT{id}
+```
+
+### Template: Enum with Extension
+```calor
+§EN{e001:Status}
+  Pending
+  Active
+  Completed
+§/EN{e001}
+
+§EEXT{ext001:Status}
+  §F{f001:IsFinished:pub}
+    §I{Status:self}
+    §O{bool}
+    §R (== self Status.Completed)
+  §/F{f001}
+§/EEXT{ext001}
+```
+
+---
+
+## 20. GENERICS
 
 ### Generic Functions and Classes
-
-Type parameters use `<T>` suffix syntax after tag attributes:
-
 ```
-§F{id:Name:pub}<T>            Generic function with one type param
-§F{id:Name:pub}<T, U>         Generic function with two type params
+§F{id:Name:vis}<T>            Generic function
+§F{id:Name:vis}<T, U>         Multiple type parameters
 §CL{id:Name}<T>               Generic class
 §IFACE{id:Name}<T>            Generic interface
 §MT{id:Name:vis}<T>           Generic method
 ```
 
-### Generic Type References
-
-Use angle brackets inline for generic types:
-
+### Type Constraints
 ```
-§I{List<T>:items}             List<T> parameter
-§I{Dictionary<str, T>:lookup} Dictionary parameter
-§O{IEnumerable<T>}            Generic return type
-§FLD{List<T>:_items:pri}      Generic field
-```
-
-### Type Constraints (§WHERE)
-
-```
-§WHERE T : class              Reference type constraint
-§WHERE T : struct             Value type constraint
-§WHERE T : new()              Parameterless constructor
-§WHERE T : IComparable<T>     Interface constraint
-§WHERE T : class, IDisposable Multiple constraints
+§WHERE T : class              Reference type
+§WHERE T : struct             Value type
+§WHERE T : new()              Has parameterless constructor
+§WHERE T : IComparable<T>     Implements interface
+§WHERE T : BaseClass          Inherits from class
 ```
 
 ### Template: Generic Repository
-
 ```calor
-§M{m001:GenericDemo}
 §CL{c001:Repository:pub}<T>
   §WHERE T : class
   §FLD{List<T>:_items:pri}
 
-  §CTOR{ct001:pub}
-    §ASSIGN _items §NEW{List<T>}
-  §/CTOR{ct001}
+  §CTOR{ctor001:pub}
+    §ASSIGN _items §NEW{List<T>} §/NEW
+  §/CTOR{ctor001}
 
   §MT{m001:Add:pub}
     §I{T:item}
@@ -341,398 +918,159 @@ Use angle brackets inline for generic types:
     §R _items
   §/MT{m002}
 §/CL{c001}
-§/M{m001}
 ```
 
-## Interfaces
+---
+
+## 21. ASYNC/AWAIT
 
 ```
-§IFACE{id:Name}           Interface definition
-  §MT{id:MethodName}      Method signature
-    §I{type:param}        Parameters
-    §O{returnType}        Return type
-  §/MT{id}
-§/IFACE{id}
+§AF{id:Name:vis}              Async function (returns Task<T>)
+  §O{T}                       Return type (wrapped in Task automatically)
+  §E{effects}                 Effects (typically net:r)
+§/AF{id}
 
-§IFACE{id:Name}<T>        Generic interface
-  §WHERE T : constraint   Type constraint
-```
+§AMT{id:Name:vis}             Async method in class
+§/AMT{id}
 
-### Template: Interface Definition
-
-```calor
-§M{m001:Shapes}
-§IFACE{i001:IShape}
-  §MT{m001:Area}
-    §O{f64}
-  §/MT{m001}
-  §MT{m002:Perimeter}
-    §O{f64}
-  §/MT{m002}
-§/IFACE{i001}
-§/M{m001}
-```
-
-### Template: Generic Interface
-
-```calor
-§IFACE{i001:IRepository:pub}<T>
-  §WHERE T : class
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{T}
-  §/MT{m001}
-§/IFACE{i001}
-```
-
-## Class Inheritance
-
-```
-§CL{id:Name:modifiers}    Class definition
-  modifiers: abs, seal, pub, pri
-§EXT{BaseClass}           Extends (class inheritance)
-§IMPL{InterfaceName}      Implements (interface)
-```
-
-### Template: Class Inheritance
-
-```calor
-§M{m001:Shapes}
-§CL{c001:Shape:pub abs}
-  §MT{mt001:Area:pub:abs}
-    §O{f64}
-  §/MT{mt001}
-§/CL{c001}
-
-§CL{c002:Circle:pub}
-  §EXT{Shape}
-  §FLD{f64:radius:pri}
-  §MT{mt001:Area:pub:over}
-    §O{f64}
-    §R (* 3.14159 (* radius radius))
-  §/MT{mt001}
-§/CL{c002}
-§/M{m001}
-```
-
-### Template: Interface Implementation
-
-```calor
-§CL{c001:GameObject:pub}
-  §IMPL{IMovable}
-  §IMPL{IDrawable}
-  §MT{mt001:Move:pub}
-    §O{void}
-  §/MT{mt001}
-  §MT{mt002:Draw:pub}
-    §O{void}
-  §/MT{mt002}
-§/CL{c001}
-```
-
-## Constructors
-
-```
-§CTOR{id:visibility}      Constructor
-  §I{type:param}          Parameters
-  §BASE §A arg §/BASE     Call base constructor
-  §THIS §A arg §/THIS     Call this constructor
-  §ASSIGN target value    Field assignment
-§/CTOR{id}
-```
-
-### Template: Constructor with Base Call
-
-```calor
-§M{m001:Animals}
-§CL{c001:Animal:pub}
-  §FLD{str:_name:pro}
-  §CTOR{ctor001:pub}
-    §I{str:name}
-    §ASSIGN §THIS._name name
-  §/CTOR{ctor001}
-§/CL{c001}
-
-§CL{c002:Dog:pub}
-  §EXT{Animal}
-  §FLD{str:_breed:pri}
-  §CTOR{ctor001:pub}
-    §I{str:name}
-    §I{str:breed}
-    §BASE §A name §/BASE
-    §ASSIGN §THIS._breed breed
-  §/CTOR{ctor001}
-§/CL{c002}
-§/M{m001}
-```
-
-## Object Creation
-
-```
-§NEW{TypeName}            Create new instance
-  §A arg1                 Constructor arguments
-  §A arg2
-§/NEW                     (optional closing tag)
-```
-
-### Template: Object Creation
-
-```calor
-§B{Item:item} §NEW{Item} §A 42
-§B{Person:person} §NEW{Person} §A "Alice" §A 30
-```
-
-## THIS and BASE Expressions
-
-```
-§THIS                     Reference to current instance
-§THIS.property            Access member via this
-§BASE                     Reference to base class
-§BASE.method              Access base class member
-§C{base.Method} §/C       Call base class method
-```
-
-### Template: Override with Base Call
-
-```calor
-§CL{c001:Derived:pub}
-  §EXT{Base}
-  §MT{mt001:GetValue:pub:over}
-    §O{i32}
-    §R (+ §C{base.GetValue} §/C 5)
-  §/MT{mt001}
-§/CL{c001}
-```
-
-## Field Assignment
-
-```
-§ASSIGN target value      Assign value to target
-§ASSIGN §THIS.field val   Assign to instance field
-```
-
-## Enums
-
-```
-§EN{id:Name}              Simple enum
-  Red
-  Green
-  Blue
-§/EN{id}
-
-§EN{id:Name:underlyingType}  Enum with underlying type
-  Ok = 200
-  NotFound = 404
-  Error = 500
-§/EN{id}
-```
-
-Underlying types: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
-
-### Template: Status Enum
-
-```calor
-§M{m001:Api}
-§EN{e001:StatusCode}
-  Ok = 200
-  NotFound = 404
-  ServerError = 500
-§/EN{e001}
-§/M{m001}
-```
-
-## Enum Extension Methods
-
-```
-§EEXT{id:EnumName}          Extension methods for enum
-  §F{f001:MethodName:pub}
-    §I{EnumType:self}       First param becomes 'this'
-    §O{returnType}
-    // body
-  §/F{f001}
-§/EEXT{id}
-```
-
-### Template: Color with ToHex Extension
-
-```calor
-§M{m001:Colors}
-§EN{e001:Color}
-  Red
-  Green
-  Blue
-§/EN{e001}
-
-§EEXT{ext001:Color}
-  §F{f001:ToHex:pub}
-    §I{Color:self}
-    §O{str}
-    §W{sw1} self
-      §K Color.Red → §R "#FF0000"
-      §K Color.Green → §R "#00FF00"
-      §K Color.Blue → §R "#0000FF"
-    §/W{sw1}
-  §/F{f001}
-§/EEXT{ext001}
-§/M{m001}
-```
-
-## Async/Await
-
-Async functions and methods use `§AF` and `§AMT` tags:
-
-```
-§AF{id:Name:vis}          Async function (returns Task<T>)
-§/AF{id}                  End async function
-§AMT{id:Name:vis}         Async method (returns Task<T>)
-§/AMT{id}                 End async method
-§AWAIT expr               Await an async operation
-§AWAIT{false} expr        Await with ConfigureAwait(false)
+§AWAIT expr                   Await expression
+§AWAIT{false} expr            Await with ConfigureAwait(false)
 ```
 
 ### Template: Async Function
-
 ```calor
-§M{m001:AsyncDemo}
 §AF{f001:FetchDataAsync:pub}
   §I{str:url}
   §O{str}
+  §E{net:r}
   §B{str:result} §AWAIT §C{client.GetStringAsync} §A url §/C
   §R result
 §/AF{f001}
-§/M{m001}
 ```
 
 ### Template: Async Method in Class
-
 ```calor
 §CL{c001:DataService:pub}
-  §AMT{mt001:ProcessAsync:pub}
+  §AMT{m001:LoadAsync:pub}
     §I{i32:id}
     §O{str}
-    §B{str:data} §AWAIT{false} §C{LoadDataAsync} §A id §/C
+    §E{net:r}
+    §B{str:data} §AWAIT{false} §C{FetchAsync} §A id §/C
     §R data
-  §/AMT{mt001}
+  §/AMT{m001}
 §/CL{c001}
 ```
 
-## Collections
+---
 
-### List
-
-```
-§LIST{name:elementType}   Create and initialize a list
-  value1
-  value2
-§/LIST{name}
-
-§PUSH{listName} value     Add to end of list
-§INS{listName} index val  Insert at index
-§SETIDX{listName} idx val Set element at index
-§REM{listName} value      Remove first occurrence
-§CLR{listName}            Clear all elements
-§CNT{listName}            Get count
-§HAS{listName} value      Check if contains
-```
-
-### Dictionary
+## 22. SWITCH/MATCH EXPRESSIONS
 
 ```
-§DICT{name:keyType:valType}  Create dictionary
-  §KV key1 value1
-  §KV key2 value2
-§/DICT{name}
-
-§PUT{dictName} key value     Add or update entry
-§REM{dictName} key           Remove by key
-§HAS{dictName} key           Check if key exists
-§CLR{dictName}               Clear all entries
+§W{id} target                 Match expression
+  §K pattern → expr           Case with arrow (expression)
+  §K pattern                  Case with block
+    ...body...
+  §/K
+§/W{id}
 ```
 
-### HashSet
+Alternative: `§SW{id}` and `§/SW{id}`
 
+### Patterns
 ```
-§HSET{name:elementType}   Create hash set
-  value1
-  value2
-§/HSET{name}
-
-§PUSH{setName} value      Add to set
-§REM{setName} value       Remove from set
-§HAS{setName} value       Check membership
-§CLR{setName}             Clear all elements
-```
-
-### Iterating Collections
-
-```
-§EACH{id:var} collection  Foreach over collection
-  ...body...
-§/EACH{id}
-
-§EACHKV{id:k:v} dict      Foreach over dictionary key-values
-  ...body...
-§/EACHKV{id}
+§K value → expr               Literal pattern
+§K _ → expr                   Wildcard (default)
+§K §VAR{name} → expr          Variable pattern
+§K §VAR{name} §WHEN cond      Variable with guard
+§K §PREL{op} value            Relational (op: gt, gte, lt, lte)
+§K §SM §VAR{x} → expr         Option Some pattern
+§K §NN → expr                 Option None pattern
+§K §OK §VAR{x} → expr         Result Ok pattern
+§K §ERR §VAR{e} → expr        Result Err pattern
 ```
 
-### Template: Collection Operations
-
+### Template: Switch with Literal Patterns
 ```calor
-§M{m001:Collections}
-§F{f001:Demo:pub}
-  §O{void}
-  §E{cw}
-
-  §LIST{numbers:i32}
-    1
-    2
-    3
-  §/LIST{numbers}
-  §PUSH{numbers} 4
-  §INS{numbers} 0 0
-
-  §DICT{ages:str:i32}
-    §KV "alice" 30
-    §KV "bob" 25
-  §/DICT{ages}
-  §PUT{ages} "charlie" 35
-
-  §HSET{tags:str}
-    "urgent"
-    "review"
-  §/HSET{tags}
-
-  §EACH{e1:n} numbers
-    §P n
-  §/EACH{e1}
+§F{f001:DayCategory:pub}
+  §I{i32:day}
+  §O{i32}
+  §R §W{sw1} day
+    §K 1 → 100
+    §K 2 → 100
+    §K 3 → 100
+    §K 4 → 100
+    §K 5 → 100
+    §K 6 → 200
+    §K 7 → 200
+    §K _ → 0
+  §/W{sw1}
 §/F{f001}
-§/M{m001}
 ```
 
-## Exception Handling
+### Template: Grade Calculator (Relational Patterns)
+```calor
+§F{f002:GetGrade:pub}
+  §I{i32:score}
+  §O{str}
+  §R §W{sw1} score
+    §K §PREL{gte} 90 → "A"
+    §K §PREL{gte} 80 → "B"
+    §K §PREL{gte} 70 → "C"
+    §K §PREL{gte} 60 → "D"
+    §K _ → "F"
+  §/W{sw1}
+§/F{f002}
+```
+
+### Template: Option Matching
+```calor
+§F{f001:UnwrapOrDefault:pub}
+  §I{Option<i32>:opt}
+  §I{i32:defaultVal}
+  §O{i32}
+  §R §W{sw1} opt
+    §K §SM §VAR{x} → x
+    §K §NN → defaultVal
+  §/W{sw1}
+§/F{f001}
+```
+
+### Template: Result Matching
+```calor
+§F{f001:HandleResult:pub}
+  §I{i32!str:result}
+  §O{i32}
+  §R §W{sw1} result
+    §K §OK §VAR{val} → val
+    §K §ERR §VAR{msg} → -1
+  §/W{sw1}
+§/F{f001}
+```
+
+---
+
+## 23. EXCEPTION HANDLING
 
 ```
-§TR{id}                   Try block
-  ...try body...
-§CA{ExceptionType:varName} Catch clause
-  ...catch body...
-§CA                       Catch-all (no type)
-  ...catch body...
-§FI                       Finally block
-  ...finally body...
-§/TR{id}                  End try block
+§TR{id}                       Try block
+  ...protected code...
+§CA{ExceptionType:var}        Catch with type
+  ...handler...
+§CA{Type:var} §WHEN cond      Catch with filter
+  ...handler...
+§CA                           Catch-all
+  ...handler...
+§FI                           Finally block
+  ...cleanup...
+§/TR{id}
 
-§TH "message"             Throw new Exception
-§TH expr                  Throw expression
-§RT                       Rethrow (inside catch)
-
-§CA{Type:var} §WHEN cond  Exception filter
+§TH expr                      Throw exception
+§TH "message"                 Throw new Exception(message)
+§RT                           Rethrow (inside catch)
 ```
 
 ### Template: Try/Catch/Finally
-
 ```calor
-§M{m001:ErrorHandling}
 §F{f001:SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -746,62 +1084,66 @@ Async functions and methods use `§AF` and `§AMT` tags:
     §P "Cleanup complete"
   §/TR{t1}
 §/F{f001}
-§/M{m001}
 ```
 
-### Template: Exception Filter with WHEN
+---
 
-```calor
-§TR{t1}
-  §TH "Error"
-§CA{Exception:ex} §WHEN (== errorCode 42)
-  §R "Special handling"
-§CA{Exception:ex}
-  §RT
-§/TR{t1}
+## 24. LAMBDAS AND DELEGATES
+
+### Inline Lambda (Arrow Syntax)
+```
+(param) → expr                Single parameter
+(type:param) → expr           Typed parameter
+() → expr                     No parameters
+(p1, p2) → expr               Multiple parameters
 ```
 
-## Lambdas and Delegates
+### Block Lambda
+```
+§LAM{id:param:type}           Lambda with block body
+  ...body...
+§/LAM{id}
+
+§LAM{id:p1:t1:p2:t2}          Multiple parameters
+  ...body...
+§/LAM{id}
+```
 
 ### Delegate Definition
-
 ```
-§DEL{id:Name:vis}         Delegate type declaration
+§DEL{id:Name:vis}             Delegate type
   §I{type:param}
   §O{returnType}
 §/DEL{id}
 ```
 
-### Lambda Expressions
-
-```
-§LAM{id:param:type}       Single-param lambda
-§LAM{id:p1:t1:p2:t2}      Multi-param lambda
-  ...body...
-§/LAM{id}                 Closing tag required
-```
-
-### Template: Delegate and Lambda
-
+### Template: Inline Lambda
 ```calor
-§M{m001:Delegates}
-§DEL{d001:Calculator:pub}
-  §I{i32:a}
-  §I{i32:b}
+§F{f001:ApplyDouble:pub}
+  §I{i32:x}
   §O{i32}
-§/DEL{d001}
-
-§F{f001:Demo:pub}
-  §O{void}
-  §B{Action<i32>:printer} §LAM{lam1:x:i32}
-    §P x
-  §/LAM{lam1}
-  §C{printer} §A 42 §/C
+  §B{Func<i32,i32>:doubler} (n) → (* n 2)
+  §R §C{doubler} §A x §/C
 §/F{f001}
-§/M{m001}
 ```
 
-## Events
+### Template: Block Lambda
+```calor
+§F{f001:ApplyComplex:pub}
+  §I{i32:x}
+  §O{i32}
+  §B{Func<i32,i32>:processor} §LAM{lam1:n:i32}
+    §IF{if1} (> n 0) → §R (* n 2)
+    §EL → §R 0
+    §/I{if1}
+  §/LAM{lam1}
+  §R §C{processor} §A x §/C
+§/F{f001}
+```
+
+---
+
+## 25. EVENTS
 
 ```
 §EVT{id:Name:vis:DelegateType}  Event declaration
@@ -809,219 +1151,178 @@ Async functions and methods use `§AF` and `§AMT` tags:
 §UNSUB{target.Event} handler    Unsubscribe (-=)
 ```
 
-### Template: Events
-
+### Template: Event Subscription
 ```calor
 §CL{c001:Button:pub}
   §EVT{evt001:Click:pub:EventHandler}
 §/CL{c001}
 
 §CL{c002:Handler:pub}
-  §MT{mt001:Setup:pub}
-    §I{Button:button}
+  §MT{m001:Setup:pub}
+    §I{Button:btn}
     §O{void}
-    §SUB{button.Click} OnClick
-  §/MT{mt001}
+    §SUB{btn.Click} OnClick
+  §/MT{m001}
 
-  §MT{mt002:Cleanup:pub}
-    §I{Button:button}
-    §O{void}
-    §UNSUB{button.Click} OnClick
-  §/MT{mt002}
-
-  §MT{mt003:OnClick:pri}
+  §MT{m002:OnClick:pri}
     §I{object:sender}
     §I{EventArgs:e}
     §O{void}
     §P "Clicked!"
-  §/MT{mt003}
+  §/MT{m002}
 §/CL{c002}
 ```
 
-## String Interpolation
+---
 
+## 26. RECORDS AND VARIANTS
+
+### Record Definition
 ```
-§INTERP                   Start interpolated string
-  "text {expr} more text"
-§/INTERP                  End interpolation
+§REC{id:Name}                 Record type
+  §FLD{type:name}             Record field
+§/REC{id}
 ```
 
-### Template: Interpolated Strings
+### Discriminated Union (Variant)
+```
+§TYPE{id:Name}                Union type
+  §VARIANT{Name}              Variant
+    §FLD{type:name}           Variant field
+  §/VARIANT
+§/TYPE{id}
+```
 
+### Template: Record
 ```calor
-§B{str:name} "World"
-§B{str:greeting} §INTERP "Hello, {name}!" §/INTERP
-§P greeting
+§REC{r001:Person}
+  §FLD{str:FirstName}
+  §FLD{str:LastName}
+  §FLD{i32:Age}
+§/REC{r001}
 ```
 
-## Modern Operators
+### Template: Discriminated Union
+```calor
+§TYPE{t001:Shape}
+  §VARIANT{Circle}
+    §FLD{f64:Radius}
+  §/VARIANT
+  §VARIANT{Rectangle}
+    §FLD{f64:Width}
+    §FLD{f64:Height}
+  §/VARIANT
+§/TYPE{t001}
+```
+
+---
+
+## 27. MODERN OPERATORS
 
 ```
-§?? left right            Null coalescing: left ?? right
-§?. target member         Null conditional: target?.member
-§RANGE start end          Range: start..end
-§^ n                      Index from end: ^n
+§?? left right                Null coalescing: left ?? right
+§?. target member             Null conditional: target?.member
+§RANGE start end              Range: start..end
+§^ n                          Index from end: ^n
 ```
 
 ### With Expression (Records)
-
 ```
-§WITH{source}             Create copy with modifications
+§WITH{source}                 Non-destructive update
   PropertyName = newValue
 §/WITH
 ```
 
-### Template: Modern Operators
+### String Interpolation
+```
+§INTERP "text {expr} more"    Interpolated string
+§/INTERP
+```
 
+---
+
+## 28. C# ATTRIBUTES
+
+```
+[@AttributeName]              Simple attribute
+[@Route("api/test")]          With positional arg
+[@JsonProperty(Name="id")]    With named arg
+```
+
+### Template: API Controller
 ```calor
-§B{?str:name} §NN
-§B{str:displayName} §?? name "Anonymous"
-§B{[i32]:arr} §ARR 1 2 3 4 5 §/ARR
-§B{i32:last} §IDX{arr} §^ 1
-§B{[i32]:slice} §IDX{arr} §RANGE 1 3
+§CL{c001:UsersController:ControllerBase}[@Route("api/[controller]")][@ApiController]
+  §MT{m001:Get:pub}[@HttpGet]
+    §O{IEnumerable<User>}
+    §R users
+  §/MT{m001}
+
+  §MT{m002:GetById:pub}[@HttpGet("{id}")]
+    §I{i32:id}
+    §O{User}
+    §R §C{FindUser} §A id §/C
+  §/MT{m002}
+§/CL{c001}
 ```
 
-## Switch/Match Expressions
+---
 
-Calor uses `§W` (Match) and `§K` (Case) for pattern matching. Alternative alias `§SW` is also available.
+## 29. USING DIRECTIVES
 
 ```
-§W{id} target             Match expression start
-§K pattern → expr         Case with arrow syntax
-§K pattern                Case with block body
-  ...body...
-§/K                       End case (optional for arrow syntax)
-§/W{id}                   End match (or §/SW{id})
+§USING{namespace}             Using directive
 ```
 
-### Template: Switch Expression
-
+### Template: Using Statements
 ```calor
-§M{m001:Grades}
-§F{f001:GetGrade:pub}
-  §I{i32:score}
-  §O{str}
-  §R §W{sw1} score
-    §K §PREL{gte} 90 → "A"
-    §K §PREL{gte} 80 → "B"
-    §K §PREL{gte} 70 → "C"
-    §K §PREL{gte} 60 → "D"
-    §K _ → "F"
-  §/W{sw1}
-§/F{f001}
+§USING{System}
+§USING{System.Collections.Generic}
+§USING{System.Linq}
+
+§M{m001:MyModule}
+  ...
 §/M{m001}
 ```
 
-### Template: HTTP Status Switch
+---
 
-```calor
-§W{sw1} code
-  §K 200 → "OK"
-  §K 404 → "Not Found"
-  §K 500 → "Server Error"
-  §K _ → "Unknown"
-§/W{sw1}
-```
+## 30. ID CONVENTIONS
 
-### Guard Clauses with WHEN
-
-```calor
-§W{sw1} x
-  §K §VAR{n} §WHEN (> n 100) → "large"
-  §K §VAR{n} §WHEN (< n 0) → "negative"
-  §K 0 → "zero"
-  §K _ → "normal"
-§/W{sw1}
-```
-
-## Pattern Matching Enhancements
-
-### Relational Patterns
-
-```
-§PREL{op} value           Relational pattern
-  op: gte, lte, gt, lt    Maps to >=, <=, >, <
-```
-
-### Variable Pattern
-
-```
-§VAR x                    Captures value into variable x
-```
-
-### Property Pattern
-
-```
-§PPROP{Type}              Match type with properties
-  PropertyName = pattern
-§/PPROP
-```
-
-### Positional Pattern
-
-```
-§PPOS{Type}               Match type with positional values
-  pattern1
-  pattern2
-§/PPOS
-```
-
-### List Pattern
-
-```
-§PLIST                    Match list structure
-  pattern1
-  pattern2
-  §REST                   Rest of list (..)
-§/PLIST
-```
-
-### Template: Advanced Pattern Matching
-
-```calor
-§W{sw1} value
-  §K §PREL{lt} 0 → §R "negative"
-  §K §PREL{gte} 100 → §R "large"
-  §K §VAR{n} §WHEN (== (% n 2) 0) → §R "even"
-  §K _ → §R "odd"
-§/W{sw1}
-```
-
-## ID Integrity Rules
-
-### Canonical IDs (Production Code)
+### Production IDs (auto-generated)
 ```
 f_01J5X7K9M2NPQRSTABWXYZ12    Function
 m_01J5X7K9M2NPQRSTABWXYZ12    Module
 c_01J5X7K9M2NPQRSTABWXYZ12    Class
 mt_01J5X7K9M2NPQRSTABWXYZ12   Method
-ctor_01J5X7K9M2NPQRSTABWXYZ12 Constructor
-p_01J5X7K9M2NPQRSTABWXYZ12    Property
-i_01J5X7K9M2NPQRSTABWXYZ12    Interface
-e_01J5X7K9M2NPQRSTABWXYZ12    Enum
 ```
 
-### Test IDs (ONLY in tests/, docs/, examples/)
+### Test IDs (tests/, docs/, examples/ only)
 ```
-f001, m001, c001              Sequential test IDs
+f001, m001, c001, mt001       Sequential IDs
 ```
 
-### Agent Rules - CRITICAL
-1. **NEVER** modify an existing ID
+### Rules
+1. **NEVER** modify existing IDs
 2. **NEVER** copy IDs when extracting code
-3. **OMIT** IDs for new declarations - run `calor ids assign`
+3. **OMIT** IDs for new declarations, run `calor ids assign`
 4. **VERIFY** before commit: `calor ids check`
 
-### Preservation Rules
-| Operation | ID Behavior |
-|-----------|-------------|
-| Rename | PRESERVE |
-| Move file | PRESERVE |
-| Reformat | PRESERVE |
-| Extract helper | NEW ID |
+---
 
-### Verification Steps
-```bash
-calor ids check .
-calor ids assign . --dry-run
-```
+## QUICK REFERENCE
+
+| Task | Syntax |
+|------|--------|
+| Function | `§F{id:Name:pub} §I{type:name} §O{type} §R expr §/F{id}` |
+| Class | `§CL{id:Name:pub} §FLD{...} §MT{...} §/CL{id}` |
+| Loop | `§L{id:i:0:10:1} ... §/L{id}` |
+| If | `§IF{id} cond → action §EI cond → action §EL → action §/I{id}` |
+| Match | `§W{id} target §K pattern → expr §/W{id}` |
+| Contract | `§Q condition` (pre), `§S condition` (post) |
+| Effect | `§E{cw,fs:r,net:r}` |
+| Async | `§AF{id:Name:pub} §O{T} §AWAIT expr §/AF{id}` |
+| Lambda | `(x) → expr` or `§LAM{id:x:i32} ... §/LAM{id}` |
+| List | `§LIST{name:type} ... §/LIST{name}` then `§PUSH{name} val` |
+| HashSet | `§HSET{name:type} §/HSET{name}` then `§ADD{name} val` |
+| Option | `§SM value` (Some), `§NN` (None) |
+| Result | `§OK value`, `§ERR "msg"` |
