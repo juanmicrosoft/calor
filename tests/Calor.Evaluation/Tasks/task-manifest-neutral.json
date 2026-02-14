@@ -1,0 +1,1070 @@
+{
+  "version": "2.0",
+  "description": "LLM task completion benchmark with language-neutral prompts",
+  "notes": "Prompts describe WHAT to achieve, not HOW. The LLM should use language knowledge to determine idiomatic implementation.",
+  "tasks": [
+    {
+      "id": "algo-001",
+      "name": "Factorial Function",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Compute the factorial of a non-negative integer",
+      "prompt": "Write a public function named Factorial that computes the factorial of an integer n. The function must only accept non-negative values of n. The result is always at least 1.",
+      "testCases": [
+        { "input": [0], "expected": 1 },
+        { "input": [1], "expected": 1 },
+        { "input": [5], "expected": 120 },
+        { "input": [10], "expected": 3628800 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Factorial",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["recursion", "math"]
+    },
+    {
+      "id": "algo-002",
+      "name": "Fibonacci Number",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Compute the nth Fibonacci number",
+      "prompt": "Write a public function named Fibonacci that computes the nth Fibonacci number (sequence: 0, 1, 1, 2, 3, 5, 8...). The function must only accept non-negative values of n.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [1], "expected": 1 },
+        { "input": [2], "expected": 1 },
+        { "input": [10], "expected": 55 },
+        { "input": [15], "expected": 610 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Fibonacci",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["recursion", "math"]
+    },
+    {
+      "id": "algo-003",
+      "name": "Is Prime",
+      "category": "basic-algorithms",
+      "difficulty": 2,
+      "description": "Check if a number is prime",
+      "prompt": "Write a public function named IsPrime that returns true if a given integer n is prime, false otherwise. The function must only accept positive values of n (n > 0).",
+      "testCases": [
+        { "input": [1], "expected": false },
+        { "input": [2], "expected": true },
+        { "input": [3], "expected": true },
+        { "input": [4], "expected": false },
+        { "input": [17], "expected": true },
+        { "input": [25], "expected": false },
+        { "input": [97], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsPrime",
+        "parameterTypes": ["int"],
+        "returnType": "bool"
+      },
+      "tags": ["math", "loops"]
+    },
+    {
+      "id": "algo-004",
+      "name": "Greatest Common Divisor",
+      "category": "basic-algorithms",
+      "difficulty": 2,
+      "description": "Compute the GCD of two positive integers using Euclidean algorithm",
+      "prompt": "Write a public function named Gcd that computes the greatest common divisor of two integers a and b using the Euclidean algorithm. Both a and b must be positive. The result is always positive.",
+      "testCases": [
+        { "input": [12, 8], "expected": 4 },
+        { "input": [17, 13], "expected": 1 },
+        { "input": [100, 25], "expected": 25 },
+        { "input": [48, 18], "expected": 6 },
+        { "input": [7, 7], "expected": 7 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Gcd",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["recursion", "math"]
+    },
+    {
+      "id": "algo-005",
+      "name": "Absolute Value",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Return the absolute value of an integer",
+      "prompt": "Write a public function named Abs that returns the absolute value of an integer n. The result is never negative.",
+      "testCases": [
+        { "input": [5], "expected": 5 },
+        { "input": [-5], "expected": 5 },
+        { "input": [0], "expected": 0 },
+        { "input": [-100], "expected": 100 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Abs",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math", "conditionals"]
+    },
+    {
+      "id": "algo-006",
+      "name": "Power Function",
+      "category": "basic-algorithms",
+      "difficulty": 2,
+      "description": "Compute base raised to exponent power",
+      "prompt": "Write a public function named Power that computes base raised to the power of exp. The exponent must be non-negative.",
+      "testCases": [
+        { "input": [2, 0], "expected": 1 },
+        { "input": [2, 3], "expected": 8 },
+        { "input": [3, 2], "expected": 9 },
+        { "input": [5, 3], "expected": 125 },
+        { "input": [10, 2], "expected": 100 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Power",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["math", "loops"]
+    },
+    {
+      "id": "algo-007",
+      "name": "Is Even",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Check if a number is even",
+      "prompt": "Write a public function named IsEven that returns true if n is even, false otherwise.",
+      "testCases": [
+        { "input": [0], "expected": true },
+        { "input": [1], "expected": false },
+        { "input": [2], "expected": true },
+        { "input": [7], "expected": false },
+        { "input": [-4], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsEven",
+        "parameterTypes": ["int"],
+        "returnType": "bool"
+      },
+      "tags": ["math", "boolean"]
+    },
+    {
+      "id": "algo-008",
+      "name": "Is Odd",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Check if a number is odd",
+      "prompt": "Write a public function named IsOdd that returns true if n is odd, false otherwise.",
+      "testCases": [
+        { "input": [0], "expected": false },
+        { "input": [1], "expected": true },
+        { "input": [2], "expected": false },
+        { "input": [7], "expected": true },
+        { "input": [-3], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsOdd",
+        "parameterTypes": ["int"],
+        "returnType": "bool"
+      },
+      "tags": ["math", "boolean"]
+    },
+    {
+      "id": "algo-009",
+      "name": "Sign",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Return the sign of a number (-1, 0, or 1)",
+      "prompt": "Write a public function named Sign that returns -1 if n is negative, 0 if n is zero, or 1 if n is positive.",
+      "testCases": [
+        { "input": [5], "expected": 1 },
+        { "input": [-5], "expected": -1 },
+        { "input": [0], "expected": 0 },
+        { "input": [100], "expected": 1 },
+        { "input": [-100], "expected": -1 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Sign",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math", "conditionals"]
+    },
+    {
+      "id": "algo-010",
+      "name": "Square",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Return the square of a number",
+      "prompt": "Write a public function named Square that returns n squared (n multiplied by itself).",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [2], "expected": 4 },
+        { "input": [5], "expected": 25 },
+        { "input": [-3], "expected": 9 },
+        { "input": [10], "expected": 100 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Square",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "algo-011",
+      "name": "Cube",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Return the cube of a number",
+      "prompt": "Write a public function named Cube that returns n cubed (n multiplied by itself twice).",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [2], "expected": 8 },
+        { "input": [3], "expected": 27 },
+        { "input": [-2], "expected": -8 },
+        { "input": [5], "expected": 125 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Cube",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "algo-012",
+      "name": "Double",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Return double the value",
+      "prompt": "Write a public function named Double that returns n multiplied by 2.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [1], "expected": 2 },
+        { "input": [5], "expected": 10 },
+        { "input": [-3], "expected": -6 },
+        { "input": [50], "expected": 100 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Double",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "algo-013",
+      "name": "Negate",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Return the negation of a number",
+      "prompt": "Write a public function named Negate that returns the negation of n (positive becomes negative, negative becomes positive).",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [5], "expected": -5 },
+        { "input": [-5], "expected": 5 },
+        { "input": [100], "expected": -100 },
+        { "input": [-1], "expected": 1 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Negate",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "algo-014",
+      "name": "Is Positive",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Check if a number is positive",
+      "prompt": "Write a public function named IsPositive that returns true if n is greater than zero, false otherwise.",
+      "testCases": [
+        { "input": [5], "expected": true },
+        { "input": [0], "expected": false },
+        { "input": [-1], "expected": false },
+        { "input": [1], "expected": true },
+        { "input": [-100], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsPositive",
+        "parameterTypes": ["int"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "conditionals"]
+    },
+    {
+      "id": "algo-015",
+      "name": "Is Negative",
+      "category": "basic-algorithms",
+      "difficulty": 1,
+      "description": "Check if a number is negative",
+      "prompt": "Write a public function named IsNegative that returns true if n is less than zero, false otherwise.",
+      "testCases": [
+        { "input": [-5], "expected": true },
+        { "input": [0], "expected": false },
+        { "input": [1], "expected": false },
+        { "input": [-1], "expected": true },
+        { "input": [100], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsNegative",
+        "parameterTypes": ["int"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "conditionals"]
+    },
+    {
+      "id": "safety-001",
+      "name": "Safe Division",
+      "category": "safety",
+      "difficulty": 1,
+      "description": "Divide two integers safely",
+      "prompt": "Write a public function named SafeDivide that divides integer a by integer b. Division by zero must not be allowed.",
+      "testCases": [
+        { "input": [10, 2], "expected": 5 },
+        { "input": [15, 3], "expected": 5 },
+        { "input": [100, 10], "expected": 10 },
+        { "input": [7, 2], "expected": 3 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "SafeDivide",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["validation", "safety"]
+    },
+    {
+      "id": "safety-002",
+      "name": "Clamp Value",
+      "category": "safety",
+      "difficulty": 2,
+      "description": "Clamp a value between min and max",
+      "prompt": "Write a public function named Clamp that returns value constrained to be between min and max (inclusive). If value is below min, return min. If value is above max, return max. Otherwise return value. The min must not exceed max. The result is always within the specified bounds.",
+      "testCases": [
+        { "input": [5, 0, 10], "expected": 5 },
+        { "input": [-5, 0, 10], "expected": 0 },
+        { "input": [15, 0, 10], "expected": 10 },
+        { "input": [0, 0, 0], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Clamp",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["bounds-checking"]
+    },
+    {
+      "id": "safety-003",
+      "name": "Safe Modulo",
+      "category": "safety",
+      "difficulty": 1,
+      "description": "Compute modulo safely",
+      "prompt": "Write a public function named SafeModulo that returns a modulo b (the remainder when a is divided by b). Division by zero must not be allowed.",
+      "testCases": [
+        { "input": [10, 3], "expected": 1 },
+        { "input": [15, 5], "expected": 0 },
+        { "input": [7, 4], "expected": 3 },
+        { "input": [100, 7], "expected": 2 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "SafeModulo",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["safety"]
+    },
+    {
+      "id": "safety-004",
+      "name": "Percentage",
+      "category": "safety",
+      "difficulty": 2,
+      "description": "Calculate percentage",
+      "prompt": "Write a public function named Percentage that returns (value * percent) / 100. The percent must be between 0 and 100 inclusive.",
+      "testCases": [
+        { "input": [100, 50], "expected": 50 },
+        { "input": [200, 25], "expected": 50 },
+        { "input": [50, 100], "expected": 50 },
+        { "input": [80, 10], "expected": 8 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Percentage",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "safety-005",
+      "name": "Valid Array Index",
+      "category": "safety",
+      "difficulty": 2,
+      "description": "Validate array index",
+      "prompt": "Write a public function named ValidIndex that returns true if index would be valid for an array of the given size (index must be at least 0 and less than size). The size must be positive.",
+      "testCases": [
+        { "input": [0, 5], "expected": true },
+        { "input": [4, 5], "expected": true },
+        { "input": [5, 5], "expected": false },
+        { "input": [-1, 5], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "ValidIndex",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["bounds"]
+    },
+    {
+      "id": "safety-006",
+      "name": "In Range",
+      "category": "safety",
+      "difficulty": 2,
+      "description": "Check if value is in range",
+      "prompt": "Write a public function named InRange that returns true if value is between min and max (inclusive). The min must not exceed max.",
+      "testCases": [
+        { "input": [5, 0, 10], "expected": true },
+        { "input": [0, 0, 10], "expected": true },
+        { "input": [10, 0, 10], "expected": true },
+        { "input": [11, 0, 10], "expected": false },
+        { "input": [-1, 0, 10], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "InRange",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["bounds"]
+    },
+    {
+      "id": "safety-007",
+      "name": "Positive Difference",
+      "category": "safety",
+      "difficulty": 1,
+      "description": "Return positive difference between two numbers",
+      "prompt": "Write a public function named PositiveDiff that returns the absolute difference between a and b. The result is never negative.",
+      "testCases": [
+        { "input": [10, 3], "expected": 7 },
+        { "input": [3, 10], "expected": 7 },
+        { "input": [5, 5], "expected": 0 },
+        { "input": [-5, 5], "expected": 10 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "PositiveDiff",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "safety-008",
+      "name": "Half Even",
+      "category": "safety",
+      "difficulty": 1,
+      "description": "Return half of an even number",
+      "prompt": "Write a public function named HalfEven that returns n divided by 2. The input n must be even (divisible by 2).",
+      "testCases": [
+        { "input": [10], "expected": 5 },
+        { "input": [0], "expected": 0 },
+        { "input": [100], "expected": 50 },
+        { "input": [-4], "expected": -2 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "HalfEven",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "safety-009",
+      "name": "Normalize Score",
+      "category": "safety",
+      "difficulty": 2,
+      "description": "Normalize a score to 0-100 range",
+      "prompt": "Write a public function named NormalizeScore that normalizes a score to the 0-100 range using the formula (score * 100) / maxScore. The maxScore must be positive, score must be non-negative, and score must not exceed maxScore.",
+      "testCases": [
+        { "input": [50, 100], "expected": 50 },
+        { "input": [25, 50], "expected": 50 },
+        { "input": [10, 10], "expected": 100 },
+        { "input": [0, 100], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "NormalizeScore",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "safety-010",
+      "name": "Safe Decrement",
+      "category": "safety",
+      "difficulty": 1,
+      "description": "Decrement a positive number",
+      "prompt": "Write a public function named SafeDecrement that returns n minus 1. The input n must be positive. The result is never negative.",
+      "testCases": [
+        { "input": [1], "expected": 0 },
+        { "input": [5], "expected": 4 },
+        { "input": [100], "expected": 99 },
+        { "input": [2], "expected": 1 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "SafeDecrement",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": []
+    },
+    {
+      "id": "data-001",
+      "name": "Sum Two Numbers",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Sum two integers",
+      "prompt": "Write a public function named Sum that returns the sum of two integers a and b.",
+      "testCases": [
+        { "input": [1, 2], "expected": 3 },
+        { "input": [10, 20], "expected": 30 },
+        { "input": [-1, 1], "expected": 0 },
+        { "input": [0, 0], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Sum",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["math", "basic"]
+    },
+    {
+      "id": "data-002",
+      "name": "Find Maximum of Two",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Find the maximum of two integers",
+      "prompt": "Write a public function named Max that returns the larger of two integers a and b.",
+      "testCases": [
+        { "input": [5, 3], "expected": 5 },
+        { "input": [3, 5], "expected": 5 },
+        { "input": [-1, -5], "expected": -1 },
+        { "input": [7, 7], "expected": 7 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Max",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["conditionals", "comparison"]
+    },
+    {
+      "id": "data-003",
+      "name": "Find Minimum of Two",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Find the minimum of two integers",
+      "prompt": "Write a public function named Min that returns the smaller of two integers a and b.",
+      "testCases": [
+        { "input": [5, 3], "expected": 3 },
+        { "input": [3, 5], "expected": 3 },
+        { "input": [-1, -5], "expected": -5 },
+        { "input": [7, 7], "expected": 7 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Min",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["conditionals", "comparison"]
+    },
+    {
+      "id": "data-004",
+      "name": "Difference",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Return the difference of two numbers",
+      "prompt": "Write a public function named Difference that returns a minus b.",
+      "testCases": [
+        { "input": [10, 3], "expected": 7 },
+        { "input": [3, 10], "expected": -7 },
+        { "input": [5, 5], "expected": 0 },
+        { "input": [0, 5], "expected": -5 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Difference",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "data-005",
+      "name": "Product",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Return the product of two numbers",
+      "prompt": "Write a public function named Product that returns a multiplied by b.",
+      "testCases": [
+        { "input": [3, 4], "expected": 12 },
+        { "input": [5, 0], "expected": 0 },
+        { "input": [-2, 3], "expected": -6 },
+        { "input": [7, 7], "expected": 49 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Product",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "data-006",
+      "name": "Average",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Return the integer average of two numbers",
+      "prompt": "Write a public function named Average that returns the integer average of a and b, computed as (a + b) / 2 using integer division.",
+      "testCases": [
+        { "input": [10, 20], "expected": 15 },
+        { "input": [5, 5], "expected": 5 },
+        { "input": [0, 10], "expected": 5 },
+        { "input": [7, 8], "expected": 7 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Average",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "data-007",
+      "name": "Is Zero",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Check if a number is zero",
+      "prompt": "Write a public function named IsZero that returns true if n equals zero, false otherwise.",
+      "testCases": [
+        { "input": [0], "expected": true },
+        { "input": [1], "expected": false },
+        { "input": [-1], "expected": false },
+        { "input": [100], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsZero",
+        "parameterTypes": ["int"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean"]
+    },
+    {
+      "id": "data-008",
+      "name": "Increment",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Increment a number by one",
+      "prompt": "Write a public function named Increment that returns n plus 1.",
+      "testCases": [
+        { "input": [0], "expected": 1 },
+        { "input": [5], "expected": 6 },
+        { "input": [-1], "expected": 0 },
+        { "input": [99], "expected": 100 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Increment",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "data-009",
+      "name": "Decrement",
+      "category": "data-structures",
+      "difficulty": 1,
+      "description": "Decrement a number by one",
+      "prompt": "Write a public function named Decrement that returns n minus 1.",
+      "testCases": [
+        { "input": [1], "expected": 0 },
+        { "input": [5], "expected": 4 },
+        { "input": [0], "expected": -1 },
+        { "input": [100], "expected": 99 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Decrement",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["math"]
+    },
+    {
+      "id": "data-010",
+      "name": "Median of Three",
+      "category": "data-structures",
+      "difficulty": 2,
+      "description": "Find the median of three numbers",
+      "prompt": "Write a public function named Median3 that returns the median (middle value when sorted) of three integers a, b, and c.",
+      "testCases": [
+        { "input": [1, 2, 3], "expected": 2 },
+        { "input": [3, 1, 2], "expected": 2 },
+        { "input": [5, 5, 5], "expected": 5 },
+        { "input": [1, 5, 3], "expected": 3 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Median3",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["conditionals", "comparison"]
+    },
+    {
+      "id": "logic-001",
+      "name": "Bool To Int",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Convert boolean to integer",
+      "prompt": "Write a public function named BoolToInt that returns 1 if b is true, 0 if b is false.",
+      "testCases": [
+        { "input": [true], "expected": 1 },
+        { "input": [false], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "BoolToInt",
+        "parameterTypes": ["bool"],
+        "returnType": "int"
+      },
+      "tags": ["conversion", "boolean"]
+    },
+    {
+      "id": "logic-002",
+      "name": "Int To Bool",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Convert integer to boolean",
+      "prompt": "Write a public function named IntToBool that returns false if n is zero, true otherwise.",
+      "testCases": [
+        { "input": [0], "expected": false },
+        { "input": [1], "expected": true },
+        { "input": [-1], "expected": true },
+        { "input": [100], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IntToBool",
+        "parameterTypes": ["int"],
+        "returnType": "bool"
+      },
+      "tags": ["conversion", "boolean"]
+    },
+    {
+      "id": "logic-003",
+      "name": "Logical And",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Logical AND of two booleans",
+      "prompt": "Write a public function named And that returns true only if both a and b are true.",
+      "testCases": [
+        { "input": [true, true], "expected": true },
+        { "input": [true, false], "expected": false },
+        { "input": [false, true], "expected": false },
+        { "input": [false, false], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "And",
+        "parameterTypes": ["bool", "bool"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "logic"]
+    },
+    {
+      "id": "logic-004",
+      "name": "Logical Or",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Logical OR of two booleans",
+      "prompt": "Write a public function named Or that returns true if either a or b (or both) is true.",
+      "testCases": [
+        { "input": [true, true], "expected": true },
+        { "input": [true, false], "expected": true },
+        { "input": [false, true], "expected": true },
+        { "input": [false, false], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Or",
+        "parameterTypes": ["bool", "bool"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "logic"]
+    },
+    {
+      "id": "logic-005",
+      "name": "Logical Not",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Logical NOT of a boolean",
+      "prompt": "Write a public function named Not that returns the opposite of b (true becomes false, false becomes true).",
+      "testCases": [
+        { "input": [true], "expected": false },
+        { "input": [false], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Not",
+        "parameterTypes": ["bool"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "logic"]
+    },
+    {
+      "id": "logic-006",
+      "name": "Logical Xor",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Logical XOR of two booleans",
+      "prompt": "Write a public function named Xor that returns true if exactly one of a or b is true, but not both.",
+      "testCases": [
+        { "input": [true, true], "expected": false },
+        { "input": [true, false], "expected": true },
+        { "input": [false, true], "expected": true },
+        { "input": [false, false], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Xor",
+        "parameterTypes": ["bool", "bool"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "logic"]
+    },
+    {
+      "id": "logic-007",
+      "name": "Are Equal",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Check if two integers are equal",
+      "prompt": "Write a public function named AreEqual that returns true if a equals b, false otherwise.",
+      "testCases": [
+        { "input": [5, 5], "expected": true },
+        { "input": [5, 3], "expected": false },
+        { "input": [0, 0], "expected": true },
+        { "input": [-1, 1], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "AreEqual",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["comparison", "boolean"]
+    },
+    {
+      "id": "logic-008",
+      "name": "Are Not Equal",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Check if two integers are not equal",
+      "prompt": "Write a public function named AreNotEqual that returns true if a does not equal b, false otherwise.",
+      "testCases": [
+        { "input": [5, 5], "expected": false },
+        { "input": [5, 3], "expected": true },
+        { "input": [0, 0], "expected": false },
+        { "input": [-1, 1], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "AreNotEqual",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["comparison", "boolean"]
+    },
+    {
+      "id": "logic-009",
+      "name": "Both Positive",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Check if both numbers are positive",
+      "prompt": "Write a public function named BothPositive that returns true if both a and b are greater than zero.",
+      "testCases": [
+        { "input": [5, 3], "expected": true },
+        { "input": [5, -3], "expected": false },
+        { "input": [0, 5], "expected": false },
+        { "input": [-1, -1], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "BothPositive",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "logic"]
+    },
+    {
+      "id": "logic-010",
+      "name": "Either Positive",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Check if either number is positive",
+      "prompt": "Write a public function named EitherPositive that returns true if a is greater than zero or b is greater than zero (or both).",
+      "testCases": [
+        { "input": [5, 3], "expected": true },
+        { "input": [5, -3], "expected": true },
+        { "input": [0, -5], "expected": false },
+        { "input": [-1, -1], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "EitherPositive",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "logic"]
+    },
+    {
+      "id": "logic-011",
+      "name": "Same Sign",
+      "category": "logic",
+      "difficulty": 2,
+      "description": "Check if two numbers have the same sign",
+      "prompt": "Write a public function named SameSign that returns true if a and b are both positive, both negative, or both zero.",
+      "testCases": [
+        { "input": [5, 3], "expected": true },
+        { "input": [-5, -3], "expected": true },
+        { "input": [0, 0], "expected": true },
+        { "input": [5, -3], "expected": false },
+        { "input": [0, 5], "expected": false }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "SameSign",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "logic"]
+    },
+    {
+      "id": "logic-012",
+      "name": "Is Multiple Of",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Check if a is a multiple of b",
+      "prompt": "Write a public function named IsMultipleOf that returns true if a is evenly divisible by b (no remainder). Division by zero must not be allowed.",
+      "testCases": [
+        { "input": [10, 5], "expected": true },
+        { "input": [10, 3], "expected": false },
+        { "input": [15, 5], "expected": true },
+        { "input": [7, 7], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsMultipleOf",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["math", "boolean"]
+    },
+    {
+      "id": "logic-013",
+      "name": "Is Greater Than",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Check if a is greater than b",
+      "prompt": "Write a public function named IsGreaterThan that returns true if a is greater than b.",
+      "testCases": [
+        { "input": [5, 3], "expected": true },
+        { "input": [3, 5], "expected": false },
+        { "input": [5, 5], "expected": false },
+        { "input": [-1, -5], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsGreaterThan",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["comparison", "boolean"]
+    },
+    {
+      "id": "logic-014",
+      "name": "Is Less Than",
+      "category": "logic",
+      "difficulty": 1,
+      "description": "Check if a is less than b",
+      "prompt": "Write a public function named IsLessThan that returns true if a is less than b.",
+      "testCases": [
+        { "input": [3, 5], "expected": true },
+        { "input": [5, 3], "expected": false },
+        { "input": [5, 5], "expected": false },
+        { "input": [-5, -1], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "IsLessThan",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["comparison", "boolean"]
+    },
+    {
+      "id": "logic-015",
+      "name": "Implies",
+      "category": "logic",
+      "difficulty": 2,
+      "description": "Logical implication",
+      "prompt": "Write a public function named Implies that implements logical implication: returns false only when a is true and b is false, true in all other cases.",
+      "testCases": [
+        { "input": [true, true], "expected": true },
+        { "input": [true, false], "expected": false },
+        { "input": [false, true], "expected": true },
+        { "input": [false, false], "expected": true }
+      ],
+      "scoring": { "compilation": 0.4, "testCases": 0.6 },
+      "expectedSignature": {
+        "functionName": "Implies",
+        "parameterTypes": ["bool", "bool"],
+        "returnType": "bool"
+      },
+      "tags": ["boolean", "logic"]
+    }
+  ]
+}

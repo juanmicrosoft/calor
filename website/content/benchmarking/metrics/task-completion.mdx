@@ -6,252 +6,264 @@ order: 7
 
 
 **Category:** Task Completion
-**Result:** C# wins (0.86x)
-**What it measures:** End-to-end task success rates
+**Result:** Tie (1.00x)
+**What it measures:** AI agent ability to learn and write correct code in both languages
 
 ---
 
 ## Overview
 
-The Task Completion metric measures how successfully AI agents can complete full programming tasks, from understanding requirements to producing working code.
+The Task Completion benchmark measures how successfully AI agents can complete programming tasks using Calor vs C#. This benchmark uses **language-neutral prompts** - the same functional requirements given to both languages without syntax hints - to fairly measure whether Calor is as learnable and usable as an established language like C#.
 
 ---
 
-## Why It Matters
+## What This Benchmark Answers
 
-Real-world agent tasks involve:
-- Understanding requirements
-- Generating code
-- Compiling successfully
-- Producing correct output
-- Doing so efficiently (context window usage)
+**Primary Question:** Can an LLM learn Calor and write correct code as easily as C#?
 
-This metric captures end-to-end success, not just individual capabilities.
+**Answer:** Yes. With neutral prompts, both languages achieve identical results (1.00x ratio).
+
+This is a significant finding - it proves Calor is **learnable** and doesn't impose a productivity penalty compared to C#.
 
 ---
 
-## How It's Measured
+## Methodology
 
-### Completion Potential Score
+### Language-Neutral Prompts
 
-| Factor | Calor | C# |
-|:-------|:-----|:---|
-| Token efficiency | Variable | Typically better |
-| Compilation success | +0.20 | +0.20 |
-| Complete structure | +0.05 to +0.10 | +0.05 to +0.15 |
-| Has contracts | +0.05 | N/A |
-
-Base score: 0.50 for both
-
-### Token Efficiency Bonus
-
-| Token Count | Calor Bonus | C# Bonus |
-|:------------|:-----------|:---------|
-| < 50 | +0.15 | N/A |
-| < 100 | +0.10 | +0.10 |
-| < 200 | +0.05 | +0.05 |
-
-C# cap: 0.95 (slight penalty for verbosity overhead)
-
----
-
-## Task Verification
-
-For each task, the framework verifies:
-
-```csharp
-// Check required patterns are present
-foreach (var pattern in task.RequiredPatterns)
-{
-    if (!Regex.IsMatch(output, pattern))
-        return false;
-}
-
-// Check forbidden patterns are absent
-foreach (var pattern in task.ForbiddenPatterns)
-{
-    if (Regex.IsMatch(output, pattern))
-        return false;
-}
-
-// Verify compilation if required
-if (task.RequiresCompilation)
-{
-    return compilation.Success;
-}
-```
-
----
-
-## Efficiency Calculation
+Unlike benchmarks that give language-specific guidance, our prompts describe **what** to achieve without dictating **how**:
 
 ```
-Efficiency = (Success ? 1.0 : 0.0) / TokensUsed × 1000
+Write a public function named Factorial that computes the factorial
+of an integer n. The function must only accept non-negative values
+of n. The result is always at least 1.
 ```
 
-Higher efficiency = more success per token.
+The same prompt goes to both Calor and C#. The LLM must apply its knowledge of each language to produce idiomatic code.
+
+### Why Neutral Prompts Matter
+
+| Approach | Problem |
+|:---------|:--------|
+| Calor-biased prompts | "Add §Q precondition..." teaches syntax, doesn't test learning |
+| C#-biased prompts | Unfair to Calor, doesn't reflect real usage |
+| **Neutral prompts** | Tests whether LLM can translate requirements to idiomatic code |
+
+### Task Corpus
+
+The benchmark includes **50 programming tasks** across 4 categories:
+
+| Category | Tasks | Examples |
+|:---------|:------|:---------|
+| basic-algorithms | 15 | Factorial, Fibonacci, IsPrime, GCD, Power |
+| safety | 10 | SafeDivide, Clamp, SafeModulo, NormalizeScore |
+| data-structures | 10 | Sum, Max, Min, Average, Median |
+| logic | 15 | BoolToInt, LogicalAnd, IsMultipleOf, SameSign |
+
+### Scoring Formula
+
+Each task is scored on compilation and test results:
+
+| Factor | Weight | Description |
+|:-------|:-------|:------------|
+| Compilation | 40% | Does the generated code compile? |
+| Test Cases | 60% | What percentage of test cases pass? |
+
+**Final score:** `0.4 × compile + 0.6 × tests`
 
 ---
 
-## Why C# Wins
+## Results
 
-### 1. Ecosystem Maturity
+### Overall
 
-C# has:
-- Extensive documentation
-- Large code corpus for training
-- Well-understood patterns
-- Rich tooling support
+| Metric | Calor | C# | Advantage |
+|:-------|:------|:---|:----------|
+| Average Score | 1.00 | 1.00 | **1.00x (Tie)** |
+| Compilation Rate | 100% | 100% | Tie |
+| Test Pass Rate | 100% | 100% | Tie |
 
-### 2. Token Efficiency
+### By Category
 
-For the same logic, C# typically uses fewer tokens:
-
-| Task | Calor Tokens | C# Tokens | Ratio |
-|:-----|:------------|:----------|:------|
-| Hello World | ~25 | ~15 | 1.67x |
-| FizzBuzz | ~80 | ~50 | 1.60x |
-| Calculator | ~120 | ~75 | 1.60x |
-
-More tokens = more context window usage = less room for task context.
-
-### 3. Error Recovery
-
-When things go wrong, C# errors are:
-- More familiar to LLMs
-- Easier to diagnose
-- Faster to fix
+| Category | Calor Score | C# Score | Advantage |
+|:---------|:------------|:---------|:----------|
+| basic-algorithms | 1.00 | 1.00 | 1.00x |
+| safety | 1.00 | 1.00 | 1.00x |
+| data-structures | 1.00 | 1.00 | 1.00x |
+| logic | 1.00 | 1.00 | 1.00x |
 
 ---
 
-## Task Categories
+## What This Tells Us
 
-### Simple Tasks (Calor competitive)
+### Calor is Learnable
 
-- Hello World
-- Basic arithmetic
-- Simple loops
+The 1.00x ratio demonstrates that:
+- LLMs can learn Calor syntax from skills files
+- Calor code compiles at the same rate as C#
+- Calor implementations pass tests at the same rate as C#
 
-Both languages perform similarly on trivial tasks.
+### Task Completion ≠ Code Value
 
-### Medium Tasks (C# slightly ahead)
+This benchmark measures **task completion** - can correct code be written? It does **not** measure:
+- Whether the code has better safety properties
+- Whether contracts catch bugs that C# misses
+- Whether the code is more maintainable
 
-- FizzBuzz
-- Function with contracts
-- File I/O
-
-C#'s familiarity advantage appears.
-
-### Complex Tasks (C# advantage grows)
-
-- Multi-function programs
-- Error handling
-- Data structures
-
-C#'s ecosystem and training data advantage becomes significant.
+These are different questions that require different benchmarks.
 
 ---
 
-## Example Task
+## Example: Generated Code Comparison
 
-### Task Definition
+### Task: SafeDivide
+**Prompt:** "Write a public function named SafeDivide that divides integer a by integer b. Division by zero must not be allowed."
 
-```csharp
-var task = new TaskDefinition
-{
-    Id = "fizzbuzz",
-    Category = "loops",
-    Description = "Print FizzBuzz for 1-100",
-    Prompt = "Write FizzBuzz from 1 to 100",
-    RequiredPatterns = new List<string>
-    {
-        @"1.*100",           // Loop range
-        @"[Ff]izz",          // Contains Fizz
-        @"[Bb]uzz",          // Contains Buzz
-    },
-    RequiresCompilation = true,
-    MaxTokenBudget = 500
-};
-```
-
-### Calor Solution
-
-```
-§M{m001:FizzBuzz}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §L{for1:i:1:100:1}
-    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-    §EI (== (% i 3) 0) → §P "Fizz"
-    §EI (== (% i 5) 0) → §P "Buzz"
-    §EL → §P i
-    §/I{if1}
-  §/L{for1}
+**Generated Calor:**
+```calor
+§M{m001:SafeDivideModule}
+§F{f001:SafeDivide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §R (/ a b)
 §/F{f001}
 §/M{m001}
 ```
-- Tokens: ~80
-- Compiles: Yes
-- Success: Yes
-- Efficiency: 1.0 / 80 x 1000 = **12.5**
 
-### C# Solution
-
+**Generated C#:**
 ```csharp
-for (int i = 1; i <= 100; i++)
+public static class Functions
 {
-    if (i % 15 == 0) Console.WriteLine("FizzBuzz");
-    else if (i % 3 == 0) Console.WriteLine("Fizz");
-    else if (i % 5 == 0) Console.WriteLine("Buzz");
-    else Console.WriteLine(i);
+    public static int SafeDivide(int a, int b)
+    {
+        if (b == 0)
+            throw new ArgumentException("Division by zero");
+        return a / b;
+    }
 }
 ```
-- Tokens: ~50
-- Compiles: Yes
-- Success: Yes
-- Efficiency: 1.0 / 50 x 1000 = **20.0**
 
-C# is 1.6x more token-efficient for this task.
+Both compile and pass tests. But note that Calor uses a **contract** (`§Q (!= b 0)`) while C# uses a **guard clause**. This difference doesn't affect task completion scores, but affects code properties.
 
 ---
 
-## Context Window Impact
+### Task: NormalizeScore
+**Prompt:** "Write a public function named NormalizeScore that normalizes a score to the 0-100 range using the formula (score * 100) / maxScore. The maxScore must be positive, score must be non-negative, and score must not exceed maxScore."
 
-Given a typical 8K context window:
+**Generated Calor:**
+```calor
+§F{f001:NormalizeScore:pub}
+  §I{i32:score}
+  §I{i32:maxScore}
+  §O{i32}
+  §Q (>= score 0)
+  §Q (> maxScore 0)
+  §Q (<= score maxScore)
+  §S (>= result 0)
+  §S (<= result 100)
+  §R (/ (* score 100) maxScore)
+§/F{f001}
+```
 
-| Metric | Calor | C# |
-|:-------|:-----|:---|
-| Avg tokens per program | ~100 | ~60 |
-| Programs fitting in context | ~80 | ~130 |
-| % of context for code | Higher | Lower |
-| Room for instructions | Lower | Higher |
+**Generated C#:**
+```csharp
+public static int NormalizeScore(int score, int maxScore)
+{
+    if (maxScore <= 0)
+        throw new ArgumentException("maxScore must be positive");
+    if (score < 0)
+        throw new ArgumentException("score must be non-negative");
+    if (score > maxScore)
+        throw new ArgumentException("score must not exceed maxScore");
+
+    return (score * 100) / maxScore;
+}
+```
+
+Key difference: Calor includes **postconditions** (`§S (>= result 0)` and `§S (<= result 100)`) that guarantee output bounds. C# has no equivalent - bugs in the output go undetected.
 
 ---
 
-## Interpretation
+## Contract Usage Analysis
 
-The 0.86x ratio indicates C# has a meaningful advantage in task completion.
+When examining generated Calor code, the LLM consistently extracts constraints from requirements into contracts:
 
-This is primarily due to:
-1. **Token efficiency** - More room in context window
-2. **Training data** - LLMs know C# patterns better
-3. **Error recovery** - C# errors are easier to fix
+| Requirement Language | Generated Contract |
+|:---------------------|:-------------------|
+| "must only accept non-negative" | `§Q (>= n 0)` |
+| "must not be zero" | `§Q (!= n 0)` |
+| "result is never negative" | `§S (>= result 0)` |
+| "result is always at least 1" | `§S (>= result 1)` |
+| "must be between X and Y" | `§Q (>= n X)` + `§Q (<= n Y)` |
 
-However, the gap is modest, and Calor's advantages in comprehension and precision may offset this in specific scenarios.
+This demonstrates that the **Contract-First Methodology** in the skills file is working - the LLM translates requirement language into executable contracts.
 
 ---
 
-## When Calor Catches Up
+## Benchmark Execution
 
-Calor may perform better when:
-- Tasks require understanding existing Calor code
-- Contract verification is part of the task
-- Precise edits are needed
-- Comprehension quality matters more than speed
+### Running Locally
+
+```bash
+# Run the LLM benchmark with neutral prompts
+dotnet run --project tests/Calor.Evaluation -- llm-tasks \
+  --manifest tests/Calor.Evaluation/Tasks/task-manifest-neutral.json \
+  --verbose
+
+# Refresh cache (re-run all tasks)
+dotnet run --project tests/Calor.Evaluation -- llm-tasks \
+  --manifest tests/Calor.Evaluation/Tasks/task-manifest-neutral.json \
+  --refresh-cache
+```
+
+### Cost Controls
+
+- Results are cached to avoid redundant API calls
+- Budget caps prevent runaway costs
+- Estimated cost: ~$0.76 for 50 tasks
+
+### Model Information
+
+| Property | Value |
+|:---------|:------|
+| Provider | Anthropic |
+| Model | Claude Sonnet 4 |
+| Model ID | `claude-sonnet-4-20250514` |
+
+---
+
+## Transparency
+
+### Reproducibility
+
+All benchmark data is available:
+- Task definitions: `tests/Calor.Evaluation/Tasks/task-manifest-neutral.json`
+- Skills file: `tests/Calor.Evaluation/Skills/calor-language-skills.md`
+- Results: `llm-results.json` (includes generated code for every task)
+
+### Limitations
+
+- Results may vary with model updates
+- 50 tasks is a limited sample size
+- Simple tasks may not reveal differences in more complex scenarios
+
+---
+
+## Future: Safety Benchmark
+
+Task completion measures "can correct code be written?" A separate **Safety Benchmark** would measure "does the code catch more bugs?" by:
+
+1. Running adversarial tests with invalid inputs
+2. Measuring contract enforcement (Calor) vs exception handling (C#)
+3. Comparing error message quality and precision
+
+This would highlight Calor's contract advantages in scenarios where C# code might silently fail or produce incorrect results.
 
 ---
 
 ## Next
 
+- [Methodology](/benchmarking/methodology/) - Full benchmark methodology
 - [Token Economics](/benchmarking/metrics/token-economics/) - Token count comparison

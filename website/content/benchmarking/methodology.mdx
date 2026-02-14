@@ -227,7 +227,98 @@ The BCL effect manifest tracks which .NET methods have effects, enabling verific
 
 ---
 
-These metrics explain why Calor achieves **1.09x overall advantage** despite losing on token efficiency: the semantic verification pipeline catches classes of bugs that syntax-only tools cannot detect.
+These metrics explain why Calor achieves **1.12x overall advantage** despite losing on token efficiency: the semantic verification pipeline catches classes of bugs that syntax-only tools cannot detect.
+
+---
+
+## LLM Task Completion Benchmark
+
+The Task Completion metric uses a dedicated LLM benchmark that directly measures AI code generation success using **language-neutral prompts**.
+
+### Design Philosophy: Neutral Prompts
+
+The benchmark uses the same functional requirements for both languages without syntax hints:
+
+```
+Write a public function named Factorial that computes the factorial
+of an integer n. The function must only accept non-negative values
+of n. The result is always at least 1.
+```
+
+This tests whether an LLM can **learn** Calor and translate requirements into idiomatic code, rather than simply following syntax instructions.
+
+### How It Works
+
+1. **50 programming tasks** defined across 4 categories
+2. **Same prompt** given to both Calor and C# (no language-specific hints)
+3. Calor generation uses a **skills file** teaching Contract-First Methodology
+4. Generated code is compiled and tested against test suites
+5. Scores computed based on compilation success and test pass rate
+
+### Task Categories
+
+| Category | Count | Examples |
+|:---------|:------|:---------|
+| basic-algorithms | 15 | Factorial, Fibonacci, IsPrime, GCD, Power |
+| safety | 10 | SafeDivide, Clamp, SafeModulo, NormalizeScore |
+| data-structures | 10 | Sum, Max, Min, Average, Median |
+| logic | 15 | BoolToInt, LogicalAnd, IsMultipleOf, SameSign |
+
+### Scoring Formula
+
+```
+Score = 0.4 × compilation + 0.6 × tests
+```
+
+| Factor | Weight | Description |
+|:-------|:-------|:------------|
+| Compilation | 40% | Does the generated code compile? |
+| Test Cases | 60% | Percentage of test cases passing |
+
+No bonus for contracts - we measure task completion fairly.
+
+### Results Summary
+
+| Metric | Calor | C# |
+|:-------|:------|:---|
+| Average Score | 1.00 | 1.00 |
+| Advantage Ratio | **1.00x (Tie)** | - |
+| Compilation Rate | 100% | 100% |
+| Test Pass Rate | 100% | 100% |
+
+The 1.00x ratio demonstrates that **Calor is as learnable as C#** - LLMs can write correct code in both languages equally well.
+
+### Contract Usage (Qualitative)
+
+While task completion scores are equal, examining the generated code shows Calor consistently produces contracts:
+
+| Requirement | Calor | C# |
+|:------------|:------|:---|
+| "must not be zero" | `§Q (!= b 0)` | `if (b == 0) throw...` |
+| "result is never negative" | `§S (>= result 0)` | *(no equivalent)* |
+| "must be between X and Y" | `§Q (>= n X)` + `§Q (<= n Y)` | Two guard clauses |
+
+Calor includes **postconditions** that C# cannot express - a qualitative advantage not captured by task completion scores.
+
+### Running Locally
+
+```bash
+# Run LLM benchmark with neutral prompts
+dotnet run --project tests/Calor.Evaluation -- llm-tasks \
+  --manifest tests/Calor.Evaluation/Tasks/task-manifest-neutral.json \
+  --verbose
+
+# Refresh cache (re-run all tasks)
+dotnet run --project tests/Calor.Evaluation -- llm-tasks \
+  --manifest tests/Calor.Evaluation/Tasks/task-manifest-neutral.json \
+  --refresh-cache
+```
+
+### Cost Controls
+
+- **Caching:** Results cached to avoid redundant API calls
+- **Budget caps:** Maximum spend per run (~$0.76 for 50 tasks)
+- **Estimated cost displayed** before running
 
 ---
 
