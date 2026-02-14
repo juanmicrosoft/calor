@@ -409,73 +409,95 @@ Example:
 
 ### Collections
 
-**List creation and operations:**
+**List - create empty, add values, iterate:**
 ```
-§LIST{numbers:i32}      // Create List<int> named numbers
-  10                    // Initial values (optional)
-  20
-  30
-§/LIST{numbers}         // Close list declaration
-§PUSH{numbers} 40       // Add 40 to end of list
-§CNT{numbers}           // Get count (returns 4)
-§HAS{numbers} 20        // Check if contains 20
+§LIST{nums:i32}         // Create EMPTY List<int> named nums
+§/LIST{nums}            // Close list (empty)
+§PUSH{nums} 10          // Add 10 to list
+§PUSH{nums} 20          // Add 20 to list
+§PUSH{nums} 30          // Add 30 to list
+§CNT{nums}              // Get count (returns 3)
+§HAS{nums} 20           // Check if contains (returns true)
+
+§EACH{e1:n} nums        // Foreach n in nums
+  ...body...
+§/EACH{e1}              // Close foreach
 ```
 
-**Dictionary creation and operations:**
+**Complete function with list iteration:**
+```
+§F{f001:SumList:pub}
+  §O{i32}
+  §LIST{nums:i32}
+  §/LIST{nums}
+  §PUSH{nums} 10
+  §PUSH{nums} 20
+  §PUSH{nums} 30
+  §VAR{sum:i32} 0
+  §EACH{e1:n} nums
+    §SET{sum} (+ sum n)
+  §/EACH{e1}
+  §R sum
+§/F{f001}
+```
+
+**Dictionary - create, add entries, iterate:**
 ```
 §DICT{scores:str:i32}   // Create Dictionary<string, int>
-  §KV "alice" 95        // Key-value pairs
-  §KV "bob" 87
-§/DICT{scores}          // Close dictionary declaration
-§PUT{scores} "charlie" 92  // Add or update entry
+§/DICT{scores}          // Close (empty)
+§PUT{scores} "alice" 95 // Add key-value pair
+§PUT{scores} "bob" 87   // Add another pair
 §HAS{scores} "alice"    // Check if key exists
-```
 
-**HashSet creation:**
-```
-§HSET{tags:str}         // Create HashSet<string>
-  "urgent"
-  "review"
-§/HSET{tags}            // Close set declaration
-§PUSH{tags} "approved"  // Add to set
-§HAS{tags} "urgent"     // Check membership
-```
-
-**Iteration (foreach):**
-```
-§EACH{e1:item} numbers  // Foreach item in numbers
-  §P item               // Print current item
-§/EACH{e1}              // Close foreach
-
-§EACHKV{e2:k:v} scores  // Foreach key-value in dictionary
+§EACHKV{e1:k:v} scores  // Foreach key-value
   §P k
   §P v
-§/EACHKV{e2}            // Close foreach
+§/EACHKV{e1}            // Close foreach
+```
+
+**HashSet - create, add values:**
+```
+§HSET{tags:str}         // Create HashSet<string>
+§/HSET{tags}            // Close (empty)
+§PUSH{tags} "urgent"    // Add to set
+§PUSH{tags} "review"    // Add to set
+§HAS{tags} "urgent"     // Check membership
 ```
 
 ### Async Functions
 
-**Async function definition:**
+**Async function with await:**
 ```
-§AF{af1:FetchDataAsync:pub}
-  §I{str:url}
-  §O{Task<str>}
-  §E{net}
-  §AWAIT (HttpClient.GetStringAsync url)
+§AF{af1:ProcessAsync:pub}
+  §O{Task<i32>}
+  §E{net:r}
+  §VAR{data:i32} §AWAIT (FetchDataAsync)
+  §R (* data 2)
 §/AF{af1}
 ```
 
-**Await expression:**
-```
-§AWAIT expression       // Await an async operation
-```
+Key points:
+- Use `§AF{id:Name:pub}` for async function (not `§F`)
+- Return type is `Task<T>`
+- Use `§AWAIT expression` to await async operations
+- `§E{net:r}` declares network read effect
 
 ### Lambdas and Delegates
 
-**Inline arrow lambda:**
+**Function using inline arrow lambda:**
 ```
-(x) → (* x 2)           // Lambda that doubles x
+§F{f001:ApplyDouble:pub}
+  §I{i32:x}
+  §O{i32}
+  §VAR{doubler:Func<i32,i32>} (n) → (* n 2)
+  §R (doubler x)
+§/F{f001}
 ```
+
+Key lambda syntax:
+- `(param) → expression` for inline lambda
+- `(a, b) → (+ a b)` for multiple params
+- Use `§VAR{name:type} lambda` to bind lambda to variable
 
 **Block lambda (multi-statement):**
 ```
