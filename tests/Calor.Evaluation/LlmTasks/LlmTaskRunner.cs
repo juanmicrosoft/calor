@@ -99,12 +99,12 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
     {
         options ??= new LlmTaskRunnerOptions();
 
-        // Generate code for both languages
+        // Generate code for both languages using language-appropriate prompts
         var calorResult = await GenerateAndEvaluateAsync(
-            task, "calor", task.Prompts.Calor, options, cancellationToken);
+            task, "calor", task.GetPrompt("calor"), options, cancellationToken);
 
         var csharpResult = await GenerateAndEvaluateAsync(
-            task, "csharp", task.Prompts.CSharp, options, cancellationToken);
+            task, "csharp", task.GetPrompt("csharp"), options, cancellationToken);
 
         return new LlmTaskResult
         {
@@ -129,17 +129,19 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
         foreach (var task in tasks)
         {
             // Estimate tokens for both prompts
-            var calorInputTokens = _provider.EstimateTokenCount(task.Prompts.Calor);
-            var csharpInputTokens = _provider.EstimateTokenCount(task.Prompts.CSharp);
+            var calorPrompt = task.GetPrompt("calor");
+            var csharpPrompt = task.GetPrompt("csharp");
+            var calorInputTokens = _provider.EstimateTokenCount(calorPrompt);
+            var csharpInputTokens = _provider.EstimateTokenCount(csharpPrompt);
 
             // Estimate output (assume ~500 tokens per generation)
             var estimatedOutputTokens = 500;
 
             // Check cache
             var calorCached = options.UseCache && !options.RefreshCache &&
-                _cache.Contains(_provider.Name, task.Prompts.Calor, LlmGenerationOptions.Default);
+                _cache.Contains(_provider.Name, calorPrompt, LlmGenerationOptions.Default);
             var csharpCached = options.UseCache && !options.RefreshCache &&
-                _cache.Contains(_provider.Name, task.Prompts.CSharp, LlmGenerationOptions.Default);
+                _cache.Contains(_provider.Name, csharpPrompt, LlmGenerationOptions.Default);
 
             if (!calorCached)
             {
@@ -474,7 +476,18 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
             }
 
             // Verify output
-            var verification = _verifier.Verify(execResult, testCase.Expected);
+            if (!testCase.Expected.HasValue)
+            {
+                // No expected value means test passes if execution succeeded
+                return Task.FromResult(new TestCaseResult
+                {
+                    Index = index,
+                    Passed = execResult.Success,
+                    ErrorMessage = execResult.Success ? null : "No expected value and execution failed",
+                    ExecutionTimeMs = execResult.DurationMs
+                });
+            }
+            var verification = _verifier.Verify(execResult, testCase.Expected.Value);
 
             return Task.FromResult(new TestCaseResult
             {
@@ -560,27 +573,35 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
     }
 
     private static string? _calorSkillsContent;
+    private static string? _csharpSkillsContent;
 
-    private static string? GetCalorSkillsContent()
+    private static string? GetSkillsContent(string language)
     {
-        if (_calorSkillsContent != null)
-            return _calorSkillsContent;
+        var cacheRef = language == "calor" ? ref _calorSkillsContent : ref _csharpSkillsContent;
+
+        if (cacheRef != null)
+            return cacheRef;
+
+        var fileName = language == "calor" ? "calor-language-skills.md" : "csharp-language-skills.md";
 
         // Try to load from various locations
         var possiblePaths = new[]
         {
+            // Evaluation skills directory (new location)
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Skills", fileName),
+            Path.Combine(Directory.GetCurrentDirectory(), "tests", "Calor.Evaluation", "Skills", fileName),
+            Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "tests", "Calor.Evaluation", "Skills", fileName)),
+            // Compiler skills directory (legacy location for Calor)
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "src", "Calor.Compiler", "Resources", "Skills", "claude-calor-SKILL.md"),
             Path.Combine(Directory.GetCurrentDirectory(), "src", "Calor.Compiler", "Resources", "Skills", "claude-calor-SKILL.md"),
-            // Fallback to embedded resource path
-            Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "src", "Calor.Compiler", "Resources", "Skills", "claude-calor-SKILL.md"))
         };
 
         foreach (var path in possiblePaths)
         {
             if (File.Exists(path))
             {
-                _calorSkillsContent = File.ReadAllText(path);
-                return _calorSkillsContent;
+                cacheRef = File.ReadAllText(path);
+                return cacheRef;
             }
         }
 
@@ -588,17 +609,44 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
         return null;
     }
 
+    private static string? GetCalorSkillsContent() => GetSkillsContent("calor");
+    private static string? GetCSharpSkillsContent() => GetSkillsContent("csharp");
+
     private static string GetSystemPrompt(string language)
     {
         return language.ToLowerInvariant() switch
         {
             "calor" => GetCalorSystemPrompt(),
-
-            "csharp" or "c#" => @"You are an expert C# programmer. Generate only valid C# code without any explanation.
-Create a public static class with a public static method. Output only the code, no markdown.",
-
+            "csharp" or "c#" => GetCSharpSystemPrompt(),
             _ => "You are an expert programmer. Generate only valid source code without any explanation."
         };
+    }
+
+    /// <summary>
+    /// Gets the system prompt for a specific language (public for use by SafetyBenchmarkRunner).
+    /// </summary>
+    public static string GetSystemPromptForLanguage(string language) => GetSystemPrompt(language);
+
+    private static string GetCSharpSystemPrompt()
+    {
+        var skillsContent = GetCSharpSkillsContent();
+
+        if (skillsContent != null)
+        {
+            return $@"You are an expert C# programmer. Generate only valid C# code without any explanation.
+
+{skillsContent}
+
+IMPORTANT INSTRUCTIONS:
+1. Output ONLY the C# code, no markdown code blocks, no explanation
+2. Create a public static class named 'Functions' with the method
+3. Use appropriate guard clauses/exceptions for input validation
+4. Follow standard C# naming conventions";
+        }
+
+        // Fallback to basic prompt
+        return @"You are an expert C# programmer. Generate only valid C# code without any explanation.
+Create a public static class with a public static method. Output only the code, no markdown.";
     }
 
     private static string GetCalorSystemPrompt()

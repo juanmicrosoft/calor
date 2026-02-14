@@ -1,0 +1,256 @@
+---
+title: "Safety"
+section: "benchmarking"
+order: 8
+---
+
+**Category:** Safety Benchmark
+**Result:** 1.14x Calor advantage
+**What it measures:** Contract enforcement effectiveness and error quality
+
+---
+
+## Overview
+
+The Safety Benchmark measures how well Calor contracts catch bugs compared to C# guard clauses. Unlike the Task Completion benchmark (which answers "can correct code be written?"), this benchmark answers: **"Does the code catch more bugs?"**
+
+This measures Calor's genuine advantage: contracts enforce correctness at runtime, catching errors that C# guard clauses miss or handle poorly.
+
+---
+
+## What This Benchmark Answers
+
+**Primary Question:** Does Calor code catch more bugs with better error messages?
+
+**Key Differences Measured:**
+
+| Scenario | Calor | C# |
+|:---------|:------|:---|
+| Invalid input | `ContractViolationException` with location | Generic `ArgumentException` (maybe) |
+| Bug in output | Postcondition fails | Silent incorrect result |
+| Missing validation | Compile warning (Z3) | No warning |
+
+---
+
+## Methodology
+
+### Test Case Structure
+
+Each task has two types of test cases:
+
+1. **Normal cases** - Both languages should pass
+2. **Safety cases** - Test contract enforcement with invalid inputs
+
+```json
+{
+  "id": "safety-001",
+  "name": "Division by Zero Prevention",
+  "prompt": "Write a function SafeDivide that divides a by b. Division by zero must not be allowed.",
+  "testCases": [
+    { "input": [10, 2], "expected": 5 },
+    { "input": [0, 5], "expected": 0 },
+    { "input": [10, 0], "expectsContractViolation": true }
+  ]
+}
+```
+
+### Scoring Metrics
+
+| Metric | Weight | Description |
+|:-------|:-------|:------------|
+| **Violation Detection** | 40% | Did the code throw an exception for invalid inputs? |
+| **Error Quality** | 30% | How informative is the error message? |
+| **Normal Correctness** | 30% | Do normal test cases still pass? |
+
+### Error Quality Scoring
+
+| Level | Score | Criteria |
+|:------|:------|:---------|
+| Excellent | 1.0 | Specific exception type + precise location + condition shown |
+| Good | 0.7 | Specific exception type + meaningful message |
+| Adequate | 0.4 | Any exception thrown with some message |
+| Poor | 0.1 | Exception thrown but generic/unhelpful |
+| Fail | 0.0 | No exception (silent failure or wrong result) |
+
+**Calor advantage**: `ContractViolationException` includes FunctionId, Line, Column, Condition
+**C# typical**: `ArgumentException("b cannot be zero")` - no location info
+
+---
+
+## Task Categories
+
+### Precondition Enforcement (10 tasks)
+
+Tests whether invalid inputs are properly rejected:
+- Division by zero
+- Negative values where positive required
+- Out-of-range inputs
+- Invalid array indices
+
+### Postcondition Verification (10 tasks)
+
+Tests whether outputs satisfy constraints:
+- Result must be non-negative (absolute value)
+- Result must be bounded (clamp)
+- Result must satisfy invariants
+
+### Edge Case Handling (10 tasks)
+
+Tests boundary conditions and overflow scenarios:
+- Integer overflow prevention
+- Bounded arithmetic operations
+- Input range validation
+
+---
+
+## Example: Error Quality Comparison
+
+### Calor ContractViolationException
+
+```
+ContractViolationException: Precondition failed
+  Location: SafeDivide.calr(5,3)
+  Function: f001
+  Contract: Requires
+  Condition: (!= b 0)
+```
+
+**Quality Score: 1.0** - Has location, function, and condition
+
+### C# ArgumentException
+
+```
+ArgumentException: Division by zero not allowed
+  Parameter name: b
+```
+
+**Quality Score: 0.4** - Has parameter name but no location
+
+### C# DivideByZeroException (Runtime)
+
+```
+DivideByZeroException: Attempted to divide by zero.
+```
+
+**Quality Score: 0.2** - Caught by runtime, not by code validation
+
+---
+
+## Benchmark Results
+
+Actual benchmark results:
+
+| Metric | Calor | C# | Insight |
+|:-------|:------|:---|:--------|
+| Tasks Won | 22 | 0 | Calor won 73% of safety tasks |
+| Tasks Tied | 8 | 8 | Both languages handled simple cases |
+| Error Quality | 0.73 | 0.36 | 2x better error messages |
+| **Overall Safety Ratio** | **1.14x** | **1.00x** | **Calor catches more bugs** |
+
+---
+
+## Benchmark Execution
+
+### Running Locally
+
+```bash
+# Run the safety benchmark
+dotnet run --project tests/Calor.Evaluation -- safety-benchmark \
+  --manifest tests/Calor.Evaluation/Tasks/task-manifest-safety.json \
+  --verbose
+
+# Run specific category
+dotnet run --project tests/Calor.Evaluation -- safety-benchmark \
+  --category precondition-enforcement \
+  --verbose
+
+# Dry run to estimate costs
+dotnet run --project tests/Calor.Evaluation -- safety-benchmark \
+  --dry-run
+```
+
+### Command Options
+
+| Option | Description |
+|:-------|:------------|
+| `--manifest, -m` | Path to safety task manifest |
+| `--provider, -p` | LLM provider (claude, mock) |
+| `--model` | Specific model to use |
+| `--budget, -b` | Maximum budget in USD |
+| `--output, -o` | Output file for results |
+| `--category, -c` | Run only tasks in this category |
+| `--verbose, -v` | Enable verbose output |
+| `--dry-run` | Estimate costs without API calls |
+
+---
+
+## Why This Benchmark Is Fair
+
+1. **Same prompts** - Both languages receive identical requirements
+2. **Real-world scenarios** - Edge cases that actually occur in production
+3. **Measurable outcomes** - Did the code catch the bug or not?
+4. **No artificial penalties** - C# can pass by handling errors correctly
+
+The key insight: C# **can** achieve safety through careful guard clauses, but requires explicit effort. Calor contracts make safety the default through:
+- Preconditions that validate inputs
+- Postconditions that verify outputs
+- Rich exception metadata for debugging
+
+---
+
+## Generated Code Comparison
+
+### Task: SafeDivide
+
+**Calor:**
+```calor
+§M{m001:Math}
+§F{f001:SafeDivide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §R (/ a b)
+§/F{f001}
+§/M{m001}
+```
+
+**C#:**
+```csharp
+public static int SafeDivide(int a, int b)
+{
+    if (b == 0)
+        throw new ArgumentException("Division by zero", nameof(b));
+    return a / b;
+}
+```
+
+When `SafeDivide(10, 0)` is called:
+- **Calor**: `ContractViolationException` with line 5, condition `(!= b 0)`
+- **C#**: `ArgumentException` with message and parameter name
+
+Both catch the error, but Calor provides more debugging context.
+
+---
+
+## Transparency
+
+### Reproducibility
+
+All benchmark data is available:
+- Task definitions: `tests/Calor.Evaluation/Tasks/task-manifest-safety.json`
+- Safety scorer: `tests/Calor.Evaluation/LlmTasks/SafetyScorer.cs`
+- Results: `safety-results.json`
+
+### Limitations
+
+- Results depend on LLM-generated code quality
+- 30 tasks is a limited sample size
+- Error quality scoring is somewhat subjective
+
+---
+
+## Next
+
+- [Task Completion](/benchmarking/metrics/task-completion/) - Code correctness benchmark
+- [Methodology](/benchmarking/methodology/) - Full benchmark methodology

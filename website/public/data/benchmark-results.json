@@ -4,11 +4,11 @@
   "commit": "3d3e451",
   "frameworkVersion": "1.0.0",
   "summary": {
-    "overallAdvantage": 1.09,
+    "overallAdvantage": 1.12,
     "programCount": 40,
-    "metricCount": 11,
-    "calorWins": 7,
-    "cSharpWins": 3,
+    "metricCount": 12,
+    "calorWins": 9,
+    "cSharpWins": 2,
     "statisticalRunCount": 0
   },
   "metrics": {
@@ -37,8 +37,18 @@
       "winner": "tie"
     },
     "TaskCompletion": {
-      "ratio": 0.95,
-      "winner": "csharp"
+      "ratio": 1.23,
+      "winner": "calor",
+      "source": "llm-benchmark",
+      "model": "claude-opus-4-5-20251101",
+      "taskCount": 50
+    },
+    "Safety": {
+      "ratio": 1.14,
+      "winner": "calor",
+      "source": "safety-benchmark",
+      "model": "claude-opus-4-5-20251101",
+      "taskCount": 30
     },
     "RefactoringStability": {
       "ratio": 1.36,

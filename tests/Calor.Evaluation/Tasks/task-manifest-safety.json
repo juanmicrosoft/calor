@@ -1,0 +1,623 @@
+{
+  "version": "2.0",
+  "description": "Safety benchmark measuring contract enforcement and error quality",
+  "tasks": [
+    {
+      "id": "safety-001",
+      "name": "Division by Zero Prevention",
+      "category": "precondition-enforcement",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeDivide that divides integer a by integer b. Division by zero must not be allowed.",
+      "testCases": [
+        { "input": [10, 2], "expected": 5 },
+        { "input": [15, 3], "expected": 5 },
+        { "input": [0, 5], "expected": 0 },
+        { "input": [10, 0], "expectsContractViolation": true, "description": "Division by zero" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeDivide",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "division"]
+    },
+    {
+      "id": "safety-002",
+      "name": "Positive Square Root Input",
+      "category": "precondition-enforcement",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeSqrtInt that returns the integer square root of n. The input must be non-negative.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [1], "expected": 1 },
+        { "input": [4], "expected": 2 },
+        { "input": [16], "expected": 4 },
+        { "input": [-1], "expectsContractViolation": true, "description": "Negative input" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeSqrtInt",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "math"]
+    },
+    {
+      "id": "safety-003",
+      "name": "Modulo by Zero Prevention",
+      "category": "precondition-enforcement",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeModulo that returns a % b. The divisor b must not be zero.",
+      "testCases": [
+        { "input": [10, 3], "expected": 1 },
+        { "input": [15, 5], "expected": 0 },
+        { "input": [7, 4], "expected": 3 },
+        { "input": [10, 0], "expectsContractViolation": true, "description": "Modulo by zero" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeModulo",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "math"]
+    },
+    {
+      "id": "safety-004",
+      "name": "Factorial Non-Negative Input",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeFactorial that computes the factorial of n. The input must be non-negative.",
+      "testCases": [
+        { "input": [0], "expected": 1 },
+        { "input": [1], "expected": 1 },
+        { "input": [5], "expected": 120 },
+        { "input": [-1], "expectsContractViolation": true, "description": "Negative factorial" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeFactorial",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "recursion"]
+    },
+    {
+      "id": "safety-005",
+      "name": "Positive GCD Inputs",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeGcd that computes the greatest common divisor of two integers. Both inputs must be positive.",
+      "testCases": [
+        { "input": [12, 8], "expected": 4 },
+        { "input": [17, 13], "expected": 1 },
+        { "input": [48, 18], "expected": 6 },
+        { "input": [0, 5], "expectsContractViolation": true, "description": "Zero input" },
+        { "input": [-5, 10], "expectsContractViolation": true, "description": "Negative input" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeGcd",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "math"]
+    },
+    {
+      "id": "safety-006",
+      "name": "Array Index Validation",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "prompt": "Write a public function named ValidateIndex that returns true if index is valid for an array of given size (0 <= index < size). The size must be positive.",
+      "testCases": [
+        { "input": [0, 5], "expected": true },
+        { "input": [4, 5], "expected": true },
+        { "input": [5, 5], "expected": false },
+        { "input": [-1, 5], "expected": false },
+        { "input": [0, 0], "expectsContractViolation": true, "description": "Zero size" },
+        { "input": [0, -1], "expectsContractViolation": true, "description": "Negative size" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "ValidateIndex",
+        "parameterTypes": ["int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["precondition", "safety", "bounds"]
+    },
+    {
+      "id": "safety-007",
+      "name": "Percentage Range Validation",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "prompt": "Write a public function named ApplyPercentage that returns (value * percent) / 100. The percent must be between 0 and 100 inclusive.",
+      "testCases": [
+        { "input": [200, 50], "expected": 100 },
+        { "input": [100, 100], "expected": 100 },
+        { "input": [100, 0], "expected": 0 },
+        { "input": [100, -1], "expectsContractViolation": true, "description": "Negative percent" },
+        { "input": [100, 101], "expectsContractViolation": true, "description": "Percent over 100" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "ApplyPercentage",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "range"]
+    },
+    {
+      "id": "safety-008",
+      "name": "Decrement Positive Only",
+      "category": "precondition-enforcement",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeDecrement that returns n - 1. The input must be positive (greater than zero).",
+      "testCases": [
+        { "input": [1], "expected": 0 },
+        { "input": [5], "expected": 4 },
+        { "input": [100], "expected": 99 },
+        { "input": [0], "expectsContractViolation": true, "description": "Zero input" },
+        { "input": [-1], "expectsContractViolation": true, "description": "Negative input" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeDecrement",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety"]
+    },
+    {
+      "id": "safety-009",
+      "name": "Half of Even Number",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "prompt": "Write a public function named HalfEven that returns n / 2. The input must be even (divisible by 2).",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [10], "expected": 5 },
+        { "input": [-4], "expected": -2 },
+        { "input": [1], "expectsContractViolation": true, "description": "Odd input" },
+        { "input": [7], "expectsContractViolation": true, "description": "Odd input" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "HalfEven",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "parity"]
+    },
+    {
+      "id": "safety-010",
+      "name": "Ordered Range Validation",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "prompt": "Write a public function named InRange that returns true if value is between min and max inclusive. The min must be less than or equal to max.",
+      "testCases": [
+        { "input": [5, 0, 10], "expected": true },
+        { "input": [0, 0, 10], "expected": true },
+        { "input": [10, 0, 10], "expected": true },
+        { "input": [11, 0, 10], "expected": false },
+        { "input": [5, 10, 0], "expectsContractViolation": true, "description": "min > max" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "InRange",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["precondition", "safety", "range"]
+    },
+    {
+      "id": "safety-011",
+      "name": "Absolute Value Non-Negative Result",
+      "category": "postcondition-verification",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeAbs that returns the absolute value of n. The result must always be non-negative.",
+      "testCases": [
+        { "input": [5], "expected": 5 },
+        { "input": [-5], "expected": 5 },
+        { "input": [0], "expected": 0 },
+        { "input": [-100], "expected": 100 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeAbs",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "safety", "math"]
+    },
+    {
+      "id": "safety-012",
+      "name": "Clamp Result Bounds",
+      "category": "postcondition-verification",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeClamp that clamps value between min and max. The min must be <= max. The result must always be >= min and <= max.",
+      "testCases": [
+        { "input": [5, 0, 10], "expected": 5 },
+        { "input": [-5, 0, 10], "expected": 0 },
+        { "input": [15, 0, 10], "expected": 10 },
+        { "input": [0, 0, 0], "expected": 0 },
+        { "input": [5, 10, 0], "expectsContractViolation": true, "description": "min > max" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeClamp",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "precondition", "safety", "bounds"]
+    },
+    {
+      "id": "safety-013",
+      "name": "Positive Difference Result",
+      "category": "postcondition-verification",
+      "difficulty": 1,
+      "prompt": "Write a public function named PositiveDiff that returns the absolute difference between a and b. The result must always be non-negative.",
+      "testCases": [
+        { "input": [10, 3], "expected": 7 },
+        { "input": [3, 10], "expected": 7 },
+        { "input": [5, 5], "expected": 0 },
+        { "input": [-5, 5], "expected": 10 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "PositiveDiff",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "safety", "math"]
+    },
+    {
+      "id": "safety-014",
+      "name": "Square Non-Negative Result",
+      "category": "postcondition-verification",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeSquare that returns n * n. The result must always be non-negative.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [3], "expected": 9 },
+        { "input": [-3], "expected": 9 },
+        { "input": [10], "expected": 100 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeSquare",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "safety", "math"]
+    },
+    {
+      "id": "safety-015",
+      "name": "Normalized Score Bounds",
+      "category": "postcondition-verification",
+      "difficulty": 2,
+      "prompt": "Write a public function named NormalizeScore that normalizes a score to 0-100 using formula (score * 100) / maxScore. The maxScore must be positive, score must be non-negative and not exceed maxScore. The result must be between 0 and 100.",
+      "testCases": [
+        { "input": [50, 100], "expected": 50 },
+        { "input": [25, 50], "expected": 50 },
+        { "input": [0, 100], "expected": 0 },
+        { "input": [100, 100], "expected": 100 },
+        { "input": [50, 0], "expectsContractViolation": true, "description": "Zero maxScore" },
+        { "input": [-1, 100], "expectsContractViolation": true, "description": "Negative score" },
+        { "input": [101, 100], "expectsContractViolation": true, "description": "Score > maxScore" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "NormalizeScore",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "precondition", "safety", "range"]
+    },
+    {
+      "id": "safety-016",
+      "name": "Sign Function Bounds",
+      "category": "postcondition-verification",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeSign that returns -1 if n < 0, 0 if n == 0, or 1 if n > 0. The result must always be -1, 0, or 1.",
+      "testCases": [
+        { "input": [5], "expected": 1 },
+        { "input": [-5], "expected": -1 },
+        { "input": [0], "expected": 0 },
+        { "input": [100], "expected": 1 },
+        { "input": [-100], "expected": -1 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeSign",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "safety", "math"]
+    },
+    {
+      "id": "safety-017",
+      "name": "GCD Positive Result",
+      "category": "postcondition-verification",
+      "difficulty": 2,
+      "prompt": "Write a public function named GcdPositive that computes the GCD of two positive integers. Both inputs must be positive. The result must also be positive.",
+      "testCases": [
+        { "input": [12, 8], "expected": 4 },
+        { "input": [17, 13], "expected": 1 },
+        { "input": [100, 25], "expected": 25 },
+        { "input": [0, 5], "expectsContractViolation": true, "description": "Zero input" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "GcdPositive",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "precondition", "safety", "math"]
+    },
+    {
+      "id": "safety-018",
+      "name": "Max At Least Inputs",
+      "category": "postcondition-verification",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeMax that returns the maximum of a and b. The result must be >= a and >= b.",
+      "testCases": [
+        { "input": [5, 3], "expected": 5 },
+        { "input": [3, 5], "expected": 5 },
+        { "input": [-1, -5], "expected": -1 },
+        { "input": [7, 7], "expected": 7 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeMax",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "safety", "comparison"]
+    },
+    {
+      "id": "safety-019",
+      "name": "Min At Most Inputs",
+      "category": "postcondition-verification",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeMin that returns the minimum of a and b. The result must be <= a and <= b.",
+      "testCases": [
+        { "input": [5, 3], "expected": 3 },
+        { "input": [3, 5], "expected": 3 },
+        { "input": [-1, -5], "expected": -5 },
+        { "input": [7, 7], "expected": 7 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeMin",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "safety", "comparison"]
+    },
+    {
+      "id": "safety-020",
+      "name": "Factorial Positive Result",
+      "category": "postcondition-verification",
+      "difficulty": 2,
+      "prompt": "Write a public function named FactorialPositive that computes factorial of n. Input must be non-negative. The result must be at least 1.",
+      "testCases": [
+        { "input": [0], "expected": 1 },
+        { "input": [1], "expected": 1 },
+        { "input": [5], "expected": 120 },
+        { "input": [-1], "expectsContractViolation": true, "description": "Negative input" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "FactorialPositive",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "precondition", "safety", "recursion"]
+    },
+    {
+      "id": "safety-021",
+      "name": "Multiply Bounded",
+      "category": "edge-case-handling",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeMultiply that multiplies a and b. Both inputs must be small enough to avoid overflow (between -1000 and 1000).",
+      "testCases": [
+        { "input": [10, 5], "expected": 50 },
+        { "input": [-10, 5], "expected": -50 },
+        { "input": [0, 1000], "expected": 0 },
+        { "input": [1001, 1], "expectsContractViolation": true, "description": "Input too large" },
+        { "input": [-1001, 1], "expectsContractViolation": true, "description": "Input too small" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeMultiply",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-022",
+      "name": "Power Bounded Exponent",
+      "category": "edge-case-handling",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafePower that computes base^exp. The exponent must be non-negative and at most 20 to avoid overflow.",
+      "testCases": [
+        { "input": [2, 0], "expected": 1 },
+        { "input": [2, 10], "expected": 1024 },
+        { "input": [3, 5], "expected": 243 },
+        { "input": [2, -1], "expectsContractViolation": true, "description": "Negative exponent" },
+        { "input": [2, 21], "expectsContractViolation": true, "description": "Exponent too large" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafePower",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-023",
+      "name": "Sum Bounded Inputs",
+      "category": "edge-case-handling",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeAdd that adds a and b. Both inputs must be between -1000000 and 1000000 to avoid overflow.",
+      "testCases": [
+        { "input": [100, 200], "expected": 300 },
+        { "input": [-100, 100], "expected": 0 },
+        { "input": [1000000, 0], "expected": 1000000 },
+        { "input": [1000001, 0], "expectsContractViolation": true, "description": "Input too large" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeAdd",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-024",
+      "name": "Fibonacci Bounded Input",
+      "category": "edge-case-handling",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeFibonacci that computes the nth Fibonacci number. Input must be non-negative and at most 45 to avoid overflow.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [1], "expected": 1 },
+        { "input": [10], "expected": 55 },
+        { "input": [-1], "expectsContractViolation": true, "description": "Negative input" },
+        { "input": [46], "expectsContractViolation": true, "description": "Input too large" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeFibonacci",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-025",
+      "name": "Bounded Increment",
+      "category": "edge-case-handling",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeIncrement that returns n + 1. Input must be less than 2147483646 to avoid overflow.",
+      "testCases": [
+        { "input": [0], "expected": 1 },
+        { "input": [99], "expected": 100 },
+        { "input": [-100], "expected": -99 },
+        { "input": [2147483646], "expected": 2147483647 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeIncrement",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-026",
+      "name": "Bounded Double",
+      "category": "edge-case-handling",
+      "difficulty": 1,
+      "prompt": "Write a public function named SafeDouble that returns n * 2. Input must be between -1073741823 and 1073741823 to avoid overflow.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [50], "expected": 100 },
+        { "input": [-25], "expected": -50 },
+        { "input": [1073741824], "expectsContractViolation": true, "description": "Input too large" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeDouble",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-027",
+      "name": "Average Without Overflow",
+      "category": "edge-case-handling",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeAverage that returns the integer average of a and b. Both inputs must be between -1000000 and 1000000.",
+      "testCases": [
+        { "input": [10, 20], "expected": 15 },
+        { "input": [5, 5], "expected": 5 },
+        { "input": [7, 8], "expected": 7 },
+        { "input": [1000001, 0], "expectsContractViolation": true, "description": "Input too large" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeAverage",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-028",
+      "name": "Subtraction Bounded",
+      "category": "edge-case-handling",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeSubtract that returns a - b. Both inputs must be between -1000000 and 1000000 to avoid overflow.",
+      "testCases": [
+        { "input": [10, 3], "expected": 7 },
+        { "input": [3, 10], "expected": -7 },
+        { "input": [0, 0], "expected": 0 },
+        { "input": [1000001, 0], "expectsContractViolation": true, "description": "Input too large" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeSubtract",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-029",
+      "name": "Negate Bounded",
+      "category": "edge-case-handling",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeNegate that returns -n. Input must be greater than -2147483647 to avoid overflow.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [5], "expected": -5 },
+        { "input": [-5], "expected": 5 },
+        { "input": [2147483647], "expected": -2147483647 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeNegate",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    },
+    {
+      "id": "safety-030",
+      "name": "Cube Bounded",
+      "category": "edge-case-handling",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeCube that returns n * n * n. Input must be between -1000 and 1000 to avoid overflow.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [3], "expected": 27 },
+        { "input": [-3], "expected": -27 },
+        { "input": [10], "expected": 1000 },
+        { "input": [1001], "expectsContractViolation": true, "description": "Input too large" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.5, "contracts": 0.3 },
+      "expectedSignature": {
+        "functionName": "SafeCube",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "safety", "overflow"]
+    }
+  ]
+}

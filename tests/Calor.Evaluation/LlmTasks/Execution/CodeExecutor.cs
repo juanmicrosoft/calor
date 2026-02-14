@@ -8,6 +8,7 @@ using Calor.Compiler;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Calor.Evaluation.LlmTasks;
 using Calor.Runtime;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
@@ -21,14 +22,17 @@ public sealed class CodeExecutor : IDisposable
 {
     private readonly int _timeoutMs;
     private readonly List<AssemblyLoadContext> _loadContexts = new();
+    private readonly EmitContractMode _contractMode;
 
     /// <summary>
     /// Creates a new code executor.
     /// </summary>
     /// <param name="timeoutMs">Execution timeout in milliseconds.</param>
-    public CodeExecutor(int timeoutMs = 5000)
+    /// <param name="contractMode">Contract enforcement mode for Calor compilation.</param>
+    public CodeExecutor(int timeoutMs = 5000, EmitContractMode contractMode = EmitContractMode.Off)
     {
         _timeoutMs = timeoutMs;
+        _contractMode = contractMode;
     }
 
     /// <summary>
@@ -68,9 +72,10 @@ public sealed class CodeExecutor : IDisposable
                 };
             }
 
-            // Code generation - use Off mode to avoid contract runtime dependencies
-            // and simplify generated code for basic execution testing
-            var emitter = new CSharpEmitter(EmitContractMode.Off);
+            // Code generation - use configured contract mode
+            // Off mode: simple execution testing without contract overhead
+            // Debug mode: full contract enforcement with detailed diagnostics (safety benchmark)
+            var emitter = new CSharpEmitter(_contractMode);
             var generatedCSharp = emitter.Emit(ast);
 
             return new CalorCompileResult
@@ -289,13 +294,20 @@ public sealed class CodeExecutor : IDisposable
                     errorMessage += $" -> {exception.InnerException.Message}";
                 }
 
+                // For safety benchmark: Analyze the exception quality
+                // Determine language based on exception type (ContractViolationException = calor)
+                var language = exception is ContractViolationException ? "calor" : "csharp";
+                var safetyAnalysis = SafetyScorer.AnalyzeException(exception, language);
+
                 return new ExecutionResult
                 {
                     Success = false,
                     Error = errorMessage,
                     ExceptionType = exception.GetType().Name,
                     ContractViolation = isContractViolation,
-                    DurationMs = stopwatch.Elapsed.TotalMilliseconds
+                    DurationMs = stopwatch.Elapsed.TotalMilliseconds,
+                    Exception = exception,
+                    SafetyAnalysis = safetyAnalysis
                 };
             }
 
@@ -614,6 +626,16 @@ public record ExecutionResult
     public bool CompilationFailed { get; init; }
     public bool ContractViolation { get; init; }
     public double DurationMs { get; init; }
+
+    /// <summary>
+    /// The actual exception object (for detailed analysis in safety benchmarks).
+    /// </summary>
+    public Exception? Exception { get; init; }
+
+    /// <summary>
+    /// Safety exception analysis (populated for safety benchmarks).
+    /// </summary>
+    public SafetyExceptionAnalysis? SafetyAnalysis { get; init; }
 
     /// <summary>
     /// Gets the return value as a specific type.

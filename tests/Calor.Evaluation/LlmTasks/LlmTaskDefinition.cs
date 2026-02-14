@@ -31,9 +31,48 @@ public record LlmTaskDefinition
     public int Difficulty { get; init; } = 1;
 
     /// <summary>
-    /// Language-specific prompts for code generation.
+    /// Language-neutral prompt for code generation (v2 format).
+    /// When set, this is used for both languages, with the system prompt
+    /// providing language-specific guidance via skills files.
     /// </summary>
-    public required TaskPrompts Prompts { get; init; }
+    public string? Prompt { get; init; }
+
+    /// <summary>
+    /// Language-specific prompts for code generation (v1 format).
+    /// Used when Prompt is not set for backward compatibility.
+    /// </summary>
+    public TaskPrompts? Prompts { get; init; }
+
+    /// <summary>
+    /// Gets the prompt for a specific language.
+    /// Uses the neutral Prompt if available, otherwise falls back to language-specific prompts.
+    /// </summary>
+    public string GetPrompt(string language)
+    {
+        // Prefer neutral prompt (v2 format)
+        if (!string.IsNullOrEmpty(Prompt))
+        {
+            return Prompt;
+        }
+
+        // Fall back to language-specific prompts (v1 format)
+        if (Prompts != null)
+        {
+            return language.ToLowerInvariant() switch
+            {
+                "calor" => Prompts.Calor,
+                "csharp" or "c#" => Prompts.CSharp,
+                _ => Prompts.CSharp // Default to C#
+            };
+        }
+
+        throw new InvalidOperationException($"Task {Id} has no prompt defined");
+    }
+
+    /// <summary>
+    /// Whether this task uses neutral prompts (v2 format).
+    /// </summary>
+    public bool UsesNeutralPrompt => !string.IsNullOrEmpty(Prompt);
 
     /// <summary>
     /// Test cases to verify the generated code.
@@ -88,9 +127,9 @@ public record TaskTestCase
     public required JsonElement[] Input { get; init; }
 
     /// <summary>
-    /// Expected output value.
+    /// Expected output value. Optional for test cases that expect contract violations.
     /// </summary>
-    public required JsonElement Expected { get; init; }
+    public JsonElement? Expected { get; init; }
 
     /// <summary>
     /// Optional description of what this test case verifies.
