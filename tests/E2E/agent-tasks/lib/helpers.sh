@@ -457,11 +457,13 @@ Example:
 
 **HashSet - create, add values:**
 ```
-§HSET{tags:str}         // Create HashSet<string>
-§/HSET{tags}            // Close (empty)
-§PUSH{tags} "urgent"    // Add to set
-§PUSH{tags} "review"    // Add to set
-§HAS{tags} "urgent"     // Check membership
+§HSET{unique:i32}       // Create HashSet<int>
+§/HSET{unique}          // Close (empty)
+§ADD{unique} 1          // Add to set (use §ADD for sets)
+§ADD{unique} 2          // Add another value
+§ADD{unique} 2          // Duplicates ignored
+§HAS{unique} 1          // Check membership
+§CNT{unique}            // Get count (returns 2)
 ```
 
 ### Async Functions
@@ -527,6 +529,36 @@ Key lambda syntax:
     §R (+ a b)
   §/MT{mt1}
 §/CL{cl1}
+```
+
+**Generic class with type parameter:**
+```
+§CL{cl1:Container:pub}<T>
+  §FLD{_value:T:priv}
+  §MT{mt1:Get:pub}
+    §O{T}
+    §R _value
+  §/MT{mt1}
+  §MT{mt2:Set:pub}
+    §I{T:value}
+    §O{void}
+    §SET{_value} value
+  §/MT{mt2}
+§/CL{cl1}
+```
+
+### Multiple Postconditions (Strengthened Contracts)
+
+When fully specifying behavior, use multiple §S postconditions:
+```
+§F{f001:AbsoluteValue:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (>= result 0)
+  §S (implies (>= x 0) (== result x))
+  §S (implies (< x 0) (== result (- 0 x)))
+  §R (? (< x 0) (- 0 x) x)
+§/F{f001}
 ```
 
 ### File System Effects
