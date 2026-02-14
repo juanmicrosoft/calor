@@ -484,6 +484,30 @@ Key points:
 - Use `§AWAIT expression` to await async operations
 - `§E{net:r}` declares network read effect
 
+**ConfigureAwait(false) for library code:**
+```
+§AF{af1:BackgroundProcessAsync:pub}
+  §O{Task<i32>}
+  §E{net:r}
+  §VAR{result:i32} §AWAIT{false} (SlowOperationAsync)
+  §R result
+§/AF{af1}
+```
+
+**Async method in a class:**
+```
+§CL{cl1:DataService:pub}
+  §AMT{amt1:LoadAsync:pub}
+    §O{Task<i32>}
+    §E{net:r}
+    §AWAIT (HttpClient.GetAsync "url")
+    §R 100
+  §/AMT{amt1}
+§/CL{cl1}
+```
+
+Use `§AMT{` for async method in class (not `§AF{` or `§MT{`).
+
 ### Lambdas and Delegates
 
 **Function using inline arrow lambda:**
@@ -503,9 +527,16 @@ Key lambda syntax:
 
 **Block lambda (multi-statement):**
 ```
-§LM{lm1:i32:i32}        // Lambda: i32 -> i32
-  §R (* x 2)
-§/LM{lm1}
+§F{f001:ApplyComplex:pub}
+  §I{i32:x}
+  §O{i32}
+  §LAM{lam1:n:i32:i32}
+    §IF{if1} (> n 0) → §R (* n 2)
+    §EL → §R 0
+    §/I{if1}
+  §/LAM{lam1}
+  §R (lam1 x)
+§/F{f001}
 ```
 
 **Delegate definition:**
@@ -516,6 +547,25 @@ Key lambda syntax:
   §O{i32}
 §/DG{dg1}
 ```
+
+### Variable Binding and Assignment
+
+**Mutable variables:**
+```
+§F{f001:Accumulate:pub}
+  §I{i32:n}
+  §O{i32}
+  §B{acc:i32} 0           // Bind variable acc = 0
+  §ASSIGN acc (+ acc n)   // Assign acc = acc + n
+  §ASSIGN acc (+ acc n)   // Assign again
+  §ASSIGN acc (+ acc n)   // And again
+  §R acc
+§/F{f001}
+```
+
+Key syntax:
+- `§B{name:type} value` - bind (declare) mutable variable
+- `§ASSIGN name expression` - assign new value to variable
 
 ### Class Methods
 
@@ -579,19 +629,43 @@ When fully specifying behavior, use multiple §S postconditions:
 §E{net,cw}              // Network AND console write
 ```
 
+### Array Types
+
+Use `i32[]` for integer arrays, `str[]` for string arrays:
+```
+§I{i32[]:arr}           // Integer array parameter
+§I{str[]:names}         // String array parameter
+```
+
 ### Quantifiers (for contracts)
 
-**Forall quantifier:**
+**Forall quantifier - all elements positive:**
 ```
-§Q (forall i (and (>= i 0) (< i (len arr))) (> (at arr i) 0))
+§F{f001:AllPositive:pub}
+  §I{i32[]:arr}
+  §O{bool}
+  §S (implies result (forall i (and (>= i 0) (< i (len arr))) (> (at arr i) 0)))
+  // ... implementation loops through arr
+  §R true
+§/F{f001}
 ```
-Meaning: For all indices i in array, element at i > 0
 
-**Exists quantifier:**
+**Exists quantifier - has negative element:**
 ```
-§S (exists i (and (>= i 0) (< i (len arr))) (== (at arr i) target))
+§F{f001:HasNegative:pub}
+  §I{i32[]:arr}
+  §O{bool}
+  §S (implies result (exists i (and (>= i 0) (< i (len arr))) (< (at arr i) 0)))
+  // ... implementation loops through arr
+  §R false
+§/F{f001}
 ```
-Meaning: There exists an index i where element equals target
+
+Key quantifier syntax:
+- `(forall var range-condition property)` - all elements satisfy property
+- `(exists var range-condition property)` - some element satisfies property
+- `(len arr)` - array length
+- `(at arr i)` - element at index i
 
 CALOR_REFERENCE
 
