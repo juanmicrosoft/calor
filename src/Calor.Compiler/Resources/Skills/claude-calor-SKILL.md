@@ -13,6 +13,66 @@ Calor compiles to C# via .NET. It combines:
 
 ---
 
+## CONTRACT-FIRST METHODOLOGY
+
+**Before writing implementation, extract and express constraints as contracts.** This is your primary tool for ensuring correctness.
+
+### Step 1: Identify Input Constraints (Preconditions)
+
+Read the requirement and find ALL constraints on inputs:
+- "must be positive" → `§Q (> n 0)`
+- "must not be zero" → `§Q (!= n 0)`
+- "X must not exceed Y" → `§Q (<= x y)`
+- Any division or modulo operation → `§Q (!= divisor 0)`
+
+### Step 2: Identify Output Guarantees (Postconditions)
+
+Find what the function promises about its result:
+- "result is never negative" → `§S (>= result 0)`
+- "result is at least 1" → `§S (>= result 1)`
+- "result is bounded by input" → `§S (<= result n)`
+
+### Step 3: Write Contracts BEFORE Implementation
+
+The contracts become your specification. **If you can't satisfy a postcondition, your implementation is wrong.**
+
+```calor
+// FIRST: Write the contracts
+§F{f001:MyFunction:pub}
+  §I{i32:n}
+  §O{i32}
+  §Q (> n 0)           // Input constraint from requirement
+  §S (>= result 0)     // Output guarantee from requirement
+  // THEN: Implement logic that satisfies the contracts
+  §R ...
+§/F{f001}
+```
+
+### Common Contract Patterns
+
+| Requirement Pattern | Calor Contract |
+|---------------------|----------------|
+| "must be positive" | `§Q (> n 0)` |
+| "must be non-negative" | `§Q (>= n 0)` |
+| "must not be zero" | `§Q (!= n 0)` |
+| "must be between X and Y (inclusive)" | `§Q (>= n X)` and `§Q (<= n Y)` |
+| "must be even" | `§Q (== (% n 2) 0)` |
+| "X must not exceed Y" | `§Q (<= x y)` |
+| division or modulo by Y | Always `§Q (!= y 0)` |
+| "result is never negative" | `§S (>= result 0)` |
+| "result is always positive" | `§S (> result 0)` |
+| "result is at least 1" | `§S (>= result 1)` |
+| "result is bounded by input" | `§S (<= result n)` |
+
+### Self-Verification with Contracts
+
+Use contracts to verify your implementation:
+- **If you can't make a postcondition true** → Your implementation is wrong
+- **If a precondition seems impossible** → You misunderstood the requirement
+- **If contracts conflict** → The requirement has contradictions
+
+---
+
 ## 1. MODULES AND FUNCTIONS
 
 ### Module
