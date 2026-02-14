@@ -98,6 +98,34 @@ public record LlmTaskDefinition
     /// Tags for filtering and categorization.
     /// </summary>
     public List<string> Tags { get; init; } = new();
+
+    /// <summary>
+    /// Bug prevention documentation for effect discipline benchmarks.
+    /// Describes the real-world bug this task prevents and how each language addresses it.
+    /// </summary>
+    public BugPrevention? BugPrevention { get; init; }
+}
+
+/// <summary>
+/// Documents how a task prevents real-world bugs and compares approaches between languages.
+/// Used for fair comparison in effect discipline benchmarks.
+/// </summary>
+public record BugPrevention
+{
+    /// <summary>
+    /// Description of the actual real-world bug this task is designed to prevent.
+    /// </summary>
+    public required string RealWorldBug { get; init; }
+
+    /// <summary>
+    /// How Calor's effect system prevents this bug.
+    /// </summary>
+    public required string CalorApproach { get; init; }
+
+    /// <summary>
+    /// How C# best practices (DI, [Pure], interfaces) can prevent this bug.
+    /// </summary>
+    public required string CsharpApproach { get; init; }
 }
 
 /// <summary>

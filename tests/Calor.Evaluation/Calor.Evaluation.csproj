@@ -29,6 +29,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Exclude Analyzers folder - it's a separate project -->
+    <Compile Remove="Analyzers\**\*.cs" />
+    <None Remove="Analyzers\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\TestData\Benchmarks\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>TestData\Benchmarks\%(RecursiveDir)%(FileName)%(Extension)</Link>

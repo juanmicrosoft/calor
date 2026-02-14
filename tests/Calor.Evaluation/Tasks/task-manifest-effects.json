@@ -1,0 +1,976 @@
+{
+  "version": "2.0",
+  "description": "Effect Discipline benchmark measuring side effect management and bug prevention",
+  "tasks": [
+    {
+      "id": "flaky-001",
+      "name": "Deterministic Report Generator",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named GenerateReport that takes a string 'title' and a long 'timestamp' (Unix epoch milliseconds), and returns a formatted report string. The timestamp MUST come from the parameter, not from DateTime.Now. The function must be deterministic - same inputs always produce same output. Return format: \"Report: {title} (Generated: {timestamp})\"",
+      "testCases": [
+        { "input": ["Sales Q1", 1705312800000], "expected": "Report: Sales Q1 (Generated: 1705312800000)" },
+        { "input": ["Inventory", 1705399200000], "expected": "Report: Inventory (Generated: 1705399200000)" },
+        { "input": ["", 0], "expected": "Report:  (Generated: 0)" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "GenerateReport",
+        "parameterTypes": ["string", "long"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "time", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Report timestamps differ between test runs, breaking snapshot tests",
+        "calorApproach": "Pure effect signature prevents time effects",
+        "csharpApproach": "Passing timestamp as parameter (DI pattern)"
+      }
+    },
+    {
+      "id": "flaky-002",
+      "name": "Seeded Random Selection",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named SelectItem that takes an integer array 'items' and an integer 'seed', and returns one item selected using the seed for randomization. The selection must be deterministic - same seed always selects same item. Do not use Random without the seed parameter.",
+      "testCases": [
+        { "input": [[1, 2, 3, 4, 5], 42], "expected": 4 },
+        { "input": [[10, 20, 30], 123], "expected": 30 },
+        { "input": [[100], 0], "expected": 100 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "SelectItem",
+        "parameterTypes": ["int[]", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "random", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Tests randomly fail because item selection varies between runs",
+        "calorApproach": "Pure effect signature prevents rand effects",
+        "csharpApproach": "Using seeded Random instance from parameter"
+      }
+    },
+    {
+      "id": "flaky-003",
+      "name": "Deterministic ID Generator",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named GenerateId that takes a string 'prefix' and an integer 'sequence', and returns an ID string. The function must be deterministic - do NOT use Guid.NewGuid() or DateTime.Now. Return format: \"{prefix}-{sequence:D6}\" (6-digit zero-padded sequence).",
+      "testCases": [
+        { "input": ["USR", 1], "expected": "USR-000001" },
+        { "input": ["ORD", 12345], "expected": "ORD-012345" },
+        { "input": ["TXN", 999999], "expected": "TXN-999999" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "GenerateId",
+        "parameterTypes": ["string", "int"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "guid", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Tests comparing IDs fail because each run generates different GUIDs",
+        "calorApproach": "Pure effect signature prevents guid effects",
+        "csharpApproach": "Deterministic ID from parameters, no Guid.NewGuid()"
+      }
+    },
+    {
+      "id": "flaky-004",
+      "name": "Deterministic Hash Calculator",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named CalculateHash that takes a string 'input' and returns its hash code as an integer. The function must be deterministic and pure - same input always returns same hash. Use a simple deterministic hash algorithm (sum of char codes).",
+      "testCases": [
+        { "input": ["abc"], "expected": 294 },
+        { "input": ["hello"], "expected": 532 },
+        { "input": [""], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CalculateHash",
+        "parameterTypes": ["string"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Hash values differ across process restarts due to hash randomization",
+        "calorApproach": "Pure effect signature ensures determinism",
+        "csharpApproach": "Custom deterministic hash, not GetHashCode()"
+      }
+    },
+    {
+      "id": "flaky-005",
+      "name": "Test Data Formatter",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named FormatTestData that takes an integer 'value' and a string 'dateStr' (ISO format date string like \"2024-01-15\"), and returns formatted test data. Do NOT use DateTime.Now or any current time. Return format: \"Value: {value} on {dateStr}\".",
+      "testCases": [
+        { "input": [100, "2024-01-15"], "expected": "Value: 100 on 2024-01-15" },
+        { "input": [0, "2023-12-31"], "expected": "Value: 0 on 2023-12-31" },
+        { "input": [-50, "2025-06-30"], "expected": "Value: -50 on 2025-06-30" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "FormatTestData",
+        "parameterTypes": ["int", "string"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "time", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Test assertions fail at midnight when date rolls over",
+        "calorApproach": "Pure effect signature prevents time access",
+        "csharpApproach": "Date passed as parameter, no DateTime.Now"
+      }
+    },
+    {
+      "id": "flaky-006",
+      "name": "Deterministic Shuffle",
+      "category": "flaky-test-prevention",
+      "difficulty": 3,
+      "prompt": "Write a public function named ShuffleArray that takes an integer array 'items' and an integer 'seed', and returns a new shuffled array. The shuffle must be deterministic - same seed always produces same order. Do not modify the original array.",
+      "testCases": [
+        { "input": [[1, 2, 3, 4], 42], "expected": [3, 1, 4, 2] },
+        { "input": [[10, 20, 30], 123], "expected": [30, 10, 20] },
+        { "input": [[5], 0], "expected": [5] }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "ShuffleArray",
+        "parameterTypes": ["int[]", "int"],
+        "returnType": "int[]"
+      },
+      "tags": ["effects", "random", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Shuffle order changes between test runs, breaking order-dependent assertions",
+        "calorApproach": "Pure effect signature, seed-based randomization",
+        "csharpApproach": "Seeded Random instance for deterministic shuffle"
+      }
+    },
+    {
+      "id": "flaky-007",
+      "name": "Stable Sort Key",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named GetSortKey that takes a string 'name' and an integer 'priority', and returns a sort key string. The function must be pure and deterministic. Return format: \"{priority:D3}-{name}\" (3-digit zero-padded priority).",
+      "testCases": [
+        { "input": ["Alice", 1], "expected": "001-Alice" },
+        { "input": ["Bob", 100], "expected": "100-Bob" },
+        { "input": ["Charlie", 5], "expected": "005-Charlie" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "GetSortKey",
+        "parameterTypes": ["string", "int"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Sort order unstable when keys are generated with timestamps",
+        "calorApproach": "Pure effect signature guarantees determinism",
+        "csharpApproach": "Pure function with no external dependencies"
+      }
+    },
+    {
+      "id": "flaky-008",
+      "name": "Deterministic Token Generator",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named GenerateToken that takes an integer 'userId' and an integer 'sequence', and returns a token string. Must be deterministic - no Random or Guid. Return format: \"TOKEN-{userId}-{sequence}\".",
+      "testCases": [
+        { "input": [1001, 1], "expected": "TOKEN-1001-1" },
+        { "input": [2002, 999], "expected": "TOKEN-2002-999" },
+        { "input": [0, 0], "expected": "TOKEN-0-0" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "GenerateToken",
+        "parameterTypes": ["int", "int"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Token validation tests fail because tokens are random each run",
+        "calorApproach": "Pure effect signature prevents random effects",
+        "csharpApproach": "Deterministic token from parameters"
+      }
+    },
+    {
+      "id": "flaky-009",
+      "name": "Consistent Cache Key",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named BuildCacheKey that takes a string 'type' and an integer 'id', and returns a cache key. Must be deterministic and pure. Return format: \"{type}:{id}\".",
+      "testCases": [
+        { "input": ["user", 123], "expected": "user:123" },
+        { "input": ["product", 456], "expected": "product:456" },
+        { "input": ["order", 0], "expected": "order:0" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "BuildCacheKey",
+        "parameterTypes": ["string", "int"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Cache key includes timestamp, causing cache misses in tests",
+        "calorApproach": "Pure effect signature ensures consistency",
+        "csharpApproach": "Pure function, no time or random components"
+      }
+    },
+    {
+      "id": "flaky-010",
+      "name": "Reproducible Test Fixture",
+      "category": "flaky-test-prevention",
+      "difficulty": 2,
+      "prompt": "Write a public function named CreateFixture that takes a string 'name' and an integer 'seed', and returns a fixture ID. Must be deterministic. Return the seed XOR'd with the sum of char codes of name.",
+      "testCases": [
+        { "input": ["test", 100], "expected": 548 },
+        { "input": ["abc", 0], "expected": 294 },
+        { "input": ["", 42], "expected": 42 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CreateFixture",
+        "parameterTypes": ["string", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "determinism", "flaky-test"],
+      "bugPrevention": {
+        "realWorldBug": "Test fixtures created with random data cause intermittent failures",
+        "calorApproach": "Pure effect signature guarantees reproducibility",
+        "csharpApproach": "Seeded generation, no Random without seed"
+      }
+    },
+    {
+      "id": "security-001",
+      "name": "Offline Config Parser",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named ParseConfigValue that takes a string 'json' containing a simple JSON object and a string 'key', and returns the value for that key as a string. This runs in air-gapped environments - it MUST NOT make any network calls. Use simple string parsing (find key, extract value between quotes).",
+      "testCases": [
+        { "input": ["{\"debug\": \"true\"}", "debug"], "expected": "true" },
+        { "input": ["{\"name\": \"app\", \"version\": \"1.0\"}", "version"], "expected": "1.0" },
+        { "input": ["{\"empty\": \"\"}", "empty"], "expected": "" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "ParseConfigValue",
+        "parameterTypes": ["string", "string"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "network", "security", "offline"],
+      "bugPrevention": {
+        "realWorldBug": "Enterprise security audit failed because config parser made license validation calls",
+        "calorApproach": "Pure effect signature prevents network effects",
+        "csharpApproach": "No HttpClient, WebRequest, or Socket usage"
+      }
+    },
+    {
+      "id": "security-002",
+      "name": "Local Data Validator",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named ValidateEmail that takes a string 'email' and returns true if it's a valid email format. MUST NOT make network calls to validate (no DNS lookups, no SMTP checks). Use simple pattern matching: must contain exactly one @ with text on both sides.",
+      "testCases": [
+        { "input": ["user@example.com"], "expected": true },
+        { "input": ["invalid"], "expected": false },
+        { "input": ["@nodomain"], "expected": false },
+        { "input": ["noat.com"], "expected": false }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "ValidateEmail",
+        "parameterTypes": ["string"],
+        "returnType": "bool"
+      },
+      "tags": ["effects", "network", "security", "validation"],
+      "bugPrevention": {
+        "realWorldBug": "Email validation caused DNS queries that leaked user data",
+        "calorApproach": "Pure effect signature prevents network effects",
+        "csharpApproach": "Local validation only, no DNS or network calls"
+      }
+    },
+    {
+      "id": "security-003",
+      "name": "Sandboxed Calculator",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named EvaluateExpression that takes integers 'a', 'op' (0=add, 1=sub, 2=mul, 3=div), and 'b', and returns the result. MUST NOT read files, make network calls, or access external resources. Division by zero returns 0.",
+      "testCases": [
+        { "input": [10, 0, 5], "expected": 15 },
+        { "input": [10, 1, 3], "expected": 7 },
+        { "input": [4, 2, 5], "expected": 20 },
+        { "input": [10, 3, 2], "expected": 5 },
+        { "input": [10, 3, 0], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "EvaluateExpression",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "security", "sandboxed"],
+      "bugPrevention": {
+        "realWorldBug": "Calculator plugin loaded external formulas from network, introducing vulnerabilities",
+        "calorApproach": "Pure effect signature prevents all I/O",
+        "csharpApproach": "Pure computation, no external dependencies"
+      }
+    },
+    {
+      "id": "security-004",
+      "name": "Memory-Only Cache Lookup",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named LookupInMap that takes a string array 'keys', a string array 'values' (same length), and a string 'searchKey', and returns the corresponding value or empty string if not found. MUST NOT access files or network for lookup.",
+      "testCases": [
+        { "input": [["a", "b", "c"], ["1", "2", "3"], "b"], "expected": "2" },
+        { "input": [["x"], ["y"], "x"], "expected": "y" },
+        { "input": [["a", "b"], ["1", "2"], "z"], "expected": "" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "LookupInMap",
+        "parameterTypes": ["string[]", "string[]", "string"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "security", "memory-only"],
+      "bugPrevention": {
+        "realWorldBug": "Cache lookup fell back to remote service, exposing internal data",
+        "calorApproach": "Pure effect signature prevents I/O fallback",
+        "csharpApproach": "In-memory lookup only, no external calls"
+      }
+    },
+    {
+      "id": "security-005",
+      "name": "Offline Text Encoder",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named EncodeBase64 that takes a string 'input' and returns its Base64 encoding. MUST be computed locally without network calls. Use simple algorithm: convert chars to bytes, group by 3, map to Base64 alphabet.",
+      "testCases": [
+        { "input": ["abc"], "expected": "YWJj" },
+        { "input": ["Hello"], "expected": "SGVsbG8=" },
+        { "input": [""], "expected": "" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "EncodeBase64",
+        "parameterTypes": ["string"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "security", "encoding"],
+      "bugPrevention": {
+        "realWorldBug": "Encoding library called home to check license, leaking processed data",
+        "calorApproach": "Pure effect signature prevents network effects",
+        "csharpApproach": "Local encoding, no external service calls"
+      }
+    },
+    {
+      "id": "security-006",
+      "name": "Local Password Strength",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named CheckPasswordStrength that takes a string 'password' and returns an integer strength score (0-4). MUST NOT send password to any external service. Score: +1 for length>=8, +1 for uppercase, +1 for lowercase, +1 for digit.",
+      "testCases": [
+        { "input": ["Abcd1234"], "expected": 4 },
+        { "input": ["abc"], "expected": 1 },
+        { "input": ["ABCD1234"], "expected": 3 },
+        { "input": ["12345678"], "expected": 2 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CheckPasswordStrength",
+        "parameterTypes": ["string"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "security", "password"],
+      "bugPrevention": {
+        "realWorldBug": "Password checker sent passwords to 'strength API', exposing credentials",
+        "calorApproach": "Pure effect signature prevents network effects",
+        "csharpApproach": "Local validation only, no external calls"
+      }
+    },
+    {
+      "id": "security-007",
+      "name": "Offline Hash Verifier",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named VerifySimpleHash that takes a string 'data' and an integer 'expectedHash', and returns true if the simple hash (sum of char codes) matches. MUST NOT contact any verification service.",
+      "testCases": [
+        { "input": ["abc", 294], "expected": true },
+        { "input": ["hello", 532], "expected": true },
+        { "input": ["abc", 100], "expected": false }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "VerifySimpleHash",
+        "parameterTypes": ["string", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["effects", "pure", "security", "hash"],
+      "bugPrevention": {
+        "realWorldBug": "Hash verification called online API, creating availability dependency",
+        "calorApproach": "Pure effect signature prevents network effects",
+        "csharpApproach": "Local verification, no external dependencies"
+      }
+    },
+    {
+      "id": "security-008",
+      "name": "Isolated String Sanitizer",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named SanitizeForHtml that takes a string 'input' and returns it with HTML special characters escaped (< to &lt;, > to &gt;, & to &amp;). MUST NOT log, send telemetry, or make any external calls.",
+      "testCases": [
+        { "input": ["<script>"], "expected": "&lt;script&gt;" },
+        { "input": ["a & b"], "expected": "a &amp; b" },
+        { "input": ["normal"], "expected": "normal" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "SanitizeForHtml",
+        "parameterTypes": ["string"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "security", "sanitization"],
+      "bugPrevention": {
+        "realWorldBug": "Sanitizer sent suspicious inputs to threat analysis API, leaking user data",
+        "calorApproach": "Pure effect signature prevents all I/O",
+        "csharpApproach": "Pure transformation, no logging or telemetry"
+      }
+    },
+    {
+      "id": "security-009",
+      "name": "Local Rate Calculator",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named CalculateDiscount that takes an integer 'price' and an integer 'discountPercent', and returns the discounted price. MUST NOT fetch rates from external services. Simple calculation: price - (price * discountPercent / 100).",
+      "testCases": [
+        { "input": [100, 10], "expected": 90 },
+        { "input": [200, 25], "expected": 150 },
+        { "input": [50, 0], "expected": 50 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CalculateDiscount",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "security", "calculation"],
+      "bugPrevention": {
+        "realWorldBug": "Discount calculator fetched live tax rates, breaking offline POS",
+        "calorApproach": "Pure effect signature prevents network effects",
+        "csharpApproach": "Pure calculation from parameters only"
+      }
+    },
+    {
+      "id": "security-010",
+      "name": "Airgapped Data Transformer",
+      "category": "security-boundaries",
+      "difficulty": 2,
+      "prompt": "Write a public function named TransformData that takes an integer array 'data' and an integer 'multiplier', and returns a new array with each element multiplied. MUST NOT make any external calls - this runs in a secure enclave.",
+      "testCases": [
+        { "input": [[1, 2, 3], 2], "expected": [2, 4, 6] },
+        { "input": [[10, 20], 0], "expected": [0, 0] },
+        { "input": [[], 5], "expected": [] }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "TransformData",
+        "parameterTypes": ["int[]", "int"],
+        "returnType": "int[]"
+      },
+      "tags": ["effects", "pure", "security", "enclave"],
+      "bugPrevention": {
+        "realWorldBug": "Data transform library phoned home for analytics, violating data isolation",
+        "calorApproach": "Pure effect signature prevents all external effects",
+        "csharpApproach": "Pure transformation, no I/O operations"
+      }
+    },
+    {
+      "id": "transparency-001",
+      "name": "Pure String Sanitizer",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named SanitizeInput that takes a string 'text' and returns it with angle brackets removed. This is a utility function called millions of times - it must not have any side effects (no logging, no I/O, no metrics).",
+      "testCases": [
+        { "input": ["<script>alert('xss')</script>"], "expected": "scriptalert('xss')/script" },
+        { "input": ["normal text"], "expected": "normal text" },
+        { "input": ["<>"], "expected": "" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "SanitizeInput",
+        "parameterTypes": ["string"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "transparency", "utility"],
+      "bugPrevention": {
+        "realWorldBug": "Production disk filled up because string helper logged every call",
+        "calorApproach": "Pure effect signature enforces no side effects",
+        "csharpApproach": "Static method with no dependencies, no logging"
+      }
+    },
+    {
+      "id": "transparency-002",
+      "name": "Silent Math Operation",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named SafeSquareRoot that takes an integer 'n' and returns the integer square root (floor). For negative inputs return 0. MUST NOT log, write files, or have any side effects.",
+      "testCases": [
+        { "input": [16], "expected": 4 },
+        { "input": [10], "expected": 3 },
+        { "input": [-5], "expected": 0 },
+        { "input": [0], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "SafeSquareRoot",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "transparency", "math"],
+      "bugPrevention": {
+        "realWorldBug": "Math library logged debug info for every calculation, slowing system 10x",
+        "calorApproach": "Pure effect signature prevents all I/O",
+        "csharpApproach": "Pure computation, no logging or I/O"
+      }
+    },
+    {
+      "id": "transparency-003",
+      "name": "No-Telemetry Formatter",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named FormatCurrency that takes an integer 'cents' and returns a formatted string. MUST NOT send telemetry or analytics. Return format: \"$X.XX\" (e.g., 150 cents = \"$1.50\").",
+      "testCases": [
+        { "input": [150], "expected": "$1.50" },
+        { "input": [99], "expected": "$0.99" },
+        { "input": [1000], "expected": "$10.00" },
+        { "input": [5], "expected": "$0.05" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "FormatCurrency",
+        "parameterTypes": ["int"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "transparency", "formatting"],
+      "bugPrevention": {
+        "realWorldBug": "Currency formatter sent locale data to analytics service on every call",
+        "calorApproach": "Pure effect signature prevents telemetry",
+        "csharpApproach": "Pure formatting, no external calls"
+      }
+    },
+    {
+      "id": "transparency-004",
+      "name": "Metric-Free Comparator",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named CompareStrings that takes strings 'a' and 'b', and returns -1 if a<b, 0 if equal, 1 if a>b. MUST NOT increment counters, log comparisons, or have any side effects.",
+      "testCases": [
+        { "input": ["apple", "banana"], "expected": -1 },
+        { "input": ["zebra", "apple"], "expected": 1 },
+        { "input": ["same", "same"], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CompareStrings",
+        "parameterTypes": ["string", "string"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "transparency", "comparison"],
+      "bugPrevention": {
+        "realWorldBug": "Comparator incremented global counter causing thread contention in sort",
+        "calorApproach": "Pure effect signature prevents state mutation",
+        "csharpApproach": "Pure comparison, no counters or logging"
+      }
+    },
+    {
+      "id": "transparency-005",
+      "name": "Observable-Free Parser",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named ParseInt that takes a string 's' and returns the parsed integer, or 0 if invalid. MUST NOT emit events, notify observers, or have any side effects.",
+      "testCases": [
+        { "input": ["123"], "expected": 123 },
+        { "input": ["-45"], "expected": -45 },
+        { "input": ["abc"], "expected": 0 },
+        { "input": [""], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "ParseInt",
+        "parameterTypes": ["string"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "transparency", "parsing"],
+      "bugPrevention": {
+        "realWorldBug": "Parser fired parse event that caused cascading updates in UI",
+        "calorApproach": "Pure effect signature prevents event emission",
+        "csharpApproach": "Pure parsing, no events or observers"
+      }
+    },
+    {
+      "id": "transparency-006",
+      "name": "Audit-Free Validator",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named IsValidAge that takes an integer 'age' and returns true if valid (0-150 inclusive). MUST NOT write to audit logs or have any side effects.",
+      "testCases": [
+        { "input": [25], "expected": true },
+        { "input": [0], "expected": true },
+        { "input": [150], "expected": true },
+        { "input": [-1], "expected": false },
+        { "input": [151], "expected": false }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "IsValidAge",
+        "parameterTypes": ["int"],
+        "returnType": "bool"
+      },
+      "tags": ["effects", "pure", "transparency", "validation"],
+      "bugPrevention": {
+        "realWorldBug": "Validator wrote every check to audit log, violating privacy and filling disk",
+        "calorApproach": "Pure effect signature prevents file I/O",
+        "csharpApproach": "Pure validation, no audit logging"
+      }
+    },
+    {
+      "id": "transparency-007",
+      "name": "Trace-Free Calculator",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named CalculateTax that takes an integer 'amount' and an integer 'ratePercent', and returns the tax amount. MUST NOT trace, profile, or have any side effects. Formula: amount * ratePercent / 100.",
+      "testCases": [
+        { "input": [100, 10], "expected": 10 },
+        { "input": [250, 20], "expected": 50 },
+        { "input": [0, 15], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CalculateTax",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "transparency", "calculation"],
+      "bugPrevention": {
+        "realWorldBug": "Tax calculator traced every call causing 50ms latency per calculation",
+        "calorApproach": "Pure effect signature prevents tracing",
+        "csharpApproach": "Pure calculation, no tracing"
+      }
+    },
+    {
+      "id": "transparency-008",
+      "name": "Cache-Friendly Hasher",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named ComputeChecksum that takes an integer array 'data' and returns the XOR of all elements. MUST NOT update caches or have any side effects - this is called from cache lookups.",
+      "testCases": [
+        { "input": [[1, 2, 3]], "expected": 0 },
+        { "input": [[5, 5]], "expected": 0 },
+        { "input": [[7]], "expected": 7 },
+        { "input": [[]], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "ComputeChecksum",
+        "parameterTypes": ["int[]"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "transparency", "hash"],
+      "bugPrevention": {
+        "realWorldBug": "Checksum function updated internal cache causing deadlock with calling cache",
+        "calorApproach": "Pure effect signature prevents state mutation",
+        "csharpApproach": "Pure computation, no state changes"
+      }
+    },
+    {
+      "id": "transparency-009",
+      "name": "Side-Effect-Free Encoder",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named UrlEncode that takes a string 'input' and returns it with spaces replaced by %20 and & replaced by %26. MUST NOT log or have any side effects.",
+      "testCases": [
+        { "input": ["hello world"], "expected": "hello%20world" },
+        { "input": ["a&b"], "expected": "a%26b" },
+        { "input": ["nospace"], "expected": "nospace" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "UrlEncode",
+        "parameterTypes": ["string"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "transparency", "encoding"],
+      "bugPrevention": {
+        "realWorldBug": "URL encoder logged input containing passwords, exposing credentials",
+        "calorApproach": "Pure effect signature prevents logging",
+        "csharpApproach": "Pure transformation, no logging"
+      }
+    },
+    {
+      "id": "transparency-010",
+      "name": "Deterministic Truncator",
+      "category": "side-effect-transparency",
+      "difficulty": 2,
+      "prompt": "Write a public function named TruncateString that takes a string 'text' and an integer 'maxLen', and returns the text truncated to maxLen chars. MUST NOT emit warnings, log, or have any side effects.",
+      "testCases": [
+        { "input": ["Hello World", 5], "expected": "Hello" },
+        { "input": ["Short", 10], "expected": "Short" },
+        { "input": ["", 5], "expected": "" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "TruncateString",
+        "parameterTypes": ["string", "int"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "transparency", "string"],
+      "bugPrevention": {
+        "realWorldBug": "Truncator logged warning every time text was cut, flooding logs",
+        "calorApproach": "Pure effect signature prevents logging",
+        "csharpApproach": "Pure string operation, no warnings or logs"
+      }
+    },
+    {
+      "id": "cache-001",
+      "name": "Memoizable Price Calculator",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named CalculateTotal that takes integers 'basePrice', 'quantity', and 'taxPercent', and returns the total price. This function WILL BE MEMOIZED - it must return the same result for same inputs. Formula: (basePrice * quantity) + ((basePrice * quantity) * taxPercent / 100).",
+      "testCases": [
+        { "input": [100, 2, 10], "expected": 220 },
+        { "input": [50, 4, 0], "expected": 200 },
+        { "input": [25, 1, 20], "expected": 30 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CalculateTotal",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "cache", "memoization"],
+      "bugPrevention": {
+        "realWorldBug": "Cached prices were wrong because calculator fetched live exchange rates",
+        "calorApproach": "Pure effect signature makes function safe to memoize",
+        "csharpApproach": "All data from parameters, no external fetching"
+      }
+    },
+    {
+      "id": "cache-002",
+      "name": "Deterministic Score Calculator",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named CalculateScore that takes integers 'points', 'bonus', and 'penalty', and returns the score. This is memoized - must be deterministic. Formula: points + bonus - penalty.",
+      "testCases": [
+        { "input": [100, 20, 10], "expected": 110 },
+        { "input": [50, 0, 0], "expected": 50 },
+        { "input": [0, 100, 50], "expected": 50 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CalculateScore",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "cache", "memoization"],
+      "bugPrevention": {
+        "realWorldBug": "Memoized score was wrong because bonus was fetched from time-based API",
+        "calorApproach": "Pure effect signature ensures determinism",
+        "csharpApproach": "Pure calculation from parameters"
+      }
+    },
+    {
+      "id": "cache-003",
+      "name": "Cacheable Hash Function",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named HashString that takes a string 'input' and returns a deterministic hash integer. This is used as a cache key - must be consistent. Use sum of (char code * position).",
+      "testCases": [
+        { "input": ["abc"], "expected": 302 },
+        { "input": ["hello"], "expected": 808 },
+        { "input": [""], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "HashString",
+        "parameterTypes": ["string"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "cache", "hash"],
+      "bugPrevention": {
+        "realWorldBug": "Cache keys varied across restarts because hash used runtime-seeded salt",
+        "calorApproach": "Pure effect signature ensures deterministic output",
+        "csharpApproach": "Deterministic hash algorithm, no runtime salt"
+      }
+    },
+    {
+      "id": "cache-004",
+      "name": "Pure Conversion Function",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named ConvertTemperature that takes an integer 'celsius' and returns the Fahrenheit value as integer. This is memoized - must be pure. Formula: (celsius * 9 / 5) + 32.",
+      "testCases": [
+        { "input": [0], "expected": 32 },
+        { "input": [100], "expected": 212 },
+        { "input": [-40], "expected": -40 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "ConvertTemperature",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "cache", "conversion"],
+      "bugPrevention": {
+        "realWorldBug": "Cached conversion was wrong because function fetched calibration from sensor",
+        "calorApproach": "Pure effect signature ensures no external data",
+        "csharpApproach": "Pure formula, no external calibration"
+      }
+    },
+    {
+      "id": "cache-005",
+      "name": "Idempotent String Transform",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named NormalizeString that takes a string 'input' and returns it lowercase with leading/trailing spaces removed. This is cached - must be idempotent.",
+      "testCases": [
+        { "input": ["  Hello World  "], "expected": "hello world" },
+        { "input": ["ABC"], "expected": "abc" },
+        { "input": ["already"], "expected": "already" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "NormalizeString",
+        "parameterTypes": ["string"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "cache", "idempotent"],
+      "bugPrevention": {
+        "realWorldBug": "Cached normalization included timestamp causing cache misses",
+        "calorApproach": "Pure effect signature ensures idempotency",
+        "csharpApproach": "Pure transformation, no timestamps"
+      }
+    },
+    {
+      "id": "cache-006",
+      "name": "Stable Distance Calculator",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named CalculateDistance that takes integers 'x1', 'y1', 'x2', 'y2' and returns the Manhattan distance. This is memoized - must be deterministic. Formula: |x2-x1| + |y2-y1|.",
+      "testCases": [
+        { "input": [0, 0, 3, 4], "expected": 7 },
+        { "input": [1, 1, 1, 1], "expected": 0 },
+        { "input": [5, 5, 2, 1], "expected": 7 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "CalculateDistance",
+        "parameterTypes": ["int", "int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "cache", "geometry"],
+      "bugPrevention": {
+        "realWorldBug": "Cached distance was wrong because it used GPS for coordinates instead of params",
+        "calorApproach": "Pure effect signature prevents external data access",
+        "csharpApproach": "Pure calculation from parameters"
+      }
+    },
+    {
+      "id": "cache-007",
+      "name": "Memoization-Safe Formatter",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named FormatPercentage that takes an integer 'value' and an integer 'total', and returns a formatted percentage string. This is memoized - must be pure. Return format: \"X%\" where X = value*100/total (or \"0%\" if total is 0).",
+      "testCases": [
+        { "input": [25, 100], "expected": "25%" },
+        { "input": [1, 4], "expected": "25%" },
+        { "input": [5, 0], "expected": "0%" }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "FormatPercentage",
+        "parameterTypes": ["int", "int"],
+        "returnType": "string"
+      },
+      "tags": ["effects", "pure", "cache", "formatting"],
+      "bugPrevention": {
+        "realWorldBug": "Percentage formatter fetched precision settings from config on each call",
+        "calorApproach": "Pure effect signature prevents config access",
+        "csharpApproach": "Fixed format, no external config"
+      }
+    },
+    {
+      "id": "cache-008",
+      "name": "Consistent Array Aggregator",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named AggregateValues that takes an integer array 'values' and returns the sum. This is used in memoized contexts - must be pure and consistent.",
+      "testCases": [
+        { "input": [[1, 2, 3, 4, 5]], "expected": 15 },
+        { "input": [[100]], "expected": 100 },
+        { "input": [[]], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "AggregateValues",
+        "parameterTypes": ["int[]"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "cache", "aggregation"],
+      "bugPrevention": {
+        "realWorldBug": "Aggregator added hidden 'adjustment factor' from database",
+        "calorApproach": "Pure effect signature prevents database access",
+        "csharpApproach": "Pure aggregation, no external factors"
+      }
+    },
+    {
+      "id": "cache-009",
+      "name": "Referentially Transparent Mapper",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named MapToRange that takes integers 'value', 'inMin', 'inMax', 'outMin', 'outMax' and returns the mapped value. This is memoized - must be referentially transparent. Formula: outMin + (value - inMin) * (outMax - outMin) / (inMax - inMin). Return outMin if inMax==inMin.",
+      "testCases": [
+        { "input": [50, 0, 100, 0, 10], "expected": 5 },
+        { "input": [0, 0, 100, 100, 200], "expected": 100 },
+        { "input": [5, 5, 5, 0, 10], "expected": 0 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "MapToRange",
+        "parameterTypes": ["int", "int", "int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "cache", "mapping"],
+      "bugPrevention": {
+        "realWorldBug": "Range mapper cached results but fetched fresh min/max from API each call",
+        "calorApproach": "Pure effect signature ensures referential transparency",
+        "csharpApproach": "All parameters explicit, no external fetching"
+      }
+    },
+    {
+      "id": "cache-010",
+      "name": "Stable Interpolation",
+      "category": "cache-safety",
+      "difficulty": 2,
+      "prompt": "Write a public function named Interpolate that takes integers 'a', 'b', and 'tPercent' (0-100), and returns the interpolated value. This is memoized for animation frames - must be pure. Formula: a + (b - a) * tPercent / 100.",
+      "testCases": [
+        { "input": [0, 100, 50], "expected": 50 },
+        { "input": [10, 20, 0], "expected": 10 },
+        { "input": [10, 20, 100], "expected": 20 }
+      ],
+      "scoring": { "compilation": 0.2, "testCases": 0.4, "contracts": 0.4 },
+      "expectedSignature": {
+        "functionName": "Interpolate",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["effects", "pure", "cache", "interpolation"],
+      "bugPrevention": {
+        "realWorldBug": "Animation stuttered because interpolation fetched frame time instead of using parameter",
+        "calorApproach": "Pure effect signature prevents time access",
+        "csharpApproach": "Pure interpolation from parameters"
+      }
+    }
+  ]
+}

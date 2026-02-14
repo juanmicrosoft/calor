@@ -287,6 +287,96 @@ public static class Program
 
         rootCommand.AddCommand(safetyBenchmarkCommand);
 
+        // Effect discipline benchmark command
+        var effectDisciplineCommand = new Command("effect-discipline", "Run effect discipline benchmarks measuring side effect management");
+
+        var effectProviderOption = new Option<string>(
+            aliases: new[] { "--provider", "-p" },
+            description: "LLM provider to use (claude, mock)",
+            getDefaultValue: () => "claude");
+
+        var effectModelOption = new Option<string?>(
+            aliases: new[] { "--model" },
+            description: "Specific model to use");
+
+        var effectBudgetOption = new Option<decimal>(
+            aliases: new[] { "--budget", "-b" },
+            description: "Maximum budget in USD",
+            getDefaultValue: () => 5.00m);
+
+        var effectOutputOption = new Option<string>(
+            aliases: new[] { "--output", "-o" },
+            description: "Output file for results",
+            getDefaultValue: () => "effect-discipline-results.json");
+
+        var effectDryRunOption = new Option<bool>(
+            aliases: new[] { "--dry-run" },
+            description: "Estimate costs without making API calls");
+
+        var effectRefreshCacheOption = new Option<bool>(
+            aliases: new[] { "--refresh-cache" },
+            description: "Refresh cached responses");
+
+        var effectTasksOption = new Option<string[]>(
+            aliases: new[] { "--tasks", "-t" },
+            description: "Specific task IDs to run")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
+
+        var effectCategoryOption = new Option<string>(
+            aliases: new[] { "--category", "-c" },
+            description: "Run only tasks in this category (flaky-test-prevention, security-boundaries, side-effect-transparency, cache-safety)");
+
+        var effectSampleOption = new Option<int?>(
+            aliases: new[] { "--sample", "-s" },
+            description: "Number of tasks to sample");
+
+        var effectManifestOption = new Option<string>(
+            aliases: new[] { "--manifest", "-m" },
+            description: "Path to task manifest file");
+
+        var effectVerboseOption = new Option<bool>(
+            aliases: new[] { "--verbose", "-v" },
+            description: "Enable verbose output");
+
+        var effectEnableAnalyzersOption = new Option<bool>(
+            aliases: new[] { "--enable-analyzers", "-a" },
+            description: "Enable Roslyn analyzers for C# code evaluation (ED001-ED007)");
+
+        effectDisciplineCommand.AddOption(effectProviderOption);
+        effectDisciplineCommand.AddOption(effectModelOption);
+        effectDisciplineCommand.AddOption(effectBudgetOption);
+        effectDisciplineCommand.AddOption(effectOutputOption);
+        effectDisciplineCommand.AddOption(effectDryRunOption);
+        effectDisciplineCommand.AddOption(effectRefreshCacheOption);
+        effectDisciplineCommand.AddOption(effectTasksOption);
+        effectDisciplineCommand.AddOption(effectCategoryOption);
+        effectDisciplineCommand.AddOption(effectSampleOption);
+        effectDisciplineCommand.AddOption(effectManifestOption);
+        effectDisciplineCommand.AddOption(effectVerboseOption);
+        effectDisciplineCommand.AddOption(effectEnableAnalyzersOption);
+
+        effectDisciplineCommand.SetHandler(async (context) =>
+        {
+            var provider = context.ParseResult.GetValueForOption(effectProviderOption)!;
+            var model = context.ParseResult.GetValueForOption(effectModelOption);
+            var budget = context.ParseResult.GetValueForOption(effectBudgetOption);
+            var output = context.ParseResult.GetValueForOption(effectOutputOption)!;
+            var dryRun = context.ParseResult.GetValueForOption(effectDryRunOption);
+            var refreshCache = context.ParseResult.GetValueForOption(effectRefreshCacheOption);
+            var tasks = context.ParseResult.GetValueForOption(effectTasksOption) ?? Array.Empty<string>();
+            var category = context.ParseResult.GetValueForOption(effectCategoryOption);
+            var sample = context.ParseResult.GetValueForOption(effectSampleOption);
+            var manifest = context.ParseResult.GetValueForOption(effectManifestOption);
+            var verbose = context.ParseResult.GetValueForOption(effectVerboseOption);
+            var enableAnalyzers = context.ParseResult.GetValueForOption(effectEnableAnalyzersOption);
+
+            await RunEffectDisciplineAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, manifest, verbose, enableAnalyzers);
+        });
+
+        rootCommand.AddCommand(effectDisciplineCommand);
+
         // Default: run benchmarks if no command specified
         rootCommand.SetHandler(async () =>
         {
@@ -1096,6 +1186,209 @@ public static class Program
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("Safety results are roughly equivalent between Calor and C#.");
+        }
+        Console.ResetColor();
+    }
+
+    private static async Task RunEffectDisciplineAsync(
+        string provider,
+        string? model,
+        decimal budget,
+        string output,
+        bool dryRun,
+        bool refreshCache,
+        string[] tasks,
+        string? category,
+        int? sample,
+        string? manifestPath,
+        bool verbose,
+        bool enableAnalyzers)
+    {
+        Console.WriteLine("Effect Discipline Benchmark - Side Effect Management");
+        Console.WriteLine("=====================================================");
+        Console.WriteLine();
+        Console.WriteLine("This benchmark measures how well code prevents real-world bugs:");
+        Console.WriteLine("  - Flaky tests (non-determinism from time/random)");
+        Console.WriteLine("  - Security boundary violations (unauthorized I/O)");
+        Console.WriteLine("  - Hidden side effects (logging, telemetry)");
+        Console.WriteLine("  - Cache safety issues (non-pure memoization)");
+        Console.WriteLine();
+
+        // Load manifest
+        LlmTaskManifest manifest;
+        if (!string.IsNullOrEmpty(manifestPath) && File.Exists(manifestPath))
+        {
+            Console.WriteLine($"Loading manifest: {manifestPath}");
+            manifest = await LlmTaskManifest.LoadAsync(manifestPath);
+        }
+        else
+        {
+            // Try default effect discipline manifest location
+            var defaultPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tasks", "task-manifest-effects.json");
+            if (!File.Exists(defaultPath))
+            {
+                defaultPath = Path.Combine("Tasks", "task-manifest-effects.json");
+            }
+            if (!File.Exists(defaultPath))
+            {
+                defaultPath = Path.Combine(Directory.GetCurrentDirectory(), "tests", "Calor.Evaluation", "Tasks", "task-manifest-effects.json");
+            }
+
+            if (File.Exists(defaultPath))
+            {
+                Console.WriteLine($"Loading default effect discipline manifest: {defaultPath}");
+                manifest = await LlmTaskManifest.LoadAsync(defaultPath);
+            }
+            else
+            {
+                Console.Error.WriteLine("No effect discipline task manifest found. Use --manifest to specify a path.");
+                Console.Error.WriteLine("Expected: tests/Calor.Evaluation/Tasks/task-manifest-effects.json");
+                return;
+            }
+        }
+
+        Console.WriteLine($"Loaded {manifest.Tasks.Count} effect discipline tasks");
+        Console.WriteLine();
+
+        // Create provider
+        ILlmProvider llmProvider;
+        switch (provider.ToLowerInvariant())
+        {
+            case "claude":
+                var claudeProvider = new ClaudeProvider();
+                if (!claudeProvider.IsAvailable)
+                {
+                    Console.Error.WriteLine($"Claude provider unavailable: {claudeProvider.UnavailabilityReason}");
+                    Console.Error.WriteLine("Set the ANTHROPIC_API_KEY environment variable or use --provider mock");
+                    return;
+                }
+                llmProvider = claudeProvider;
+                break;
+
+            case "mock":
+                llmProvider = MockProvider.WithWorkingImplementations();
+                Console.WriteLine("Using mock provider (no actual API calls)");
+                break;
+
+            default:
+                Console.Error.WriteLine($"Unknown provider: {provider}");
+                Console.Error.WriteLine("Available providers: claude, mock");
+                return;
+        }
+
+        // Create runner options
+        var options = new EffectDisciplineOptions
+        {
+            BudgetLimit = budget,
+            UseCache = true,
+            RefreshCache = refreshCache,
+            DryRun = dryRun,
+            Verbose = verbose,
+            TaskFilter = tasks.Length > 0 ? tasks.ToList() : null,
+            CategoryFilter = category,
+            SampleSize = sample,
+            Model = model,
+            EnableAnalyzers = enableAnalyzers
+        };
+
+        if (enableAnalyzers)
+        {
+            Console.WriteLine("Roslyn analyzers enabled (ED001-ED007)");
+        }
+
+        // Create cache
+        var cache = new LlmResponseCache();
+        var cacheStats = cache.GetStatistics();
+        Console.WriteLine($"Cache: {cacheStats.EntryCount} entries ({cacheStats.TotalSizeFormatted})");
+        Console.WriteLine();
+
+        // Create runner
+        using var runner = new EffectDisciplineBenchmarkRunner(llmProvider, cache);
+
+        if (dryRun)
+        {
+            Console.WriteLine("Dry run - no API calls made");
+            return;
+        }
+
+        // Run tasks
+        Console.WriteLine("Running effect discipline benchmark tasks...");
+        Console.WriteLine();
+
+        var results = await runner.RunAllAsync(manifest, options);
+
+        // Save results
+        var jsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        var json = JsonSerializer.Serialize(results, jsonOptions);
+        await File.WriteAllTextAsync(output, json);
+        Console.WriteLine($"Results saved to: {output}");
+        Console.WriteLine();
+
+        // Print summary
+        var summary = results.Summary;
+
+        Console.WriteLine("Effect Discipline Benchmark Results");
+        Console.WriteLine("------------------------------------");
+        Console.WriteLine($"Total tasks:              {summary.TotalTasks}");
+        Console.WriteLine($"Calor wins:               {summary.CalorWins}");
+        Console.WriteLine($"C# wins:                  {summary.CSharpWins}");
+        Console.WriteLine($"Ties:                     {summary.Ties}");
+        Console.WriteLine();
+
+        Console.WriteLine("Discipline Scores:");
+        Console.WriteLine($"  Calor:                  {summary.AverageCalorDisciplineScore:F3}");
+        Console.WriteLine($"  C#:                     {summary.AverageCSharpDisciplineScore:F3}");
+        Console.WriteLine($"  Advantage ratio:        {summary.DisciplineAdvantageRatio:F2}x");
+        Console.WriteLine();
+
+        Console.WriteLine("Bug Prevention Rate:");
+        Console.WriteLine($"  Calor:                  {summary.CalorBugPreventionRate:P1}");
+        Console.WriteLine($"  C#:                     {summary.CSharpBugPreventionRate:P1}");
+        Console.WriteLine();
+
+        Console.WriteLine("Functional Correctness:");
+        Console.WriteLine($"  Calor:                  {summary.CalorCorrectnessRate:P1}");
+        Console.WriteLine($"  C#:                     {summary.CSharpCorrectnessRate:P1}");
+        Console.WriteLine();
+
+        Console.WriteLine($"Total cost:               ${results.TotalCost:F4}");
+        Console.WriteLine($"Remaining budget:         ${runner.RemainingBudget:F2}");
+        Console.WriteLine();
+
+        if (summary.ByCategory.Count > 0)
+        {
+            Console.WriteLine("By Category:");
+            foreach (var (cat, catSummary) in summary.ByCategory.OrderByDescending(kv => kv.Value.DisciplineAdvantageRatio))
+            {
+                var indicator = catSummary.DisciplineAdvantageRatio > 1.05 ? "+" : (catSummary.DisciplineAdvantageRatio < 0.95 ? "-" : "=");
+                Console.WriteLine($"  {indicator} {cat}:");
+                Console.WriteLine($"      Discipline: {catSummary.DisciplineAdvantageRatio:F2}x (Calor={catSummary.AverageCalorDisciplineScore:F2}, C#={catSummary.AverageCSharpDisciplineScore:F2})");
+                Console.WriteLine($"      Bug Prevention: Calor={catSummary.CalorBugPreventionRate:P0}, C#={catSummary.CSharpBugPreventionRate:P0}");
+                Console.WriteLine($"      Correctness: Calor={catSummary.CalorCorrectnessRate:P0}, C#={catSummary.CSharpCorrectnessRate:P0}");
+            }
+        }
+
+        // Highlight the winner
+        Console.WriteLine();
+        if (summary.DisciplineAdvantageRatio > 1.10)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Calor demonstrates {(summary.DisciplineAdvantageRatio - 1) * 100:F1}% effect discipline advantage!");
+            Console.WriteLine("Effect system prevents more real-world bugs at compile time.");
+        }
+        else if (summary.DisciplineAdvantageRatio < 0.90)
+        {
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine($"C# shows {(1 - summary.DisciplineAdvantageRatio) * 100:F1}% effect discipline advantage.");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Effect discipline results are roughly equivalent between Calor and C#.");
         }
         Console.ResetColor();
     }

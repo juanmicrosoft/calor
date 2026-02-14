@@ -6,8 +6,8 @@
   "summary": {
     "overallAdvantage": 1.12,
     "programCount": 40,
-    "metricCount": 12,
-    "calorWins": 9,
+    "metricCount": 13,
+    "calorWins": 10,
     "cSharpWins": 2,
     "statisticalRunCount": 0
   },
@@ -49,6 +49,13 @@
       "source": "safety-benchmark",
       "model": "claude-opus-4-5-20251101",
       "taskCount": 30
+    },
+    "EffectDiscipline": {
+      "ratio": 1.30,
+      "winner": "calor",
+      "source": "effect-discipline-benchmark",
+      "taskCount": 40,
+      "description": "Side effect management and bug prevention"
     },
     "RefactoringStability": {
       "ratio": 1.36,

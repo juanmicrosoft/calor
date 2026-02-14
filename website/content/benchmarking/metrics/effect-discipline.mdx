@@ -1,0 +1,218 @@
+---
+title: "Effect Discipline"
+section: "benchmarking"
+order: 9
+---
+
+# Effect Discipline Benchmark
+
+The Effect Discipline benchmark measures how well code prevents **real-world bugs** caused by hidden side effects.
+
+---
+
+## Why This Matters
+
+These are actual bugs that have caused production incidents:
+
+| Bug Type | Real-World Impact | How Often |
+|:---------|:------------------|:----------|
+| **Flaky Tests** | Random CI failures, wasted developer time | Daily |
+| **Security Violations** | Data leaks, compliance failures | Critical |
+| **Hidden Side Effects** | "Why did this happen?" debugging | Common |
+| **Cache Bugs** | Wrong results, hard to reproduce | Subtle |
+
+---
+
+## The Four Categories
+
+### 1. Flaky Test Prevention
+
+**Real Bug:** Tests pass locally but fail in CI because they use `DateTime.Now`.
+
+```
+// BAD: Non-deterministic
+public string GenerateReport(string title) {
+    return $"Report: {title} (Generated: {DateTime.Now})";
+}
+
+// GOOD: Deterministic
+public string GenerateReport(string title, long timestamp) {
+    return $"Report: {title} (Generated: {timestamp})";
+}
+```
+
+**How Calor Prevents It:**
+- Effect signature `pure` prevents time effects
+- Compiler error if you try to use `DateTime.Now` in a pure function
+
+**How C# Developers Prevent It:**
+- Pass dependencies as parameters (DI pattern)
+- Use `ITimeProvider` interfaces
+- Discipline and code review
+
+---
+
+### 2. Security Boundaries
+
+**Real Bug:** A config file parser secretly phones home to validate licenses.
+
+```
+// BAD: Hidden network call
+public Config ParseConfig(string json) {
+    ValidateLicenseOnline(); // SECURITY VIOLATION
+    return JsonParse(json);
+}
+
+// GOOD: Offline only
+public Config ParseConfig(string json) {
+    return JsonParse(json);
+}
+```
+
+**How Calor Prevents It:**
+- Effect signature `pure` or `fs:r` prevents network effects
+- Any HTTP call in a pure function = compiler error
+
+**How C# Developers Prevent It:**
+- Interface boundaries for I/O
+- Code review and security audits
+- No compile-time enforcement
+
+---
+
+### 3. Side Effect Transparency
+
+**Real Bug:** A "utility" function writes to a log file, causing disk space issues.
+
+```
+// BAD: Hidden logging
+public string Sanitize(string input) {
+    Logger.Log($"Sanitizing: {input}"); // SIDE EFFECT
+    return input.Replace("<", "");
+}
+
+// GOOD: Pure function
+public string Sanitize(string input) {
+    return input.Replace("<", "");
+}
+```
+
+**How Calor Prevents It:**
+- Pure functions cannot have I/O effects
+- Effect annotations document what a function can do
+
+**How C# Developers Prevent It:**
+- `[Pure]` attribute (advisory only)
+- Static methods with no dependencies
+- Discipline
+
+---
+
+### 4. Cache Safety
+
+**Real Bug:** Memoized function returns stale exchange rates because it secretly fetched live data.
+
+```
+// BAD: Not actually cacheable
+[Memoized]
+public decimal CalculatePrice(decimal base, int qty) {
+    var rate = FetchExchangeRate(); // BREAKS MEMOIZATION
+    return base * qty * rate;
+}
+
+// GOOD: Safe to memoize
+[Memoized]
+public decimal CalculatePrice(decimal base, int qty, decimal rate) {
+    return base * qty * rate;
+}
+```
+
+**How Calor Prevents It:**
+- Pure functions are safe to memoize by definition
+- Compiler enforces no external data access
+
+**How C# Developers Prevent It:**
+- Careful parameter design
+- All inputs must be explicit
+- No enforcement mechanism
+
+---
+
+## Scoring Methodology
+
+| Component | Weight | What It Measures |
+|:----------|:-------|:-----------------|
+| **Functional Correctness** | 40% | Does the code work? |
+| **Bug Prevention** | 40% | Would this code have the target bug? |
+| **Maintainability** | 20% | Can another developer understand the constraints? |
+
+### Bug Prevention Scoring
+
+Both languages can achieve full marks:
+
+- **Calor**: Effect system catches violation at compile time = full points
+- **C#**: Best practice followed that prevents bug = full points
+- **C#**: Analyzer would catch it = partial points
+- **Either**: Bug would reach production = zero points
+
+---
+
+## Expected Results
+
+| Category | Calor | C# | Analysis |
+|:---------|:------|:---|:---------|
+| Flaky Test Prevention | ~90% | ~75% | Both can solve with DI; Calor enforces it |
+| Security Boundaries | ~95% | ~60% | C# has no enforcement mechanism |
+| Side Effect Transparency | ~90% | ~70% | C# relies on discipline |
+| Cache Safety | ~90% | ~75% | Similar to flaky tests |
+| **Overall** | **~91%** | **~70%** | **~1.30x advantage** |
+
+### Why the Advantage is Modest (1.3x not 1.6x)
+
+- C# developers CAN write safe code following best practices
+- Many tasks are solvable with good architecture
+- Calor's advantage is **enforcement**, not capability
+- The benchmark rewards outcomes, not techniques
+
+---
+
+## Fair Comparison
+
+This benchmark does **NOT** force C# into Calor's paradigm:
+
+**C# Best Practices Recognized:**
+- Passing dependencies as parameters (DI pattern)
+- Using `ITimeProvider` / `IRandomGenerator` interfaces
+- `[Pure]` attribute usage
+- Static methods with no dependencies
+- Interface boundaries for I/O
+- Immutable patterns (`readonly`, records)
+
+**What We're Testing:**
+- "Which language produces code less likely to have these bugs?"
+- NOT "Does Calor's effect system work?"
+
+---
+
+## Running the Benchmark
+
+```bash
+# Run all effect discipline tasks
+dotnet run --project tests/Calor.Evaluation -- effect-discipline
+
+# Run specific category
+dotnet run --project tests/Calor.Evaluation -- effect-discipline \
+  --category flaky-test-prevention
+
+# Sample 10 tasks
+dotnet run --project tests/Calor.Evaluation -- effect-discipline \
+  --sample 10 --verbose
+```
+
+---
+
+## Learn More
+
+- [Safety Benchmark](/benchmarking/metrics/safety/) - Contract enforcement
+- [Effect Soundness](/benchmarking/metrics/effect-soundness/) - Effect accuracy (Calor-only)
+- [Methodology](/benchmarking/methodology/) - How benchmarks work
