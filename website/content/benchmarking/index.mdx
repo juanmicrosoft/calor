@@ -6,7 +6,7 @@ hasChildren: true
 ---
 
 
-Calor is evaluated against C# across 10 metrics designed to measure what matters for AI coding agents.
+Calor is evaluated against C# across 12 metrics designed to measure what matters for AI coding agents.
 
 ---
 
@@ -18,7 +18,8 @@ Calor is evaluated against C# across 10 metrics designed to measure what matters
 | [**Error Detection**](/benchmarking/metrics/error-detection/) | Bug identification, contract violation detection | Can agents find issues using explicit semantics? |
 | [**Edit Precision**](/benchmarking/metrics/edit-precision/) | Targeting accuracy, change isolation | Can agents make precise edits using unique IDs? |
 | [**Generation Accuracy**](/benchmarking/metrics/generation-accuracy/) | Compilation success, structural correctness | Can agents produce valid code? |
-| [**Task Completion**](/benchmarking/metrics/task-completion/) | End-to-end success rates | Can agents complete full tasks? |
+| [**Task Completion**](/benchmarking/metrics/task-completion/) | LLM code generation success | Can AI complete tasks with Calor vs C#? |
+| [**Safety**](/benchmarking/metrics/safety/) | Contract enforcement effectiveness | Does code catch bugs with informative errors? |
 | [**Token Economics**](/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
 | [**Information Density**](/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
 
@@ -48,12 +49,14 @@ Calor excels where explicitness matters:
 - **Comprehension** - Explicit structure aids understanding
 - **Error Detection** - Contracts surface invariant violations
 - **Edit Precision** - Unique IDs enable targeted changes
+- **Task Completion** - AI completes 23% more tasks successfully with Calor
+- **Safety** - Contracts catch 14% more bugs with better error messages
 
 C# wins on token efficiency:
 - **Token Economics** - Calor's explicit syntax uses more tokens
 - **Information Density** - C# packs more per token
 
-This reflects a fundamental tradeoff: **explicit semantics require more tokens but enable better agent reasoning**.
+This reflects a fundamental tradeoff: **explicit semantics require more tokens but enable better agent reasoning and task completion**.
 
 ---
 

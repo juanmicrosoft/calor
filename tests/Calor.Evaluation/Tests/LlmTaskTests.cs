@@ -402,7 +402,7 @@ public static class Math
         Assert.Equal("Test Task", task.Name);
         Assert.Equal("test", task.Category);
         Assert.Equal(1, task.Difficulty);
-        Assert.Equal("Write Calor code", task.Prompts.Calor);
+        Assert.Equal("Write Calor code", task.Prompts!.Calor);
         Assert.Equal("Write C# code", task.Prompts.CSharp);
         Assert.Single(task.TestCases);
         Assert.Equal(0.3, task.Scoring.Compilation);
