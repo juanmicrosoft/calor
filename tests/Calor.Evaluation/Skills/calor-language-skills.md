@@ -781,6 +781,34 @@ These examples show correct patterns for common string tasks:
 §B{next} (indexof rest "@")           // ✓ Search in substring
 ```
 
+### Variable Redeclaration Mistakes
+
+**WRONG - Using §B to update an existing variable:**
+```calor
+// WRONG: Can't redeclare a variable in the same scope
+§B{k} (% rng n)                 // First use: declares k
+§B{k} (abs k)                   // ❌ ERROR - 'k' already defined
+
+// WRONG: Redeclaring in conditional
+§B{result} 0
+§IF{if1} (< n 0)
+  §B{result} (- 0 n)            // ❌ ERROR - 'result' already exists
+§/I{if1}
+```
+
+**CORRECT - Use §ASSIGN to update existing variables:**
+```calor
+// CORRECT: §B to declare, §ASSIGN to update
+§B{k} (% rng n)                 // Declare k
+§ASSIGN k (abs k)               // ✓ Update k
+
+// CORRECT: Update in conditional
+§B{result} 0
+§IF{if1} (< n 0)
+  §ASSIGN result (- 0 n)        // ✓ Update existing result
+§/I{if1}
+```
+
 ### Character Literal Mistakes
 
 **WRONG - Single-quoted character literals (cause "Unexpected character '''" error):**
@@ -789,9 +817,10 @@ These examples show correct patterns for common string tasks:
 §IF{if1} (== c '0')             // ❌ ERROR
 §IF{if2} (== c '-')             // ❌ ERROR
 §IF{if3} (&& (>= c '0') (<= c '9'))  // ❌ ERROR
+§B{pad} '='                     // ❌ ERROR - can't use single quotes
 ```
 
-**CORRECT - Use character predicates or code comparisons:**
+**CORRECT - Use character predicates, codes, or string extraction:**
 ```calor
 // CORRECT: Use (is-digit c) for digit check
 §IF{if1} (is-digit c)           // ✓ Check if digit
@@ -802,7 +831,23 @@ These examples show correct patterns for common string tasks:
 // CORRECT: Use codes for range check
 §B{code} (char-code c)
 §IF{if3} (&& (>= code 48) (<= code 57))  // ✓ Check if '0'-'9'
+
+// CORRECT: Get character constant using char-from-code
+§B{equalChar} (char-from-code 61)   // ✓ '=' character (code 61)
+§B{plusChar} (char-from-code 43)    // ✓ '+' character (code 43)
+
+// CORRECT: Get character from string
+§B{equalChar} (char-at "=" 0)       // ✓ '=' from string
 ```
+
+**Common Character Codes:**
+| Char | Code | Char | Code |
+|------|------|------|------|
+| '='  | 61   | '+'  | 43   |
+| '-'  | 45   | '/'  | 47   |
+| '0'  | 48   | '9'  | 57   |
+| 'A'  | 65   | 'Z'  | 90   |
+| 'a'  | 97   | 'z'  | 122  |
 
 ### Array Syntax Mistakes
 
