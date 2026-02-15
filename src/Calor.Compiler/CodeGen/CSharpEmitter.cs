@@ -1317,24 +1317,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ArrayCreationNode node)
     {
         var elementType = MapTypeName(node.ElementType);
-        var varName = SanitizeIdentifier(node.Name);
 
         if (node.Size != null)
         {
-            // Sized array: int[] arr = new int[10];
+            // Sized array expression: new int[10] or new int[n]
             var size = node.Size.Accept(this);
-            return $"{elementType}[] {varName} = new {elementType}[{size}];";
+            return $"new {elementType}[{size}]";
         }
         else if (node.Initializer.Count > 0)
         {
-            // Initialized array: int[] arr = { 1, 2, 3 };
+            // Initialized array expression: new[] { 1, 2, 3 }
             var elements = string.Join(", ", node.Initializer.Select(e => e.Accept(this)));
-            return $"{elementType}[] {varName} = {{ {elements} }};";
+            return $"new {elementType}[] {{ {elements} }}";
         }
         else
         {
-            // Empty array
-            return $"{elementType}[] {varName} = Array.Empty<{elementType}>();";
+            // Empty array expression
+            return $"Array.Empty<{elementType}>()";
         }
     }
 
