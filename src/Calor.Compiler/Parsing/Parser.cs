@@ -3068,7 +3068,8 @@ public sealed class Parser
 
     /// <summary>
     /// Parses array creation.
-    /// §ARR[arr1:i32:10]                         // int[] arr1 = new int[10]; (sized)
+    /// §ARR[arr1:i32:10]                         // int[] arr1 = new int[10]; (sized with literal)
+    /// §ARR[arr1:i32:n]                          // int[] arr1 = new int[n]; (sized with variable)
     /// §ARR[arr2:i32] §A 1 §A 2 §A 3 §/ARR[arr2] // int[] arr2 = { 1, 2, 3 }; (initialized)
     /// </summary>
     private ArrayCreationNode ParseArrayCreation()
@@ -3090,9 +3091,18 @@ public sealed class Parser
         var initializer = new List<ExpressionNode>();
 
         // If size is specified in attributes, use it
-        if (!string.IsNullOrEmpty(sizeStr) && int.TryParse(sizeStr, out var sizeVal))
+        if (!string.IsNullOrEmpty(sizeStr))
         {
-            size = new IntLiteralNode(startToken.Span, sizeVal);
+            if (int.TryParse(sizeStr, out var sizeVal))
+            {
+                // Size is an integer literal
+                size = new IntLiteralNode(startToken.Span, sizeVal);
+            }
+            else
+            {
+                // Size is a variable reference (e.g., §ARR{a001:i32:n} where n is a variable)
+                size = new ReferenceNode(startToken.Span, sizeStr);
+            }
         }
         else
         {

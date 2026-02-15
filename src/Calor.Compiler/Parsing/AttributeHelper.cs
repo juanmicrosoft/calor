@@ -147,6 +147,10 @@ public static class AttributeHelper
         if (string.IsNullOrEmpty(value))
             return false;
 
+        // Array types start with '[' e.g., [i32], [str]
+        if (value.StartsWith('['))
+            return true;
+
         var lower = value.ToLowerInvariant();
         return lower switch
         {
@@ -332,6 +336,14 @@ public static class AttributeHelper
     {
         if (string.IsNullOrEmpty(compactType))
             return compactType;
+
+        // Handle Calor-style array types: [T] -> ARRAY[element=T]
+        // e.g., [i32] -> ARRAY[element=INT]
+        if (compactType.StartsWith('[') && compactType.EndsWith(']'))
+        {
+            var inner = ExpandType(compactType[1..^1]);
+            return $"ARRAY[element={inner}]";
+        }
 
         // Handle Option type: ?T -> OPTION[inner=T]
         if (compactType.StartsWith('?'))

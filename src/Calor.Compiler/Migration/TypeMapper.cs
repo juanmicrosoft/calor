@@ -343,6 +343,17 @@ public static class TypeMapper
             return "double";
         }
 
+        // Handle expanded ARRAY format: ARRAY[element=T] -> T[]
+        if (calorType.StartsWith("ARRAY[element=", StringComparison.Ordinal))
+        {
+            var elementType = ExtractBracketValue(calorType, "ARRAY[element=");
+            if (elementType != null)
+            {
+                var mappedElement = CalorToCSharp(elementType);
+                return $"{mappedElement}[]";
+            }
+        }
+
         // Handle Option types ?T -> T?
         if (calorType.StartsWith("?"))
         {

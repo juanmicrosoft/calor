@@ -73,8 +73,8 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 
 ```
 §ARR elem1 elem2 §/ARR    Array literal
-§IDX{array} index         Array access (array[index])
-§IDX{array} §^ n          Index from end (array[^n])
+§IDX array index          Array access (array[index])
+§IDX array §^ n           Index from end (array[^n])
 §^ n                      Index from end operator (^n)
 §LEN array                Array length (array.Length)
 §SETIDX{array} idx val    Set element at index (array[idx] = val)
@@ -83,10 +83,10 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 **CRITICAL: Don't mix tag-style (§IDX) inside Lisp expressions:**
 ```
 // WRONG: §IDX inside Lisp expression
-§ASSIGN sum (+ sum §IDX{data} i)    ← ERROR
+§ASSIGN sum (+ sum §IDX data i)    ← ERROR
 
 // CORRECT: Use a binding first
-§B{val} §IDX{data} i
+§B{val} §IDX data i
 §ASSIGN sum (+ sum val)             ← Works
 ```
 
@@ -1011,8 +1011,8 @@ Async functions and methods use `§AF` and `§AMT` tags:
 §B{?str:name} §NN
 §B{str:displayName} §?? name "Anonymous"
 §B{[i32]:arr} §ARR 1 2 3 4 5 §/ARR
-§B{i32:last} §IDX{arr} §^ 1
-§B{[i32]:slice} §IDX{arr} §RANGE 1 3
+§B{i32:last} §IDX arr §^ 1
+§B{[i32]:slice} §IDX arr §RANGE 1 3
 ```
 
 Note: `§^` and `§RANGE` syntax requires full program context.

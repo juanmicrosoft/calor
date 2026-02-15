@@ -294,12 +294,13 @@ Use contracts to express requirements and guarantees mentioned in the task:
 
 **Array Element Access:**
 ```calor
-// Access element at index - use §IDX
-§B{elem} §IDX{arr} 0                        // arr[0]
-§B{elem} §IDX{arr} i                        // arr[i]
-§B{last} §IDX{arr} §^ 1                     // arr[^1] - last element
+// Access element at index - use §IDX (NO braces around array name)
+§B{elem} §IDX arr 0                         // arr[0]
+§B{elem} §IDX arr i                         // arr[i]
+§B{last} §IDX arr §^ 1                      // arr[^1] - last element
 
 // WRONG: These do NOT work
+// §IDX{arr} i      ❌ ERROR - braces cause parsing issues
 // (get arr i)      ❌ ERROR - not valid
 // (at arr i)       ❌ ERROR - not valid
 // arr[i]           ❌ ERROR - no C# indexer syntax
@@ -330,7 +331,7 @@ Use contracts to express requirements and guarantees mentioned in the task:
   §B{i} 0
   §WH{wh1} (< i (len nums))
     // IMPORTANT: Get element into a binding first, THEN use in expression
-    §B{val} §IDX{nums} i
+    §B{val} §IDX nums i
     §ASSIGN sum (+ sum val)
     §ASSIGN i (+ i 1)
   §/WH{wh1}
@@ -341,10 +342,10 @@ Use contracts to express requirements and guarantees mentioned in the task:
 **CRITICAL: Don't mix tag-style (§IDX) inside Lisp expressions:**
 ```calor
 // WRONG: §IDX inside Lisp expression
-§ASSIGN sum (+ sum §IDX{data} i)    // ❌ ERROR - can't nest §IDX in (...)
+§ASSIGN sum (+ sum §IDX data i)     // ❌ ERROR - can't nest §IDX in (...)
 
 // CORRECT: Use a binding first
-§B{val} §IDX{data} i
+§B{val} §IDX data i
 §ASSIGN sum (+ sum val)             // ✓ Works - val is a simple identifier
 ```
 
@@ -814,8 +815,8 @@ These examples show correct patterns for common string tasks:
 // CORRECT: Type with brackets before
 §I{[i32]:items}                 // ✓ Array of i32
 
-// CORRECT: Element access with §IDX
-§B{x} §IDX{arr} i               // ✓ arr[i]
+// CORRECT: Element access with §IDX (NO braces)
+§B{x} §IDX arr i                // ✓ arr[i]
 
 // CORRECT: Element assignment with §SETIDX
 §SETIDX{arr} i value            // ✓ arr[i] = value
@@ -828,19 +829,19 @@ These examples show correct patterns for common string tasks:
 **WRONG - Mixing tag-style §IDX inside Lisp expressions:**
 ```calor
 // WRONG: Can't nest §IDX inside (...)
-§ASSIGN sum (+ sum §IDX{data} i)    // ❌ ERROR - tag inside Lisp expr
+§ASSIGN sum (+ sum §IDX data i)     // ❌ ERROR - tag inside Lisp expr
 
 // WRONG: Can't use §IDX directly in operators
-§R (^ hash §IDX{arr} j)             // ❌ ERROR - tag inside Lisp expr
+§R (^ hash §IDX arr j)              // ❌ ERROR - tag inside Lisp expr
 ```
 
 **CORRECT - Use a binding first:**
 ```calor
 // CORRECT: Extract to binding, then use in expression
-§B{val} §IDX{data} i
+§B{val} §IDX data i
 §ASSIGN sum (+ sum val)             // ✓ val is a simple identifier
 
-§B{elem} §IDX{arr} j
+§B{elem} §IDX arr j
 §R (^ hash elem)                    // ✓ elem is a simple identifier
 ```
 
