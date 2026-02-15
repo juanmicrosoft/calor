@@ -72,12 +72,21 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 ### Array Operations
 
 ```
-§ARR elem1 elem2 §/ARR    Array literal
-§IDX array index          Array access (array[index])
-§IDX array §^ n           Index from end (array[^n])
-§^ n                      Index from end operator (^n)
-§LEN array                Array length (array.Length)
-§SETIDX{array} idx val    Set element at index (array[idx] = val)
+§ARR elem1 elem2 §/ARR       Array literal
+§ARR{id:type:size}           Sized array: new type[size]
+§ARR{id:type:(len arr)}      Sized array with expression: new type[arr.Length]
+§IDX array index             Array access (array[index])
+§IDX array §^ n              Index from end (array[^n])
+§^ n                         Index from end operator (^n)
+§LEN array                   Array length (array.Length)
+§SETIDX{array} idx val       Set element at index (array[idx] = val)
+```
+
+**Array creation patterns:**
+```
+§B{[i32]:result} §ARR{a001:i32:n}          Variable size: new int[n]
+§B{[i32]:result} §ARR{a001:i32:10}         Literal size: new int[10]
+§B{[i32]:result} §ARR{a001:i32:(len data)} Expression size: new int[data.Length]
 ```
 
 **CRITICAL: Don't mix tag-style (§IDX) inside Lisp expressions:**
@@ -247,18 +256,27 @@ Multi-line form:
 §/I{id}
 ```
 
-**CRITICAL: §IF is a STATEMENT, not an expression.**
-```
-// WRONG - cannot use §IF to assign a value
-§B{x} §IF{if1} (< n 0) → (- 0 n) §EL → n §/I{if1}  ← ERROR
+### IF as Expression (Conditional/Ternary)
 
-// CORRECT - use separate branches
-§IF{if1} (< n 0)
-  §B{x} (- 0 n)
-§EL
-  §B{x} n
-§/I{if1}
+§IF can be used as an expression to return a value (like C#'s ternary `?:`):
+
 ```
+§B{x} §IF{id} condition → thenValue §EL → elseValue §/I{id}
+```
+
+**Example - Conditional assignment:**
+```
+§B{minLen} §IF{if1} (<= lenA lenB) → lenA §EL → lenB §/I{if1}
+// Compiles to: var minLen = (lenA <= lenB) ? lenA : lenB;
+```
+
+**Example - Absolute value:**
+```
+§B{abs} §IF{if1} (< n 0) → (- 0 n) §EL → n §/I{if1}
+// Compiles to: var abs = (n < 0) ? (0 - n) : n;
+```
+
+**Note:** Both `→ thenValue` and `§EL → elseValue` are required for IF expressions.
 
 ## Contracts
 

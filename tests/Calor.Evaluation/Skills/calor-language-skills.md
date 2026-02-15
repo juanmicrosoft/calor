@@ -285,8 +285,14 @@ Use contracts to express requirements and guarantees mentioned in the task:
 
 **Array Creation:**
 ```calor
-// Sized array
+// Sized array with literal
 §B{[i32]:arr} §ARR{a001:i32:5}              // Create int[5]
+
+// Sized array with variable
+§B{[i32]:arr} §ARR{a001:i32:n}              // Create int[n]
+
+// Sized array with expression
+§B{[i32]:result} §ARR{a001:i32:(len data)}  // Create int[data.Length]
 
 // Initialized array
 §B{[i32]:arr} §ARR{a001:i32} 1 2 3 §/ARR{a001}  // Create [1, 2, 3]
@@ -380,24 +386,31 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 - No arrow after the condition
 - Statements go on following lines
 
-**COMMON MISTAKE - Using §IF as an expression:**
+**§IF as Expression (Conditional/Ternary):**
+
+§IF can be used as an expression to return a value (like C#'s ternary `?:`):
+
 ```calor
-// WRONG - §IF is a STATEMENT, not an expression
-§B{x} §IF{if1} (< n 0) → (- 0 n) §EL → n §/I{if1}  // ❌ ERROR
+// Syntax: §IF{id} condition → thenValue §EL → elseValue §/I{id}
+§B{x} §IF{if1} (< n 0) → (- 0 n) §EL → n §/I{if1}
+// Compiles to: var x = (n < 0) ? (0 - n) : n;
+
+// Conditional assignment - minimum of two values
+§B{minLen} §IF{if1} (<= lenA lenB) → lenA §EL → lenB §/I{if1}
+// Compiles to: var minLen = (lenA <= lenB) ? lenA : lenB;
 ```
 
-**CORRECT - Use explicit branches with §R or §ASSIGN:**
+**IMPORTANT:** Both `→ thenValue` and `§EL → elseValue` are required for IF expressions.
+
+**Alternative - Use explicit branches for complex logic:**
 ```calor
-// CORRECT: Use if statement to assign different values
+// For complex logic with multiple statements, use block syntax
 §IF{if1} (< n 0)
   §B{x} (- 0 n)
 §EL
   §B{x} n
 §/I{if1}
 // Now use x
-
-// OR compute absolute value with a function
-§B{absN} §C{Abs} §A n §/C
 ```
 
 **COMMON MISTAKE - Arrow syntax with statements after:**
@@ -845,20 +858,22 @@ These examples show correct patterns for common string tasks:
 §R (^ hash elem)                    // ✓ elem is a simple identifier
 ```
 
-### If-Statement-as-Expression Mistakes
+### If-Expression Patterns (Ternary/Conditional)
 
-**WRONG - Using §IF as an expression to assign a value:**
+**§IF as Expression - NOW SUPPORTED:**
 ```calor
-// WRONG: §IF is a STATEMENT, not an expression
-§B{absX} §IF{if1} (< x 0) → (- 0 x) §EL → x §/I{if1}  // ❌ ERROR
+// IF expression for conditional values (compiles to C# ternary)
+§B{absX} §IF{if1} (< x 0) → (- 0 x) §EL → x §/I{if1}
+// Compiles to: var absX = (x < 0) ? (0 - x) : x;
 
-// WRONG: Inline ternary-style if
-§R §IF{if1} (< a b) → (- 0 1) §EL → 1 §/I{if1}        // ❌ ERROR
+// IF expression in return
+§R §IF{if1} (< a b) → (- 0 1) §EL → 1 §/I{if1}
+// Compiles to: return (a < b) ? (0 - 1) : 1;
 ```
 
-**CORRECT - Use separate branches:**
+**Alternative - Block syntax for complex logic:**
 ```calor
-// CORRECT: Use if statement with separate assignments
+// When you need multiple statements, use block syntax
 §B{absX} 0
 §IF{if1} (< x 0)
   §ASSIGN absX (- 0 x)
@@ -866,7 +881,7 @@ These examples show correct patterns for common string tasks:
   §ASSIGN absX x
 §/I{if1}
 
-// CORRECT: For simple returns, use arrow syntax
+// Or arrow syntax with statements
 §IF{if1} (< a b) → §R (- 0 1)
 §EL → §R 1
 §/I{if1}

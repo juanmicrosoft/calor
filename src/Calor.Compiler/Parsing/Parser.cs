@@ -921,6 +921,8 @@ public sealed class Parser
             or TokenKind.Identifier
             // Lisp-style expression
             or TokenKind.OpenParen
+            // Phase 2: Control Flow - IF as conditional expression
+            or TokenKind.If
             // Phase 3: Type System
             or TokenKind.Some
             or TokenKind.None
@@ -972,6 +974,8 @@ public sealed class Parser
             TokenKind.OpenParen => ParseParenExpressionOrInlineLambda(),
             // Collection/array initializer: {elem1, elem2, ...}
             TokenKind.OpenBrace => ParseCollectionInitializer(),
+            // Phase 2: Control Flow - IF as conditional expression
+            TokenKind.If => ParseIfExpression(),
             // Phase 3: Type System
             TokenKind.Some => ParseSomeExpression(),
             TokenKind.None => ParseNoneExpression(),
@@ -2228,6 +2232,62 @@ public sealed class Parser
         return new DoWhileStatementNode(span, id, body, condition, attrs);
     }
 
+    /// <summary>
+    /// Parses IF as a conditional expression (ternary).
+    /// §IF{id} condition → thenExpr §EL → elseExpr §/I{id}
+    /// Returns a ConditionalExpressionNode for use in expression contexts.
+    /// </summary>
+    private ExpressionNode ParseIfExpression()
+    {
+        var startToken = Expect(TokenKind.If);
+        var attrs = ParseAttributes();
+
+        // Parse the condition
+        var condition = ParseExpression();
+
+        // Expect arrow and then expression
+        if (!Check(TokenKind.Arrow))
+        {
+            _diagnostics.ReportError(Current.Span, "Calor0100", "Expected '→' after IF condition in expression context");
+            return new IntLiteralNode(startToken.Span, 0);
+        }
+        Advance(); // consume →
+
+        // Parse then expression
+        var thenExpr = ParseExpression();
+
+        // Expect §EL (else)
+        if (!Check(TokenKind.Else))
+        {
+            _diagnostics.ReportError(Current.Span, "Calor0101", "IF expression requires an else clause (§EL)");
+            return thenExpr;
+        }
+        Expect(TokenKind.Else);
+
+        // Expect arrow and else expression
+        if (!Check(TokenKind.Arrow))
+        {
+            _diagnostics.ReportError(Current.Span, "Calor0102", "Expected '→' after §EL in IF expression");
+            return thenExpr;
+        }
+        Advance(); // consume →
+
+        // Parse else expression
+        var elseExpr = ParseExpression();
+
+        // Expect closing §/I{id}
+        var endSpan = elseExpr.Span;
+        if (Check(TokenKind.EndIf))
+        {
+            var endToken = Expect(TokenKind.EndIf);
+            var endAttrs = ParseAttributes();
+            endSpan = endToken.Span;
+        }
+
+        var span = startToken.Span.Union(endSpan);
+        return new ConditionalExpressionNode(span, condition, thenExpr, elseExpr);
+    }
+
     private IfStatementNode ParseIfStatement()
     {
         var startToken = Expect(TokenKind.If);
@@ -3098,6 +3158,12 @@ public sealed class Parser
                 // Size is an integer literal
                 size = new IntLiteralNode(startToken.Span, sizeVal);
             }
+            else if (sizeStr.StartsWith("("))
+            {
+                // Size is an expression like (len data) - re-lex and parse it
+                // This handles §ARR{a001:i32:(len data)}
+                size = ParseEmbeddedExpression(sizeStr, startToken.Span);
+            }
             else
             {
                 // Size is a variable reference (e.g., §ARR{a001:i32:n} where n is a variable)
@@ -3106,10 +3172,19 @@ public sealed class Parser
         }
         else
         {
-            // Check for initializer elements (§A expressions until §/ARR)
-            while (!IsAtEnd && !Check(TokenKind.EndArray) && Check(TokenKind.Arg))
+            // No size in attributes - check for a following expression or initializer elements
+            if (IsExpressionStart())
             {
-                initializer.Add(ParseArgument());
+                // Size specified as expression after tag: §ARR{a001:i32} (len data)
+                size = ParseExpression();
+            }
+            else
+            {
+                // Check for initializer elements (§A expressions until §/ARR)
+                while (!IsAtEnd && !Check(TokenKind.EndArray) && Check(TokenKind.Arg))
+                {
+                    initializer.Add(ParseArgument());
+                }
             }
         }
 
@@ -3130,6 +3205,39 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endSpan);
         return new ArrayCreationNode(span, id, id, elementType, size, initializer, attrs);
+    }
+
+    /// <summary>
+    /// Parses an embedded expression from a string (e.g., "(len data)" from array size attribute).
+    /// Re-lexes and parses the string as an expression.
+    /// </summary>
+    private ExpressionNode ParseEmbeddedExpression(string expressionText, TextSpan fallbackSpan)
+    {
+        try
+        {
+            // Create a mini-lexer to tokenize the expression text
+            var lexer = new Lexer(expressionText, _diagnostics);
+            var tokens = lexer.Tokenize().ToList();
+
+            if (tokens.Count == 0 || (tokens.Count == 1 && tokens[0].Kind == TokenKind.Eof))
+            {
+                _diagnostics.ReportError(fallbackSpan, "Calor0103", "Empty embedded expression");
+                return new IntLiteralNode(fallbackSpan, 0);
+            }
+
+            // Create a mini-parser for the expression using shared diagnostics
+            var parser = new Parser(tokens, _diagnostics);
+            var expr = parser.ParseExpression();
+
+            // Transfer the span to use fallback if the embedded one is synthetic
+            return expr;
+        }
+        catch
+        {
+            // If parsing fails, treat as a reference (fallback behavior)
+            _diagnostics.ReportError(fallbackSpan, "Calor0104", $"Failed to parse embedded expression: {expressionText}");
+            return new ReferenceNode(fallbackSpan, expressionText.Trim('(', ')', ' '));
+        }
     }
 
     /// <summary>
