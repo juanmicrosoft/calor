@@ -409,6 +409,24 @@ public sealed class CodeExecutor : IDisposable
             {
                 converted[i] = arg;
             }
+            else if (paramType.IsArray && arg is object[] objArray)
+            {
+                // Convert object[] to the proper typed array (e.g., int[], string[])
+                var elementType = paramType.GetElementType()!;
+                var typedArray = Array.CreateInstance(elementType, objArray.Length);
+                for (int j = 0; j < objArray.Length; j++)
+                {
+                    try
+                    {
+                        typedArray.SetValue(Convert.ChangeType(objArray[j], elementType), j);
+                    }
+                    catch
+                    {
+                        typedArray.SetValue(objArray[j], j);
+                    }
+                }
+                converted[i] = typedArray;
+            }
             else
             {
                 // Try to convert numeric types

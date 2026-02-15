@@ -204,6 +204,14 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 (! a)                 Logical not
 ```
 
+### Unavailable Operators - Use IF Expressions
+
+**CRITICAL: These operators do NOT exist:**
+- `(abs x)` - Use IF expression: `§IF{id} (< x 0) → (- 0 x) §EL → x §/I{id}`
+- `(max a b)` - Use IF expression: `§IF{id} (> a b) → a §EL → b §/I{id}`
+- `(min a b)` - Use IF expression: `§IF{id} (< a b) → a §EL → b §/I{id}`
+- `(sqrt x)`, `(pow a b)` - Not available
+
 ## Statements
 
 ```

@@ -134,6 +134,27 @@ Use contracts to express requirements and guarantees mentioned in the task:
 (! a)         // NOT a
 ```
 
+#### Unavailable Operators - Use IF Expressions Instead
+
+**CRITICAL: The following operators do NOT exist in Calor:**
+- `(abs x)` - absolute value
+- `(max a b)` - maximum
+- `(min a b)` - minimum
+- `(sqrt x)` - square root
+- `(pow a b)` - power
+
+**Use IF expressions to implement these:**
+```calor
+// Absolute value - NO (abs x) operator!
+§B{absVal} §IF{if1} (< x 0) → (- 0 x) §EL → x §/I{if1}
+
+// Maximum - NO (max a b) operator!
+§B{maxVal} §IF{if1} (> a b) → a §EL → b §/I{if1}
+
+// Minimum - NO (min a b) operator!
+§B{minVal} §IF{if1} (< a b) → a §EL → b §/I{if1}
+```
+
 #### String Operations
 
 **IMPORTANT: Use these operations for string manipulation. Do NOT invent syntax.**
@@ -787,7 +808,7 @@ These examples show correct patterns for common string tasks:
 ```calor
 // WRONG: Can't redeclare a variable in the same scope
 §B{k} (% rng n)                 // First use: declares k
-§B{k} (abs k)                   // ❌ ERROR - 'k' already defined
+§B{k} (+ k 1)                   // ❌ ERROR - 'k' already defined
 
 // WRONG: Redeclaring in conditional
 §B{result} 0
@@ -800,7 +821,7 @@ These examples show correct patterns for common string tasks:
 ```calor
 // CORRECT: §B to declare, §ASSIGN to update
 §B{k} (% rng n)                 // Declare k
-§ASSIGN k (abs k)               // ✓ Update k
+§ASSIGN k (+ k 1)               // ✓ Update k
 
 // CORRECT: Update in conditional
 §B{result} 0
