@@ -77,6 +77,17 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 §IDX{array} §^ n          Index from end (array[^n])
 §^ n                      Index from end operator (^n)
 §LEN array                Array length (array.Length)
+§SETIDX{array} idx val    Set element at index (array[idx] = val)
+```
+
+**CRITICAL: Don't mix tag-style (§IDX) inside Lisp expressions:**
+```
+// WRONG: §IDX inside Lisp expression
+§ASSIGN sum (+ sum §IDX{data} i)    ← ERROR
+
+// CORRECT: Use a binding first
+§B{val} §IDX{data} i
+§ASSIGN sum (+ sum val)             ← Works
 ```
 
 ### Type Casting
@@ -85,6 +96,73 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 §AS{targetType} expr      Safe cast (as operator)
 §CAST{targetType} expr    Explicit cast
 ```
+
+### Character Operations
+
+**CRITICAL: Calor does NOT support single-quoted character literals.**
+
+```
+// WRONG - single quotes cause "Unexpected character '''" error
+(== c '0')        ← ERROR
+(== c '-')        ← ERROR
+```
+
+**Use character classification predicates or numeric code comparisons:**
+
+```
+// Character classification
+(is-digit c)        true if c is '0'-'9'
+(is-letter c)       true if c is a letter
+(is-whitespace c)   true if c is space, tab, newline
+(is-upper c)        true if c is uppercase
+(is-lower c)        true if c is lowercase
+
+// Character extraction and conversion
+(char-at s i)       Get character at index i from string s
+(char-code c)       Get Unicode code point: 'A' → 65
+(char-from-code n)  Create char from code: 65 → 'A'
+(char-upper c)      Convert to uppercase
+(char-lower c)      Convert to lowercase
+
+// Compare characters using numeric codes
+(== (char-code c) 48)   c == '0' (code 48)
+(== (char-code c) 45)   c == '-' (code 45)
+```
+
+**Common Character Codes:**
+| Char | Code | Char | Code |
+|------|------|------|------|
+| '0'  | 48   | '9'  | 57   |
+| 'A'  | 65   | 'Z'  | 90   |
+| 'a'  | 97   | 'z'  | 122  |
+| '-'  | 45   | '_'  | 95   |
+| ' '  | 32   | '.'  | 46   |
+
+### String Operations
+
+```
+(len s)           String length
+(contains s t)    Contains substring
+(starts s t)      Starts with
+(ends s t)        Ends with
+(indexof s t)     Index of (first occurrence, 2 args only!)
+(isempty s)       Is null or empty
+(equals s t)      String equality
+
+(upper s)         To uppercase
+(lower s)         To lowercase
+(trim s)          Trim whitespace
+(substr s i n)    Substring (start, length)
+(substr s i)      Substring to end
+(replace s a b)   Replace all occurrences
+
+(str x)           Convert any value to string
+(concat a b c)    Concatenate strings
+(fmt "{0}" x)     Format string (C# String.Format style)
+```
+
+**NOTE:** No `<` or `>` comparison on strings. Use `(equals)` for equality.
+`(indexof)` takes exactly 2 arguments - no startIndex parameter.
 
 ## Lisp-Style Expressions
 
@@ -167,6 +245,19 @@ Multi-line form:
 §EL
   ...body...
 §/I{id}
+```
+
+**CRITICAL: §IF is a STATEMENT, not an expression.**
+```
+// WRONG - cannot use §IF to assign a value
+§B{x} §IF{if1} (< n 0) → (- 0 n) §EL → n §/I{if1}  ← ERROR
+
+// CORRECT - use separate branches
+§IF{if1} (< n 0)
+  §B{x} (- 0 n)
+§EL
+  §B{x} n
+§/I{if1}
 ```
 
 ## Contracts
