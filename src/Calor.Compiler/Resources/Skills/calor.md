@@ -145,6 +145,21 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 | 'A'  | 65   | 'Z'  | 90   |
 | 'a'  | 97   | 'z'  | 122  |
 | '-'  | 45   | '_'  | 95   |
+| '='  | 61   | '+'  | 43   |
+| '/'  | 47   | ' '  | 32   |
+
+**Getting character constants (without single quotes):**
+```
+// Use char-from-code to create character values
+§B{equalChar} (char-from-code 61)    // '='
+§B{plusChar} (char-from-code 43)     // '+'
+§B{spaceChar} (char-from-code 32)    // ' '
+
+// Or extract from a string
+§B{equalChar} (char-at "=" 0)        // '='
+§B{padChars} "=+"
+§B{equalChar} (char-at padChars 0)   // '='
+```
 | ' '  | 32   | '.'  | 46   |
 
 ### String Operations
@@ -192,12 +207,22 @@ ReadDict<K,V>         IReadOnlyDictionary<K,V>
 ## Statements
 
 ```
-§B{name} expr         Bind variable
+§B{name} expr         Bind variable (declare and initialize)
 §B{type:name} expr    Bind with explicit type
 §R expr               Return value
 §P expr               Print line (Console.WriteLine)
 §Pf expr              Print without newline (Console.Write)
-§ASSIGN target val    Assignment statement
+§ASSIGN target val    Assignment statement (for existing variables)
+```
+
+**CRITICAL: §B declares a NEW variable. Use §ASSIGN to update existing variables.**
+```
+§B{k} (% rng n)              // First use: declare k
+§ASSIGN k (+ k offset)       // Update: use §ASSIGN, not §B
+
+// WRONG - variable redeclaration error:
+§B{k} (% rng n)
+§B{k} (abs k)                // ERROR: k already defined in this scope
 ```
 
 ### Explicit Body Markers
