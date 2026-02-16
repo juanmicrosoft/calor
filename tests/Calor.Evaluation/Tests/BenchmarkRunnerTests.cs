@@ -80,7 +80,7 @@ public class BenchmarkRunnerTests
         var calculators = runner.GetCalculators();
 
         // Assert
-        Assert.Equal(12, calculators.Count);
+        Assert.Equal(10, calculators.Count);
         Assert.Contains(calculators, c => c.Category == "TokenEconomics");
         Assert.Contains(calculators, c => c.Category == "GenerationAccuracy");
         Assert.Contains(calculators, c => c.Category == "Comprehension");
@@ -89,9 +89,7 @@ public class BenchmarkRunnerTests
         Assert.Contains(calculators, c => c.Category == "InformationDensity");
         Assert.Contains(calculators, c => c.Category == "TaskCompletion");
         Assert.Contains(calculators, c => c.Category == "RefactoringStability");
-        // Calor-only metrics
-        Assert.Contains(calculators, c => c.Category == "ContractVerification");
-        Assert.Contains(calculators, c => c.Category == "EffectSoundness");
+        // Calor-only metric (InteropEffectCoverage is the only remaining one)
         Assert.Contains(calculators, c => c.Category == "InteropEffectCoverage");
         // LLM task completion
         Assert.Contains(calculators, c => c.Category == "LlmTaskCompletion");

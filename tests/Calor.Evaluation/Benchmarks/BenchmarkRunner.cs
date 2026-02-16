@@ -31,9 +31,7 @@ public class BenchmarkRunner
             new InformationDensityCalculator(),
             new TaskCompletionCalculator(),
             new RefactoringStabilityCalculator(),
-            // Calor-only metrics (C# score always 0)
-            new ContractVerificationCalculator(),
-            new EffectSoundnessCalculator(),
+            // Calor-only metric (C# score always 0)
             new InteropEffectCoverageCalculator(),
             // LLM-based task completion (uses estimation mode by default)
             new LlmTaskCompletionCalculator()
