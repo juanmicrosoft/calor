@@ -1,0 +1,94 @@
+---
+title: "Agent Tasks"
+section: "benchmarking"
+order: 3
+---
+
+# Agent Task Benchmark
+
+This benchmark tests Claude's ability to generate correct Calor code from natural language prompts. It validates that Claude can learn Calor syntax from the bundled documentation and produce working code.
+
+<AgentBenchmarkDashboard />
+
+---
+
+## How It Works
+
+Each test:
+
+1. **Provides a natural language prompt** describing what code to generate
+2. **Claude reads CLAUDE.md** with Calor syntax reference
+3. **Claude generates Calor code** in a `.calr` file
+4. **Custom verification scripts** check the generated code
+
+Success requires the generated code to:
+- Compile without errors
+- Match expected syntax patterns
+- Pass any contract verification (when enabled)
+
+---
+
+## Test Categories
+
+| Category | Focus Area |
+|----------|------------|
+| Basic Syntax | Functions, parameters, return types |
+| Contract Writing | Preconditions, postconditions, invariants |
+| Advanced Contracts | Quantifiers, implications, custom messages |
+| Control Flow | Loops, conditionals, pattern matching |
+| Collections | List, Dictionary, HashSet operations |
+| Effects System | Effect declarations, file/network/console |
+| OOP Features | Classes, interfaces, properties |
+| Async Functions | Async/await patterns |
+| Generics | Generic functions and classes |
+| Type System | Option, Result, type inference |
+| Refactoring | Code transformation tasks |
+
+---
+
+## Running the Benchmark
+
+```bash
+# Run tests with single-run mode
+./tests/E2E/agent-tasks/run-agent-tests.sh --single-run
+
+# Run with majority voting (3 runs, 2/3 needed)
+./tests/E2E/agent-tasks/run-agent-tests.sh
+
+# Generate benchmark JSON for website
+./tests/E2E/agent-tasks/generate-benchmark.sh
+```
+
+---
+
+## Skill Quality Validation
+
+This benchmark serves as validation for the Calor skill documentation:
+
+- **Tests fail** → Skill documentation needs improvement
+- **Tests pass** → Claude can learn syntax from documentation
+
+When tests fail, the fix is improving `CLAUDE.md` and skill files, not the prompts.
+
+---
+
+## Pass Rate Threshold
+
+The benchmark requires an **80% pass rate** to be considered successful. This threshold balances:
+
+- **High bar for skill quality** — Most tasks should succeed
+- **Allowance for edge cases** — Complex syntax patterns may need iteration
+- **Practical reliability** — Users can expect Claude to generate working code
+
+---
+
+## Adding New Tests
+
+To add a new agent task test:
+
+1. Create a directory in `tests/E2E/agent-tasks/tasks/{category}/{number}_{name}/`
+2. Add `task.json` with prompt and metadata
+3. Add `verify.sh` with verification logic
+4. Run tests to validate
+
+See [Adding Benchmarks](/docs/contributing/adding-benchmarks/) for full details.
