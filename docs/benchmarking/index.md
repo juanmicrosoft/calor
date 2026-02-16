@@ -8,7 +8,7 @@ permalink: /benchmarking/
 
 # Benchmarking
 
-Calor is evaluated against C# across 7 metrics designed to measure what matters for AI coding agents.
+Calor is evaluated against C# across 7 static metrics plus an agent refactoring benchmark designed to measure what matters for AI coding agents.
 
 ---
 
@@ -51,3 +51,4 @@ This reflects a fundamental tradeoff: **explicit semantics require more tokens b
 - [Methodology](/calor/benchmarking/methodology/) - How benchmarks work
 - [Results](/calor/benchmarking/results/) - Detailed results table
 - [Individual Metrics](/calor/benchmarking/metrics/comprehension/) - Deep dive into each metric
+- [Agent Refactoring Benchmark](/calor/benchmarking/agent-refactoring/) - Real-world refactoring tests with Claude Code

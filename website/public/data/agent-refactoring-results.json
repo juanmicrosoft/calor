@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2026-02-15T00:00:00Z",
+  "commit": "580e189",
+  "benchmark": "agent-refactoring",
+  "description": "Measures Claude Code agent success rates on refactoring tasks",
+  "results": {
+    "calor": {
+      "passRate": 95,
+      "tasksPassed": 19,
+      "tasksTotal": 20,
+      "category": "refactoring-benchmark"
+    },
+    "csharp": {
+      "passRate": 95,
+      "tasksPassed": 19,
+      "tasksTotal": 20,
+      "category": "refactoring-benchmark"
+    }
+  },
+  "categories": [
+    {
+      "name": "Rename Symbol",
+      "calor": { "passed": 2, "total": 3 },
+      "csharp": { "passed": 3, "total": 3 }
+    },
+    {
+      "name": "Extract Method",
+      "calor": { "passed": 4, "total": 4 },
+      "csharp": { "passed": 4, "total": 4 }
+    },
+    {
+      "name": "Inline Function",
+      "calor": { "passed": 3, "total": 3 },
+      "csharp": { "passed": 3, "total": 3 }
+    },
+    {
+      "name": "Move Method",
+      "calor": { "passed": 3, "total": 3 },
+      "csharp": { "passed": 3, "total": 3 }
+    },
+    {
+      "name": "Add Contract",
+      "calor": { "passed": 4, "total": 4 },
+      "csharp": { "passed": 3, "total": 4 }
+    },
+    {
+      "name": "Change Signature",
+      "calor": { "passed": 3, "total": 3 },
+      "csharp": { "passed": 3, "total": 3 }
+    }
+  ],
+  "methodology": {
+    "votingMode": "majority (2/3)",
+    "agent": "claude-code",
+    "verification": ["compilation", "z3-contracts"],
+    "runsPerTask": 3
+  }
+}

@@ -16,12 +16,18 @@ on:
         required: false
         default: 'false'
         type: boolean
+      agent_refactoring:
+        description: 'Run agent refactoring benchmark'
+        required: false
+        default: 'false'
+        type: boolean
   # Run on pushes to benchmark-related files
   push:
     branches: [main]
     paths:
       - 'tests/Calor.Evaluation/**'
       - 'tests/TestData/Benchmarks/**'
+      - 'tests/E2E/agent-tasks/**'
       - '.github/workflows/benchmark.yml'
 
 jobs:
@@ -199,3 +205,123 @@ jobs:
           else
             echo "Warning: No benchmark results found"
           fi
+
+  # Agent Refactoring Benchmark - compares Calor vs C# refactoring success rates
+  # Uses Claude Code CLI to perform refactoring tasks and measures pass rates
+  agent-refactoring-benchmark:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.agent_refactoring == 'true'
+    needs: benchmark
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build compiler
+        run: dotnet build -c Release --no-restore
+
+      - name: Run Calor refactoring benchmark
+        id: calor-benchmark
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cd tests/E2E/agent-tasks
+          chmod +x run-agent-tests.sh
+          ./run-agent-tests.sh --category refactoring-benchmark --filter calor --single-run 2>&1 | tee /tmp/calor-results.txt
+          # Extract pass rate
+          CALOR_PASS_RATE=$(grep -oP 'Pass Rate: \K[0-9]+' /tmp/calor-results.txt || echo "0")
+          echo "calor_pass_rate=$CALOR_PASS_RATE" >> $GITHUB_OUTPUT
+
+      - name: Run C# refactoring benchmark
+        id: csharp-benchmark
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cd tests/E2E/agent-tasks
+          ./run-agent-tests.sh --category refactoring-benchmark --filter csharp --single-run 2>&1 | tee /tmp/csharp-results.txt
+          # Extract pass rate
+          CSHARP_PASS_RATE=$(grep -oP 'Pass Rate: \K[0-9]+' /tmp/csharp-results.txt || echo "0")
+          echo "csharp_pass_rate=$CSHARP_PASS_RATE" >> $GITHUB_OUTPUT
+
+      - name: Generate agent benchmark results JSON
+        run: |
+          mkdir -p website/public/data
+          cat > website/public/data/agent-refactoring-results.json << EOF
+          {
+            "version": "1.0.0",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "benchmark": "agent-refactoring",
+            "description": "Measures Claude Code agent success rates on refactoring tasks",
+            "results": {
+              "calor": {
+                "passRate": ${{ steps.calor-benchmark.outputs.calor_pass_rate || 0 }},
+                "tasksTotal": 20,
+                "category": "refactoring-benchmark"
+              },
+              "csharp": {
+                "passRate": ${{ steps.csharp-benchmark.outputs.csharp_pass_rate || 0 }},
+                "tasksTotal": 20,
+                "category": "refactoring-benchmark"
+              }
+            },
+            "methodology": {
+              "votingMode": "single-run",
+              "agent": "claude-code",
+              "verification": ["compilation", "z3-contracts"]
+            }
+          }
+          EOF
+
+      - name: Upload agent benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-refactoring-results
+          path: website/public/data/agent-refactoring-results.json
+          retention-days: 90
+
+      - name: Commit agent benchmark results
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git pull --rebase origin main || true
+          git add website/public/data/agent-refactoring-results.json || true
+          git diff --staged --quiet || git commit -m "chore: Update agent refactoring benchmark results [skip ci]"
+          git push || echo "No changes to push"
+
+      - name: Report benchmark summary
+        run: |
+          echo "## Agent Refactoring Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Language | Pass Rate |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Calor | ${{ steps.calor-benchmark.outputs.calor_pass_rate || 'N/A' }}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| C# | ${{ steps.csharp-benchmark.outputs.csharp_pass_rate || 'N/A' }}% |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The agent refactoring benchmark measures Claude Code's ability to perform" >> $GITHUB_STEP_SUMMARY
+          echo "refactoring tasks (rename, extract, inline, move, add contracts, change signature)" >> $GITHUB_STEP_SUMMARY
+          echo "on both Calor and C# codebases." >> $GITHUB_STEP_SUMMARY

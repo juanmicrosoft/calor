@@ -1,5 +1,6 @@
 'use client';
 
+import { AgentRefactoringCard } from './AgentRefactoringCard';
 import { MetricCard } from './MetricCard';
 import { ProgramTable } from './ProgramTable';
 import { cn } from '@/lib/utils';
@@ -150,6 +151,9 @@ export function BenchmarkDashboard() {
           highlight="csharp"
         />
       </div>
+
+      {/* Agent Refactoring Benchmark */}
+      <AgentRefactoringCard />
 
       {/* Metric breakdown */}
       <div>
