@@ -35,6 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -157,14 +158,26 @@ jobs:
             website/public/data/dashboard.html
           retention-days: 90
 
-      - name: Commit results to repo
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add website/public/data/*.json website/public/data/dashboard.html docs/benchmarking/results.md || true
-          git diff --staged --quiet || git commit -m "chore: Update benchmark results [skip ci]"
-          git push || echo "No changes to push"
+      - name: Create PR with benchmark results
+        if: github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update benchmark results"
+          title: "chore: Update benchmark results"
+          body: |
+            This PR updates the benchmark results.
+
+            ## Changes
+            - Updated benchmark-results.json with latest metrics
+            - Generated HTML dashboard
+            - Updated docs/benchmarking/results.md
+
+            ## Metrics
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          branch: benchmark-results-update
+          base: main
+          delete-branch: true
 
   regression-check:
     runs-on: ubuntu-latest
