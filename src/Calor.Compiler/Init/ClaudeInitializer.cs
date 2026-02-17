@@ -133,8 +133,7 @@ public class ClaudeInitializer : IAiInitializer
             if (allModifiedFiles.Count > 0)
             {
                 messages.Add($"Initialized Calor project for Claude Code (calor v{version})");
-                messages.Add("  - MCP server 'calor-lsp' configured for language features");
-                messages.Add("  - MCP server 'calor' configured for AI agent tools (compile, verify, analyze, convert)");
+                messages.Add("  - MCP server 'calor' configured for AI agent tools (compile, verify, analyze, convert, typecheck)");
             }
             else
             {
@@ -388,14 +387,7 @@ public class ClaudeInitializer : IAiInitializer
 
     private static async Task<McpConfigResult> ConfigureMcpServersAsync(string mcpJsonPath, bool force)
     {
-        // MCP server configurations with required "type": "stdio"
-        var calorLspConfig = new McpServerConfig
-        {
-            Type = "stdio",
-            Command = "calor",
-            Args = new[] { "lsp" }
-        };
-
+        // MCP server configuration - only the MCP server, not LSP (LSP is a different protocol)
         var calorMcpConfig = new McpServerConfig
         {
             Type = "stdio",
@@ -410,7 +402,6 @@ public class ClaudeInitializer : IAiInitializer
             {
                 McpServers = new Dictionary<string, McpServerConfig>
                 {
-                    ["calor-lsp"] = calorLspConfig,
                     ["calor"] = calorMcpConfig
                 }
             };
@@ -435,7 +426,6 @@ public class ClaudeInitializer : IAiInitializer
                 {
                     McpServers = new Dictionary<string, McpServerConfig>
                     {
-                        ["calor-lsp"] = calorLspConfig,
                         ["calor"] = calorMcpConfig
                     }
                 };
@@ -450,9 +440,10 @@ public class ClaudeInitializer : IAiInitializer
 
         var updated = false;
 
-        if (!existingConfig.McpServers.ContainsKey("calor-lsp"))
+        // Remove the incorrect calor-lsp entry if it exists (LSP is not MCP)
+        if (existingConfig.McpServers.ContainsKey("calor-lsp"))
         {
-            existingConfig.McpServers["calor-lsp"] = calorLspConfig;
+            existingConfig.McpServers.Remove("calor-lsp");
             updated = true;
         }
 

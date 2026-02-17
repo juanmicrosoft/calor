@@ -320,11 +320,12 @@ public class InitCommandIntegrationTests : IDisposable
 
         var content = await File.ReadAllTextAsync(mcpJsonPath);
         Assert.Contains("mcpServers", content);
-        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"calor\"", content);
         Assert.Contains("\"type\": \"stdio\"", content);
         Assert.Contains("\"command\": \"calor\"", content);
         Assert.Contains("\"args\"", content);
-        Assert.Contains("\"lsp\"", content);
+        Assert.Contains("\"mcp\"", content);
+        Assert.Contains("\"--stdio\"", content);
     }
 
     [Fact]
@@ -359,7 +360,7 @@ public class InitCommandIntegrationTests : IDisposable
         // Both servers should exist
         Assert.Contains("existing-server", content);
         Assert.Contains("existing-command", content);
-        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"calor\"", content);
         Assert.Contains("\"command\": \"calor\"", content);
     }
 
@@ -401,7 +402,7 @@ public class InitCommandIntegrationTests : IDisposable
         // MCP server should be added to .mcp.json (separate file)
         var mcpContent = await File.ReadAllTextAsync(Path.Combine(_testDirectory, ".mcp.json"));
         Assert.Contains("mcpServers", mcpContent);
-        Assert.Contains("calor-lsp", mcpContent);
+        Assert.Contains("\"calor\"", mcpContent);
     }
 
     [Fact]
@@ -420,8 +421,8 @@ public class InitCommandIntegrationTests : IDisposable
         var mcpJsonPath = Path.Combine(_testDirectory, ".mcp.json");
         var content = await File.ReadAllTextAsync(mcpJsonPath);
 
-        // calor-lsp should only appear once
-        var count = CountOccurrences(content, "calor-lsp");
+        // "calor": should only appear once (the key, not in args)
+        var count = CountOccurrences(content, "\"calor\":");
         Assert.Equal(1, count);
     }
 
@@ -437,6 +438,6 @@ public class InitCommandIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success);
-        Assert.Contains(result.Messages, m => m.Contains("MCP server") || m.Contains("calor-lsp"));
+        Assert.Contains(result.Messages, m => m.Contains("MCP server"));
     }
 }
