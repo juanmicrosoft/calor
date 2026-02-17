@@ -225,6 +225,27 @@ public static class FeatureSupport
         },
 
         // Not supported features
+        ["relational-pattern"] = new FeatureInfo
+        {
+            Name = "relational-pattern",
+            Support = SupportLevel.NotSupported,
+            Description = "Relational patterns (is > x, is < x) are not supported",
+            Workaround = "Use explicit comparison expressions"
+        },
+        ["compound-pattern"] = new FeatureInfo
+        {
+            Name = "compound-pattern",
+            Support = SupportLevel.NotSupported,
+            Description = "Compound patterns (and/or) are not supported",
+            Workaround = "Use explicit boolean expressions"
+        },
+        ["generic-type-constraint"] = new FeatureInfo
+        {
+            Name = "generic-type-constraint",
+            Support = SupportLevel.NotSupported,
+            Description = "Generic type constraints (where T : class) are not supported",
+            Workaround = "Remove constraints or add runtime type checks"
+        },
         ["goto"] = new FeatureInfo
         {
             Name = "goto",
@@ -303,6 +324,245 @@ public static class FeatureSupport
             Support = SupportLevel.ManualRequired,
             Description = "Explicit conversions require manual handling",
             Workaround = "Use explicit conversion methods"
+        },
+
+        // Additional features based on agent feedback
+        ["yield-return"] = new FeatureInfo
+        {
+            Name = "yield-return",
+            Support = SupportLevel.NotSupported,
+            Description = "Yield return (iterator methods) is not supported",
+            Workaround = "Use explicit List<T> construction and return the complete list"
+        },
+        ["is-type-pattern"] = new FeatureInfo
+        {
+            Name = "is-type-pattern",
+            Support = SupportLevel.Partial,
+            Description = "Type patterns (is Type) are partially supported; declaration patterns (is Type varName) are not",
+            Workaround = "Use GetType() comparison or explicit type checks with separate variable declaration"
+        },
+        ["generic-method-expression"] = new FeatureInfo
+        {
+            Name = "generic-method-expression",
+            Support = SupportLevel.Partial,
+            Description = "Generic method calls like Option<T>.Some() in expressions may have issues",
+            Workaround = "Assign generic method results to intermediate variables before use"
+        },
+        ["equals-operator"] = new FeatureInfo
+        {
+            Name = "equals-operator",
+            Support = SupportLevel.ManualRequired,
+            Description = "Custom == and != operator overloading requires manual conversion",
+            Workaround = "Define an Equals method instead"
+        },
+        ["primary-constructor"] = new FeatureInfo
+        {
+            Name = "primary-constructor",
+            Support = SupportLevel.NotSupported,
+            Description = "Primary constructors (class Foo(int x)) are not supported",
+            Workaround = "Use traditional constructor syntax"
+        },
+        ["range-expression"] = new FeatureInfo
+        {
+            Name = "range-expression",
+            Support = SupportLevel.NotSupported,
+            Description = "Range expressions (0..5, ..5, 5..) are not supported",
+            Workaround = "Use explicit loop bounds or Substring/Take methods"
+        },
+        ["index-from-end"] = new FeatureInfo
+        {
+            Name = "index-from-end",
+            Support = SupportLevel.NotSupported,
+            Description = "Index from end expressions (^1) are not supported",
+            Workaround = "Use array.Length - 1 instead of ^1"
+        },
+        ["target-typed-new"] = new FeatureInfo
+        {
+            Name = "target-typed-new",
+            Support = SupportLevel.NotSupported,
+            Description = "Target-typed new expressions (new()) are not supported",
+            Workaround = "Use explicit type in new expression: new TypeName()"
+        },
+        ["null-conditional-method"] = new FeatureInfo
+        {
+            Name = "null-conditional-method",
+            Support = SupportLevel.NotSupported,
+            Description = "Null-conditional method calls (obj?.Method()) are not supported",
+            Workaround = "Use explicit null check: if (obj != null) obj.Method()"
+        },
+        ["named-argument"] = new FeatureInfo
+        {
+            Name = "named-argument",
+            Support = SupportLevel.NotSupported,
+            Description = "Named arguments (param: value) are not supported",
+            Workaround = "Use positional arguments in the correct order"
+        },
+        ["declaration-pattern"] = new FeatureInfo
+        {
+            Name = "declaration-pattern",
+            Support = SupportLevel.NotSupported,
+            Description = "Declaration patterns (is Type varName) are not supported",
+            Workaround = "Check type separately and cast to a new variable"
+        },
+        ["throw-expression"] = new FeatureInfo
+        {
+            Name = "throw-expression",
+            Support = SupportLevel.NotSupported,
+            Description = "Throw expressions (?? throw new ...) are not supported",
+            Workaround = "Use explicit if-throw statement"
+        },
+        ["nested-generic-type"] = new FeatureInfo
+        {
+            Name = "nested-generic-type",
+            Support = SupportLevel.Partial,
+            Description = "Nested generic types (Expression<Func<T, U>>) may have issues",
+            Workaround = "Simplify generic nesting where possible"
+        },
+        ["out-var"] = new FeatureInfo
+        {
+            Name = "out-var",
+            Support = SupportLevel.NotSupported,
+            Description = "Inline out variable declarations (out var x) are not supported",
+            Workaround = "Declare the variable before the method call"
+        },
+
+        // Phase 2 features
+        ["in-parameter"] = new FeatureInfo
+        {
+            Name = "in-parameter",
+            Support = SupportLevel.NotSupported,
+            Description = "in parameters (readonly ref) are not supported",
+            Workaround = "Pass by value or use regular ref parameter"
+        },
+        ["checked-block"] = new FeatureInfo
+        {
+            Name = "checked-block",
+            Support = SupportLevel.NotSupported,
+            Description = "checked/unchecked blocks are not supported",
+            Workaround = "Remove checked/unchecked wrapper; handle overflow manually if needed"
+        },
+        ["with-expression"] = new FeatureInfo
+        {
+            Name = "with-expression",
+            Support = SupportLevel.NotSupported,
+            Description = "with expressions (record copying) are not supported",
+            Workaround = "Create a new instance and copy properties manually"
+        },
+        ["init-accessor"] = new FeatureInfo
+        {
+            Name = "init-accessor",
+            Support = SupportLevel.NotSupported,
+            Description = "init accessors are not supported",
+            Workaround = "Use regular set accessor or constructor initialization"
+        },
+        ["required-member"] = new FeatureInfo
+        {
+            Name = "required-member",
+            Support = SupportLevel.NotSupported,
+            Description = "required members (C# 11) are not supported",
+            Workaround = "Use constructor parameters to enforce required values"
+        },
+        ["list-pattern"] = new FeatureInfo
+        {
+            Name = "list-pattern",
+            Support = SupportLevel.NotSupported,
+            Description = "list/slice patterns ([a, b, ..rest]) are not supported",
+            Workaround = "Use explicit indexing and Length checks"
+        },
+        ["static-abstract-member"] = new FeatureInfo
+        {
+            Name = "static-abstract-member",
+            Support = SupportLevel.NotSupported,
+            Description = "static abstract/virtual interface members are not supported",
+            Workaround = "Use instance methods or regular static methods"
+        },
+        ["ref-struct"] = new FeatureInfo
+        {
+            Name = "ref-struct",
+            Support = SupportLevel.NotSupported,
+            Description = "ref struct types are not supported",
+            Workaround = "Use regular struct or class types"
+        },
+
+        // Phase 3 features
+        ["lock-statement"] = new FeatureInfo
+        {
+            Name = "lock-statement",
+            Support = SupportLevel.NotSupported,
+            Description = "lock statements are not supported",
+            Workaround = "Use explicit Monitor.Enter/Exit or other synchronization primitives"
+        },
+        ["await-foreach"] = new FeatureInfo
+        {
+            Name = "await-foreach",
+            Support = SupportLevel.NotSupported,
+            Description = "await foreach (async streams) is not supported",
+            Workaround = "Enumerate the async enumerable manually with explicit await"
+        },
+        ["await-using"] = new FeatureInfo
+        {
+            Name = "await-using",
+            Support = SupportLevel.NotSupported,
+            Description = "await using statements are not supported",
+            Workaround = "Use explicit try/finally with await DisposeAsync()"
+        },
+        ["scoped-parameter"] = new FeatureInfo
+        {
+            Name = "scoped-parameter",
+            Support = SupportLevel.NotSupported,
+            Description = "scoped parameters and locals are not supported",
+            Workaround = "Remove scoped keyword; ensure ref safety manually"
+        },
+        ["collection-expression"] = new FeatureInfo
+        {
+            Name = "collection-expression",
+            Support = SupportLevel.NotSupported,
+            Description = "collection expressions [1, 2, 3] (C# 12) are not supported",
+            Workaround = "Use explicit array or list construction: new[] { 1, 2, 3 }"
+        },
+        ["readonly-struct"] = new FeatureInfo
+        {
+            Name = "readonly-struct",
+            Support = SupportLevel.NotSupported,
+            Description = "readonly struct types are not supported",
+            Workaround = "Use regular struct; readonly semantics cannot be enforced"
+        },
+
+        // Phase 4 features (C# 11-13)
+        ["default-lambda-parameter"] = new FeatureInfo
+        {
+            Name = "default-lambda-parameter",
+            Support = SupportLevel.NotSupported,
+            Description = "default lambda parameters (C# 12) are not supported",
+            Workaround = "Use method overloads or null checks inside lambda"
+        },
+        ["file-scoped-type"] = new FeatureInfo
+        {
+            Name = "file-scoped-type",
+            Support = SupportLevel.NotSupported,
+            Description = "file-scoped types (C# 11) are not supported",
+            Workaround = "Use internal or private nested types"
+        },
+        ["utf8-string-literal"] = new FeatureInfo
+        {
+            Name = "utf8-string-literal",
+            Support = SupportLevel.NotSupported,
+            Description = "UTF-8 string literals (C# 11) are not supported",
+            Workaround = "Use Encoding.UTF8.GetBytes(\"text\") instead"
+        },
+        ["generic-attribute"] = new FeatureInfo
+        {
+            Name = "generic-attribute",
+            Support = SupportLevel.NotSupported,
+            Description = "generic attributes (C# 11) are not supported",
+            Workaround = "Use typeof() parameter in non-generic attribute"
+        },
+        ["using-type-alias"] = new FeatureInfo
+        {
+            Name = "using-type-alias",
+            Support = SupportLevel.NotSupported,
+            Description = "using type aliases for tuples/complex types (C# 12) are not supported",
+            Workaround = "Define explicit record or class types"
         },
 
         // Fallback features (for explain mode)

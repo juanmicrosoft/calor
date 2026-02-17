@@ -161,7 +161,7 @@ public class AssessToolTests
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
         Assert.Contains("unsupportedConstructs", text);
-        Assert.Contains("PrimaryConstructor", text);
+        Assert.Contains("primary-constructor", text);
     }
 
     [Fact]

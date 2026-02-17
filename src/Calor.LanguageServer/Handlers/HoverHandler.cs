@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.LanguageServer.Documentation;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Utilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -24,31 +25,140 @@ public sealed class HoverHandler : HoverHandlerBase
     public override Task<Hover?> Handle(HoverParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        if (state == null)
         {
             return Task.FromResult<Hover?>(null);
         }
 
         var (line, column) = PositionConverter.ToCalorPosition(request.Position);
-        var result = SymbolFinder.FindSymbolAtPosition(state.Ast, line, column, state.Source);
 
-        if (result == null)
+        // Try tag documentation hover FIRST - educational docs for Calor syntax tags
+        // This takes priority because users hovering over § tags want syntax help
+        var tagHover = TryGetTagHover(state.Source, request.Position);
+        if (tagHover != null)
         {
-            return Task.FromResult<Hover?>(null);
+            return Task.FromResult<Hover?>(tagHover);
         }
 
-        var content = BuildHoverContent(result, state.Ast);
-        var range = PositionConverter.ToLspRange(result.Span, state.Source);
+        // Fall back to symbol-based hover (when we have AST)
+        if (state.Ast != null)
+        {
+            var result = SymbolFinder.FindSymbolAtPosition(state.Ast, line, column, state.Source);
+            if (result != null)
+            {
+                var content = BuildHoverContent(result, state.Ast);
+                var range = PositionConverter.ToLspRange(result.Span, state.Source);
 
-        return Task.FromResult<Hover?>(new Hover
+                return Task.FromResult<Hover?>(new Hover
+                {
+                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                    {
+                        Kind = MarkupKind.Markdown,
+                        Value = content
+                    }),
+                    Range = range
+                });
+            }
+        }
+
+        return Task.FromResult<Hover?>(null);
+    }
+
+    /// <summary>
+    /// Attempts to provide hover documentation for a Calor syntax tag.
+    /// </summary>
+    private static Hover? TryGetTagHover(string source, Position position)
+    {
+        // Convert LSP position (0-based) to offset
+        var offset = PositionConverter.ToOffset(position, source);
+        if (offset < 0 || offset >= source.Length)
+            return null;
+
+        // Try to extract a tag at this position
+        var tag = TagDocumentationProvider.ExtractTagAtPosition(source, offset);
+        if (tag == null)
+            return null;
+
+        // Get documentation for the tag
+        var doc = TagDocumentationProvider.Instance.GetTagDocumentation(tag);
+        if (doc == null)
+            return null;
+
+        // Build the hover range (find the tag boundaries)
+        var (startOffset, endOffset) = FindTagBoundaries(source, offset, tag);
+        var range = OffsetRangeToLspRange(source, startOffset, endOffset);
+
+        return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
             {
                 Kind = MarkupKind.Markdown,
-                Value = content
+                Value = doc.ToMarkdown()
             }),
             Range = range
-        });
+        };
+    }
+
+    /// <summary>
+    /// Finds the start and end offsets of a tag in the source.
+    /// </summary>
+    private static (int Start, int End) FindTagBoundaries(string source, int offset, string tag)
+    {
+        // Find the § character
+        var start = offset;
+        while (start > 0 && source[start] != '§')
+            start--;
+
+        // Find the end of the tag name (before { or whitespace)
+        var end = start + 1;
+        if (end < source.Length && source[end] == '/')
+            end++; // Skip closing tag slash
+
+        while (end < source.Length && (char.IsLetter(source[end]) || source[end] == '?' || source[end] == '!'))
+            end++;
+
+        return (start, end);
+    }
+
+    /// <summary>
+    /// Converts offset range to LSP Range.
+    /// </summary>
+    private static OmniSharp.Extensions.LanguageServer.Protocol.Models.Range OffsetRangeToLspRange(string source, int startOffset, int endOffset)
+    {
+        var startLine = 0;
+        var startChar = 0;
+        var endLine = 0;
+        var endChar = 0;
+
+        for (var i = 0; i < source.Length && i <= endOffset; i++)
+        {
+            if (i == startOffset)
+            {
+                startLine = endLine;
+                startChar = endChar;
+            }
+
+            if (i == endOffset)
+            {
+                break;
+            }
+
+            if (source[i] == '\n')
+            {
+                endLine++;
+                endChar = 0;
+            }
+            else
+            {
+                endChar++;
+            }
+        }
+
+        return new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range
+        {
+            Start = new Position(startLine, startChar),
+            End = new Position(endLine, endChar)
+        };
     }
 
     private static string BuildHoverContent(SymbolLookupResult result, ModuleNode ast)

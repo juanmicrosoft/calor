@@ -188,6 +188,8 @@ public class Program
         rootCommand.AddCommand(VerifyCommand.Create());
         rootCommand.AddCommand(LspCommand.Create());
         rootCommand.AddCommand(McpCommand.Create());
+        rootCommand.AddCommand(FeatureCheckCommand.Create());
+        rootCommand.AddCommand(CoverageCommand.Create());
 
         // Initialize telemetry for subcommands
         // Parse --no-telemetry early from args
@@ -224,6 +226,8 @@ public class Program
                 Console.WriteLine("  calor benchmark [options]                      Compare token economics");
                 Console.WriteLine("  calor init --ai <agent>                        Initialize for AI coding agents");
                 Console.WriteLine("  calor format <files>                           Format Calor source files");
+                Console.WriteLine("  calor feature-check <feature>                  Check C# feature support");
+                Console.WriteLine("  calor coverage <file>                          Analyze C# file for conversion coverage");
                 Console.WriteLine();
                 Console.WriteLine("Strictness options:");
                 Console.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
@@ -372,6 +376,27 @@ public class Program
         {
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
+        }
+
+        // Type checking (optional)
+        if (options.EnableTypeChecking)
+        {
+            phaseSw.Restart();
+            var typeChecker = new TypeChecking.TypeChecker(diagnostics);
+            typeChecker.Check(ast);
+            phaseSw.Stop();
+            telemetry?.TrackPhase("TypeChecker", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+
+            if (options.Verbose)
+            {
+                Console.WriteLine("Type checking completed");
+            }
+
+            if (diagnostics.HasErrors)
+            {
+                TrackDiagnostics(telemetry, diagnostics);
+                return new CompilationResult(diagnostics, ast, "");
+            }
         }
 
         // Pattern exhaustiveness checking
@@ -632,6 +657,11 @@ public sealed class CompilationOptions
     /// Results from verification analyses.
     /// </summary>
     public Analysis.VerificationAnalysisResult? VerificationAnalysisResult { get; internal set; }
+
+    /// <summary>
+    /// Enable type checking phase.
+    /// </summary>
+    public bool EnableTypeChecking { get; init; }
 }
 
 /// <summary>

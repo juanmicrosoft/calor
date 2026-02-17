@@ -336,4 +336,103 @@ public class CodeActionHandlerTests
         var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
         Assert.DoesNotContain(diagnostics, d => d.Code == "Calor0200");
     }
+
+    #region Operator Typo Suggestion Tests
+
+    [Fact]
+    public void OperatorTypo_GeneratesFix()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{bool}
+            §R (cotains "hello" "h")
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
+
+        Assert.NotEmpty(fixes);
+        var operatorFix = fixes.FirstOrDefault(f => f.Code == "Calor0106");
+        Assert.NotNull(operatorFix);
+        Assert.Contains("contains", operatorFix.Fix.Description);
+        Assert.Single(operatorFix.Fix.Edits);
+        Assert.Equal("contains", operatorFix.Fix.Edits[0].NewText);
+    }
+
+    [Fact]
+    public void OperatorTypo_AppliedFix_ProducesValidCode()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{bool}
+            §R (cotains "hello" "h")
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
+        var fix = fixes.First(f => f.Code == "Calor0106");
+
+        // Apply the fix manually
+        var fixedSource = source.Replace("cotains", fix.Fix.Edits[0].NewText);
+
+        // Verify the fixed source compiles
+        var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
+        Assert.DoesNotContain(diagnostics, d => d.Code == "Calor0106");
+    }
+
+    [Fact]
+    public void CSharpConstruct_NoFix_ButHelpfulMessage()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{str}
+            §R (nameof x)
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var diagnostics = LspTestHarness.GetDiagnostics(source);
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.Code == "Calor0106");
+        Assert.Contains("nameof", error.Message);
+        Assert.Contains("string literal", error.Message);
+
+        // No fix expected for C# constructs - they need manual conversion
+        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
+        var operatorFix = fixes.FirstOrDefault(f => f.Code == "Calor0106");
+        Assert.Null(operatorFix);
+    }
+
+    [Fact]
+    public void UnknownOperator_NoSimilar_NoFix()
+    {
+        var source = """
+            §M{m001:TestModule}
+            §F{f001:Test:pub}
+            §O{i32}
+            §R (xyzqwerty 1 2)
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var diagnostics = LspTestHarness.GetDiagnostics(source);
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.Code == "Calor0106");
+        Assert.Contains("xyzqwerty", error.Message);
+        Assert.Contains("arithmetic", error.Message); // Shows valid operator categories
+
+        // No fix expected for completely unknown operators
+        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
+        var operatorFix = fixes.FirstOrDefault(f => f.Code == "Calor0106");
+        Assert.Null(operatorFix);
+    }
+
+    #endregion
 }

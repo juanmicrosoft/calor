@@ -63,13 +63,43 @@ public sealed class DiagnoseTool : McpToolBase
 
             var result = Program.Compile(source, "mcp-input.calr", compileOptions);
 
-            var diagnostics = result.Diagnostics.Select(d => new DiagnosticOutput
+            // Build lookup from DiagnosticsWithFixes to populate fix info
+            // Include message in key to differentiate between different constructs at same location
+            var fixLookup = result.Diagnostics.DiagnosticsWithFixes
+                .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var diagnostics = result.Diagnostics.Select(d =>
             {
-                Severity = d.IsError ? "error" : "warning",
-                Code = d.Code.ToString(),
-                Message = d.Message,
-                Line = d.Span.Line,
-                Column = d.Span.Column
+                var output = new DiagnosticOutput
+                {
+                    Severity = d.IsError ? "error" : "warning",
+                    Code = d.Code.ToString(),
+                    Message = d.Message,
+                    Line = d.Span.Line,
+                    Column = d.Span.Column
+                };
+
+                // Check if this diagnostic has an associated fix
+                var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
+                if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
+                {
+                    output.Suggestion = diagnosticWithFix.Fix.Description;
+                    output.Fix = new FixOutput
+                    {
+                        Description = diagnosticWithFix.Fix.Description,
+                        Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditOutput
+                        {
+                            StartLine = e.StartLine,
+                            StartColumn = e.StartColumn,
+                            EndLine = e.EndLine,
+                            EndColumn = e.EndColumn,
+                            NewText = e.NewText
+                        }).ToList()
+                    };
+                }
+
+                return output;
             }).ToList();
 
             var output = new DiagnoseToolOutput
@@ -119,5 +149,40 @@ public sealed class DiagnoseTool : McpToolBase
 
         [JsonPropertyName("column")]
         public int Column { get; init; }
+
+        [JsonPropertyName("suggestion")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Suggestion { get; set; }
+
+        [JsonPropertyName("fix")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public FixOutput? Fix { get; set; }
+    }
+
+    private sealed class FixOutput
+    {
+        [JsonPropertyName("description")]
+        public required string Description { get; init; }
+
+        [JsonPropertyName("edits")]
+        public required List<EditOutput> Edits { get; init; }
+    }
+
+    private sealed class EditOutput
+    {
+        [JsonPropertyName("startLine")]
+        public int StartLine { get; init; }
+
+        [JsonPropertyName("startColumn")]
+        public int StartColumn { get; init; }
+
+        [JsonPropertyName("endLine")]
+        public int EndLine { get; init; }
+
+        [JsonPropertyName("endColumn")]
+        public int EndColumn { get; init; }
+
+        [JsonPropertyName("newText")]
+        public required string NewText { get; init; }
     }
 }

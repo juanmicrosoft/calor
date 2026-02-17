@@ -68,7 +68,7 @@ public static class DiagnoseCommand
         }
         var sw = Stopwatch.StartNew();
 
-        var allDiagnostics = new List<Diagnostic>();
+        var allDiagnostics = new DiagnosticBag();
 
         foreach (var file in files)
         {
@@ -103,7 +103,7 @@ public static class DiagnoseCommand
             }
         }
 
-        // Format output
+        // Format output (use DiagnosticBag overload to include fix information)
         var formatter = DiagnosticFormatterFactory.Create(format);
         var formatted = formatter.Format(allDiagnostics);
 

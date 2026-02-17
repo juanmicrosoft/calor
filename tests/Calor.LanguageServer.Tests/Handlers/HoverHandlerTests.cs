@@ -1,10 +1,22 @@
+using Calor.LanguageServer.Documentation;
+using Calor.LanguageServer.Handlers;
+using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
+using Calor.LanguageServer.Utilities;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Xunit;
 
 namespace Calor.LanguageServer.Tests.Handlers;
 
 public class HoverHandlerTests
 {
+    private readonly WorkspaceState _workspace = new();
+    private readonly HoverHandler _handler;
+
+    public HoverHandlerTests()
+    {
+        _handler = new HoverHandler(_workspace);
+    }
     [Fact]
     public void Hover_Function_ReturnsSymbolInfo()
     {
@@ -201,4 +213,307 @@ public class HoverHandlerTests
         Assert.Equal("TestModule", result.Name);
         Assert.Equal("module", result.Kind);
     }
+
+    #region Tag Documentation Hover Tests
+
+    [Fact]
+    public async Task Handle_TagHover_NEW_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§NEW{User}(name)§/NEW";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test_new.calr");
+        var doc = _workspace.GetOrCreate(uri, source);
+        Assert.NotNull(doc); // Verify document was created
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1) // On 'N' of §NEW
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("New Instance", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_F_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§F{f001:Test}§/F";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1) // On 'F' of §F
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("Function", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_L_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§L{i:0..10} body §/L";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1)
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("Loop", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_IF_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§IF{x > 0} true §/IF";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 2) // On 'I' of §IF
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("If", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_ClosingTag_ReturnsOpeningTagDocAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§NEW{User}()§/NEW";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 14) // On '/' of §/NEW
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("New Instance", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_AWAIT_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§AWAIT expr §/AWAIT";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 3) // On 'A' of §AWAIT
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("Await", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_TR_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§TR{} body §CA{} handler §/TR";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 2)
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("Try", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_E_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§E{cw,fs:r}";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1)
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("Effects", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_Q_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§Q (x > 0)";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1)
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("Precondition", content);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_S_ReturnsDocumentationAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§S ($result > 0)";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1)
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("Postcondition", content);
+    }
+
+    [Fact]
+    public async Task Handle_NoTagOrSymbol_ReturnsNullAsync()
+    {
+        // Use whitespace-only content where no symbol or tag should be found
+        var source = "   ";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test_whitespace.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1) // In the middle of whitespace
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Handle_UnknownDocument_ReturnsNullAsync()
+    {
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///unknown.calr")),
+            Position = new Position(0, 0)
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_IncludesCSharpEquivalentAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§NEW{User}(name)§/NEW";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1)
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("C# equivalent", content);
+        Assert.Contains("csharp", content); // Code block
+    }
+
+    [Fact]
+    public async Task Handle_TagHover_IncludesSyntaxExampleAsync()
+    {
+        if (!TagDocumentationProvider.Instance.IsLoaded) return;
+
+        var source = "§L{i:0..10}§/L";
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///test.calr");
+        _workspace.GetOrCreate(uri, source);
+
+        var request = new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = new Position(0, 1)
+        };
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? "";
+        Assert.Contains("```calor", content); // Has syntax example
+    }
+
+    #endregion
 }

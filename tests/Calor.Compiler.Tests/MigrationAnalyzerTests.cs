@@ -691,8 +691,8 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "RelationalPattern");
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "CompoundPattern");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "relational-pattern");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "compound-pattern");
     }
 
     [Fact]
@@ -708,7 +708,7 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "PrimaryConstructor");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "primary-constructor");
     }
 
     [Fact]
@@ -746,7 +746,7 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "ThrowExpression");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "throw-expression");
     }
 
     [Fact]
@@ -762,7 +762,7 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "GenericTypeConstraint");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "generic-type-constraint");
     }
 
     [Fact]
@@ -784,7 +784,7 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "DeclarationPattern");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "declaration-pattern");
     }
 
     [Fact]
@@ -804,7 +804,7 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "OutRefParameter");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "ref-parameter");
     }
 
     [Fact]
@@ -822,7 +822,7 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "NestedGenericType");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "nested-generic-type");
     }
 
     [Fact]
@@ -841,7 +841,7 @@ public class MigrationAnalyzerTests
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "RangeExpression");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "range-expression");
     }
 
     [Fact]
@@ -938,6 +938,529 @@ public class MigrationAnalyzerTests
             $"Expected at least 3 unsupported constructs, got {result.UnsupportedConstructs.Count}");
         Assert.True(result.TotalScore < 20,
             $"Expected score < 20 with multiple unsupported constructs, got {result.TotalScore}");
+    }
+
+    #endregion
+
+    #region Phase 2 Unsupported Constructs Detection
+
+    [Fact]
+    public void AnalyzeSource_YieldReturn_DetectedAsUnsupported()
+    {
+        var source = """
+            using System.Collections.Generic;
+            public class Generator
+            {
+                public IEnumerable<int> GetNumbers()
+                {
+                    yield return 1;
+                    yield return 2;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "yield-return");
+    }
+
+    [Fact]
+    public void AnalyzeSource_GotoStatement_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Service
+            {
+                public void Process()
+                {
+                    int i = 0;
+                start:
+                    i++;
+                    if (i < 10) goto start;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "goto");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "labeled-statement");
+    }
+
+    [Fact]
+    public void AnalyzeSource_UnsafeCode_DetectedAsUnsupported()
+    {
+        var source = """
+            public class UnsafeService
+            {
+                public unsafe void Process()
+                {
+                    int x = 10;
+                    int* p = &x;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "unsafe");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "pointer");
+    }
+
+    [Fact]
+    public void AnalyzeSource_VolatileField_DetectedAsUnsupported()
+    {
+        var source = """
+            public class ThreadSafe
+            {
+                private volatile int _counter;
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "volatile");
+    }
+
+    [Fact]
+    public void AnalyzeSource_OperatorOverload_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Vector
+            {
+                public int X { get; set; }
+                public static Vector operator +(Vector a, Vector b)
+                {
+                    return new Vector { X = a.X + b.X };
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "operator-overload");
+    }
+
+    [Fact]
+    public void AnalyzeSource_ImplicitConversion_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Wrapper
+            {
+                public int Value { get; set; }
+                public static implicit operator int(Wrapper w) => w.Value;
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "implicit-conversion");
+    }
+
+    [Fact]
+    public void AnalyzeSource_ExtensionMethod_DetectedAsUnsupported()
+    {
+        var source = """
+            public static class StringExtensions
+            {
+                public static int WordCount(this string str)
+                {
+                    return str.Split(' ').Length;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "extension-method");
+    }
+
+    [Fact]
+    public void AnalyzeSource_InParameter_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Service
+            {
+                public void Process(in int value)
+                {
+                    var x = value * 2;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "in-parameter");
+    }
+
+    [Fact]
+    public void AnalyzeSource_CheckedBlock_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Calculator
+            {
+                public int Add(int a, int b)
+                {
+                    checked
+                    {
+                        return a + b;
+                    }
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "checked-block");
+    }
+
+    [Fact]
+    public void AnalyzeSource_WithExpression_DetectedAsUnsupported()
+    {
+        var source = """
+            public record Person(string Name, int Age);
+            public class Service
+            {
+                public Person Clone(Person p)
+                {
+                    return p with { Name = "Clone" };
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "with-expression");
+    }
+
+    [Fact]
+    public void AnalyzeSource_InitAccessor_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Config
+            {
+                public string Name { get; init; }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "init-accessor");
+    }
+
+    [Fact]
+    public void AnalyzeSource_RequiredMember_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Person
+            {
+                public required string Name { get; set; }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "required-member");
+    }
+
+    [Fact]
+    public void AnalyzeSource_ListPattern_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Matcher
+            {
+                public bool IsFirstTwo(int[] arr)
+                {
+                    return arr is [1, 2, ..];
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "list-pattern");
+    }
+
+    [Fact]
+    public void AnalyzeSource_RefStruct_DetectedAsUnsupported()
+    {
+        var source = """
+            public ref struct RefSpan
+            {
+                public int Length;
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "ref-struct");
+    }
+
+    [Fact]
+    public void AnalyzeSource_StaticAbstractMember_DetectedAsUnsupported()
+    {
+        var source = """
+            public interface IAddable<T>
+            {
+                static abstract T Add(T a, T b);
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "static-abstract-member");
+    }
+
+    #endregion
+
+    #region Phase 3 Unsupported Constructs Detection
+
+    [Fact]
+    public void AnalyzeSource_LockStatement_DetectedAsUnsupported()
+    {
+        var source = """
+            public class ThreadSafe
+            {
+                private readonly object _lock = new object();
+                private int _counter;
+
+                public void Increment()
+                {
+                    lock (_lock)
+                    {
+                        _counter++;
+                    }
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "lock-statement");
+    }
+
+    [Fact]
+    public void AnalyzeSource_AwaitForeach_DetectedAsUnsupported()
+    {
+        var source = """
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            public class AsyncProcessor
+            {
+                public async Task ProcessAsync(IAsyncEnumerable<int> items)
+                {
+                    await foreach (var item in items)
+                    {
+                        await Task.Delay(1);
+                    }
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "await-foreach");
+    }
+
+    [Fact]
+    public void AnalyzeSource_AwaitUsing_DetectedAsUnsupported()
+    {
+        var source = """
+            using System;
+            using System.Threading.Tasks;
+            public class AsyncService
+            {
+                public async Task ProcessAsync()
+                {
+                    await using var resource = new AsyncDisposable();
+                }
+            }
+            public class AsyncDisposable : IAsyncDisposable
+            {
+                public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "await-using");
+    }
+
+    [Fact]
+    public void AnalyzeSource_ScopedParameter_DetectedAsUnsupported()
+    {
+        var source = """
+            using System;
+            public class Service
+            {
+                public void Process(scoped ReadOnlySpan<int> span)
+                {
+                    var len = span.Length;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "scoped-parameter");
+    }
+
+    [Fact]
+    public void AnalyzeSource_CollectionExpression_DetectedAsUnsupported()
+    {
+        var source = """
+            using System.Collections.Generic;
+            public class Service
+            {
+                public List<int> GetNumbers()
+                {
+                    return [1, 2, 3, 4, 5];
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "collection-expression");
+    }
+
+    [Fact]
+    public void AnalyzeSource_ReadonlyStruct_DetectedAsUnsupported()
+    {
+        var source = """
+            public readonly struct Point
+            {
+                public int X { get; }
+                public int Y { get; }
+
+                public Point(int x, int y)
+                {
+                    X = x;
+                    Y = y;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "readonly-struct");
+    }
+
+    #endregion
+
+    #region Phase 4 Unsupported Constructs Detection (C# 11-13)
+
+    [Fact]
+    public void AnalyzeSource_DefaultLambdaParameter_DetectedAsUnsupported()
+    {
+        var source = """
+            using System;
+            public class Service
+            {
+                public Func<int, int> GetAdder()
+                {
+                    return (int x = 5) => x + 1;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "default-lambda-parameter");
+    }
+
+    [Fact]
+    public void AnalyzeSource_FileScopedType_DetectedAsUnsupported()
+    {
+        var source = """
+            file class InternalHelper
+            {
+                public void DoWork() { }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "file-scoped-type");
+    }
+
+    [Fact]
+    public void AnalyzeSource_Utf8StringLiteral_DetectedAsUnsupported()
+    {
+        var source = """
+            public class Service
+            {
+                public ReadOnlySpan<byte> GetBytes()
+                {
+                    return "Hello"u8;
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "utf8-string-literal");
+    }
+
+    [Fact]
+    public void AnalyzeSource_GenericAttribute_DetectedAsUnsupported()
+    {
+        var source = """
+            using System;
+
+            public class TypedAttribute<T> : Attribute { }
+
+            [TypedAttribute<string>]
+            public class Service
+            {
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "generic-attribute");
+    }
+
+    [Fact]
+    public void AnalyzeSource_UsingTypeAlias_DetectedAsUnsupported()
+    {
+        var source = """
+            using Point = (int X, int Y);
+
+            public class Service
+            {
+                public Point GetOrigin() => (0, 0);
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        Assert.True(result.HasUnsupportedConstructs);
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "using-type-alias");
     }
 
     #endregion

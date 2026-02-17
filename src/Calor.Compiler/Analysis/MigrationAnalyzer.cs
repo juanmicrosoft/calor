@@ -151,7 +151,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "RelationalPattern",
+                Name = "relational-pattern",
                 Description = "Relational patterns (is > x, is < x) not yet supported",
                 Count = visitor.RelationalPatternCount,
                 Examples = visitor.RelationalPatternExamples
@@ -162,7 +162,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "CompoundPattern",
+                Name = "compound-pattern",
                 Description = "Compound patterns (and/or) not yet supported",
                 Count = visitor.CompoundPatternCount,
                 Examples = visitor.CompoundPatternExamples
@@ -173,7 +173,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "RangeExpression",
+                Name = "range-expression",
                 Description = "Range expressions (0..5, ..5, 5..) not yet supported",
                 Count = visitor.RangeExpressionCount,
                 Examples = visitor.RangeExpressionExamples
@@ -184,7 +184,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "IndexFromEnd",
+                Name = "index-from-end",
                 Description = "Index from end expressions (^1) not yet supported",
                 Count = visitor.IndexExpressionCount,
                 Examples = visitor.IndexExpressionExamples
@@ -195,7 +195,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "ImplicitObjectCreation",
+                Name = "target-typed-new",
                 Description = "Target-typed new expressions (new(...)) not yet supported",
                 Count = visitor.ImplicitObjectCreationCount,
                 Examples = visitor.ImplicitObjectCreationExamples
@@ -206,7 +206,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "ConditionalAccessMethod",
+                Name = "null-conditional-method",
                 Description = "Null-conditional method calls (?.Method()) not yet supported",
                 Count = visitor.ConditionalAccessMethodCount,
                 Examples = visitor.ConditionalAccessMethodExamples
@@ -217,7 +217,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "NamedArgument",
+                Name = "named-argument",
                 Description = "Named arguments (param: value) not yet supported",
                 Count = visitor.NamedArgumentCount,
                 Examples = visitor.NamedArgumentExamples
@@ -228,7 +228,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "PrimaryConstructor",
+                Name = "primary-constructor",
                 Description = "Primary constructors (class Foo(int x)) not yet supported",
                 Count = visitor.PrimaryConstructorCount,
                 Examples = visitor.PrimaryConstructorExamples
@@ -239,7 +239,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "OutRefParameter",
+                Name = "ref-parameter",
                 Description = "out/ref parameters not yet supported",
                 Count = visitor.OutRefParameterCount,
                 Examples = visitor.OutRefParameterExamples
@@ -250,7 +250,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "VarDeclarationInArgument",
+                Name = "out-var",
                 Description = "Inline variable declarations (out var x) not yet supported",
                 Count = visitor.VarDeclarationInArgumentCount,
                 Examples = visitor.VarDeclarationInArgumentExamples
@@ -261,7 +261,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "DeclarationPattern",
+                Name = "declaration-pattern",
                 Description = "Declaration patterns (is Type varName) not yet supported",
                 Count = visitor.DeclarationPatternCount,
                 Examples = visitor.DeclarationPatternExamples
@@ -272,7 +272,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "NestedGenericType",
+                Name = "nested-generic-type",
                 Description = "Nested generic types (Expression<Func<T, U>>) not yet supported",
                 Count = visitor.NestedGenericTypeCount,
                 Examples = visitor.NestedGenericTypeExamples
@@ -285,7 +285,7 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "ThrowExpression",
+                Name = "throw-expression",
                 Description = "Throw expressions (?? throw new ...) not yet supported",
                 Count = visitor.ThrowExpressionCount,
                 Examples = visitor.ThrowExpressionExamples
@@ -296,10 +296,344 @@ public sealed class MigrationAnalyzer
         {
             result.Add(new UnsupportedConstruct
             {
-                Name = "GenericTypeConstraint",
+                Name = "generic-type-constraint",
                 Description = "Generic type constraints (where T : class) not yet supported",
                 Count = visitor.GenericTypeConstraintCount,
                 Examples = visitor.GenericTypeConstraintExamples
+            });
+        }
+
+        // Additional unsupported constructs
+        if (visitor.YieldStatementCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "yield-return",
+                Description = "Yield statements (yield return, yield break) not supported",
+                Count = visitor.YieldStatementCount,
+                Examples = visitor.YieldStatementExamples
+            });
+        }
+
+        if (visitor.GotoStatementCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "goto",
+                Description = "Goto statements not supported",
+                Count = visitor.GotoStatementCount,
+                Examples = visitor.GotoStatementExamples
+            });
+        }
+
+        if (visitor.LabeledStatementCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "labeled-statement",
+                Description = "Labeled statements not supported",
+                Count = visitor.LabeledStatementCount,
+                Examples = visitor.LabeledStatementExamples
+            });
+        }
+
+        if (visitor.UnsafeBlockCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "unsafe",
+                Description = "Unsafe code blocks and methods not supported",
+                Count = visitor.UnsafeBlockCount,
+                Examples = visitor.UnsafeBlockExamples
+            });
+        }
+
+        if (visitor.PointerTypeCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "pointer",
+                Description = "Pointer types not supported",
+                Count = visitor.PointerTypeCount,
+                Examples = visitor.PointerTypeExamples
+            });
+        }
+
+        if (visitor.StackAllocCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "stackalloc",
+                Description = "stackalloc expressions not supported",
+                Count = visitor.StackAllocCount,
+                Examples = visitor.StackAllocExamples
+            });
+        }
+
+        if (visitor.FixedStatementCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "fixed",
+                Description = "Fixed statements not supported",
+                Count = visitor.FixedStatementCount,
+                Examples = visitor.FixedStatementExamples
+            });
+        }
+
+        if (visitor.VolatileFieldCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "volatile",
+                Description = "Volatile fields not supported",
+                Count = visitor.VolatileFieldCount,
+                Examples = visitor.VolatileFieldExamples
+            });
+        }
+
+        if (visitor.OperatorOverloadCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "operator-overload",
+                Description = "Operator overloading requires manual conversion",
+                Count = visitor.OperatorOverloadCount,
+                Examples = visitor.OperatorOverloadExamples
+            });
+        }
+
+        if (visitor.ConversionOperatorCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "implicit-conversion",
+                Description = "Implicit/explicit conversion operators require manual conversion",
+                Count = visitor.ConversionOperatorCount,
+                Examples = visitor.ConversionOperatorExamples
+            });
+        }
+
+        if (visitor.ExtensionMethodCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "extension-method",
+                Description = "Extension methods require manual conversion to regular methods or traits",
+                Count = visitor.ExtensionMethodCount,
+                Examples = visitor.ExtensionMethodExamples
+            });
+        }
+
+        // Phase 2 constructs
+        if (visitor.InParameterCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "in-parameter",
+                Description = "in parameters (readonly ref) not yet supported",
+                Count = visitor.InParameterCount,
+                Examples = visitor.InParameterExamples
+            });
+        }
+
+        if (visitor.CheckedBlockCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "checked-block",
+                Description = "checked/unchecked blocks not yet supported",
+                Count = visitor.CheckedBlockCount,
+                Examples = visitor.CheckedBlockExamples
+            });
+        }
+
+        if (visitor.WithExpressionCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "with-expression",
+                Description = "with expressions (record copying) not yet supported",
+                Count = visitor.WithExpressionCount,
+                Examples = visitor.WithExpressionExamples
+            });
+        }
+
+        if (visitor.InitAccessorCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "init-accessor",
+                Description = "init accessors not yet supported",
+                Count = visitor.InitAccessorCount,
+                Examples = visitor.InitAccessorExamples
+            });
+        }
+
+        if (visitor.RequiredMemberCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "required-member",
+                Description = "required members (C# 11) not yet supported",
+                Count = visitor.RequiredMemberCount,
+                Examples = visitor.RequiredMemberExamples
+            });
+        }
+
+        if (visitor.ListPatternCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "list-pattern",
+                Description = "list/slice patterns ([a, b, ..rest]) not yet supported",
+                Count = visitor.ListPatternCount,
+                Examples = visitor.ListPatternExamples
+            });
+        }
+
+        if (visitor.StaticAbstractMemberCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "static-abstract-member",
+                Description = "static abstract/virtual interface members not yet supported",
+                Count = visitor.StaticAbstractMemberCount,
+                Examples = visitor.StaticAbstractMemberExamples
+            });
+        }
+
+        if (visitor.RefStructCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "ref-struct",
+                Description = "ref struct types not yet supported",
+                Count = visitor.RefStructCount,
+                Examples = visitor.RefStructExamples
+            });
+        }
+
+        // Phase 3 constructs
+        if (visitor.LockStatementCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "lock-statement",
+                Description = "lock statements not yet supported",
+                Count = visitor.LockStatementCount,
+                Examples = visitor.LockStatementExamples
+            });
+        }
+
+        if (visitor.AwaitForeachCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "await-foreach",
+                Description = "await foreach statements not yet supported",
+                Count = visitor.AwaitForeachCount,
+                Examples = visitor.AwaitForeachExamples
+            });
+        }
+
+        if (visitor.AwaitUsingCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "await-using",
+                Description = "await using statements not yet supported",
+                Count = visitor.AwaitUsingCount,
+                Examples = visitor.AwaitUsingExamples
+            });
+        }
+
+        if (visitor.ScopedParameterCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "scoped-parameter",
+                Description = "scoped parameters/locals not yet supported",
+                Count = visitor.ScopedParameterCount,
+                Examples = visitor.ScopedParameterExamples
+            });
+        }
+
+        if (visitor.CollectionExpressionCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "collection-expression",
+                Description = "collection expressions [1, 2, 3] not yet supported",
+                Count = visitor.CollectionExpressionCount,
+                Examples = visitor.CollectionExpressionExamples
+            });
+        }
+
+        if (visitor.ReadonlyStructCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "readonly-struct",
+                Description = "readonly struct types not yet supported",
+                Count = visitor.ReadonlyStructCount,
+                Examples = visitor.ReadonlyStructExamples
+            });
+        }
+
+        // Phase 4 constructs (C# 11-13)
+        if (visitor.DefaultLambdaParameterCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "default-lambda-parameter",
+                Description = "default lambda parameters (C# 12) not yet supported",
+                Count = visitor.DefaultLambdaParameterCount,
+                Examples = visitor.DefaultLambdaParameterExamples
+            });
+        }
+
+        if (visitor.FileScopedTypeCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "file-scoped-type",
+                Description = "file-scoped types (C# 11) not yet supported",
+                Count = visitor.FileScopedTypeCount,
+                Examples = visitor.FileScopedTypeExamples
+            });
+        }
+
+        if (visitor.Utf8StringLiteralCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "utf8-string-literal",
+                Description = "UTF-8 string literals (C# 11) not yet supported",
+                Count = visitor.Utf8StringLiteralCount,
+                Examples = visitor.Utf8StringLiteralExamples
+            });
+        }
+
+        if (visitor.GenericAttributeCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "generic-attribute",
+                Description = "generic attributes (C# 11) not yet supported",
+                Count = visitor.GenericAttributeCount,
+                Examples = visitor.GenericAttributeExamples
+            });
+        }
+
+        if (visitor.UsingTypeAliasCount > 0)
+        {
+            result.Add(new UnsupportedConstruct
+            {
+                Name = "using-type-alias",
+                Description = "using type aliases (C# 12) not yet supported",
+                Count = visitor.UsingTypeAliasCount,
+                Examples = visitor.UsingTypeAliasExamples
             });
         }
 
@@ -579,6 +913,100 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     public int GenericTypeConstraintCount { get; private set; }
     public List<string> GenericTypeConstraintExamples { get; } = new();
 
+    // Additional unsupported constructs
+    public int YieldStatementCount { get; private set; }
+    public List<string> YieldStatementExamples { get; } = new();
+
+    public int GotoStatementCount { get; private set; }
+    public List<string> GotoStatementExamples { get; } = new();
+
+    public int LabeledStatementCount { get; private set; }
+    public List<string> LabeledStatementExamples { get; } = new();
+
+    public int UnsafeBlockCount { get; private set; }
+    public List<string> UnsafeBlockExamples { get; } = new();
+
+    public int PointerTypeCount { get; private set; }
+    public List<string> PointerTypeExamples { get; } = new();
+
+    public int StackAllocCount { get; private set; }
+    public List<string> StackAllocExamples { get; } = new();
+
+    public int FixedStatementCount { get; private set; }
+    public List<string> FixedStatementExamples { get; } = new();
+
+    public int VolatileFieldCount { get; private set; }
+    public List<string> VolatileFieldExamples { get; } = new();
+
+    public int OperatorOverloadCount { get; private set; }
+    public List<string> OperatorOverloadExamples { get; } = new();
+
+    public int ConversionOperatorCount { get; private set; }
+    public List<string> ConversionOperatorExamples { get; } = new();
+
+    public int ExtensionMethodCount { get; private set; }
+    public List<string> ExtensionMethodExamples { get; } = new();
+
+    // Additional C# constructs (phase 2)
+    public int InParameterCount { get; private set; }
+    public List<string> InParameterExamples { get; } = new();
+
+    public int CheckedBlockCount { get; private set; }
+    public List<string> CheckedBlockExamples { get; } = new();
+
+    public int WithExpressionCount { get; private set; }
+    public List<string> WithExpressionExamples { get; } = new();
+
+    public int InitAccessorCount { get; private set; }
+    public List<string> InitAccessorExamples { get; } = new();
+
+    public int RequiredMemberCount { get; private set; }
+    public List<string> RequiredMemberExamples { get; } = new();
+
+    public int ListPatternCount { get; private set; }
+    public List<string> ListPatternExamples { get; } = new();
+
+    public int StaticAbstractMemberCount { get; private set; }
+    public List<string> StaticAbstractMemberExamples { get; } = new();
+
+    public int RefStructCount { get; private set; }
+    public List<string> RefStructExamples { get; } = new();
+
+    // Phase 3 constructs
+    public int LockStatementCount { get; private set; }
+    public List<string> LockStatementExamples { get; } = new();
+
+    public int AwaitForeachCount { get; private set; }
+    public List<string> AwaitForeachExamples { get; } = new();
+
+    public int AwaitUsingCount { get; private set; }
+    public List<string> AwaitUsingExamples { get; } = new();
+
+    public int ScopedParameterCount { get; private set; }
+    public List<string> ScopedParameterExamples { get; } = new();
+
+    public int CollectionExpressionCount { get; private set; }
+    public List<string> CollectionExpressionExamples { get; } = new();
+
+    public int ReadonlyStructCount { get; private set; }
+    public List<string> ReadonlyStructExamples { get; } = new();
+
+    // Phase 4 constructs (C# 11-13)
+    public int DefaultLambdaParameterCount { get; private set; }
+    public List<string> DefaultLambdaParameterExamples { get; } = new();
+
+    public int FileScopedTypeCount { get; private set; }
+    public List<string> FileScopedTypeExamples { get; } = new();
+
+    public int Utf8StringLiteralCount { get; private set; }
+    public List<string> Utf8StringLiteralExamples { get; } = new();
+
+    public int GenericAttributeCount { get; private set; }
+    public List<string> GenericAttributeExamples { get; } = new();
+
+    public int UsingTypeAliasCount { get; private set; }
+    public List<string> UsingTypeAliasExamples { get; } = new();
+
     private static readonly HashSet<string> ArgumentExceptionTypes = new(StringComparer.Ordinal)
     {
         "ArgumentNullException",
@@ -645,6 +1073,30 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         MethodCount++;
         CheckPublicMember(node.Modifiers, node.Identifier.Text, node);
 
+        // Check for extension methods (first parameter has 'this' modifier)
+        var firstParam = node.ParameterList.Parameters.FirstOrDefault();
+        if (firstParam != null && firstParam.Modifiers.Any(SyntaxKind.ThisKeyword))
+        {
+            ExtensionMethodCount++;
+            var extendedType = firstParam.Type?.ToString() ?? "?";
+            AddExample(ExtensionMethodExamples, $"this {extendedType}.{node.Identifier.Text}()");
+        }
+
+        // Check for unsafe modifier on method
+        if (node.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+        {
+            UnsafeBlockCount++;
+            AddExample(UnsafeBlockExamples, $"unsafe method {node.Identifier.Text}");
+        }
+
+        // Check for static abstract/virtual interface members (C# 11)
+        if (node.Modifiers.Any(SyntaxKind.StaticKeyword) &&
+            (node.Modifiers.Any(SyntaxKind.AbstractKeyword) || node.Modifiers.Any(SyntaxKind.VirtualKeyword)))
+        {
+            StaticAbstractMemberCount++;
+            AddExample(StaticAbstractMemberExamples, $"static abstract {node.ReturnType} {node.Identifier}()");
+        }
+
         // Check for async modifier
         if (node.Modifiers.Any(SyntaxKind.AsyncKeyword))
         {
@@ -671,6 +1123,14 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     {
         TypeCount++;
         CheckPublicMember(node.Modifiers, node.Identifier.Text, node);
+
+        // Check for file-scoped type (C# 11)
+        if (node.Modifiers.Any(SyntaxKind.FileKeyword))
+        {
+            FileScopedTypeCount++;
+            AddExample(FileScopedTypeExamples, $"file interface {node.Identifier}");
+        }
+
         base.VisitInterfaceDeclaration(node);
     }
 
@@ -678,6 +1138,14 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     {
         TypeCount++;
         CheckPublicMember(node.Modifiers, node.Identifier.Text, node);
+
+        // Check for file-scoped type (C# 11)
+        if (node.Modifiers.Any(SyntaxKind.FileKeyword))
+        {
+            FileScopedTypeCount++;
+            AddExample(FileScopedTypeExamples, $"file record {node.Identifier}");
+        }
+
         base.VisitRecordDeclaration(node);
     }
 
@@ -685,12 +1153,56 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     {
         TypeCount++;
         CheckPublicMember(node.Modifiers, node.Identifier.Text, node);
+
+        // Check for ref struct
+        if (node.Modifiers.Any(SyntaxKind.RefKeyword))
+        {
+            RefStructCount++;
+            AddExample(RefStructExamples, $"ref struct {node.Identifier}");
+        }
+
+        // Check for readonly struct
+        if (node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword))
+        {
+            ReadonlyStructCount++;
+            AddExample(ReadonlyStructExamples, $"readonly struct {node.Identifier}");
+        }
+
+        // Check for file-scoped type (C# 11)
+        if (node.Modifiers.Any(SyntaxKind.FileKeyword))
+        {
+            FileScopedTypeCount++;
+            AddExample(FileScopedTypeExamples, $"file struct {node.Identifier}");
+        }
+
         base.VisitStructDeclaration(node);
     }
 
     public override void VisitPropertyDeclaration(PropertyDeclarationSyntax node)
     {
         CheckPublicMember(node.Modifiers, node.Identifier.Text, node);
+
+        // Check for required modifier (C# 11)
+        if (node.Modifiers.Any(SyntaxKind.RequiredKeyword))
+        {
+            RequiredMemberCount++;
+            AddExample(RequiredMemberExamples, $"required {node.Type} {node.Identifier}");
+        }
+
+        // Check for init accessor
+        if (node.AccessorList != null)
+        {
+            foreach (var accessor in node.AccessorList.Accessors)
+            {
+                if (accessor.Keyword.IsKind(SyntaxKind.InitKeyword))
+                {
+                    InitAccessorCount++;
+                    AddExample(InitAccessorExamples, $"{node.Type} {node.Identifier} {{ get; init; }}");
+                    break;
+                }
+            }
+        }
+
         base.VisitPropertyDeclaration(node);
     }
 
@@ -965,6 +1477,7 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     }
 
     // Track primary constructors: class Foo(int x) { }
+    // Track file-scoped types (C# 11): file class Foo { }
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
         TypeCount++;
@@ -977,10 +1490,17 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
             AddExample(PrimaryConstructorExamples, $"class {node.Identifier.Text}({paramList})");
         }
 
+        // Check for file-scoped type (C# 11)
+        if (node.Modifiers.Any(SyntaxKind.FileKeyword))
+        {
+            FileScopedTypeCount++;
+            AddExample(FileScopedTypeExamples, $"file class {node.Identifier}");
+        }
+
         base.VisitClassDeclaration(node);
     }
 
-    // Track ref/out parameters in method declarations
+    // Track ref/out/in/scoped parameters in method declarations
     public override void VisitParameter(ParameterSyntax node)
     {
         foreach (var modifier in node.Modifiers)
@@ -989,6 +1509,18 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
             {
                 OutRefParameterCount++;
                 AddExample(OutRefParameterExamples, $"{modifier.Text} {node.Type} {node.Identifier}");
+                break;
+            }
+            else if (modifier.IsKind(SyntaxKind.InKeyword))
+            {
+                InParameterCount++;
+                AddExample(InParameterExamples, $"in {node.Type} {node.Identifier}");
+                break;
+            }
+            else if (modifier.IsKind(SyntaxKind.ScopedKeyword))
+            {
+                ScopedParameterCount++;
+                AddExample(ScopedParameterExamples, $"scoped {node.Type} {node.Identifier}");
                 break;
             }
         }
@@ -1028,10 +1560,18 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
     }
 
     // Track lambda expressions (informational only - lambdas are now supported)
+    // Also detect default lambda parameters (C# 12)
     public override void VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node)
     {
         LambdaExpressionCount++;
         AddExample(LambdaExpressionExamples, $"{node.Parameter} => ...");
+
+        // Check for default parameter value
+        if (node.Parameter.Default != null)
+        {
+            DefaultLambdaParameterCount++;
+            AddExample(DefaultLambdaParameterExamples, $"{node.Parameter.Identifier} = {node.Parameter.Default.Value}");
+        }
 
         // Check for async lambda
         if (node.Modifiers.Any(SyntaxKind.AsyncKeyword))
@@ -1049,6 +1589,16 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         var paramList = string.Join(", ", node.ParameterList.Parameters.Select(p => p.ToString()));
         AddExample(LambdaExpressionExamples, $"({paramList}) => ...");
 
+        // Check for default parameter values (C# 12)
+        foreach (var param in node.ParameterList.Parameters)
+        {
+            if (param.Default != null)
+            {
+                DefaultLambdaParameterCount++;
+                AddExample(DefaultLambdaParameterExamples, $"{param.Identifier} = {param.Default.Value}");
+            }
+        }
+
         // Check for async lambda
         if (node.Modifiers.Any(SyntaxKind.AsyncKeyword))
         {
@@ -1057,6 +1607,157 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         }
 
         base.VisitParenthesizedLambdaExpression(node);
+    }
+
+    // Track yield statements (yield return, yield break)
+    public override void VisitYieldStatement(YieldStatementSyntax node)
+    {
+        YieldStatementCount++;
+        var keyword = node.ReturnOrBreakKeyword.Text;
+        AddExample(YieldStatementExamples, $"yield {keyword}");
+        base.VisitYieldStatement(node);
+    }
+
+    // Track goto statements
+    public override void VisitGotoStatement(GotoStatementSyntax node)
+    {
+        GotoStatementCount++;
+        var target = node.Expression?.ToString() ?? node.CaseOrDefaultKeyword.Text;
+        AddExample(GotoStatementExamples, $"goto {target}");
+        base.VisitGotoStatement(node);
+    }
+
+    // Track labeled statements
+    public override void VisitLabeledStatement(LabeledStatementSyntax node)
+    {
+        LabeledStatementCount++;
+        AddExample(LabeledStatementExamples, $"{node.Identifier.Text}:");
+        base.VisitLabeledStatement(node);
+    }
+
+    // Track unsafe blocks
+    public override void VisitUnsafeStatement(UnsafeStatementSyntax node)
+    {
+        UnsafeBlockCount++;
+        AddExample(UnsafeBlockExamples, "unsafe { ... }");
+        base.VisitUnsafeStatement(node);
+    }
+
+    // Track pointer types
+    public override void VisitPointerType(PointerTypeSyntax node)
+    {
+        PointerTypeCount++;
+        AddExample(PointerTypeExamples, $"{node.ElementType}*");
+        base.VisitPointerType(node);
+    }
+
+    // Track stackalloc expressions
+    public override void VisitStackAllocArrayCreationExpression(StackAllocArrayCreationExpressionSyntax node)
+    {
+        StackAllocCount++;
+        AddExample(StackAllocExamples, $"stackalloc {node.Type}");
+        base.VisitStackAllocArrayCreationExpression(node);
+    }
+
+    // Track implicit stackalloc (stackalloc [] { ... })
+    public override void VisitImplicitStackAllocArrayCreationExpression(ImplicitStackAllocArrayCreationExpressionSyntax node)
+    {
+        StackAllocCount++;
+        AddExample(StackAllocExamples, "stackalloc [] { ... }");
+        base.VisitImplicitStackAllocArrayCreationExpression(node);
+    }
+
+    // Track fixed statements
+    public override void VisitFixedStatement(FixedStatementSyntax node)
+    {
+        FixedStatementCount++;
+        var decl = node.Declaration.ToString();
+        if (decl.Length > 40) decl = decl.Substring(0, 40) + "...";
+        AddExample(FixedStatementExamples, $"fixed ({decl})");
+        base.VisitFixedStatement(node);
+    }
+
+    // Track operator overloads
+    public override void VisitOperatorDeclaration(OperatorDeclarationSyntax node)
+    {
+        OperatorOverloadCount++;
+        AddExample(OperatorOverloadExamples, $"operator {node.OperatorToken.Text}");
+        base.VisitOperatorDeclaration(node);
+    }
+
+    // Track implicit/explicit conversion operators
+    public override void VisitConversionOperatorDeclaration(ConversionOperatorDeclarationSyntax node)
+    {
+        ConversionOperatorCount++;
+        var kind = node.ImplicitOrExplicitKeyword.Text;
+        AddExample(ConversionOperatorExamples, $"{kind} operator {node.Type}");
+        base.VisitConversionOperatorDeclaration(node);
+    }
+
+    // Track volatile fields and required members
+    public override void VisitFieldDeclaration(FieldDeclarationSyntax node)
+    {
+        if (node.Modifiers.Any(SyntaxKind.VolatileKeyword))
+        {
+            VolatileFieldCount++;
+            var fieldName = node.Declaration.Variables.FirstOrDefault()?.Identifier.Text ?? "field";
+            AddExample(VolatileFieldExamples, $"volatile {node.Declaration.Type} {fieldName}");
+        }
+
+        // Check for required modifier (C# 11)
+        if (node.Modifiers.Any(SyntaxKind.RequiredKeyword))
+        {
+            RequiredMemberCount++;
+            var fieldName = node.Declaration.Variables.FirstOrDefault()?.Identifier.Text ?? "field";
+            AddExample(RequiredMemberExamples, $"required {node.Declaration.Type} {fieldName}");
+        }
+
+        base.VisitFieldDeclaration(node);
+    }
+
+    // Track checked/unchecked blocks
+    public override void VisitCheckedStatement(CheckedStatementSyntax node)
+    {
+        CheckedBlockCount++;
+        var keyword = node.Keyword.Text;
+        AddExample(CheckedBlockExamples, $"{keyword} {{ ... }}");
+        base.VisitCheckedStatement(node);
+    }
+
+    // Track with expressions (records)
+    public override void VisitWithExpression(WithExpressionSyntax node)
+    {
+        WithExpressionCount++;
+        var preview = node.ToString();
+        if (preview.Length > 50) preview = preview.Substring(0, 50) + "...";
+        AddExample(WithExpressionExamples, preview);
+        base.VisitWithExpression(node);
+    }
+
+    // Track list patterns [a, b, ..rest]
+    public override void VisitListPattern(ListPatternSyntax node)
+    {
+        ListPatternCount++;
+        AddExample(ListPatternExamples, $"[{string.Join(", ", node.Patterns.Select(p => p.ToString()))}]");
+        base.VisitListPattern(node);
+    }
+
+    // Track slice patterns ..
+    public override void VisitSlicePattern(SlicePatternSyntax node)
+    {
+        ListPatternCount++; // Count as list pattern variant
+        AddExample(ListPatternExamples, $"..{node.Pattern?.ToString() ?? ""}");
+        base.VisitSlicePattern(node);
+    }
+
+    // Track lock statements
+    public override void VisitLockStatement(LockStatementSyntax node)
+    {
+        LockStatementCount++;
+        var expr = node.Expression.ToString();
+        if (expr.Length > 30) expr = expr.Substring(0, 30) + "...";
+        AddExample(LockStatementExamples, $"lock ({expr})");
+        base.VisitLockStatement(node);
     }
 
     // Track await expressions
@@ -1115,37 +1816,109 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         base.VisitLetClause(node);
     }
 
-    // Track await foreach (async iteration)
+    // Track await foreach (async iteration + blocker)
     public override void VisitForEachStatement(ForEachStatementSyntax node)
     {
         if (node.AwaitKeyword != default)
         {
+            AwaitForeachCount++;
+            AddExample(AwaitForeachExamples, $"await foreach ({node.Type} {node.Identifier} in ...)");
             AsyncPatterns++;
             AddExample(AsyncExamples, $"await foreach ({node.Identifier})");
         }
         base.VisitForEachStatement(node);
     }
 
-    // Track await using (async disposal)
+    // Track await using statements (async disposal + blocker)
     public override void VisitUsingStatement(UsingStatementSyntax node)
     {
         if (node.AwaitKeyword != default)
         {
+            AwaitUsingCount++;
+            AddExample(AwaitUsingExamples, "await using (...)");
             AsyncPatterns++;
             AddExample(AsyncExamples, "await using statement");
         }
         base.VisitUsingStatement(node);
     }
 
-    // Track await using declarations (C# 8+)
+    // Track await using declarations (C# 8+) - async pattern + blocker
     public override void VisitLocalDeclarationStatement(LocalDeclarationStatementSyntax node)
     {
         if (node.AwaitKeyword != default && node.UsingKeyword != default)
         {
+            AwaitUsingCount++;
+            var varName = node.Declaration.Variables.FirstOrDefault()?.Identifier.Text ?? "var";
+            AddExample(AwaitUsingExamples, $"await using var {varName} = ...");
             AsyncPatterns++;
             AddExample(AsyncExamples, "await using declaration");
         }
+
+        // Track scoped locals
+        if (node.Modifiers.Any(SyntaxKind.ScopedKeyword))
+        {
+            ScopedParameterCount++;
+            var varName = node.Declaration.Variables.FirstOrDefault()?.Identifier.Text ?? "var";
+            AddExample(ScopedParameterExamples, $"scoped {node.Declaration.Type} {varName}");
+        }
+
         base.VisitLocalDeclarationStatement(node);
+    }
+
+    // Track collection expressions [1, 2, 3]
+    public override void VisitCollectionExpression(CollectionExpressionSyntax node)
+    {
+        CollectionExpressionCount++;
+        var preview = node.ToString();
+        if (preview.Length > 40) preview = preview.Substring(0, 40) + "...";
+        AddExample(CollectionExpressionExamples, preview);
+        base.VisitCollectionExpression(node);
+    }
+
+    // Track UTF-8 string literals (C# 11): "text"u8
+    public override void VisitLiteralExpression(LiteralExpressionSyntax node)
+    {
+        if (node.IsKind(SyntaxKind.Utf8StringLiteralExpression))
+        {
+            Utf8StringLiteralCount++;
+            var preview = node.ToString();
+            if (preview.Length > 40) preview = preview.Substring(0, 40) + "...";
+            AddExample(Utf8StringLiteralExamples, preview);
+        }
+        base.VisitLiteralExpression(node);
+    }
+
+    // Track generic attributes (C# 11): [Attr<T>]
+    public override void VisitAttribute(AttributeSyntax node)
+    {
+        if (node.Name is GenericNameSyntax genericAttr)
+        {
+            GenericAttributeCount++;
+            AddExample(GenericAttributeExamples, $"[{genericAttr}]");
+        }
+        base.VisitAttribute(node);
+    }
+
+    // Track using type aliases (C# 12): using Point = (int x, int y)
+    public override void VisitUsingDirective(UsingDirectiveSyntax node)
+    {
+        // Check if this is a type alias (has Alias and the target is not a simple namespace)
+        if (node.Alias != null && node.NamespaceOrType != null)
+        {
+            // If the target contains special characters like parentheses (tuples) or angle brackets (generics)
+            // or if it's a predefined type, it's a type alias not a namespace alias
+            var targetText = node.NamespaceOrType.ToString();
+            if (targetText.Contains('(') || targetText.Contains('<') ||
+                node.NamespaceOrType is PredefinedTypeSyntax ||
+                node.NamespaceOrType is TupleTypeSyntax ||
+                node.NamespaceOrType is ArrayTypeSyntax ||
+                node.NamespaceOrType is NullableTypeSyntax)
+            {
+                UsingTypeAliasCount++;
+                AddExample(UsingTypeAliasExamples, $"using {node.Alias.Name} = {targetText}");
+            }
+        }
+        base.VisitUsingDirective(node);
     }
 
     private static bool HasNestedGenericTypes(GenericNameSyntax genericName)
