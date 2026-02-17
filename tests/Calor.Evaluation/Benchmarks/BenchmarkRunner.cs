@@ -20,10 +20,12 @@ public class BenchmarkRunner
         var benchmarkPath = TestDataAdapter.GetBenchmarkPath();
         _adapter = new TestDataAdapter(testDataPath, benchmarkPath);
 
-        // Initialize all calculators
+        // Initialize static metrics only
+        // LLM-based metrics (TaskCompletion, Safety, EffectDiscipline) require
+        // an LLM provider and must be run separately via their dedicated commands
         _calculators = new List<IMetricCalculator>
         {
-            // Static metrics
+            // Static metrics - can run without LLM provider
             new TokenEconomicsCalculator(),
             new GenerationAccuracyCalculator(),
             new ComprehensionCalculator(),
@@ -31,13 +33,14 @@ public class BenchmarkRunner
             new ErrorDetectionCalculator(),
             new InformationDensityCalculator(),
             new RefactoringStabilityCalculator(),
-            // LLM-based metrics (use estimation mode by default if no provider configured)
-            new TaskCompletionCalculator(),
-            new SafetyCalculator(),
-            new EffectDisciplineCalculator(),
-            // Fair comparison metric - pure pass/fail on test cases
+            // Correctness uses code execution, not LLM generation
             new CorrectnessCalculator()
         };
+
+        // Note: LLM-based metrics are NOT included here:
+        // - TaskCompletionCalculator: run via 'llm-tasks' command
+        // - SafetyCalculator: run via 'safety-benchmark' command
+        // - EffectDisciplineCalculator: run via 'effect-discipline' command
     }
 
     /// <summary>
