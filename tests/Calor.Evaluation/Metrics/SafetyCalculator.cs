@@ -12,6 +12,9 @@ namespace Calor.Evaluation.Metrics;
 ///
 /// Unlike static metrics, this uses LLM-generated code to test whether
 /// Calor contracts catch more bugs with better error messages than C# guard clauses.
+///
+/// IMPORTANT: This metric requires an LLM provider. It cannot be used
+/// without configuring a provider (e.g., Claude API).
 /// </summary>
 public class SafetyCalculator : IMetricCalculator
 {
@@ -20,35 +23,27 @@ public class SafetyCalculator : IMetricCalculator
     public string Description =>
         "Measures contract enforcement effectiveness and error quality for catching bugs";
 
-    private readonly ILlmProvider? _provider;
+    private readonly ILlmProvider _provider;
     private readonly LlmResponseCache? _cache;
-    private readonly LlmTaskManifest? _manifest;
+    private readonly LlmTaskManifest _manifest;
     private readonly SafetyBenchmarkOptions _options;
     private SafetyBenchmarkResults? _lastResults;
 
     /// <summary>
-    /// Creates a calculator with default settings (uses estimation if no provider configured).
+    /// Creates a calculator with specified provider and manifest.
     /// </summary>
-    public SafetyCalculator()
-    {
-        _options = new SafetyBenchmarkOptions
-        {
-            DryRun = true, // Default to dry run to avoid API costs
-            UseCache = true
-        };
-    }
-
-    /// <summary>
-    /// Creates a calculator with specified provider and options.
-    /// </summary>
+    /// <param name="provider">The LLM provider to use for code generation.</param>
+    /// <param name="manifest">The task manifest containing safety task definitions.</param>
+    /// <param name="options">Optional benchmark configuration.</param>
+    /// <param name="cache">Optional response cache for reducing API costs.</param>
     public SafetyCalculator(
         ILlmProvider provider,
         LlmTaskManifest manifest,
         SafetyBenchmarkOptions? options = null,
         LlmResponseCache? cache = null)
     {
-        _provider = provider;
-        _manifest = manifest;
+        _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        _manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
         _cache = cache;
         _options = options ?? new SafetyBenchmarkOptions();
     }
@@ -60,12 +55,6 @@ public class SafetyCalculator : IMetricCalculator
 
     public async Task<MetricResult> CalculateAsync(EvaluationContext context)
     {
-        // If no provider or manifest configured, return estimation based on context
-        if (_provider == null || _manifest == null)
-        {
-            return CalculateEstimatedMetric(context);
-        }
-
         // Run actual safety benchmark
         using var runner = new SafetyBenchmarkRunner(_provider, _cache);
         _lastResults = await runner.RunAllAsync(_manifest, _options);
@@ -96,106 +85,7 @@ public class SafetyCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Calculates an estimated safety metric based on code characteristics when
-    /// actual LLM-based safety evaluation is not available.
-    /// </summary>
-    private MetricResult CalculateEstimatedMetric(EvaluationContext context)
-    {
-        var calorScore = EstimateCalorSafetyScore(context);
-        var csharpScore = EstimateCSharpSafetyScore(context);
-
-        var details = new Dictionary<string, object>
-        {
-            ["estimated"] = true,
-            ["reason"] = "No LLM provider configured - using structural estimation",
-            ["calorFactors"] = new Dictionary<string, object>
-            {
-                ["compiles"] = context.CalorCompilation.Success,
-                ["hasPreconditions"] = context.CalorSource.Contains("§REQ") ||
-                                       context.CalorSource.Contains("§Q"),
-                ["hasPostconditions"] = context.CalorSource.Contains("§ENS") ||
-                                        context.CalorSource.Contains("§S"),
-                ["hasInvariants"] = context.CalorSource.Contains("§INV")
-            },
-            ["csharpFactors"] = new Dictionary<string, object>
-            {
-                ["compiles"] = context.CSharpCompilation.Success,
-                ["hasThrowStatements"] = context.CSharpSource.Contains("throw "),
-                ["hasArgumentChecks"] = context.CSharpSource.Contains("ArgumentException") ||
-                                        context.CSharpSource.Contains("ArgumentNullException")
-            }
-        };
-
-        return MetricResult.CreateHigherIsBetter(
-            Category,
-            "EstimatedSafety",
-            calorScore,
-            csharpScore,
-            details);
-    }
-
-    private static double EstimateCalorSafetyScore(EvaluationContext context)
-    {
-        var score = 0.3; // Base score for having contracts available
-
-        if (!context.CalorCompilation.Success)
-            return 0.0;
-
-        var source = context.CalorSource;
-
-        // Preconditions (§REQ or §Q)
-        if (source.Contains("§REQ") || source.Contains("§Q"))
-            score += 0.25;
-
-        // Postconditions (§ENS or §S)
-        if (source.Contains("§ENS") || source.Contains("§S"))
-            score += 0.20;
-
-        // Invariants
-        if (source.Contains("§INV"))
-            score += 0.15;
-
-        // Effects (help with catching side-effect bugs)
-        if (source.Contains("§E{"))
-            score += 0.10;
-
-        return Math.Min(score, 1.0);
-    }
-
-    private static double EstimateCSharpSafetyScore(EvaluationContext context)
-    {
-        var score = 0.2; // Base score
-
-        if (!context.CSharpCompilation.Success)
-            return 0.0;
-
-        var source = context.CSharpSource;
-
-        // Exception throwing
-        if (source.Contains("throw "))
-            score += 0.15;
-
-        // Argument validation
-        if (source.Contains("ArgumentException") || source.Contains("ArgumentNullException"))
-            score += 0.15;
-
-        // Null checks
-        if (source.Contains("== null") || source.Contains("is null"))
-            score += 0.10;
-
-        // Debug.Assert
-        if (source.Contains("Debug.Assert"))
-            score += 0.10;
-
-        // Contract.Requires/Ensures (Code Contracts)
-        if (source.Contains("Contract.Requires") || source.Contains("Contract.Ensures"))
-            score += 0.20;
-
-        return Math.Min(score, 0.85); // Cap lower than Calor - no postconditions
-    }
-
-    /// <summary>
-    /// Creates a calculator configured for actual LLM-based safety evaluation.
+    /// Creates a calculator configured for LLM-based safety evaluation.
     /// </summary>
     public static SafetyCalculator CreateWithProvider(
         ILlmProvider provider,

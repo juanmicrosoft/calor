@@ -15,6 +15,9 @@ namespace Calor.Evaluation.Metrics;
 /// - Security violations (unauthorized I/O)
 /// - Side effect transparency (hidden effects)
 /// - Cache safety (memoization correctness)
+///
+/// IMPORTANT: This metric requires an LLM provider. It cannot be used
+/// without configuring a provider (e.g., Claude API).
 /// </summary>
 public class EffectDisciplineCalculator : IMetricCalculator
 {
@@ -23,35 +26,27 @@ public class EffectDisciplineCalculator : IMetricCalculator
     public string Description =>
         "Measures side effect management quality and bug prevention for effect-related issues";
 
-    private readonly ILlmProvider? _provider;
+    private readonly ILlmProvider _provider;
     private readonly LlmResponseCache? _cache;
-    private readonly LlmTaskManifest? _manifest;
+    private readonly LlmTaskManifest _manifest;
     private readonly EffectDisciplineOptions _options;
     private EffectDisciplineResults? _lastResults;
 
     /// <summary>
-    /// Creates a calculator with default settings (uses estimation if no provider configured).
+    /// Creates a calculator with specified provider and manifest.
     /// </summary>
-    public EffectDisciplineCalculator()
-    {
-        _options = new EffectDisciplineOptions
-        {
-            DryRun = true, // Default to dry run to avoid API costs
-            UseCache = true
-        };
-    }
-
-    /// <summary>
-    /// Creates a calculator with specified provider and options.
-    /// </summary>
+    /// <param name="provider">The LLM provider to use for code generation.</param>
+    /// <param name="manifest">The task manifest containing effect discipline task definitions.</param>
+    /// <param name="options">Optional benchmark configuration.</param>
+    /// <param name="cache">Optional response cache for reducing API costs.</param>
     public EffectDisciplineCalculator(
         ILlmProvider provider,
         LlmTaskManifest manifest,
         EffectDisciplineOptions? options = null,
         LlmResponseCache? cache = null)
     {
-        _provider = provider;
-        _manifest = manifest;
+        _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        _manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
         _cache = cache;
         _options = options ?? new EffectDisciplineOptions();
     }
@@ -63,12 +58,6 @@ public class EffectDisciplineCalculator : IMetricCalculator
 
     public async Task<MetricResult> CalculateAsync(EvaluationContext context)
     {
-        // If no provider or manifest configured, return estimation based on context
-        if (_provider == null || _manifest == null)
-        {
-            return CalculateEstimatedMetric(context);
-        }
-
         // Run actual effect discipline benchmark
         using var runner = new EffectDisciplineBenchmarkRunner(_provider, _cache);
         _lastResults = await runner.RunAllAsync(_manifest, _options);
@@ -99,69 +88,7 @@ public class EffectDisciplineCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Calculates an estimated effect discipline metric based on code characteristics when
-    /// actual LLM-based evaluation is not available.
-    /// </summary>
-    private MetricResult CalculateEstimatedMetric(EvaluationContext context)
-    {
-        var calorScore = EstimateCalorDisciplineScore(context);
-        var csharpScore = EstimateCSharpDisciplineScore(context);
-
-        var details = new Dictionary<string, object>
-        {
-            ["estimated"] = true,
-            ["reason"] = "No LLM provider configured - using structural estimation",
-            ["calorFactors"] = new Dictionary<string, object>
-            {
-                ["compiles"] = context.CalorCompilation.Success,
-                ["hasEffectDeclarations"] = context.CalorSource.Contains("§E{"),
-                ["hasPureAnnotation"] = context.CalorSource.Contains("pure") ||
-                                        context.CalorSource.Contains("§E{}"),
-                ["hasIoEffects"] = context.CalorSource.Contains("io") ||
-                                   context.CalorSource.Contains("net") ||
-                                   context.CalorSource.Contains("fs")
-            },
-            ["csharpFactors"] = new Dictionary<string, object>
-            {
-                ["compiles"] = context.CSharpCompilation.Success,
-                ["hasPureAttribute"] = context.CSharpSource.Contains("[Pure]"),
-                ["usesReadonly"] = context.CSharpSource.Contains("readonly"),
-                ["usesStaticMethods"] = context.CSharpSource.Contains("static ")
-            }
-        };
-
-        return MetricResult.CreateHigherIsBetter(
-            Category,
-            "EstimatedDiscipline",
-            calorScore,
-            csharpScore,
-            details);
-    }
-
-    /// <summary>
-    /// Estimates Calor discipline score based on compilation success.
-    /// With outcome-based scoring, both languages get the same base score.
-    /// </summary>
-    private static double EstimateCalorDisciplineScore(EvaluationContext context)
-    {
-        // Outcome-based: compilation success = 1.0, failure = 0.0
-        // No syntax-based bonuses to avoid language bias
-        return context.CalorCompilation.Success ? 1.0 : 0.0;
-    }
-
-    /// <summary>
-    /// Estimates C# discipline score based on compilation success.
-    /// With outcome-based scoring, both languages get the same base score.
-    /// </summary>
-    private static double EstimateCSharpDisciplineScore(EvaluationContext context)
-    {
-        // Outcome-based: compilation success = 1.0, failure = 0.0
-        // No cap, no syntax-based penalties - fair comparison
-        return context.CSharpCompilation.Success ? 1.0 : 0.0;
-    }
-
-    /// <summary>
-    /// Creates a calculator configured for actual LLM-based effect discipline evaluation.
+    /// Creates a calculator configured for LLM-based effect discipline evaluation.
     /// </summary>
     public static EffectDisciplineCalculator CreateWithProvider(
         ILlmProvider provider,

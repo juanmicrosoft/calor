@@ -71,7 +71,7 @@ public class BenchmarkRunnerTests
     }
 
     [Fact]
-    public void BenchmarkRunner_GetCalculators_ReturnsAllCalculators()
+    public void BenchmarkRunner_GetCalculators_ReturnsStaticCalculators()
     {
         // Arrange
         var runner = new BenchmarkRunner();
@@ -79,8 +79,10 @@ public class BenchmarkRunnerTests
         // Act
         var calculators = runner.GetCalculators();
 
-        // Assert - 11 calculators: 7 static + 3 LLM-based + 1 Calor-only
-        Assert.Equal(11, calculators.Count);
+        // Assert - 8 calculators: 7 static + 1 Correctness
+        // LLM-based metrics (TaskCompletion, Safety, EffectDiscipline) require
+        // an LLM provider and are run via dedicated commands
+        Assert.Equal(8, calculators.Count);
         // Static metrics
         Assert.Contains(calculators, c => c.Category == "TokenEconomics");
         Assert.Contains(calculators, c => c.Category == "GenerationAccuracy");
@@ -89,12 +91,13 @@ public class BenchmarkRunnerTests
         Assert.Contains(calculators, c => c.Category == "ErrorDetection");
         Assert.Contains(calculators, c => c.Category == "InformationDensity");
         Assert.Contains(calculators, c => c.Category == "RefactoringStability");
-        // LLM-based metrics
-        Assert.Contains(calculators, c => c.Category == "TaskCompletion");
-        Assert.Contains(calculators, c => c.Category == "Safety");
-        Assert.Contains(calculators, c => c.Category == "EffectDiscipline");
-        // Fair comparison metric
+        // Correctness uses code execution, not LLM generation
         Assert.Contains(calculators, c => c.Category == "Correctness");
+
+        // LLM-based metrics are NOT included by default
+        Assert.DoesNotContain(calculators, c => c.Category == "TaskCompletion");
+        Assert.DoesNotContain(calculators, c => c.Category == "Safety");
+        Assert.DoesNotContain(calculators, c => c.Category == "EffectDiscipline");
     }
 
     #endregion

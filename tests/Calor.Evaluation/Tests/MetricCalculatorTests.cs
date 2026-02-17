@@ -269,31 +269,9 @@ namespace Calculator
 
     #endregion
 
-    #region Task Completion Tests
-
-    [Fact]
-    public async Task TaskCompletionCalculator_CalculatesCompletionPotential()
-    {
-        // Arrange
-        var calculator = new TaskCompletionCalculator();
-        var context = CreateContext(
-            calor: @"§M{m001:Task}
-§F{f001:Run:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}",
-            csharp: @"namespace Task { public class TaskModule { public void Run() { } } }");
-
-        // Act
-        var result = await calculator.CalculateAsync(context);
-
-        // Assert
-        Assert.Equal("TaskCompletion", result.Category);
-        Assert.True(result.Details.ContainsKey("calorFactors"));
-        Assert.True(result.Details.ContainsKey("csharpFactors"));
-    }
-
-    #endregion
+    // Note: Task Completion tests removed - this is now an LLM-only metric
+    // that requires an LLM provider and is tested via dedicated LLM task tests
+    // in LlmTaskTests.cs. The metric calculator tests focus on static metrics.
 
     #region MetricResult Tests
 
