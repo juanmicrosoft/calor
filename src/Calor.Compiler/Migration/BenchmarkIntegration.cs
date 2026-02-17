@@ -22,9 +22,7 @@ public sealed class BenchmarkIntegration
         "ErrorDetection",
         "InformationDensity",
         "TaskCompletion",
-        // Calor-only metrics
-        "ContractVerification",
-        "EffectSoundness",
+        // Calor-only metric
         "InteropEffectCoverage"
     };
 

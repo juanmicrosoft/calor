@@ -19,27 +19,27 @@ const METRIC_NAMES: Record<string, string> = {
   ErrorDetection: 'Error Detection',
   EditPrecision: 'Edit Precision',
   RefactoringStability: 'Refactoring Stability',
+  Safety: 'Safety',
+  EffectDiscipline: 'Effect Discipline',
   GenerationAccuracy: 'Generation Accuracy',
   TaskCompletion: 'Task Completion',
   TokenEconomics: 'Token Economics',
   InformationDensity: 'Information Density',
-  ContractVerification: 'Contract Verification',
-  EffectSoundness: 'Effect Soundness',
   InteropEffectCoverage: 'Interop Coverage',
 };
 
-// Preferred display order (Calor wins first, then C# wins)
+// Preferred display order (Calor wins first, then C# wins, then Calor-only)
 const METRIC_ORDER = [
   'Comprehension',
   'ErrorDetection',
   'EditPrecision',
   'RefactoringStability',
+  'Safety',
+  'EffectDiscipline',
   'GenerationAccuracy',
   'TaskCompletion',
   'TokenEconomics',
   'InformationDensity',
-  'ContractVerification',
-  'EffectSoundness',
   'InteropEffectCoverage',
 ];
 

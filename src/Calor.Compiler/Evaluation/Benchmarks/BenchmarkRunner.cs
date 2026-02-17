@@ -15,7 +15,7 @@ public class BenchmarkRunner
     {
         _options = options ?? new BenchmarkRunnerOptions();
 
-        // Initialize all calculators (7 standard + 3 Calor-only)
+        // Initialize all calculators (7 standard + 1 Calor-only)
         _calculators = new List<IMetricCalculator>
         {
             new TokenEconomicsCalculator(),
@@ -25,9 +25,7 @@ public class BenchmarkRunner
             new ErrorDetectionCalculator(),
             new InformationDensityCalculator(),
             new TaskCompletionCalculator(),
-            // Calor-only metrics (C# score always 0)
-            new ContractVerificationCalculator(),
-            new EffectSoundnessCalculator(),
+            // Calor-only metric (C# score always 0)
             new InteropEffectCoverageCalculator()
         };
     }
@@ -141,9 +139,7 @@ public class BenchmarkRunner
         "ErrorDetection",
         "InformationDensity",
         "TaskCompletion",
-        // Calor-only metrics (C# always scores 0)
-        "ContractVerification",
-        "EffectSoundness",
+        // Calor-only metric (C# always scores 0)
         "InteropEffectCoverage"
     };
 }

@@ -33,8 +33,8 @@ const metricDisplayNames: Record<string, string> = {
   InformationDensity: 'Information Density',
   TaskCompletion: 'Task Completion',
   RefactoringStability: 'Refactoring Stability',
-  ContractVerification: 'Contract Verification',
-  EffectSoundness: 'Effect Soundness',
+  Safety: 'Safety',
+  EffectDiscipline: 'Effect Discipline',
   InteropEffectCoverage: 'Interop Effect Coverage',
 };
 
@@ -72,13 +72,13 @@ const metricInterpretations: Record<string, { calor: string; csharp: string }> =
     calor: 'More stable during refactoring',
     csharp: 'Better refactoring support',
   },
-  ContractVerification: {
-    calor: 'Calor contracts are statically verified by Z3',
-    csharp: 'N/A',
+  Safety: {
+    calor: 'Contracts catch more bugs with better error messages',
+    csharp: 'Guard clauses require manual implementation',
   },
-  EffectSoundness: {
-    calor: 'Calor effect declarations are proven sound',
-    csharp: 'N/A',
+  EffectDiscipline: {
+    calor: 'Effect system prevents hidden side effect bugs',
+    csharp: 'Side effect discipline relies on conventions',
   },
   InteropEffectCoverage: {
     calor: 'Calor has comprehensive BCL effect coverage',

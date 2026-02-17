@@ -32,7 +32,7 @@ dotnet run --project tests/Calor.Evaluation -- --statistical --runs 30
 
 ### Current Scale
 
-- **100 programs** across 6 categories
+- **40 programs** across multiple categories
 - Each program has paired Calor (.calr) and C# (.cs) implementations
 - Complexity levels 1-5 (simple to advanced)
 
@@ -40,12 +40,13 @@ dotnet run --project tests/Calor.Evaluation -- --statistical --runs 30
 
 | Category | Count | Examples |
 |:---------|:------|:---------|
-| Data Structures | 15 | LinkedList, BinaryTree, HashTable, LRUCache |
-| Async/Concurrent | 12 | AsyncFileReader, ProducerConsumer, RateLimiter |
-| Design Patterns | 15 | Factory, Observer, Strategy, State Machine |
-| Domain Problems | 18 | ShoppingCart, OrderProcessor, AuthService |
-| Error Handling | 10 | ResultMonad, ValidationChain, CircuitBreaker |
-| Complex Algorithms | 10 | Dijkstra, QuickSort, A* Pathfinding |
+| Basic Functions | 10 | HelloWorld, Calculator, FizzBuzz |
+| Data Structures | 4 | Stack, Queue, LinkedList, BinaryTree |
+| Design Patterns | 4 | Singleton, Factory, ShoppingCart |
+| Algorithms | 3 | BinarySearch, QuickSort, Fibonacci |
+| Contract Verification | 7 | ProvableContracts, OverflowSafe, StringContracts |
+| Effect Soundness | 3 | CorrectEffects, MissingEffects, HiddenNetworkEffect |
+| Interop Effects | 2 | BclCoverage, PureFunctions |
 
 ### Requirements
 
@@ -56,7 +57,7 @@ Both implementations must:
 
 ---
 
-## The Eight Metrics
+## The Metrics
 
 ### 1. Token Economics
 
@@ -165,19 +166,7 @@ Both implementations must:
 
 ---
 
-### 7. Task Completion
-
-**Measures:** End-to-end task success potential.
-
-**Factors:**
-- Token efficiency (context window usage)
-- Compilation success
-- Structural completeness
-- Contract presence
-
----
-
-### 8. Refactoring Stability (NEW)
+### 7. Refactoring Stability
 
 **Measures:** How well unique IDs preserve references during code transformations.
 
@@ -198,36 +187,72 @@ Both implementations must:
 
 ---
 
-## Semantic Verification Metrics
+## LLM-Based Metrics
 
-Three metrics measure what constrained decoding cannot provide:
+These metrics use actual LLM code generation to measure real-world effectiveness:
 
-### Contract Verification (Calor-only)
+### 8. Task Completion
 
-Z3 proves contracts hold for all inputs, or provides counterexamples. This is impossible with grammar-constrained generation—syntax doesn't encode invariants.
+**Measures:** LLM code generation success using language-neutral prompts.
 
-**What it catches:**
-- Division by zero when divisor could be zero
-- Array bounds violations
-- Integer overflow in arithmetic
-- Null dereferences
+**Method:**
+- 50 programming tasks across 4 categories
+- Same prompt given to both Calor and C# (no language-specific hints)
+- Calor generation uses a skills file teaching Contract-First Methodology
+- Generated code is compiled and tested against test suites
 
-### Effect Soundness (Calor-only)
+**Scoring:** 40% compilation success + 60% test pass rate
 
-The compiler enforces that declared effects match actual effects. A function marked `§E{pure}` cannot contain I/O operations.
-
-**What it catches:**
-- Hidden network calls in "pure" functions
-- Undeclared database writes
-- Logging in supposedly side-effect-free code
-
-### Interop Effect Coverage (Calor-only)
-
-The BCL effect manifest tracks which .NET methods have effects, enabling verification even when calling external code.
+See the [LLM Task Completion Benchmark](#llm-task-completion-benchmark) section below for details.
 
 ---
 
-These metrics explain why Calor achieves **1.12x overall advantage** despite losing on token efficiency: the semantic verification pipeline catches classes of bugs that syntax-only tools cannot detect.
+### 9. Safety
+
+**Measures:** Contract enforcement effectiveness and error quality for catching bugs.
+
+**Method:**
+- Tests whether Calor contracts catch more bugs than C# guard clauses
+- Evaluates error message quality (informative vs cryptic)
+- Measures violation detection rate across input categories
+
+**What it catches:**
+- Division by zero
+- Array bounds violations
+- Integer overflow
+- Null dereferences
+- Invalid argument values
+
+---
+
+### 10. Effect Discipline
+
+**Measures:** Side effect management quality and bug prevention.
+
+**Method:**
+- Tests whether code prevents real-world bugs caused by hidden side effects
+- Evaluates effect declaration completeness
+- Measures bug prevention rate for effect-related issues
+
+**What it catches:**
+- Flaky tests (non-determinism from hidden state)
+- Security violations (unauthorized I/O)
+- Side effect transparency issues
+- Cache safety problems (memoization correctness)
+
+---
+
+## Calor-Only Metrics
+
+### 11. Interop Effect Coverage
+
+**Measures:** BCL methods covered by effect manifests.
+
+The BCL effect manifest tracks which .NET methods have effects, enabling verification even when calling external code. This has no C# equivalent since C# lacks an effect system.
+
+---
+
+These metrics explain why Calor achieves its overall advantage despite losing on token efficiency: the semantic verification pipeline and effect system catch classes of bugs that syntax-only tools cannot detect.
 
 ---
 
@@ -439,7 +464,7 @@ The CI pipeline checks for:
 
 ## Limitations
 
-1. **Corpus size**: While expanded to 100 programs, may not cover all patterns
+1. **Corpus size**: 40 programs may not cover all patterns
 2. **C# baseline**: Other languages might perform differently
 3. **Static analysis**: Some metrics don't capture runtime behavior
 4. **LLM variance**: Model updates can affect evaluation scores

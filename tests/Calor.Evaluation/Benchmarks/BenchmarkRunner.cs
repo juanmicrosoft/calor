@@ -23,18 +23,20 @@ public class BenchmarkRunner
         // Initialize all calculators
         _calculators = new List<IMetricCalculator>
         {
+            // Static metrics
             new TokenEconomicsCalculator(),
             new GenerationAccuracyCalculator(),
             new ComprehensionCalculator(),
             new EditPrecisionCalculator(),
             new ErrorDetectionCalculator(),
             new InformationDensityCalculator(),
-            new TaskCompletionCalculator(),
             new RefactoringStabilityCalculator(),
+            // LLM-based metrics (use estimation mode by default if no provider configured)
+            new TaskCompletionCalculator(),
+            new SafetyCalculator(),
+            new EffectDisciplineCalculator(),
             // Calor-only metric (C# score always 0)
-            new InteropEffectCoverageCalculator(),
-            // LLM-based task completion (uses estimation mode by default)
-            new LlmTaskCompletionCalculator()
+            new InteropEffectCoverageCalculator()
         };
     }
 
