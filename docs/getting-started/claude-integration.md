@@ -25,10 +25,51 @@ This creates:
 |:-----|:--------|
 | `.claude/skills/calor/SKILL.md` | Teaches Claude Calor syntax for writing new code |
 | `.claude/skills/calor-convert/SKILL.md` | Teaches Claude how to convert C# to Calor |
-| `.claude/settings.json` | **Enforces Calor-first** - blocks `.cs` file creation |
+| `.claude/skills/calor-semantics/SKILL.md` | Teaches Claude about Calor semantics and verification |
+| `.claude/skills/calor-analyze/SKILL.md` | Teaches Claude how to analyze C# for Calor migration |
+| `.claude/settings.json` | **Hooks + MCP servers** - blocks `.cs` file creation and provides tools |
 | `CLAUDE.md` | Project documentation with Calor reference and conventions |
 
 You can run this command again anytime to update the Calor documentation section in CLAUDE.md without losing your custom content.
+
+---
+
+## MCP Tools Integration
+
+In addition to skills and hooks, `calor init --ai claude` configures **MCP servers** that give Claude direct access to Calor compiler capabilities:
+
+| Tool | Description |
+|:-----|:------------|
+| `calor_compile` | Compile Calor code to C# and see results |
+| `calor_verify` | Verify contracts with Z3 SMT solver, get counterexamples |
+| `calor_analyze` | Analyze code for security vulnerabilities and bugs |
+| `calor_convert` | Convert C# code to Calor programmatically |
+| `calor_syntax_help` | Get syntax help for specific Calor features |
+
+These tools allow Claude to:
+- **Verify** your contracts are satisfiable before you run the code
+- **Catch bugs** through static analysis during code generation
+- **Convert** existing C# code to Calor on-the-fly
+- **Look up** Calor syntax without leaving the conversation
+
+The MCP servers are configured in `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "calor-lsp": {
+      "command": "calor",
+      "args": ["lsp"]
+    },
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio"]
+    }
+  }
+}
+```
+
+See [`calor mcp`](/calor/cli/mcp/) for detailed tool documentation.
 
 ---
 

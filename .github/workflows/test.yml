@@ -109,3 +109,48 @@ jobs:
           else
             echo "No .calr files found in docs or examples"
           fi
+
+  skill-file-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check skill files are in sync
+        run: |
+          # The canonical source is tests/Calor.Evaluation/Skills/calor-language-skills.md
+          # It should be in sync with src/Calor.Compiler/Resources/Skills/calor.md
+          CANONICAL="tests/Calor.Evaluation/Skills/calor-language-skills.md"
+          EMBEDDED="src/Calor.Compiler/Resources/Skills/calor.md"
+
+          if [ ! -f "$CANONICAL" ]; then
+            echo "Error: Canonical skill file not found: $CANONICAL"
+            exit 1
+          fi
+
+          if [ ! -f "$EMBEDDED" ]; then
+            echo "Error: Embedded skill file not found: $EMBEDDED"
+            exit 1
+          fi
+
+          if diff -q "$CANONICAL" "$EMBEDDED" > /dev/null 2>&1; then
+            echo "Skill files are in sync."
+          else
+            echo "Error: Skill files are out of sync!"
+            echo ""
+            echo "The canonical source of truth is:"
+            echo "  $CANONICAL"
+            echo ""
+            echo "It should be identical to the embedded resource:"
+            echo "  $EMBEDDED"
+            echo ""
+            echo "To fix locally, run:"
+            echo "  ./scripts/sync-skill-files.sh"
+            echo ""
+            echo "Or the build should auto-sync them."
+            echo ""
+            echo "Diff (first 50 lines):"
+            diff "$CANONICAL" "$EMBEDDED" | head -50 || true
+            exit 1
+          fi

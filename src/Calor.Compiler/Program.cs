@@ -187,6 +187,7 @@ public class Program
         rootCommand.AddCommand(EffectsCommand.Create());
         rootCommand.AddCommand(VerifyCommand.Create());
         rootCommand.AddCommand(LspCommand.Create());
+        rootCommand.AddCommand(McpCommand.Create());
 
         // Initialize telemetry for subcommands
         // Parse --no-telemetry early from args

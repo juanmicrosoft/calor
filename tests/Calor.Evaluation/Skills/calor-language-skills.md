@@ -9,6 +9,19 @@ Calor is designed for:
 - **Clarity**: No operator precedence ambiguity - all expressions use prefix notation
 - **Verifiability**: Constraints are machine-checkable, not just documentation
 
+## Semantic Guarantees
+
+Calor has formal semantics (v1.0.0) that differ from C#. **Do not assume C# behavior.**
+
+| Rule | Calor Behavior |
+|------|----------------|
+| Evaluation Order | Strictly left-to-right for all expressions |
+| Short-Circuit | `&&`/`||` always short-circuit |
+| Scoping | Lexical with shadowing; inner scope does NOT mutate outer |
+| Integer Overflow | TRAP by default (throws `OverflowException`) |
+| Type Coercion | Explicit for narrowing; implicit only for widening |
+| Contracts | `§Q` before body, `§S` after body |
+
 ## Contract-First Methodology
 
 **Before writing implementation, extract and express constraints as contracts.** This is your primary tool for ensuring correctness.
@@ -138,30 +151,45 @@ The `(len arr)` operation will throw `NullReferenceException` if `arr` is null. 
 
 **Why this matters:** Without the null check, passing `null` causes a runtime crash (`NullReferenceException`) instead of a clean contract violation (`ContractViolationException`). The null check ensures invalid inputs are rejected with a proper error message.
 
-### Syntax Quick Reference
+## Syntax Quick Reference
 
-#### Function Structure
-```calor
-§F{id:FunctionName:pub}
-  §I{type:paramName}     // Input parameter
-  §O{returnType}         // Return type
-  §Q (condition)         // Precondition (0 or more)
-  §S (condition)         // Postcondition (0 or more)
-  // body
-  §R expression          // Return
-§/F{id}
+### Structure Tags
+
+```
+§M{id:Name}           Module (namespace)
+§F{id:Name:vis}       Function (pub|pri)
+§I{type:name}         Input parameter
+§O{type}              Output/return type
+§E{effects}           Side effects: cw,cr,fs:r,fs:w,net:rw,db:rw
+§U{namespace}         Using directive
+§/M{id} §/F{id}       Close tags (ID must match)
 ```
 
-#### Types
-| Calor | Meaning |
-|-------|---------|
-| `i32` | 32-bit integer |
-| `i64` | 64-bit integer |
-| `bool` | Boolean |
-| `str` | String |
-| `void` | No return value |
+### Types
 
-#### Numeric Literals and Constants
+```
+i32, i64, f32, f64    Numbers
+u8, u16, u32, u64     Unsigned integers
+str, bool, void       String, boolean, unit
+?T                    Option<T> (nullable)
+T!E                   Result<T,E> (fallible)
+[T]                   Array of T (e.g., [u8], [i32], [str])
+[[T]]                 Nested array (e.g., [[i32]] for int[][])
+
+datetime              DateTime
+datetimeoffset        DateTimeOffset
+timespan              TimeSpan
+date                  DateOnly
+time                  TimeOnly
+guid                  Guid
+
+List<T>               List<T>
+Dict<K,V>             Dictionary<K,V>
+ReadList<T>           IReadOnlyList<T>
+ReadDict<K,V>         IReadOnlyDictionary<K,V>
+```
+
+### Numeric Literals and Constants
 
 **IMPORTANT: For extreme integer values, use typed literals:**
 ```calor
@@ -179,7 +207,8 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 §R INT:-2147483648  // ✓ Returns int.MinValue
 ```
 
-#### Expressions (Prefix Notation)
+### Expressions (Prefix Notation)
+
 ```calor
 (+ a b)       // a + b
 (- a b)       // a - b
@@ -199,7 +228,7 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 (! a)         // NOT a
 ```
 
-#### Unavailable Operators - Use IF Expressions Instead
+### Unavailable Operators - Use IF Expressions Instead
 
 **CRITICAL: The following operators do NOT exist in Calor:**
 - `(abs x)` - absolute value
@@ -220,7 +249,7 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 §B{minVal} §IF{if1} (< a b) → a §EL → b §/I{if1}
 ```
 
-#### String Operations
+### String Operations
 
 **IMPORTANT: Use these operations for string manipulation. Do NOT invent syntax.**
 
@@ -259,7 +288,7 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 (char-at s i)     // Character at index: (char-at "hello" 0) → 'h'
 ```
 
-#### Character Operations
+### Character Operations
 
 **CRITICAL: Calor does NOT support single-quoted character literals.**
 
@@ -301,61 +330,20 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 | `'a'` | 97 | `'z'` | 122 |
 | `'-'` | 45 | `'_'` | 95 |
 | `' '` (space) | 32 | `'.'` | 46 |
+| `'='` | 61 | `'+'` | 43 |
+| `'/'` | 47 | | |
 
-**Character Operation Examples:**
-
+**Getting character constants (without single quotes):**
 ```calor
-// Check if character is a digit - PREFERRED way
-§IF{if1} (is-digit c) → §R true
-§/I{if1}
+// Use char-from-code to create character values
+§B{equalChar} (char-from-code 61)    // '='
+§B{plusChar} (char-from-code 43)     // '+'
 
-// Check if character is '0' using code comparison
-§IF{if2} (== (char-code c) 48) → §R true
-§/I{if2}
-
-// Check if character is in range '0'-'9' using codes
-§B{code} (char-code c)
-§IF{if3} (&& (>= code 48) (<= code 57))
-  §R true
-§/I{if3}
-
-// Iterate through string checking each character
-§B{i} 0
-§WH{wh1} (< i (len s))
-  §B{c} (char-at s i)
-  §IF{if4} (is-digit c)
-    // process digit
-  §/I{if4}
-  §ASSIGN i (+ i 1)
-§/WH{wh1}
+// Or extract from a string
+§B{equalChar} (char-at "=" 0)        // '='
 ```
 
-**Common Patterns for Building Formatted Strings:**
-
-```calor
-// Pattern 1: Using concat with str for number conversion
-// Task: Return "{type}:{id}"
-§R (concat type ":" (str id))
-
-// Pattern 2: Using fmt for complex formatting
-// Task: Return "TOKEN-{userId}-{sequence}"
-§R (fmt "TOKEN-{0}-{1}" userId sequence)
-
-// Pattern 3: Zero-padded numbers using fmt with format specifier
-// Task: Return "{prefix}-{sequence:D6}" (6-digit zero-padded)
-§R (fmt "{0}-{1:D6}" prefix sequence)
-
-// Pattern 4: Building report strings
-// Task: Return "Report: {title} (Generated: {timestamp})"
-§R (fmt "Report: {0} (Generated: {1})" title timestamp)
-```
-
-**CRITICAL: Do NOT invent string operations.** Use only the operations listed above.
-- Do NOT use `ToString` - use `(str x)` instead
-- Do NOT use `§CONCAT` or `§TOSTR` - these do not exist
-- Do NOT use `String.Format` - use `(fmt ...)` instead
-
-#### Array Operations
+### Array Operations
 
 **IMPORTANT: Array syntax is different from C#. Do NOT use C#-style array syntax.**
 
@@ -448,7 +436,7 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 §S (>= result 0)                    // ✓ Simple value constraint
 ```
 
-#### Control Flow
+### Control Flow
 
 **IMPORTANT: Arrow Syntax vs Block Syntax**
 
@@ -495,17 +483,6 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 
 **IMPORTANT:** Both `→ thenValue` and `§EL → elseValue` are required for IF expressions.
 
-**Alternative - Use explicit branches for complex logic:**
-```calor
-// For complex logic with multiple statements, use block syntax
-§IF{if1} (< n 0)
-  §B{x} (- 0 n)
-§EL
-  §B{x} n
-§/I{if1}
-// Now use x
-```
-
 **COMMON MISTAKE - Arrow syntax with statements after:**
 ```calor
 // WRONG - arrow syntax cannot have statements after it on separate lines
@@ -522,15 +499,6 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 §ASSIGN y (+ y 1)    // Now this is outside the if, which is correct
 ```
 
-**Or if both statements should be conditional:**
-```calor
-§IF{if1} (== x 0)
-  §R false
-§EL
-  §ASSIGN y (+ y 1)
-§/I{if1}
-```
-
 **For Loop:**
 ```calor
 §L{id:var:start:end:step}
@@ -545,6 +513,19 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 §/WH{id}
 ```
 
+**Do-While Loop:**
+```calor
+§DO{id}
+  ...body (executes at least once)...
+§/DO{id} condition
+```
+
+**Break and Continue:**
+```calor
+§BK                       // Break out of loop
+§CN                       // Continue to next iteration
+```
+
 **Nested Control Flow Pattern:**
 When you have a loop with conditional logic inside, use block-style for inner ifs:
 ```calor
@@ -556,15 +537,35 @@ When you have a loop with conditional logic inside, use block-style for inner if
 §/WH{wh1}
 ```
 
-#### Bindings and Assignment
+### Bindings and Assignment
+
 ```calor
 §B{varName} expression    // Create binding: varName = expression
+§B{type:varName} expr     // Create binding with explicit type
 §ASSIGN varName expr      // Update existing binding
 ```
 
-#### Return
+**CRITICAL: §B declares a NEW variable. Use §ASSIGN to update existing variables.**
+```calor
+§B{k} (% rng n)              // First use: declare k
+§ASSIGN k (+ k offset)       // Update: use §ASSIGN, not §B
+
+// WRONG - variable redeclaration error:
+§B{k} (% rng n)
+§B{k} (abs k)                // ERROR: k already defined in this scope
+```
+
+### Return
+
 ```calor
 §R expression             // Return the expression's value
+```
+
+### Statements
+
+```calor
+§P expr               // Print line (Console.WriteLine)
+§Pf expr              // Print without newline (Console.Write)
 ```
 
 ## Complete Examples
@@ -668,66 +669,372 @@ When a loop contains an if statement, always use block-style for the inner if:
 §/F{f001}
 ```
 
-### Compound Contracts
+## String Operation Examples
 
-For complex requirements, combine multiple contracts:
+These examples show correct patterns for common string tasks:
 
-**Absolute value** - result is non-negative and equals n or -n:
+### Building Cache Keys
+
+Task: Return `"{type}:{id}"`
+
 ```calor
-§F{f001:Abs:pub}
-  §I{i32:n}
-  §O{i32}
-  §S (>= result 0)
-  §S (|| (== result n) (== result (- 0 n)))
-  §IF{if1} (< n 0) → §R (- 0 n)
-  §EL → §R n
-  §/I{if1}
+§M{m001:CacheModule}
+§F{f001:BuildCacheKey:pub}
+  §I{str:type}
+  §I{i32:id}
+  §O{str}
+  §R (concat type ":" (str id))
 §/F{f001}
+§/M{m001}
 ```
 
-**Factorial** - input non-negative, result at least 1:
+### Generating Formatted Tokens
+
+Task: Return `"TOKEN-{userId}-{sequence}"`
+
 ```calor
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n 0)
-  §S (>= result 1)
-  §IF{if1} (<= n 1) → §R 1
-  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
-  §/I{if1}
+§M{m001:TokenModule}
+§F{f001:GenerateToken:pub}
+  §I{i32:userId}
+  §I{i32:sequence}
+  §O{str}
+  §R (fmt "TOKEN-{0}-{1}" userId sequence)
 §/F{f001}
+§/M{m001}
 ```
 
-**Clamp to range** - valid range required, result bounded:
+### Zero-Padded IDs
+
+Task: Return `"{prefix}-{sequence:D6}"` (6-digit zero-padded)
+
 ```calor
-§F{f001:Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
-  §Q (<= min max)
-  §S (>= result min)
-  §S (<= result max)
-  §IF{if1} (< value min) → §R min
-  §EI (> value max) → §R max
-  §EL → §R value
-  §/I{if1}
+§M{m001:IdModule}
+§F{f001:GenerateId:pub}
+  §I{str:prefix}
+  §I{i32:sequence}
+  §O{str}
+  §R (fmt "{0}-{1:D6}" prefix sequence)
 §/F{f001}
+§/M{m001}
 ```
 
-**Sum of range** - start <= end, result non-negative for non-negative inputs:
+## Collections
+
+### List
+
 ```calor
-§F{f001:SumRange:pub}
-  §I{i32:start}
-  §I{i32:end}
+§LIST{name:elementType}   // Create and initialize a list
+  value1
+  value2
+§/LIST{name}
+
+§PUSH{listName} value     // Add to end of list
+§INS{listName} index val  // Insert at index
+§SETIDX{listName} idx val // Set element at index
+§REM{listName} value      // Remove first occurrence
+§CLR{listName}            // Clear all elements
+§CNT{listName}            // Get count
+§HAS{listName} value      // Check if contains
+```
+
+### Dictionary
+
+```calor
+§DICT{name:keyType:valType}  // Create dictionary
+  §KV key1 value1
+  §KV key2 value2
+§/DICT{name}
+
+§PUT{dictName} key value     // Add or update entry
+§REM{dictName} key           // Remove by key
+§HAS{dictName} key           // Check if key exists
+§CLR{dictName}               // Clear all entries
+```
+
+### HashSet
+
+```calor
+§HSET{name:elementType}   // Create hash set
+  value1
+  value2
+§/HSET{name}
+
+§PUSH{setName} value      // Add to set
+§REM{setName} value       // Remove from set
+§HAS{setName} value       // Check membership
+§CLR{setName}             // Clear all elements
+```
+
+### Iterating Collections
+
+```calor
+§EACH{id:var} collection  // Foreach over collection
+  ...body...
+§/EACH{id}
+
+§EACHKV{id:k:v} dict      // Foreach over dictionary key-values
+  ...body...
+§/EACHKV{id}
+```
+
+## Async/Await
+
+Async functions and methods use `§AF` and `§AMT` tags:
+
+```calor
+§AF{id:Name:vis}          // Async function (returns Task<T>)
+§/AF{id}                  // End async function
+§AMT{id:Name:vis}         // Async method (returns Task<T>)
+§/AMT{id}                 // End async method
+§AWAIT expr               // Await an async operation
+§AWAIT{false} expr        // Await with ConfigureAwait(false)
+```
+
+### Template: Async Function
+
+```calor
+§M{m001:AsyncDemo}
+§AF{f001:FetchDataAsync:pub}
+  §I{str:url}
+  §O{str}
+  §B{str:result} §AWAIT §C{client.GetStringAsync} §A url §/C
+  §R result
+§/AF{f001}
+§/M{m001}
+```
+
+## Exception Handling
+
+```calor
+§TR{id}                   // Try block
+  ...try body...
+§CA{ExceptionType:varName} // Catch clause
+  ...catch body...
+§CA                       // Catch-all (no type)
+  ...catch body...
+§FI                       // Finally block
+  ...finally body...
+§/TR{id}                  // End try block
+
+§TH "message"             // Throw new Exception
+§TH expr                  // Throw expression
+§RT                       // Rethrow (inside catch)
+
+§CA{Type:var} §WHEN cond  // Exception filter
+```
+
+### Template: Try/Catch/Finally
+
+```calor
+§M{m001:ErrorHandling}
+§F{f001:SafeDivide:pub}
+  §I{i32:a}
+  §I{i32:b}
   §O{i32}
-  §Q (<= start end)
-  §B{sum} 0
-  §L{for1:i:start:end:1}
-    §ASSIGN sum (+ sum i)
-  §/L{for1}
-  §R sum
+  §TR{t1}
+    §R (/ a b)
+  §CA{DivideByZeroException:ex}
+    §P "Division by zero!"
+    §R 0
+  §FI
+    §P "Cleanup complete"
+  §/TR{t1}
 §/F{f001}
+§/M{m001}
+```
+
+## Generics
+
+### Generic Functions and Classes
+
+Type parameters use `<T>` suffix syntax after tag attributes:
+
+```calor
+§F{id:Name:pub}<T>            // Generic function with one type param
+§F{id:Name:pub}<T, U>         // Generic function with two type params
+§CL{id:Name}<T>               // Generic class
+§IFACE{id:Name}<T>            // Generic interface
+§MT{id:Name:vis}<T>           // Generic method
+```
+
+### Type Constraints (§WHERE)
+
+```calor
+§WHERE T : class              // Reference type constraint
+§WHERE T : struct             // Value type constraint
+§WHERE T : new()              // Parameterless constructor
+§WHERE T : IComparable<T>     // Interface constraint
+§WHERE T : class, IDisposable // Multiple constraints
+```
+
+### Template: Generic Repository
+
+```calor
+§M{m001:GenericDemo}
+§CL{c001:Repository:pub}<T>
+  §WHERE T : class
+  §FLD{List<T>:_items:pri}
+
+  §CTOR{ct001:pub}
+    §ASSIGN _items §NEW{List<T>}
+  §/CTOR{ct001}
+
+  §MT{m001:Add:pub}
+    §I{T:item}
+    §O{void}
+    §C{_items.Add} §A item §/C
+  §/MT{m001}
+
+  §MT{m002:GetAll:pub}
+    §O{IReadOnlyList<T>}
+    §R _items
+  §/MT{m002}
+§/CL{c001}
+§/M{m001}
+```
+
+## Classes and Interfaces
+
+### Class Definition
+
+```calor
+§CL{id:Name:modifiers}    // Class definition
+  // modifiers: abs, seal, pub, pri
+§EXT{BaseClass}           // Extends (class inheritance)
+§IMPL{InterfaceName}      // Implements (interface)
+```
+
+### Interface Definition
+
+```calor
+§IFACE{id:Name}           // Interface definition
+  §MT{id:MethodName}      // Method signature
+    §I{type:param}        // Parameters
+    §O{returnType}        // Return type
+  §/MT{id}
+§/IFACE{id}
+```
+
+### Method Modifiers
+
+```calor
+§VR                       // Virtual method modifier
+§OV                       // Override method modifier
+§AB                       // Abstract method modifier
+§SD                       // Sealed method modifier
+```
+
+### Template: Class Inheritance
+
+```calor
+§M{m001:Shapes}
+§CL{c001:Shape:pub abs}
+  §MT{mt001:Area:pub:abs}
+    §O{f64}
+  §/MT{mt001}
+§/CL{c001}
+
+§CL{c002:Circle:pub}
+  §EXT{Shape}
+  §FLD{f64:radius:pri}
+  §MT{mt001:Area:pub:over}
+    §O{f64}
+    §R (* 3.14159 (* radius radius))
+  §/MT{mt001}
+§/CL{c002}
+§/M{m001}
+```
+
+## Constructors
+
+```calor
+§CTOR{id:visibility}      // Constructor
+  §I{type:param}          // Parameters
+  §BASE §A arg §/BASE     // Call base constructor
+  §THIS §A arg §/THIS     // Call this constructor
+  §ASSIGN target value    // Field assignment
+§/CTOR{id}
+```
+
+### Template: Constructor with Base Call
+
+```calor
+§M{m001:Animals}
+§CL{c001:Animal:pub}
+  §FLD{str:_name:pro}
+  §CTOR{ctor001:pub}
+    §I{str:name}
+    §ASSIGN §THIS._name name
+  §/CTOR{ctor001}
+§/CL{c001}
+
+§CL{c002:Dog:pub}
+  §EXT{Animal}
+  §FLD{str:_breed:pri}
+  §CTOR{ctor001:pub}
+    §I{str:name}
+    §I{str:breed}
+    §BASE §A name §/BASE
+    §ASSIGN §THIS._breed breed
+  §/CTOR{ctor001}
+§/CL{c002}
+§/M{m001}
+```
+
+## Switch/Match Expressions
+
+```calor
+§W{id} target             // Match expression start
+§K pattern → expr         // Case with arrow syntax
+§K pattern                // Case with block body
+  ...body...
+§/K                       // End case
+§/W{id}                   // End match
+```
+
+### Template: Switch Expression
+
+```calor
+§M{m001:Grades}
+§F{f001:GetGrade:pub}
+  §I{i32:score}
+  §O{str}
+  §R §W{sw1} score
+    §K §PREL{gte} 90 → "A"
+    §K §PREL{gte} 80 → "B"
+    §K §PREL{gte} 70 → "C"
+    §K §PREL{gte} 60 → "D"
+    §K _ → "F"
+  §/W{sw1}
+§/F{f001}
+§/M{m001}
+```
+
+### Guard Clauses with WHEN
+
+```calor
+§W{sw1} x
+  §K §VAR{n} §WHEN (> n 100) → "large"
+  §K §VAR{n} §WHEN (< n 0) → "negative"
+  §K 0 → "zero"
+  §K _ → "normal"
+§/W{sw1}
+```
+
+## Enums
+
+```calor
+§EN{id:Name}              // Simple enum
+  Red
+  Green
+  Blue
+§/EN{id}
+
+§EN{id:Name:underlyingType}  // Enum with underlying type
+  Ok = 200
+  NotFound = 404
+  Error = 500
+§/EN{id}
 ```
 
 ## Guidelines for Writing Calor
@@ -758,79 +1065,6 @@ For complex requirements, combine multiple contracts:
 8. **Use contracts to verify your work**: If a postcondition fails at runtime, your implementation is incorrect. Contracts are your self-checking mechanism.
 
 9. **Use proper string operations**: For string manipulation, use `(str x)` for conversion, `(concat ...)` for joining, `(fmt ...)` for formatting. NEVER invent syntax like `ToString`, `§CONCAT`, or `§TOSTR`.
-
-## String Operation Examples
-
-These examples show correct patterns for common string tasks:
-
-### Building Cache Keys
-```calor
-// Task: Return "{type}:{id}"
-§M{m001:CacheModule}
-§F{f001:BuildCacheKey:pub}
-  §I{str:type}
-  §I{i32:id}
-  §O{str}
-  §R (concat type ":" (str id))
-§/F{f001}
-§/M{m001}
-```
-
-### Generating Formatted Tokens
-```calor
-// Task: Return "TOKEN-{userId}-{sequence}"
-§M{m001:TokenModule}
-§F{f001:GenerateToken:pub}
-  §I{i32:userId}
-  §I{i32:sequence}
-  §O{str}
-  §R (fmt "TOKEN-{0}-{1}" userId sequence)
-§/F{f001}
-§/M{m001}
-```
-
-### Zero-Padded IDs
-```calor
-// Task: Return "{prefix}-{sequence:D6}" (6-digit zero-padded)
-§M{m001:IdModule}
-§F{f001:GenerateId:pub}
-  §I{str:prefix}
-  §I{i32:sequence}
-  §O{str}
-  §R (fmt "{0}-{1:D6}" prefix sequence)
-§/F{f001}
-§/M{m001}
-```
-
-### Report with Timestamp
-```calor
-// Task: Return "Report: {title} (Generated: {timestamp})"
-§M{m001:ReportModule}
-§F{f001:GenerateReport:pub}
-  §I{str:title}
-  §I{i64:timestamp}
-  §O{str}
-  §R (fmt "Report: {0} (Generated: {1})" title timestamp)
-§/F{f001}
-§/M{m001}
-```
-
-### Simple Integer Parsing (with default)
-```calor
-// Task: Parse string to int, return 0 if invalid
-// Note: For complex parsing, keep it simple - use available operations
-§M{m001:ParseModule}
-§F{f001:ParseInt:pub}
-  §I{str:s}
-  §O{i32}
-  §IF{if1} (isempty s) → §R 0
-  §/I{if1}
-  // For basic cases, return 0 as default for invalid input
-  // Complex parsing with character iteration requires more elaborate logic
-  §R 0
-§/F{f001}
-§/M{m001}
-```
 
 ## Common Mistakes to Avoid
 
@@ -960,15 +1194,6 @@ These examples show correct patterns for common string tasks:
 §B{equalChar} (char-at "=" 0)       // ✓ '=' from string
 ```
 
-**Common Character Codes:**
-| Char | Code | Char | Code |
-|------|------|------|------|
-| '='  | 61   | '+'  | 43   |
-| '-'  | 45   | '/'  | 47   |
-| '0'  | 48   | '9'  | 57   |
-| 'A'  | 65   | 'Z'  | 90   |
-| 'a'  | 97   | 'z'  | 122  |
-
 ### Array Syntax Mistakes
 
 **WRONG - C#-style array syntax:**
@@ -1036,22 +1261,6 @@ These examples show correct patterns for common string tasks:
 // Compiles to: return (a < b) ? (0 - 1) : 1;
 ```
 
-**Alternative - Block syntax for complex logic:**
-```calor
-// When you need multiple statements, use block syntax
-§B{absX} 0
-§IF{if1} (< x 0)
-  §ASSIGN absX (- 0 x)
-§EL
-  §ASSIGN absX x
-§/I{if1}
-
-// Or arrow syntax with statements
-§IF{if1} (< a b) → §R (- 0 1)
-§EL → §R 1
-§/I{if1}
-```
-
 ### String Comparison Mistakes
 
 **WRONG - Using < or > on strings:**
@@ -1063,10 +1272,321 @@ These examples show correct patterns for common string tasks:
 
 **CORRECT - Use string operations or character codes:**
 ```calor
-// CORRECT: Use (equals) for equality
 §IF{if1} (equals a b) → §R 0
 §/I{if1}
+```
 
-// For lexicographic comparison, compare character by character
-// using (char-at) and (char-code)
+For lexicographic comparison, compare character by character using `(char-at)` and `(char-code)`.
+
+## Records and Union Types
+
+```
+§D{Name} (type:field, ...)   Record (data class)
+§/D{Name}                    End record (if block form)
+
+§T{Name}                     Type/Union definition
+  §V{VariantName}            Variant case
+  §V{VariantName} (fields)   Variant with data
+§/T{Name}                    End type
+```
+
+### Template: Result Type
+
+```calor
+§T{Result}
+  §V{Ok} (i32:value)
+  §V{Err} (str:message)
+§/T{Result}
+```
+
+## Properties
+
+```
+§PROP{id:Name:type:vis}   Property definition
+  §GET{vis}               Getter
+    §R expression
+  §/GET
+  §SET                    Setter
+    §ASSIGN _field value
+  §/SET
+  §INIT                   Init-only setter (C# 9+)
+§/PROP{id}
+
+§FLD{type:name:vis}       Field definition
+§DEFAULT                  Default value expression
+```
+
+## Lambdas and Delegates
+
+### Delegate Definition
+
+```
+§DEL{id:Name:vis}         Delegate type declaration
+  §I{type:param}
+  §O{returnType}
+§/DEL{id}
+```
+
+### Lambda Expressions
+
+```
+§LAM{id:param:type}       Single-param lambda
+§LAM{id:p1:t1:p2:t2}      Multi-param lambda
+  ...body...
+§/LAM{id}                 Closing tag required
+```
+
+## Events
+
+```
+§EVT{id:Name:vis:DelegateType}  Event declaration
+§SUB{target.Event} handler      Subscribe (+=)
+§UNSUB{target.Event} handler    Unsubscribe (-=)
+```
+
+## String Interpolation
+
+```
+§INTERP                   Start interpolated string
+  "text {expr} more text"
+§/INTERP                  End interpolation
+```
+
+## Modern Operators
+
+```
+§?? left right            Null coalescing: left ?? right
+§?. target member         Null conditional: target?.member
+§RANGE start end          Range: start..end
+§^ n                      Index from end: ^n
+§EXP expr                 Expression (for complex expressions)
+§DEFAULT                  Default value (default(T))
+```
+
+### With Expression (Records)
+
+```
+§WITH{source}             Create copy with modifications
+  PropertyName = newValue
+§/WITH
+```
+
+## Option/Result Types
+
+```
+§SM value             Some(value)
+§NN{type=T}           None of type T
+§OK value             Ok(value)
+§ERR "message"        Err(message)
+```
+
+## Switch/Match (Additional)
+
+Alternative alias `§SW` is available for `§W`:
+
+```
+§SW{id} target            Same as §W{id} target
+§/SW{id}                  Same as §/W{id}
+```
+
+## Pattern Matching Enhancements
+
+### Relational Patterns
+
+```
+§PREL{op} value           Relational pattern
+  op: gte, lte, gt, lt    Maps to >=, <=, >, <
+```
+
+### Variable Pattern
+
+```
+§VAR x                    Captures value into variable x
+```
+
+### Property Pattern
+
+```
+§PPROP{Type}              Match type with properties
+  PropertyName = pattern
+§/PPROP
+```
+
+### Positional Pattern
+
+```
+§PPOS{Type}               Match type with positional values
+  pattern1
+  pattern2
+§/PPOS
+```
+
+### List Pattern
+
+```
+§PLIST                    Match list structure
+  pattern1
+  pattern2
+  §REST                   Rest of list (..)
+§/PLIST
+```
+
+### Property Match Pattern
+
+```
+§PMATCH{property} pattern    Match property value inline
+```
+
+## Explicit Body Markers
+
+```
+§BODY                 Start function body (optional)
+...statements...
+§END_BODY             End function body (optional)
+```
+
+## Enum Extensions
+
+```
+§ENUM{id:Name}            Enum (legacy alias for §EN)
+§/ENUM{id}                End enum (legacy)
+
+§EEXT{id:EnumName}        Extension methods for enum
+  §F{f001:MethodName:pub}
+    §I{EnumType:self}     First param becomes 'this'
+    §O{returnType}
+  §/F{f001}
+§/EEXT{id}
+```
+
+## Extended Features: Metadata
+
+### Issue Tracking
+
+```
+§TD "description"            Todo marker
+§TD{id:category:priority}    Todo with metadata
+§FX "description"            Fixme marker (bug to fix)
+§FX{id:category:priority}    Fixme with metadata
+§HK "description"            Hack marker (workaround)
+§HK{id} "description"        Hack with id
+```
+
+### Inline Examples
+
+```
+§EX expr → expected          Inline example/test
+§EX{id:msg:"desc"} expr → expected   Example with metadata
+```
+
+### Dependencies
+
+```
+§US{target1, target2}        Uses (dependencies)
+§/US                         End uses block
+§UB{caller1, caller2}        Used by (reverse dependencies)
+§/UB                         End used by block
+```
+
+### Versioning and Stability
+
+```
+§SN{1.0.0}                   Since (version introduced)
+§DP{since:1.0.0}             Deprecated marker
+§BR{1.5.0} "description"     Breaking change marker
+§XP                          Experimental (unstable API)
+§SB                          Stable (API guaranteed stable)
+```
+
+### Complexity Contracts
+
+```
+§CX{time:O(n)}               Time complexity
+§CX{time:O(n):space:O(1)}    Time and space complexity
+```
+
+### Context and Decisions
+
+```
+§CT                          Context section start
+§/CT                         End context
+
+§DC{id}                      Decision record
+  §CHOSEN option             Chosen option
+  §REJECTED option           Rejected alternative
+  §REASON "explanation"      Rationale
+§/DC{id}                     End decision
+```
+
+### Visibility Sections
+
+```
+§VS                          Visible section (for agents/users)
+§/VS                         End visible
+
+§HD                          Hidden section (implementation details)
+§/HD                         End hidden
+
+§FC target                   Focus marker (highlight importance)
+```
+
+### Agent Authorship
+
+```
+§AU{agent:agent-id}          Author marker
+§TASK{PROJ-123} "description"  Task reference
+§DATE{2024-01-15}            Date marker
+§LK{agent:id:expires:time}   Lock (multi-agent editing)
+```
+
+### Property Testing
+
+```
+§PT predicate                Property test
+```
+
+### File References
+
+```
+§FILE{path/to/file.cs}       Reference external file
+```
+
+### Field and Invariant
+
+```
+§FL{type:name}               Field definition (in types)
+§IV condition                Invariant (must always hold)
+§IV{msg:"error"} condition   Invariant with message
+```
+
+### Collection Access
+
+```
+§KEY expr                    Get dictionary key
+§VAL expr                    Get dictionary value
+```
+
+### Type Casting
+
+```
+§AS{targetType} expr      Safe cast (as operator)
+§CAST{targetType} expr    Explicit cast
+```
+
+### Where Clause (Legacy)
+
+```
+§WR T : constraint           Where clause (legacy, prefer §WHERE)
+```
+
+### Async Modifier
+
+```
+§ASYNC                    Async modifier (standalone)
+```
+
+### Adding to Collections
+
+```
+§ADD{collection} item     Add item to collection
 ```

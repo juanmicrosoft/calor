@@ -148,6 +148,7 @@ The Calor skills teach Gemini:
 | Calor-first enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only |
 | Blocks `.cs` creation | Yes | Yes | No |
 | Hook mechanism | `PreToolUse` | `BeforeTool` | N/A |
+| **MCP tools** | **Yes** (compile, verify, analyze, convert) | No | No |
 
 ---
 

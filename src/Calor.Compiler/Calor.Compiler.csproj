@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Calor.Compiler.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>calor</AssemblyName>
@@ -106,6 +110,18 @@
   <ItemGroup>
     <PackageReference Include="DiffPlex" Version="1.7.2" />
   </ItemGroup>
+
+  <!-- Sync skill files from canonical source before build -->
+  <!-- The canonical source is: tests/Calor.Evaluation/Skills/calor-language-skills.md -->
+  <!-- It gets copied to: src/Calor.Compiler/Resources/Skills/calor.md for embedding -->
+  <Target Name="SyncSkillFiles" BeforeTargets="BeforeBuild" Condition="Exists('$(MSBuildThisFileDirectory)..\..\tests\Calor.Evaluation\Skills\calor-language-skills.md')">
+    <PropertyGroup>
+      <CanonicalSkillFile>$(MSBuildThisFileDirectory)..\..\tests\Calor.Evaluation\Skills\calor-language-skills.md</CanonicalSkillFile>
+      <EmbeddedSkillFile>$(MSBuildThisFileDirectory)Resources\Skills\calor.md</EmbeddedSkillFile>
+    </PropertyGroup>
+    <Copy SourceFiles="$(CanonicalSkillFile)" DestinationFiles="$(EmbeddedSkillFile)" SkipUnchangedFiles="true" />
+    <Message Importance="low" Text="Synced skill file: $(CanonicalSkillFile) -> $(EmbeddedSkillFile)" />
+  </Target>
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\Skills\*.md">

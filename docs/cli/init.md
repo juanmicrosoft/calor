@@ -124,8 +124,43 @@ Creates the following files:
 |:-----|:--------|
 | `.claude/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
 | `.claude/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
-| `.claude/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `.claude/skills/calor-semantics/SKILL.md` | Calor semantics and verification skill |
+| `.claude/skills/calor-analyze/SKILL.md` | C# analysis for Calor migration skill |
+| `.claude/settings.json` | **Hooks + MCP servers** - enforces Calor-first development and provides tools |
 | `CLAUDE.md` | Project documentation (creates new or updates Calor section) |
+
+#### MCP Server Integration
+
+The `.claude/settings.json` file configures **two MCP servers**:
+
+```json
+{
+  "mcpServers": {
+    "calor-lsp": {
+      "command": "calor",
+      "args": ["lsp"]
+    },
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio"]
+    }
+  }
+}
+```
+
+| Server | Purpose |
+|:-------|:--------|
+| `calor-lsp` | Language server for real-time diagnostics, hover info, go-to-definition |
+| `calor` | MCP tools for compile, verify, analyze, convert, and syntax help |
+
+The MCP tools allow Claude to:
+- **Compile** Calor code and see generated C#
+- **Verify** contracts with Z3 SMT solver
+- **Analyze** code for security vulnerabilities
+- **Convert** C# to Calor programmatically
+- **Get syntax help** for specific Calor features
+
+See [`calor mcp`](/calor/cli/mcp/) for full tool documentation.
 
 #### Calor-First Enforcement
 

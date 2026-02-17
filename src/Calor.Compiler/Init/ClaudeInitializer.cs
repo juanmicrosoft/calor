@@ -122,6 +122,7 @@ public class ClaudeInitializer : IAiInitializer
             {
                 messages.Add($"Initialized Calor project for Claude Code (calor v{version})");
                 messages.Add("  - MCP server 'calor-lsp' configured for language features");
+                messages.Add("  - MCP server 'calor' configured for AI agent tools (compile, verify, analyze, convert)");
             }
             else
             {
@@ -274,6 +275,11 @@ public class ClaudeInitializer : IAiInitializer
                     {
                         Command = "calor",
                         Args = new[] { "lsp" }
+                    },
+                    ["calor"] = new McpServerConfig
+                    {
+                        Command = "calor",
+                        Args = new[] { "mcp", "--stdio" }
                     }
                 }
             };
@@ -308,6 +314,11 @@ public class ClaudeInitializer : IAiInitializer
                         {
                             Command = "calor",
                             Args = new[] { "lsp" }
+                        },
+                        ["calor"] = new McpServerConfig
+                        {
+                            Command = "calor",
+                            Args = new[] { "mcp", "--stdio" }
                         }
                     }
                 };
@@ -365,7 +376,7 @@ public class ClaudeInitializer : IAiInitializer
 
         existingSettings.Hooks.PostToolUse = existingPostHooks.ToArray();
 
-        // Configure MCP server for language server
+        // Configure MCP servers for language server and AI agent tools
         existingSettings.McpServers ??= new Dictionary<string, McpServerConfig>();
         if (!existingSettings.McpServers.ContainsKey("calor-lsp"))
         {
@@ -373,6 +384,15 @@ public class ClaudeInitializer : IAiInitializer
             {
                 Command = "calor",
                 Args = new[] { "lsp" }
+            };
+            updated = true;
+        }
+        if (!existingSettings.McpServers.ContainsKey("calor"))
+        {
+            existingSettings.McpServers["calor"] = new McpServerConfig
+            {
+                Command = "calor",
+                Args = new[] { "mcp", "--stdio" }
             };
             updated = true;
         }

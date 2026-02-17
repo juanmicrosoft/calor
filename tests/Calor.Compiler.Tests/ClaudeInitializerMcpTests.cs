@@ -213,11 +213,12 @@ public class ClaudeInitializerMcpTests : IDisposable
 
         var content = await File.ReadAllTextAsync(Path.Combine(claudeDir, "settings.json"));
 
-        // Should preserve the existing custom configuration
+        // Should preserve the existing custom calor-lsp configuration
         Assert.Contains("custom-calor", content);
         Assert.Contains("custom-arg", content);
-        // Should not have the default config
-        Assert.DoesNotContain("\"command\": \"calor\"", content);
+        // Should add the calor MCP server (for AI agent tools)
+        Assert.Contains("\"calor\":", content);
+        Assert.Contains("\"mcp\"", content);
     }
 
     [Fact]
