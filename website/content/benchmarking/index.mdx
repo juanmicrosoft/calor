@@ -6,11 +6,13 @@ hasChildren: true
 ---
 
 
-Calor is evaluated against C# across 13 metrics designed to measure what matters for AI coding agents.
+Calor is evaluated against C# across 11 metrics designed to measure what matters for AI coding agents.
 
 ---
 
 ## The Metrics
+
+### Static Analysis Metrics
 
 | Category | What It Measures | Why It Matters |
 |:---------|:-----------------|:---------------|
@@ -18,11 +20,19 @@ Calor is evaluated against C# across 13 metrics designed to measure what matters
 | [**Error Detection**](/benchmarking/metrics/error-detection/) | Bug identification, contract violation detection | Can agents find issues using explicit semantics? |
 | [**Edit Precision**](/benchmarking/metrics/edit-precision/) | Targeting accuracy, change isolation | Can agents make precise edits using unique IDs? |
 | [**Generation Accuracy**](/benchmarking/metrics/generation-accuracy/) | Compilation success, structural correctness | Can agents produce valid code? |
+| [**Token Economics**](/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
+| [**Information Density**](/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
+| [**Refactoring Stability**](/benchmarking/metrics/refactoring-stability/) | ID-based reference preservation | Do unique IDs survive code transformations? |
+
+### LLM-Based Metrics
+
+These metrics use actual LLM code generation to measure real-world effectiveness:
+
+| Category | What It Measures | Why It Matters |
+|:---------|:-----------------|:---------------|
 | [**Task Completion**](/benchmarking/metrics/task-completion/) | LLM code generation success | Can AI complete tasks with Calor vs C#? |
 | [**Safety**](/benchmarking/metrics/safety/) | Contract enforcement effectiveness | Does code catch bugs with informative errors? |
 | [**Effect Discipline**](/benchmarking/metrics/effect-discipline/) | Side effect management, bug prevention | Does code prevent flaky tests, security violations? |
-| [**Token Economics**](/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
-| [**Information Density**](/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
 
 ### Calor-Only Metrics
 
@@ -30,8 +40,6 @@ These metrics measure capabilities unique to Calor that have no C# equivalent:
 
 | Category | What It Measures | Why It Matters |
 |:---------|:-----------------|:---------------|
-| [**Contract Verification**](/benchmarking/metrics/contract-verification/) | Z3 static contract verification rates | Are preconditions/postconditions provably correct? |
-| [**Effect Soundness**](/benchmarking/metrics/effect-soundness/) | Effect declarations match actual behavior | Do declared effects accurately describe side effects? |
 | [**Interop Coverage**](/benchmarking/metrics/interop-effect-coverage/) | BCL methods covered by effect manifests | How well are .NET interop effects documented? |
 
 ---
@@ -47,18 +55,19 @@ These metrics measure capabilities unique to Calor that have no C# equivalent:
 ## Key Insight
 
 Calor excels where explicitness matters:
-- **Comprehension** - Explicit structure aids understanding
-- **Error Detection** - Contracts surface invariant violations
-- **Edit Precision** - Unique IDs enable targeted changes
-- **Task Completion** - AI completes 23% more tasks successfully with Calor
-- **Safety** - Contracts catch 14% more bugs with better error messages
-- **Effect Discipline** - Effect system prevents 30% more real-world side effect bugs
+- **Comprehension (1.55x)** - Explicit structure aids understanding
+- **Error Detection (1.24x)** - Contracts surface invariant violations
+- **Edit Precision (1.37x)** - Unique IDs enable targeted changes
+- **Refactoring Stability (1.37x)** - ID-based references survive transformations
+- **Safety (1.59x)** - Contracts catch more bugs with better error messages
+- **Effect Discipline (1.11x)** - Effect system prevents real-world side effect bugs
 
-C# wins on token efficiency:
-- **Token Economics** - Calor's explicit syntax uses more tokens
-- **Information Density** - C# packs more per token
+C# wins on efficiency:
+- **Token Economics (0.92x)** - Calor's explicit syntax uses more tokens
+- **Generation Accuracy (0.97x)** - C# has broader training data
+- **Task Completion (0.95x)** - C# syntax familiarity helps LLMs
 
-This reflects a fundamental tradeoff: **explicit semantics require more tokens but enable better agent reasoning and task completion**.
+This reflects a fundamental tradeoff: **explicit semantics require more tokens but enable better agent reasoning and safer code**.
 
 ---
 

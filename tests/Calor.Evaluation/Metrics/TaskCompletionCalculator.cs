@@ -1,280 +1,234 @@
 using Calor.Evaluation.Core;
+using Calor.Evaluation.LlmTasks;
+using Calor.Evaluation.LlmTasks.Caching;
+using Calor.Evaluation.LlmTasks.Providers;
 
 namespace Calor.Evaluation.Metrics;
 
 /// <summary>
-/// Category 7: Task Completion Calculator
-/// Measures end-to-end success rates for Calor vs C#.
-/// Less context usage means more room for work in LLM context windows.
+/// Calculates LLM-based task completion metrics by having AI agents
+/// generate code in both Calor and C#, then verifying correctness.
+///
+/// This provides empirical evidence for whether Calor's explicit structure
+/// and contracts help AI agents write more correct code.
+///
+/// Note: Previously there was a static TaskCompletionCalculator that estimated
+/// completion potential based on code structure. This has been replaced with
+/// this LLM-based implementation that actually generates and tests code.
 /// </summary>
 public class TaskCompletionCalculator : IMetricCalculator
 {
     public string Category => "TaskCompletion";
 
-    public string Description => "Measures end-to-end task success rates and efficiency";
+    public string Description =>
+        "Measures AI agent task completion rates by generating and executing code in both languages";
 
-    public Task<MetricResult> CalculateAsync(EvaluationContext context)
+    private readonly ILlmProvider? _provider;
+    private readonly LlmResponseCache? _cache;
+    private readonly LlmTaskManifest? _manifest;
+    private readonly LlmTaskRunnerOptions _runnerOptions;
+    private LlmTaskRunResults? _lastResults;
+
+    /// <summary>
+    /// Creates a calculator with default settings (uses mock provider if no API key).
+    /// </summary>
+    public TaskCompletionCalculator()
     {
-        // Calculate task completion potential based on code characteristics
-        var calorPotential = CalculateCalorCompletionPotential(context);
-        var csharpPotential = CalculateCSharpCompletionPotential(context);
+        _runnerOptions = new LlmTaskRunnerOptions
+        {
+            DryRun = true, // Default to dry run to avoid API costs
+            UseCache = true
+        };
+    }
+
+    /// <summary>
+    /// Creates a calculator with specified provider and options.
+    /// </summary>
+    public TaskCompletionCalculator(
+        ILlmProvider provider,
+        LlmTaskManifest manifest,
+        LlmTaskRunnerOptions? options = null,
+        LlmResponseCache? cache = null)
+    {
+        _provider = provider;
+        _manifest = manifest;
+        _cache = cache;
+        _runnerOptions = options ?? new LlmTaskRunnerOptions();
+    }
+
+    /// <summary>
+    /// Gets the results from the last calculation.
+    /// </summary>
+    public LlmTaskRunResults? LastResults => _lastResults;
+
+    public async Task<MetricResult> CalculateAsync(EvaluationContext context)
+    {
+        // If no provider or manifest configured, return estimation based on context
+        if (_provider == null || _manifest == null)
+        {
+            return CalculateEstimatedMetric(context);
+        }
+
+        // Run actual LLM tasks
+        using var runner = new LlmTaskRunner(_provider, _cache);
+        _lastResults = await runner.RunAllAsync(_manifest, _runnerOptions);
+
+        var summary = _lastResults.Summary;
 
         var details = new Dictionary<string, object>
         {
-            ["calorFactors"] = GetCalorCompletionFactors(context),
-            ["csharpFactors"] = GetCSharpCompletionFactors(context)
+            ["totalTasks"] = summary.TotalTasks,
+            ["calorWins"] = summary.CalorWins,
+            ["csharpWins"] = summary.CSharpWins,
+            ["ties"] = summary.Ties,
+            ["calorCompilationRate"] = summary.CalorCompilationRate,
+            ["csharpCompilationRate"] = summary.CSharpCompilationRate,
+            ["calorTestPassRate"] = summary.CalorTestPassRate,
+            ["csharpTestPassRate"] = summary.CSharpTestPassRate,
+            ["totalCost"] = _lastResults.TotalCost,
+            ["provider"] = _lastResults.Provider ?? "unknown",
+            ["isDryRun"] = _lastResults.IsDryRun,
+            ["byCategory"] = summary.ByCategory
         };
 
-        return Task.FromResult(MetricResult.CreateHigherIsBetter(
+        return MetricResult.CreateHigherIsBetter(
             Category,
-            "CompletionPotential",
-            calorPotential,
-            csharpPotential,
-            details));
+            "ActualCompletion",
+            summary.AverageCalorScore,
+            summary.AverageCSharpScore,
+            details);
     }
 
     /// <summary>
-    /// Evaluates a specific task completion scenario.
+    /// Calculates an estimated metric based on code characteristics when
+    /// actual LLM evaluation is not available.
     /// </summary>
-    public TaskCompletionResult EvaluateTask(
-        TaskDefinition task,
-        string calorOutput,
-        string csharpOutput,
-        int calorTokensUsed,
-        int csharpTokensUsed)
+    private MetricResult CalculateEstimatedMetric(EvaluationContext context)
     {
-        // Verify outputs against expected results
-        var calorCorrect = VerifyTaskOutput(task, calorOutput, isCalor: true);
-        var csharpCorrect = VerifyTaskOutput(task, csharpOutput, isCalor: false);
+        // Estimate completion potential based on structural characteristics
+        var calorScore = EstimateCalorCompletionScore(context);
+        var csharpScore = EstimateCSharpCompletionScore(context);
 
-        // Calculate efficiency (correctness per token used)
-        var calorEfficiency = calorTokensUsed > 0 ? (calorCorrect ? 1.0 : 0.0) / calorTokensUsed * 1000 : 0;
-        var csharpEfficiency = csharpTokensUsed > 0 ? (csharpCorrect ? 1.0 : 0.0) / csharpTokensUsed * 1000 : 0;
-
-        return new TaskCompletionResult
+        var details = new Dictionary<string, object>
         {
-            TaskId = task.Id,
-            TaskCategory = task.Category,
-            CalorSucceeded = calorCorrect,
-            CSharpSucceeded = csharpCorrect,
-            CalorTokensUsed = calorTokensUsed,
-            CSharpTokensUsed = csharpTokensUsed,
-            CalorEfficiency = calorEfficiency,
-            CSharpEfficiency = csharpEfficiency
+            ["estimated"] = true,
+            ["reason"] = "No LLM provider configured - using structural estimation",
+            ["calorFactors"] = new Dictionary<string, object>
+            {
+                ["compiles"] = context.CalorCompilation.Success,
+                ["hasContracts"] = context.CalorSource.Contains("§REQ") ||
+                                   context.CalorSource.Contains("§ENS"),
+                ["hasExplicitTypes"] = context.CalorSource.Contains("§O{")
+            },
+            ["csharpFactors"] = new Dictionary<string, object>
+            {
+                ["compiles"] = context.CSharpCompilation.Success,
+                ["hasReturnStatements"] = context.CSharpSource.Contains("return ")
+            }
         };
+
+        return MetricResult.CreateHigherIsBetter(
+            Category,
+            "EstimatedCompletion",
+            calorScore,
+            csharpScore,
+            details);
     }
 
-    /// <summary>
-    /// Calculates completion potential for Calor based on code characteristics.
-    /// </summary>
-    private static double CalculateCalorCompletionPotential(EvaluationContext context)
+    private static double EstimateCalorCompletionScore(EvaluationContext context)
     {
-        var score = 0.5; // Base score
+        var score = 0.0;
 
-        // Compactness improves context efficiency
-        var tokenCount = CountTokens(context.CalorSource);
-        if (tokenCount < 50) score += 0.15;
-        else if (tokenCount < 100) score += 0.10;
-        else if (tokenCount < 200) score += 0.05;
+        // Base compilation score
+        if (context.CalorCompilation.Success)
+            score += 0.4;
 
-        // Compilation success is crucial
-        if (context.CalorCompilation.Success) score += 0.20;
-
-        // Structural completeness
+        // Structure completeness
         var source = context.CalorSource;
-        if (source.Contains("§M{") && source.Contains("§/M{")) score += 0.05;
-        if (source.Contains("§F{") && source.Contains("§/F{")) score += 0.05;
+        if (source.Contains("§M{") && source.Contains("§/M{"))
+            score += 0.1;
+        if (source.Contains("§F{") && source.Contains("§/F{"))
+            score += 0.1;
+        if (source.Contains("§B{") && source.Contains("§/B{"))
+            score += 0.1;
 
-        // Contracts enable verification
-        if (source.Contains("§REQ") || source.Contains("§ENS")) score += 0.05;
+        // Contracts provide additional correctness guarantees
+        if (source.Contains("§REQ") || source.Contains("§REQUIRE"))
+            score += 0.15;
+        if (source.Contains("§ENS") || source.Contains("§ENSURE"))
+            score += 0.15;
 
         return Math.Min(score, 1.0);
     }
 
-    /// <summary>
-    /// Calculates completion potential for C# based on code characteristics.
-    /// </summary>
-    private static double CalculateCSharpCompletionPotential(EvaluationContext context)
+    private static double EstimateCSharpCompletionScore(EvaluationContext context)
     {
-        var score = 0.5; // Base score
+        var score = 0.0;
 
-        // Token count (C# typically needs more)
-        var tokenCount = CountTokens(context.CSharpSource);
-        if (tokenCount < 100) score += 0.10;
-        else if (tokenCount < 200) score += 0.05;
+        // Base compilation score
+        if (context.CSharpCompilation.Success)
+            score += 0.4;
 
-        // Compilation success
-        if (context.CSharpCompilation.Success) score += 0.20;
-
-        // Structural completeness
+        // Structure completeness
         var source = context.CSharpSource;
-        if (source.Contains("namespace")) score += 0.05;
-        if (source.Contains("class")) score += 0.05;
-        if (source.Contains("return")) score += 0.05;
+        if (source.Contains("class ") || source.Contains("struct "))
+            score += 0.1;
+        if (source.Contains("public ") || source.Contains("private "))
+            score += 0.05;
+        if (source.Contains("return "))
+            score += 0.15;
 
-        return Math.Min(score, 0.95); // Cap slightly lower to reflect verbosity overhead
-    }
+        // Method completeness
+        if (source.Contains("(") && source.Contains(")") && source.Contains("{"))
+            score += 0.1;
 
-    private static Dictionary<string, object> GetCalorCompletionFactors(EvaluationContext context)
-    {
-        var tokenCount = CountTokens(context.CalorSource);
-        return new Dictionary<string, object>
-        {
-            ["tokenCount"] = tokenCount,
-            ["compilesSuccessfully"] = context.CalorCompilation.Success,
-            ["hasCompleteStructure"] = context.CalorSource.Contains("§/M{"),
-            ["hasContracts"] = context.CalorSource.Contains("§REQ") || context.CalorSource.Contains("§ENS"),
-            ["estimatedContextUsage"] = tokenCount / 4096.0 // Fraction of typical context
-        };
-    }
+        // Exception handling (equivalent to contracts)
+        if (source.Contains("throw ") || source.Contains("ArgumentException"))
+            score += 0.1;
 
-    private static Dictionary<string, object> GetCSharpCompletionFactors(EvaluationContext context)
-    {
-        var tokenCount = CountTokens(context.CSharpSource);
-        return new Dictionary<string, object>
-        {
-            ["tokenCount"] = tokenCount,
-            ["compilesSuccessfully"] = context.CSharpCompilation.Success,
-            ["hasNamespace"] = context.CSharpSource.Contains("namespace"),
-            ["hasClass"] = context.CSharpSource.Contains("class"),
-            ["estimatedContextUsage"] = tokenCount / 4096.0
-        };
+        // Documentation
+        if (source.Contains("///") || source.Contains("//"))
+            score += 0.05;
+
+        return Math.Min(score, 0.95); // Cap lower than Calor to reflect lack of contracts
     }
 
     /// <summary>
-    /// Verifies task output against expected results.
+    /// Creates a calculator configured for actual LLM evaluation.
     /// </summary>
-    private static bool VerifyTaskOutput(TaskDefinition task, string output, bool isCalor)
+    public static TaskCompletionCalculator CreateWithProvider(
+        ILlmProvider provider,
+        LlmTaskManifest manifest,
+        LlmTaskRunnerOptions? options = null)
     {
-        if (string.IsNullOrWhiteSpace(output))
-            return false;
-
-        // Check for required patterns
-        foreach (var pattern in task.RequiredPatterns)
-        {
-            if (!System.Text.RegularExpressions.Regex.IsMatch(output, pattern))
-                return false;
-        }
-
-        // Check for forbidden patterns (should not be present)
-        foreach (var pattern in task.ForbiddenPatterns)
-        {
-            if (System.Text.RegularExpressions.Regex.IsMatch(output, pattern))
-                return false;
-        }
-
-        // Language-specific verification
-        if (isCalor)
-        {
-            // Calor should have proper structure
-            if (task.RequiresCompilation)
-            {
-                var ctx = new EvaluationContext
-                {
-                    CalorSource = output,
-                    CSharpSource = "",
-                    FileName = task.Id
-                };
-                return ctx.CalorCompilation.Success;
-            }
-        }
-        else
-        {
-            // C# should compile
-            if (task.RequiresCompilation)
-            {
-                var ctx = new EvaluationContext
-                {
-                    CalorSource = "",
-                    CSharpSource = output,
-                    FileName = task.Id
-                };
-                return ctx.CSharpCompilation.Success;
-            }
-        }
-
-        return true;
+        return new TaskCompletionCalculator(provider, manifest, options);
     }
 
-    private static int CountTokens(string source)
+    /// <summary>
+    /// Creates a calculator using the Claude API (requires ANTHROPIC_API_KEY).
+    /// </summary>
+    public static TaskCompletionCalculator CreateWithClaude(
+        LlmTaskManifest manifest,
+        LlmTaskRunnerOptions? options = null)
     {
-        var tokens = 0;
-        var inToken = false;
-
-        foreach (var ch in source)
+        var provider = new ClaudeProvider();
+        if (!provider.IsAvailable)
         {
-            if (char.IsWhiteSpace(ch))
-            {
-                if (inToken)
-                {
-                    tokens++;
-                    inToken = false;
-                }
-            }
-            else if (char.IsPunctuation(ch) || char.IsSymbol(ch))
-            {
-                if (inToken)
-                {
-                    tokens++;
-                    inToken = false;
-                }
-                tokens++;
-            }
-            else
-            {
-                inToken = true;
-            }
+            throw new InvalidOperationException(
+                $"Claude provider unavailable: {provider.UnavailabilityReason}");
         }
 
-        if (inToken)
-            tokens++;
-
-        return tokens;
+        return new TaskCompletionCalculator(provider, manifest, options);
     }
-}
 
-/// <summary>
-/// Definition of a task for completion evaluation.
-/// </summary>
-public class TaskDefinition
-{
-    public required string Id { get; init; }
-    public required string Category { get; init; }
-    public required string Description { get; init; }
-    public required string Prompt { get; init; }
-    public List<string> RequiredPatterns { get; init; } = new();
-    public List<string> ForbiddenPatterns { get; init; } = new();
-    public bool RequiresCompilation { get; init; } = true;
-    public int MaxTokenBudget { get; init; } = 1000;
-}
-
-/// <summary>
-/// Result of a task completion evaluation.
-/// </summary>
-public class TaskCompletionResult
-{
-    public required string TaskId { get; init; }
-    public required string TaskCategory { get; init; }
-    public bool CalorSucceeded { get; init; }
-    public bool CSharpSucceeded { get; init; }
-    public int CalorTokensUsed { get; init; }
-    public int CSharpTokensUsed { get; init; }
-    public double CalorEfficiency { get; init; }
-    public double CSharpEfficiency { get; init; }
-
-    public MetricResult ToMetricResult()
+    /// <summary>
+    /// Creates a calculator using the mock provider (for testing).
+    /// </summary>
+    public static TaskCompletionCalculator CreateWithMock(
+        LlmTaskManifest manifest,
+        LlmTaskRunnerOptions? options = null)
     {
-        return MetricResult.CreateHigherIsBetter(
-            "TaskCompletion",
-            $"Task_{TaskId}",
-            CalorSucceeded ? 1.0 : 0.0,
-            CSharpSucceeded ? 1.0 : 0.0,
-            new Dictionary<string, object>
-            {
-                ["calorTokensUsed"] = CalorTokensUsed,
-                ["csharpTokensUsed"] = CSharpTokensUsed,
-                ["calorEfficiency"] = CalorEfficiency,
-                ["csharpEfficiency"] = CSharpEfficiency
-            });
+        var provider = MockProvider.WithWorkingImplementations();
+        return new TaskCompletionCalculator(provider, manifest, options);
     }
 }

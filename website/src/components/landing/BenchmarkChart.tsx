@@ -70,15 +70,15 @@ const metricDisplayInfo: Record<
     calorInterpretation: 'Code stays correct after restructuring',
     csharpInterpretation: 'C# has better refactoring tools',
   },
-  ContractVerification: {
-    name: 'Rule Checking',
-    calorInterpretation: 'Compiler proves rules are followed (unique to Calor)',
-    csharpInterpretation: 'C# can\'t check rules automatically',
+  Safety: {
+    name: 'Bug Catching',
+    calorInterpretation: 'Contracts catch more bugs with better error messages',
+    csharpInterpretation: 'Guard clauses require manual implementation',
   },
-  EffectSoundness: {
-    name: 'Side Effect Tracking',
-    calorInterpretation: 'All side effects are accounted for (unique to Calor)',
-    csharpInterpretation: 'C# doesn\'t track side effects',
+  EffectDiscipline: {
+    name: 'Side Effect Control',
+    calorInterpretation: 'Effect system prevents hidden side effect bugs',
+    csharpInterpretation: 'Relies on conventions, no enforcement',
   },
   InteropEffectCoverage: {
     name: '.NET Library Coverage',
