@@ -830,6 +830,27 @@ public static class Program
         await File.WriteAllTextAsync(outputPath, html);
     }
 
+    // Human-readable metric names for HTML dashboard
+    private static readonly Dictionary<string, string> MetricDisplayNames = new()
+    {
+        ["TokenEconomics"] = "Token Economics",
+        ["GenerationAccuracy"] = "Generation Accuracy",
+        ["Comprehension"] = "Comprehension",
+        ["EditPrecision"] = "Edit Precision",
+        ["ErrorDetection"] = "Error Detection",
+        ["InformationDensity"] = "Information Density",
+        ["TaskCompletion"] = "Task Completion",
+        ["RefactoringStability"] = "Refactoring Stability",
+        ["Safety"] = "Safety",
+        ["EffectDiscipline"] = "Effect Discipline",
+        ["Correctness"] = "Correctness",
+    };
+
+    private static string GetMetricDisplayName(string category)
+    {
+        return MetricDisplayNames.TryGetValue(category, out var displayName) ? displayName : category;
+    }
+
     private static string GenerateMetricRows(EvaluationResult result)
     {
         var rows = new System.Text.StringBuilder();
@@ -854,8 +875,9 @@ public static class Program
                 ciStr = $"<span class=\"ci\">[{ci.Lower:F2}, {ci.Upper:F2}]</span>";
             }
 
+            var displayName = GetMetricDisplayName(category);
             rows.AppendLine($@"                    <tr>
-                        <td>{category}</td>
+                        <td>{displayName}</td>
                         <td class=""{winnerClass}"">{advantage:F2}x</td>
                         <td><span class=""badge {badgeClass}"">{winner}</span></td>
                         <td>{ciStr}</td>
