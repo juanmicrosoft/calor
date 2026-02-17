@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-02-17
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.18x (Calor leads)
+- **Metrics**: Calor wins 6, C# wins 2
+- **Highlights**:
+  - Comprehension: 1.55x (Calor wins, large effect)
+  - EditPrecision: 1.37x (Calor wins, large effect)
+  - RefactoringStability: 1.37x (Calor wins, large effect)
+  - ErrorDetection: 1.24x (Calor wins, large effect)
+- **Programs Tested**: 40
+
+### Added
+- **Ask Calor GPT integration** - Custom GPT link added to website header, footer, and dedicated homepage section with analytics tracking
+- **MCP Server tools** - New `calor_assess` tool for C# migration analysis, plus `lint`, `format`, `diagnose`, and `ids` tools for AI agent integration
+- **Hero section update** - New video and messaging on website homepage
+
+### Fixed
+- CI workflow: removed weekly schedule trigger, now runs all benchmarks on release with human-readable metric names
+- Website: tied benchmark results now display with salmon color for clarity
+- Evaluation: removed bias in effect discipline and correctness benchmarks
+- Evaluation: consolidated benchmark metrics and integrated Safety/EffectDiscipline
+
 ## [0.2.4] - 2026-02-16
 
 ### Benchmark Results (Statistical: 30 runs)

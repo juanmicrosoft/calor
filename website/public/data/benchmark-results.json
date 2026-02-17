@@ -1,60 +1,112 @@
 {
   "version": "1.0",
-  "timestamp": "2026-02-17T13:07:15.082521Z",
-  "commit": "59799d1",
+  "timestamp": "2026-02-17T20:50:33.034141Z",
+  "commit": "79582c5",
   "frameworkVersion": "1.0.0",
   "summary": {
-    "overallAdvantage": 1.16,
+    "overallAdvantage": 1.18,
     "programCount": 40,
-    "metricCount": 11,
+    "metricCount": 8,
     "calorWins": 6,
     "cSharpWins": 2,
-    "statisticalRunCount": 0
+    "statisticalRunCount": 30
   },
   "metrics": {
     "TokenEconomics": {
-      "ratio": 0.83,
-      "winner": "csharp"
+      "ratio": 0.92,
+      "winner": "csharp",
+      "ci95": [
+        0.916,
+        0.916
+      ],
+      "significant": true,
+      "pValue": 0.0006,
+      "effectSize": 0.072,
+      "effectInterpretation": "negligible"
     },
     "GenerationAccuracy": {
       "ratio": 0.97,
-      "winner": "csharp"
+      "winner": "csharp",
+      "ci95": [
+        0.969,
+        0.969
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": -0.985,
+      "effectInterpretation": "large"
     },
     "Comprehension": {
-      "ratio": 1.51,
-      "winner": "calor"
+      "ratio": 1.55,
+      "winner": "calor",
+      "ci95": [
+        1.545,
+        1.545
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 2.458,
+      "effectInterpretation": "large"
     },
     "EditPrecision": {
       "ratio": 1.37,
-      "winner": "calor"
+      "winner": "calor",
+      "ci95": [
+        1.368,
+        1.368
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 11.798,
+      "effectInterpretation": "large"
     },
     "ErrorDetection": {
-      "ratio": 1.22,
-      "winner": "calor"
+      "ratio": 1.24,
+      "winner": "calor",
+      "ci95": [
+        1.239,
+        1.239
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 1.704,
+      "effectInterpretation": "large"
     },
     "InformationDensity": {
-      "ratio": 1,
-      "winner": "tie"
+      "ratio": 1.05,
+      "winner": "calor",
+      "ci95": [
+        1.053,
+        1.053
+      ],
+      "significant": true,
+      "pValue": 0.0028,
+      "effectSize": -0.12,
+      "effectInterpretation": "negligible"
     },
     "RefactoringStability": {
-      "ratio": 1.36,
-      "winner": "calor"
-    },
-    "TaskCompletion": {
-      "ratio": 1.22,
-      "winner": "calor"
-    },
-    "Safety": {
-      "ratio": 1.59,
-      "winner": "calor"
-    },
-    "EffectDiscipline": {
-      "ratio": 1.0,
-      "winner": "tie"
+      "ratio": 1.37,
+      "winner": "calor",
+      "ci95": [
+        1.365,
+        1.365
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 4.359,
+      "effectInterpretation": "large"
     },
     "Correctness": {
-      "ratio": 1.0,
-      "winner": "tie"
+      "ratio": 1.12,
+      "winner": "calor",
+      "ci95": [
+        1.124,
+        1.124
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 0.536,
+      "effectInterpretation": "medium"
     }
   },
   "programs": [
@@ -70,7 +122,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.354,
+      "advantage": 1.293,
       "metrics": {
         "TokenEconomics": 0.717,
         "GenerationAccuracy": 0.94,
@@ -79,9 +131,6 @@
         "ErrorDetection": 1.5,
         "InformationDensity": 1.283,
         "RefactoringStability": 1.306,
-        "TaskCompletion": 0.923,
-        "Safety": 2,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.1
       }
     },
@@ -98,7 +147,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.062,
+      "advantage": 1.054,
       "metrics": {
         "TokenEconomics": 0.48,
         "GenerationAccuracy": 0.94,
@@ -107,9 +156,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.615,
         "RefactoringStability": 1.284,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 1
       }
     },
@@ -126,7 +172,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.208,
+      "advantage": 1.114,
       "metrics": {
         "TokenEconomics": 0.96,
         "GenerationAccuracy": 0.94,
@@ -135,9 +181,6 @@
         "ErrorDetection": 1.5,
         "InformationDensity": 0.363,
         "RefactoringStability": 1.469,
-        "TaskCompletion": 0.75,
-        "Safety": 2,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.1
       }
     },
@@ -153,7 +196,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.077,
+      "advantage": 1.075,
       "metrics": {
         "TokenEconomics": 0.5,
         "GenerationAccuracy": 0.94,
@@ -162,9 +205,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.825,
         "RefactoringStability": 1.26,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 1
       }
     },
@@ -180,7 +220,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.061,
+      "advantage": 1.053,
       "metrics": {
         "TokenEconomics": 0.381,
         "GenerationAccuracy": 0.94,
@@ -189,9 +229,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.768,
         "RefactoringStability": 1.26,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 1
       }
     },
@@ -208,7 +245,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.183,
+      "advantage": 1.095,
       "metrics": {
         "TokenEconomics": 0.928,
         "GenerationAccuracy": 0.94,
@@ -217,9 +254,6 @@
         "ErrorDetection": 0.889,
         "InformationDensity": 0.819,
         "RefactoringStability": 1.11,
-        "TaskCompletion": 0.75,
-        "Safety": 2.5,
-        "EffectDiscipline": 1,
         "Correctness": 1.5
       }
     },
@@ -235,7 +269,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.054,
+      "advantage": 1.043,
       "metrics": {
         "TokenEconomics": 0.523,
         "GenerationAccuracy": 0.94,
@@ -244,9 +278,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.648,
         "RefactoringStability": 1.284,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 0.833
       }
     },
@@ -263,7 +294,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.163,
+      "advantage": 1.172,
       "metrics": {
         "TokenEconomics": 1.136,
         "GenerationAccuracy": 0.94,
@@ -272,9 +303,6 @@
         "ErrorDetection": 0.889,
         "InformationDensity": 1,
         "RefactoringStability": 1.402,
-        "TaskCompletion": 0.75,
-        "Safety": 1.667,
-        "EffectDiscipline": 1,
         "Correctness": 1.4
       }
     },
@@ -290,7 +318,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.113,
+      "advantage": 1.124,
       "metrics": {
         "TokenEconomics": 0.566,
         "GenerationAccuracy": 0.94,
@@ -299,9 +327,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 1.429,
         "RefactoringStability": 1.236,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 0.833
       }
     },
@@ -318,7 +343,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 0.985,
+      "advantage": 1.011,
       "metrics": {
         "TokenEconomics": 0.527,
         "GenerationAccuracy": 0.94,
@@ -327,9 +352,6 @@
         "ErrorDetection": 0.889,
         "InformationDensity": 1.314,
         "RefactoringStability": 1.254,
-        "TaskCompletion": 0.75,
-        "Safety": 1,
-        "EffectDiscipline": 1,
         "Correctness": 0.833
       }
     },
@@ -346,7 +368,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.098,
+      "advantage": 1.061,
       "metrics": {
         "TokenEconomics": 0.649,
         "GenerationAccuracy": 0.94,
@@ -355,9 +377,6 @@
         "ErrorDetection": 0.889,
         "InformationDensity": 0.7,
         "RefactoringStability": 1.324,
-        "TaskCompletion": 0.75,
-        "Safety": 1.833,
-        "EffectDiscipline": 1,
         "Correctness": 1.3
       }
     },
@@ -374,7 +393,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.096,
+      "advantage": 1.101,
       "metrics": {
         "TokenEconomics": 0.956,
         "GenerationAccuracy": 0.94,
@@ -383,9 +402,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.775,
         "RefactoringStability": 1.31,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 0.714
       }
     },
@@ -401,7 +417,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.104,
+      "advantage": 1.112,
       "metrics": {
         "TokenEconomics": 0.543,
         "GenerationAccuracy": 0.94,
@@ -410,9 +426,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.729,
         "RefactoringStability": 1.26,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 1
       }
     },
@@ -428,7 +441,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.074,
+      "advantage": 1.07,
       "metrics": {
         "TokenEconomics": 0.709,
         "GenerationAccuracy": 0.94,
@@ -437,9 +450,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.487,
         "RefactoringStability": 1.31,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 1
       }
     },
@@ -455,7 +465,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.072,
+      "advantage": 1.067,
       "metrics": {
         "TokenEconomics": 0.486,
         "GenerationAccuracy": 0.94,
@@ -464,9 +474,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.778,
         "RefactoringStability": 1.26,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 1
       }
     },
@@ -482,7 +489,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.127,
+      "advantage": 1.143,
       "metrics": {
         "TokenEconomics": 0.75,
         "GenerationAccuracy": 0.94,
@@ -491,9 +498,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 1.311,
         "RefactoringStability": 1.236,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 0.833
       }
     },
@@ -510,7 +514,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.057,
+      "advantage": 1.047,
       "metrics": {
         "TokenEconomics": 0.608,
         "GenerationAccuracy": 0.94,
@@ -519,9 +523,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.747,
         "RefactoringStability": 1.26,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 0.833
       }
     },
@@ -538,7 +539,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.104,
+      "advantage": 1.112,
       "metrics": {
         "TokenEconomics": 0.535,
         "GenerationAccuracy": 0.94,
@@ -547,9 +548,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 1.139,
         "RefactoringStability": 1.375,
-        "TaskCompletion": 0.75,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 0.833
       }
     },
@@ -565,7 +563,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.139,
+      "advantage": 1.118,
       "metrics": {
         "TokenEconomics": 0.818,
         "GenerationAccuracy": 0.94,
@@ -574,9 +572,6 @@
         "ErrorDetection": 0.889,
         "InformationDensity": 0.938,
         "RefactoringStability": 1.17,
-        "TaskCompletion": 0.75,
-        "Safety": 1.833,
-        "EffectDiscipline": 1,
         "Correctness": 1.5
       }
     },
@@ -593,7 +588,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.264,
+      "advantage": 1.207,
       "metrics": {
         "TokenEconomics": 1.122,
         "GenerationAccuracy": 0.94,
@@ -602,9 +597,6 @@
         "ErrorDetection": 0.889,
         "InformationDensity": 0.992,
         "RefactoringStability": 1.17,
-        "TaskCompletion": 0.75,
-        "Safety": 2.5,
-        "EffectDiscipline": 1,
         "Correctness": 1.7
       }
     },
@@ -621,7 +613,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.112,
+      "advantage": 1.172,
       "metrics": {
         "TokenEconomics": 1.176,
         "GenerationAccuracy": 0.94,
@@ -630,9 +622,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.139,
         "RefactoringStability": 1.31,
-        "TaskCompletion": 0.667,
-        "Safety": 0.857,
-        "EffectDiscipline": 1.0,
         "Correctness": 1
       }
     },
@@ -649,7 +638,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.1,
+      "advantage": 1.155,
       "metrics": {
         "TokenEconomics": 1.092,
         "GenerationAccuracy": 0.94,
@@ -658,9 +647,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.253,
         "RefactoringStability": 1.31,
-        "TaskCompletion": 0.667,
-        "Safety": 0.857,
-        "EffectDiscipline": 1.0,
         "Correctness": 0.833
       }
     },
@@ -678,7 +664,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.231,
+      "advantage": 1.335,
       "metrics": {
         "TokenEconomics": 2.141,
         "GenerationAccuracy": 0.94,
@@ -687,9 +673,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.229,
         "RefactoringStability": 1.56,
-        "TaskCompletion": 0.667,
-        "Safety": 0.857,
-        "EffectDiscipline": 1.0,
         "Correctness": 1
       }
     },
@@ -707,7 +690,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.179,
+      "advantage": 1.287,
       "metrics": {
         "TokenEconomics": 1.9,
         "GenerationAccuracy": 0.94,
@@ -716,9 +699,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 0.999,
         "RefactoringStability": 1.882,
-        "TaskCompletion": 0.667,
-        "Safety": 0.667,
-        "EffectDiscipline": 1.0,
         "Correctness": 0.769
       }
     },
@@ -735,7 +715,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.043,
+      "advantage": 1.09,
       "metrics": {
         "TokenEconomics": 0.718,
         "GenerationAccuracy": 0.94,
@@ -744,9 +724,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 1.007,
         "RefactoringStability": 1.284,
-        "TaskCompletion": 0.75,
-        "Safety": 1,
-        "EffectDiscipline": 1,
         "Correctness": 0.769
       }
     },
@@ -763,7 +740,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.211,
+      "advantage": 1.295,
       "metrics": {
         "TokenEconomics": 1.003,
         "GenerationAccuracy": 0.94,
@@ -772,9 +749,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 0.971,
         "RefactoringStability": 1.77,
-        "TaskCompletion": 0.667,
-        "Safety": 1.5,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.25
       }
     },
@@ -792,7 +766,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.3,
+      "advantage": 1.35,
       "metrics": {
         "TokenEconomics": 1.77,
         "GenerationAccuracy": 0.94,
@@ -801,9 +775,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.089,
         "RefactoringStability": 1.77,
-        "TaskCompletion": 0.667,
-        "Safety": 1.5,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.062
       }
     },
@@ -821,7 +792,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.245,
+      "advantage": 1.334,
       "metrics": {
         "TokenEconomics": 2.158,
         "GenerationAccuracy": 0.94,
@@ -830,9 +801,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.073,
         "RefactoringStability": 1.456,
-        "TaskCompletion": 0.667,
-        "Safety": 1.1,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.071
       }
     },
@@ -848,7 +816,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.247,
+      "advantage": 1.323,
       "metrics": {
         "TokenEconomics": 0.592,
         "GenerationAccuracy": 1.068,
@@ -857,9 +825,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.051,
         "RefactoringStability": 1.521,
-        "TaskCompletion": 0.632,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 1.417
       }
     },
@@ -875,7 +840,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.298,
+      "advantage": 1.259,
       "metrics": {
         "TokenEconomics": 0.66,
         "GenerationAccuracy": 1.068,
@@ -884,9 +849,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 1.227,
         "RefactoringStability": 1.365,
-        "TaskCompletion": 0.706,
-        "Safety": 2.5,
-        "EffectDiscipline": 1,
         "Correctness": 1
       }
     },
@@ -902,7 +864,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.261,
+      "advantage": 1.312,
       "metrics": {
         "TokenEconomics": 0.852,
         "GenerationAccuracy": 1.068,
@@ -911,9 +873,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.199,
         "RefactoringStability": 1.394,
-        "TaskCompletion": 0.632,
-        "Safety": 1.5,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.417
       }
     },
@@ -931,7 +890,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.524,
+      "advantage": 1.395,
       "metrics": {
         "TokenEconomics": 0.983,
         "GenerationAccuracy": 0.969,
@@ -940,9 +899,6 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 2.202,
         "RefactoringStability": 1.17,
-        "TaskCompletion": 0.857,
-        "Safety": 3.75,
-        "EffectDiscipline": 1,
         "Correctness": 1.7
       }
     },
@@ -960,7 +916,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.28,
+      "advantage": 1.288,
       "metrics": {
         "TokenEconomics": 1.131,
         "GenerationAccuracy": 0.969,
@@ -969,9 +925,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.403,
         "RefactoringStability": 1.31,
-        "TaskCompletion": 0.632,
-        "Safety": 2.143,
-        "EffectDiscipline": 1,
         "Correctness": 1.7
       }
     },
@@ -988,7 +941,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.115,
+      "advantage": 1.142,
       "metrics": {
         "TokenEconomics": 0.89,
         "GenerationAccuracy": 0.969,
@@ -997,9 +950,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.219,
         "RefactoringStability": 1.236,
-        "TaskCompletion": 0.632,
-        "Safety": 1.5,
-        "EffectDiscipline": 1,
         "Correctness": 1.071
       }
     },
@@ -1016,7 +966,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.248,
+      "advantage": 1.244,
       "metrics": {
         "TokenEconomics": 1.035,
         "GenerationAccuracy": 0.969,
@@ -1025,9 +975,6 @@
         "ErrorDetection": 1.143,
         "InformationDensity": 1.145,
         "RefactoringStability": 1.31,
-        "TaskCompletion": 0.632,
-        "Safety": 2.143,
-        "EffectDiscipline": 1,
         "Correctness": 1.7
       }
     },
@@ -1042,7 +989,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.362,
+      "advantage": 1.331,
       "metrics": {
         "TokenEconomics": 0.762,
         "GenerationAccuracy": 1.068,
@@ -1051,9 +998,6 @@
         "ErrorDetection": 1.667,
         "InformationDensity": 1.036,
         "RefactoringStability": 1.469,
-        "TaskCompletion": 0.706,
-        "Safety": 2,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.1
       }
     },
@@ -1068,7 +1012,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.386,
+      "advantage": 1.365,
       "metrics": {
         "TokenEconomics": 0.894,
         "GenerationAccuracy": 1.068,
@@ -1077,9 +1021,6 @@
         "ErrorDetection": 1.667,
         "InformationDensity": 1.177,
         "RefactoringStability": 1.469,
-        "TaskCompletion": 0.706,
-        "Safety": 2,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.1
       }
     },
@@ -1094,7 +1035,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.476,
+      "advantage": 1.509,
       "metrics": {
         "TokenEconomics": 1.288,
         "GenerationAccuracy": 1.068,
@@ -1103,9 +1044,6 @@
         "ErrorDetection": 1.429,
         "InformationDensity": 2.075,
         "RefactoringStability": 1.51,
-        "TaskCompletion": 0.857,
-        "Safety": 2,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.1
       }
     },
@@ -1121,7 +1059,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.337,
+      "advantage": 1.338,
       "metrics": {
         "TokenEconomics": 1.252,
         "GenerationAccuracy": 1.068,
@@ -1130,9 +1068,6 @@
         "ErrorDetection": 1.429,
         "InformationDensity": 1.12,
         "RefactoringStability": 1.382,
-        "TaskCompletion": 0.706,
-        "Safety": 2,
-        "EffectDiscipline": 1.0,
         "Correctness": 1.1
       }
     },
@@ -1147,7 +1082,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.348,
+      "advantage": 1.296,
       "metrics": {
         "TokenEconomics": 0.463,
         "GenerationAccuracy": 1.068,
@@ -1156,11 +1091,96 @@
         "ErrorDetection": 1.333,
         "InformationDensity": 0.829,
         "RefactoringStability": 1.589,
-        "TaskCompletion": 0.706,
-        "Safety": 2.75,
-        "EffectDiscipline": 1,
         "Correctness": 1.5
       }
     }
-  ]
+  ],
+  "statisticalAnalysis": {
+    "runCount": 30,
+    "confidenceLevel": 0.95,
+    "significantCategories": [
+      "TokenEconomics",
+      "GenerationAccuracy",
+      "Comprehension",
+      "EditPrecision",
+      "ErrorDetection",
+      "InformationDensity",
+      "RefactoringStability",
+      "Correctness"
+    ],
+    "categoryDetails": {
+      "TokenEconomics": {
+        "mean": 0.916,
+        "stdDev": 24.551,
+        "ci95Lower": 0.892,
+        "ci95Upper": 0.941,
+        "cohensD": 0.072,
+        "pValue": 0.0006,
+        "significant": true
+      },
+      "GenerationAccuracy": {
+        "mean": 0.969,
+        "stdDev": 0.033,
+        "ci95Lower": 0.966,
+        "ci95Upper": 0.971,
+        "cohensD": -0.985,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "Comprehension": {
+        "mean": 1.545,
+        "stdDev": 0.005,
+        "ci95Lower": 1.526,
+        "ci95Upper": 1.565,
+        "cohensD": 2.458,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "EditPrecision": {
+        "mean": 1.368,
+        "stdDev": 0.006,
+        "ci95Lower": 1.365,
+        "ci95Upper": 1.37,
+        "cohensD": 11.798,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "ErrorDetection": {
+        "mean": 1.239,
+        "stdDev": 0.014,
+        "ci95Lower": 1.228,
+        "ci95Upper": 1.25,
+        "cohensD": 1.704,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "InformationDensity": {
+        "mean": 1.053,
+        "stdDev": 0.019,
+        "ci95Lower": 1.033,
+        "ci95Upper": 1.072,
+        "cohensD": -0.12,
+        "pValue": 0.0028,
+        "significant": true
+      },
+      "RefactoringStability": {
+        "mean": 1.365,
+        "stdDev": 0.014,
+        "ci95Lower": 1.356,
+        "ci95Upper": 1.375,
+        "cohensD": 4.359,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "Correctness": {
+        "mean": 1.124,
+        "stdDev": 0.044,
+        "ci95Lower": 1.108,
+        "ci95Upper": 1.14,
+        "cohensD": 0.536,
+        "pValue": 0.0001,
+        "significant": true
+      }
+    }
+  }
 }
