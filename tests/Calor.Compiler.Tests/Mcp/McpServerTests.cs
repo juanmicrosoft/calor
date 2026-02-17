@@ -131,6 +131,8 @@ public class McpServerTests
         Assert.Contains("calor_syntax_help", json);
         Assert.Contains("calor_syntax_lookup", json);
         Assert.Contains("calor_assess", json);
+        Assert.Contains("calor_typecheck", json);
+        Assert.Contains("calor_verify_contracts", json);
     }
 
     [Fact]
@@ -446,6 +448,8 @@ public class McpServerTests
         Assert.Contains("calor_syntax_help", response);
         Assert.Contains("calor_syntax_lookup", response);
         Assert.Contains("calor_assess", response);
+        Assert.Contains("calor_typecheck", response);
+        Assert.Contains("calor_verify_contracts", response);
     }
 
     [Fact]
