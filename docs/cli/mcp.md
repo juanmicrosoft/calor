@@ -25,6 +25,10 @@ The `mcp` command starts an MCP server that exposes Calor compiler capabilities 
 - **Analyze** code for security vulnerabilities and bugs
 - **Convert** C# code to Calor
 - **Get syntax help** for Calor features
+- **Lint** code for agent-optimal format compliance
+- **Format** code to canonical style
+- **Diagnose** code with machine-readable diagnostics
+- **Manage IDs** (check and assign declaration IDs)
 
 The server communicates over stdio using the [Model Context Protocol](https://modelcontextprotocol.io/) specification.
 
@@ -41,7 +45,7 @@ The server communicates over stdio using the [Model Context Protocol](https://mo
 
 ## Available Tools
 
-The MCP server exposes five tools:
+The MCP server exposes nine tools:
 
 ### calor_compile
 
@@ -121,6 +125,68 @@ Get syntax documentation for a specific Calor feature.
 
 **Output:** Relevant syntax documentation and examples.
 
+### calor_lint
+
+Check Calor source code for agent-optimal format compliance.
+
+**Input Schema:**
+```json
+{
+  "source": "string (required) - Calor source code to lint",
+  "fix": "boolean - Return auto-fixed code in the response (default: false)"
+}
+```
+
+**Output:** Parse success status, lint issues with line numbers and messages, and optionally the fixed code.
+
+### calor_format
+
+Format Calor source code to canonical style.
+
+**Input Schema:**
+```json
+{
+  "source": "string (required) - Calor source code to format"
+}
+```
+
+**Output:** Formatted code and whether it changed from the original.
+
+### calor_diagnose
+
+Get machine-readable diagnostics from Calor source code.
+
+**Input Schema:**
+```json
+{
+  "source": "string (required) - Calor source code to diagnose",
+  "options": {
+    "strictApi": "boolean - Enable strict API checking (default: false)",
+    "requireDocs": "boolean - Require documentation on public functions (default: false)"
+  }
+}
+```
+
+**Output:** Errors and warnings with severity, code, message, line, and column.
+
+### calor_ids
+
+Manage Calor declaration IDs. Check for missing, duplicate, or invalid IDs and optionally assign new ones.
+
+**Input Schema:**
+```json
+{
+  "source": "string (required) - Calor source code to check/process",
+  "action": "string - 'check' validates IDs, 'assign' adds missing IDs (default: 'check')",
+  "options": {
+    "allowTestIds": "boolean - Allow test IDs (f001, m001) without flagging as issues (default: false)",
+    "fixDuplicates": "boolean - When assigning, also fix duplicate IDs (default: false)"
+  }
+}
+```
+
+**Output:** For 'check': ID issues with type, line, kind, name, and message. For 'assign': Modified code and list of assignments.
+
 ---
 
 ## Configuration
@@ -161,7 +227,7 @@ When you run `calor init --ai claude`, the MCP server is automatically configure
 
 This configures two servers:
 - **calor-lsp**: Language server for IDE features (diagnostics, hover, go-to-definition)
-- **calor**: MCP server with tools for compile, verify, analyze, convert, and syntax help
+- **calor**: MCP server with tools for compile, verify, analyze, convert, syntax help, lint, format, diagnose, and IDs
 
 ### VS Code
 

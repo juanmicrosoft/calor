@@ -45,6 +45,10 @@ In addition to skills and hooks, `calor init --ai claude` configures **MCP serve
 | `calor_analyze` | Analyze code for security vulnerabilities and bugs |
 | `calor_convert` | Convert C# code to Calor programmatically |
 | `calor_syntax_help` | Get syntax help for specific Calor features |
+| `calor_lint` | Check code for agent-optimal format compliance |
+| `calor_format` | Format code to canonical style |
+| `calor_diagnose` | Get machine-readable diagnostics with precise locations |
+| `calor_ids` | Check/assign declaration IDs (detect missing, duplicates, invalid) |
 
 These tools allow Claude to:
 - **Verify** your contracts are satisfiable before you run the code
