@@ -302,7 +302,7 @@ public class InitCommandIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task ClaudeInit_CreatesSettingsWithMcpServer()
+    public async Task ClaudeInit_CreatesMcpJsonWithMcpServer()
     {
         // Arrange
         await CreateTestCsproj();
@@ -314,12 +314,14 @@ public class InitCommandIntegrationTests : IDisposable
         // Assert
         Assert.True(result.Success);
 
-        var settingsPath = Path.Combine(_testDirectory, ".claude", "settings.json");
-        Assert.True(File.Exists(settingsPath));
+        // MCP servers should be in .mcp.json (not settings.json)
+        var mcpJsonPath = Path.Combine(_testDirectory, ".mcp.json");
+        Assert.True(File.Exists(mcpJsonPath));
 
-        var content = await File.ReadAllTextAsync(settingsPath);
+        var content = await File.ReadAllTextAsync(mcpJsonPath);
         Assert.Contains("mcpServers", content);
         Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"type\": \"stdio\"", content);
         Assert.Contains("\"command\": \"calor\"", content);
         Assert.Contains("\"args\"", content);
         Assert.Contains("\"lsp\"", content);
@@ -331,20 +333,19 @@ public class InitCommandIntegrationTests : IDisposable
         // Arrange
         await CreateTestCsproj();
 
-        // Create existing settings with another MCP server
-        var claudeDir = Path.Combine(_testDirectory, ".claude");
-        Directory.CreateDirectory(claudeDir);
-        var existingSettings = """
+        // Create existing .mcp.json with another MCP server
+        var existingMcpConfig = """
             {
               "mcpServers": {
                 "existing-server": {
+                  "type": "stdio",
                   "command": "existing-command",
                   "args": ["arg1", "arg2"]
                 }
               }
             }
             """;
-        await File.WriteAllTextAsync(Path.Combine(claudeDir, "settings.json"), existingSettings);
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, ".mcp.json"), existingMcpConfig);
 
         // Act
         var claudeInitializer = new ClaudeInitializer();
@@ -353,7 +354,7 @@ public class InitCommandIntegrationTests : IDisposable
         // Assert
         Assert.True(result.Success);
 
-        var content = await File.ReadAllTextAsync(Path.Combine(claudeDir, "settings.json"));
+        var content = await File.ReadAllTextAsync(Path.Combine(_testDirectory, ".mcp.json"));
 
         // Both servers should exist
         Assert.Contains("existing-server", content);
@@ -363,7 +364,7 @@ public class InitCommandIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task ClaudeInit_WithExistingHooksButNoMcp_AddsMcpServer()
+    public async Task ClaudeInit_WithExistingHooksButNoMcp_AddsMcpServerToMcpJson()
     {
         // Arrange
         await CreateTestCsproj();
@@ -392,15 +393,15 @@ public class InitCommandIntegrationTests : IDisposable
         // Assert
         Assert.True(result.Success);
 
-        var content = await File.ReadAllTextAsync(Path.Combine(claudeDir, "settings.json"));
+        // Existing hooks should be preserved in settings.json
+        var settingsContent = await File.ReadAllTextAsync(Path.Combine(claudeDir, "settings.json"));
+        Assert.Contains("CustomMatcher", settingsContent);
+        Assert.Contains("custom-command", settingsContent);
 
-        // Existing hooks should be preserved
-        Assert.Contains("CustomMatcher", content);
-        Assert.Contains("custom-command", content);
-
-        // MCP server should be added
-        Assert.Contains("mcpServers", content);
-        Assert.Contains("calor-lsp", content);
+        // MCP server should be added to .mcp.json (separate file)
+        var mcpContent = await File.ReadAllTextAsync(Path.Combine(_testDirectory, ".mcp.json"));
+        Assert.Contains("mcpServers", mcpContent);
+        Assert.Contains("calor-lsp", mcpContent);
     }
 
     [Fact]
@@ -415,9 +416,9 @@ public class InitCommandIntegrationTests : IDisposable
         await claudeInitializer.InitializeAsync(_testDirectory, force: false);
         await claudeInitializer.InitializeAsync(_testDirectory, force: false);
 
-        // Assert
-        var settingsPath = Path.Combine(_testDirectory, ".claude", "settings.json");
-        var content = await File.ReadAllTextAsync(settingsPath);
+        // Assert - check .mcp.json (not settings.json)
+        var mcpJsonPath = Path.Combine(_testDirectory, ".mcp.json");
+        var content = await File.ReadAllTextAsync(mcpJsonPath);
 
         // calor-lsp should only appear once
         var count = CountOccurrences(content, "calor-lsp");

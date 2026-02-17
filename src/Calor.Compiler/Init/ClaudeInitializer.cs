@@ -103,7 +103,7 @@ public class ClaudeInitializer : IAiInitializer
                 updatedFiles.Add(claudeMdPath);
             }
 
-            // Configure Claude Code hooks for Calor-first enforcement
+            // Configure Claude Code hooks for Calor-first enforcement (in .claude/settings.json)
             var settingsPath = Path.Combine(targetDirectory, ".claude", "settings.json");
             var settingsResult = await ConfigureHooksAsync(settingsPath, force);
             if (settingsResult == HookSettingsResult.Created)
@@ -113,6 +113,18 @@ public class ClaudeInitializer : IAiInitializer
             else if (settingsResult == HookSettingsResult.Updated)
             {
                 updatedFiles.Add(settingsPath);
+            }
+
+            // Configure MCP servers in .mcp.json (Claude Code reads MCP configs from here, not settings.json)
+            var mcpJsonPath = Path.Combine(targetDirectory, ".mcp.json");
+            var mcpResult = await ConfigureMcpServersAsync(mcpJsonPath, force);
+            if (mcpResult == McpConfigResult.Created)
+            {
+                createdFiles.Add(mcpJsonPath);
+            }
+            else if (mcpResult == McpConfigResult.Updated)
+            {
+                updatedFiles.Add(mcpJsonPath);
             }
 
             var allModifiedFiles = createdFiles.Concat(updatedFiles).ToList();
@@ -261,26 +273,13 @@ public class ClaudeInitializer : IAiInitializer
 
         if (!File.Exists(settingsPath))
         {
-            // Create new settings file with hook and MCP server configuration
+            // Create new settings file with hook configuration (MCP servers go in .mcp.json)
             var settings = new ClaudeSettings
             {
                 Hooks = new ClaudeHooksConfig
                 {
                     PreToolUse = new[] { writePreHookConfig, editPreHookConfig },
                     PostToolUse = new[] { writePostHookConfig }
-                },
-                McpServers = new Dictionary<string, McpServerConfig>
-                {
-                    ["calor-lsp"] = new McpServerConfig
-                    {
-                        Command = "calor",
-                        Args = new[] { "lsp" }
-                    },
-                    ["calor"] = new McpServerConfig
-                    {
-                        Command = "calor",
-                        Args = new[] { "mcp", "--stdio" }
-                    }
                 }
             };
 
@@ -307,19 +306,6 @@ public class ClaudeInitializer : IAiInitializer
                     {
                         PreToolUse = new[] { writePreHookConfig, editPreHookConfig },
                         PostToolUse = new[] { writePostHookConfig }
-                    },
-                    McpServers = new Dictionary<string, McpServerConfig>
-                    {
-                        ["calor-lsp"] = new McpServerConfig
-                        {
-                            Command = "calor",
-                            Args = new[] { "lsp" }
-                        },
-                        ["calor"] = new McpServerConfig
-                        {
-                            Command = "calor",
-                            Args = new[] { "mcp", "--stdio" }
-                        }
                     }
                 };
                 await File.WriteAllTextAsync(settingsPath, JsonSerializer.Serialize(settings, JsonOptions));
@@ -376,27 +362,6 @@ public class ClaudeInitializer : IAiInitializer
 
         existingSettings.Hooks.PostToolUse = existingPostHooks.ToArray();
 
-        // Configure MCP servers for language server and AI agent tools
-        existingSettings.McpServers ??= new Dictionary<string, McpServerConfig>();
-        if (!existingSettings.McpServers.ContainsKey("calor-lsp"))
-        {
-            existingSettings.McpServers["calor-lsp"] = new McpServerConfig
-            {
-                Command = "calor",
-                Args = new[] { "lsp" }
-            };
-            updated = true;
-        }
-        if (!existingSettings.McpServers.ContainsKey("calor"))
-        {
-            existingSettings.McpServers["calor"] = new McpServerConfig
-            {
-                Command = "calor",
-                Args = new[] { "mcp", "--stdio" }
-            };
-            updated = true;
-        }
-
         if (!updated)
         {
             return HookSettingsResult.Unchanged;
@@ -413,17 +378,113 @@ public class ClaudeInitializer : IAiInitializer
         await File.WriteAllTextAsync(settingsPath, newJson);
         return HookSettingsResult.Updated;
     }
+
+    private enum McpConfigResult
+    {
+        Created,
+        Updated,
+        Unchanged
+    }
+
+    private static async Task<McpConfigResult> ConfigureMcpServersAsync(string mcpJsonPath, bool force)
+    {
+        // MCP server configurations with required "type": "stdio"
+        var calorLspConfig = new McpServerConfig
+        {
+            Type = "stdio",
+            Command = "calor",
+            Args = new[] { "lsp" }
+        };
+
+        var calorMcpConfig = new McpServerConfig
+        {
+            Type = "stdio",
+            Command = "calor",
+            Args = new[] { "mcp", "--stdio" }
+        };
+
+        if (!File.Exists(mcpJsonPath))
+        {
+            // Create new .mcp.json file
+            var mcpConfig = new McpJsonConfig
+            {
+                McpServers = new Dictionary<string, McpServerConfig>
+                {
+                    ["calor-lsp"] = calorLspConfig,
+                    ["calor"] = calorMcpConfig
+                }
+            };
+
+            await File.WriteAllTextAsync(mcpJsonPath, JsonSerializer.Serialize(mcpConfig, JsonOptions));
+            return McpConfigResult.Created;
+        }
+
+        // Read existing .mcp.json
+        var existingJson = await File.ReadAllTextAsync(mcpJsonPath);
+        McpJsonConfig? existingConfig;
+
+        try
+        {
+            existingConfig = JsonSerializer.Deserialize<McpJsonConfig>(existingJson, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            if (force)
+            {
+                var mcpConfig = new McpJsonConfig
+                {
+                    McpServers = new Dictionary<string, McpServerConfig>
+                    {
+                        ["calor-lsp"] = calorLspConfig,
+                        ["calor"] = calorMcpConfig
+                    }
+                };
+                await File.WriteAllTextAsync(mcpJsonPath, JsonSerializer.Serialize(mcpConfig, JsonOptions));
+                return McpConfigResult.Updated;
+            }
+            return McpConfigResult.Unchanged;
+        }
+
+        existingConfig ??= new McpJsonConfig();
+        existingConfig.McpServers ??= new Dictionary<string, McpServerConfig>();
+
+        var updated = false;
+
+        if (!existingConfig.McpServers.ContainsKey("calor-lsp"))
+        {
+            existingConfig.McpServers["calor-lsp"] = calorLspConfig;
+            updated = true;
+        }
+
+        if (!existingConfig.McpServers.ContainsKey("calor"))
+        {
+            existingConfig.McpServers["calor"] = calorMcpConfig;
+            updated = true;
+        }
+
+        if (!updated)
+        {
+            return McpConfigResult.Unchanged;
+        }
+
+        var newJson = JsonSerializer.Serialize(existingConfig, JsonOptions);
+
+        if (newJson.TrimEnd() == existingJson.TrimEnd())
+        {
+            return McpConfigResult.Unchanged;
+        }
+
+        await File.WriteAllTextAsync(mcpJsonPath, newJson);
+        return McpConfigResult.Updated;
+    }
 }
 
-// JSON structure classes for Claude Code settings
+// JSON structure classes for Claude Code settings (.claude/settings.json)
 // Note: Claude Code expects "hooks" and "PreToolUse" in specific casing
 internal class ClaudeSettings
 {
     [JsonPropertyName("hooks")]
     public ClaudeHooksConfig? Hooks { get; set; }
-
-    [JsonPropertyName("mcpServers")]
-    public Dictionary<string, McpServerConfig>? McpServers { get; set; }
 }
 
 internal class ClaudeHooksConfig
@@ -453,8 +514,19 @@ internal class ClaudeHook
     public string? Command { get; set; }
 }
 
+// JSON structure for .mcp.json (MCP server configuration)
+// Claude Code reads MCP servers from .mcp.json, not settings.json
+internal class McpJsonConfig
+{
+    [JsonPropertyName("mcpServers")]
+    public Dictionary<string, McpServerConfig>? McpServers { get; set; }
+}
+
 internal class McpServerConfig
 {
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
     [JsonPropertyName("command")]
     public string? Command { get; set; }
 
