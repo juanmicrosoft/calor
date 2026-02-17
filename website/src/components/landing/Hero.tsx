@@ -20,10 +20,8 @@ export function Hero() {
         playsInline
         className="absolute inset-0 w-full h-full object-cover -z-20"
       >
-        <source src={`${basePath}/calor-back-long.mp4`} type="video/mp4" />
+        <source src={`${basePath}/calor-lava.mp4`} type="video/mp4" />
       </video>
-      {/* Dark overlay for text contrast */}
-      <div className="absolute inset-0 bg-black/50 -z-10" />
 
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
@@ -41,10 +39,10 @@ export function Hero() {
             Calor
           </h1>
           <p className="mt-4 text-xl font-medium text-white sm:text-2xl">
-            Stop debugging AI-generated code.
+            A programming language for coding agents
           </p>
           <p className="mt-6 text-lg leading-8 text-white/80">
-            A programming language that catches bugs your AI agent misses—before you run a single test.
+            Fewer errors. Better refactors. Cleaner merges.
           </p>
 
           <div className="mt-10 flex items-center justify-center gap-x-4">
