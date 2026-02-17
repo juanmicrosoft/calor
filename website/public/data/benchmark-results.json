@@ -4,11 +4,11 @@
   "commit": "59799d1",
   "frameworkVersion": "1.0.0",
   "summary": {
-    "overallAdvantage": 1.11,
+    "overallAdvantage": 1.16,
     "programCount": 40,
     "metricCount": 11,
-    "calorWins": 5,
-    "cSharpWins": 3,
+    "calorWins": 6,
+    "cSharpWins": 2,
     "statisticalRunCount": 0
   },
   "metrics": {
@@ -41,8 +41,8 @@
       "winner": "calor"
     },
     "TaskCompletion": {
-      "ratio": 0.72,
-      "winner": "csharp"
+      "ratio": 1.22,
+      "winner": "calor"
     },
     "Safety": {
       "ratio": 1.59,
