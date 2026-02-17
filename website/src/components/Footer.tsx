@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import packageJson from '../../package.json';
+import { trackAskCalorClick } from '@/lib/analytics';
 
 const footerLinks = {
   documentation: [
@@ -15,6 +18,7 @@ const footerLinks = {
   community: [
     { name: 'GitHub', href: 'https://github.com/juanmicrosoft/calor', external: true },
     { name: 'Issues', href: 'https://github.com/juanmicrosoft/calor/issues', external: true },
+    { name: 'Ask Calor', href: 'https://chatgpt.com/g/g-6994cc69517c8191a0dc7be0bfc00186-ask-calor', external: true },
   ],
 };
 
@@ -74,6 +78,7 @@ export function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-muted-foreground hover:text-primary"
+                    onClick={link.name === 'Ask Calor' ? () => trackAskCalorClick('footer') : undefined}
                   >
                     {link.name}
                   </a>

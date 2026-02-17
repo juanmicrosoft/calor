@@ -21,6 +21,10 @@ export function trackCtaClick(button: 'get_started' | 'github') {
   sendEvent({ action: 'cta_click', category: 'engagement', label: button });
 }
 
+export function trackAskCalorClick(location: 'header' | 'footer' | 'mobile_menu' | 'homepage') {
+  sendEvent({ action: 'ask_calor_click', category: 'conversion', label: location });
+}
+
 export function trackInstallCommandCopy(step: string) {
   sendEvent({ action: 'install_command_copy', category: 'conversion', label: step });
 }

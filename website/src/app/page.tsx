@@ -4,7 +4,7 @@ import { CatchBugs } from '@/components/landing/CatchBugs';
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
 import { BenchmarkChart } from '@/components/landing/BenchmarkChart';
 import { QuickStart } from '@/components/landing/QuickStart';
-import { ProjectStatus } from '@/components/landing/ProjectStatus';
+import { AskCalor } from '@/components/landing/AskCalor';
 import { ScrollDepthTracker } from '@/components/landing/ScrollDepthTracker';
 
 export default function HomePage() {
@@ -17,7 +17,7 @@ export default function HomePage() {
       <FeatureGrid />
       <BenchmarkChart />
       <QuickStart />
-      <ProjectStatus />
+      <AskCalor />
     </div>
   );
 }

@@ -4,10 +4,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { Menu, X, Github, Moon, Sun } from 'lucide-react';
+import { Menu, X, Github, Moon, Sun, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, getBasePath } from '@/lib/utils';
-import { trackDarkModeToggle, trackOutboundLink } from '@/lib/analytics';
+import { trackDarkModeToggle, trackOutboundLink, trackAskCalorClick } from '@/lib/analytics';
 
 // basePath needed for pathname comparison since usePathname returns full path
 const basePath = getBasePath();
@@ -95,6 +95,17 @@ export function Header() {
                 <span className="sr-only">GitHub</span>
               </a>
             </Button>
+            <Button variant="ghost" size="icon" asChild>
+              <a
+                href="https://chatgpt.com/g/g-6994cc69517c8191a0dc7be0bfc00186-ask-calor"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackAskCalorClick('header')}
+              >
+                <MessageCircle className="h-5 w-5" />
+                <span className="sr-only">Ask Calor</span>
+              </a>
+            </Button>
           </div>
         </nav>
       </header>
@@ -157,6 +168,16 @@ export function Header() {
                       onClick={() => trackOutboundLink('https://github.com/juanmicrosoft/calor')}
                     >
                       <Github className="h-5 w-5" />
+                    </a>
+                  </Button>
+                  <Button variant="ghost" size="icon" asChild>
+                    <a
+                      href="https://chatgpt.com/g/g-6994cc69517c8191a0dc7be0bfc00186-ask-calor"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackAskCalorClick('mobile_menu')}
+                    >
+                      <MessageCircle className="h-5 w-5" />
                     </a>
                   </Button>
                 </div>
