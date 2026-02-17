@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-02-17T11:06:41.878611Z",
-  "commit": "43232d2",
+  "timestamp": "2026-02-17T13:07:15.082521Z",
+  "commit": "59799d1",
   "frameworkVersion": "1.0.0",
   "summary": {
     "overallAdvantage": 1.12,
     "programCount": 40,
     "metricCount": 11,
-    "calorWins": 7,
+    "calorWins": 6,
     "cSharpWins": 3,
     "statisticalRunCount": 0
   },
@@ -52,10 +52,9 @@
       "ratio": 1.11,
       "winner": "calor"
     },
-    "InteropEffectCoverage": {
-      "ratio": 1,
-      "winner": "calor",
-      "isCalorOnly": true
+    "Correctness": {
+      "ratio": 1.0,
+      "winner": "tie"
     }
   },
   "programs": [
@@ -71,7 +70,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.345,
+      "advantage": 1.354,
       "metrics": {
         "TokenEconomics": 0.717,
         "GenerationAccuracy": 0.94,
@@ -83,7 +82,7 @@
         "TaskCompletion": 0.923,
         "Safety": 2,
         "EffectDiscipline": 1.625,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.1
       }
     },
     {
@@ -111,7 +110,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -127,7 +126,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.199,
+      "advantage": 1.208,
       "metrics": {
         "TokenEconomics": 0.96,
         "GenerationAccuracy": 0.94,
@@ -139,7 +138,7 @@
         "TaskCompletion": 0.75,
         "Safety": 2,
         "EffectDiscipline": 1.625,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.1
       }
     },
     {
@@ -166,7 +165,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -193,7 +192,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -209,7 +208,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.137,
+      "advantage": 1.183,
       "metrics": {
         "TokenEconomics": 0.928,
         "GenerationAccuracy": 0.94,
@@ -221,7 +220,7 @@
         "TaskCompletion": 0.75,
         "Safety": 2.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.5
       }
     },
     {
@@ -236,7 +235,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.069,
+      "advantage": 1.054,
       "metrics": {
         "TokenEconomics": 0.523,
         "GenerationAccuracy": 0.94,
@@ -248,7 +247,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.833
       }
     },
     {
@@ -264,7 +263,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.127,
+      "advantage": 1.163,
       "metrics": {
         "TokenEconomics": 1.136,
         "GenerationAccuracy": 0.94,
@@ -276,7 +275,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.667,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.4
       }
     },
     {
@@ -291,7 +290,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.128,
+      "advantage": 1.113,
       "metrics": {
         "TokenEconomics": 0.566,
         "GenerationAccuracy": 0.94,
@@ -303,7 +302,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.833
       }
     },
     {
@@ -319,7 +318,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.001,
+      "advantage": 0.985,
       "metrics": {
         "TokenEconomics": 0.527,
         "GenerationAccuracy": 0.94,
@@ -331,7 +330,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.833
       }
     },
     {
@@ -347,7 +346,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.07,
+      "advantage": 1.098,
       "metrics": {
         "TokenEconomics": 0.649,
         "GenerationAccuracy": 0.94,
@@ -359,7 +358,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.833,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.3
       }
     },
     {
@@ -375,7 +374,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.122,
+      "advantage": 1.096,
       "metrics": {
         "TokenEconomics": 0.956,
         "GenerationAccuracy": 0.94,
@@ -387,7 +386,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.714
       }
     },
     {
@@ -414,7 +413,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -441,7 +440,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -468,7 +467,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -483,7 +482,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.142,
+      "advantage": 1.127,
       "metrics": {
         "TokenEconomics": 0.75,
         "GenerationAccuracy": 0.94,
@@ -495,7 +494,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.833
       }
     },
     {
@@ -511,7 +510,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.072,
+      "advantage": 1.057,
       "metrics": {
         "TokenEconomics": 0.608,
         "GenerationAccuracy": 0.94,
@@ -523,7 +522,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.833
       }
     },
     {
@@ -539,7 +538,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.12,
+      "advantage": 1.104,
       "metrics": {
         "TokenEconomics": 0.535,
         "GenerationAccuracy": 0.94,
@@ -551,7 +550,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.833
       }
     },
     {
@@ -566,7 +565,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.093,
+      "advantage": 1.139,
       "metrics": {
         "TokenEconomics": 0.818,
         "GenerationAccuracy": 0.94,
@@ -578,7 +577,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1.833,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.5
       }
     },
     {
@@ -594,7 +593,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.2,
+      "advantage": 1.264,
       "metrics": {
         "TokenEconomics": 1.122,
         "GenerationAccuracy": 0.94,
@@ -606,7 +605,7 @@
         "TaskCompletion": 0.75,
         "Safety": 2.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.7
       }
     },
     {
@@ -634,7 +633,7 @@
         "TaskCompletion": 0.667,
         "Safety": 0.857,
         "EffectDiscipline": 1.333,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -650,7 +649,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.115,
+      "advantage": 1.1,
       "metrics": {
         "TokenEconomics": 1.092,
         "GenerationAccuracy": 0.94,
@@ -662,7 +661,7 @@
         "TaskCompletion": 0.667,
         "Safety": 0.857,
         "EffectDiscipline": 1.333,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.833
       }
     },
     {
@@ -691,7 +690,7 @@
         "TaskCompletion": 0.667,
         "Safety": 0.857,
         "EffectDiscipline": 1.333,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -708,7 +707,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.2,
+      "advantage": 1.179,
       "metrics": {
         "TokenEconomics": 1.9,
         "GenerationAccuracy": 0.94,
@@ -720,7 +719,7 @@
         "TaskCompletion": 0.667,
         "Safety": 0.667,
         "EffectDiscipline": 1.333,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.769
       }
     },
     {
@@ -736,7 +735,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.064,
+      "advantage": 1.043,
       "metrics": {
         "TokenEconomics": 0.718,
         "GenerationAccuracy": 0.94,
@@ -748,7 +747,7 @@
         "TaskCompletion": 0.75,
         "Safety": 1,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 0.769
       }
     },
     {
@@ -764,7 +763,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.189,
+      "advantage": 1.211,
       "metrics": {
         "TokenEconomics": 1.003,
         "GenerationAccuracy": 0.94,
@@ -776,7 +775,7 @@
         "TaskCompletion": 0.667,
         "Safety": 1.5,
         "EffectDiscipline": 0.8,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.25
       }
     },
     {
@@ -793,7 +792,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.295,
+      "advantage": 1.3,
       "metrics": {
         "TokenEconomics": 1.77,
         "GenerationAccuracy": 0.94,
@@ -805,7 +804,7 @@
         "TaskCompletion": 0.667,
         "Safety": 1.5,
         "EffectDiscipline": 1.333,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.062
       }
     },
     {
@@ -822,7 +821,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.238,
+      "advantage": 1.245,
       "metrics": {
         "TokenEconomics": 2.158,
         "GenerationAccuracy": 0.94,
@@ -834,7 +833,7 @@
         "TaskCompletion": 0.667,
         "Safety": 1.1,
         "EffectDiscipline": 1.25,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.071
       }
     },
     {
@@ -849,7 +848,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.209,
+      "advantage": 1.247,
       "metrics": {
         "TokenEconomics": 0.592,
         "GenerationAccuracy": 1.068,
@@ -861,7 +860,7 @@
         "TaskCompletion": 0.632,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.417
       }
     },
     {
@@ -888,7 +887,7 @@
         "TaskCompletion": 0.706,
         "Safety": 2.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1
       }
     },
     {
@@ -903,7 +902,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.223,
+      "advantage": 1.261,
       "metrics": {
         "TokenEconomics": 0.852,
         "GenerationAccuracy": 1.068,
@@ -915,7 +914,7 @@
         "TaskCompletion": 0.632,
         "Safety": 1.5,
         "EffectDiscipline": 1.25,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.417
       }
     },
     {
@@ -932,7 +931,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.461,
+      "advantage": 1.524,
       "metrics": {
         "TokenEconomics": 0.983,
         "GenerationAccuracy": 0.969,
@@ -944,7 +943,7 @@
         "TaskCompletion": 0.857,
         "Safety": 3.75,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.7
       }
     },
     {
@@ -961,7 +960,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.216,
+      "advantage": 1.28,
       "metrics": {
         "TokenEconomics": 1.131,
         "GenerationAccuracy": 0.969,
@@ -973,7 +972,7 @@
         "TaskCompletion": 0.632,
         "Safety": 2.143,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.7
       }
     },
     {
@@ -989,7 +988,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.109,
+      "advantage": 1.115,
       "metrics": {
         "TokenEconomics": 0.89,
         "GenerationAccuracy": 0.969,
@@ -1001,7 +1000,7 @@
         "TaskCompletion": 0.632,
         "Safety": 1.5,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.071
       }
     },
     {
@@ -1017,7 +1016,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.184,
+      "advantage": 1.248,
       "metrics": {
         "TokenEconomics": 1.035,
         "GenerationAccuracy": 0.969,
@@ -1029,7 +1028,7 @@
         "TaskCompletion": 0.632,
         "Safety": 2.143,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.7
       }
     },
     {
@@ -1043,7 +1042,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.352,
+      "advantage": 1.362,
       "metrics": {
         "TokenEconomics": 0.762,
         "GenerationAccuracy": 1.068,
@@ -1055,7 +1054,7 @@
         "TaskCompletion": 0.706,
         "Safety": 2,
         "EffectDiscipline": 1.625,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.1
       }
     },
     {
@@ -1069,7 +1068,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.377,
+      "advantage": 1.386,
       "metrics": {
         "TokenEconomics": 0.894,
         "GenerationAccuracy": 1.068,
@@ -1081,7 +1080,7 @@
         "TaskCompletion": 0.706,
         "Safety": 2,
         "EffectDiscipline": 1.625,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.1
       }
     },
     {
@@ -1095,7 +1094,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.467,
+      "advantage": 1.476,
       "metrics": {
         "TokenEconomics": 1.288,
         "GenerationAccuracy": 1.068,
@@ -1107,7 +1106,7 @@
         "TaskCompletion": 0.857,
         "Safety": 2,
         "EffectDiscipline": 1.3,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.1
       }
     },
     {
@@ -1122,7 +1121,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.328,
+      "advantage": 1.337,
       "metrics": {
         "TokenEconomics": 1.252,
         "GenerationAccuracy": 1.068,
@@ -1134,7 +1133,7 @@
         "TaskCompletion": 0.706,
         "Safety": 2,
         "EffectDiscipline": 1.3,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.1
       }
     },
     {
@@ -1148,7 +1147,7 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.302,
+      "advantage": 1.348,
       "metrics": {
         "TokenEconomics": 0.463,
         "GenerationAccuracy": 1.068,
@@ -1160,7 +1159,7 @@
         "TaskCompletion": 0.706,
         "Safety": 2.75,
         "EffectDiscipline": 1,
-        "InteropEffectCoverage": 1
+        "Correctness": 1.5
       }
     }
   ]

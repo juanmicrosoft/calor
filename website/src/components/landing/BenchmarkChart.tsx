@@ -80,10 +80,10 @@ const metricDisplayInfo: Record<
     calorInterpretation: 'Effect system prevents hidden side effect bugs',
     csharpInterpretation: 'Relies on conventions, no enforcement',
   },
-  InteropEffectCoverage: {
-    name: '.NET Library Coverage',
-    calorInterpretation: 'Most .NET methods have effect information',
-    csharpInterpretation: 'N/A for C#',
+  Correctness: {
+    name: 'Edge Case Handling',
+    calorInterpretation: 'Contracts help prevent edge case bugs',
+    csharpInterpretation: 'Guard clauses require explicit implementation',
   },
 };
 

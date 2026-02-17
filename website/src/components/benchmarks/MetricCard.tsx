@@ -35,7 +35,7 @@ const metricDisplayNames: Record<string, string> = {
   RefactoringStability: 'Refactoring Stability',
   Safety: 'Safety',
   EffectDiscipline: 'Effect Discipline',
-  InteropEffectCoverage: 'Interop Effect Coverage',
+  Correctness: 'Correctness',
 };
 
 // Brief interpretations for each metric
@@ -80,9 +80,9 @@ const metricInterpretations: Record<string, { calor: string; csharp: string }> =
     calor: 'Effect system prevents hidden side effect bugs',
     csharp: 'Side effect discipline relies on conventions',
   },
-  InteropEffectCoverage: {
-    calor: 'Calor has comprehensive BCL effect coverage',
-    csharp: 'N/A',
+  Correctness: {
+    calor: 'Contracts help prevent edge case bugs',
+    csharp: 'Guard clauses require explicit implementation',
   },
 };
 

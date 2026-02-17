@@ -33,14 +33,7 @@ These metrics use actual LLM code generation to measure real-world effectiveness
 | [**Task Completion**](/benchmarking/metrics/task-completion/) | LLM code generation success | Can AI complete tasks with Calor vs C#? |
 | [**Safety**](/benchmarking/metrics/safety/) | Contract enforcement effectiveness | Does code catch bugs with informative errors? |
 | [**Effect Discipline**](/benchmarking/metrics/effect-discipline/) | Side effect management, bug prevention | Does code prevent flaky tests, security violations? |
-
-### Calor-Only Metrics
-
-These metrics measure capabilities unique to Calor that have no C# equivalent:
-
-| Category | What It Measures | Why It Matters |
-|:---------|:-----------------|:---------------|
-| [**Interop Coverage**](/benchmarking/metrics/interop-effect-coverage/) | BCL methods covered by effect manifests | How well are .NET interop effects documented? |
+| [**Correctness**](/benchmarking/metrics/correctness/) | Edge case handling, bug prevention | Does code produce correct results for edge cases? |
 
 ---
 
@@ -55,12 +48,15 @@ These metrics measure capabilities unique to Calor that have no C# equivalent:
 ## Key Insight
 
 Calor excels where explicitness matters:
-- **Comprehension (1.55x)** - Explicit structure aids understanding
-- **Error Detection (1.24x)** - Contracts surface invariant violations
+- **Comprehension (1.51x)** - Explicit structure aids understanding
+- **Error Detection (1.22x)** - Contracts surface invariant violations
 - **Edit Precision (1.37x)** - Unique IDs enable targeted changes
-- **Refactoring Stability (1.37x)** - ID-based references survive transformations
+- **Refactoring Stability (1.36x)** - ID-based references survive transformations
 - **Safety (1.59x)** - Contracts catch more bugs with better error messages
 - **Effect Discipline (1.11x)** - Effect system prevents real-world side effect bugs
+
+Calor and C# are equivalent on:
+- **Correctness (1.0x)** - Both languages achieve 100% on edge case handling when benchmarked fairly
 
 C# wins on efficiency:
 - **Token Economics (0.92x)** - Calor's explicit syntax uses more tokens

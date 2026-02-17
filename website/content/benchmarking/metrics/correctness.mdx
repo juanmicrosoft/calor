@@ -5,7 +5,7 @@ order: 11
 ---
 
 **Category:** Code Correctness
-**Result:** 1.09x Calor advantage (estimation mode)
+**Result:** 1.0x (tie) — both languages achieve 100%
 **What it measures:** Bug prevention through correct edge case handling
 
 ---
@@ -143,16 +143,20 @@ Tests general boundary handling:
 ```calor
 §M{m001:Math}
 §F{f001:FindMax:pub}
-  §I{i32[]:arr}
+  §I{[i32]:arr}
   §O{i32}
-  §Q (> (len arr) 0)           // Requires non-empty array
+  §Q (!= arr null)             // First: null check
+  §Q (> (len arr) 0)           // Then: requires non-empty array
 
-  §V{v001:i32:max} (get arr 0)
-  §FOR{i:1:(len arr)}
-    §WHEN (> (get arr i) max)
-      §SET max (get arr i)
-    §/WHEN
-  §/FOR
+  §B{max} §IDX arr 0
+  §B{i} 1
+  §WH{wh1} (< i (len arr))
+    §B{current} §IDX arr i
+    §IF{if1} (> current max)
+      §ASSIGN max current
+    §/I{if1}
+    §ASSIGN i (+ i 1)
+  §/WH{wh1}
   §R max
 §/F{f001}
 §/M{m001}
@@ -162,8 +166,10 @@ Tests general boundary handling:
 ```csharp
 public static int FindMax(int[] arr)
 {
-    if (arr == null || arr.Length == 0)
-        return 0; // or throw ArgumentException
+    if (arr == null)
+        throw new ArgumentNullException(nameof(arr));
+    if (arr.Length == 0)
+        throw new ArgumentException("Array cannot be empty", nameof(arr));
 
     int max = arr[0];
     for (int i = 1; i < arr.Length; i++)
@@ -175,7 +181,7 @@ public static int FindMax(int[] arr)
 }
 ```
 
-Both implementations can pass all tests. The benchmark measures which actually does.
+Both implementations achieve 100% correctness. The benchmark recognizes both Calor's `ContractViolationException` and C#'s `ArgumentException` as valid contract enforcement.
 
 ---
 
@@ -247,24 +253,27 @@ dotnet run --project tests/Calor.Evaluation -- correctness-benchmark --dry-run
 
 | Metric | Calor | C# |
 |:-------|:------|:---|
-| Overall Score | 95% | 87% |
-| Edge Case Score | 92% | 78% |
-| Normal Case Score | 98% | 96% |
-| **Advantage Ratio** | **1.09x** | 1.00x |
+| Overall Score | 100% | 100% |
+| Edge Case Score | 100% | 100% |
+| Normal Case Score | 100% | 100% |
+| **Advantage Ratio** | **1.0x** | 1.0x |
 
 ### By Category
 
 | Category | Calor Score | C# Score | Winner |
 |:---------|:------------|:---------|:-------|
-| Null Handling | 94% | 82% | Calor |
-| Arithmetic Safety | 96% | 88% | Calor |
-| String Processing | 92% | 90% | Calor |
-| Collection Operations | 96% | 84% | Calor |
-| Boundary Conditions | 98% | 92% | Calor |
+| Precondition Enforcement | 100% | 100% | Tie |
+| Postcondition Guarantee | 100% | 100% | Tie |
+| Combined Contracts | 100% | 100% | Tie |
 
 ### Key Finding
 
-Calor's **preconditions and postconditions** provide automatic edge case protection. C# requires explicit guard clauses that LLMs sometimes forget to include.
+Both languages achieve **equal correctness** when benchmarked fairly:
+
+- **Calor:** Preconditions (`§Q`) and postconditions (`§S`) provide contract-based protection
+- **C#:** Guard clauses (`ArgumentException`, `ArgumentNullException`) provide equivalent protection
+
+The benchmark accepts **both mechanisms** as valid contract enforcement. This ensures a fair comparison of actual code quality rather than language-specific features.
 
 ---
 

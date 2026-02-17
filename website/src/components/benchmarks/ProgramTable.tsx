@@ -36,7 +36,7 @@ const metricDisplayNames: Record<string, string> = {
   RefactoringStability: 'Refactor',
   Safety: 'Safety',
   EffectDiscipline: 'Effects',
-  InteropEffectCoverage: 'Interop',
+  Correctness: 'Correct',
 };
 
 function formatValue(value: number): string {

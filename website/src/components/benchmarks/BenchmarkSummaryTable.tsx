@@ -21,11 +21,11 @@ const METRIC_NAMES: Record<string, string> = {
   RefactoringStability: 'Refactoring Stability',
   Safety: 'Safety',
   EffectDiscipline: 'Effect Discipline',
+  Correctness: 'Correctness',
   GenerationAccuracy: 'Generation Accuracy',
   TaskCompletion: 'Task Completion',
   TokenEconomics: 'Token Economics',
   InformationDensity: 'Information Density',
-  InteropEffectCoverage: 'Interop Coverage',
 };
 
 // Preferred display order (Calor wins first, then C# wins, then Calor-only)
@@ -36,11 +36,11 @@ const METRIC_ORDER = [
   'RefactoringStability',
   'Safety',
   'EffectDiscipline',
+  'Correctness',
   'GenerationAccuracy',
   'TaskCompletion',
   'TokenEconomics',
   'InformationDensity',
-  'InteropEffectCoverage',
 ];
 
 const data = benchmarkData as BenchmarkData;
