@@ -1,9 +1,6 @@
 name: Benchmarks
 
 on:
-  # Run weekly on Sunday at midnight UTC
-  schedule:
-    - cron: '0 0 * * 0'
   # Run on releases - includes all benchmarks (LLM included)
   release:
     types: [created]
@@ -62,7 +59,7 @@ jobs:
             --verbose
 
       - name: Run statistical analysis
-        if: github.event_name == 'schedule' || github.event.inputs.statistical_runs != ''
+        if: github.event.inputs.statistical_runs != ''
         run: |
           RUNS="${{ github.event.inputs.statistical_runs || '30' }}"
           dotnet run --project tests/Calor.Evaluation -c Release -- run \
@@ -72,9 +69,9 @@ jobs:
             --output website/public/data/benchmark-results-statistical.json \
             --verbose
 
-      # LLM Benchmarks - run on schedule, or when not skipped
+      # LLM Benchmarks - run on release, or when not skipped in manual trigger
       - name: Restore LLM response cache
-        if: github.event_name == 'schedule' || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
         uses: actions/cache@v4
         with:
           path: ~/.calor/llm-cache
@@ -83,7 +80,7 @@ jobs:
             llm-cache-
 
       - name: Run TaskCompletion benchmark (LLM)
-        if: github.event_name == 'schedule' || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -99,7 +96,7 @@ jobs:
             --verbose
 
       - name: Run Safety benchmark (LLM)
-        if: github.event_name == 'schedule' || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -114,7 +111,7 @@ jobs:
             --verbose
 
       - name: Run EffectDiscipline benchmark (LLM)
-        if: github.event_name == 'schedule' || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -134,7 +131,7 @@ jobs:
           node-version: '20'
 
       - name: Merge LLM results into benchmark-results.json
-        if: github.event_name == 'schedule' || github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
         run: |
           node scripts/merge-llm-results.js
 
@@ -200,7 +197,7 @@ jobs:
   # Uses Claude Code CLI to perform refactoring tasks and measures pass rates
   agent-refactoring-benchmark:
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event.inputs.agent_refactoring == 'true'
+    if: github.event_name == 'release' || github.event.inputs.agent_refactoring == 'true'
     needs: benchmark
     permissions:
       contents: write
