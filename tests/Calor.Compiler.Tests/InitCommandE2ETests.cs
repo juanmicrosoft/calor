@@ -90,7 +90,7 @@ public class InitCommandE2ETests : IDisposable
         Assert.Contains("Calor-First Project", claudeMdContent);
         Assert.Matches(@"calor v\d+\.\d+\.\d+", claudeMdContent);
 
-        // Assert - settings.json exists with hooks and MCP servers
+        // Assert - settings.json exists with hooks (MCP servers are in .mcp.json)
         var settingsPath = Path.Combine(_testDirectory, ".claude", "settings.json");
         Assert.True(File.Exists(settingsPath));
         var settingsContent = await File.ReadAllTextAsync(settingsPath);
@@ -104,20 +104,30 @@ public class InitCommandE2ETests : IDisposable
         Assert.Contains("calor hook validate-ids", settingsContent);
         Assert.Contains("calor hook post-write-lint", settingsContent);
 
+        // settings.json should NOT contain mcpServers (they go in .mcp.json)
+        Assert.DoesNotContain("mcpServers", settingsContent);
+
+        // Assert - .mcp.json exists with MCP servers
+        var mcpJsonPath = Path.Combine(_testDirectory, ".mcp.json");
+        Assert.True(File.Exists(mcpJsonPath));
+        var mcpJsonContent = await File.ReadAllTextAsync(mcpJsonPath);
+
         // Verify MCP servers - both LSP and MCP
-        Assert.Contains("mcpServers", settingsContent);
-        Assert.Contains("calor-lsp", settingsContent);
-        Assert.Contains("\"calor\":", settingsContent); // The MCP server entry
+        Assert.Contains("mcpServers", mcpJsonContent);
+        Assert.Contains("calor-lsp", mcpJsonContent);
+        Assert.Contains("\"calor\":", mcpJsonContent); // The MCP server entry
 
         // Parse JSON to verify structure
-        var settingsJson = JsonDocument.Parse(settingsContent);
-        var mcpServers = settingsJson.RootElement.GetProperty("mcpServers");
+        var mcpJson = JsonDocument.Parse(mcpJsonContent);
+        var mcpServers = mcpJson.RootElement.GetProperty("mcpServers");
 
         Assert.True(mcpServers.TryGetProperty("calor-lsp", out var lspServer));
+        Assert.Equal("stdio", lspServer.GetProperty("type").GetString());
         Assert.Equal("calor", lspServer.GetProperty("command").GetString());
         Assert.Contains("lsp", lspServer.GetProperty("args").EnumerateArray().Select(a => a.GetString()));
 
         Assert.True(mcpServers.TryGetProperty("calor", out var mcpServer));
+        Assert.Equal("stdio", mcpServer.GetProperty("type").GetString());
         Assert.Equal("calor", mcpServer.GetProperty("command").GetString());
         var mcpArgs = mcpServer.GetProperty("args").EnumerateArray().Select(a => a.GetString()).ToList();
         Assert.Contains("mcp", mcpArgs);

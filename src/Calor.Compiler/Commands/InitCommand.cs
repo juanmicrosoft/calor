@@ -295,6 +295,7 @@ public static class InitCommand
             Console.WriteLine();
             Console.WriteLine("Agent configuration:");
             Console.WriteLine("  - MCP server 'calor-lsp' configured for language features");
+            Console.WriteLine("  - MCP server 'calor' configured for AI agent tools (compile, verify, analyze, convert, assess)");
         }
 
         // Show skipped/already initialized info
@@ -317,7 +318,7 @@ public static class InitCommand
         // Show next steps
         Console.WriteLine();
         Console.WriteLine("Next steps:");
-        Console.WriteLine("  1. Run 'calor analyze ./src' to find migration candidates");
+        Console.WriteLine("  1. Run 'calor assess ./src' to find migration candidates");
         Console.WriteLine("  2. Create .calr files in your projects");
         Console.WriteLine("  3. Run 'dotnet build' to compile Calor to C#");
         if (agentNames.Count == 0)
@@ -506,7 +507,7 @@ public static class InitCommand
         // Show next steps
         Console.WriteLine();
         Console.WriteLine("Next steps:");
-        Console.WriteLine("  1. Run 'calor analyze ./src' to find migration candidates");
+        Console.WriteLine("  1. Run 'calor assess ./src' to find migration candidates");
         Console.WriteLine("  2. Create .calr files in your project");
         Console.WriteLine("  3. Run 'dotnet build' to compile Calor to C#");
         if (agentNames.Count == 0)

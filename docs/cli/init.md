@@ -45,8 +45,9 @@ This is ideal for multi-project solutions where you want consistent Calor toolin
 MySolution/
 ├── MySolution.sln
 ├── CLAUDE.md                    # AI config in solution root
+├── .mcp.json                    # MCP server configuration
 ├── .claude/
-│   ├── settings.json
+│   ├── settings.json            # Hooks configuration
 │   └── skills/calor/SKILL.md
 ├── src/
 │   ├── Core/
@@ -70,8 +71,9 @@ This is ideal for standalone projects or when you need different AI configuratio
 MyProject/
 ├── MyProject.csproj             # Has Calor MSBuild targets
 ├── CLAUDE.md                    # AI config in project root
+├── .mcp.json                    # MCP server configuration
 └── .claude/
-    ├── settings.json
+    ├── settings.json            # Hooks configuration
     └── skills/calor/SKILL.md
 ```
 
@@ -126,21 +128,24 @@ Creates the following files:
 | `.claude/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
 | `.claude/skills/calor-semantics/SKILL.md` | Calor semantics and verification skill |
 | `.claude/skills/calor-analyze/SKILL.md` | C# analysis for Calor migration skill |
-| `.claude/settings.json` | **Hooks + MCP servers** - enforces Calor-first development and provides tools |
+| `.claude/settings.json` | **Hooks** - enforces Calor-first development with pre-tool-use hooks |
+| `.mcp.json` | **MCP servers** - provides Calor compiler tools to Claude |
 | `CLAUDE.md` | Project documentation (creates new or updates Calor section) |
 
 #### MCP Server Integration
 
-The `.claude/settings.json` file configures **two MCP servers**:
+The `.mcp.json` file configures **two MCP servers**:
 
 ```json
 {
   "mcpServers": {
     "calor-lsp": {
+      "type": "stdio",
       "command": "calor",
       "args": ["lsp"]
     },
     "calor": {
+      "type": "stdio",
       "command": "calor",
       "args": ["mcp", "--stdio"]
     }
@@ -164,7 +169,7 @@ See [`calor mcp`](/calor/cli/mcp/) for full tool documentation.
 
 #### Calor-First Enforcement
 
-The `.claude/settings.json` file configures a `PreToolUse` hook that **blocks Claude from creating `.cs` files**. When Claude tries to write a C# file, it will see:
+The `.claude/settings.json` file configures a `PreToolUse` hook that **blocks Claude from creating `.cs` files** (MCP servers are in the separate `.mcp.json` file). When Claude tries to write a C# file, it will see:
 
 ```
 BLOCKED: Cannot create C# file 'MyClass.cs'
@@ -516,6 +521,7 @@ Solution: MySolution.sln (3 projects)
 
 Created files:
   CLAUDE.md
+  .mcp.json
   .claude/skills/calor/SKILL.md
   .claude/skills/calor-convert/SKILL.md
   .claude/settings.json

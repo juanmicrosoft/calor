@@ -27,7 +27,8 @@ This creates:
 | `.claude/skills/calor-convert/SKILL.md` | Teaches Claude how to convert C# to Calor |
 | `.claude/skills/calor-semantics/SKILL.md` | Teaches Claude about Calor semantics and verification |
 | `.claude/skills/calor-analyze/SKILL.md` | Teaches Claude how to analyze C# for Calor migration |
-| `.claude/settings.json` | **Hooks + MCP servers** - blocks `.cs` file creation and provides tools |
+| `.claude/settings.json` | **Hooks** - blocks `.cs` file creation with pre-tool-use hooks |
+| `.mcp.json` | **MCP servers** - provides Calor compiler tools to Claude |
 | `CLAUDE.md` | Project documentation with Calor reference and conventions |
 
 You can run this command again anytime to update the Calor documentation section in CLAUDE.md without losing your custom content.
@@ -58,16 +59,18 @@ These tools allow Claude to:
 - **Look up** Calor syntax without leaving the conversation
 - **Assess** C# files to prioritize which ones benefit most from Calor migration
 
-The MCP servers are configured in `.claude/settings.json`:
+The MCP servers are configured in `.mcp.json` (project root):
 
 ```json
 {
   "mcpServers": {
     "calor-lsp": {
+      "type": "stdio",
       "command": "calor",
       "args": ["lsp"]
     },
     "calor": {
+      "type": "stdio",
       "command": "calor",
       "args": ["mcp", "--stdio"]
     }
@@ -107,7 +110,7 @@ The hook allows:
 
 ### Disabling Enforcement
 
-If you need to temporarily allow `.cs` file creation, remove or rename `.claude/settings.json`. Re-run `calor init --ai claude` to restore enforcement.
+If you need to temporarily allow `.cs` file creation, remove or rename `.claude/settings.json` (hooks are in this file). Re-run `calor init --ai claude` to restore enforcement. Note: MCP servers are in `.mcp.json` and can be managed separately.
 
 ---
 
