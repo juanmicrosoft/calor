@@ -332,7 +332,7 @@ Measures end-to-end success:
 
 ## See Also
 
-- [calor analyze](/calor/cli/analyze/) - Score files for migration potential
+- [calor assess](/calor/cli/assess/) - Score files for migration potential
 - [calor convert](/calor/cli/convert/) - Convert files with benchmark option
 - [Benchmarking](/calor/benchmarking/) - Detailed methodology documentation
 - [Results](/calor/benchmarking/results/) - Published benchmark results

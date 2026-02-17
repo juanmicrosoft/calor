@@ -129,6 +129,7 @@ public class McpServerTests
         Assert.Contains("calor_analyze", json);
         Assert.Contains("calor_convert", json);
         Assert.Contains("calor_syntax_help", json);
+        Assert.Contains("calor_assess", json);
     }
 
     [Fact]
@@ -349,6 +350,7 @@ public class McpServerTests
         Assert.Contains("calor_analyze", response);
         Assert.Contains("calor_convert", response);
         Assert.Contains("calor_syntax_help", response);
+        Assert.Contains("calor_assess", response);
     }
 
     [Fact]
@@ -377,5 +379,93 @@ public class McpServerTests
         // Should have responses for initialize and tools/list (initialized is a notification)
         Assert.Contains("protocolVersion", response);
         Assert.Contains("calor_compile", response);
+    }
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_AssessTool_Success()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("10").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_assess",
+                    "arguments": {
+                        "source": "public class Test { public async Task<int> GetValueAsync() { return await Task.FromResult(42); } }"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+        Assert.Contains("success", json);
+        Assert.Contains("summary", json);
+        Assert.Contains("files", json);
+        Assert.Contains("AsyncPotential", json);
+    }
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_AssessTool_MultiFile()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("11").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_assess",
+                    "arguments": {
+                        "files": [
+                            { "path": "Service.cs", "source": "public class Service { public async Task RunAsync() { await Task.Delay(1); } }" },
+                            { "path": "Query.cs", "source": "using System.Linq; public class Query { public int[] Filter(int[] data) => data.Where(x => x > 0).ToArray(); }" }
+                        ]
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+        Assert.Contains("success", json);
+        Assert.Contains("totalFiles", json);
+        Assert.Contains("Service.cs", json);
+        Assert.Contains("Query.cs", json);
+    }
+
+    [Fact]
+    public async Task McpServer_ProcessMessage_AssessToolFlow()
+    {
+        var inputMessage = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_assess","arguments":{"source":"public class Test { public void Method() { } }"}}}""";
+        var inputBytes = Encoding.UTF8.GetBytes(inputMessage);
+        var fullInput = $"Content-Length: {inputBytes.Length}\r\n\r\n{inputMessage}";
+
+        using var input = new MemoryStream(Encoding.UTF8.GetBytes(fullInput));
+        using var output = new MemoryStream();
+
+        var server = new McpServer(input, output);
+        await server.RunAsync();
+
+        output.Position = 0;
+        var response = Encoding.UTF8.GetString(output.ToArray());
+
+        Assert.Contains("success", response);
+        Assert.Contains("dimensions", response);
+        Assert.Contains("ContractPotential", response);
+        Assert.Contains("AsyncPotential", response);
+        Assert.Contains("LinqPotential", response);
     }
 }

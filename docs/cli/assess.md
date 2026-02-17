@@ -1,24 +1,28 @@
 ---
 layout: default
-title: analyze
+title: assess
 parent: CLI Reference
 nav_order: 1
-permalink: /cli/analyze/
+permalink: /cli/assess/
+redirect_from:
+  - /cli/analyze/
 ---
 
-# calor analyze
+# calor assess
 
 Score C# files for Calor migration potential.
 
 ```bash
-calor analyze <path> [options]
+calor assess <path> [options]
 ```
+
+> **Note:** The command `calor analyze` is supported as an alias for backwards compatibility.
 
 ---
 
 ## Overview
 
-The `analyze` command scans a C# codebase and scores each file based on how much it would benefit from Calor's features. It detects patterns like argument validation, null handling, error handling, and side effects that map directly to Calor language constructs.
+The `assess` command scans a C# codebase and scores each file based on how much it would benefit from Calor's features. It detects patterns like argument validation, null handling, error handling, async/await usage, and LINQ patterns that map directly to Calor language constructs.
 
 Use this command to:
 
@@ -31,30 +35,32 @@ Use this command to:
 ## Quick Start
 
 ```bash
-# Analyze current directory
-calor analyze .
+# Assess current directory
+calor assess .
 
-# Analyze with detailed breakdown
-calor analyze ./src --verbose
+# Assess with detailed breakdown
+calor assess ./src --verbose
 
 # Export as JSON for processing
-calor analyze ./src --format json --output analysis.json
+calor assess ./src --format json --output assessment.json
 ```
 
 ---
 
 ## Scoring Dimensions
 
-Each file is scored across six dimensions that correspond to Calor language features:
+Each file is scored across eight dimensions that correspond to Calor language features:
 
 | Dimension | Weight | What It Detects | Calor Feature |
 |:----------|:------:|:----------------|:-------------|
-| **ContractPotential** | 20% | Argument validation, `ArgumentException` throws, range checks | `§Q`/`§S` contracts |
-| **NullSafetyPotential** | 20% | Nullable types, `?.`, `??`, null checks | `Option<T>` |
-| **ErrorHandlingPotential** | 20% | Try/catch blocks, throw statements | `Result<T,E>` |
-| **EffectPotential** | 15% | File I/O, network calls, database access, console | `§E` effect declarations |
-| **ApiComplexityPotential** | 15% | Undocumented public APIs | Calor metadata requirements |
-| **PatternMatchPotential** | 10% | Switch statements/expressions | Exhaustiveness checking |
+| **ContractPotential** | 18% | Argument validation, `ArgumentException` throws, range checks | `§Q`/`§S` contracts |
+| **NullSafetyPotential** | 18% | Nullable types, `?.`, `??`, null checks | `Option<T>` |
+| **ErrorHandlingPotential** | 18% | Try/catch blocks, throw statements | `Result<T,E>` |
+| **EffectPotential** | 13% | File I/O, network calls, database access, console | `§E` effect declarations |
+| **ApiComplexityPotential** | 13% | Undocumented public APIs | Calor metadata requirements |
+| **PatternMatchPotential** | 8% | Switch statements/expressions | Exhaustiveness checking |
+| **AsyncPotential** | 6% | `async`/`await`, `Task<T>`, `CancellationToken`, `ConfigureAwait` | Calor async model |
+| **LinqPotential** | 6% | LINQ methods (`.Where()`, `.Select()`) and query syntax | Calor collection patterns |
 
 The total score (0-100) is the weighted sum of individual dimension scores.
 
@@ -92,7 +98,7 @@ Files are categorized into priority bands based on their total score:
 Human-readable summary with ASCII bar charts:
 
 ```
-=== Calor Migration Analysis ===
+=== Calor Migration Assessment ===
 
 Analyzed: 42 files
 Skipped: 8 files (generated/errors)
@@ -109,7 +115,9 @@ Average Scores by Dimension:
   ContractPotential        38.1 |#######
   NullSafetyPotential      35.6 |#######
   EffectPotential          28.4 |#####
+  AsyncPotential           24.5 |####
   ApiComplexityPotential   22.1 |####
+  LinqPotential            15.8 |###
   PatternMatchPotential    12.3 |##
 
 Top 20 Files for Migration:
@@ -135,7 +143,7 @@ With `--verbose`, each file shows dimension breakdown:
 Machine-readable format for processing:
 
 ```bash
-calor analyze ./src --format json --output analysis.json
+calor assess ./src --format json --output assessment.json
 ```
 
 ```json
@@ -160,7 +168,9 @@ calor analyze ./src --format json --output analysis.json
       "NullSafetyPotential": 35.6,
       "ErrorHandlingPotential": 45.2,
       "PatternMatchPotential": 12.3,
-      "ApiComplexityPotential": 22.1
+      "ApiComplexityPotential": 22.1,
+      "AsyncPotential": 24.5,
+      "LinqPotential": 15.8
     }
   },
   "files": [
@@ -174,7 +184,7 @@ calor analyze ./src --format json --output analysis.json
       "dimensions": {
         "ContractPotential": {
           "score": 88.0,
-          "weight": 0.20,
+          "weight": 0.18,
           "patternCount": 8,
           "examples": ["throw new ArgumentNullException(...)", "if (...) throw validation"]
         }
@@ -189,7 +199,7 @@ calor analyze ./src --format json --output analysis.json
 [SARIF](https://sarifweb.azurewebsites.net/) (Static Analysis Results Interchange Format) for IDE and CI/CD integration:
 
 ```bash
-calor analyze ./src --format sarif --output analysis.sarif
+calor assess ./src --format sarif --output assessment.sarif
 ```
 
 SARIF output integrates with:
@@ -214,7 +224,7 @@ Use exit code `1` in CI/CD to flag codebases with high migration potential:
 
 ```bash
 # Fail CI if high-priority migration candidates exist
-calor analyze ./src --threshold 51
+calor assess ./src --threshold 51
 if [ $? -eq 1 ]; then
   echo "High-priority Calor migration candidates found"
 fi
@@ -228,38 +238,38 @@ fi
 
 ```bash
 # Show top 10 files scoring above 50
-calor analyze ./src --threshold 50 --top 10
+calor assess ./src --threshold 50 --top 10
 ```
 
 ### CI/CD Integration
 
 ```yaml
 # GitHub Actions example
-- name: Analyze Calor migration potential
+- name: Assess Calor migration potential
   run: |
-    calor analyze ./src --format sarif --output calor-analysis.sarif
+    calor assess ./src --format sarif --output calor-assessment.sarif
 
 - name: Upload SARIF
   uses: github/codeql-action/upload-sarif@v2
   with:
-    sarif_file: calor-analysis.sarif
+    sarif_file: calor-assessment.sarif
 ```
 
 ### Generate Migration Report
 
 ```bash
 # Full JSON report for documentation
-calor analyze . --format json --output migration-report.json
+calor assess . --format json --output migration-report.json
 
 # Parse with jq to find critical files
 cat migration-report.json | jq '.files[] | select(.priority == "critical") | .path'
 ```
 
-### Verbose Analysis of Specific Area
+### Verbose Assessment of Specific Area
 
 ```bash
 # Deep dive into a specific directory
-calor analyze ./src/Services --verbose --top 50
+calor assess ./src/Services --verbose --top 50
 ```
 
 ---

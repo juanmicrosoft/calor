@@ -344,4 +344,4 @@ fi
 
 - [calor format](/calor/cli/format/) - Format Calor source files
 - [calor compile](/calor/cli/compile/) - Compile with error reporting
-- [calor analyze](/calor/cli/analyze/) - Analyze C# for migration potential
+- [calor assess](/calor/cli/assess/) - Assess C# for migration potential

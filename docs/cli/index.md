@@ -33,7 +33,7 @@ dotnet tool update -g calor
 | Command | Description |
 |:--------|:------------|
 | `calor` (default) | Compile Calor source files to C# |
-| [`calor analyze`](/calor/cli/analyze/) | Score C# files for Calor migration potential |
+| [`calor assess`](/calor/cli/assess/) | Score C# files for Calor migration potential |
 | [`calor init`](/calor/cli/init/) | Initialize Calor with AI agent support and .csproj integration |
 | [`calor convert`](/calor/cli/convert/) | Convert single files between C# and Calor |
 | [`calor migrate`](/calor/cli/migrate/) | Migrate entire projects between C# and Calor |

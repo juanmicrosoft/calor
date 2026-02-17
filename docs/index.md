@@ -132,16 +132,16 @@ dotnet run --project samples/HelloWorld
 
 ---
 
-## Migration Analysis
+## Migration Assessment
 
-Have an existing C# codebase? Use `calor analyze` to find files that would benefit most from Calor:
+Have an existing C# codebase? Use `calor assess` to find files that would benefit most from Calor:
 
 ```bash
 # Score C# files for migration potential
-calor analyze ./src
+calor assess ./src
 
 # Output:
-# === Calor Migration Analysis ===
+# === Calor Migration Assessment ===
 # Analyzed: 42 files
 # Average Score: 34.2/100
 #
@@ -151,9 +151,9 @@ calor analyze ./src
 #   ...
 ```
 
-The analyzer scores files based on patterns like null handling, error handling, and argument validation that map to Calor features.
+The tool scores files based on patterns like null handling, error handling, async/await, and LINQ usage that map to Calor features.
 
-[Learn more about analyze](/calor/cli/analyze/){: .btn .btn-outline }
+[Learn more about assess](/calor/cli/assess/){: .btn .btn-outline }
 
 ---
 

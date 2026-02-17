@@ -29,6 +29,7 @@ The `mcp` command starts an MCP server that exposes Calor compiler capabilities 
 - **Format** code to canonical style
 - **Diagnose** code with machine-readable diagnostics
 - **Manage IDs** (check and assign declaration IDs)
+- **Assess** C# code for Calor migration potential
 
 The server communicates over stdio using the [Model Context Protocol](https://modelcontextprotocol.io/) specification.
 
@@ -45,7 +46,7 @@ The server communicates over stdio using the [Model Context Protocol](https://mo
 
 ## Available Tools
 
-The MCP server exposes nine tools:
+The MCP server exposes ten tools:
 
 ### calor_compile
 
@@ -186,6 +187,33 @@ Manage Calor declaration IDs. Check for missing, duplicate, or invalid IDs and o
 ```
 
 **Output:** For 'check': ID issues with type, line, kind, name, and message. For 'assign': Modified code and list of assignments.
+
+### calor_assess
+
+Assess C# source code for Calor migration potential. Returns scores across 8 dimensions plus detection of unsupported C# constructs.
+
+**Input Schema:**
+```json
+{
+  "source": "string - C# source code to assess (single file mode)",
+  "files": "array - Multiple C# files to assess (multi-file mode), each with 'path' and 'source'",
+  "options": {
+    "threshold": "integer - Minimum score (0-100) to include in results (default: 0)"
+  }
+}
+```
+
+**Scoring Dimensions:**
+- **ContractPotential** (18%): Argument validation, assertions -> contracts
+- **EffectPotential** (13%): I/O, network, database calls -> effect declarations
+- **NullSafetyPotential** (18%): Nullable types, null checks -> Option&lt;T&gt;
+- **ErrorHandlingPotential** (18%): Try/catch, throw -> Result&lt;T,E&gt;
+- **PatternMatchPotential** (8%): Switch statements -> exhaustiveness checking
+- **ApiComplexityPotential** (13%): Undocumented public APIs
+- **AsyncPotential** (6%): async/await, Task&lt;T&gt; returns
+- **LinqPotential** (6%): LINQ method usage
+
+**Output:** Summary with average score and priority breakdown, plus per-file details including scores, dimensions, and unsupported constructs.
 
 ---
 

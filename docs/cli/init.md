@@ -207,7 +207,7 @@ This means:
 - Codex *should* create `.calr` files based on the instructions
 - However, enforcement is not automatic - Codex may occasionally create `.cs` files
 - Review file extensions after code generation
-- Use `calor analyze` to find any unconverted `.cs` files
+- Use `calor assess` to find any unconverted `.cs` files
 
 After initialization, use these Codex commands:
 
@@ -302,7 +302,7 @@ This means:
 - Copilot *should* create `.calr` files based on the instructions
 - However, enforcement is not automatic - Copilot may occasionally create `.cs` files
 - Review file extensions after code generation
-- Use `calor analyze` to find any unconverted `.cs` files
+- Use `calor assess` to find any unconverted `.cs` files
 
 After initialization, reference the Calor skills when asking Copilot about Calor syntax or converting C# code.
 
@@ -473,7 +473,7 @@ cd ~/projects/MyApp
 calor init
 
 # Analyze codebase for migration candidates
-calor analyze ./src --top 10
+calor assess ./src --top 10
 ```
 
 ### Initialize with Claude Code
@@ -584,7 +584,7 @@ calor init --solution MyApp.sln --ai claude
 
 - [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Complete migration guide
 - [calor convert](/calor/cli/convert/) - Convert individual files
-- [calor analyze](/calor/cli/analyze/) - Find migration candidates
+- [calor assess](/calor/cli/assess/) - Find migration candidates
 - [Claude Integration](/calor/getting-started/claude-integration/) - Using Calor with Claude Code
 - [Codex Integration](/calor/getting-started/codex-integration/) - Using Calor with OpenAI Codex CLI
 - [Gemini Integration](/calor/getting-started/gemini-integration/) - Using Calor with Google Gemini CLI

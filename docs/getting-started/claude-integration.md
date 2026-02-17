@@ -49,12 +49,14 @@ In addition to skills and hooks, `calor init --ai claude` configures **MCP serve
 | `calor_format` | Format code to canonical style |
 | `calor_diagnose` | Get machine-readable diagnostics with precise locations |
 | `calor_ids` | Check/assign declaration IDs (detect missing, duplicates, invalid) |
+| `calor_assess` | Assess C# code for Calor migration potential (scores across 8 dimensions) |
 
 These tools allow Claude to:
 - **Verify** your contracts are satisfiable before you run the code
 - **Catch bugs** through static analysis during code generation
 - **Convert** existing C# code to Calor on-the-fly
 - **Look up** Calor syntax without leaving the conversation
+- **Assess** C# files to prioritize which ones benefit most from Calor migration
 
 The MCP servers are configured in `.claude/settings.json`:
 

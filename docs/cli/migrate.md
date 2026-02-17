@@ -317,6 +317,6 @@ fi
 ## See Also
 
 - [calor convert](/calor/cli/convert/) - Convert single files
-- [calor analyze](/calor/cli/analyze/) - Find migration candidates
+- [calor assess](/calor/cli/assess/) - Find migration candidates
 - [calor benchmark](/calor/cli/benchmark/) - Detailed metrics comparison
 - [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Complete migration guide

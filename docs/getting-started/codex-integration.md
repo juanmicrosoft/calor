@@ -39,7 +39,7 @@ Unlike Claude Code which uses hooks to enforce Calor-first development, **Codex 
 - Codex *should* follow the instructions in AGENTS.md and create `.calr` files
 - However, enforcement is not automatic - Codex may occasionally create `.cs` files
 - Always review file extensions after code generation
-- Use `calor analyze` to find any unconverted `.cs` files
+- Use `calor assess` to find any unconverted `.cs` files
 
 ---
 
@@ -222,7 +222,7 @@ Since Codex doesn't enforce Calor-first automatically, periodically check for un
 
 ```bash
 # Find C# files that might need conversion
-calor analyze ./src --top 10
+calor assess ./src --top 10
 
 # Check for any new .cs files that should be .calr
 find . -name "*.cs" -not -name "*.g.cs" -not -path "./obj/*"
@@ -235,7 +235,7 @@ find . -name "*.cs" -not -name "*.g.cs" -not -path "./obj/*"
 1. **Review generated files** - Always check that Codex created `.calr` files, not `.cs`
 2. **Use explicit instructions** - Be specific about wanting Calor output
 3. **Include skill reference** - Start prompts with `$calor` or `$calor-convert`
-4. **Run analysis regularly** - Use `calor analyze` to find migration candidates
+4. **Run analysis regularly** - Use `calor assess` to find migration candidates
 5. **Convert promptly** - If Codex creates a `.cs` file, convert it immediately
 
 ---

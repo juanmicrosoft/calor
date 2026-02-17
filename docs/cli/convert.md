@@ -258,6 +258,6 @@ Review the warnings and manually adjust as needed.
 ## See Also
 
 - [calor migrate](/calor/cli/migrate/) - Convert entire projects
-- [calor analyze](/calor/cli/analyze/) - Find best conversion candidates
+- [calor assess](/calor/cli/assess/) - Find best conversion candidates
 - [calor benchmark](/calor/cli/benchmark/) - Detailed metrics comparison
 - [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Complete migration guide

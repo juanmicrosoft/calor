@@ -33,7 +33,17 @@ public enum ScoreDimension
     /// <summary>
     /// Public APIs, undocumented methods → Calor metadata.
     /// </summary>
-    ApiComplexityPotential
+    ApiComplexityPotential,
+
+    /// <summary>
+    /// async/await patterns, Task&lt;T&gt; returns → Calor has different async model.
+    /// </summary>
+    AsyncPotential,
+
+    /// <summary>
+    /// LINQ methods (Where, Select, OrderBy) → Calor uses different collection patterns.
+    /// </summary>
+    LinqPotential
 }
 
 /// <summary>
@@ -50,12 +60,14 @@ public sealed class DimensionScore
 
     public static double GetWeight(ScoreDimension dimension) => dimension switch
     {
-        ScoreDimension.ContractPotential => 0.20,
-        ScoreDimension.EffectPotential => 0.15,
-        ScoreDimension.NullSafetyPotential => 0.20,
-        ScoreDimension.ErrorHandlingPotential => 0.20,
-        ScoreDimension.PatternMatchPotential => 0.10,
-        ScoreDimension.ApiComplexityPotential => 0.15,
+        ScoreDimension.ContractPotential => 0.18,
+        ScoreDimension.EffectPotential => 0.13,
+        ScoreDimension.NullSafetyPotential => 0.18,
+        ScoreDimension.ErrorHandlingPotential => 0.18,
+        ScoreDimension.PatternMatchPotential => 0.08,
+        ScoreDimension.ApiComplexityPotential => 0.13,
+        ScoreDimension.AsyncPotential => 0.06,
+        ScoreDimension.LinqPotential => 0.06,
         _ => 0.0
     };
 }

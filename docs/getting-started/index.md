@@ -119,7 +119,7 @@ See [Hello World](/calor/getting-started/hello-world/) for a detailed explanatio
 For existing C# codebases, analyze which files are good candidates for migration:
 
 ```bash
-calor analyze ./src --top 10
+calor assess ./src --top 10
 ```
 
 Then convert high-scoring files:

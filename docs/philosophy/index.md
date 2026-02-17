@@ -138,7 +138,7 @@ Calor targets a specific workflow: AI agents as primary code authors with human 
 
 ### "My team will never adopt this."
 
-Calor doesn't require team-wide adoption. It can target specific modules where correctness matters most — financial calculations, state machines, data validation — while the rest of your codebase stays in C#. The `calor analyze` command identifies which files would benefit most.
+Calor doesn't require team-wide adoption. It can target specific modules where correctness matters most — financial calculations, state machines, data validation — while the rest of your codebase stays in C#. The `calor assess` command identifies which files would benefit most.
 
 ### "Is this production-ready?"
 

@@ -10,15 +10,15 @@ using Calor.Compiler.Telemetry;
 namespace Calor.Compiler.Commands;
 
 /// <summary>
-/// CLI command for analyzing C# codebases for Calor migration potential.
+/// CLI command for assessing C# codebases for Calor migration potential.
 /// </summary>
-public static class AnalyzeCommand
+public static class AssessCommand
 {
     public static Command Create()
     {
         var pathArgument = new Argument<DirectoryInfo>(
             name: "path",
-            description: "Directory to analyze recursively")
+            description: "Directory to assess recursively")
         {
             Arity = ArgumentArity.ExactlyOne
         };
@@ -46,7 +46,7 @@ public static class AnalyzeCommand
             getDefaultValue: () => 20,
             description: "Number of top files to show");
 
-        var command = new Command("analyze", "Analyze C# files for Calor migration potential")
+        var command = new Command("assess", "Assess C# files for Calor migration potential")
         {
             pathArgument,
             formatOption,
@@ -55,6 +55,9 @@ public static class AnalyzeCommand
             verboseOption,
             topOption
         };
+
+        // Add 'analyze' as alias for backwards compatibility
+        command.AddAlias("analyze");
 
         command.SetHandler(ExecuteAsync, pathArgument, formatOption, outputOption, thresholdOption, verboseOption, topOption);
 
@@ -70,7 +73,7 @@ public static class AnalyzeCommand
         int top)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
-        telemetry?.SetCommand("analyze");
+        telemetry?.SetCommand("assess");
         if (telemetry != null)
         {
             var discovered = CalorConfigManager.Discover(path.FullName);
@@ -149,13 +152,13 @@ public static class AnalyzeCommand
         finally
         {
             sw.Stop();
-            telemetry?.TrackCommand("analyze", exitCode, new Dictionary<string, string>
+            telemetry?.TrackCommand("assess", exitCode, new Dictionary<string, string>
             {
                 ["durationMs"] = sw.ElapsedMilliseconds.ToString()
             });
             if (exitCode != 0)
             {
-                IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "analyze", "Analysis failed");
+                IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "assess", "Assessment failed");
             }
         }
     }
@@ -174,7 +177,7 @@ public static class AnalyzeCommand
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("=== Calor Migration Analysis ===");
+        sb.AppendLine("=== Calor Migration Assessment ===");
         sb.AppendLine();
 
         // Summary
@@ -305,7 +308,7 @@ public static class AnalyzeCommand
                     {
                         Driver = new SarifDriver
                         {
-                            Name = "calor-analyze",
+                            Name = "calor-assess",
                             Version = "1.0.0",
                             InformationUri = "https://github.com/calor-lang/calor",
                             Rules = GetSarifRules()
@@ -346,6 +349,8 @@ public static class AnalyzeCommand
         ScoreDimension.ErrorHandlingPotential => "Code has error handling that Calor Result<T,E> can improve",
         ScoreDimension.PatternMatchPotential => "Code has pattern matching that benefits from Calor exhaustiveness",
         ScoreDimension.ApiComplexityPotential => "Public APIs lack documentation that Calor metadata requires",
+        ScoreDimension.AsyncPotential => "Code uses async/await patterns that Calor handles differently",
+        ScoreDimension.LinqPotential => "Code uses LINQ patterns that map to Calor collection operations",
         _ => "Calor migration opportunity"
     };
 

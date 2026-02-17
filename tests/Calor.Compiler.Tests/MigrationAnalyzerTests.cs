@@ -626,12 +626,14 @@ public class MigrationAnalyzerTests
     #region Dimension Weights
 
     [Theory]
-    [InlineData(ScoreDimension.ContractPotential, 0.20)]
-    [InlineData(ScoreDimension.EffectPotential, 0.15)]
-    [InlineData(ScoreDimension.NullSafetyPotential, 0.20)]
-    [InlineData(ScoreDimension.ErrorHandlingPotential, 0.20)]
-    [InlineData(ScoreDimension.PatternMatchPotential, 0.10)]
-    [InlineData(ScoreDimension.ApiComplexityPotential, 0.15)]
+    [InlineData(ScoreDimension.ContractPotential, 0.18)]
+    [InlineData(ScoreDimension.EffectPotential, 0.13)]
+    [InlineData(ScoreDimension.NullSafetyPotential, 0.18)]
+    [InlineData(ScoreDimension.ErrorHandlingPotential, 0.18)]
+    [InlineData(ScoreDimension.PatternMatchPotential, 0.08)]
+    [InlineData(ScoreDimension.ApiComplexityPotential, 0.13)]
+    [InlineData(ScoreDimension.AsyncPotential, 0.06)]
+    [InlineData(ScoreDimension.LinqPotential, 0.06)]
     public void DimensionScore_GetWeight_ReturnsCorrectWeight(ScoreDimension dimension, double expected)
     {
         Assert.Equal(expected, DimensionScore.GetWeight(dimension));

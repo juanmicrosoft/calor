@@ -60,20 +60,20 @@ After this step, you can immediately start writing `.calr` files and they'll com
 
 ## Step 2: Analyze Your Codebase
 
-Use `calor analyze` to find C# files that would benefit most from Calor:
+Use `calor assess` to find C# files that would benefit most from Calor:
 
 ```bash
 # Analyze your source directory
-calor analyze ./src
+calor assess ./src
 
 # Show top 10 candidates with detailed scores
-calor analyze ./src --top 10 --verbose
+calor assess ./src --top 10 --verbose
 ```
 
 ### Understanding the Output
 
 ```
-=== Calor Migration Analysis ===
+=== Calor Migration Assessment ===
 
 Analyzed: 42 files
 Average Score: 34.2/100
@@ -296,7 +296,7 @@ MyProject/
 
 ### What to Convert First
 
-1. **High-scoring files** from `calor analyze`
+1. **High-scoring files** from `calor assess`
 2. **Files with complex validation** - benefit from contracts
 3. **Files with error handling** - benefit from `Result<T,E>`
 4. **Files with side effects** - benefit from effect declarations
@@ -360,5 +360,5 @@ Review these manually and adjust the Calor code as needed.
 - [Syntax Reference](/calor/syntax-reference/) - Complete Calor language reference
 - [Contracts](/calor/syntax-reference/contracts/) - Writing preconditions and postconditions
 - [Effects](/calor/syntax-reference/effects/) - Declaring side effects
-- [calor analyze](/calor/cli/analyze/) - Understanding migration scores
+- [calor assess](/calor/cli/assess/) - Understanding migration scores
 - [calor benchmark](/calor/cli/benchmark/) - Comparing Calor vs C# metrics

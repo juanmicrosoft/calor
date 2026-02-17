@@ -31,6 +31,7 @@ public sealed class McpMessageHandler
         RegisterTool(new FormatTool());
         RegisterTool(new DiagnoseTool());
         RegisterTool(new IdsTool());
+        RegisterTool(new AssessTool());
     }
 
     private void RegisterTool(IMcpTool tool)
