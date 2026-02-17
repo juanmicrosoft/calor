@@ -385,14 +385,20 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 §/F{f001}
 ```
 
-**CRITICAL: Don't mix tag-style (§IDX) inside Lisp expressions:**
+**CRITICAL: Don't mix tag-style (§IDX) inside Lisp expressions or contracts:**
 ```calor
 // WRONG: §IDX inside Lisp expression
 §ASSIGN sum (+ sum §IDX data i)     // ❌ ERROR - can't nest §IDX in (...)
 
+// WRONG: §IDX inside contract
+§S (== result §IDX arr 0)           // ❌ ERROR - can't nest §IDX in contracts
+
 // CORRECT: Use a binding first
 §B{val} §IDX data i
 §ASSIGN sum (+ sum val)             // ✓ Works - val is a simple identifier
+
+// CORRECT: For contracts referencing array elements, use simple postconditions
+§S (>= result 0)                    // ✓ Simple value constraint
 ```
 
 #### Control Flow

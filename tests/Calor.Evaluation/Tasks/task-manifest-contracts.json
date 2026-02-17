@@ -1,0 +1,503 @@
+{
+  "version": "1.0",
+  "description": "Contract Enforcement Benchmark - measures Calor's contract advantages over C#",
+  "notes": "Tasks are designed to demonstrate where Calor's §Q (preconditions) and §S (postconditions) catch bugs that C# might miss. Tests include both valid inputs and contract-violating inputs.",
+  "tasks": [
+    {
+      "id": "contract-001",
+      "name": "SquareRoot",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "description": "Calculate integer square root with non-negative precondition",
+      "prompt": "Write a public function named IntSqrt that calculates the integer square root of n (the largest integer whose square is <= n). The function REQUIRES n to be non-negative. Use a precondition to enforce this. For Calor use §Q, for C# throw ArgumentException if n < 0.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [1], "expected": 1 },
+        { "input": [4], "expected": 2 },
+        { "input": [9], "expected": 3 },
+        { "input": [10], "expected": 3 },
+        { "input": [100], "expected": 10 },
+        { "input": [2], "expected": 1 },
+        { "input": [-1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative input should trigger contract violation" },
+        { "input": [-100], "expectsContractViolation": true, "isEdgeCase": true, "description": "Large negative should trigger contract violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "IntSqrt",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "math", "non-negative"]
+    },
+    {
+      "id": "contract-002",
+      "name": "Factorial",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "description": "Calculate factorial with non-negative precondition and positive postcondition",
+      "prompt": "Write a public function named Factorial that calculates n! (n factorial). The function REQUIRES n to be non-negative (0 to 12 to avoid overflow). It ENSURES the result is at least 1. Use preconditions and postconditions to enforce these constraints.",
+      "testCases": [
+        { "input": [0], "expected": 1 },
+        { "input": [1], "expected": 1 },
+        { "input": [2], "expected": 2 },
+        { "input": [3], "expected": 6 },
+        { "input": [4], "expected": 24 },
+        { "input": [5], "expected": 120 },
+        { "input": [10], "expected": 3628800 },
+        { "input": [12], "expected": 479001600 },
+        { "input": [-1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative input should trigger precondition violation" },
+        { "input": [-5], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative input should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Factorial",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "postcondition", "math", "recursion"]
+    },
+    {
+      "id": "contract-003",
+      "name": "SafeDivide",
+      "category": "precondition-enforcement",
+      "difficulty": 1,
+      "description": "Division with non-zero divisor precondition",
+      "prompt": "Write a public function named Divide that divides a by b. The function REQUIRES b to be non-zero. Use a precondition to enforce this - do NOT silently return 0 or handle the error. The caller is responsible for ensuring b != 0.",
+      "testCases": [
+        { "input": [10, 2], "expected": 5 },
+        { "input": [15, 3], "expected": 5 },
+        { "input": [7, 2], "expected": 3 },
+        { "input": [0, 5], "expected": 0 },
+        { "input": [-10, 2], "expected": -5 },
+        { "input": [10, -2], "expected": -5 },
+        { "input": [100, 7], "expected": 14 },
+        { "input": [10, 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "Division by zero should trigger precondition violation" },
+        { "input": [0, 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "0/0 should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Divide",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "division-by-zero", "arithmetic"]
+    },
+    {
+      "id": "contract-004",
+      "name": "ArrayElement",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "description": "Array access with bounds preconditions",
+      "prompt": "Write a public function named GetElement that returns the element at index i from an integer array. The function REQUIRES: array is not null, index >= 0, and index < array length. Use preconditions to enforce all three constraints.",
+      "testCases": [
+        { "input": [[1, 2, 3], 0], "expected": 1 },
+        { "input": [[1, 2, 3], 1], "expected": 2 },
+        { "input": [[1, 2, 3], 2], "expected": 3 },
+        { "input": [[42], 0], "expected": 42 },
+        { "input": [[-5, 10, -15], 2], "expected": -15 },
+        { "input": [[1, 2, 3], -1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative index should trigger precondition violation" },
+        { "input": [[1, 2, 3], 3], "expectsContractViolation": true, "isEdgeCase": true, "description": "Index out of bounds should trigger precondition violation" },
+        { "input": [[1, 2, 3], 100], "expectsContractViolation": true, "isEdgeCase": true, "description": "Large index should trigger precondition violation" },
+        { "input": [null, 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "Null array should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "GetElement",
+        "parameterTypes": ["int[]", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "arrays", "bounds", "null-safety"]
+    },
+    {
+      "id": "contract-005",
+      "name": "Modulo",
+      "category": "precondition-enforcement",
+      "difficulty": 1,
+      "description": "Modulo with non-zero divisor precondition",
+      "prompt": "Write a public function named Mod that computes a modulo b. The function REQUIRES b to be non-zero. Use a precondition to enforce this.",
+      "testCases": [
+        { "input": [10, 3], "expected": 1 },
+        { "input": [15, 5], "expected": 0 },
+        { "input": [7, 2], "expected": 1 },
+        { "input": [100, 7], "expected": 2 },
+        { "input": [0, 5], "expected": 0 },
+        { "input": [10, 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "Modulo by zero should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Mod",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "division-by-zero", "arithmetic"]
+    },
+    {
+      "id": "contract-006",
+      "name": "AbsoluteValue",
+      "category": "postcondition-guarantee",
+      "difficulty": 1,
+      "description": "Absolute value with non-negative result postcondition",
+      "prompt": "Write a public function named Abs that returns the absolute value of an integer. The function ENSURES the result is always non-negative (>= 0). Use a postcondition to guarantee this.",
+      "testCases": [
+        { "input": [5], "expected": 5 },
+        { "input": [-5], "expected": 5 },
+        { "input": [0], "expected": 0 },
+        { "input": [-1], "expected": 1 },
+        { "input": [100], "expected": 100 },
+        { "input": [-100], "expected": 100 },
+        { "input": [2147483647], "expected": 2147483647 }
+      ],
+      "expectedSignature": {
+        "functionName": "Abs",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "math", "non-negative"]
+    },
+    {
+      "id": "contract-007",
+      "name": "ClampValue",
+      "category": "postcondition-guarantee",
+      "difficulty": 2,
+      "description": "Clamp with bounded result postconditions",
+      "prompt": "Write a public function named Clamp that constrains value between min and max. The function REQUIRES min <= max. It ENSURES result >= min AND result <= max. Use both pre and postconditions.",
+      "testCases": [
+        { "input": [5, 0, 10], "expected": 5 },
+        { "input": [15, 0, 10], "expected": 10 },
+        { "input": [-5, 0, 10], "expected": 0 },
+        { "input": [0, 0, 10], "expected": 0 },
+        { "input": [10, 0, 10], "expected": 10 },
+        { "input": [5, 5, 5], "expected": 5 },
+        { "input": [-100, -50, -10], "expected": -50 },
+        { "input": [0, -10, 10], "expected": 0 },
+        { "input": [5, 10, 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "min > max should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Clamp",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "postcondition", "bounds"]
+    },
+    {
+      "id": "contract-008",
+      "name": "Percentage",
+      "category": "postcondition-guarantee",
+      "difficulty": 2,
+      "description": "Calculate percentage with bounded result",
+      "prompt": "Write a public function named Percent that calculates what percentage part is of whole (part * 100 / whole). The function REQUIRES whole > 0 and part >= 0 and part <= whole. It ENSURES result >= 0 AND result <= 100.",
+      "testCases": [
+        { "input": [50, 100], "expected": 50 },
+        { "input": [25, 100], "expected": 25 },
+        { "input": [1, 4], "expected": 25 },
+        { "input": [3, 4], "expected": 75 },
+        { "input": [0, 100], "expected": 0 },
+        { "input": [100, 100], "expected": 100 },
+        { "input": [1, 3], "expected": 33 },
+        { "input": [50, 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "Zero whole should trigger precondition violation" },
+        { "input": [-10, 100], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative part should trigger precondition violation" },
+        { "input": [150, 100], "expectsContractViolation": true, "isEdgeCase": true, "description": "Part > whole should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Percent",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "postcondition", "bounds", "arithmetic"]
+    },
+    {
+      "id": "contract-009",
+      "name": "BinarySearch",
+      "category": "combined-contracts",
+      "difficulty": 3,
+      "description": "Binary search with multiple contracts",
+      "prompt": "Write a public function named BinarySearch that finds value in a sorted integer array and returns its index. The function REQUIRES: array is not null, array length > 0. It ENSURES: result == -1 OR (result >= 0 AND result < array length). Return -1 if not found.",
+      "testCases": [
+        { "input": [[1, 2, 3, 4, 5], 3], "expected": 2 },
+        { "input": [[1, 2, 3, 4, 5], 1], "expected": 0 },
+        { "input": [[1, 2, 3, 4, 5], 5], "expected": 4 },
+        { "input": [[1, 2, 3, 4, 5], 6], "expected": -1 },
+        { "input": [[1, 2, 3, 4, 5], 0], "expected": -1 },
+        { "input": [[10], 10], "expected": 0 },
+        { "input": [[10], 5], "expected": -1 },
+        { "input": [[1, 3, 5, 7, 9], 7], "expected": 3 },
+        { "input": [null, 1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Null array should trigger precondition violation" },
+        { "input": [[], 1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Empty array should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "BinarySearch",
+        "parameterTypes": ["int[]", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "postcondition", "algorithms", "arrays"]
+    },
+    {
+      "id": "contract-010",
+      "name": "Power",
+      "category": "combined-contracts",
+      "difficulty": 2,
+      "description": "Calculate power with non-negative exponent",
+      "prompt": "Write a public function named Power that calculates base raised to exp (base^exp). The function REQUIRES exp >= 0. It ENSURES result >= 1 when base != 0, and result == 0 when base == 0 and exp > 0.",
+      "testCases": [
+        { "input": [2, 0], "expected": 1 },
+        { "input": [2, 1], "expected": 2 },
+        { "input": [2, 2], "expected": 4 },
+        { "input": [2, 3], "expected": 8 },
+        { "input": [2, 10], "expected": 1024 },
+        { "input": [3, 4], "expected": 81 },
+        { "input": [5, 3], "expected": 125 },
+        { "input": [1, 100], "expected": 1 },
+        { "input": [0, 5], "expected": 0 },
+        { "input": [10, 0], "expected": 1 },
+        { "input": [2, -1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative exponent should trigger precondition violation" },
+        { "input": [5, -3], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative exponent should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Power",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "math", "non-negative"]
+    },
+    {
+      "id": "contract-011",
+      "name": "StringAt",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "description": "String character access with bounds preconditions",
+      "prompt": "Write a public function named CharAt that returns the character at index i from a string. The function REQUIRES: string is not null, string is not empty, index >= 0, and index < string length. Use preconditions to enforce all constraints.",
+      "testCases": [
+        { "input": ["hello", 0], "expected": "h" },
+        { "input": ["hello", 4], "expected": "o" },
+        { "input": ["hello", 2], "expected": "l" },
+        { "input": ["a", 0], "expected": "a" },
+        { "input": ["test", 3], "expected": "t" },
+        { "input": ["hello", -1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative index should trigger precondition violation" },
+        { "input": ["hello", 5], "expectsContractViolation": true, "isEdgeCase": true, "description": "Index out of bounds should trigger precondition violation" },
+        { "input": [null, 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "Null string should trigger precondition violation" },
+        { "input": ["", 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "Empty string should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "CharAt",
+        "parameterTypes": ["string", "int"],
+        "returnType": "char"
+      },
+      "tags": ["precondition", "strings", "bounds", "null-safety"]
+    },
+    {
+      "id": "contract-012",
+      "name": "Average",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "description": "Calculate average with non-empty array precondition",
+      "prompt": "Write a public function named Average that calculates the average of an integer array (using integer division). The function REQUIRES: array is not null AND array length > 0. Use preconditions to enforce these.",
+      "testCases": [
+        { "input": [[1, 2, 3, 4, 5]], "expected": 3 },
+        { "input": [[10]], "expected": 10 },
+        { "input": [[1, 2]], "expected": 1 },
+        { "input": [[6, 6, 6]], "expected": 6 },
+        { "input": [[0, 0, 0]], "expected": 0 },
+        { "input": [[-10, 10]], "expected": 0 },
+        { "input": [null], "expectsContractViolation": true, "isEdgeCase": true, "description": "Null array should trigger precondition violation" },
+        { "input": [[]], "expectsContractViolation": true, "isEdgeCase": true, "description": "Empty array should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Average",
+        "parameterTypes": ["int[]"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "arrays", "arithmetic", "null-safety"]
+    },
+    {
+      "id": "contract-013",
+      "name": "GCD",
+      "category": "combined-contracts",
+      "difficulty": 3,
+      "description": "Greatest common divisor with positive inputs",
+      "prompt": "Write a public function named GCD that calculates the greatest common divisor of a and b using Euclid's algorithm. The function REQUIRES both a > 0 AND b > 0. It ENSURES result > 0 AND result divides both a and b.",
+      "testCases": [
+        { "input": [12, 8], "expected": 4 },
+        { "input": [15, 5], "expected": 5 },
+        { "input": [7, 3], "expected": 1 },
+        { "input": [100, 25], "expected": 25 },
+        { "input": [17, 13], "expected": 1 },
+        { "input": [48, 18], "expected": 6 },
+        { "input": [1, 1], "expected": 1 },
+        { "input": [0, 5], "expectsContractViolation": true, "isEdgeCase": true, "description": "Zero input should trigger precondition violation" },
+        { "input": [5, 0], "expectsContractViolation": true, "isEdgeCase": true, "description": "Zero input should trigger precondition violation" },
+        { "input": [-5, 10], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative input should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "GCD",
+        "parameterTypes": ["int", "int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "postcondition", "math", "algorithms"]
+    },
+    {
+      "id": "contract-014",
+      "name": "Fibonacci",
+      "category": "combined-contracts",
+      "difficulty": 2,
+      "description": "Fibonacci with non-negative input and non-negative result",
+      "prompt": "Write a public function named Fibonacci that returns the nth Fibonacci number (F(0)=0, F(1)=1, F(n)=F(n-1)+F(n-2)). The function REQUIRES n >= 0 AND n <= 45 (to avoid overflow). It ENSURES result >= 0.",
+      "testCases": [
+        { "input": [0], "expected": 0 },
+        { "input": [1], "expected": 1 },
+        { "input": [2], "expected": 1 },
+        { "input": [3], "expected": 2 },
+        { "input": [4], "expected": 3 },
+        { "input": [5], "expected": 5 },
+        { "input": [10], "expected": 55 },
+        { "input": [20], "expected": 6765 },
+        { "input": [-1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative input should trigger precondition violation" },
+        { "input": [46], "expectsContractViolation": true, "isEdgeCase": true, "description": "Input > 45 should trigger precondition violation (overflow)" }
+      ],
+      "expectedSignature": {
+        "functionName": "Fibonacci",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "postcondition", "math", "recursion"]
+    },
+    {
+      "id": "contract-015",
+      "name": "SubstringLength",
+      "category": "precondition-enforcement",
+      "difficulty": 2,
+      "description": "Substring with bounds preconditions",
+      "prompt": "Write a public function named Substring that returns a substring starting at start with given length. The function REQUIRES: string is not null, start >= 0, length >= 0, and start + length <= string length. Use preconditions to enforce all constraints.",
+      "testCases": [
+        { "input": ["hello", 0, 5], "expected": "hello" },
+        { "input": ["hello", 1, 3], "expected": "ell" },
+        { "input": ["hello", 0, 0], "expected": "" },
+        { "input": ["hello", 4, 1], "expected": "o" },
+        { "input": ["test", 0, 4], "expected": "test" },
+        { "input": ["hello", -1, 3], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative start should trigger precondition violation" },
+        { "input": ["hello", 0, -1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Negative length should trigger precondition violation" },
+        { "input": ["hello", 3, 5], "expectsContractViolation": true, "isEdgeCase": true, "description": "start + length > string length should trigger precondition violation" },
+        { "input": [null, 0, 1], "expectsContractViolation": true, "isEdgeCase": true, "description": "Null string should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Substring",
+        "parameterTypes": ["string", "int", "int"],
+        "returnType": "string"
+      },
+      "tags": ["precondition", "strings", "bounds", "null-safety"]
+    },
+    {
+      "id": "contract-016",
+      "name": "ArraySum",
+      "category": "precondition-enforcement",
+      "difficulty": 1,
+      "description": "Sum array elements with non-null precondition",
+      "prompt": "Write a public function named Sum that returns the sum of all elements in an integer array. The function REQUIRES array is not null. Use a precondition to enforce this. Return 0 for empty arrays.",
+      "testCases": [
+        { "input": [[1, 2, 3, 4, 5]], "expected": 15 },
+        { "input": [[10]], "expected": 10 },
+        { "input": [[-1, 1]], "expected": 0 },
+        { "input": [[0, 0, 0]], "expected": 0 },
+        { "input": [[]], "expected": 0 },
+        { "input": [[100, -50, 25]], "expected": 75 },
+        { "input": [null], "expectsContractViolation": true, "isEdgeCase": true, "description": "Null array should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Sum",
+        "parameterTypes": ["int[]"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "arrays", "null-safety"]
+    },
+    {
+      "id": "contract-017",
+      "name": "RangeCheck",
+      "category": "postcondition-guarantee",
+      "difficulty": 1,
+      "description": "Ensure boolean result postcondition",
+      "prompt": "Write a public function named InRange that returns true if value is between min and max (inclusive). The function REQUIRES min <= max. It ENSURES the result accurately reflects whether value is in range.",
+      "testCases": [
+        { "input": [5, 1, 10], "expected": true },
+        { "input": [1, 1, 10], "expected": true },
+        { "input": [10, 1, 10], "expected": true },
+        { "input": [0, 1, 10], "expected": false },
+        { "input": [11, 1, 10], "expected": false },
+        { "input": [5, 5, 5], "expected": true },
+        { "input": [-5, -10, 0], "expected": true },
+        { "input": [5, 10, 1], "expectsContractViolation": true, "isEdgeCase": true, "description": "min > max should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "InRange",
+        "parameterTypes": ["int", "int", "int"],
+        "returnType": "bool"
+      },
+      "tags": ["precondition", "bounds", "conditionals"]
+    },
+    {
+      "id": "contract-018",
+      "name": "ArrayMax",
+      "category": "combined-contracts",
+      "difficulty": 2,
+      "description": "Find maximum with non-empty array precondition and bounded result postcondition",
+      "prompt": "Write a public function named Max that returns the maximum value in an integer array. The function REQUIRES: array is not null AND array length > 0. It ENSURES the result exists in the array (result is one of the array elements).",
+      "testCases": [
+        { "input": [[1, 2, 3]], "expected": 3 },
+        { "input": [[3, 2, 1]], "expected": 3 },
+        { "input": [[5]], "expected": 5 },
+        { "input": [[-1, -2, -3]], "expected": -1 },
+        { "input": [[0, 0, 0]], "expected": 0 },
+        { "input": [[1, 5, 3, 5, 2]], "expected": 5 },
+        { "input": [null], "expectsContractViolation": true, "isEdgeCase": true, "description": "Null array should trigger precondition violation" },
+        { "input": [[]], "expectsContractViolation": true, "isEdgeCase": true, "description": "Empty array should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Max",
+        "parameterTypes": ["int[]"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "postcondition", "arrays"]
+    },
+    {
+      "id": "contract-019",
+      "name": "ArrayMin",
+      "category": "combined-contracts",
+      "difficulty": 2,
+      "description": "Find minimum with non-empty array precondition",
+      "prompt": "Write a public function named Min that returns the minimum value in an integer array. The function REQUIRES: array is not null AND array length > 0. It ENSURES the result exists in the array.",
+      "testCases": [
+        { "input": [[1, 2, 3]], "expected": 1 },
+        { "input": [[3, 2, 1]], "expected": 1 },
+        { "input": [[5]], "expected": 5 },
+        { "input": [[-1, -2, -3]], "expected": -3 },
+        { "input": [[0, 0, 0]], "expected": 0 },
+        { "input": [[1, 5, 3, 0, 2]], "expected": 0 },
+        { "input": [null], "expectsContractViolation": true, "isEdgeCase": true, "description": "Null array should trigger precondition violation" },
+        { "input": [[]], "expectsContractViolation": true, "isEdgeCase": true, "description": "Empty array should trigger precondition violation" }
+      ],
+      "expectedSignature": {
+        "functionName": "Min",
+        "parameterTypes": ["int[]"],
+        "returnType": "int"
+      },
+      "tags": ["precondition", "postcondition", "arrays"]
+    },
+    {
+      "id": "contract-020",
+      "name": "Sign",
+      "category": "postcondition-guarantee",
+      "difficulty": 1,
+      "description": "Return sign with bounded result postcondition",
+      "prompt": "Write a public function named Sign that returns -1 if n < 0, 0 if n == 0, or 1 if n > 0. The function ENSURES result is -1, 0, or 1.",
+      "testCases": [
+        { "input": [5], "expected": 1 },
+        { "input": [-5], "expected": -1 },
+        { "input": [0], "expected": 0 },
+        { "input": [100], "expected": 1 },
+        { "input": [-100], "expected": -1 },
+        { "input": [1], "expected": 1 },
+        { "input": [-1], "expected": -1 },
+        { "input": [2147483647], "expected": 1 }
+      ],
+      "expectedSignature": {
+        "functionName": "Sign",
+        "parameterTypes": ["int"],
+        "returnType": "int"
+      },
+      "tags": ["postcondition", "math", "conditionals"]
+    }
+  ]
+}
