@@ -2063,4 +2063,46 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var argsStr = string.Join(" ", args);
         return args.Any() ? $"({opName} {argsStr})" : $"({opName})";
     }
+
+    // Fallback nodes for unsupported C# constructs
+
+    public string Visit(FallbackExpressionNode node)
+    {
+        // Emit as §ERR{"TODO: feature -- original: code"}
+        // Note: Cannot use /* */ comments inline as Calor parser doesn't support them in expressions
+        var escapedCode = node.OriginalCSharp
+            .Replace("\"", "'")  // Escape double quotes since we're inside a string
+            .Replace("\n", " ")  // Collapse newlines
+            .Replace("\r", "");  // Remove carriage returns
+
+        // Truncate very long code to avoid overly long error messages
+        if (escapedCode.Length > 100)
+        {
+            escapedCode = escapedCode.Substring(0, 97) + "...";
+        }
+
+        return $"§ERR{{\"TODO: {node.FeatureName} -- C#: {escapedCode}\"}}";
+    }
+
+    public string Visit(FallbackCommentNode node)
+    {
+        // Emit as multi-line comment block with TODO
+        AppendLine($"// TODO: Manual conversion needed [{node.FeatureName}]");
+
+        // Split original C# into lines and emit each as a comment
+        var lines = node.OriginalCSharp.Split('\n');
+        foreach (var line in lines)
+        {
+            var trimmed = line.TrimEnd('\r');
+            AppendLine($"// C#: {trimmed}");
+        }
+
+        // Add suggestion if present
+        if (!string.IsNullOrEmpty(node.Suggestion))
+        {
+            AppendLine($"// Suggestion: {node.Suggestion}");
+        }
+
+        return "";
+    }
 }

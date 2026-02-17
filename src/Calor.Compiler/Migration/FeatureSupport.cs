@@ -304,6 +304,78 @@ public static class FeatureSupport
             Description = "Explicit conversions require manual handling",
             Workaround = "Use explicit conversion methods"
         },
+
+        // Fallback features (for explain mode)
+        ["unknown-expression"] = new FeatureInfo
+        {
+            Name = "unknown-expression",
+            Support = SupportLevel.NotSupported,
+            Description = "Unknown or unsupported expression syntax",
+            Workaround = "Review and manually convert the expression"
+        },
+        ["unknown-literal"] = new FeatureInfo
+        {
+            Name = "unknown-literal",
+            Support = SupportLevel.NotSupported,
+            Description = "Unknown or unsupported literal type",
+            Workaround = "Use a supported literal type"
+        },
+        ["complex-is-pattern"] = new FeatureInfo
+        {
+            Name = "complex-is-pattern",
+            Support = SupportLevel.NotSupported,
+            Description = "Complex 'is' pattern matching expression",
+            Workaround = "Break down into simpler type checks or use match expression"
+        },
+        ["collection-spread"] = new FeatureInfo
+        {
+            Name = "collection-spread",
+            Support = SupportLevel.NotSupported,
+            Description = "Collection spread operator (..)",
+            Workaround = "Use explicit collection concatenation methods"
+        },
+        ["implicit-new-with-args"] = new FeatureInfo
+        {
+            Name = "implicit-new-with-args",
+            Support = SupportLevel.NotSupported,
+            Description = "Target-typed new with arguments: new(args)",
+            Workaround = "Use explicit type: new TypeName(args)"
+        },
+        ["binary pattern (and/or)"] = new FeatureInfo
+        {
+            Name = "binary pattern (and/or)",
+            Support = SupportLevel.NotSupported,
+            Description = "Pattern combinators: pattern1 and pattern2, pattern1 or pattern2",
+            Workaround = "Use separate match cases or if-else with explicit conditions"
+        },
+        ["unary pattern (not)"] = new FeatureInfo
+        {
+            Name = "unary pattern (not)",
+            Support = SupportLevel.NotSupported,
+            Description = "Negated patterns: not null, not 0",
+            Workaround = "Use guard clause with negated condition"
+        },
+        ["unknown-pattern"] = new FeatureInfo
+        {
+            Name = "unknown-pattern",
+            Support = SupportLevel.NotSupported,
+            Description = "Unrecognized pattern syntax",
+            Workaround = "Simplify pattern or use if-else with explicit conditions"
+        },
+        ["complex-recursive-pattern"] = new FeatureInfo
+        {
+            Name = "complex-recursive-pattern",
+            Support = SupportLevel.NotSupported,
+            Description = "Complex recursive pattern without clear type",
+            Workaround = "Use positional or property patterns with explicit type"
+        },
+        ["postfix-operator"] = new FeatureInfo
+        {
+            Name = "postfix-operator",
+            Support = SupportLevel.NotSupported,
+            Description = "Postfix increment/decrement as expression: i++, i--",
+            Workaround = "Use as statement or rewrite as x = x + 1"
+        },
     };
 
     /// <summary>

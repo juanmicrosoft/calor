@@ -1132,6 +1132,187 @@ public class CSharpToCalorConversionTests
 
     #endregion
 
+    #region Fallback Tests
+
+    [Fact]
+    public void Convert_UnsupportedExpression_EmitsFallbackNode_WhenGracefulFallbackEnabled()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    var x = stackalloc int[10];
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var result = converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§ERR{\"TODO: unknown-expression", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_UnsupportedExpression_FailsConversion_WhenGracefulFallbackDisabled()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    var x = stackalloc int[10];
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = false });
+        var result = converter.Convert(csharpSource);
+
+        Assert.False(result.Success);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Issues, i =>
+            i.Severity == ConversionIssueSeverity.Error &&
+            i.Message.Contains("unknown-expression"));
+    }
+
+    [Fact]
+    public void Convert_UnsupportedExpression_RecordsInExplanation()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    var x = stackalloc int[10];
+                    var y = stackalloc byte[20];
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Explain = true });
+        var result = converter.Convert(csharpSource);
+
+        Assert.True(result.Success);
+        var explanation = result.Context.GetExplanation();
+
+        Assert.True(explanation.TotalUnsupportedCount >= 2);
+        Assert.Contains("unknown-expression", explanation.UnsupportedFeatures.Keys);
+    }
+
+    [Fact]
+    public void Convert_FallbackExpression_DoesNotContainInlineComments()
+    {
+        // Inline /* */ comments break the Calor parser - verify they're not emitted
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    var x = stackalloc int[10];
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharpSource);
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain("/*", result.CalorSource);
+        Assert.DoesNotContain("*/", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_FallbackExpression_RoundtripsSuccessfully()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    var x = stackalloc int[10];
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var conversionResult = converter.Convert(csharpSource);
+
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+
+        // Compile the Calor source back to C#
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
+    [Fact]
+    public void Convert_ComplexPattern_EmitsWildcardFallback()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M(object o)
+                {
+                    var result = o switch
+                    {
+                        string s and { Length: > 5 } => "long",
+                        _ => "other"
+                    };
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Explain = true });
+        var result = converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should emit wildcard pattern, not raw C# text
+        Assert.DoesNotContain("string s and", result.CalorSource);
+        Assert.Contains("§K _", result.CalorSource);
+
+        // Should record in explanation
+        var explanation = result.Context.GetExplanation();
+        Assert.Contains("binary pattern (and/or)", explanation.UnsupportedFeatures.Keys);
+    }
+
+    [Fact]
+    public void Convert_ComplexPattern_RoundtripsSuccessfully()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M(object o)
+                {
+                    var result = o switch
+                    {
+                        string s and { Length: > 5 } => "long",
+                        int i when i > 0 => "positive",
+                        _ => "other"
+                    };
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var conversionResult = converter.Convert(csharpSource);
+
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+
+        // Compile the Calor source back to C#
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static string GetErrorMessage(ConversionResult result)

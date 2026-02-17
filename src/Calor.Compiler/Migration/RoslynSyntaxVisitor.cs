@@ -829,18 +829,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private StatementNode? HandleUnsupportedStatement(StatementSyntax statement)
     {
-        return HandleUnsupportedStatement(statement, $"statement type: {statement.Kind()}");
+        var featureName = statement.Kind().ToString().Replace("Statement", "").ToLowerInvariant();
+        return HandleUnsupportedStatement(statement, featureName);
     }
 
-    private StatementNode? HandleUnsupportedStatement(StatementSyntax statement, string description)
+    private StatementNode? HandleUnsupportedStatement(StatementSyntax statement, string featureName)
     {
         var lineSpan = statement.GetLocation().GetLineSpan();
         _context.AddWarning(
-            $"Unsupported {description}",
+            $"Unsupported statement: {featureName}",
+            feature: featureName,
             line: lineSpan.StartLinePosition.Line + 1,
             column: lineSpan.StartLinePosition.Character + 1);
         _context.IncrementSkipped();
-        return null;
+
+        // Return a fallback comment node instead of null
+        return CreateFallbackStatement(statement, featureName);
     }
 
     private ReturnStatementNode ConvertReturnStatement(ReturnStatementSyntax node)
@@ -1554,8 +1558,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Parenthesized pattern: (pattern)
             ParenthesizedPatternSyntax parenPattern => ConvertPattern(parenPattern.Pattern),
 
-            // Default fallback: emit as raw text
-            _ => new LiteralPatternNode(span, new ReferenceNode(span, pattern.ToString()))
+            // Default fallback: use wildcard to ensure valid Calor
+            _ => HandleUnsupportedPattern(pattern, "unknown-pattern")
         };
     }
 
@@ -1619,23 +1623,33 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 return new VarPatternNode(span, designation.Identifier.Text);
             }
+            // Type-only pattern (e.g., "string" in "case string:") - emit as type reference
             return new LiteralPatternNode(span, new ReferenceNode(span, pattern.Type.ToString()));
         }
 
-        return new LiteralPatternNode(span, new ReferenceNode(span, pattern.ToString()));
+        // Complex recursive pattern without clear type - use wildcard fallback
+        return HandleUnsupportedPattern(pattern, "complex-recursive-pattern");
     }
 
     private PatternNode HandleUnsupportedPattern(PatternSyntax pattern, string description)
     {
         var span = GetTextSpan(pattern);
         var lineSpan = pattern.GetLocation().GetLineSpan();
+        var line = lineSpan.StartLinePosition.Line + 1;
+        var suggestion = "Simplify pattern or use if-else with explicit conditions";
+
         _context.AddWarning(
-            $"Partial support for {description}: may not round-trip exactly",
-            line: lineSpan.StartLinePosition.Line + 1,
+            $"Unsupported pattern [{description}]: will match any value (wildcard)",
+            feature: description,
+            line: line,
             column: lineSpan.StartLinePosition.Character + 1);
 
-        // Emit as a literal pattern containing the raw text
-        return new LiteralPatternNode(span, new ReferenceNode(span, pattern.ToString()));
+        // Record for explanation output
+        _context.RecordUnsupportedFeature(description, pattern.ToString(), line, suggestion);
+
+        // Emit as wildcard pattern - this is valid Calor but changes semantics
+        // The original pattern is lost, so the case will match more broadly
+        return new WildcardPatternNode(span);
     }
 
     private ExpressionNode ConvertExpression(ExpressionSyntax expression)
@@ -1667,7 +1681,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
             ImplicitObjectCreationExpressionSyntax implicitNew => ConvertImplicitObjectCreation(implicitNew),
             SwitchExpressionSyntax switchExpr => ConvertSwitchExpression(switchExpr),
-            _ => new ReferenceNode(GetTextSpan(expression), expression.ToString())
+            _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
 
@@ -1693,7 +1707,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new BoolLiteralNode(GetTextSpan(literal), false),
             SyntaxKind.NullLiteralExpression =>
                 new ReferenceNode(GetTextSpan(literal), "null"),
-            _ => new ReferenceNode(GetTextSpan(literal), literal.ToString())
+            _ => CreateFallbackExpression(literal, "unknown-literal")
         };
     }
 
@@ -1733,8 +1747,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 // "x is SomeType" - convert to type check reference
                 new ReferenceNode(GetTextSpan(isPattern), $"({left} is {typePattern.Type})"),
             _ =>
-                // For other patterns, fall back to string representation
-                new ReferenceNode(GetTextSpan(isPattern), isPattern.ToString())
+                // For other patterns, create a fallback expression
+                CreateFallbackExpression(isPattern, "complex-is-pattern")
         };
     }
 
@@ -1770,8 +1784,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             else if (element is SpreadElementSyntax spread)
             {
-                // Spread elements like ..otherArray - fall back to string representation
-                return new ReferenceNode(GetTextSpan(collection), collection.ToString());
+                // Spread elements like ..otherArray - not supported in Calor
+                return CreateFallbackExpression(collection, "collection-spread");
             }
         }
 
@@ -1810,14 +1824,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
         // Convert target-typed new: new() or new(args)
-        // Use "default" for parameterless, otherwise use a reference node
+        // Use "default" for parameterless, otherwise create a fallback
         if (implicitNew.ArgumentList == null || implicitNew.ArgumentList.Arguments.Count == 0)
         {
             return new ReferenceNode(GetTextSpan(implicitNew), "default");
         }
 
-        // Fall back to string representation for complex cases
-        return new ReferenceNode(GetTextSpan(implicitNew), implicitNew.ToString());
+        // Implicit new with arguments needs explicit type - create fallback
+        return CreateFallbackExpression(implicitNew, "implicit-new-with-args");
     }
 
     private UnaryOperationNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)
@@ -1839,9 +1853,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return operand;
         }
 
-        // For other postfix operators (++, --), fall back to string representation
-        // These are typically used in statements, not expressions
-        return new ReferenceNode(GetTextSpan(postfix), postfix.ToString());
+        // For other postfix operators (++, --), use fallback since Calor doesn't support them as expressions
+        return CreateFallbackExpression(postfix, "postfix-operator");
     }
 
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
@@ -2673,6 +2686,36 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             node.Span.Length,
             lineSpan.StartLinePosition.Line + 1,
             lineSpan.StartLinePosition.Character + 1);
+    }
+
+    /// <summary>
+    /// Creates a fallback expression node for unsupported expressions.
+    /// Records the unsupported feature for explanation output.
+    /// </summary>
+    private FallbackExpressionNode CreateFallbackExpression(SyntaxNode node, string featureName)
+    {
+        var lineSpan = node.GetLocation().GetLineSpan();
+        var line = lineSpan.StartLinePosition.Line + 1;
+        var suggestion = FeatureSupport.GetWorkaround(featureName);
+
+        _context.RecordUnsupportedFeature(featureName, node.ToString(), line, suggestion);
+
+        return new FallbackExpressionNode(GetTextSpan(node), node.ToString(), featureName, suggestion);
+    }
+
+    /// <summary>
+    /// Creates a fallback comment node for unsupported statements.
+    /// Records the unsupported feature for explanation output.
+    /// </summary>
+    private FallbackCommentNode CreateFallbackStatement(SyntaxNode node, string featureName)
+    {
+        var lineSpan = node.GetLocation().GetLineSpan();
+        var line = lineSpan.StartLinePosition.Line + 1;
+        var suggestion = FeatureSupport.GetWorkaround(featureName);
+
+        _context.RecordUnsupportedFeature(featureName, node.ToString(), line, suggestion);
+
+        return new FallbackCommentNode(GetTextSpan(node), node.ToString(), featureName, suggestion);
     }
 
     /// <summary>

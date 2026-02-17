@@ -182,6 +182,9 @@ public interface IAstVisitor
     void Visit(CharOperationNode node);
     // Native StringBuilder Operations
     void Visit(StringBuilderOperationNode node);
+    // Fallback nodes for unsupported C# constructs
+    void Visit(FallbackExpressionNode node);
+    void Visit(FallbackCommentNode node);
 }
 
 /// <summary>
@@ -348,6 +351,9 @@ public interface IAstVisitor<T>
     T Visit(CharOperationNode node);
     // Native StringBuilder Operations
     T Visit(StringBuilderOperationNode node);
+    // Fallback nodes for unsupported C# constructs
+    T Visit(FallbackExpressionNode node);
+    T Visit(FallbackCommentNode node);
 }
 
 /// <summary>

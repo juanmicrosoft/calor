@@ -50,6 +50,19 @@ public sealed class ConversionOptions
     /// Whether to auto-generate unique IDs for Calor elements.
     /// </summary>
     public bool AutoGenerateIds { get; set; } = true;
+
+    /// <summary>
+    /// Whether to emit graceful fallback comments for unsupported constructs.
+    /// When true, unsupported C# code is emitted as TODO comments instead of invalid Calor.
+    /// Default is true.
+    /// </summary>
+    public bool GracefulFallback { get; set; } = true;
+
+    /// <summary>
+    /// Whether to include explanation details about unsupported features.
+    /// When true, conversion results include a detailed explanation of what was not converted.
+    /// </summary>
+    public bool Explain { get; set; }
 }
 
 /// <summary>
@@ -212,7 +225,8 @@ public sealed class CSharpToCalorConverter
             IncludeBenchmark = _options.IncludeBenchmark,
             PreserveComments = _options.PreserveComments,
             AutoGenerateIds = _options.AutoGenerateIds,
-            ModuleName = _options.ModuleName
+            ModuleName = _options.ModuleName,
+            GracefulFallback = _options.GracefulFallback
         };
     }
 

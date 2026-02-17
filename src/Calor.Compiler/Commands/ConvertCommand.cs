@@ -29,20 +29,30 @@ public static class ConvertCommand
             aliases: new[] { "--verbose", "-v" },
             description: "Enable verbose output");
 
+        var explainOption = new Option<bool>(
+            aliases: new[] { "--explain", "-e" },
+            description: "Show detailed explanation of unsupported features");
+
+        var noFallbackOption = new Option<bool>(
+            aliases: new[] { "--no-fallback" },
+            description: "Fail conversion when encountering unsupported constructs (instead of emitting TODO comments)");
+
         var command = new Command("convert", "Convert a single file between C# and Calor")
         {
             inputArgument,
             outputOption,
             benchmarkOption,
-            verboseOption
+            verboseOption,
+            explainOption,
+            noFallbackOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, outputOption, benchmarkOption, verboseOption);
+        command.SetHandler(ExecuteAsync, inputArgument, outputOption, benchmarkOption, verboseOption, explainOption, noFallbackOption);
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose)
+    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -80,7 +90,7 @@ public static class ConvertCommand
         {
             if (direction == ConversionDirection.CSharpToCalor)
             {
-                await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose);
+                await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback);
             }
             else
             {
@@ -107,12 +117,14 @@ public static class ConvertCommand
         }
     }
 
-    private static async Task ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose)
+    private static async Task ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
             Verbose = verbose,
-            IncludeBenchmark = benchmark
+            IncludeBenchmark = benchmark,
+            Explain = explain,
+            GracefulFallback = !noFallback
         });
 
         var result = await converter.ConvertFileAsync(inputPath);
@@ -147,6 +159,14 @@ public static class ConvertCommand
             {
                 Console.WriteLine($"  ... and {warnings.Count - 5} more");
             }
+        }
+
+        // Show explanation if requested
+        if (explain)
+        {
+            Console.WriteLine();
+            var explanation = result.Context.GetExplanation();
+            Console.WriteLine(explanation.FormatForCli());
         }
 
         // Show benchmark if requested

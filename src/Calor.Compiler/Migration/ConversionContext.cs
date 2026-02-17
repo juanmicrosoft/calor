@@ -11,6 +11,105 @@ public enum ConversionIssueSeverity
 }
 
 /// <summary>
+/// Represents a single instance of an unsupported feature usage.
+/// </summary>
+public sealed class UnsupportedFeatureInstance
+{
+    public required string Code { get; init; }
+    public required int Line { get; init; }
+    public string? Suggestion { get; init; }
+}
+
+/// <summary>
+/// Detailed explanation of conversion issues and unsupported features.
+/// </summary>
+public sealed class ConversionExplanation
+{
+    /// <summary>
+    /// Dictionary of feature name → list of instances where that feature was used.
+    /// </summary>
+    public required Dictionary<string, List<UnsupportedFeatureInstance>> UnsupportedFeatures { get; init; }
+
+    /// <summary>
+    /// Total count of unsupported feature instances.
+    /// </summary>
+    public int TotalUnsupportedCount { get; init; }
+
+    /// <summary>
+    /// List of partially supported features that were used (may need review).
+    /// </summary>
+    public required List<string> PartialFeatures { get; init; }
+
+    /// <summary>
+    /// List of features that require manual conversion.
+    /// </summary>
+    public required List<string> ManualRequiredFeatures { get; init; }
+
+    /// <summary>
+    /// Formats the explanation as a human-readable string for CLI output.
+    /// </summary>
+    public string FormatForCli()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("=== Conversion Explanation ===");
+        sb.AppendLine();
+
+        if (UnsupportedFeatures.Count > 0)
+        {
+            sb.AppendLine($"Unsupported Features ({TotalUnsupportedCount} instance(s)):");
+            foreach (var (feature, instances) in UnsupportedFeatures)
+            {
+                sb.AppendLine($"  [{feature}] - {instances.Count} occurrence(s)");
+                foreach (var instance in instances.Take(3))
+                {
+                    sb.AppendLine($"    (line {instance.Line}): {instance.Code}");
+                    if (!string.IsNullOrEmpty(instance.Suggestion))
+                    {
+                        sb.AppendLine($"      Suggestion: {instance.Suggestion}");
+                    }
+                }
+                if (instances.Count > 3)
+                {
+                    sb.AppendLine($"    ... and {instances.Count - 3} more");
+                }
+            }
+            sb.AppendLine();
+        }
+
+        if (PartialFeatures.Count > 0)
+        {
+            sb.AppendLine("Partially Supported Features (may need review):");
+            foreach (var feature in PartialFeatures)
+            {
+                var workaround = FeatureSupport.GetWorkaround(feature);
+                var hint = workaround != null ? $": {workaround}" : "";
+                sb.AppendLine($"  - {feature}{hint}");
+            }
+            sb.AppendLine();
+        }
+
+        if (ManualRequiredFeatures.Count > 0)
+        {
+            sb.AppendLine("Features Requiring Manual Conversion:");
+            foreach (var feature in ManualRequiredFeatures)
+            {
+                var workaround = FeatureSupport.GetWorkaround(feature);
+                var hint = workaround != null ? $": {workaround}" : "";
+                sb.AppendLine($"  - {feature}{hint}");
+            }
+            sb.AppendLine();
+        }
+
+        if (UnsupportedFeatures.Count == 0 && PartialFeatures.Count == 0 && ManualRequiredFeatures.Count == 0)
+        {
+            sb.AppendLine("All features fully supported. No manual conversion needed.");
+        }
+
+        return sb.ToString();
+    }
+}
+
+/// <summary>
 /// Represents an issue encountered during conversion.
 /// </summary>
 public sealed class ConversionIssue
@@ -58,6 +157,7 @@ public sealed class ConversionContext
     private readonly List<ConversionIssue> _issues = new();
     private readonly HashSet<string> _usedFeatures = new();
     private readonly Stack<string> _scopeStack = new();
+    private readonly Dictionary<string, List<UnsupportedFeatureInstance>> _unsupportedFeatures = new();
     private int _idCounter = 0;
 
     /// <summary>
@@ -84,6 +184,13 @@ public sealed class ConversionContext
     /// Whether to generate module IDs automatically.
     /// </summary>
     public bool AutoGenerateIds { get; set; } = true;
+
+    /// <summary>
+    /// Whether to emit graceful fallback for unsupported constructs.
+    /// When true (default), unsupported code emits TODO comments and conversion succeeds.
+    /// When false, unsupported code causes conversion to fail with errors.
+    /// </summary>
+    public bool GracefulFallback { get; set; } = true;
 
     /// <summary>
     /// The module name to use (derived from file name if not set).
@@ -347,6 +454,57 @@ public sealed class ConversionContext
     }
 
     /// <summary>
+    /// Records an instance of an unsupported feature for explanation output.
+    /// </summary>
+    public void RecordUnsupportedFeature(string featureName, string originalCode, int line, string? suggestion = null)
+    {
+        if (!_unsupportedFeatures.TryGetValue(featureName, out var instances))
+        {
+            instances = new List<UnsupportedFeatureInstance>();
+            _unsupportedFeatures[featureName] = instances;
+        }
+
+        var truncatedCode = originalCode.Length > 100 ? originalCode.Substring(0, 97) + "..." : originalCode;
+
+        instances.Add(new UnsupportedFeatureInstance
+        {
+            Code = truncatedCode,
+            Line = line,
+            Suggestion = suggestion
+        });
+
+        // When GracefulFallback is disabled, unsupported features cause errors
+        if (!GracefulFallback)
+        {
+            AddError($"Unsupported feature [{featureName}]: {truncatedCode}", feature: featureName, line: line);
+        }
+    }
+
+    /// <summary>
+    /// Gets a detailed explanation of the conversion, including unsupported features.
+    /// </summary>
+    public ConversionExplanation GetExplanation()
+    {
+        var partialFeatures = _usedFeatures
+            .Where(f => FeatureSupport.GetSupportLevel(f) == SupportLevel.Partial)
+            .ToList();
+
+        var manualRequired = _usedFeatures
+            .Where(f => FeatureSupport.GetSupportLevel(f) == SupportLevel.ManualRequired)
+            .ToList();
+
+        var totalUnsupported = _unsupportedFeatures.Values.Sum(list => list.Count);
+
+        return new ConversionExplanation
+        {
+            UnsupportedFeatures = new Dictionary<string, List<UnsupportedFeatureInstance>>(_unsupportedFeatures),
+            TotalUnsupportedCount = totalUnsupported,
+            PartialFeatures = partialFeatures,
+            ManualRequiredFeatures = manualRequired
+        };
+    }
+
+    /// <summary>
     /// Resets the context for a new conversion.
     /// </summary>
     public void Reset()
@@ -354,6 +512,7 @@ public sealed class ConversionContext
         _issues.Clear();
         _usedFeatures.Clear();
         _scopeStack.Clear();
+        _unsupportedFeatures.Clear();
         _idCounter = 0;
         CurrentNamespace = null;
         CurrentTypeName = null;

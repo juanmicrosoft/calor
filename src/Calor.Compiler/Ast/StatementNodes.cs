@@ -76,3 +76,36 @@ public sealed class PrintStatementNode : StatementNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents a fallback comment for unsupported C# statements.
+/// Emitted as // TODO: Manual conversion needed [feature] with original C# code.
+/// </summary>
+public sealed class FallbackCommentNode : StatementNode
+{
+    /// <summary>
+    /// The original C# code that could not be converted.
+    /// </summary>
+    public string OriginalCSharp { get; }
+
+    /// <summary>
+    /// The name of the unsupported feature (e.g., "goto", "stackalloc").
+    /// </summary>
+    public string FeatureName { get; }
+
+    /// <summary>
+    /// Optional suggestion for how to manually convert this construct.
+    /// </summary>
+    public string? Suggestion { get; }
+
+    public FallbackCommentNode(TextSpan span, string originalCSharp, string featureName, string? suggestion = null)
+        : base(span)
+    {
+        OriginalCSharp = originalCSharp ?? throw new ArgumentNullException(nameof(originalCSharp));
+        FeatureName = featureName ?? throw new ArgumentNullException(nameof(featureName));
+        Suggestion = suggestion;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

@@ -172,3 +172,36 @@ public static class UnaryOperatorExtensions
         };
     }
 }
+
+/// <summary>
+/// Represents a fallback expression for unsupported C# constructs.
+/// Emitted as §ERR{"TODO: feature"} /* C#: originalCode */ in Calor output.
+/// </summary>
+public sealed class FallbackExpressionNode : ExpressionNode
+{
+    /// <summary>
+    /// The original C# code that could not be converted.
+    /// </summary>
+    public string OriginalCSharp { get; }
+
+    /// <summary>
+    /// The name of the unsupported feature (e.g., "implicit-new-with-args", "stackalloc").
+    /// </summary>
+    public string FeatureName { get; }
+
+    /// <summary>
+    /// Optional suggestion for how to manually convert this construct.
+    /// </summary>
+    public string? Suggestion { get; }
+
+    public FallbackExpressionNode(TextSpan span, string originalCSharp, string featureName, string? suggestion = null)
+        : base(span)
+    {
+        OriginalCSharp = originalCSharp ?? throw new ArgumentNullException(nameof(originalCSharp));
+        FeatureName = featureName ?? throw new ArgumentNullException(nameof(featureName));
+        Suggestion = suggestion;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

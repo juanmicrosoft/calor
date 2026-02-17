@@ -3130,6 +3130,28 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
     }
 
+    // Fallback nodes for unsupported C# constructs (from C# to Calor conversion)
+
+    public string Visit(FallbackExpressionNode node)
+    {
+        // Emit the original C# code with a TODO comment
+        return $"/* TODO: {node.FeatureName} */ {node.OriginalCSharp}";
+    }
+
+    public string Visit(FallbackCommentNode node)
+    {
+        // Emit as a comment block
+        var escapedCode = node.OriginalCSharp.Replace("*/", "* /");
+        AppendLine($"/* TODO: Manual conversion needed [{node.FeatureName}]");
+        AppendLine($"   C#: {escapedCode}");
+        if (!string.IsNullOrEmpty(node.Suggestion))
+        {
+            AppendLine($"   Suggestion: {node.Suggestion}");
+        }
+        AppendLine("*/");
+        return "";
+    }
+
     /// <summary>
     /// Represents a single variable's finite range.
     /// </summary>
