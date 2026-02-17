@@ -11,8 +11,8 @@ on:
         description: 'Number of statistical runs (default 30)'
         required: false
         default: '30'
-      llm_eval:
-        description: 'Run LLM evaluation'
+      skip_llm:
+        description: 'Skip LLM benchmarks (faster, cheaper)'
         required: false
         default: 'false'
         type: boolean
@@ -51,7 +51,7 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
 
-      - name: Run benchmarks
+      - name: Run static benchmarks
         run: |
           dotnet run --project tests/Calor.Evaluation -c Release -- run \
             --format website \
@@ -69,16 +69,77 @@ jobs:
             --output website/public/data/benchmark-results-statistical.json \
             --verbose
 
-      - name: Generate HTML dashboard
+      # LLM Benchmarks - run on schedule, or when not skipped
+      - name: Restore LLM response cache
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        uses: actions/cache@v4
+        with:
+          path: ~/.calor/llm-cache
+          key: llm-cache-${{ github.run_id }}
+          restore-keys: |
+            llm-cache-
+
+      - name: Run TaskCompletion benchmark (LLM)
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          dotnet run --project tests/Calor.Evaluation -c Release -- run \
-            --format html \
-            --output website/public/data/dashboard
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set, skipping LLM benchmarks"
+            exit 0
+          fi
+          dotnet run --project tests/Calor.Evaluation -c Release -- llm-tasks \
+            -m tests/Calor.Evaluation/Tasks/task-manifest.json \
+            --budget 5.00 \
+            --output website/public/data/llm-results.json \
+            --verbose
+
+      - name: Run Safety benchmark (LLM)
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            exit 0
+          fi
+          dotnet run --project tests/Calor.Evaluation -c Release -- safety-benchmark \
+            -m tests/Calor.Evaluation/Tasks/task-manifest-safety.json \
+            --budget 5.00 \
+            --output website/public/data/safety-results.json \
+            --verbose
+
+      - name: Run EffectDiscipline benchmark (LLM)
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            exit 0
+          fi
+          dotnet run --project tests/Calor.Evaluation -c Release -- effect-discipline \
+            -m tests/Calor.Evaluation/Tasks/task-manifest-effects.json \
+            --budget 5.00 \
+            --output website/public/data/effect-discipline-results.json \
+            --verbose
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Merge LLM results into benchmark-results.json
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        run: |
+          node scripts/merge-llm-results.js
+
+      - name: Generate HTML dashboard
+        run: |
+          dotnet run --project tests/Calor.Evaluation -c Release -- run \
+            --format html \
+            --output website/public/data/dashboard
 
       - name: Generate docs/benchmarking/results.md
         run: node scripts/generate-results-md.js
@@ -90,6 +151,9 @@ jobs:
           path: |
             website/public/data/benchmark-results.json
             website/public/data/benchmark-results-statistical.json
+            website/public/data/llm-results.json
+            website/public/data/safety-results.json
+            website/public/data/effect-discipline-results.json
             website/public/data/dashboard.html
           retention-days: 90
 
@@ -98,82 +162,8 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add website/public/data/benchmark-results*.json website/public/data/dashboard.html docs/benchmarking/results.md || true
+          git add website/public/data/*.json website/public/data/dashboard.html docs/benchmarking/results.md || true
           git diff --staged --quiet || git commit -m "chore: Update benchmark results [skip ci]"
-          git push || echo "No changes to push"
-
-  # LLM evaluation runs separately (more expensive, weekly only or on-demand)
-  llm-evaluation:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event.inputs.llm_eval == 'true'
-    needs: benchmark
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build
-        run: dotnet build -c Release --no-restore
-
-      - name: Ensure output directory exists
-        run: mkdir -p website/public/data
-
-      - name: Restore LLM response cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/calor-llm-cache
-          key: llm-cache-opus-${{ github.run_id }}
-          restore-keys: |
-            llm-cache-opus-
-
-      - name: Run LLM evaluation (Claude Opus)
-        id: llm-opus
-        continue-on-error: true
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          dotnet run --project tests/Calor.Evaluation -c Release -- llm-tasks \
-            --provider claude \
-            --model claude-opus-4-5-20251101 \
-            --budget 10.00 \
-            --output website/public/data/llm-eval-claude-opus.json \
-            --verbose
-
-      - name: Check LLM evaluation status
-        run: |
-          if [ "${{ steps.llm-opus.outcome }}" == "failure" ]; then
-            echo "::warning::LLM evaluation failed. Check if ANTHROPIC_API_KEY secret is configured."
-          fi
-          # List any results that were generated
-          ls -la website/public/data/llm-eval-*.json 2>/dev/null || echo "No LLM evaluation results generated"
-
-      - name: Upload LLM evaluation results
-        if: hashFiles('website/public/data/llm-eval-*.json') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: llm-eval-results
-          path: |
-            website/public/data/llm-eval-*.json
-          retention-days: 90
-
-      - name: Commit LLM results to repo
-        if: github.ref == 'refs/heads/main' && hashFiles('website/public/data/llm-eval-*.json') != ''
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git pull --rebase origin main || true
-          git add website/public/data/llm-eval-*.json || true
-          git diff --staged --quiet || git commit -m "chore: Update LLM evaluation results [skip ci]"
           git push || echo "No changes to push"
 
   regression-check:
@@ -196,9 +186,6 @@ jobs:
       - name: Check for regression
         run: |
           echo "Checking for benchmark regressions..."
-          # TODO: Implement regression detection
-          # Compare current results with previous results
-          # Alert if any metric drops by more than 10%
           if [ -f "current-results/benchmark-results.json" ]; then
             echo "Benchmark results generated successfully"
             cat current-results/benchmark-results.json | head -50
