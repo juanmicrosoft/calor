@@ -1,0 +1,1456 @@
+{
+  "version": "1.0.0",
+  "constructs": [
+    {
+      "id": "object_instantiation",
+      "csharpConstruct": "object instantiation",
+      "keywords": ["new", "object", "instantiation", "create", "constructor", "instance", "instantiate"],
+      "calorSyntax": "§NEW{ClassName}(arg1, arg2)§/NEW",
+      "description": "Creates a new instance of a class. The class name goes in braces, constructor arguments in parentheses.",
+      "examples": [
+        {
+          "csharp": "var user = new User(\"John\", 25);",
+          "calor": "§B{user}=§NEW{User}(\"John\", 25)§/NEW§/B"
+        },
+        {
+          "csharp": "var list = new List<int>();",
+          "calor": "§B{list}=§NEW{List<i32>}()§/NEW§/B"
+        },
+        {
+          "csharp": "return new Result(value);",
+          "calor": "§R §NEW{Result}(value)§/NEW §/R"
+        }
+      ]
+    },
+    {
+      "id": "variable_declaration",
+      "csharpConstruct": "variable declaration",
+      "keywords": ["var", "variable", "declare", "declaration", "let", "binding", "assign"],
+      "calorSyntax": "§B{name}=value§/B or §B{~name}=value§/B (mutable)",
+      "description": "Declares a variable binding. Use ~ prefix for mutable variables. Immutable by default.",
+      "examples": [
+        {
+          "csharp": "var count = 0;",
+          "calor": "§B{count}=0§/B"
+        },
+        {
+          "csharp": "int mutableCount = 0; // needs to be modified later",
+          "calor": "§B{~mutableCount}=0§/B"
+        },
+        {
+          "csharp": "string name = \"John\";",
+          "calor": "§B{name}=\"John\"§/B"
+        }
+      ]
+    },
+    {
+      "id": "method_definition",
+      "csharpConstruct": "method definition",
+      "keywords": ["method", "function", "def", "define", "void", "return type", "class method", "member method"],
+      "calorSyntax": "§MT{id:name:visibility:modifiers} §I{type:param}... §O{returnType} body §/MT",
+      "description": "Defines a method within a class. Supports visibility (pub/priv/prot), virtual (vr), override (ov), abstract (ab), and static (st) modifiers.",
+      "examples": [
+        {
+          "csharp": "public void Process(int value) { ... }",
+          "calor": "§MT{1:Process:pub}\n  §I{i32:value}\n  §O{void}\n  ...\n§/MT"
+        },
+        {
+          "csharp": "public virtual string GetName() { return _name; }",
+          "calor": "§MT{1:GetName:pub:vr}\n  §O{str}\n  §R _name §/R\n§/MT"
+        },
+        {
+          "csharp": "public override int Calculate(int x) { ... }",
+          "calor": "§MT{1:Calculate:pub:ov}\n  §I{i32:x}\n  §O{i32}\n  ...\n§/MT"
+        }
+      ]
+    },
+    {
+      "id": "function_definition",
+      "csharpConstruct": "function definition",
+      "keywords": ["function", "func", "method", "standalone", "static method", "top-level"],
+      "calorSyntax": "§F{id:name:visibility} §I{type:param}... §O{returnType} body §/F",
+      "description": "Defines a standalone function (not a class member). Use for top-level functions or static utility methods.",
+      "examples": [
+        {
+          "csharp": "public static int Add(int a, int b) { return a + b; }",
+          "calor": "§F{1:Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R a + b §/R\n§/F"
+        },
+        {
+          "csharp": "private void Log(string message) { Console.WriteLine(message); }",
+          "calor": "§F{1:Log:priv}\n  §I{str:message}\n  §O{void}\n  §E{cw}\n  §!{Console.WriteLine}(message)§/!\n§/F"
+        }
+      ]
+    },
+    {
+      "id": "lambda_expression",
+      "csharpConstruct": "lambda expression",
+      "keywords": ["lambda", "arrow", "=>", "anonymous", "closure", "delegate", "action", "func"],
+      "calorSyntax": "§LAM{} §I{type:param}... §O{returnType} body §/LAM",
+      "description": "Creates an anonymous function/lambda expression. Can capture variables from enclosing scope.",
+      "examples": [
+        {
+          "csharp": "x => x * 2",
+          "calor": "§LAM{}\n  §I{i32:x}\n  §O{i32}\n  x * 2\n§/LAM"
+        },
+        {
+          "csharp": "(a, b) => a + b",
+          "calor": "§LAM{}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  a + b\n§/LAM"
+        },
+        {
+          "csharp": "items.Where(x => x > 5)",
+          "calor": "§!{items.Where}(§LAM{} §I{i32:x} §O{bool} x > 5 §/LAM)§/!"
+        }
+      ]
+    },
+    {
+      "id": "property_definition",
+      "csharpConstruct": "property definition",
+      "keywords": ["property", "get", "set", "getter", "setter", "accessor", "prop"],
+      "calorSyntax": "§PROP{id:type:name:visibility} §GET body §/GET §SET body §/SET §/PROP",
+      "description": "Defines a property with optional getter and setter. Auto-properties use shorthand syntax.",
+      "examples": [
+        {
+          "csharp": "public string Name { get; set; }",
+          "calor": "§PROP{1:str:Name:pub}§/PROP"
+        },
+        {
+          "csharp": "public int Count { get; private set; }",
+          "calor": "§PROP{1:i32:Count:pub}\n  §GET §/GET\n  §SET:priv §/SET\n§/PROP"
+        },
+        {
+          "csharp": "public int Value { get { return _value; } set { _value = value; } }",
+          "calor": "§PROP{1:i32:Value:pub}\n  §GET §R _value §/R §/GET\n  §SET _value = value §/SET\n§/PROP"
+        }
+      ]
+    },
+    {
+      "id": "for_loop",
+      "csharpConstruct": "for loop",
+      "keywords": ["for", "loop", "iterate", "iteration", "counter", "index", "range"],
+      "calorSyntax": "§L{var:start..end} body §/L or §L{var:start..end..step} body §/L",
+      "description": "For loop with range. Use .. for exclusive end, ..= for inclusive. Optional step value.",
+      "examples": [
+        {
+          "csharp": "for (int i = 0; i < 10; i++) { ... }",
+          "calor": "§L{i:0..10}\n  ...\n§/L"
+        },
+        {
+          "csharp": "for (int i = 0; i <= 10; i++) { ... }",
+          "calor": "§L{i:0..=10}\n  ...\n§/L"
+        },
+        {
+          "csharp": "for (int i = 0; i < 100; i += 2) { ... }",
+          "calor": "§L{i:0..100..2}\n  ...\n§/L"
+        }
+      ]
+    },
+    {
+      "id": "foreach_loop",
+      "csharpConstruct": "foreach loop",
+      "keywords": ["foreach", "for each", "iterate", "collection", "enumerable", "items", "elements"],
+      "calorSyntax": "§L{item:collection} body §/L",
+      "description": "Iterates over each element in a collection.",
+      "examples": [
+        {
+          "csharp": "foreach (var item in items) { ... }",
+          "calor": "§L{item:items}\n  ...\n§/L"
+        },
+        {
+          "csharp": "foreach (var (key, value) in dictionary) { ... }",
+          "calor": "§L{(key, value):dictionary}\n  ...\n§/L"
+        }
+      ]
+    },
+    {
+      "id": "while_loop",
+      "csharpConstruct": "while loop",
+      "keywords": ["while", "loop", "condition", "repeat", "until"],
+      "calorSyntax": "§WH{condition} body §/WH",
+      "description": "Executes body while condition is true.",
+      "examples": [
+        {
+          "csharp": "while (count > 0) { count--; }",
+          "calor": "§WH{count > 0}\n  count--\n§/WH"
+        },
+        {
+          "csharp": "while (true) { if (done) break; }",
+          "calor": "§WH{true}\n  §IF{done} §BK §/IF\n§/WH"
+        }
+      ]
+    },
+    {
+      "id": "if_statement",
+      "csharpConstruct": "if statement",
+      "keywords": ["if", "else", "conditional", "branch", "condition", "then", "elseif", "else if"],
+      "calorSyntax": "§IF{condition} body §EI{condition} body §EL body §/IF",
+      "description": "Conditional branching. §EI for else-if, §EL for else. Both are optional.",
+      "examples": [
+        {
+          "csharp": "if (x > 0) { return true; }",
+          "calor": "§IF{x > 0}\n  §R true §/R\n§/IF"
+        },
+        {
+          "csharp": "if (x > 0) { a(); } else { b(); }",
+          "calor": "§IF{x > 0}\n  a()\n§EL\n  b()\n§/IF"
+        },
+        {
+          "csharp": "if (x > 0) { } else if (x < 0) { } else { }",
+          "calor": "§IF{x > 0}\n  ...\n§EI{x < 0}\n  ...\n§EL\n  ...\n§/IF"
+        }
+      ]
+    },
+    {
+      "id": "return_statement",
+      "csharpConstruct": "return statement",
+      "keywords": ["return", "result", "output", "yield", "value"],
+      "calorSyntax": "§R expression §/R or §R§/R (void)",
+      "description": "Returns a value from a function or method. Use empty §R§/R for void returns.",
+      "examples": [
+        {
+          "csharp": "return 42;",
+          "calor": "§R 42 §/R"
+        },
+        {
+          "csharp": "return user.Name;",
+          "calor": "§R user.Name §/R"
+        },
+        {
+          "csharp": "return;",
+          "calor": "§R§/R"
+        }
+      ]
+    },
+    {
+      "id": "class_definition",
+      "csharpConstruct": "class definition",
+      "keywords": ["class", "type", "object", "inheritance", "extends", "implements", "abstract", "sealed"],
+      "calorSyntax": "§CL{id:name:visibility:modifiers} §EXT{base} §IMPL{interface} members... §/CL",
+      "description": "Defines a class. Supports abstract (abs), sealed, partial modifiers. Use §EXT for base class, §IMPL for interfaces.",
+      "examples": [
+        {
+          "csharp": "public class User { }",
+          "calor": "§CL{1:User:pub}\n§/CL"
+        },
+        {
+          "csharp": "public class Admin : User, IAdmin { }",
+          "calor": "§CL{1:Admin:pub}\n  §EXT{User}\n  §IMPL{IAdmin}\n§/CL"
+        },
+        {
+          "csharp": "public abstract class BaseEntity { }",
+          "calor": "§CL{1:BaseEntity:pub:abs}\n§/CL"
+        }
+      ]
+    },
+    {
+      "id": "async_method",
+      "csharpConstruct": "async method",
+      "keywords": ["async", "await", "task", "asynchronous", "async/await", "promise", "future"],
+      "calorSyntax": "§AF{id:name} or §AMT{id:name} for async methods",
+      "description": "Defines an async function. Use §AF for standalone async functions, §AMT for async class methods.",
+      "examples": [
+        {
+          "csharp": "public async Task<string> FetchDataAsync() { ... }",
+          "calor": "§AF{1:FetchDataAsync:pub}\n  §O{str}\n  ...\n§/AF"
+        },
+        {
+          "csharp": "public async Task ProcessAsync() { await DoWork(); }",
+          "calor": "§AMT{1:ProcessAsync:pub}\n  §O{void}\n  §AWAIT §!{DoWork}()§/! §/AWAIT\n§/AMT"
+        }
+      ]
+    },
+    {
+      "id": "await_expression",
+      "csharpConstruct": "await expression",
+      "keywords": ["await", "async", "wait", "asynchronous", "task"],
+      "calorSyntax": "§AWAIT expression §/AWAIT",
+      "description": "Awaits an asynchronous operation.",
+      "examples": [
+        {
+          "csharp": "var result = await FetchAsync();",
+          "calor": "§B{result}=§AWAIT §!{FetchAsync}()§/! §/AWAIT§/B"
+        },
+        {
+          "csharp": "await Task.Delay(1000);",
+          "calor": "§AWAIT §!{Task.Delay}(1000)§/! §/AWAIT"
+        }
+      ]
+    },
+    {
+      "id": "try_catch",
+      "csharpConstruct": "try catch",
+      "keywords": ["try", "catch", "finally", "exception", "error", "throw", "handle"],
+      "calorSyntax": "§TR{} body §CA{ExceptionType:varName} handler §FI{} cleanup §/TR",
+      "description": "Exception handling. §TR for try block, §CA for catch (with optional type and variable), §FI for finally.",
+      "examples": [
+        {
+          "csharp": "try { x(); } catch { y(); }",
+          "calor": "§TR{}\n  x()\n§CA{}\n  y()\n§/TR"
+        },
+        {
+          "csharp": "try { } catch (Exception ex) { Log(ex); }",
+          "calor": "§TR{}\n  ...\n§CA{Exception:ex}\n  §!{Log}(ex)§/!\n§/TR"
+        },
+        {
+          "csharp": "try { } finally { Cleanup(); }",
+          "calor": "§TR{}\n  ...\n§FI{}\n  §!{Cleanup}()§/!\n§/TR"
+        }
+      ]
+    },
+    {
+      "id": "throw_statement",
+      "csharpConstruct": "throw statement",
+      "keywords": ["throw", "exception", "error", "raise"],
+      "calorSyntax": "§TH expression §/TH or §TH§/TH (rethrow)",
+      "description": "Throws an exception. Use empty §TH§/TH to rethrow in a catch block.",
+      "examples": [
+        {
+          "csharp": "throw new ArgumentException(\"Invalid\");",
+          "calor": "§TH §NEW{ArgumentException}(\"Invalid\")§/NEW §/TH"
+        },
+        {
+          "csharp": "throw;",
+          "calor": "§TH§/TH"
+        }
+      ]
+    },
+    {
+      "id": "effects_annotation",
+      "csharpConstruct": "side effects",
+      "keywords": ["effects", "side effect", "pure", "impure", "io", "console", "file", "network", "database"],
+      "calorSyntax": "§E{effect1,effect2,...}",
+      "description": "Declares side effects a function may have. Common effects: cw (console write), cr (console read), fs:r (file read), fs:w (file write), net (network), db (database), mem (memory allocation).",
+      "examples": [
+        {
+          "csharp": "// Method that writes to console",
+          "calor": "§F{1:Print:pub}\n  §E{cw}\n  ...\n§/F"
+        },
+        {
+          "csharp": "// Method that reads file and writes console",
+          "calor": "§F{1:ProcessFile:pub}\n  §E{fs:r,cw}\n  ...\n§/F"
+        },
+        {
+          "csharp": "// Pure function (no effects)",
+          "calor": "§F{1:Calculate:pub}\n  §O{i32}\n  §R a + b §/R\n§/F"
+        }
+      ]
+    },
+    {
+      "id": "precondition",
+      "csharpConstruct": "precondition",
+      "keywords": ["precondition", "requires", "require", "contract", "guard", "validate", "check", "assert"],
+      "calorSyntax": "§Q (condition) or §Q (condition, \"message\")",
+      "description": "Declares a precondition that must be true when the function is called. Part of Design by Contract.",
+      "examples": [
+        {
+          "csharp": "// Contract.Requires(value >= 0)",
+          "calor": "§F{1:Process:pub}\n  §I{i32:value}\n  §Q (value >= 0)\n  ...\n§/F"
+        },
+        {
+          "csharp": "// Guard.Against.Null(input)",
+          "calor": "§F{1:Process:pub}\n  §I{str:input}\n  §Q (input != null, \"input cannot be null\")\n  ...\n§/F"
+        }
+      ]
+    },
+    {
+      "id": "postcondition",
+      "csharpConstruct": "postcondition",
+      "keywords": ["postcondition", "ensures", "ensure", "contract", "result", "guarantee"],
+      "calorSyntax": "§S (condition) or §S (condition, \"message\")",
+      "description": "Declares a postcondition that will be true when the function returns. Use $result to refer to return value.",
+      "examples": [
+        {
+          "csharp": "// Contract.Ensures(result >= 0)",
+          "calor": "§F{1:Abs:pub}\n  §I{i32:x}\n  §O{i32}\n  §S ($result >= 0)\n  ...\n§/F"
+        },
+        {
+          "csharp": "// Ensures non-empty result",
+          "calor": "§F{1:GetItems:pub}\n  §O{List<Item>}\n  §S ($result.Count > 0, \"must return at least one item\")\n  ...\n§/F"
+        }
+      ]
+    },
+    {
+      "id": "invariant",
+      "csharpConstruct": "class invariant",
+      "keywords": ["invariant", "always", "constraint", "rule", "class constraint"],
+      "calorSyntax": "§INV (condition)",
+      "description": "Declares a class invariant that must always be true for valid instances.",
+      "examples": [
+        {
+          "csharp": "// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }",
+          "calor": "§CL{1:Counter:pub}\n  §INV (_count >= 0)\n  §FLD{i32:_count:priv}\n§/CL"
+        }
+      ]
+    },
+    {
+      "id": "method_call",
+      "csharpConstruct": "method call",
+      "keywords": ["call", "invoke", "method", "function call", "execute"],
+      "calorSyntax": "§!{method}(args)§/! or just method(args) for internal calls",
+      "description": "Calls a method or function. Use §!{...}§/! for external/effectful calls.",
+      "examples": [
+        {
+          "csharp": "Console.WriteLine(\"Hello\");",
+          "calor": "§!{Console.WriteLine}(\"Hello\")§/!"
+        },
+        {
+          "csharp": "user.Save();",
+          "calor": "§!{user.Save}()§/!"
+        },
+        {
+          "csharp": "Calculate(x, y) // internal pure call",
+          "calor": "Calculate(x, y)"
+        }
+      ]
+    },
+    {
+      "id": "field_definition",
+      "csharpConstruct": "field definition",
+      "keywords": ["field", "member", "private field", "backing field", "_"],
+      "calorSyntax": "§FLD{type:name:visibility}",
+      "description": "Defines a field in a class. Usually private, prefixed with underscore by convention.",
+      "examples": [
+        {
+          "csharp": "private string _name;",
+          "calor": "§FLD{str:_name:priv}"
+        },
+        {
+          "csharp": "private readonly int _id;",
+          "calor": "§FLD{i32:_id:priv:ro}"
+        }
+      ]
+    },
+    {
+      "id": "interface_definition",
+      "csharpConstruct": "interface definition",
+      "keywords": ["interface", "contract", "abstraction", "implement"],
+      "calorSyntax": "§IFACE{id:name:visibility} signatures... §/IFACE",
+      "description": "Defines an interface with method signatures.",
+      "examples": [
+        {
+          "csharp": "public interface IRepository { void Save(Entity e); }",
+          "calor": "§IFACE{1:IRepository:pub}\n  §MT{1:Save}\n    §I{Entity:e}\n    §O{void}\n  §/MT\n§/IFACE"
+        }
+      ]
+    },
+    {
+      "id": "enum_definition",
+      "csharpConstruct": "enum definition",
+      "keywords": ["enum", "enumeration", "values", "constants"],
+      "calorSyntax": "§EN{id:name:visibility:underlyingType} §EV{name:value} §/EN",
+      "description": "Defines an enumeration. §EV for each enum value.",
+      "examples": [
+        {
+          "csharp": "public enum Status { Active, Inactive, Pending }",
+          "calor": "§EN{1:Status:pub}\n  §EV{Active}\n  §EV{Inactive}\n  §EV{Pending}\n§/EN"
+        },
+        {
+          "csharp": "public enum Priority : byte { Low = 0, High = 1 }",
+          "calor": "§EN{1:Priority:pub:byte}\n  §EV{Low:0}\n  §EV{High:1}\n§/EN"
+        }
+      ]
+    },
+    {
+      "id": "constructor",
+      "csharpConstruct": "constructor",
+      "keywords": ["constructor", "ctor", "initialize", "new", "construct"],
+      "calorSyntax": "§CTOR{visibility} §I{type:param}... body §/CTOR",
+      "description": "Defines a class constructor. Use §BASE(...) to call base constructor, §THIS(...) to chain constructors.",
+      "examples": [
+        {
+          "csharp": "public User(string name) { _name = name; }",
+          "calor": "§CTOR{pub}\n  §I{str:name}\n  _name = name\n§/CTOR"
+        },
+        {
+          "csharp": "public Admin(string name) : base(name) { }",
+          "calor": "§CTOR{pub}\n  §I{str:name}\n  §BASE(name)\n§/CTOR"
+        }
+      ]
+    },
+    {
+      "id": "switch_expression",
+      "csharpConstruct": "switch expression",
+      "keywords": ["switch", "match", "pattern", "case", "when"],
+      "calorSyntax": "§W{expression} §K{pattern} result §K{_} default §/W",
+      "description": "Pattern matching switch expression. §K for each case/pattern. Use _ for default.",
+      "examples": [
+        {
+          "csharp": "x switch { 1 => \"one\", 2 => \"two\", _ => \"other\" }",
+          "calor": "§W{x}\n  §K{1} \"one\"\n  §K{2} \"two\"\n  §K{_} \"other\"\n§/W"
+        },
+        {
+          "csharp": "shape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }",
+          "calor": "§W{shape}\n  §K{Circle c} c.Area()\n  §K{Rectangle r} r.Width * r.Height\n§/W"
+        }
+      ]
+    },
+    {
+      "id": "null_check",
+      "csharpConstruct": "null check",
+      "keywords": ["null", "nullable", "?.", "??", "null check", "optional"],
+      "calorSyntax": "§?{expression}§/? for null-conditional, §??{default} for null-coalescing",
+      "description": "Handles nullable values. §? for null-conditional access, §?? for default values.",
+      "examples": [
+        {
+          "csharp": "user?.Name",
+          "calor": "§?{user.Name}§/?"
+        },
+        {
+          "csharp": "name ?? \"default\"",
+          "calor": "name §??{\"default\"}"
+        },
+        {
+          "csharp": "user?.Address?.City ?? \"Unknown\"",
+          "calor": "§?{user.Address.City}§/? §??{\"Unknown\"}"
+        }
+      ]
+    },
+    {
+      "id": "using_statement",
+      "csharpConstruct": "using statement",
+      "keywords": ["using", "dispose", "resource", "cleanup", "idisposable"],
+      "calorSyntax": "§USE{var}=expression body §/USE",
+      "description": "Resource management with automatic disposal.",
+      "examples": [
+        {
+          "csharp": "using (var stream = File.OpenRead(path)) { ... }",
+          "calor": "§USE{stream}=§!{File.OpenRead}(path)§/!\n  ...\n§/USE"
+        },
+        {
+          "csharp": "using var connection = new SqlConnection(connStr);",
+          "calor": "§USE{connection}=§NEW{SqlConnection}(connStr)§/NEW\n  ...\n§/USE"
+        }
+      ]
+    },
+    {
+      "id": "generic_type",
+      "csharpConstruct": "generic type",
+      "keywords": ["generic", "template", "<T>", "type parameter", "constraint", "where"],
+      "calorSyntax": "§G{T} for type parameter, §WHERE{T:constraint} for constraints",
+      "description": "Generic type parameters and constraints.",
+      "examples": [
+        {
+          "csharp": "public class Repository<T> where T : class { }",
+          "calor": "§CL{1:Repository:pub}\n  §G{T}\n  §WHERE{T:class}\n§/CL"
+        },
+        {
+          "csharp": "public T Get<T>(int id) where T : new() { }",
+          "calor": "§F{1:Get:pub}\n  §G{T}\n  §WHERE{T:new()}\n  §I{i32:id}\n  §O{T}\n  ...\n§/F"
+        }
+      ]
+    },
+    {
+      "id": "linq_query",
+      "csharpConstruct": "LINQ query",
+      "keywords": ["linq", "query", "where", "select", "orderby", "from"],
+      "calorSyntax": "Use method syntax with lambdas: §!{collection.Method}(§LAM{}...§/LAM)§/!",
+      "description": "LINQ queries use method syntax with lambdas in Calor.",
+      "examples": [
+        {
+          "csharp": "items.Where(x => x > 5).Select(x => x * 2)",
+          "calor": "§!{items.Where}(§LAM{} §I{i32:x} §O{bool} x > 5 §/LAM)§/!\n  .Select(§LAM{} §I{i32:x} §O{i32} x * 2 §/LAM)"
+        },
+        {
+          "csharp": "from item in items where item.Active select item.Name",
+          "calor": "§!{items.Where}(§LAM{} §I{Item:item} §O{bool} item.Active §/LAM)§/!\n  .Select(§LAM{} §I{Item:item} §O{str} item.Name §/LAM)"
+        }
+      ]
+    },
+    {
+      "id": "string_interpolation",
+      "csharpConstruct": "string interpolation",
+      "keywords": ["interpolation", "format", "$\"", "string format", "template string"],
+      "calorSyntax": "§STR{...{expression}...}§/STR",
+      "description": "String interpolation with embedded expressions.",
+      "examples": [
+        {
+          "csharp": "$\"Hello, {name}!\"",
+          "calor": "§STR{Hello, {name}!}§/STR"
+        },
+        {
+          "csharp": "$\"Total: {price:C2}\"",
+          "calor": "§STR{Total: {price:C2}}§/STR"
+        }
+      ]
+    },
+    {
+      "id": "break_continue",
+      "csharpConstruct": "break and continue",
+      "keywords": ["break", "continue", "exit", "skip", "next"],
+      "calorSyntax": "§BK for break, §CN for continue",
+      "description": "Loop control statements.",
+      "examples": [
+        {
+          "csharp": "if (done) break;",
+          "calor": "§IF{done} §BK §/IF"
+        },
+        {
+          "csharp": "if (skip) continue;",
+          "calor": "§IF{skip} §CN §/IF"
+        }
+      ]
+    },
+    {
+      "id": "record_type",
+      "csharpConstruct": "record type",
+      "keywords": ["record", "data", "immutable", "value object"],
+      "calorSyntax": "§D{id:name:visibility} §FLD{type:name}... §/D",
+      "description": "Defines an immutable data record.",
+      "examples": [
+        {
+          "csharp": "public record Person(string Name, int Age);",
+          "calor": "§D{1:Person:pub}\n  §FLD{str:Name:pub}\n  §FLD{i32:Age:pub}\n§/D"
+        }
+      ]
+    },
+    {
+      "id": "static_class",
+      "csharpConstruct": "static class",
+      "keywords": ["static", "static class", "utility", "helper"],
+      "calorSyntax": "§CL{id:name:pub:st} ... §/CL",
+      "description": "Defines a static class (utility class).",
+      "examples": [
+        {
+          "csharp": "public static class StringHelper { }",
+          "calor": "§CL{1:StringHelper:pub:st}\n  ...\n§/CL"
+        }
+      ]
+    },
+    {
+      "id": "virtual_method",
+      "csharpConstruct": "virtual method",
+      "keywords": ["virtual", "override", "polymorphism", "inheritance", "overridable"],
+      "calorSyntax": "§MT{id:name:visibility:vr} body §/MT",
+      "description": "Defines a virtual method that can be overridden in derived classes. Use 'vr' modifier.",
+      "examples": [
+        {
+          "csharp": "public virtual string GetName() { return _name; }",
+          "calor": "§MT{1:GetName:pub:vr}\n  §O{str}\n  §R _name §/R\n§/MT"
+        },
+        {
+          "csharp": "protected virtual void OnChanged() { }",
+          "calor": "§MT{1:OnChanged:prot:vr}\n  §O{void}\n§/MT"
+        }
+      ]
+    },
+    {
+      "id": "override_method",
+      "csharpConstruct": "override method",
+      "keywords": ["override", "overriding", "polymorphism", "derived", "subclass"],
+      "calorSyntax": "§MT{id:name:visibility:ov} body §/MT",
+      "description": "Overrides a virtual method from a base class. Use 'ov' modifier.",
+      "examples": [
+        {
+          "csharp": "public override string ToString() { return _name; }",
+          "calor": "§MT{1:ToString:pub:ov}\n  §O{str}\n  §R _name §/R\n§/MT"
+        },
+        {
+          "csharp": "public override int GetHashCode() { return _id; }",
+          "calor": "§MT{1:GetHashCode:pub:ov}\n  §O{i32}\n  §R _id §/R\n§/MT"
+        }
+      ]
+    },
+    {
+      "id": "abstract_class",
+      "csharpConstruct": "abstract class",
+      "keywords": ["abstract", "base class", "inheritance", "cannot instantiate"],
+      "calorSyntax": "§CL{id:name:visibility:ab} body §/CL",
+      "description": "Defines an abstract class that cannot be instantiated directly. Use 'ab' modifier.",
+      "examples": [
+        {
+          "csharp": "public abstract class Shape { }",
+          "calor": "§CL{1:Shape:pub:ab}\n  ...\n§/CL"
+        }
+      ]
+    },
+    {
+      "id": "abstract_method",
+      "csharpConstruct": "abstract method",
+      "keywords": ["abstract", "no body", "must override", "pure virtual"],
+      "calorSyntax": "§MT{id:name:visibility:ab} §I{...} §O{type} §/MT",
+      "description": "Defines an abstract method with no body that must be overridden. Use 'ab' modifier.",
+      "examples": [
+        {
+          "csharp": "public abstract double GetArea();",
+          "calor": "§MT{1:GetArea:pub:ab}\n  §O{f64}\n§/MT"
+        }
+      ]
+    },
+    {
+      "id": "sealed_class",
+      "csharpConstruct": "sealed class",
+      "keywords": ["sealed", "final", "no inheritance", "cannot derive"],
+      "calorSyntax": "§CL{id:name:visibility:sd} body §/CL",
+      "description": "Defines a sealed class that cannot be inherited from. Use 'sd' modifier.",
+      "examples": [
+        {
+          "csharp": "public sealed class FinalClass { }",
+          "calor": "§CL{1:FinalClass:pub:sd}\n  ...\n§/CL"
+        }
+      ]
+    },
+    {
+      "id": "lock_statement",
+      "csharpConstruct": "lock statement",
+      "keywords": ["lock", "thread", "synchronization", "mutex", "critical section", "thread-safe"],
+      "calorSyntax": "§LK{object} body §/LK",
+      "description": "Acquires an exclusive lock on an object for thread-safe access.",
+      "examples": [
+        {
+          "csharp": "lock (_sync) { _count++; }",
+          "calor": "§LK{_sync}\n  §B{_count}=_count + 1§/B\n§/LK"
+        }
+      ]
+    },
+    {
+      "id": "todo_comment",
+      "csharpConstruct": "todo comment",
+      "keywords": ["todo", "fixme", "hack", "comment", "annotation"],
+      "calorSyntax": "§TD{description} or §FX{description} or §HK{description}",
+      "description": "Marks todo items, fixmes, or hacks in the code.",
+      "examples": [
+        {
+          "csharp": "// TODO: Implement caching",
+          "calor": "§TD{Implement caching}"
+        },
+        {
+          "csharp": "// FIXME: This breaks with null input",
+          "calor": "§FX{This breaks with null input}"
+        },
+        {
+          "csharp": "// HACK: Temporary workaround for API bug",
+          "calor": "§HK{Temporary workaround for API bug}"
+        }
+      ]
+    },
+    {
+      "id": "deprecated_annotation",
+      "csharpConstruct": "obsolete attribute",
+      "keywords": ["deprecated", "obsolete", "old", "legacy", "do not use"],
+      "calorSyntax": "§DP{reason}",
+      "description": "Marks code as deprecated with a reason.",
+      "examples": [
+        {
+          "csharp": "[Obsolete(\"Use NewMethod instead\")]",
+          "calor": "§DP{Use NewMethod instead}"
+        }
+      ]
+    },
+    {
+      "id": "complexity_annotation",
+      "csharpConstruct": "complexity documentation",
+      "keywords": ["complexity", "big o", "performance", "algorithm", "time complexity", "space complexity"],
+      "calorSyntax": "§CX{O(n)} or §CX{O(log n)}",
+      "description": "Documents the algorithmic complexity of a function.",
+      "examples": [
+        {
+          "csharp": "// Complexity: O(n log n)",
+          "calor": "§CX{O(n log n)}"
+        },
+        {
+          "csharp": "// Complexity: O(1) - constant time",
+          "calor": "§CX{O(1)}"
+        }
+      ]
+    },
+    {
+      "id": "visibility_modifiers",
+      "csharpConstruct": "access modifiers",
+      "keywords": ["public", "private", "protected", "internal", "visibility", "access", "modifier"],
+      "calorSyntax": "pub (public), priv (private), prot (protected)",
+      "description": "Visibility modifiers are specified in the tag header. Use 'pub' for public, 'priv' for private, 'prot' for protected.",
+      "examples": [
+        {
+          "csharp": "public void Method() { }",
+          "calor": "§MT{1:Method:pub}\n  §O{void}\n§/MT"
+        },
+        {
+          "csharp": "private int _field;",
+          "calor": "§FLD{i32:_field:priv}"
+        },
+        {
+          "csharp": "protected virtual void OnChange() { }",
+          "calor": "§MT{1:OnChange:prot:vr}\n  §O{void}\n§/MT"
+        }
+      ]
+    },
+    {
+      "id": "event_definition",
+      "csharpConstruct": "event definition",
+      "keywords": ["event", "delegate", "handler", "subscribe", "publish", "raise", "eventhandler"],
+      "calorSyntax": "§EV{id:name:visibility} §O{EventType} §/EV",
+      "description": "Defines an event that other objects can subscribe to.",
+      "examples": [
+        {
+          "csharp": "public event EventHandler OnChanged;",
+          "calor": "§EV{1:OnChanged:pub}\n  §O{EventHandler}\n§/EV"
+        },
+        {
+          "csharp": "public event Action<int> ValueUpdated;",
+          "calor": "§EV{1:ValueUpdated:pub}\n  §O{Action<i32>}\n§/EV"
+        }
+      ]
+    }
+  ],
+  "tags": {
+    "§NEW": {
+      "name": "New Instance",
+      "syntax": "§NEW{ClassName}(args)§/NEW",
+      "description": "Creates a new instance of a class using its constructor.",
+      "csharpEquivalent": "new ClassName(args)"
+    },
+    "§B": {
+      "name": "Binding",
+      "syntax": "§B{name}=value§/B or §B{~name}=value§/B",
+      "description": "Variable binding. Immutable by default, use ~ prefix for mutable variables.",
+      "csharpEquivalent": "var name = value; or int name = value; (mutable)"
+    },
+    "§V": {
+      "name": "Binding (Alias)",
+      "syntax": "§V{name}=value§/V",
+      "description": "Alternative syntax for variable binding. Identical to §B.",
+      "csharpEquivalent": "var name = value;"
+    },
+    "§F": {
+      "name": "Function",
+      "syntax": "§F{id:name:visibility} body §/F",
+      "description": "Defines a standalone function. Not a class member.",
+      "csharpEquivalent": "public static ReturnType Name(params) { body }"
+    },
+    "§AF": {
+      "name": "Async Function",
+      "syntax": "§AF{id:name:visibility} body §/AF",
+      "description": "Defines an async standalone function.",
+      "csharpEquivalent": "public static async Task<T> Name(params) { body }"
+    },
+    "§M": {
+      "name": "Function (Alias)",
+      "syntax": "§M{id:name:visibility} body §/M",
+      "description": "Alternative syntax for function definition. Identical to §F.",
+      "csharpEquivalent": "public static ReturnType Name(params) { body }"
+    },
+    "§MT": {
+      "name": "Method",
+      "syntax": "§MT{id:name:visibility:modifiers} body §/MT",
+      "description": "Defines a class method. Modifiers: vr (virtual), ov (override), ab (abstract), st (static).",
+      "csharpEquivalent": "public ReturnType Name(params) { body }"
+    },
+    "§AMT": {
+      "name": "Async Method",
+      "syntax": "§AMT{id:name:visibility} body §/AMT",
+      "description": "Defines an async class method.",
+      "csharpEquivalent": "public async Task<T> Name(params) { body }"
+    },
+    "§I": {
+      "name": "Input Parameter",
+      "syntax": "§I{type:name} or §I{type:name:default}",
+      "description": "Defines an input parameter for a function or method.",
+      "csharpEquivalent": "Type name or Type name = default"
+    },
+    "§O": {
+      "name": "Output Type",
+      "syntax": "§O{type}",
+      "description": "Declares the return type of a function or method.",
+      "csharpEquivalent": "Return type declaration"
+    },
+    "§R": {
+      "name": "Return",
+      "syntax": "§R expression §/R or §R§/R",
+      "description": "Returns a value from a function. Empty for void returns.",
+      "csharpEquivalent": "return expression; or return;"
+    },
+    "§CL": {
+      "name": "Class",
+      "syntax": "§CL{id:name:visibility:modifiers} body §/CL",
+      "description": "Defines a class. Modifiers: abs (abstract), sealed, partial, st (static).",
+      "csharpEquivalent": "public class Name { body }"
+    },
+    "§EXT": {
+      "name": "Extends",
+      "syntax": "§EXT{BaseClass}",
+      "description": "Specifies the base class for inheritance.",
+      "csharpEquivalent": ": BaseClass"
+    },
+    "§IMPL": {
+      "name": "Implements",
+      "syntax": "§IMPL{Interface}",
+      "description": "Specifies an interface the class implements.",
+      "csharpEquivalent": ": IInterface"
+    },
+    "§IFACE": {
+      "name": "Interface",
+      "syntax": "§IFACE{id:name:visibility} body §/IFACE",
+      "description": "Defines an interface.",
+      "csharpEquivalent": "public interface IName { body }"
+    },
+    "§L": {
+      "name": "Loop",
+      "syntax": "§L{var:range} body §/L or §L{item:collection} body §/L",
+      "description": "For loop or foreach loop. Range syntax: start..end (exclusive), start..=end (inclusive).",
+      "csharpEquivalent": "for (var i = start; i < end; i++) or foreach (var item in collection)"
+    },
+    "§WH": {
+      "name": "While Loop",
+      "syntax": "§WH{condition} body §/WH",
+      "description": "While loop that continues while condition is true.",
+      "csharpEquivalent": "while (condition) { body }"
+    },
+    "§DO": {
+      "name": "Do-While Loop",
+      "syntax": "§DO{} body §WH{condition}§/DO",
+      "description": "Do-while loop that executes at least once.",
+      "csharpEquivalent": "do { body } while (condition);"
+    },
+    "§IF": {
+      "name": "If Statement",
+      "syntax": "§IF{condition} body §/IF",
+      "description": "Conditional execution. Can include §EI (else-if) and §EL (else).",
+      "csharpEquivalent": "if (condition) { body }"
+    },
+    "§EI": {
+      "name": "Else If",
+      "syntax": "§EI{condition} body",
+      "description": "Else-if branch in a conditional.",
+      "csharpEquivalent": "else if (condition) { body }"
+    },
+    "§EL": {
+      "name": "Else",
+      "syntax": "§EL body",
+      "description": "Else branch in a conditional.",
+      "csharpEquivalent": "else { body }"
+    },
+    "§ASYNC": {
+      "name": "Async Block",
+      "syntax": "§ASYNC{} body §/ASYNC",
+      "description": "Marks a block as async.",
+      "csharpEquivalent": "async context"
+    },
+    "§AWAIT": {
+      "name": "Await",
+      "syntax": "§AWAIT expression §/AWAIT",
+      "description": "Awaits an asynchronous operation.",
+      "csharpEquivalent": "await expression"
+    },
+    "§TR": {
+      "name": "Try Block",
+      "syntax": "§TR{} body §CA{Type:var} handler §FI{} cleanup §/TR",
+      "description": "Exception handling with try, catch, and optional finally.",
+      "csharpEquivalent": "try { body } catch (Type var) { handler } finally { cleanup }"
+    },
+    "§CA": {
+      "name": "Catch Block",
+      "syntax": "§CA{ExceptionType:varName} body or §CA{} body",
+      "description": "Catches exceptions. Type and variable name are optional.",
+      "csharpEquivalent": "catch (ExceptionType varName) { body }"
+    },
+    "§FI": {
+      "name": "Finally Block",
+      "syntax": "§FI{} body",
+      "description": "Finally block that always executes.",
+      "csharpEquivalent": "finally { body }"
+    },
+    "§TH": {
+      "name": "Throw",
+      "syntax": "§TH expression §/TH or §TH§/TH",
+      "description": "Throws an exception. Empty form rethrows current exception.",
+      "csharpEquivalent": "throw expression; or throw;"
+    },
+    "§E": {
+      "name": "Effects",
+      "syntax": "§E{effect1,effect2,...}",
+      "description": "Declares side effects. Common: cw (console write), cr (console read), fs:r/fs:w (file), net (network), db (database).",
+      "csharpEquivalent": "No direct equivalent - annotations or documentation"
+    },
+    "§Q": {
+      "name": "Precondition",
+      "syntax": "§Q (condition) or §Q (condition, \"message\")",
+      "description": "Declares a precondition that must be true when function is called.",
+      "csharpEquivalent": "Contract.Requires(condition) or Guard clauses"
+    },
+    "§S": {
+      "name": "Postcondition",
+      "syntax": "§S (condition) or §S (condition, \"message\")",
+      "description": "Declares a postcondition that will be true when function returns. Use $result for return value.",
+      "csharpEquivalent": "Contract.Ensures(condition)"
+    },
+    "§PRE": {
+      "name": "Precondition (Alias)",
+      "syntax": "§PRE (condition)",
+      "description": "Alternative syntax for precondition. Identical to §Q.",
+      "csharpEquivalent": "Contract.Requires(condition)"
+    },
+    "§POST": {
+      "name": "Postcondition (Alias)",
+      "syntax": "§POST (condition)",
+      "description": "Alternative syntax for postcondition. Identical to §S.",
+      "csharpEquivalent": "Contract.Ensures(condition)"
+    },
+    "§INV": {
+      "name": "Invariant",
+      "syntax": "§INV (condition)",
+      "description": "Class invariant that must always be true.",
+      "csharpEquivalent": "Contract.Invariant(condition)"
+    },
+    "§PROP": {
+      "name": "Property",
+      "syntax": "§PROP{id:type:name:visibility} body §/PROP",
+      "description": "Defines a property with optional getter and setter.",
+      "csharpEquivalent": "public Type Name { get; set; }"
+    },
+    "§GET": {
+      "name": "Getter",
+      "syntax": "§GET body §/GET",
+      "description": "Property getter.",
+      "csharpEquivalent": "get { body }"
+    },
+    "§SET": {
+      "name": "Setter",
+      "syntax": "§SET body §/SET or §SET:visibility body §/SET",
+      "description": "Property setter with optional visibility modifier.",
+      "csharpEquivalent": "set { body } or private set { body }"
+    },
+    "§FLD": {
+      "name": "Field",
+      "syntax": "§FLD{type:name:visibility:modifiers}",
+      "description": "Defines a class field. Modifiers: ro (readonly), st (static).",
+      "csharpEquivalent": "private Type _name;"
+    },
+    "§CTOR": {
+      "name": "Constructor",
+      "syntax": "§CTOR{visibility} body §/CTOR",
+      "description": "Defines a class constructor.",
+      "csharpEquivalent": "public ClassName(params) { body }"
+    },
+    "§BASE": {
+      "name": "Base Constructor",
+      "syntax": "§BASE(args)",
+      "description": "Calls the base class constructor.",
+      "csharpEquivalent": ": base(args)"
+    },
+    "§THIS": {
+      "name": "This Constructor",
+      "syntax": "§THIS(args)",
+      "description": "Chains to another constructor in the same class.",
+      "csharpEquivalent": ": this(args)"
+    },
+    "§EN": {
+      "name": "Enum",
+      "syntax": "§EN{id:name:visibility:underlyingType} body §/EN",
+      "description": "Defines an enumeration.",
+      "csharpEquivalent": "public enum Name { ... }"
+    },
+    "§EV": {
+      "name": "Enum Value",
+      "syntax": "§EV{name} or §EV{name:value}",
+      "description": "Defines an enum member.",
+      "csharpEquivalent": "Name or Name = value"
+    },
+    "§LAM": {
+      "name": "Lambda",
+      "syntax": "§LAM{} body §/LAM",
+      "description": "Anonymous function/lambda expression.",
+      "csharpEquivalent": "(params) => expression or (params) => { body }"
+    },
+    "§W": {
+      "name": "Switch/Match",
+      "syntax": "§W{expression} §K{pattern} result ... §/W",
+      "description": "Pattern matching switch expression.",
+      "csharpEquivalent": "expression switch { pattern => result, ... }"
+    },
+    "§K": {
+      "name": "Case",
+      "syntax": "§K{pattern} result",
+      "description": "A case in a switch expression. Use _ for default.",
+      "csharpEquivalent": "pattern => result"
+    },
+    "§BK": {
+      "name": "Break",
+      "syntax": "§BK",
+      "description": "Breaks out of a loop.",
+      "csharpEquivalent": "break;"
+    },
+    "§CN": {
+      "name": "Continue",
+      "syntax": "§CN",
+      "description": "Continues to next loop iteration.",
+      "csharpEquivalent": "continue;"
+    },
+    "§!": {
+      "name": "External Call",
+      "syntax": "§!{method}(args)§/!",
+      "description": "Calls an external or effectful method.",
+      "csharpEquivalent": "method(args)"
+    },
+    "§USE": {
+      "name": "Using/Resource",
+      "syntax": "§USE{var}=expression body §/USE",
+      "description": "Resource management with automatic disposal.",
+      "csharpEquivalent": "using (var name = expression) { body }"
+    },
+    "§G": {
+      "name": "Generic Type Parameter",
+      "syntax": "§G{T}",
+      "description": "Declares a generic type parameter.",
+      "csharpEquivalent": "<T>"
+    },
+    "§WHERE": {
+      "name": "Generic Constraint",
+      "syntax": "§WHERE{T:constraint}",
+      "description": "Constraint on a generic type parameter.",
+      "csharpEquivalent": "where T : constraint"
+    },
+    "§?": {
+      "name": "Null-Conditional",
+      "syntax": "§?{expression}§/?",
+      "description": "Null-conditional access.",
+      "csharpEquivalent": "expression?."
+    },
+    "§??": {
+      "name": "Null-Coalescing",
+      "syntax": "expression §??{default}",
+      "description": "Provides default value if null.",
+      "csharpEquivalent": "expression ?? default"
+    },
+    "§D": {
+      "name": "Data/Record",
+      "syntax": "§D{id:name:visibility} body §/D",
+      "description": "Defines an immutable data record.",
+      "csharpEquivalent": "public record Name { ... }"
+    },
+    "§STR": {
+      "name": "String Interpolation",
+      "syntax": "§STR{text {expression} text}§/STR",
+      "description": "String interpolation with embedded expressions.",
+      "csharpEquivalent": "$\"text {expression} text\""
+    },
+    "§M": {
+      "name": "Module",
+      "syntax": "§M{id:name} body §/M",
+      "description": "Defines a module (namespace/compilation unit). All code must be inside a module.",
+      "csharpEquivalent": "namespace Name { ... }"
+    },
+    "§C": {
+      "name": "Call (Internal)",
+      "syntax": "§C{functionName} args",
+      "description": "Calls an internal function. Use §!{...}§/! for external/effectful calls.",
+      "csharpEquivalent": "functionName(args)"
+    },
+    "§U": {
+      "name": "Using Import",
+      "syntax": "§U{namespace} or §U{alias:namespace}",
+      "description": "Imports a namespace or creates an alias.",
+      "csharpEquivalent": "using Namespace; or using Alias = Namespace;"
+    },
+    "§SM": {
+      "name": "Some (Option)",
+      "syntax": "§SM value",
+      "description": "Creates a Some value for Option types. Represents a present value.",
+      "csharpEquivalent": "Some(value) or value (with nullable)"
+    },
+    "§NN": {
+      "name": "None (Option)",
+      "syntax": "§NN or §NN{Type}",
+      "description": "Creates a None value for Option types. Represents absence of value.",
+      "csharpEquivalent": "None or null"
+    },
+    "§OK": {
+      "name": "Ok (Result)",
+      "syntax": "§OK value",
+      "description": "Creates an Ok result for Result types. Represents success.",
+      "csharpEquivalent": "Result.Ok(value)"
+    },
+    "§ERR": {
+      "name": "Err (Result)",
+      "syntax": "§ERR error",
+      "description": "Creates an Err result for Result types. Represents failure.",
+      "csharpEquivalent": "Result.Err(error)"
+    },
+    "§ARR": {
+      "name": "Array",
+      "syntax": "§ARR{elementType} size or §ARR{elementType} [elements]",
+      "description": "Creates a fixed-size array.",
+      "csharpEquivalent": "new Type[size] or new[] { elements }"
+    },
+    "§LIST": {
+      "name": "List",
+      "syntax": "§LIST{elementType} or §LIST{elementType} [elements]",
+      "description": "Creates a dynamic list.",
+      "csharpEquivalent": "new List<Type>() or new List<Type> { elements }"
+    },
+    "§DICT": {
+      "name": "Dictionary",
+      "syntax": "§DICT{keyType:valueType}",
+      "description": "Creates a dictionary/map.",
+      "csharpEquivalent": "new Dictionary<TKey, TValue>()"
+    },
+    "§P": {
+      "name": "Print",
+      "syntax": "§P expression",
+      "description": "Prints to console with newline. Use §Pf for no newline.",
+      "csharpEquivalent": "Console.WriteLine(expression)"
+    },
+    "§EACH": {
+      "name": "Foreach",
+      "syntax": "§EACH{item:collection} body §/EACH",
+      "description": "Iterates over each element. Alternative to §L{item:collection}.",
+      "csharpEquivalent": "foreach (var item in collection) { body }"
+    },
+    "§IV": {
+      "name": "Invariant",
+      "syntax": "§IV (condition)",
+      "description": "Class invariant that must always be true. Alias for §INV.",
+      "csharpEquivalent": "Contract.Invariant(condition)"
+    },
+    "§SIG": {
+      "name": "Signature",
+      "syntax": "§SIG{id:name} (params) → returnType",
+      "description": "Declares a method signature in an interface.",
+      "csharpEquivalent": "ReturnType Name(params);"
+    },
+    "§RT": {
+      "name": "Rethrow",
+      "syntax": "§RT",
+      "description": "Rethrows the current exception in a catch block.",
+      "csharpEquivalent": "throw;"
+    },
+    "§VAR": {
+      "name": "Variable Pattern",
+      "syntax": "§VAR{name}",
+      "description": "Captures a value into a variable in pattern matching.",
+      "csharpEquivalent": "var name"
+    },
+    "§WHEN": {
+      "name": "Guard Clause",
+      "syntax": "§WHEN condition",
+      "description": "Adds a guard condition to a pattern match case.",
+      "csharpEquivalent": "when condition"
+    },
+    "§A": {
+      "name": "Argument",
+      "syntax": "§A{type:name}",
+      "description": "Defines an argument (alternative to §I for input parameters).",
+      "csharpEquivalent": "Type name"
+    },
+    "§VR": {
+      "name": "Virtual Modifier",
+      "syntax": "§MT{id:name:pub:vr}",
+      "description": "Marks a method as virtual, allowing it to be overridden in derived classes.",
+      "csharpEquivalent": "public virtual ReturnType Name()"
+    },
+    "§OV": {
+      "name": "Override Modifier",
+      "syntax": "§MT{id:name:pub:ov}",
+      "description": "Marks a method as overriding a virtual method from a base class.",
+      "csharpEquivalent": "public override ReturnType Name()"
+    },
+    "§AB": {
+      "name": "Abstract Modifier",
+      "syntax": "§MT{id:name:pub:ab} or §CL{id:name:pub:ab}",
+      "description": "Marks a method or class as abstract. Abstract methods have no body.",
+      "csharpEquivalent": "public abstract ReturnType Name(); or public abstract class Name"
+    },
+    "§SD": {
+      "name": "Sealed Modifier",
+      "syntax": "§CL{id:name:pub:sd}",
+      "description": "Marks a class as sealed, preventing inheritance.",
+      "csharpEquivalent": "public sealed class Name"
+    },
+    "§SW": {
+      "name": "Switch/Match",
+      "syntax": "§SW{expression} cases §/SW",
+      "description": "Pattern matching switch expression. Alternative syntax for §K (match).",
+      "csharpEquivalent": "expression switch { patterns }"
+    },
+    "§BODY": {
+      "name": "Body Start",
+      "syntax": "§BODY content §/BODY",
+      "description": "Explicitly marks the start of a function or method body. Optional in most cases.",
+      "csharpEquivalent": "{ body }"
+    },
+    "§TD": {
+      "name": "Todo",
+      "syntax": "§TD{description}",
+      "description": "Marks a todo item in the code.",
+      "csharpEquivalent": "// TODO: description"
+    },
+    "§FX": {
+      "name": "Fixme",
+      "syntax": "§FX{description}",
+      "description": "Marks a fixme item in the code indicating something that needs to be fixed.",
+      "csharpEquivalent": "// FIXME: description"
+    },
+    "§HK": {
+      "name": "Hack",
+      "syntax": "§HK{description}",
+      "description": "Marks a hack or workaround in the code.",
+      "csharpEquivalent": "// HACK: description"
+    },
+    "§EX": {
+      "name": "Example",
+      "syntax": "§EX{description} code §/EX",
+      "description": "Inline example or test code in documentation.",
+      "csharpEquivalent": "// Example: description"
+    },
+    "§SN": {
+      "name": "Since",
+      "syntax": "§SN{version}",
+      "description": "Documents the version when a feature was introduced.",
+      "csharpEquivalent": "/// <since>version</since>"
+    },
+    "§DP": {
+      "name": "Deprecated",
+      "syntax": "§DP{reason}",
+      "description": "Marks a feature as deprecated with a reason.",
+      "csharpEquivalent": "[Obsolete(\"reason\")]"
+    },
+    "§BR": {
+      "name": "Breaking Change",
+      "syntax": "§BR{description}",
+      "description": "Documents a breaking change in the API.",
+      "csharpEquivalent": "// BREAKING CHANGE: description"
+    },
+    "§XP": {
+      "name": "Experimental",
+      "syntax": "§XP{description}",
+      "description": "Marks a feature as experimental and subject to change.",
+      "csharpEquivalent": "// EXPERIMENTAL: description"
+    },
+    "§SB": {
+      "name": "Stable",
+      "syntax": "§SB",
+      "description": "Marks a feature as stable and production-ready.",
+      "csharpEquivalent": "// STABLE"
+    },
+    "§DC": {
+      "name": "Decision",
+      "syntax": "§DC{id:title} alternatives §/DC",
+      "description": "Documents an architectural or design decision with alternatives considered.",
+      "csharpEquivalent": "// DECISION: title"
+    },
+    "§CHOSEN": {
+      "name": "Chosen Alternative",
+      "syntax": "§CHOSEN{description}",
+      "description": "Documents the chosen alternative in a decision.",
+      "csharpEquivalent": "// CHOSEN: description"
+    },
+    "§CT": {
+      "name": "Context",
+      "syntax": "§CT{description} §/CT",
+      "description": "Documents the context or background for a decision or feature.",
+      "csharpEquivalent": "// CONTEXT: description"
+    },
+    "§VS": {
+      "name": "Visible Section",
+      "syntax": "§VS content §/VS",
+      "description": "Marks a section as visible (not hidden).",
+      "csharpEquivalent": "#region Visible"
+    },
+    "§HD": {
+      "name": "Hidden Section",
+      "syntax": "§HD content §/HD",
+      "description": "Marks a section as hidden from normal view.",
+      "csharpEquivalent": "#region Hidden"
+    },
+    "§FC": {
+      "name": "Focus",
+      "syntax": "§FC content §/FC",
+      "description": "Marks a section as the current focus area for editing.",
+      "csharpEquivalent": "// FOCUS"
+    },
+    "§CX": {
+      "name": "Complexity",
+      "syntax": "§CX{O(n)} or §CX{O(n log n)}",
+      "description": "Documents the algorithmic complexity of a function or method.",
+      "csharpEquivalent": "// Complexity: O(n)"
+    },
+    "§AS": {
+      "name": "Assume",
+      "syntax": "§AS condition",
+      "description": "Documents an assumption that must be true at this point in the code.",
+      "csharpEquivalent": "Debug.Assert(condition); // Assumption"
+    },
+    "§UB": {
+      "name": "Used By",
+      "syntax": "§UB{function_or_class} §/UB",
+      "description": "Documents what uses this code (reverse dependency).",
+      "csharpEquivalent": "// Used by: function_or_class"
+    },
+    "§LK": {
+      "name": "Lock",
+      "syntax": "§LK{object} body §/LK",
+      "description": "Acquires a lock on an object for thread-safe access.",
+      "csharpEquivalent": "lock (object) { body }"
+    },
+    "§PT": {
+      "name": "Property Test",
+      "syntax": "§PT{property} body §/PT",
+      "description": "Defines a property-based test.",
+      "csharpEquivalent": "[Property] public bool TestName() { ... }"
+    },
+    "§FILE": {
+      "name": "File Reference",
+      "syntax": "§FILE{path}",
+      "description": "References an external file.",
+      "csharpEquivalent": "// See: path"
+    },
+    "§TASK": {
+      "name": "Task Reference",
+      "syntax": "§TASK{id}",
+      "description": "References a task or issue ID.",
+      "csharpEquivalent": "// Task: #id"
+    },
+    "§DATE": {
+      "name": "Date Marker",
+      "syntax": "§DATE{YYYY-MM-DD}",
+      "description": "Marks a date associated with the code (e.g., when added or modified).",
+      "csharpEquivalent": "// Date: YYYY-MM-DD"
+    },
+    "§AU": {
+      "name": "Author",
+      "syntax": "§AU{name}",
+      "description": "Documents the author of the code.",
+      "csharpEquivalent": "// Author: name"
+    },
+    "§US": {
+      "name": "Uses",
+      "syntax": "§US dependencies §/US",
+      "description": "Declares dependencies or imports used by the code.",
+      "csharpEquivalent": "using Namespace;"
+    },
+    "§FL": {
+      "name": "Field (Alias)",
+      "syntax": "§FL{type:name}",
+      "description": "Alias for §FLD. Defines a field in a class.",
+      "csharpEquivalent": "private Type name;"
+    },
+    "§WR": {
+      "name": "Where Constraint (Legacy)",
+      "syntax": "§WR{T:constraint}",
+      "description": "Legacy syntax for generic type constraints. Prefer §WHERE.",
+      "csharpEquivalent": "where T : constraint"
+    },
+    "§ENUM": {
+      "name": "Enum (Legacy)",
+      "syntax": "§ENUM{id:name} members §/ENUM",
+      "description": "Legacy syntax for enum definition. Prefer §EN.",
+      "csharpEquivalent": "public enum Name { members }"
+    },
+    "§EEXT": {
+      "name": "Enum Extension",
+      "syntax": "§EEXT{EnumName} extensions §/EEXT",
+      "description": "Defines extension methods for an enum type.",
+      "csharpEquivalent": "public static class EnumExtensions { ... }"
+    },
+    "§T": {
+      "name": "Type",
+      "syntax": "§T{TypeName}",
+      "description": "References or declares a type.",
+      "csharpEquivalent": "TypeName"
+    },
+    "§END_BODY": {
+      "name": "End Body",
+      "syntax": "§END_BODY",
+      "description": "Explicitly marks the end of a function or method body. Pairs with §BODY. Optional in most cases.",
+      "csharpEquivalent": "}"
+    }
+  }
+}

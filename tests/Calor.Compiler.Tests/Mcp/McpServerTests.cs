@@ -129,6 +129,7 @@ public class McpServerTests
         Assert.Contains("calor_analyze", json);
         Assert.Contains("calor_convert", json);
         Assert.Contains("calor_syntax_help", json);
+        Assert.Contains("calor_syntax_lookup", json);
         Assert.Contains("calor_assess", json);
     }
 
@@ -248,6 +249,99 @@ public class McpServerTests
     }
 
     [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_SyntaxLookupTool_Success()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("12").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_syntax_lookup",
+                    "arguments": {
+                        "query": "object instantiation"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+        Assert.Contains("found", json);
+        Assert.Contains("true", json.ToLower());
+        // Check for NEW tag (JSON escapes § as \u00a7)
+        Assert.Contains("NEW", json);
+        Assert.Contains("examples", json);
+    }
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_SyntaxLookupTool_FuzzyMatch()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("13").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_syntax_lookup",
+                    "arguments": {
+                        "query": "for loop"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+        Assert.Contains("found", json);
+        Assert.Contains("true", json.ToLower());
+        // Check for loop syntax (JSON escapes § as \u00a7, and contains L{)
+        Assert.Contains("for loop", json.ToLower());
+    }
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_SyntaxLookupTool_NotFound()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("14").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_syntax_lookup",
+                    "arguments": {
+                        "query": "nonexistent xyz abc"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+        Assert.Contains("found", json);
+        Assert.Contains("false", json.ToLower());
+        Assert.Contains("availableConstructs", json);
+    }
+
+    [Fact]
     public async Task McpMessageHandler_HandleToolsCall_UnknownTool_ReturnsError()
     {
         var handler = new McpMessageHandler();
@@ -350,6 +444,7 @@ public class McpServerTests
         Assert.Contains("calor_analyze", response);
         Assert.Contains("calor_convert", response);
         Assert.Contains("calor_syntax_help", response);
+        Assert.Contains("calor_syntax_lookup", response);
         Assert.Contains("calor_assess", response);
     }
 
