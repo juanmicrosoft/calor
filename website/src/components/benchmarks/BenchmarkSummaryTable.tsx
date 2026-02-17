@@ -91,10 +91,12 @@ export function BenchmarkSummaryTable() {
                       ? 'text-calor-pink font-medium'
                       : metric.winner === 'calor'
                         ? 'text-calor-pink font-medium'
-                        : 'text-calor-cerulean'
+                        : metric.winner === 'tie'
+                          ? 'text-calor-salmon font-medium'
+                          : 'text-calor-cerulean'
                   }
                 >
-                  {metric.isCalorOnly ? 'Calor only' : metric.winner === 'calor' ? 'Calor' : 'C#'}
+                  {metric.isCalorOnly ? 'Calor only' : metric.winner === 'calor' ? 'Calor' : metric.winner === 'tie' ? 'Tie' : 'C#'}
                 </span>
               </td>
             </tr>

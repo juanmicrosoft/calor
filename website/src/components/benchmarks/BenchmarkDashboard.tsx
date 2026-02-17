@@ -23,7 +23,7 @@ interface BenchmarkData {
     cSharpWins: number;
     statisticalRunCount: number;
   };
-  metrics: Record<string, { ratio: number; winner: 'calor' | 'csharp'; isCalorOnly?: boolean }>;
+  metrics: Record<string, { ratio: number; winner: 'calor' | 'csharp' | 'tie'; isCalorOnly?: boolean }>;
   programs: Array<{
     id: string;
     name: string;
@@ -171,6 +171,10 @@ export function BenchmarkDashboard() {
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-calor-pink" />
             <span>Calor better</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-calor-salmon" />
+            <span>Tie</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-calor-cerulean" />

@@ -28,75 +28,93 @@ interface BenchmarkData {
 // Human-readable metric names and interpretations
 const metricDisplayInfo: Record<
   string,
-  { name: string; calorInterpretation: string; csharpInterpretation: string }
+  { name: string; calorInterpretation: string; csharpInterpretation: string; tieInterpretation: string }
 > = {
   TokenEconomics: {
     name: 'Code Size',
     calorInterpretation: 'Calor code is more compact',
     csharpInterpretation: 'Calor\'s explicit rules add some overhead',
+    tieInterpretation: 'Both languages produce similar code size',
   },
   GenerationAccuracy: {
     name: 'First-Try Success',
     calorInterpretation: 'AI generates correct code more often',
     csharpInterpretation: 'AI knows C# better (for now)',
+    tieInterpretation: 'AI generates correct code at similar rates',
   },
   Comprehension: {
     name: 'Understanding Code',
     calorInterpretation: 'AI understands Calor code 1.5x better',
     csharpInterpretation: 'C# familiarity helps AI follow along',
+    tieInterpretation: 'AI understands both languages equally well',
   },
   EditPrecision: {
     name: 'Accurate Edits',
     calorInterpretation: 'AI makes precise changes without breaking things',
     csharpInterpretation: 'C# editing patterns are well-established',
+    tieInterpretation: 'AI makes equally precise edits in both languages',
   },
   ErrorDetection: {
     name: 'Finding Bugs',
     calorInterpretation: 'AI spots 22% more bugs in Calor code',
     csharpInterpretation: 'C# has mature debugging tools',
+    tieInterpretation: 'AI spots bugs equally well in both languages',
   },
   InformationDensity: {
     name: 'Meaning Per Line',
     calorInterpretation: 'Each line carries more information',
     csharpInterpretation: 'Calor trades brevity for clarity',
+    tieInterpretation: 'Both languages convey similar meaning per line',
   },
   TaskCompletion: {
     name: 'Finishing Tasks',
     calorInterpretation: 'AI completes more tasks successfully',
     csharpInterpretation: 'More libraries and examples help AI',
+    tieInterpretation: 'AI completes tasks at similar rates',
   },
   RefactoringStability: {
     name: 'Safe Refactoring',
     calorInterpretation: 'Code stays correct after restructuring',
     csharpInterpretation: 'C# has better refactoring tools',
+    tieInterpretation: 'Both languages maintain stability during refactoring',
   },
   Safety: {
     name: 'Bug Catching',
     calorInterpretation: 'Contracts catch more bugs with better error messages',
     csharpInterpretation: 'Guard clauses require manual implementation',
+    tieInterpretation: 'Both approaches catch bugs equally well',
   },
   EffectDiscipline: {
     name: 'Side Effect Control',
     calorInterpretation: 'Effect system prevents hidden side effect bugs',
     csharpInterpretation: 'Relies on conventions, no enforcement',
+    tieInterpretation: 'Both approaches manage side effects equally',
   },
   Correctness: {
     name: 'Edge Case Handling',
     calorInterpretation: 'Contracts help prevent edge case bugs',
     csharpInterpretation: 'Guard clauses require explicit implementation',
+    tieInterpretation: 'Both languages handle edge cases equally well',
   },
 };
 
 function transformMetrics(data: BenchmarkData): BenchmarkResult[] {
   return Object.entries(data.metrics)
     .map(([key, metric]) => {
-      const info = metricDisplayInfo[key] || { name: key, calorInterpretation: '', csharpInterpretation: '' };
+      const info = metricDisplayInfo[key] || { name: key, calorInterpretation: '', csharpInterpretation: '', tieInterpretation: '' };
+      let interpretation: string;
+      if (metric.winner === 'calor') {
+        interpretation = info.calorInterpretation;
+      } else if (metric.winner === 'tie') {
+        interpretation = info.tieInterpretation;
+      } else {
+        interpretation = info.csharpInterpretation;
+      }
       return {
         category: info.name,
         ratio: metric.ratio,
         winner: metric.winner,
-        interpretation:
-          metric.winner === 'calor' ? info.calorInterpretation : info.csharpInterpretation,
+        interpretation,
         isCalorOnly: metric.isCalorOnly,
       };
     })
@@ -170,10 +188,12 @@ export function BenchmarkChart() {
                           ? 'bg-calor-pink/20 text-calor-pink'
                           : result.winner === 'calor'
                             ? 'bg-calor-pink/20 text-calor-pink'
-                            : 'bg-calor-cerulean/20 text-calor-cerulean'
+                            : result.winner === 'tie'
+                              ? 'bg-calor-salmon/20 text-calor-salmon'
+                              : 'bg-calor-cerulean/20 text-calor-cerulean'
                       )}
                     >
-                      {result.isCalorOnly ? 'Calor only' : result.winner === 'calor' ? 'Calor wins' : 'C# wins'}
+                      {result.isCalorOnly ? 'Calor only' : result.winner === 'calor' ? 'Calor wins' : result.winner === 'tie' ? 'Tie' : 'C# wins'}
                     </span>
                   </div>
                   <span className="font-mono font-bold">
@@ -189,7 +209,9 @@ export function BenchmarkChart() {
                         ? 'bg-gradient-to-r from-calor-pink to-calor-pink/60'
                         : result.winner === 'calor'
                           ? 'bg-gradient-to-r from-calor-pink to-calor-pink/80'
-                          : 'bg-gradient-to-r from-calor-cerulean to-calor-cerulean/80'
+                          : result.winner === 'tie'
+                            ? 'bg-gradient-to-r from-calor-salmon to-calor-salmon/80'
+                            : 'bg-gradient-to-r from-calor-cerulean to-calor-cerulean/80'
                     )}
                     style={{ width: result.isCalorOnly ? '100%' : `${getBarWidth(result.ratio)}%` }}
                   />
@@ -211,6 +233,10 @@ export function BenchmarkChart() {
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-calor-pink" />
               <span>Calor better</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-calor-salmon" />
+              <span>Tie</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-calor-cerulean" />
