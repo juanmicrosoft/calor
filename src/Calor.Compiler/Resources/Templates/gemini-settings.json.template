@@ -1,4 +1,10 @@
 {
+  "mcpServers": {
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio"]
+    }
+  },
   "hooks": {
     "BeforeTool": [
       {

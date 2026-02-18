@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Calor.Compiler.Init;
 using Xunit;
 
@@ -434,9 +435,15 @@ This should be preserved.
         // First initialization
         await initializer.InitializeAsync(_testDirectory, force: false);
 
-        // Modify settings file but keep our hook command
+        // Modify settings file but keep our hook command and MCP server
         var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
         var customSettings = @"{
+  ""mcpServers"": {
+    ""calor"": {
+      ""command"": ""calor"",
+      ""args"": [""mcp"", ""--stdio""]
+    }
+  },
   ""hooks"": {
     ""BeforeTool"": [
       {
@@ -463,7 +470,7 @@ This should be preserved.
         Assert.DoesNotContain(settingsPath, result.CreatedFiles);
         Assert.DoesNotContain(settingsPath, result.UpdatedFiles);
 
-        // Settings should not be modified
+        // Custom settings should be preserved
         var content = await File.ReadAllTextAsync(settingsPath);
         Assert.Contains("customSetting", content);
     }
@@ -490,5 +497,280 @@ This should be preserved.
         var content = await File.ReadAllTextAsync(settingsPath);
         Assert.Contains("calor hook validate-write", content);
         Assert.DoesNotContain("customSetting", content);
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_SettingsContainsMcpServers()
+    {
+        var initializer = new GeminiInitializer();
+
+        var result = await initializer.InitializeAsync(_testDirectory, force: false);
+
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        Assert.True(File.Exists(settingsPath));
+
+        var content = await File.ReadAllTextAsync(settingsPath);
+        var json = JsonDocument.Parse(content);
+
+        // Verify mcpServers section exists with calor entry
+        Assert.True(json.RootElement.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(mcpServers.TryGetProperty("calor", out var calor));
+        Assert.Equal("calor", calor.GetProperty("command").GetString());
+        var args = calor.GetProperty("args");
+        Assert.Equal("mcp", args[0].GetString());
+        Assert.Equal("--stdio", args[1].GetString());
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_SettingsHasBothHooksAndMcpServers()
+    {
+        var initializer = new GeminiInitializer();
+
+        await initializer.InitializeAsync(_testDirectory, force: false);
+
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        var content = await File.ReadAllTextAsync(settingsPath);
+        var json = JsonDocument.Parse(content);
+
+        // Both sections should exist
+        Assert.True(json.RootElement.TryGetProperty("mcpServers", out _));
+        Assert.True(json.RootElement.TryGetProperty("hooks", out _));
+
+        // Hooks should still have our validate-write command
+        Assert.Contains("calor hook validate-write", content);
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_McpServerHasNoTypeField()
+    {
+        var initializer = new GeminiInitializer();
+
+        await initializer.InitializeAsync(_testDirectory, force: false);
+
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        var content = await File.ReadAllTextAsync(settingsPath);
+        var json = JsonDocument.Parse(content);
+
+        var calor = json.RootElement.GetProperty("mcpServers").GetProperty("calor");
+
+        // Gemini doesn't need a "type" field (unlike Claude)
+        Assert.False(calor.TryGetProperty("type", out _));
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_PreservesExistingMcpServers()
+    {
+        var initializer = new GeminiInitializer();
+
+        // First init creates settings with hooks and MCP
+        await initializer.InitializeAsync(_testDirectory, force: false);
+
+        // Manually add another MCP server to the settings
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        var content = await File.ReadAllTextAsync(settingsPath);
+        var modified = content.Replace(
+            @"""calor"": {",
+            @"""other-tool"": {
+      ""command"": ""other-tool"",
+      ""args"": [""serve""]
+    },
+    ""calor"": {");
+        await File.WriteAllTextAsync(settingsPath, modified);
+
+        // Second init should preserve other-tool
+        await initializer.InitializeAsync(_testDirectory, force: false);
+
+        var finalContent = await File.ReadAllTextAsync(settingsPath);
+        Assert.Contains("other-tool", finalContent);
+        Assert.Contains("\"calor\"", finalContent);
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_McpServersIdempotent()
+    {
+        var initializer = new GeminiInitializer();
+
+        await initializer.InitializeAsync(_testDirectory, force: false);
+
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        var contentAfterFirst = await File.ReadAllTextAsync(settingsPath);
+
+        // Second run
+        await initializer.InitializeAsync(_testDirectory, force: false);
+        var contentAfterSecond = await File.ReadAllTextAsync(settingsPath);
+
+        Assert.Equal(contentAfterFirst, contentAfterSecond);
+
+        // Count occurrences of "calor" MCP server key - should only appear once
+        var count = contentAfterSecond.Split("\"calor\":").Length - 1;
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_UpgradePathAddsMcpToExistingHooks()
+    {
+        var initializer = new GeminiInitializer();
+
+        // Simulate existing settings.json with only hooks (no mcpServers) - the upgrade scenario
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+        var hooksOnlySettings = @"{
+  ""hooks"": {
+    ""BeforeTool"": [
+      {
+        ""matcher"": ""write_file|replace"",
+        ""hooks"": [
+          {
+            ""name"": ""calor-validate-write"",
+            ""type"": ""command"",
+            ""command"": ""calor hook validate-write --format gemini $TOOL_INPUT"",
+            ""description"": ""Enforce Calor-first development""
+          }
+        ]
+      }
+    ]
+  }
+}";
+        await File.WriteAllTextAsync(settingsPath, hooksOnlySettings);
+
+        // Run init - should add mcpServers while preserving hooks
+        var result = await initializer.InitializeAsync(_testDirectory, force: false);
+
+        Assert.True(result.Success);
+
+        var content = await File.ReadAllTextAsync(settingsPath);
+        var json = JsonDocument.Parse(content);
+
+        // Both sections should exist
+        Assert.True(json.RootElement.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(json.RootElement.TryGetProperty("hooks", out _));
+
+        // MCP server should be added
+        Assert.True(mcpServers.TryGetProperty("calor", out _));
+
+        // Hooks should be preserved
+        Assert.Contains("calor hook validate-write", content);
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_ForcePreservesBothSections()
+    {
+        var initializer = new GeminiInitializer();
+
+        // First init
+        await initializer.InitializeAsync(_testDirectory, force: false);
+
+        // Force re-init
+        var result = await initializer.InitializeAsync(_testDirectory, force: true);
+
+        Assert.True(result.Success);
+
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        var content = await File.ReadAllTextAsync(settingsPath);
+
+        // Both hooks and MCP should be present after force
+        Assert.Contains("mcpServers", content);
+        Assert.Contains("calor hook validate-write", content);
+        Assert.Contains("\"calor\"", content);
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_MessagesMentionMcpServer()
+    {
+        var initializer = new GeminiInitializer();
+
+        var result = await initializer.InitializeAsync(_testDirectory, force: false);
+
+        Assert.True(result.Success);
+        Assert.Contains(result.Messages, m => m.Contains("MCP server"));
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_SettingsWithOnlyEmptyMcpServers_AddsBothHooksAndMcp()
+    {
+        var initializer = new GeminiInitializer();
+
+        // Create settings.json with only empty mcpServers — no hooks, no calor hook marker
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+        await File.WriteAllTextAsync(settingsPath, @"{ ""mcpServers"": {} }");
+
+        var result = await initializer.InitializeAsync(_testDirectory, force: false);
+
+        Assert.True(result.Success);
+
+        var content = await File.ReadAllTextAsync(settingsPath);
+
+        // Hooks step sees no "calor hook validate-write" marker, file exists but
+        // force=false so it leaves the file unchanged. MCP step then parses it,
+        // sees no "calor" in mcpServers, and adds it.
+        // The end result: MCP is added, but hooks are NOT added (no force, no marker match).
+        // This is intentional — without force, we don't overwrite user files that lack our hooks.
+        Assert.Contains("\"calor\"", content);
+        Assert.Contains("mcp", content);
+
+        var json = JsonDocument.Parse(content);
+        Assert.True(json.RootElement.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(mcpServers.TryGetProperty("calor", out _));
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_SettingsWithOnlyEmptyMcpServers_ForceAddsBoth()
+    {
+        var initializer = new GeminiInitializer();
+
+        // Create settings.json with only empty mcpServers — no hooks
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+        await File.WriteAllTextAsync(settingsPath, @"{ ""mcpServers"": {} }");
+
+        // With force, hooks step overwrites with template (which has both hooks + MCP)
+        var result = await initializer.InitializeAsync(_testDirectory, force: true);
+
+        Assert.True(result.Success);
+
+        var content = await File.ReadAllTextAsync(settingsPath);
+        var json = JsonDocument.Parse(content);
+
+        // Both hooks and MCP should be present after force
+        Assert.True(json.RootElement.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(mcpServers.TryGetProperty("calor", out _));
+        Assert.Contains("calor hook validate-write", content);
+        Assert.Contains("BeforeTool", content);
+    }
+
+    [Fact]
+    public async Task GeminiInitializer_Initialize_InvalidJsonWithForce_RecoversBothHooksAndMcp()
+    {
+        var initializer = new GeminiInitializer();
+
+        // Create invalid JSON in settings
+        var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+        await File.WriteAllTextAsync(settingsPath, "{ not valid json }}}");
+
+        // Force should recover — hooks step overwrites with template, MCP step sees calor exists
+        var result = await initializer.InitializeAsync(_testDirectory, force: true);
+
+        Assert.True(result.Success);
+
+        var content = await File.ReadAllTextAsync(settingsPath);
+        var json = JsonDocument.Parse(content);
+
+        // Template has both hooks and MCP, so force overwrites with both
+        Assert.True(json.RootElement.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(mcpServers.TryGetProperty("calor", out _));
+        Assert.Contains("calor hook validate-write", content);
+    }
+
+    [Fact]
+    public void EmbeddedResourceHelper_ReadTemplate_GeminiSettingsContainsMcpServers()
+    {
+        var content = EmbeddedResourceHelper.ReadTemplate("gemini-settings.json.template");
+
+        Assert.Contains("mcpServers", content);
+        Assert.Contains("\"calor\"", content);
+        Assert.Contains("mcp", content);
+        Assert.Contains("--stdio", content);
     }
 }

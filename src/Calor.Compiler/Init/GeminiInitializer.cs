@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace Calor.Compiler.Init;
 
 /// <summary>
@@ -81,7 +84,10 @@ public class GeminiInitializer : IAiInitializer
                 updatedFiles.Add(geminiMdPath);
             }
 
-            // Configure Gemini CLI hooks for Calor-first enforcement
+            // Configure Gemini CLI hooks for Calor-first enforcement.
+            // IMPORTANT: Hooks must run before MCP merge. On force + invalid JSON,
+            // ConfigureHooksAsync overwrites with the template (which includes mcpServers),
+            // so ConfigureMcpServersAsync will find calor already present and no-op.
             var settingsPath = Path.Combine(targetDirectory, ".gemini", "settings.json");
             var settingsResult = await ConfigureHooksAsync(settingsPath, force);
             if (settingsResult == HookSettingsResult.Created)
@@ -93,12 +99,26 @@ public class GeminiInitializer : IAiInitializer
                 updatedFiles.Add(settingsPath);
             }
 
+            // Configure MCP servers in .gemini/settings.json (same file as hooks)
+            var mcpResult = await ConfigureMcpServersAsync(settingsPath, force);
+            if (mcpResult == McpConfigResult.Created)
+            {
+                if (!createdFiles.Contains(settingsPath))
+                    createdFiles.Add(settingsPath);
+            }
+            else if (mcpResult == McpConfigResult.Updated)
+            {
+                if (!createdFiles.Contains(settingsPath) && !updatedFiles.Contains(settingsPath))
+                    updatedFiles.Add(settingsPath);
+            }
+
             var allModifiedFiles = createdFiles.Concat(updatedFiles).ToList();
             var messages = new List<string>();
 
             if (allModifiedFiles.Count > 0)
             {
                 messages.Add($"Initialized Calor project for Google Gemini CLI (calor v{version})");
+                messages.Add("  - MCP server 'calor' configured for AI agent tools (compile, verify, analyze, convert, typecheck)");
                 messages.Add("");
                 messages.Add("Calor-first enforcement is enabled via BeforeTool hooks.");
                 messages.Add("Gemini CLI will automatically block .cs file creation.");
@@ -216,4 +236,107 @@ public class GeminiInitializer : IAiInitializer
         // Otherwise leave unchanged
         return HookSettingsResult.Unchanged;
     }
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private enum McpConfigResult
+    {
+        Created,
+        Updated,
+        Unchanged
+    }
+
+    private static async Task<McpConfigResult> ConfigureMcpServersAsync(string settingsPath, bool force)
+    {
+        var calorMcpConfig = new GeminiMcpServerConfig
+        {
+            Command = "calor",
+            Args = new[] { "mcp", "--stdio" }
+        };
+
+        if (!File.Exists(settingsPath))
+        {
+            // Create new settings file with just MCP servers
+            var settings = new GeminiSettings
+            {
+                McpServers = new Dictionary<string, GeminiMcpServerConfig>
+                {
+                    ["calor"] = calorMcpConfig
+                }
+            };
+            await File.WriteAllTextAsync(settingsPath, JsonSerializer.Serialize(settings, JsonOptions));
+            return McpConfigResult.Created;
+        }
+
+        var existingJson = await File.ReadAllTextAsync(settingsPath);
+        GeminiSettings? existingSettings;
+
+        try
+        {
+            existingSettings = JsonSerializer.Deserialize<GeminiSettings>(existingJson, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            if (force)
+            {
+                // Can't parse - but we don't want to lose hooks, so just return unchanged
+                // The hooks ConfigureHooksAsync with force already overwrote with template (which has mcpServers)
+                return McpConfigResult.Unchanged;
+            }
+            return McpConfigResult.Unchanged;
+        }
+
+        existingSettings ??= new GeminiSettings();
+        existingSettings.McpServers ??= new Dictionary<string, GeminiMcpServerConfig>();
+
+        // Check if calor MCP server already exists
+        if (existingSettings.McpServers.ContainsKey("calor"))
+        {
+            return McpConfigResult.Unchanged;
+        }
+
+        // Add calor MCP server
+        existingSettings.McpServers["calor"] = calorMcpConfig;
+
+        var newJson = JsonSerializer.Serialize(existingSettings, JsonOptions);
+
+        if (newJson.TrimEnd() == existingJson.TrimEnd())
+        {
+            return McpConfigResult.Unchanged;
+        }
+
+        await File.WriteAllTextAsync(settingsPath, newJson);
+        return McpConfigResult.Updated;
+    }
+}
+
+// JSON structure classes for Gemini CLI settings (.gemini/settings.json)
+internal class GeminiSettings
+{
+    [JsonPropertyName("mcpServers")]
+    public Dictionary<string, GeminiMcpServerConfig>? McpServers { get; set; }
+
+    [JsonPropertyName("hooks")]
+    public JsonElement? Hooks { get; set; }
+
+    // Preserve any other properties
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
+internal class GeminiMcpServerConfig
+{
+    [JsonPropertyName("command")]
+    public string? Command { get; set; }
+
+    [JsonPropertyName("args")]
+    public string[]? Args { get; set; }
+
+    // Preserve any other properties (note: no "type" field - Gemini doesn't need it)
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }

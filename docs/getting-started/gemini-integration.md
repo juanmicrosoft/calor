@@ -25,7 +25,7 @@ This creates:
 |:-----|:--------|
 | `.gemini/skills/calor/SKILL.md` | Teaches Gemini Calor syntax for writing new code |
 | `.gemini/skills/calor-convert/SKILL.md` | Teaches Gemini how to convert C# to Calor |
-| `.gemini/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `.gemini/settings.json` | **MCP server + hooks** - AI agent tools and Calor-first enforcement |
 | `GEMINI.md` | Project documentation with Calor-first guidelines |
 
 You can run this command again anytime to update the Calor documentation section in GEMINI.md without losing your custom content.
@@ -52,6 +52,40 @@ Gemini will then automatically retry with an `.calr` file.
 - `.calr` files (Calor source code)
 - `.g.cs` files (generated C# from Calor)
 - Files in `obj/` directory (build artifacts)
+
+---
+
+## MCP Tools
+
+Gemini CLI now has access to Calor's MCP (Model Context Protocol) tools, enabling direct compilation, verification, and analysis from within Gemini conversations.
+
+The MCP server is automatically configured in `.gemini/settings.json` alongside hooks:
+
+```json
+{
+  "mcpServers": {
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio"]
+    }
+  },
+  "hooks": { ... }
+}
+```
+
+**Available tools:**
+- `calor_compile` — Compile `.calr` files to C#
+- `calor_verify` — Verify contracts and semantics
+- `calor_analyze` — Analyze code quality and complexity
+- `calor_convert` — Convert C# to Calor
+- `calor_typecheck` — Type-check Calor source
+- `calor_syntax_help` — Get Calor syntax reference
+- `calor_lint` — Lint Calor source for style issues
+- `calor_format` — Format Calor source code
+- `calor_diagnose` — Diagnose compilation errors
+- `calor_ids` — List and validate Calor IDs
+
+Gemini can use these tools autonomously during conversations to compile, verify, and fix Calor code without leaving the chat.
 
 ---
 
@@ -148,7 +182,7 @@ The Calor skills teach Gemini:
 | Calor-first enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only |
 | Blocks `.cs` creation | Yes | Yes | No |
 | Hook mechanism | `PreToolUse` | `BeforeTool` | N/A |
-| **MCP tools** | **Yes** (compile, verify, analyze, convert) | No | No |
+| **MCP tools** | **Yes** (compile, verify, analyze, convert, etc.) | **Yes** (compile, verify, analyze, convert, etc.) | No |
 
 ---
 
@@ -320,5 +354,6 @@ ls -la .gemini/skills/calor-convert/SKILL.md
 - [Syntax Reference](/calor/syntax-reference/) - Complete language reference
 - [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Migration guide
 - [calor init](/calor/cli/init/) - Full init command documentation
+- [MCP Server](/calor/cli/mcp/) - MCP tools documentation
 - [Claude Integration](/calor/getting-started/claude-integration/) - Alternative with Claude Code
 - [Codex Integration](/calor/getting-started/codex-integration/) - Alternative with OpenAI Codex CLI
