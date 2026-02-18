@@ -70,6 +70,28 @@ Claude Code will automatically start the MCP server when you open the project.
 
 ---
 
+## Gemini CLI Integration
+
+When you run `calor init --ai gemini`, the MCP server is automatically configured in `.gemini/settings.json` alongside hooks:
+
+```json
+{
+  "mcpServers": {
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio"]
+    }
+  },
+  "hooks": {
+    "BeforeTool": [ ... ]
+  }
+}
+```
+
+Unlike Claude Code, Gemini CLI's MCP config does not require a `type` field, and configuration is project-level (`.gemini/settings.json`) rather than user-level.
+
+---
+
 ## Available Tools
 
 The MCP server exposes 19 tools organized by category:
@@ -366,5 +388,6 @@ tail -f mcp.log
 ## See Also
 
 - [Claude Integration](/getting-started/claude-integration/) - Full Claude Code setup guide
+- [Gemini Integration](/getting-started/gemini-integration/) - Google Gemini CLI setup guide
 - [calor init](/cli/init/) - Initialize project with MCP configuration
 - [calor diagnose](/cli/diagnose/) - Standalone diagnostics

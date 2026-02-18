@@ -301,6 +301,37 @@ This configures two servers:
 - **calor-lsp**: Language server for IDE features (diagnostics, hover, go-to-definition)
 - **calor**: MCP server with tools for compile, verify, analyze, convert, syntax help, lint, format, diagnose, and IDs
 
+### Gemini CLI (via calor init)
+
+When you run `calor init --ai gemini`, the MCP server is automatically configured in `.gemini/settings.json` alongside hooks:
+
+```json
+{
+  "mcpServers": {
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio"]
+    }
+  },
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "write_file|replace",
+        "hooks": [
+          {
+            "name": "calor-validate-write",
+            "type": "command",
+            "command": "calor hook validate-write --format gemini $TOOL_INPUT"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Note: Unlike Claude Code, Gemini CLI's MCP config does not require a `type` field, and configuration is project-level (`.gemini/settings.json`) rather than user-level.
+
 ### VS Code
 
 Add to `.vscode/mcp.json`:
@@ -352,4 +383,5 @@ The server implements [MCP 2024-11-05](https://spec.modelcontextprotocol.io/) wi
 
 - [calor init](/calor/cli/init/) - Initialize project with MCP server configuration
 - [Claude Integration](/calor/getting-started/claude-integration/) - Using Calor with Claude Code
+- [Gemini Integration](/calor/getting-started/gemini-integration/) - Using Calor with Google Gemini CLI
 - [Model Context Protocol](https://modelcontextprotocol.io/) - MCP specification

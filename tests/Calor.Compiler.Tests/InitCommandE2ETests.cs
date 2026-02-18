@@ -253,11 +253,23 @@ public class InitCommandE2ETests : IDisposable
         Assert.Contains("<!-- END CalorC SECTION -->", geminiMdContent);
         Assert.Matches(@"calor v\d+\.\d+\.\d+", geminiMdContent);
 
-        // Assert - settings.json exists with hooks (Gemini supports hooks)
+        // Assert - settings.json exists with hooks and MCP servers (Gemini supports both)
         var settingsPath = Path.Combine(_testDirectory, ".gemini", "settings.json");
         Assert.True(File.Exists(settingsPath));
         var settingsContent = await File.ReadAllTextAsync(settingsPath);
         Assert.Contains("calor hook validate-write", settingsContent);
+
+        // Verify MCP server configuration in settings.json
+        Assert.Contains("mcpServers", settingsContent);
+        var settingsJson = JsonDocument.Parse(settingsContent);
+        var mcpServers = settingsJson.RootElement.GetProperty("mcpServers");
+        Assert.True(mcpServers.TryGetProperty("calor", out var mcpServer));
+        Assert.Equal("calor", mcpServer.GetProperty("command").GetString());
+        var mcpArgs = mcpServer.GetProperty("args").EnumerateArray().Select(a => a.GetString()).ToList();
+        Assert.Contains("mcp", mcpArgs);
+        Assert.Contains("--stdio", mcpArgs);
+        // Gemini MCP config should NOT have a "type" field
+        Assert.False(mcpServer.TryGetProperty("type", out _));
 
         // Assert - .csproj has Calor targets
         var csprojContent = await File.ReadAllTextAsync(csprojPath);

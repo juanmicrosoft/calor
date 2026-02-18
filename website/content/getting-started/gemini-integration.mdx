@@ -23,7 +23,7 @@ This creates:
 |:-----|:--------|
 | `.gemini/skills/calor/SKILL.md` | Teaches Gemini Calor syntax |
 | `.gemini/skills/calor-convert/SKILL.md` | Teaches Gemini C# to Calor conversion |
-| `.gemini/settings.json` | **Hook configuration** - enforces Calor-first development |
+| `.gemini/settings.json` | **MCP server + hooks** - AI agent tools and Calor-first enforcement |
 | `GEMINI.md` | Project documentation with Calor-first guidelines |
 
 ---
@@ -43,6 +43,75 @@ When Gemini tries to create a `.cs` file, the hook blocks the operation and retu
 ```
 
 Gemini will then automatically retry with an `.calr` file.
+
+---
+
+## MCP Server Integration
+
+The init command also configures an **MCP (Model Context Protocol) server** that gives Gemini direct access to the Calor compiler. This enables Gemini to:
+
+- **Type check** code and get semantic errors
+- **Verify contracts** using the Z3 SMT solver
+- **Navigate code** with goto-definition and find-references
+- **Analyze** code for bugs and migration potential
+
+### How It Works
+
+The MCP server is configured in `.gemini/settings.json` alongside hooks:
+
+```json
+{
+  "mcpServers": {
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio"]
+    }
+  },
+  "hooks": { ... }
+}
+```
+
+When you start Gemini CLI in the project, it discovers the MCP server and can use tools like:
+
+```
+calor_typecheck     - Check for type errors
+calor_verify        - Verify function contracts
+calor_goto_definition - Navigate to symbol definitions
+calor_find_references - Find all usages of a symbol
+```
+
+### Example: Contract Verification
+
+Gemini can verify your contracts are correct:
+
+```
+You: Does this function have any contract violations?
+
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §R (/ a b)
+§/F{f001}
+
+Gemini: [Uses calor_verify_contracts tool]
+The precondition §Q (!= b 0) is proven correct by Z3.
+This ensures division by zero cannot occur.
+```
+
+### Available Tools
+
+| Tool | Purpose |
+|:-----|:--------|
+| `calor_typecheck` | Semantic type checking with error categorization |
+| `calor_verify_contracts` | Z3-based contract verification |
+| `calor_goto_definition` | Navigate to symbol definitions |
+| `calor_find_references` | Find all usages of a symbol |
+| `calor_document_outline` | Get file structure |
+| `calor_analyze` | Advanced bug detection |
+
+See [calor mcp](/cli/mcp/) for the complete list of 19 available tools.
 
 ---
 
@@ -86,6 +155,7 @@ public class Calculator
 | Skill invocation | `/calor` | `@calor` | `$calor` |
 | Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only |
 | Hook mechanism | `PreToolUse` | `BeforeTool` | N/A |
+| **MCP tools** | **Yes** (compile, verify, analyze, convert, etc.) | **Yes** (compile, verify, analyze, convert, etc.) | No |
 
 ---
 
@@ -125,5 +195,6 @@ export PATH="$PATH:$HOME/.dotnet/tools"
 
 - [Syntax Reference](/syntax-reference/) - Complete language reference
 - [calor init](/cli/init/) - Full init command documentation
+- [MCP Server](/cli/mcp/) - MCP tools documentation
 - [Claude Integration](/getting-started/claude-integration/) - Alternative with Claude Code
 - [Codex Integration](/getting-started/codex-integration/) - Alternative with OpenAI Codex CLI
