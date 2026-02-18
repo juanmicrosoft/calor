@@ -34,20 +34,24 @@ public class ClaudeInitializer : IAiInitializer
 
         try
         {
+            // Resolve git root so all artifacts land where Claude Code expects them.
+            // Claude Code resolves project config by git root, not by working directory.
+            var effectiveDir = FindGitRoot(targetDirectory) ?? targetDirectory;
+
             // Create .claude/skills/calor/ directory
-            var calorSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "calor");
+            var calorSkillDir = Path.Combine(effectiveDir, ".claude", "skills", "calor");
             Directory.CreateDirectory(calorSkillDir);
 
             // Create .claude/skills/calor-convert/ directory
-            var convertSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "calor-convert");
+            var convertSkillDir = Path.Combine(effectiveDir, ".claude", "skills", "calor-convert");
             Directory.CreateDirectory(convertSkillDir);
 
             // Create .claude/skills/calor-semantics/ directory
-            var semanticsSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "calor-semantics");
+            var semanticsSkillDir = Path.Combine(effectiveDir, ".claude", "skills", "calor-semantics");
             Directory.CreateDirectory(semanticsSkillDir);
 
             // Create .claude/skills/calor-analyze/ directory
-            var analyzeSkillDir = Path.Combine(targetDirectory, ".claude", "skills", "calor-analyze");
+            var analyzeSkillDir = Path.Combine(effectiveDir, ".claude", "skills", "calor-analyze");
             Directory.CreateDirectory(analyzeSkillDir);
 
             // Write skill files (Claude uses SKILL.md format with YAML frontmatter)
@@ -93,7 +97,7 @@ public class ClaudeInitializer : IAiInitializer
             }
 
             // Create or update CLAUDE.md from template with section-aware handling
-            var claudeMdPath = Path.Combine(targetDirectory, "CLAUDE.md");
+            var claudeMdPath = Path.Combine(effectiveDir, "CLAUDE.md");
             var template = EmbeddedResourceHelper.ReadTemplate("CLAUDE.md.template");
             var version = EmbeddedResourceHelper.GetVersion();
             var calorSection = template.Replace("{{VERSION}}", version);
@@ -109,7 +113,7 @@ public class ClaudeInitializer : IAiInitializer
             }
 
             // Configure Claude Code hooks for Calor-first enforcement (in .claude/settings.json)
-            var settingsPath = Path.Combine(targetDirectory, ".claude", "settings.json");
+            var settingsPath = Path.Combine(effectiveDir, ".claude", "settings.json");
             var settingsResult = await ConfigureHooksAsync(settingsPath, force);
             if (settingsResult == HookSettingsResult.Created)
             {
@@ -123,7 +127,7 @@ public class ClaudeInitializer : IAiInitializer
             // Configure MCP servers in ~/.claude.json (per-project section)
             var claudeJsonPath = ClaudeJsonPathOverride ??
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude.json");
-            var mcpResult = await ConfigureMcpServersInClaudeJsonAsync(claudeJsonPath, targetDirectory, force);
+            var mcpResult = await ConfigureMcpServersInClaudeJsonAsync(claudeJsonPath, effectiveDir, force);
             if (mcpResult == McpConfigResult.Updated)
             {
                 updatedFiles.Add(claudeJsonPath);
@@ -386,6 +390,27 @@ public class ClaudeInitializer : IAiInitializer
         Unchanged
     }
 
+    /// <summary>
+    /// Walk up the directory tree looking for a .git entry to find the git repo root.
+    /// Detects both normal repos (.git as directory) and worktrees (.git as file).
+    /// Returns the git root path, or null if not in a git repo.
+    /// </summary>
+    internal static string? FindGitRoot(string path)
+    {
+        var dir = Path.GetFullPath(path);
+        for (var depth = 0; depth < 20 && dir != null; depth++)
+        {
+            var gitPath = Path.Combine(dir, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath))
+                return dir;
+            var parent = Directory.GetParent(dir);
+            if (parent == null || parent.FullName == dir)
+                break;
+            dir = parent.FullName;
+        }
+        return null;
+    }
+
     private static async Task<McpConfigResult> ConfigureMcpServersInClaudeJsonAsync(string claudeJsonPath, string projectPath, bool force)
     {
         // MCP server configuration
@@ -396,8 +421,11 @@ public class ClaudeInitializer : IAiInitializer
             Args = new[] { "mcp", "--stdio" }
         };
 
-        // Normalize the project path to use as key
+        // Normalize the project path, then resolve git root for the project key.
+        // Claude Code resolves project config by git root, so we must key by that.
         var normalizedProjectPath = Path.GetFullPath(projectPath);
+        var gitRoot = FindGitRoot(normalizedProjectPath);
+        var projectKey = gitRoot ?? normalizedProjectPath;
 
         // Read existing ~/.claude.json or create new structure
         ClaudeJsonConfig? claudeConfig;
@@ -427,11 +455,11 @@ public class ClaudeInitializer : IAiInitializer
         claudeConfig ??= new ClaudeJsonConfig();
         claudeConfig.Projects ??= new Dictionary<string, ClaudeProjectConfig>();
 
-        // Get or create the project entry
-        if (!claudeConfig.Projects.TryGetValue(normalizedProjectPath, out var projectConfig))
+        // Get or create the project entry (keyed by git root when available)
+        if (!claudeConfig.Projects.TryGetValue(projectKey, out var projectConfig))
         {
             projectConfig = new ClaudeProjectConfig();
-            claudeConfig.Projects[normalizedProjectPath] = projectConfig;
+            claudeConfig.Projects[projectKey] = projectConfig;
         }
 
         projectConfig.McpServers ??= new Dictionary<string, McpServerConfig>();
