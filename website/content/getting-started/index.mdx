@@ -101,7 +101,7 @@ This adds Calor skills and project documentation that instruct the AI to:
 - Write all new code in Calor (not C#)
 - Analyze existing C# files before modifying them
 
-**Note:** Claude Code and Gemini CLI enforce Calor-first via hooks (blocks `.cs` creation). Codex CLI and GitHub Copilot are guidance-based only.
+**Note:** Claude Code and Gemini CLI enforce Calor-first via hooks (blocks `.cs` creation). Codex CLI is guidance-based only. GitHub Copilot is guidance-based with MCP tool support.
 
 ### Step 4: Write Calor Code
 
@@ -182,9 +182,10 @@ See the [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-pro
 | Component | Description |
 |:----------|:------------|
 | Copilot skills | `calor` and `calor-convert` skills (referenced by name) |
-| copilot-instructions.md | Project guidelines (guidance-based, not enforced) |
+| copilot-instructions.md | Project guidelines with Calor-first rules |
+| MCP tools | `calor_compile`, `calor_verify`, `calor_analyze`, etc. via `.vscode/mcp.json` |
 
-**Note:** GitHub Copilot does not support hooks, so Calor-first is guidance-based only.
+**Note:** GitHub Copilot does not support hooks, but MCP tools provide programmatic compiler access for validation.
 
 ---
 
@@ -195,8 +196,9 @@ See the [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-pro
 | Skills directory | `.claude/skills/` | `.gemini/skills/` | `.codex/skills/` | `.github/copilot/skills/` |
 | Project instructions | `CLAUDE.md` | `GEMINI.md` | `AGENTS.md` | `copilot-instructions.md` |
 | Skill invocation | `/calor` | `@calor` | `$calor` | Reference skill name |
-| Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only | Guidance only |
-| Hook mechanism | `PreToolUse` | `BeforeTool` | N/A | N/A |
+| MCP tools | `~/.claude.json` | N/A | N/A | `.vscode/mcp.json` |
+| Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only | Guidance + MCP tools |
+| Hook mechanism | `PreToolUse` | `BeforeTool` | N/A | MCP tools |
 
 ---
 

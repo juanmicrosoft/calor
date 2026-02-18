@@ -1,12 +1,22 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace Calor.Compiler.Init;
 
 /// <summary>
 /// Initializer for GitHub Copilot AI agent.
-/// Creates .github/copilot/skills/ directory with Calor skills and copilot-instructions.md project file.
-/// Note: GitHub Copilot does not support hooks, so Calor-first enforcement is guidance-based only.
+/// Creates .github/copilot/skills/ directory with Calor skills, copilot-instructions.md project file,
+/// and configures MCP servers in .vscode/mcp.json for Copilot Agent mode.
+/// Note: GitHub Copilot does not support hooks, so Calor-first enforcement is guidance-based with MCP tool support.
 /// </summary>
 public class GitHubCopilotInitializer : IAiInitializer
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     private const string SectionStart = "<!-- BEGIN CalorC SECTION - DO NOT EDIT -->";
     private const string SectionEnd = "<!-- END CalorC SECTION -->";
 
@@ -80,16 +90,27 @@ public class GitHubCopilotInitializer : IAiInitializer
                 updatedFiles.Add(instructionsPath);
             }
 
+            // Configure MCP servers in .vscode/mcp.json (project-level)
+            var mcpJsonPath = Path.Combine(targetDirectory, ".vscode", "mcp.json");
+            var mcpResult = await ConfigureMcpServersAsync(mcpJsonPath, force);
+            if (mcpResult == McpConfigResult.Created)
+            {
+                createdFiles.Add(mcpJsonPath);
+            }
+            else if (mcpResult == McpConfigResult.Updated)
+            {
+                updatedFiles.Add(mcpJsonPath);
+            }
+
             var allModifiedFiles = createdFiles.Concat(updatedFiles).ToList();
             var messages = new List<string>();
 
             if (allModifiedFiles.Count > 0)
             {
                 messages.Add($"Initialized Calor project for GitHub Copilot (calor v{version})");
+                messages.Add("  - MCP server 'calor' configured for AI agent tools (compile, verify, analyze, convert, typecheck)");
                 messages.Add("");
-                messages.Add("WARNING: GitHub Copilot cannot enforce Calor-first development.");
-                messages.Add("This agent lacks hooks to prevent writing .cs files directly.");
-                messages.Add("For best results, use Claude Code: calor init --ai claude");
+                messages.Add("NOTE: Calor-first enforcement is guidance-based via copilot-instructions.md and MCP tools.");
             }
             else
             {
@@ -172,4 +193,117 @@ public class GitHubCopilotInitializer : IAiInitializer
         await File.WriteAllTextAsync(path, newContent);
         return InstructionsUpdateResult.Updated;
     }
+
+    private enum McpConfigResult
+    {
+        Created,
+        Updated,
+        Unchanged
+    }
+
+    private static async Task<McpConfigResult> ConfigureMcpServersAsync(string mcpJsonPath, bool force)
+    {
+        // MCP server configuration for Copilot (no "type" field - command implies stdio)
+        var calorMcpConfig = new CopilotMcpServerConfig
+        {
+            Command = "calor",
+            Args = new[] { "mcp", "--stdio" }
+        };
+
+        // Ensure .vscode/ directory exists
+        var vscodeDir = Path.GetDirectoryName(mcpJsonPath);
+        if (!string.IsNullOrEmpty(vscodeDir))
+        {
+            Directory.CreateDirectory(vscodeDir);
+        }
+
+        if (!File.Exists(mcpJsonPath))
+        {
+            // Create new mcp.json
+            var config = new VscodeMcpConfig
+            {
+                Servers = new Dictionary<string, CopilotMcpServerConfig>
+                {
+                    ["calor"] = calorMcpConfig
+                }
+            };
+            await File.WriteAllTextAsync(mcpJsonPath, JsonSerializer.Serialize(config, JsonOptions));
+            return McpConfigResult.Created;
+        }
+
+        // Read existing mcp.json
+        var existingJson = await File.ReadAllTextAsync(mcpJsonPath);
+        VscodeMcpConfig? existingConfig;
+
+        try
+        {
+            existingConfig = JsonSerializer.Deserialize<VscodeMcpConfig>(existingJson, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            if (force)
+            {
+                var config = new VscodeMcpConfig
+                {
+                    Servers = new Dictionary<string, CopilotMcpServerConfig>
+                    {
+                        ["calor"] = calorMcpConfig
+                    }
+                };
+                await File.WriteAllTextAsync(mcpJsonPath, JsonSerializer.Serialize(config, JsonOptions));
+                return McpConfigResult.Updated;
+            }
+            // Leave invalid JSON unchanged
+            return McpConfigResult.Unchanged;
+        }
+
+        existingConfig ??= new VscodeMcpConfig();
+        existingConfig.Servers ??= new Dictionary<string, CopilotMcpServerConfig>();
+
+        // Skip if calor is already configured (idempotency)
+        if (existingConfig.Servers.ContainsKey("calor"))
+        {
+            return McpConfigResult.Unchanged;
+        }
+
+        existingConfig.Servers["calor"] = calorMcpConfig;
+
+        var newJson = JsonSerializer.Serialize(existingConfig, JsonOptions);
+
+        if (newJson.TrimEnd() == existingJson.TrimEnd())
+        {
+            return McpConfigResult.Unchanged;
+        }
+
+        await File.WriteAllTextAsync(mcpJsonPath, newJson);
+        return McpConfigResult.Updated;
+    }
+}
+
+// JSON structure for .vscode/mcp.json (GitHub Copilot MCP configuration)
+internal class VscodeMcpConfig
+{
+    [JsonPropertyName("servers")]
+    public Dictionary<string, CopilotMcpServerConfig>? Servers { get; set; }
+
+    // Preserve other top-level properties (e.g., "inputs" array from Copilot config)
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
+internal class CopilotMcpServerConfig
+{
+    // Note: No "type" field - Copilot infers stdio from "command"
+    [JsonPropertyName("command")]
+    public string? Command { get; set; }
+
+    [JsonPropertyName("args")]
+    public string[]? Args { get; set; }
+
+    [JsonPropertyName("env")]
+    public Dictionary<string, string>? Env { get; set; }
+
+    // Preserve other properties
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }

@@ -162,6 +162,34 @@ After initialization, use these Gemini CLI commands:
 | `@calor` | Write new Calor code with Gemini's assistance |
 | `@calor-convert` | Convert existing C# code to Calor syntax |
 
+### GitHub Copilot (`--ai github`)
+
+Creates the following files:
+
+| File | Purpose |
+|:-----|:--------|
+| `.github/copilot/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
+| `.github/copilot/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
+| `.github/copilot-instructions.md` | Project documentation with Calor-first guidelines |
+| `.vscode/mcp.json` | MCP server configuration for Copilot Agent mode |
+
+#### Guidance + MCP Tool Enforcement
+
+GitHub Copilot does not support hooks like Claude Code or Gemini CLI. Calor-first development is **guidance-based with MCP tool support**.
+
+MCP tools give Copilot programmatic access to the Calor compiler:
+- `calor_compile`, `calor_verify`, `calor_analyze`, `calor_convert`, `calor_typecheck`
+- `calor_diagnose` and `calor_validate_snippet` for validation
+- Enforcement is not automatic - review file extensions after generation
+- Use `calor analyze` to find any unconverted `.cs` files
+
+After initialization, reference skills by name in your prompts:
+
+| Usage | Description |
+|:------|:------------|
+| Reference `calor` skill | Write new Calor code with Copilot's assistance |
+| Reference `calor-convert` skill | Convert existing C# code to Calor syntax |
+
 ---
 
 ## MSBuild Integration
@@ -203,6 +231,13 @@ calor analyze ./src --top 10
 calor init --ai claude
 ```
 
+### With GitHub Copilot
+
+```bash
+# Add GitHub Copilot support
+calor init --ai github
+```
+
 ### Initialize New Project
 
 ```bash
@@ -219,6 +254,8 @@ calor init --ai claude  # Optional
 - [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) - Complete migration guide
 - [calor convert](/cli/convert/) - Convert individual files
 - [calor analyze](/cli/analyze/) - Find migration candidates
+- [calor mcp](/cli/mcp/) - MCP server for AI agent integration
 - [Claude Integration](/getting-started/claude-integration/) - Using Calor with Claude Code
 - [Codex Integration](/getting-started/codex-integration/) - Using Calor with OpenAI Codex CLI
 - [Gemini Integration](/getting-started/gemini-integration/) - Using Calor with Google Gemini CLI
+- [GitHub Copilot Integration](/getting-started/github-integration/) - Using Calor with GitHub Copilot

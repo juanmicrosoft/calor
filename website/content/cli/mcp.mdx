@@ -92,6 +92,27 @@ Unlike Claude Code, Gemini CLI's MCP config does not require a `type` field, and
 
 ---
 
+## GitHub Copilot Integration
+
+When you run `calor init --ai github`, the MCP server is automatically configured in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "calor": {
+      "command": "calor",
+      "args": ["mcp", "--stdio"]
+    }
+  }
+}
+```
+
+Copilot will use the MCP server when Agent mode is enabled in VS Code.
+
+**Note:** The Copilot config format differs from Claude — it uses `servers` (not `mcpServers`), is project-level (not user-level), and does not require a `type` field.
+
+---
+
 ## Available Tools
 
 The MCP server exposes 19 tools organized by category:
@@ -389,5 +410,6 @@ tail -f mcp.log
 
 - [Claude Integration](/getting-started/claude-integration/) - Full Claude Code setup guide
 - [Gemini Integration](/getting-started/gemini-integration/) - Google Gemini CLI setup guide
+- [GitHub Copilot Integration](/getting-started/github-integration/) - GitHub Copilot setup guide
 - [calor init](/cli/init/) - Initialize project with MCP configuration
 - [calor diagnose](/cli/diagnose/) - Standalone diagnostics

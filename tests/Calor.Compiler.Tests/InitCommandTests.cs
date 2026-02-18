@@ -394,8 +394,8 @@ Run `dotnet build` to compile.
         // Verify copilot-instructions.md is created
         Assert.True(File.Exists(Path.Combine(_testDirectory, ".github", "copilot-instructions.md")));
 
-        // Verify warning about no enforcement is present
-        Assert.Contains("cannot enforce Calor-first development", string.Join("\n", result.Messages));
+        // Verify MCP server message is present
+        Assert.Contains("MCP server", string.Join("\n", result.Messages));
     }
 
     [Fact]
@@ -418,7 +418,7 @@ Run `dotnet build` to compile.
         Assert.Contains("Rule 1: Never create new `.cs` files", content);
         Assert.Contains("Rule 2: Convert C# to Calor before modifying", content);
         Assert.Contains("calor analyze", content);
-        Assert.Contains("guidance-based only", content);
+        Assert.Contains("guidance-based", content);
     }
 
     [Fact]

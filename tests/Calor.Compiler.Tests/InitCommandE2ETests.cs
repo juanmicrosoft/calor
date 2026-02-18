@@ -329,6 +329,22 @@ public class InitCommandE2ETests : IDisposable
         var settingsPath = Path.Combine(_testDirectory, ".github", "settings.json");
         Assert.False(File.Exists(settingsPath));
 
+        // Assert - .vscode/mcp.json exists with correct MCP configuration
+        var mcpJsonPath = Path.Combine(_testDirectory, ".vscode", "mcp.json");
+        Assert.True(File.Exists(mcpJsonPath));
+        var mcpJsonContent = await File.ReadAllTextAsync(mcpJsonPath);
+        var mcpJson = JsonDocument.Parse(mcpJsonContent);
+
+        var servers = mcpJson.RootElement.GetProperty("servers");
+        Assert.True(servers.TryGetProperty("calor", out var calorMcp));
+        Assert.Equal("calor", calorMcp.GetProperty("command").GetString());
+        var mcpArgs = calorMcp.GetProperty("args").EnumerateArray().Select(a => a.GetString()).ToList();
+        Assert.Contains("mcp", mcpArgs);
+        Assert.Contains("--stdio", mcpArgs);
+
+        // Copilot MCP config should NOT have a "type" field
+        Assert.False(calorMcp.TryGetProperty("type", out _));
+
         // Assert - .csproj has Calor targets
         var csprojContent = await File.ReadAllTextAsync(csprojPath);
         Assert.Contains("CompileCalorFiles", csprojContent);
@@ -381,6 +397,7 @@ public class InitCommandE2ETests : IDisposable
         // GitHub
         Assert.True(File.Exists(Path.Combine(_testDirectory, ".github", "copilot", "skills", "calor", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(_testDirectory, ".github", "copilot-instructions.md")));
+        Assert.True(File.Exists(Path.Combine(_testDirectory, ".vscode", "mcp.json")));
 
         // Common files
         Assert.True(File.Exists(Path.Combine(_testDirectory, ".gitattributes")));
