@@ -545,4 +545,99 @@ public class ExceptionHandlingTests
     }
 
     #endregion
+
+    #region Using Statement (§USE) Tests
+
+    [Fact]
+    public void CodeGen_UsingStatement_GeneratesValidCSharp()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:ReadFile:pub}
+§I{str:path}
+§O{void}
+§E{cw}
+§USE{u1:reader:StreamReader} §NEW{StreamReader} §A path
+  §P ""inside using""
+§/USE{u1}
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("using (StreamReader reader =", result);
+        Assert.Contains("new StreamReader(path)", result);
+    }
+
+    [Fact]
+    public void CodeGen_UsingStatementNoType_UsesVar()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:ReadFile:pub}
+§I{str:path}
+§O{void}
+§E{cw}
+§USE{u1:reader} §NEW{StreamReader} §A path
+  §P ""inside using""
+§/USE{u1}
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("using (var reader =", result);
+    }
+
+    [Fact]
+    public void CodeGen_UsingStatementWithMethodCallResource_GeneratesValidCSharp()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Process:pub}
+§I{str:path}
+§O{void}
+§E{cw}
+§USE{u1:stream:FileStream} §C{File.OpenRead} §A path §/C
+  §P ""reading""
+§/USE{u1}
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("using (FileStream stream =", result);
+        Assert.Contains("File.OpenRead(path)", result);
+    }
+
+    [Fact]
+    public void Parse_UsingStatementMismatchedId_ReportsError()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:ReadFile:pub}
+§O{void}
+§USE{u1:reader:StreamReader} §NEW{StreamReader} §A ""test""
+  §P ""inside""
+§/USE{u2}
+§/F{f1}
+§/M{m1}
+";
+
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath("test.calr");
+
+        var lexer = new Lexer(source, diagnostics);
+        var tokens = lexer.TokenizeAll();
+
+        var parser = new Parser(tokens, diagnostics);
+        parser.Parse();
+
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
+    }
+
+    #endregion
 }

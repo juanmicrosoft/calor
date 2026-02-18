@@ -957,10 +957,10 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Using statements are converted to try/finally for disposal
-        Assert.Contains("§TR{", result.CalorSource);
-        Assert.Contains("§FI", result.CalorSource);
-        Assert.Contains("Dispose", result.CalorSource);
+        // Using statements are now converted to §USE blocks
+        Assert.Contains("§USE{", result.CalorSource);
+        Assert.Contains("§/USE{", result.CalorSource);
+        Assert.Contains("reader", result.CalorSource);
         Assert.Contains("using-statement", result.Context.UsedFeatures);
     }
 
@@ -984,9 +984,10 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Using statements are converted to try/finally
-        Assert.Contains("§TR{", result.CalorSource);
+        // Using statements are now converted to §USE blocks with type
+        Assert.Contains("§USE{", result.CalorSource);
         Assert.Contains("writer", result.CalorSource);
+        Assert.Contains("StreamWriter", result.CalorSource);
     }
 
     [Fact]
@@ -1012,9 +1013,9 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Should have two try/finally blocks (one per using)
-        var tryCount = result.CalorSource.Split("§TR{using_").Length - 1;
-        Assert.Equal(2, tryCount);
+        // Should have two §USE blocks (one per using)
+        var useCount = result.CalorSource.Split("§USE{").Length - 1;
+        Assert.Equal(2, useCount);
     }
 
     #endregion
@@ -1309,6 +1310,215 @@ public class CSharpToCalorConversionTests
 
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
+    #endregion
+
+    #region Constructor Argument Preservation Tests
+
+    [Fact]
+    public void Convert_ListWithConstructorArg_PreservesArgument()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var existing = new List<int> { 1, 2, 3 };
+                    var copy = new List<int>(existing);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Constructor arg version should use §NEW, not §LIST
+        Assert.Contains("§NEW", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_ListWithCapacityArg_PreservesArgument()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var list = new List<int>(100);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§NEW", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_DictionaryWithConstructorArg_PreservesArgument()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var old = new Dictionary<string, int>();
+                    var copy = new Dictionary<string, int>(old);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // The copy with ctor arg should use §NEW
+        Assert.Contains("§NEW", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_ListWithInitializerNoArgs_StillUsesListCreation()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var list = new List<int> { 1, 2, 3 };
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // No-arg initializer should still use §LIST (regression check)
+        Assert.Contains("§LIST{", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_HashSetWithConstructorArg_PreservesArgument()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var existing = new List<int> { 1, 2, 3 };
+                    var set = new HashSet<int>(existing);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§NEW", result.CalorSource);
+    }
+
+    #endregion
+
+    #region Using Statement Round-Trip Tests
+
+    [Fact]
+    public void Roundtrip_UsingStatement_CSharpToCalorToCSharp()
+    {
+        var csharpSource = """
+            public class FileProcessor
+            {
+                public void Process(string path)
+                {
+                    using (var reader = new StreamReader(path))
+                    {
+                        Console.WriteLine(reader.ReadToEnd());
+                    }
+                }
+            }
+            """;
+
+        // Step 1: C# -> Calor
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+        Assert.Contains("§USE{", conversionResult.CalorSource);
+        Assert.Contains("§/USE{", conversionResult.CalorSource);
+
+        // Step 2: Calor -> C#
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+
+        // Step 3: Verify the generated C# contains using statement
+        Assert.Contains("using (", compilationResult.GeneratedCode);
+        Assert.Contains("reader", compilationResult.GeneratedCode);
+    }
+
+    [Fact]
+    public void Roundtrip_UsingStatementWithType_PreservesType()
+    {
+        var csharpSource = """
+            public class FileProcessor
+            {
+                public void Process(string path)
+                {
+                    using (StreamWriter writer = new StreamWriter(path))
+                    {
+                        writer.Write("test");
+                    }
+                }
+            }
+            """;
+
+        // C# -> Calor
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+
+        // Calor -> C#
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+
+        // Verify type is preserved through the round-trip
+        Assert.Contains("using (StreamWriter writer =", compilationResult.GeneratedCode);
+    }
+
+    [Fact]
+    public void Roundtrip_UsingStatementWithGenericType_PreservesGenericType()
+    {
+        var csharpSource = """
+            using System.Collections.Generic;
+
+            public class Test
+            {
+                public void Run()
+                {
+                    using (IEnumerator<int> enumerator = new List<int>().GetEnumerator())
+                    {
+                        enumerator.MoveNext();
+                    }
+                }
+            }
+            """;
+
+        // C# -> Calor
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+
+        // Calor -> C#
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+
+        // Verify generic type survives the round-trip
+        Assert.Contains("IEnumerator<int>", compilationResult.GeneratedCode);
     }
 
     #endregion

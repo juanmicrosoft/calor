@@ -750,6 +750,10 @@ public sealed class Parser
         {
             return ParseTryStatement();
         }
+        else if (Check(TokenKind.Use))
+        {
+            return ParseUsingStatement();
+        }
         else if (Check(TokenKind.Throw))
         {
             return ParseThrowStatement();
@@ -5114,6 +5118,46 @@ public sealed class Parser
     ///   ...
     /// §/TRY[try1]
     /// </summary>
+    /// <summary>
+    /// Parses a using statement.
+    /// §USE{id:variableName:variableType} resource-expression
+    ///   ...body...
+    /// §/USE{id}
+    /// </summary>
+    private UsingStatementNode ParseUsingStatement()
+    {
+        var startToken = Expect(TokenKind.Use);
+        var attrs = ParseAttributes();
+
+        // Positional: {id:variableName:variableType}
+        var id = attrs["_pos0"] ?? "";
+        var variableName = attrs["_pos1"];
+        var variableType = attrs["_pos2"];
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "USE", "id");
+        }
+
+        // Parse resource expression
+        var resource = ParseExpression();
+
+        // Parse body statements
+        var body = ParseStatementBlock(TokenKind.EndUse);
+
+        var endToken = Expect(TokenKind.EndUse);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "USE", id, "END_USE", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new UsingStatementNode(span, id, variableName, variableType, resource, body);
+    }
+
     private TryStatementNode ParseTryStatement()
     {
         var startToken = Expect(TokenKind.Try);

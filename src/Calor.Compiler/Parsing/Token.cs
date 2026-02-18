@@ -107,6 +107,8 @@ public enum TokenKind
 
     // Phase 5: Using Statements (.NET Interop)
     Using,
+    Use,                // §USE - using statement open
+    EndUse,             // §/USE - using statement close
 
     // Phase 6: Arrays and Collections
     Array,

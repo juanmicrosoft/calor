@@ -401,6 +401,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         DiagnosticCode.DuplicatePattern => "Duplicate pattern",
         DiagnosticCode.MissingDocComment => "Missing documentation comment",
         DiagnosticCode.BreakingChangeWithoutMarker => "Breaking change without marker",
+        DiagnosticCode.CodeGenSyntaxError => "Generated C# code contains syntax errors",
         _ => "Calor compiler diagnostic"
     };
 

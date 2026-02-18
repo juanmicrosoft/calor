@@ -318,6 +318,13 @@ public static class DiagnosticCode
     /// Info: Sanitizer applied to tainted data.
     /// </summary>
     public const string TaintSanitized = "Calor0986";
+
+    // Code generation validation (Calor1000-1009)
+
+    /// <summary>
+    /// Warning: Generated C# code contains syntax errors.
+    /// </summary>
+    public const string CodeGenSyntaxError = "Calor1000";
 }
 
 /// <summary>

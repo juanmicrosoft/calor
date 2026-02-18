@@ -1,5 +1,6 @@
 using Calor.Compiler.Init;
 using Xunit;
+using System.Text.RegularExpressions;
 
 namespace Calor.Compiler.Tests;
 
@@ -256,6 +257,34 @@ public class CsprojInitializerTests : IDisposable
           </PropertyGroup>
         </Project>
         """;
+
+    [Fact]
+    public async Task InitializeAsync_UsesActualAssemblyVersion()
+    {
+        // Arrange
+        var csprojPath = Path.Combine(_testDir, "Test.csproj");
+        await File.WriteAllTextAsync(csprojPath, SdkStyleCsproj);
+        var expectedVersion = EmbeddedResourceHelper.GetVersion();
+
+        // Act
+        var result = await _initializer.InitializeAsync(csprojPath);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        var content = await File.ReadAllTextAsync(csprojPath);
+        Assert.Contains(expectedVersion, content);
+        Assert.DoesNotContain("0.1.6", content);
+    }
+
+    [Fact]
+    public void GenerateCalorTargetsXml_UsesActualAssemblyVersion()
+    {
+        var xml = CsprojInitializer.GenerateCalorTargetsXml();
+        var expectedVersion = EmbeddedResourceHelper.GetVersion();
+
+        Assert.Contains(expectedVersion, xml);
+        Assert.DoesNotContain("0.1.6", xml);
+    }
 
     private const string LegacyStyleCsproj = """
         <?xml version="1.0" encoding="utf-8"?>

@@ -292,6 +292,7 @@ public sealed class CompoundAssignmentStatementNode : StatementNode
 /// </summary>
 public sealed class UsingStatementNode : StatementNode
 {
+    public string? Id { get; }
     public string? VariableName { get; }
     public string? VariableType { get; }
     public ExpressionNode Resource { get; }
@@ -303,8 +304,20 @@ public sealed class UsingStatementNode : StatementNode
         string? variableType,
         ExpressionNode resource,
         IReadOnlyList<StatementNode> body)
+        : this(span, null, variableName, variableType, resource, body)
+    {
+    }
+
+    public UsingStatementNode(
+        TextSpan span,
+        string? id,
+        string? variableName,
+        string? variableType,
+        ExpressionNode resource,
+        IReadOnlyList<StatementNode> body)
         : base(span)
     {
+        Id = id;
         VariableName = variableName;
         VariableType = variableType;
         Resource = resource ?? throw new ArgumentNullException(nameof(resource));
