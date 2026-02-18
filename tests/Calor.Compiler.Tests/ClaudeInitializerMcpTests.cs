@@ -280,6 +280,121 @@ public class ClaudeInitializerMcpTests : IDisposable
     }
 
     [Fact]
+    public async Task Initialize_FromSubdirectory_KeysByGitRoot()
+    {
+        // Simulate a git repo: create .git at the root
+        var gitRoot = _testDir;
+        Directory.CreateDirectory(Path.Combine(gitRoot, ".git"));
+
+        // Create a nested subdirectory (simulates running from a subdirectory)
+        var subDir = Path.Combine(gitRoot, "src", "MyProject");
+        Directory.CreateDirectory(subDir);
+
+        var initializer = CreateInitializer();
+        await initializer.InitializeAsync(subDir, force: false);
+
+        // MCP config should be keyed by git root, not the subdirectory
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
+        var json = JsonDocument.Parse(content);
+        var projects = json.RootElement.GetProperty("projects");
+
+        Assert.True(projects.TryGetProperty(gitRoot, out var project),
+            $"Expected project key '{gitRoot}' but found: {projects}");
+        Assert.True(project.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(mcpServers.TryGetProperty("calor", out _));
+
+        // The subdirectory path should NOT be a key
+        Assert.False(projects.TryGetProperty(subDir, out _),
+            "Subdirectory should not be a project key");
+    }
+
+    [Fact]
+    public async Task Initialize_FromSubdirectory_PlacesArtifactsAtGitRoot()
+    {
+        // Simulate a git repo
+        var gitRoot = _testDir;
+        Directory.CreateDirectory(Path.Combine(gitRoot, ".git"));
+
+        var subDir = Path.Combine(gitRoot, "src", "MyProject");
+        Directory.CreateDirectory(subDir);
+
+        var initializer = CreateInitializer();
+        await initializer.InitializeAsync(subDir, force: false);
+
+        // Skills, CLAUDE.md, and settings.json should be at git root, not subdirectory
+        Assert.True(File.Exists(Path.Combine(gitRoot, "CLAUDE.md")),
+            "CLAUDE.md should be at git root");
+        Assert.True(File.Exists(Path.Combine(gitRoot, ".claude", "settings.json")),
+            "settings.json should be at git root");
+        Assert.True(Directory.Exists(Path.Combine(gitRoot, ".claude", "skills", "calor")),
+            "skills should be at git root");
+
+        // Should NOT be in subdirectory
+        Assert.False(File.Exists(Path.Combine(subDir, "CLAUDE.md")),
+            "CLAUDE.md should not be in subdirectory");
+        Assert.False(Directory.Exists(Path.Combine(subDir, ".claude")),
+            ".claude dir should not be in subdirectory");
+    }
+
+    [Fact]
+    public async Task Initialize_FromDifferentSubdirs_MergesMcpConfig()
+    {
+        // Simulate a git repo
+        var gitRoot = _testDir;
+        Directory.CreateDirectory(Path.Combine(gitRoot, ".git"));
+
+        var subDirA = Path.Combine(gitRoot, "src", "ProjectA");
+        var subDirB = Path.Combine(gitRoot, "src", "ProjectB");
+        Directory.CreateDirectory(subDirA);
+        Directory.CreateDirectory(subDirB);
+
+        var initializer = CreateInitializer();
+
+        // Init from two different subdirectories
+        await initializer.InitializeAsync(subDirA, force: false);
+        await initializer.InitializeAsync(subDirB, force: false);
+
+        // Should have exactly one project entry keyed by git root
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
+        var json = JsonDocument.Parse(content);
+        var projects = json.RootElement.GetProperty("projects");
+
+        Assert.True(projects.TryGetProperty(gitRoot, out var project));
+        Assert.True(project.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(mcpServers.TryGetProperty("calor", out _));
+
+        // Count project entries - should be exactly 1
+        var projectCount = 0;
+        foreach (var _ in projects.EnumerateObject()) projectCount++;
+        Assert.Equal(1, projectCount);
+    }
+
+    [Fact]
+    public async Task Initialize_GitWorktree_DetectsGitFile()
+    {
+        // In a git worktree, .git is a file (not a directory) containing "gitdir: ..."
+        var gitRoot = _testDir;
+        await File.WriteAllTextAsync(Path.Combine(gitRoot, ".git"),
+            "gitdir: /some/other/path/.git/worktrees/my-branch");
+
+        var subDir = Path.Combine(gitRoot, "src", "MyProject");
+        Directory.CreateDirectory(subDir);
+
+        var initializer = CreateInitializer();
+        await initializer.InitializeAsync(subDir, force: false);
+
+        // MCP config should be keyed by the worktree root (where .git file is)
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
+        var json = JsonDocument.Parse(content);
+        var projects = json.RootElement.GetProperty("projects");
+
+        Assert.True(projects.TryGetProperty(gitRoot, out _),
+            "Should key by worktree root where .git file exists");
+        Assert.False(projects.TryGetProperty(subDir, out _),
+            "Subdirectory should not be a project key");
+    }
+
+    [Fact]
     public async Task Initialize_CreatesNewProjectEntry_WhenNotExists()
     {
         // Pre-create .claude.json without this project
