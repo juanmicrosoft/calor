@@ -20,6 +20,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<DelegateDefinitionNode> _delegates = new();
     private readonly List<FunctionNode> _functions = new();
     private readonly List<StatementNode> _topLevelStatements = new();
+    private HashSet<string> _reassignedVariables = new();
 
     /// <summary>
     /// Gets the top-level statements collected during conversion (C# 9+ feature).
@@ -43,6 +44,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _delegates.Clear();
         _functions.Clear();
         _topLevelStatements.Clear();
+        _reassignedVariables = CollectReassignedVariables(root);
 
         // Visit all nodes
         Visit(root);
@@ -503,6 +505,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("method");
         _context.EnterMethod(node.Identifier.Text);
+        _reassignedVariables = CollectReassignedVariables(node);
 
         var id = _context.GenerateId("m");
         var name = node.Identifier.Text;
@@ -552,6 +555,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ConstructorNode ConvertConstructor(ConstructorDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("constructor");
+        _reassignedVariables = CollectReassignedVariables(node);
 
         var id = _context.GenerateId("ctor");
         var visibility = GetVisibility(node.Modifiers);
@@ -1111,6 +1115,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection());
     }
 
+    /// <summary>
+    /// Scans a syntax scope to find all variable names that are reassigned
+    /// (via assignment expressions or increment/decrement operators).
+    /// </summary>
+    private static HashSet<string> CollectReassignedVariables(SyntaxNode scope)
+    {
+        var reassigned = new HashSet<string>();
+        foreach (var assignment in scope.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        {
+            if (assignment.Left is IdentifierNameSyntax id)
+                reassigned.Add(id.Identifier.Text);
+        }
+        foreach (var unary in scope.DescendantNodes().OfType<PostfixUnaryExpressionSyntax>())
+        {
+            if (unary.Operand is IdentifierNameSyntax id)
+                reassigned.Add(id.Identifier.Text);
+        }
+        foreach (var unary in scope.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>())
+        {
+            if (unary.Operand is IdentifierNameSyntax id)
+                reassigned.Add(id.Identifier.Text);
+        }
+        return reassigned;
+    }
+
     private BindStatementNode ConvertLocalDeclaration(LocalDeclarationStatementSyntax node)
     {
         _context.IncrementConverted();
@@ -1120,7 +1149,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeName = node.Declaration.Type.IsVar
             ? null
             : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
-        var isMutable = !node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword);
+        var isMutable = _reassignedVariables.Contains(name);
         var initializer = variable.Initializer != null
             ? ConvertExpression(variable.Initializer.Value)
             : null;
@@ -1140,12 +1169,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeName = node.Declaration.Type.IsVar
             ? null
             : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
-        var isMutable = !node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword);
 
         foreach (var variable in node.Declaration.Variables)
         {
             _context.IncrementConverted();
             var name = variable.Identifier.Text;
+            var isMutable = _reassignedVariables.Contains(name);
             var initializer = variable.Initializer != null
                 ? ConvertExpression(variable.Initializer.Value)
                 : null;
@@ -1240,6 +1269,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (node.Condition is BinaryExpressionSyntax binExpr)
         {
             to = ConvertExpression(binExpr.Right);
+
+            // Calor loops are inclusive (<=), so adjust for exclusive C# bounds
+            if (binExpr.OperatorToken.IsKind(SyntaxKind.LessThanToken))
+            {
+                to = new BinaryOperationNode(TextSpan.Empty, Ast.BinaryOperator.Subtract, to, new IntLiteralNode(TextSpan.Empty, 1));
+            }
+            else if (binExpr.OperatorToken.IsKind(SyntaxKind.GreaterThanToken))
+            {
+                to = new BinaryOperationNode(TextSpan.Empty, Ast.BinaryOperator.Add, to, new IntLiteralNode(TextSpan.Empty, 1));
+            }
         }
 
         // Extract step from incrementors
@@ -2501,12 +2540,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var index = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
         var span = GetTextSpan(elementAccess);
 
-        // Convert string indexing s[i] to (char-at s i)
-        // Heuristic: if the target is a simple identifier that looks like a string variable,
-        // or if it's a string method result, convert to char-at
-        var targetStr = elementAccess.Expression.ToString();
-        // Don't convert if it looks like an array/list pattern with "[]" or "<>"
-        if (!targetStr.Contains("[]") && !targetStr.Contains("<"))
+        // Only use char-at when the target is a string literal (e.g. "hello"[0])
+        // Default to §IDX (ArrayAccess) — array/list indexing is far more common
+        if (elementAccess.Expression is LiteralExpressionSyntax literal
+            && literal.IsKind(SyntaxKind.StringLiteralExpression))
         {
             _context.RecordFeatureUsage("native-char-op");
             return new CharOperationNode(span, CharOp.CharAt, new List<ExpressionNode> { array, index });

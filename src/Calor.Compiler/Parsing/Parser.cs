@@ -3370,6 +3370,22 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Index);
 
+        // Detect common error: §IDX{arr} (brace format) instead of §IDX arr
+        if (Check(TokenKind.OpenBrace))
+        {
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                "§IDX does not use braces. Use '§IDX arr index' instead of '§IDX{arr} index'.");
+
+            // Recovery: skip { ... } so we don't cascade into collection-initializer parsing
+            Advance(); // consume {
+            var recoveredArray = ParseExpression();
+            if (Check(TokenKind.CloseBrace))
+                Advance(); // consume }
+            var recoveredIndex = ParseExpression();
+            var recoveredSpan = startToken.Span.Union(recoveredIndex.Span);
+            return new ArrayAccessNode(recoveredSpan, recoveredArray, recoveredIndex);
+        }
+
         var array = ParseExpression();
         var index = ParseExpression();
 

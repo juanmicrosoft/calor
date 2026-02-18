@@ -676,4 +676,274 @@ public class ConverterImprovementTests
     }
 
     #endregion
+
+    #region Element Access: §IDX vs char-at
+
+    [Fact]
+    public void Migration_ArrayIndexing_ConvertsToIdx()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string GetFirst(string[] args)
+                {
+                    return args[0];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
+        Assert.IsType<ArrayAccessNode>(ret.Expression);
+    }
+
+    [Fact]
+    public void Migration_ListIndexing_ConvertsToIdx()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            public class Service
+            {
+                public int GetItem(List<int> items, int i)
+                {
+                    return items[i];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
+        Assert.IsType<ArrayAccessNode>(ret.Expression);
+    }
+
+    [Fact]
+    public void Migration_StringLiteralIndexing_ConvertsToCharAt()
+    {
+        var csharp = """
+            public class Service
+            {
+                public char GetChar()
+                {
+                    return "hello"[0];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
+        Assert.IsType<CharOperationNode>(ret.Expression);
+    }
+
+    #endregion
+
+    #region Loop Bounds Adjustment
+
+    [Fact]
+    public void Migration_ForLessThan_AdjustsBoundDown()
+    {
+        var csharp = """
+            public class Service
+            {
+                public void Run(int n)
+                {
+                    for (int i = 0; i < n; i++)
+                    {
+                        System.Console.WriteLine(i);
+                    }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
+
+        // Upper bound should be (- n 1) for exclusive < bound
+        var to = Assert.IsType<BinaryOperationNode>(loop.To);
+        Assert.Equal(BinaryOperator.Subtract, to.Operator);
+        var right = Assert.IsType<IntLiteralNode>(to.Right);
+        Assert.Equal(1, right.Value);
+    }
+
+    [Fact]
+    public void Migration_ForLessThanOrEqual_NoBoundsAdjustment()
+    {
+        var csharp = """
+            public class Service
+            {
+                public void Run(int n)
+                {
+                    for (int i = 0; i <= n; i++)
+                    {
+                        System.Console.WriteLine(i);
+                    }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
+
+        // Upper bound should be n directly (no adjustment for inclusive <=)
+        Assert.IsType<ReferenceNode>(loop.To);
+    }
+
+    [Fact]
+    public void Migration_ForLessThan_CompoundBound_AdjustsCorrectly()
+    {
+        // i < arr.Length should produce (- arr.Length 1)
+        var csharp = """
+            public class Service
+            {
+                public void Run(int[] arr)
+                {
+                    for (int i = 0; i < arr.Length; i++)
+                    {
+                        System.Console.WriteLine(arr[i]);
+                    }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
+
+        // Upper bound should be (- arr.Length 1) wrapping the compound expression
+        var to = Assert.IsType<BinaryOperationNode>(loop.To);
+        Assert.Equal(BinaryOperator.Subtract, to.Operator);
+        var right = Assert.IsType<IntLiteralNode>(to.Right);
+        Assert.Equal(1, right.Value);
+        // Left side should be the arr.Length expression (FieldAccessNode or similar)
+        Assert.NotNull(to.Left);
+    }
+
+    [Fact]
+    public void Migration_ForGreaterThan_AdjustsBoundUp()
+    {
+        var csharp = """
+            public class Service
+            {
+                public void Run(int n)
+                {
+                    for (int i = 10; i > n; i--)
+                    {
+                        System.Console.WriteLine(i);
+                    }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
+
+        // Upper bound should be (+ n 1) for exclusive > bound
+        var to = Assert.IsType<BinaryOperationNode>(loop.To);
+        Assert.Equal(BinaryOperator.Add, to.Operator);
+        var right = Assert.IsType<IntLiteralNode>(to.Right);
+        Assert.Equal(1, right.Value);
+    }
+
+    #endregion
+
+    #region Mutable Variable Tracking
+
+    [Fact]
+    public void Migration_VariableNeverReassigned_EmitsLet()
+    {
+        var csharp = """
+            public class Service
+            {
+                public int Run()
+                {
+                    var x = 42;
+                    return x;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var bind = Assert.IsType<BindStatementNode>(method.Body[0]);
+        Assert.False(bind.IsMutable, "Variable 'x' should be §LET (immutable) — it's never reassigned");
+    }
+
+    [Fact]
+    public void Migration_VariableReassigned_EmitsMut()
+    {
+        var csharp = """
+            public class Service
+            {
+                public int Run()
+                {
+                    var x = 0;
+                    x = 42;
+                    return x;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var bind = Assert.IsType<BindStatementNode>(method.Body[0]);
+        Assert.True(bind.IsMutable, "Variable 'x' should be §MUT — it's reassigned");
+    }
+
+    [Fact]
+    public void Migration_VariableIncremented_EmitsMut()
+    {
+        var csharp = """
+            public class Service
+            {
+                public int Run()
+                {
+                    var count = 0;
+                    count++;
+                    return count;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var bind = Assert.IsType<BindStatementNode>(method.Body[0]);
+        Assert.True(bind.IsMutable, "Variable 'count' should be §MUT — it's incremented");
+    }
+
+    #endregion
 }

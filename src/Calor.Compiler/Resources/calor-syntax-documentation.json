@@ -1117,10 +1117,16 @@
       "csharpEquivalent": "public record Name { ... }"
     },
     "§STR": {
-      "name": "String Interpolation",
-      "syntax": "§STR{text {expression} text}§/STR",
-      "description": "String interpolation with embedded expressions.",
+      "name": "String Interpolation (alias)",
+      "syntax": "§STR ... §/STR",
+      "description": "Alias for §INTERP. See §INTERP for correct syntax.",
       "csharpEquivalent": "$\"text {expression} text\""
+    },
+    "§INTERP": {
+      "name": "String Interpolation",
+      "syntax": "§INTERP \"literal\" §EXP expr \"literal\" §/INTERP",
+      "description": "Builds an interpolated string from literal parts and §EXP expression parts. Strings are opaque — expressions cannot be embedded inside quotes. Use separate \"literal\" and §EXP expr parts.",
+      "csharpEquivalent": "$\"literal{expr}literal\""
     },
     "§M": {
       "name": "Module",
@@ -1137,7 +1143,7 @@
     "§U": {
       "name": "Using Import",
       "syntax": "§U{namespace} or §U{alias:namespace}",
-      "description": "Imports a namespace or creates an alias.",
+      "description": "Imports a namespace or creates an alias. Must appear inside a module (§M) block.",
       "csharpEquivalent": "using Namespace; or using Alias = Namespace;"
     },
     "§SM": {

@@ -534,35 +534,34 @@ public class CharOperationTests
     }
 
     [Fact]
-    public void Migration_StringIndexer_ConvertsToCharAt()
+    public void Migration_StringIndexer_ConvertsToIdx()
     {
-        // The C# to Calor converter converts s[0] to char-at
+        // Without semantic model, variable indexing defaults to §IDX (not char-at)
+        // Only string literals produce char-at
         var csharp = "public class Test { public char M(string s) { return s[0]; } }";
         var converter = new CSharpToCalorConverter();
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
 
-        // Check via round-trip - the emitted Calor should contain char-at
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("char-at", calor);
+        Assert.Contains("§IDX", calor);
     }
 
     [Fact]
-    public void Migration_StringIndexerVariable_ConvertsToCharAt()
+    public void Migration_StringIndexerVariable_ConvertsToIdx()
     {
-        // The C# to Calor converter converts s[i] to char-at
+        // Without semantic model, variable indexing defaults to §IDX (not char-at)
         var csharp = "public class Test { public char M(string s, int i) { return s[i]; } }";
         var converter = new CSharpToCalorConverter();
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
 
-        // Check via round-trip - the emitted Calor should contain char-at
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("char-at", calor);
+        Assert.Contains("§IDX", calor);
     }
 
     [Theory]
@@ -588,9 +587,10 @@ public class CharOperationTests
     }
 
     [Fact]
-    public void Migration_CharAt_RoundTripsToCalor()
+    public void Migration_StringLiteralCharAt_RoundTripsToCalor()
     {
-        var csharp = "public class Test { public char M(string s) { return s[0]; } }";
+        // String literal indexing should produce char-at
+        var csharp = "public class Test { public char M() { return \"hello\"[0]; } }";
         var converter = new CSharpToCalorConverter();
         var result = converter.Convert(csharp);
 
@@ -645,10 +645,11 @@ public class CharOperationTests
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        // Should contain both char and string operations
+        // Should contain char and string operations; indexing uses §IDX (not char-at)
+        // because the converter cannot determine the type of s.ToUpper() without semantic model
         Assert.Contains("is-letter", calor);
         Assert.Contains("upper", calor);
-        Assert.Contains("char-at", calor);
+        Assert.Contains("§IDX", calor);
     }
 
     [Fact]
