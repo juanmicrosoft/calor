@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-02-18
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.18x (Calor leads)
+- **Metrics**: Calor wins 6, C# wins 2
+- **Highlights**:
+  - Comprehension: 1.55x (Calor wins, large effect)
+  - EditPrecision: 1.37x (Calor wins, large effect)
+  - RefactoringStability: 1.37x (Calor wins, large effect)
+  - ErrorDetection: 1.24x (Calor wins, large effect)
+- **Programs Tested**: 40
+
+### Added
+- **MCP server documentation** - Comprehensive documentation for `calor mcp` command with all 19 tools
+- **LSP-style MCP navigation tools** - `calor_goto_definition`, `calor_find_references`, `calor_symbol_info`, `calor_document_outline`, `calor_find_symbol`
+- **Semantic analysis MCP tools** - `calor_typecheck` for type checking with error categorization, `calor_verify_contracts` for Z3 contract verification
+
+### Fixed
+- MCP server now writes configuration to `~/.claude.json` per-project section instead of `.mcp.json`
+- MCP server uses newline-delimited JSON (NDJSON) instead of Content-Length framing
+
 ## [0.2.5] - 2026-02-17
 
 ### Benchmark Results (Statistical: 30 runs)
