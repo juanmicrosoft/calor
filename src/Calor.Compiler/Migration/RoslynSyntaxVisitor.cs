@@ -1422,6 +1422,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         return new UsingStatementNode(
             GetTextSpan(node),
+            _context.GenerateId("use"),
             variableName,
             variableType,
             resource,
@@ -2227,15 +2228,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .ToList();
 
             // Check for collection types and convert to appropriate nodes
-            if (typeName == "List" && typeArgs.Count == 1)
+            // Skip collection-specific converters when constructor args are present,
+            // as they only handle initializer elements and would drop the arguments.
+            var hasCtorArgs = objCreation.ArgumentList?.Arguments.Count > 0;
+
+            if (typeName == "List" && typeArgs.Count == 1 && !hasCtorArgs)
             {
                 return ConvertListCreation(objCreation, typeArgs[0]);
             }
-            else if (typeName == "Dictionary" && typeArgs.Count == 2)
+            else if (typeName == "Dictionary" && typeArgs.Count == 2 && !hasCtorArgs)
             {
                 return ConvertDictionaryCreation(objCreation, typeArgs[0], typeArgs[1]);
             }
-            else if (typeName == "HashSet" && typeArgs.Count == 1)
+            else if (typeName == "HashSet" && typeArgs.Count == 1 && !hasCtorArgs)
             {
                 return ConvertHashSetCreation(objCreation, typeArgs[0]);
             }

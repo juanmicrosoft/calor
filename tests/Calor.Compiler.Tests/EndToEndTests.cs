@@ -1,3 +1,6 @@
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -307,5 +310,64 @@ public class EndToEndTests
         // The generated code should chain additions
         Assert.Contains("a + b", result.GeneratedCode);
         Assert.Contains("+ c", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void ValidateCodegen_ValidProgram_NoRoslynParseErrors()
+    {
+        var source = """
+            §M{m001:Hello}
+            §F{f001:Main:pub}
+              §O{void}
+              §E{cw}
+              §P "Hello"
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors);
+        Assert.NotEmpty(result.GeneratedCode);
+
+        // Validate generated C# is syntactically valid (same as --validate-codegen)
+        var tree = CSharpSyntaxTree.ParseText(result.GeneratedCode);
+        var roslynErrors = tree.GetDiagnostics()
+            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            .ToList();
+
+        Assert.Empty(roslynErrors);
+    }
+
+    [Fact]
+    public void ValidateCodegen_InvalidCSharp_ProducesCalor1000Diagnostic()
+    {
+        // Simulate what --validate-codegen does: parse invalid C# and report Calor1000
+        var invalidCSharp = "public class { }"; // missing class name
+
+        var diagnostics = new DiagnosticBag();
+        var tree = CSharpSyntaxTree.ParseText(invalidCSharp);
+        foreach (var roslynDiag in tree.GetDiagnostics())
+        {
+            if (roslynDiag.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            {
+                var lineSpan = roslynDiag.Location.GetLineSpan();
+                var span = new TextSpan(
+                    0,
+                    roslynDiag.Location.SourceSpan.Length,
+                    lineSpan.StartLinePosition.Line + 1,
+                    lineSpan.StartLinePosition.Character + 1);
+                diagnostics.Report(
+                    span,
+                    DiagnosticCode.CodeGenSyntaxError,
+                    $"Generated C# syntax error: {roslynDiag.GetMessage()}",
+                    DiagnosticSeverity.Warning);
+            }
+        }
+
+        // Should have at least one Calor1000 warning
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.CodeGenSyntaxError);
+        // Should be warnings, not errors
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.CodeGenSyntaxError && d.IsError);
     }
 }

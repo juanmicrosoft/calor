@@ -738,18 +738,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(UsingStatementNode node)
     {
-        // The parser doesn't support §USING statements, so emit as try/finally
-        // which is semantically equivalent (how C# compiles using statements)
-        var typePart = node.VariableType != null ? TypeMapper.CSharpToCalor(node.VariableType) + ":" : "";
-        var namePart = node.VariableName ?? "_using_resource";
+        var id = node.Id ?? $"use{_usingCounter++}";
+        var namePart = node.VariableName ?? "_";
+        var typePart = node.VariableType != null ? ":" + TypeMapper.CSharpToCalor(node.VariableType) : "";
         var resource = node.Resource.Accept(this);
-        var tryId = $"using_{_usingCounter++}";
 
-        // Bind the resource variable
-        AppendLine($"§B{{{typePart}{namePart}}} {resource}");
-
-        // Wrap body in try/finally to ensure disposal
-        AppendLine($"§TR{{{tryId}}}");
+        AppendLine($"§USE{{{id}:{namePart}{typePart}}} {resource}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -758,16 +752,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine("§FI");
-        Indent();
-        // Dispose the resource if not null
-        AppendLine($"§IF{{{tryId}_dispose] (!= {namePart} null)");
-        Indent();
-        AppendLine($"§C{{{namePart}.Dispose] §/C");
-        Dedent();
-        AppendLine($"§/I{{{tryId}_dispose]");
-        Dedent();
-        AppendLine($"§/TR{{{tryId}}}");
+        AppendLine($"§/USE{{{id}}}");
         return "";
     }
     private int _usingCounter = 0;

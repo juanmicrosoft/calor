@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
 using Calor.Compiler.Telemetry;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Calor.Compiler.Commands;
 
@@ -38,16 +39,21 @@ public static class DiagnoseCommand
             aliases: ["--require-docs"],
             description: "Require documentation on public functions");
 
+        var validateCodegenOption = new Option<bool>(
+            aliases: ["--validate-codegen"],
+            description: "Validate generated C# code for syntax errors");
+
         var command = new Command("diagnose", "Output machine-readable diagnostics for Calor files")
         {
             inputArgument,
             formatOption,
             outputOption,
             strictApiOption,
-            requireDocsOption
+            requireDocsOption,
+            validateCodegenOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, formatOption, outputOption, strictApiOption, requireDocsOption);
+        command.SetHandler(ExecuteAsync, inputArgument, formatOption, outputOption, strictApiOption, requireDocsOption, validateCodegenOption);
 
         return command;
     }
@@ -57,7 +63,8 @@ public static class DiagnoseCommand
         string format,
         FileInfo? output,
         bool strictApi,
-        bool requireDocs)
+        bool requireDocs,
+        bool validateCodegen)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("diagnose");
@@ -95,6 +102,29 @@ public static class DiagnoseCommand
                 };
                 var result = Program.Compile(source, file.FullName, options);
                 allDiagnostics.AddRange(result.Diagnostics);
+
+                // Validate generated C# if requested
+                if (validateCodegen && !string.IsNullOrEmpty(result.GeneratedCode))
+                {
+                    var tree = CSharpSyntaxTree.ParseText(result.GeneratedCode);
+                    foreach (var roslynDiag in tree.GetDiagnostics())
+                    {
+                        if (roslynDiag.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                        {
+                            var lineSpan = roslynDiag.Location.GetLineSpan();
+                            var span = new Parsing.TextSpan(
+                                0,
+                                roslynDiag.Location.SourceSpan.Length,
+                                lineSpan.StartLinePosition.Line + 1,
+                                lineSpan.StartLinePosition.Character + 1);
+                            allDiagnostics.Report(
+                                span,
+                                DiagnosticCode.CodeGenSyntaxError,
+                                $"Generated C# syntax error: {roslynDiag.GetMessage()}",
+                                DiagnosticSeverity.Warning);
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {

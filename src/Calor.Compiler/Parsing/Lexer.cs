@@ -73,6 +73,10 @@ public sealed class Lexer
         ["FL"] = TokenKind.Field,           // §FL = Field
         ["IV"] = TokenKind.Invariant,       // §IV = Invariant
 
+        // Using statement (block form)
+        ["USE"] = TokenKind.Use,            // §USE = using statement open
+        ["/USE"] = TokenKind.EndUse,        // §/USE = using statement close
+
         // Arrays and Collections
         ["ARR"] = TokenKind.Array,
         ["/ARR"] = TokenKind.EndArray,

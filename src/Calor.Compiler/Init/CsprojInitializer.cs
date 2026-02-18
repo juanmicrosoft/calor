@@ -170,7 +170,7 @@ public sealed class CsprojInitializer
         var runtimePropertyGroup = new XElement("PropertyGroup",
             new XElement("CalorToolVersion",
                 new XAttribute("Condition", "'$(CalorToolVersion)' == ''"),
-                "0.1.6"),
+                EmbeddedResourceHelper.GetVersion()),
             new XElement("CalorRuntimePath",
                 @"$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net8.0/any/Calor.Runtime.dll"));
 
@@ -264,7 +264,7 @@ public sealed class CsprojInitializer
     /// </summary>
     public static string GenerateCalorTargetsXml()
     {
-        return """
+        return $"""
             <!-- Calor Compilation Configuration -->
             <PropertyGroup>
               <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\calor\</CalorOutputDirectory>
@@ -272,7 +272,7 @@ public sealed class CsprojInitializer
             </PropertyGroup>
 
             <PropertyGroup>
-              <CalorToolVersion Condition="'$(CalorToolVersion)' == ''">0.1.6</CalorToolVersion>
+              <CalorToolVersion Condition="'$(CalorToolVersion)' == ''">{EmbeddedResourceHelper.GetVersion()}</CalorToolVersion>
               <CalorRuntimePath>$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net8.0/any/Calor.Runtime.dll</CalorRuntimePath>
             </PropertyGroup>
 
