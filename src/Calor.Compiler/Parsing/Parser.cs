@@ -1186,7 +1186,7 @@ public sealed class Parser
         var startToken = Expect(TokenKind.OpenParen);
 
         // Get the operator
-        var (opKind, opText) = ParseLispOperator();
+        var (opKind, opText, opSpan) = ParseLispOperator();
 
         // Handle quantifiers
         if (opText == "forall" || opText == "exists")
@@ -1312,13 +1312,15 @@ public sealed class Parser
 
             if (nonKeywordArgs.Count < minArgs)
             {
+                var example = OperatorSuggestions.GetStringOpExample(opText);
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                    $"String operation '{opText}' requires at least {minArgs} argument(s), got {nonKeywordArgs.Count}");
+                    $"String operation '{opText}' requires at least {minArgs} argument(s), got {nonKeywordArgs.Count}. Example: {example}");
             }
             else if (nonKeywordArgs.Count > maxArgs)
             {
+                var example = OperatorSuggestions.GetStringOpExample(opText);
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                    $"String operation '{opText}' accepts at most {maxArgs} argument(s), got {nonKeywordArgs.Count}");
+                    $"String operation '{opText}' accepts at most {maxArgs} argument(s), got {nonKeywordArgs.Count}. Example: {example}");
             }
 
             return new StringOperationNode(span, finalOp, nonKeywordArgs, comparisonMode);
@@ -1333,13 +1335,15 @@ public sealed class Parser
 
             if (args.Count < minArgs)
             {
+                var example = OperatorSuggestions.GetCharOpExample(opText);
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                    $"Char operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}");
+                    $"Char operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}. Example: {example}");
             }
             else if (args.Count > maxArgs)
             {
+                var example = OperatorSuggestions.GetCharOpExample(opText);
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                    $"Char operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}");
+                    $"Char operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}. Example: {example}");
             }
 
             return new CharOperationNode(span, charOp.Value, args);
@@ -1354,113 +1358,147 @@ public sealed class Parser
 
             if (args.Count < minArgs)
             {
+                var example = OperatorSuggestions.GetStringBuilderOpExample(opText);
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                    $"StringBuilder operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}");
+                    $"StringBuilder operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}. Example: {example}");
             }
             else if (args.Count > maxArgs)
             {
+                var example = OperatorSuggestions.GetStringBuilderOpExample(opText);
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-                    $"StringBuilder operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}");
+                    $"StringBuilder operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}. Example: {example}");
             }
 
             return new StringBuilderOperationNode(span, sbOp.Value, args);
         }
 
-        // Unknown operator
-        _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
-            $"Unknown operator '{opText}' in Lisp expression");
+        // Unknown operator - provide helpful suggestions
+        var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
+        var suggestion = OperatorSuggestions.FindSimilarOperator(opText);
+
+        if (csharpHint != null)
+        {
+            // C# construct with Calor alternative
+            _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
+                $"Unknown operator '{opText}'. {csharpHint}");
+        }
+        else if (suggestion != null)
+        {
+            // Typo - suggest the correct operator
+            // Use opSpan (the operator token's span) for precise fix positioning
+            var filePath = _diagnostics.CurrentFilePath ?? "";
+            var fix = new Diagnostics.SuggestedFix(
+                $"Replace '{opText}' with '{suggestion}'",
+                Diagnostics.TextEdit.Replace(filePath, opSpan.Line, opSpan.Column, opSpan.Line, opSpan.Column + opText.Length, suggestion));
+            _diagnostics.ReportErrorWithFix(opSpan, DiagnosticCode.InvalidOperator,
+                $"Unknown operator '{opText}'. Did you mean '{suggestion}'?", fix);
+        }
+        else
+        {
+            // No suggestion - show categories of valid operators
+            _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
+                $"Unknown operator '{opText}'. Valid operators include: {OperatorSuggestions.GetOperatorCategories()}");
+        }
+
         return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
     }
 
-    private (TokenKind kind, string text) ParseLispOperator()
+    private (TokenKind kind, string text, TextSpan span) ParseLispOperator()
     {
         var token = Current;
         var text = token.Text;
+        var span = token.Span;
 
         switch (token.Kind)
         {
             case TokenKind.Plus:
                 Advance();
-                return (TokenKind.Plus, "+");
+                return (TokenKind.Plus, "+", span);
             case TokenKind.Minus:
                 Advance();
-                return (TokenKind.Minus, "-");
+                return (TokenKind.Minus, "-", span);
             case TokenKind.Star:
                 Advance();
-                return (TokenKind.Star, "*");
+                return (TokenKind.Star, "*", span);
             case TokenKind.StarStar:
                 Advance();
-                return (TokenKind.StarStar, "**");
+                return (TokenKind.StarStar, "**", span);
             case TokenKind.Slash:
                 Advance();
-                return (TokenKind.Slash, "/");
+                return (TokenKind.Slash, "/", span);
             case TokenKind.Percent:
                 Advance();
-                return (TokenKind.Percent, "%");
+                return (TokenKind.Percent, "%", span);
             case TokenKind.EqualEqual:
                 Advance();
-                return (TokenKind.EqualEqual, "==");
+                return (TokenKind.EqualEqual, "==", span);
             case TokenKind.BangEqual:
                 Advance();
-                return (TokenKind.BangEqual, "!=");
+                return (TokenKind.BangEqual, "!=", span);
             case TokenKind.Less:
                 Advance();
-                return (TokenKind.Less, "<");
+                return (TokenKind.Less, "<", span);
             case TokenKind.LessEqual:
                 Advance();
-                return (TokenKind.LessEqual, "<=");
+                return (TokenKind.LessEqual, "<=", span);
             case TokenKind.Greater:
                 Advance();
-                return (TokenKind.Greater, ">");
+                return (TokenKind.Greater, ">", span);
             case TokenKind.GreaterEqual:
                 Advance();
-                return (TokenKind.GreaterEqual, ">=");
+                return (TokenKind.GreaterEqual, ">=", span);
             case TokenKind.AmpAmp:
                 Advance();
-                return (TokenKind.AmpAmp, "&&");
+                return (TokenKind.AmpAmp, "&&", span);
             case TokenKind.PipePipe:
                 Advance();
-                return (TokenKind.PipePipe, "||");
+                return (TokenKind.PipePipe, "||", span);
             case TokenKind.Amp:
                 Advance();
-                return (TokenKind.Amp, "&");
+                return (TokenKind.Amp, "&", span);
             case TokenKind.Pipe:
                 Advance();
-                return (TokenKind.Pipe, "|");
+                return (TokenKind.Pipe, "|", span);
             case TokenKind.Caret:
                 Advance();
-                return (TokenKind.Caret, "^");
+                return (TokenKind.Caret, "^", span);
             case TokenKind.LessLess:
                 Advance();
-                return (TokenKind.LessLess, "<<");
+                return (TokenKind.LessLess, "<<", span);
             case TokenKind.GreaterGreater:
                 Advance();
-                return (TokenKind.GreaterGreater, ">>");
+                return (TokenKind.GreaterGreater, ">>", span);
             case TokenKind.Exclamation:
                 Advance();
-                return (TokenKind.Exclamation, "!");
+                return (TokenKind.Exclamation, "!", span);
             case TokenKind.Tilde:
                 Advance();
-                return (TokenKind.Tilde, "~");
+                return (TokenKind.Tilde, "~", span);
             case TokenKind.Question:
                 Advance();
-                return (TokenKind.Question, "?");
+                return (TokenKind.Question, "?", span);
             case TokenKind.Arrow:
                 Advance();
-                return (TokenKind.Arrow, "->");
+                return (TokenKind.Arrow, "->", span);
             case TokenKind.Identifier:
                 // Support word operators like "and", "or", "not", "mod"
                 // Also support hyphenated identifiers like "char-at", "is-letter", "sb-new", "regex-test"
+                var startSpan = span;
                 Advance();
 
                 // Check for hyphenated identifier (e.g., char-at, is-letter, sb-new)
                 var opName = text;
+                var endSpan = span;
                 while (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.Identifier)
                 {
                     Advance(); // consume '-'
                     opName += "-" + Current.Text;
+                    endSpan = Current.Span;
                     Advance(); // consume the next identifier part
                 }
+
+                // For hyphenated identifiers, compute the full span
+                var fullSpan = opName.Contains('-') ? startSpan.Union(endSpan) : startSpan;
 
                 return (TokenKind.Identifier, opName.ToLowerInvariant() switch
                 {
@@ -1475,12 +1513,25 @@ public sealed class Parser
                     "gt" => ">",
                     "ge" or "gte" => ">=",
                     _ => opName
-                });
+                }, fullSpan);
             default:
-                _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
-                    $"Expected operator in Lisp expression, found '{token.Text}'");
+                // Provide helpful message based on what was found
+                var hint = token.Kind switch
+                {
+                    TokenKind.IntLiteral or TokenKind.FloatLiteral =>
+                        "Operators come before arguments: (+ 1 2) not (1 + 2)",
+                    TokenKind.StrLiteral =>
+                        "Operators come before arguments: (contains str \"x\") not (str contains \"x\")",
+                    TokenKind.OpenParen =>
+                        "Nested expression found where operator expected. Check parentheses balance.",
+                    TokenKind.CloseParen =>
+                        "Unexpected closing parenthesis. Check parentheses balance.",
+                    _ => $"Valid operators: {OperatorSuggestions.GetOperatorCategories()}"
+                };
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"Expected operator in Lisp expression, found '{token.Text}'. {hint}");
                 Advance();
-                return (token.Kind, text);
+                return (token.Kind, text, span);
         }
     }
 
@@ -1589,19 +1640,56 @@ public sealed class Parser
             return new IntLiteralNode(colonToken.Span, 0);
         }
 
-        ExpressionNode expr = Current.Kind switch
+        ExpressionNode expr;
+        switch (Current.Kind)
         {
-            TokenKind.IntLiteral => ParseIntLiteral(),
-            TokenKind.StrLiteral => ParseStringLiteral(),
-            TokenKind.BoolLiteral => ParseBoolLiteral(),
-            TokenKind.FloatLiteral => ParseFloatLiteral(),
-            TokenKind.Identifier => ParseBareReference(), // Bare variable reference
-            TokenKind.OpenParen => ParseLispExpression(), // Nested expression
-            TokenKind.Call => ParseCallExpression(), // Call expression inside Lisp
-            TokenKind.New => ParseNewExpression(), // New expression inside Lisp
-            TokenKind.Await => ParseAwaitExpression(), // Await expression inside Lisp
-            _ => throw new InvalidOperationException($"Unexpected token {Current.Kind} in Lisp expression argument")
-        };
+            case TokenKind.IntLiteral:
+                expr = ParseIntLiteral();
+                break;
+            case TokenKind.StrLiteral:
+                expr = ParseStringLiteral();
+                break;
+            case TokenKind.BoolLiteral:
+                expr = ParseBoolLiteral();
+                break;
+            case TokenKind.FloatLiteral:
+                expr = ParseFloatLiteral();
+                break;
+            case TokenKind.Identifier:
+                expr = ParseBareReference(); // Bare variable reference
+                break;
+            case TokenKind.OpenParen:
+                expr = ParseLispExpression(); // Nested expression
+                break;
+            case TokenKind.Call:
+                expr = ParseCallExpression(); // Call expression inside Lisp
+                break;
+            case TokenKind.New:
+                expr = ParseNewExpression(); // New expression inside Lisp
+                break;
+            case TokenKind.Await:
+                expr = ParseAwaitExpression(); // Await expression inside Lisp
+                break;
+            default:
+                // Provide helpful message for unexpected tokens
+                var hint = Current.Kind switch
+                {
+                    TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash =>
+                        "Operators come before arguments in Lisp syntax: (+ a b) not (a + b)",
+                    TokenKind.EqualEqual or TokenKind.BangEqual or TokenKind.Less or TokenKind.Greater =>
+                        "Comparison operators come first: (== a b) not (a == b)",
+                    TokenKind.AmpAmp or TokenKind.PipePipe =>
+                        "Logical operators come first: (&& a b) not (a && b)",
+                    TokenKind.CloseParen =>
+                        "Unexpected closing parenthesis. Check expression structure.",
+                    _ => "Expected a value (number, string, variable) or nested expression"
+                };
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                    $"Unexpected token '{Current.Text}' in expression argument. {hint}");
+                Advance();
+                expr = new IntLiteralNode(Current.Span, 0); // Recovery: return dummy value
+                break;
+        }
 
         // Handle trailing member access (e.g., §C[...] §/C.Length or run?.Status)
         // and array access (e.g., array{index})

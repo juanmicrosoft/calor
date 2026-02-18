@@ -131,6 +131,8 @@ public class McpServerTests
         Assert.Contains("calor_syntax_help", json);
         Assert.Contains("calor_syntax_lookup", json);
         Assert.Contains("calor_assess", json);
+        Assert.Contains("calor_typecheck", json);
+        Assert.Contains("calor_verify_contracts", json);
     }
 
     [Fact]
@@ -446,6 +448,8 @@ public class McpServerTests
         Assert.Contains("calor_syntax_help", response);
         Assert.Contains("calor_syntax_lookup", response);
         Assert.Contains("calor_assess", response);
+        Assert.Contains("calor_typecheck", response);
+        Assert.Contains("calor_verify_contracts", response);
     }
 
     [Fact]
@@ -563,4 +567,201 @@ public class McpServerTests
         Assert.Contains("AsyncPotential", response);
         Assert.Contains("LinqPotential", response);
     }
+
+    #region Diagnose Tool Integration Tests with Suggestions and Fixes
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithTypo_IncludesSuggestionAndFix()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("20").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_diagnose",
+                    "arguments": {
+                        "source": "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+
+        // Verify suggestion is included
+        Assert.Contains("suggestion", json);
+        Assert.Contains("contains", json);
+
+        // Verify fix structure is included
+        Assert.Contains("fix", json);
+        Assert.Contains("description", json);
+        Assert.Contains("edits", json);
+        Assert.Contains("startLine", json);
+        Assert.Contains("newText", json);
+    }
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithCSharpConstruct_IncludesHelpfulMessage()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("21").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_diagnose",
+                    "arguments": {
+                        "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x) §/F{f001} §/M{m001}"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+
+        // Verify helpful C# migration hint is included
+        Assert.Contains("nameof", json);
+        Assert.Contains("string literal", json);
+    }
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithMismatchedId_IncludesFix()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("22").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_diagnose",
+                    "arguments": {
+                        "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42 §/F{f002} §/M{m001}"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+
+        // Verify mismatched ID error with fix
+        Assert.Contains("f001", json);
+        Assert.Contains("f002", json);
+        Assert.Contains("fix", json);
+    }
+
+    [Fact]
+    public async Task McpServer_ProcessMessage_DiagnoseToolWithSuggestions()
+    {
+        // Test the full MCP server flow with diagnose tool
+        // Note: The § character is multi-byte in UTF-8, so we must calculate Content-Length correctly
+        var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R (abss -5) §/F{f001} §/M{m001}";
+        var jsonSource = JsonSerializer.Serialize(source); // Properly escape for JSON
+        var inputMessage = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"calor_diagnose\",\"arguments\":{{\"source\":{jsonSource}}}}}}}";
+        var inputBytes = Encoding.UTF8.GetBytes(inputMessage);
+        var fullInput = $"Content-Length: {inputBytes.Length}\r\n\r\n{inputMessage}";
+
+        using var input = new MemoryStream(Encoding.UTF8.GetBytes(fullInput));
+        using var output = new MemoryStream();
+
+        var server = new McpServer(input, output);
+        await server.RunAsync();
+
+        output.Position = 0;
+        var response = Encoding.UTF8.GetString(output.ToArray());
+
+        // Verify diagnostics appear in MCP server output (abs typo should be caught)
+        Assert.Contains("diagnostics", response);
+        Assert.Contains("abss", response);
+    }
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithUnknownSectionMarker_IncludesSuggestion()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("23").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_diagnose",
+                    "arguments": {
+                        "source": "§FUNC{f001:Test}"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+
+        // Verify section marker suggestion
+        Assert.Contains("FUNC", json);
+        // Should suggest §F for §FUNC (§ may be escaped as \u00A7 in JSON)
+        Assert.True(json.Contains("§F") || json.Contains("\\u00A7F"),
+            $"Expected suggestion for §F but got: {json[..Math.Min(500, json.Length)]}");
+    }
+
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_ValidCode_NoSuggestionsOrFixes()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("24").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_diagnose",
+                    "arguments": {
+                        "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F{f001} §/M{m001}"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+
+        // Verify success with no diagnostics
+        Assert.Contains("success", json);
+        Assert.Contains("true", json.ToLower());
+        // errorCount may have varied spacing in JSON
+        Assert.True(json.Contains("errorCount") && json.Contains(":0"),
+            $"Expected errorCount:0 but got: {json[..Math.Min(500, json.Length)]}");
+    }
+
+    #endregion
 }

@@ -26,6 +26,11 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
     public IReadOnlyList<Diagnostic> Warnings
         => _diagnostics.Where(d => d.IsWarning).ToList();
 
+    /// <summary>
+    /// Gets the current file path for diagnostics.
+    /// </summary>
+    public string? CurrentFilePath => _currentFilePath;
+
     public void SetFilePath(string? filePath)
     {
         _currentFilePath = filePath;
@@ -129,16 +134,100 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         string closeTag, string closeId)
     {
         var message = $"{closeTag} id '{closeId}' does not match {openTag} id '{openId}'";
+        var filePath = _currentFilePath ?? "";
+
+        // If closeId is empty, the closing tag is completely missing - suggest inserting it
+        if (string.IsNullOrEmpty(closeId))
+        {
+            var closingTag = GetClosingTagSyntax(openTag, openId);
+            var fix = new SuggestedFix(
+                $"Insert missing closing tag '{closingTag}'",
+                TextEdit.Insert(filePath, span.Line, span.Column, closingTag + "\n"));
+
+            ReportErrorWithFix(span, DiagnosticCode.MismatchedId, message, fix);
+            return;
+        }
 
         // Create fix to replace the wrong ID with the correct one
         // The edit position is calculated based on where the ID appears in the close tag
-        // Format: §/TAG{closeId} - the ID starts after {
-        var filePath = _currentFilePath ?? "";
-        var fix = new SuggestedFix(
-            $"Change '{closeId}' to '{openId}'",
-            TextEdit.Replace(filePath, span.Line, span.Column, span.Line, span.Column + closeId.Length, openId));
+        // Format: §/TAG{closeId} - the ID starts at column + prefix length
+        // Prefix is "§/TAG{" where TAG length varies
+        var tagLetters = GetClosingTagLetters(openTag);
+        var prefixLength = 3 + tagLetters.Length; // § (1) + / (1) + TAG + { (1)
+        var idStartColumn = span.Column + prefixLength;
 
-        ReportErrorWithFix(span, DiagnosticCode.MismatchedId, message, fix);
+        var idFix = new SuggestedFix(
+            $"Change '{closeId}' to '{openId}'",
+            TextEdit.Replace(filePath, span.Line, idStartColumn, span.Line, idStartColumn + closeId.Length, openId));
+
+        ReportErrorWithFix(span, DiagnosticCode.MismatchedId, message, idFix);
+    }
+
+    /// <summary>
+    /// Gets the closing tag letters for an opening tag name.
+    /// </summary>
+    private static string GetClosingTagLetters(string openTag)
+    {
+        return openTag switch
+        {
+            "MODULE" or "M" => "M",
+            "FUNC" or "F" => "F",
+            "AF" => "AF",
+            "CLASS" or "CL" => "CL",
+            "METHOD" or "MT" => "MT",
+            "IFACE" => "IFACE",
+            "FOR" or "L" => "L",
+            "WHILE" or "W" => "W",
+            "DO" => "DO",
+            "IF" => "IF",
+            "MATCH" or "MA" => "MA",
+            "TRY" or "TR" => "TR",
+            "LAM" => "LAM",
+            "PROP" or "PR" => "PR",
+            "CTOR" or "CT" => "CT",
+            "DECISION" or "DC" => "DC",
+            "EN" => "EN",
+            "EXT" => "EXT",
+            "ARR" => "ARR",
+            "EACH" => "EACH",
+            "LIST" => "LIST",
+            "DICT" => "DICT",
+            "HSET" => "HSET",
+            "EACHKV" => "EACHKV",
+            "AMT" => "AMT",
+            "DEL" => "DEL",
+            _ => openTag // fallback to the tag name itself
+        };
+    }
+
+    /// <summary>
+    /// Gets the correct closing tag syntax for an opening tag.
+    /// </summary>
+    private static string GetClosingTagSyntax(string openTag, string id)
+    {
+        // Map opening tag names to their closing tag syntax
+        return openTag switch
+        {
+            "MODULE" or "M" => $"§/M{{{id}}}",
+            "FUNC" or "F" => $"§/F{{{id}}}",
+            "AF" => $"§/AF{{{id}}}",
+            "CLASS" or "CL" => $"§/CL{{{id}}}",
+            "METHOD" or "MT" => $"§/MT{{{id}}}",
+            "IFACE" => $"§/IFACE{{{id}}}",
+            "FOR" or "L" => $"§/L{{{id}}}",
+            "WHILE" or "W" => $"§/W{{{id}}}",
+            "DO" => $"§/DO{{{id}}}",
+            "IF" => $"§/IF{{{id}}}",
+            "MATCH" or "MA" => $"§/MA{{{id}}}",
+            "TRY" or "TR" => $"§/TR{{{id}}}",
+            "LAM" => $"§/LAM{{{id}}}",
+            "PROP" or "PR" => $"§/PR{{{id}}}",
+            "CTOR" or "CT" => $"§/CT{{{id}}}",
+            "DECISION" or "DC" => $"§/DC{{{id}}}",
+            "EN" => $"§/EN{{{id}}}",
+            "EXT" => $"§/EXT{{{id}}}",
+            _ => $"§/{openTag}{{{id}}}"
+        };
     }
 
     /// <summary>
@@ -200,6 +289,12 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
     public void AddRange(IEnumerable<Diagnostic> diagnostics)
     {
         _diagnostics.AddRange(diagnostics);
+    }
+
+    public void AddRange(DiagnosticBag other)
+    {
+        _diagnostics.AddRange(other._diagnostics);
+        _diagnosticsWithFixes.AddRange(other._diagnosticsWithFixes);
     }
 
     public void Clear()

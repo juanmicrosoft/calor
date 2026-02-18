@@ -155,7 +155,7 @@ Format Calor source code to canonical style.
 
 ### calor_diagnose
 
-Get machine-readable diagnostics from Calor source code.
+Get machine-readable diagnostics from Calor source code. Includes suggestions and fix information for errors when available.
 
 **Input Schema:**
 ```json
@@ -168,7 +168,51 @@ Get machine-readable diagnostics from Calor source code.
 }
 ```
 
-**Output:** Errors and warnings with severity, code, message, line, and column.
+**Output:**
+```json
+{
+  "success": true,
+  "errorCount": 1,
+  "warningCount": 0,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "Calor0106",
+      "message": "Unknown operator 'cotains'. Did you mean 'contains'?",
+      "line": 1,
+      "column": 40,
+      "suggestion": "Replace 'cotains' with 'contains'",
+      "fix": {
+        "description": "Replace 'cotains' with 'contains'",
+        "edits": [
+          {
+            "startLine": 1,
+            "startColumn": 40,
+            "endLine": 1,
+            "endColumn": 47,
+            "newText": "contains"
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**Diagnostic Fields:**
+- `severity` - "error" or "warning"
+- `code` - Diagnostic code (e.g., "Calor0106" for invalid operator)
+- `message` - Human-readable error message
+- `line` - 1-based line number
+- `column` - 1-based column number
+- `suggestion` - (optional) Brief description of the suggested fix
+- `fix` - (optional) Machine-applicable fix with edits
+
+**Fix-Supported Diagnostics:**
+- Typos in operators (e.g., "cotains" → "contains")
+- Mismatched closing tag IDs
+- Undefined variables with similar names in scope
+- C# constructs with Calor alternatives (e.g., "nameof" → use string literal)
 
 ### calor_ids
 

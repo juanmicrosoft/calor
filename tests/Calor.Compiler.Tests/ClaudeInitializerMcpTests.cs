@@ -32,9 +32,10 @@ public class ClaudeInitializerMcpTests : IDisposable
         var content = await File.ReadAllTextAsync(mcpJsonPath);
 
         Assert.Contains("mcpServers", content);
-        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"calor\"", content);
         Assert.Contains("\"command\": \"calor\"", content);
-        Assert.Contains("\"lsp\"", content);
+        Assert.Contains("\"mcp\"", content);
+        Assert.Contains("\"--stdio\"", content);
         Assert.Contains("\"type\": \"stdio\"", content);
     }
 
@@ -66,7 +67,7 @@ public class ClaudeInitializerMcpTests : IDisposable
         var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
 
         Assert.Contains("existing-server", content);
-        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"calor\"", content);
     }
 
     [Fact]
@@ -82,8 +83,9 @@ public class ClaudeInitializerMcpTests : IDisposable
         var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
         var content = await File.ReadAllTextAsync(mcpJsonPath);
 
-        // Count occurrences of calor-lsp - should only appear once
-        var count = content.Split("calor-lsp").Length - 1;
+        // Count occurrences of "calor" as a key - should only appear once
+        // We check for "calor": which is the key (not calor in args)
+        var count = content.Split("\"calor\":").Length - 1;
         Assert.Equal(1, count);
     }
 
@@ -94,7 +96,7 @@ public class ClaudeInitializerMcpTests : IDisposable
         var result = await initializer.InitializeAsync(_testDir, force: false);
 
         Assert.True(result.Success);
-        Assert.Contains(result.Messages, m => m.Contains("calor-lsp") || m.Contains("MCP server"));
+        Assert.Contains(result.Messages, m => m.Contains("MCP server"));
     }
 
     [Fact]
@@ -108,7 +110,7 @@ public class ClaudeInitializerMcpTests : IDisposable
 
         // Verify the JSON structure matches expected Claude Code format
         Assert.Contains("\"mcpServers\"", content);
-        Assert.Contains("\"calor-lsp\"", content);
+        Assert.Contains("\"calor\"", content);
         Assert.Contains("\"type\": \"stdio\"", content);
         Assert.Contains("\"command\": \"calor\"", content);
         Assert.Contains("\"args\"", content);
@@ -130,7 +132,7 @@ public class ClaudeInitializerMcpTests : IDisposable
 
         var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
         Assert.Contains("mcpServers", content);
-        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"calor\"", content);
     }
 
     [Fact]
@@ -150,13 +152,13 @@ public class ClaudeInitializerMcpTests : IDisposable
         var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
         var mcpContent = await File.ReadAllTextAsync(mcpJsonPath);
         Assert.Contains("mcpServers", mcpContent);
-        Assert.Contains("calor-lsp", mcpContent);
+        Assert.Contains("\"calor\"", mcpContent);
     }
 
     // Edge case tests
 
     [Fact]
-    public async Task Initialize_WithEmptyMcpServersObject_AddsCalorLsp()
+    public async Task Initialize_WithEmptyMcpServersObject_AddsCalor()
     {
         // Pre-create .mcp.json with empty mcpServers object
         await File.WriteAllTextAsync(
@@ -167,11 +169,11 @@ public class ClaudeInitializerMcpTests : IDisposable
         await initializer.InitializeAsync(_testDir, force: false);
 
         var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
-        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"calor\"", content);
     }
 
     [Fact]
-    public async Task Initialize_WithNullMcpServers_AddsCalorLsp()
+    public async Task Initialize_WithNullMcpServers_AddsCalor()
     {
         // Pre-create .mcp.json with null mcpServers
         await File.WriteAllTextAsync(
@@ -182,16 +184,16 @@ public class ClaudeInitializerMcpTests : IDisposable
         await initializer.InitializeAsync(_testDir, force: false);
 
         var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
-        Assert.Contains("calor-lsp", content);
+        Assert.Contains("\"calor\"", content);
     }
 
     [Fact]
-    public async Task Initialize_WithExistingCalorLsp_DoesNotOverwrite()
+    public async Task Initialize_WithExistingCalor_DoesNotOverwrite()
     {
-        // Pre-create .mcp.json with calor-lsp already configured with custom args
+        // Pre-create .mcp.json with calor already configured with custom args
         var existingConfig = @"{
   ""mcpServers"": {
-    ""calor-lsp"": {
+    ""calor"": {
       ""type"": ""stdio"",
       ""command"": ""custom-calor"",
       ""args"": [""custom-arg""]
@@ -205,11 +207,35 @@ public class ClaudeInitializerMcpTests : IDisposable
 
         var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
 
-        // Should preserve the existing custom calor-lsp configuration
+        // Should preserve the existing custom calor configuration
         Assert.Contains("custom-calor", content);
         Assert.Contains("custom-arg", content);
-        // Should add the calor MCP server (for AI agent tools)
-        Assert.Contains("\"calor\":", content);
+    }
+
+    [Fact]
+    public async Task Initialize_RemovesIncorrectCalorLspEntry()
+    {
+        // Pre-create .mcp.json with incorrect calor-lsp entry (LSP is not MCP)
+        var existingConfig = @"{
+  ""mcpServers"": {
+    ""calor-lsp"": {
+      ""type"": ""stdio"",
+      ""command"": ""calor"",
+      ""args"": [""lsp""]
+    }
+  }
+}";
+        await File.WriteAllTextAsync(Path.Combine(_testDir, ".mcp.json"), existingConfig);
+
+        var initializer = new ClaudeInitializer();
+        await initializer.InitializeAsync(_testDir, force: false);
+
+        var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
+
+        // Should remove the incorrect calor-lsp entry
+        Assert.DoesNotContain("calor-lsp", content);
+        // Should add the correct calor MCP server
+        Assert.Contains("\"calor\"", content);
         Assert.Contains("\"mcp\"", content);
     }
 
@@ -227,8 +253,8 @@ public class ClaudeInitializerMcpTests : IDisposable
         var mcpContent = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
         // Should preserve existing MCP server
         Assert.Contains("other-server", mcpContent);
-        // Should add calor-lsp
-        Assert.Contains("calor-lsp", mcpContent);
+        // Should add calor
+        Assert.Contains("\"calor\"", mcpContent);
 
         var settingsContent = await File.ReadAllTextAsync(Path.Combine(_testDir, ".claude", "settings.json"));
         // Should add hooks
@@ -237,7 +263,7 @@ public class ClaudeInitializerMcpTests : IDisposable
     }
 
     [Fact]
-    public async Task Initialize_WithEmptyMcpJsonObject_AddsAllMcpServers()
+    public async Task Initialize_WithEmptyMcpJsonObject_AddsCalorMcpServer()
     {
         // Pre-create empty .mcp.json object
         await File.WriteAllTextAsync(
@@ -251,8 +277,7 @@ public class ClaudeInitializerMcpTests : IDisposable
 
         // Should add MCP servers
         Assert.Contains("mcpServers", content);
-        Assert.Contains("calor-lsp", content);
-        Assert.Contains("calor", content);
+        Assert.Contains("\"calor\"", content);
     }
 
     [Fact]
@@ -270,18 +295,19 @@ public class ClaudeInitializerMcpTests : IDisposable
 
         // Verify mcpServers structure
         Assert.True(root.TryGetProperty("mcpServers", out var mcpServers));
-        Assert.True(mcpServers.TryGetProperty("calor-lsp", out var calorLsp));
-        Assert.True(calorLsp.TryGetProperty("type", out var type));
+        Assert.True(mcpServers.TryGetProperty("calor", out var calor));
+        Assert.True(calor.TryGetProperty("type", out var type));
         Assert.Equal("stdio", type.GetString());
-        Assert.True(calorLsp.TryGetProperty("command", out var command));
+        Assert.True(calor.TryGetProperty("command", out var command));
         Assert.Equal("calor", command.GetString());
-        Assert.True(calorLsp.TryGetProperty("args", out var args));
+        Assert.True(calor.TryGetProperty("args", out var args));
         Assert.Equal(System.Text.Json.JsonValueKind.Array, args.ValueKind);
-        Assert.Equal("lsp", args[0].GetString());
+        Assert.Equal("mcp", args[0].GetString());
+        Assert.Equal("--stdio", args[1].GetString());
     }
 
     [Fact]
-    public async Task Initialize_ConfiguresBothCalorMcpServers()
+    public async Task Initialize_ConfiguresCalorMcpServer()
     {
         var initializer = new ClaudeInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
@@ -289,17 +315,12 @@ public class ClaudeInitializerMcpTests : IDisposable
         var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
         var content = await File.ReadAllTextAsync(mcpJsonPath);
 
-        // Should configure both calor-lsp and calor MCP servers
-        Assert.Contains("calor-lsp", content);
+        // Should configure calor MCP server
         Assert.Contains("\"calor\":", content);
 
         // Verify the calor MCP server has correct args
         var jsonDoc = System.Text.Json.JsonDocument.Parse(content);
         var mcpServers = jsonDoc.RootElement.GetProperty("mcpServers");
-
-        // calor-lsp runs "calor lsp"
-        var calorLsp = mcpServers.GetProperty("calor-lsp");
-        Assert.Equal("lsp", calorLsp.GetProperty("args")[0].GetString());
 
         // calor runs "calor mcp --stdio"
         var calor = mcpServers.GetProperty("calor");

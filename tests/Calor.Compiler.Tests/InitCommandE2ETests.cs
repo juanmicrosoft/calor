@@ -112,19 +112,14 @@ public class InitCommandE2ETests : IDisposable
         Assert.True(File.Exists(mcpJsonPath));
         var mcpJsonContent = await File.ReadAllTextAsync(mcpJsonPath);
 
-        // Verify MCP servers - both LSP and MCP
+        // Verify MCP server (only calor MCP, not calor-lsp which is LSP not MCP)
         Assert.Contains("mcpServers", mcpJsonContent);
-        Assert.Contains("calor-lsp", mcpJsonContent);
         Assert.Contains("\"calor\":", mcpJsonContent); // The MCP server entry
+        Assert.DoesNotContain("calor-lsp", mcpJsonContent); // LSP is not MCP
 
         // Parse JSON to verify structure
         var mcpJson = JsonDocument.Parse(mcpJsonContent);
         var mcpServers = mcpJson.RootElement.GetProperty("mcpServers");
-
-        Assert.True(mcpServers.TryGetProperty("calor-lsp", out var lspServer));
-        Assert.Equal("stdio", lspServer.GetProperty("type").GetString());
-        Assert.Equal("calor", lspServer.GetProperty("command").GetString());
-        Assert.Contains("lsp", lspServer.GetProperty("args").EnumerateArray().Select(a => a.GetString()));
 
         Assert.True(mcpServers.TryGetProperty("calor", out var mcpServer));
         Assert.Equal("stdio", mcpServer.GetProperty("type").GetString());

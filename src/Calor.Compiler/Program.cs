@@ -378,6 +378,27 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        // Type checking (optional)
+        if (options.EnableTypeChecking)
+        {
+            phaseSw.Restart();
+            var typeChecker = new TypeChecking.TypeChecker(diagnostics);
+            typeChecker.Check(ast);
+            phaseSw.Stop();
+            telemetry?.TrackPhase("TypeChecker", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+
+            if (options.Verbose)
+            {
+                Console.WriteLine("Type checking completed");
+            }
+
+            if (diagnostics.HasErrors)
+            {
+                TrackDiagnostics(telemetry, diagnostics);
+                return new CompilationResult(diagnostics, ast, "");
+            }
+        }
+
         // Pattern exhaustiveness checking
         phaseSw.Restart();
         var patternChecker = new PatternChecker(diagnostics);
@@ -636,6 +657,11 @@ public sealed class CompilationOptions
     /// Results from verification analyses.
     /// </summary>
     public Analysis.VerificationAnalysisResult? VerificationAnalysisResult { get; internal set; }
+
+    /// <summary>
+    /// Enable type checking phase.
+    /// </summary>
+    public bool EnableTypeChecking { get; init; }
 }
 
 /// <summary>

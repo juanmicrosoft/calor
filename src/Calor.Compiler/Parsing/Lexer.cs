@@ -566,8 +566,8 @@ public sealed class Lexer
                 return MakeToken(kind);
             }
 
-            // Unknown closing tag
-            _diagnostics.ReportUnexpectedCharacter(CurrentSpan(), '/');
+            // Unknown closing tag - provide helpful suggestions
+            ReportUnknownSectionMarker(keyword, isClosing: true);
             return MakeToken(TokenKind.Error);
         }
 
@@ -605,9 +605,36 @@ public sealed class Lexer
             return MakeToken(keywordKind);
         }
 
-        // Unknown section keyword - report error but return as identifier
-        _diagnostics.ReportUnexpectedCharacter(CurrentSpan(), '§');
+        // Unknown section keyword - provide helpful suggestions
+        ReportUnknownSectionMarker(fullKeyword, isClosing: false);
         return MakeToken(TokenKind.Error);
+    }
+
+    /// <summary>
+    /// Reports an unknown section marker with helpful suggestions.
+    /// </summary>
+    private void ReportUnknownSectionMarker(string keyword, bool isClosing)
+    {
+        var displayKeyword = isClosing ? $"/{keyword}" : keyword;
+        var lookupKeyword = isClosing ? $"/{keyword}" : keyword;
+
+        // Try to find a similar marker
+        var suggestion = SectionMarkerSuggestions.FindSimilarMarker(lookupKeyword);
+
+        if (suggestion != null)
+        {
+            var description = SectionMarkerSuggestions.MarkerDescriptions.TryGetValue(
+                suggestion.TrimStart('/'), out var desc)
+                ? $" ({desc})"
+                : "";
+            _diagnostics.ReportError(CurrentSpan(), Diagnostics.DiagnosticCode.UnexpectedCharacter,
+                $"Unknown section marker '§{displayKeyword}'. Did you mean '§{suggestion}'{description}?");
+        }
+        else
+        {
+            _diagnostics.ReportError(CurrentSpan(), Diagnostics.DiagnosticCode.UnexpectedCharacter,
+                $"Unknown section marker '§{displayKeyword}'. Common markers: {SectionMarkerSuggestions.GetCommonMarkers()}");
+        }
     }
 
     private Token ScanIdentifierOrTypedLiteral()

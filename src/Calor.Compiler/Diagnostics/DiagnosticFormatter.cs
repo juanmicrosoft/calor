@@ -10,6 +10,7 @@ namespace Calor.Compiler.Diagnostics;
 public interface IDiagnosticFormatter
 {
     string Format(IEnumerable<Diagnostic> diagnostics);
+    string Format(DiagnosticBag diagnostics);
     string ContentType { get; }
 }
 
@@ -23,6 +24,12 @@ public sealed class TextDiagnosticFormatter : IDiagnosticFormatter
     public string Format(IEnumerable<Diagnostic> diagnostics)
     {
         return string.Join(Environment.NewLine, diagnostics.Select(d => d.ToString()));
+    }
+
+    public string Format(DiagnosticBag diagnostics)
+    {
+        // Text format just uses the diagnostic messages
+        return Format((IEnumerable<Diagnostic>)diagnostics);
     }
 }
 
@@ -57,8 +64,75 @@ public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
                     Column = d.Span.Column,
                     Length = d.Span.Length
                 },
-                Fix = null // Fix suggestions not yet implemented in base Diagnostic
+                Suggestion = null,
+                Fix = null
             }).ToList(),
+            Summary = new SummaryInfo
+            {
+                Total = diagnostics.Count(),
+                Errors = diagnostics.Count(d => d.IsError),
+                Warnings = diagnostics.Count(d => d.IsWarning),
+                Info = diagnostics.Count(d => d.Severity == DiagnosticSeverity.Info)
+            }
+        };
+
+        return JsonSerializer.Serialize(output, s_options);
+    }
+
+    public string Format(DiagnosticBag diagnostics)
+    {
+        // Build lookup from DiagnosticsWithFixes to populate fix info
+        // Include message in key to differentiate between different constructs at same location
+        var fixLookup = diagnostics.DiagnosticsWithFixes
+            .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var entries = new List<DiagnosticEntry>();
+        foreach (var d in diagnostics)
+        {
+            var entry = new DiagnosticEntry
+            {
+                Code = d.Code,
+                Message = d.Message,
+                Severity = d.Severity.ToString().ToLower(),
+                Location = new LocationInfo
+                {
+                    File = d.FilePath,
+                    Line = d.Span.Line,
+                    Column = d.Span.Column,
+                    Length = d.Span.Length
+                },
+                Suggestion = null,
+                Fix = null
+            };
+
+            // Check if this diagnostic has an associated fix
+            var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
+            if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
+            {
+                entry.Suggestion = diagnosticWithFix.Fix.Description;
+                entry.Fix = new FixInfo
+                {
+                    Description = diagnosticWithFix.Fix.Description,
+                    Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditInfo
+                    {
+                        FilePath = e.FilePath,
+                        StartLine = e.StartLine,
+                        StartColumn = e.StartColumn,
+                        EndLine = e.EndLine,
+                        EndColumn = e.EndColumn,
+                        NewText = e.NewText
+                    }).ToList()
+                };
+            }
+
+            entries.Add(entry);
+        }
+
+        var output = new DiagnosticOutput
+        {
+            Version = "1.0",
+            Diagnostics = entries,
             Summary = new SummaryInfo
             {
                 Total = diagnostics.Count(),
@@ -84,7 +158,8 @@ public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
         public required string Message { get; init; }
         public required string Severity { get; init; }
         public required LocationInfo Location { get; init; }
-        public FixInfo? Fix { get; init; }
+        public string? Suggestion { get; set; }
+        public FixInfo? Fix { get; set; }
     }
 
     private sealed class LocationInfo
@@ -186,6 +261,112 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
                         },
                         Fixes = null // Fix suggestions not yet implemented
                     }).ToList()
+                }
+            }
+        };
+
+        return JsonSerializer.Serialize(sarif, s_options);
+    }
+
+    public string Format(DiagnosticBag diagnostics)
+    {
+        // Build lookup from DiagnosticsWithFixes to populate fix info
+        // Include message in key to differentiate between different constructs at same location
+        var fixLookup = diagnostics.DiagnosticsWithFixes
+            .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var results = new List<SarifResult>();
+        foreach (var d in diagnostics)
+        {
+            List<SarifFix>? fixes = null;
+
+            // Check if this diagnostic has an associated fix
+            var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
+            if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
+            {
+                fixes = new List<SarifFix>
+                {
+                    new SarifFix
+                    {
+                        Description = new SarifMessage { Text = diagnosticWithFix.Fix.Description },
+                        ArtifactChanges = diagnosticWithFix.Fix.Edits.Select(e => new SarifArtifactChange
+                        {
+                            ArtifactLocation = new SarifArtifactLocation
+                            {
+                                Uri = e.FilePath
+                            },
+                            Replacements = new List<SarifReplacement>
+                            {
+                                new SarifReplacement
+                                {
+                                    DeletedRegion = new SarifRegion
+                                    {
+                                        StartLine = e.StartLine,
+                                        StartColumn = e.StartColumn,
+                                        EndLine = e.EndLine,
+                                        EndColumn = e.EndColumn
+                                    },
+                                    InsertedContent = new SarifContent { Text = e.NewText }
+                                }
+                            }
+                        }).ToList()
+                    }
+                };
+            }
+
+            results.Add(new SarifResult
+            {
+                RuleId = d.Code,
+                Level = d.Severity switch
+                {
+                    DiagnosticSeverity.Error => "error",
+                    DiagnosticSeverity.Warning => "warning",
+                    _ => "note"
+                },
+                Message = new SarifMessage { Text = d.Message },
+                Locations = new List<SarifLocation>
+                {
+                    new SarifLocation
+                    {
+                        PhysicalLocation = new SarifPhysicalLocation
+                        {
+                            ArtifactLocation = new SarifArtifactLocation
+                            {
+                                Uri = d.FilePath != null ? new Uri(d.FilePath, UriKind.RelativeOrAbsolute).ToString() : null
+                            },
+                            Region = new SarifRegion
+                            {
+                                StartLine = d.Span.Line,
+                                StartColumn = d.Span.Column,
+                                EndColumn = d.Span.Column + d.Span.Length
+                            }
+                        }
+                    }
+                },
+                Fixes = fixes
+            });
+        }
+
+        var sarif = new SarifLog
+        {
+            Schema = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            Version = "2.1.0",
+            Runs = new List<SarifRun>
+            {
+                new SarifRun
+                {
+                    Tool = new SarifTool
+                    {
+                        Driver = new SarifToolDriver
+                        {
+                            Name = "calor",
+                            Version = "1.0.0",
+                            InformationUri = "https://github.com/calor-lang/calor",
+                            Rules = GetRules(diagnostics)
+                        }
+                    },
+                    Results = results
                 }
             }
         };
