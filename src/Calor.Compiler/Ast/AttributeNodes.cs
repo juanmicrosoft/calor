@@ -99,6 +99,8 @@ public sealed class CalorAttributeArgument
             Type t => $"typeof({t.Name})",
             // For type name strings that represent typeof expressions
             TypeOfReference tr => $"typeof({tr.TypeName})",
+            // Member access expression (e.g., AttributeTargets.Method)
+            MemberAccessReference ma => ma.Expression,
             // Default: treat as identifier/enum value
             _ => Value?.ToString() ?? "null"
         };
@@ -128,4 +130,19 @@ public sealed class TypeOfReference
     }
 
     public override string ToString() => $"typeof({TypeName})";
+}
+
+/// <summary>
+/// Represents a member access expression in an attribute argument (e.g., AttributeTargets.Method).
+/// </summary>
+public sealed class MemberAccessReference
+{
+    public string Expression { get; }
+
+    public MemberAccessReference(string expression)
+    {
+        Expression = expression;
+    }
+
+    public override string ToString() => Expression;
 }

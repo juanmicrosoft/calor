@@ -2799,7 +2799,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             LiteralExpressionSyntax literal => literal.Token.Value ?? literal.Token.Text,
             TypeOfExpressionSyntax typeOf => new TypeOfReference(typeOf.Type.ToString()),
-            MemberAccessExpressionSyntax memberAccess => memberAccess.ToString(),
+            MemberAccessExpressionSyntax memberAccess => new MemberAccessReference(memberAccess.ToString()),
             IdentifierNameSyntax identifier => identifier.Identifier.Text,
             _ => expression.ToString()
         };

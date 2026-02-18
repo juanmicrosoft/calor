@@ -141,7 +141,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         AppendLine();
 
-        var namespaceName = SanitizeIdentifier(node.Name);
+        var namespaceName = SanitizeNamespace(node.Name);
 
         // Emit module-level extended metadata as file-level comments
         if (node.Context != null)
@@ -226,7 +226,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Emit module-level functions in a static class
         if (node.Functions.Count > 0)
         {
-            AppendLine($"public static class {namespaceName}Module");
+            var moduleClassName = SanitizeIdentifier(node.Name.Contains('.')
+                ? node.Name.Split('.').Last()
+                : node.Name) + "Module";
+            AppendLine($"public static class {moduleClassName}");
             AppendLine("{");
             Indent();
 
@@ -2886,6 +2889,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             => "@" + result,
             _ => result
         };
+    }
+
+    private static string SanitizeNamespace(string name)
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < name.Length; i++)
+        {
+            var c = name[i];
+            if (char.IsLetterOrDigit(c) || c == '_' || c == '.')
+            {
+                sb.Append(c);
+            }
+        }
+
+        var result = sb.ToString();
+        if (result.Length > 0 && char.IsDigit(result[0]))
+        {
+            result = "_" + result;
+        }
+        return result;
     }
 
     /// <summary>
