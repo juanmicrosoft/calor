@@ -1190,8 +1190,8 @@
     },
     "§EACH": {
       "name": "Foreach",
-      "syntax": "§EACH{item:collection} body §/EACH",
-      "description": "Iterates over each element. Alternative to §L{item:collection}.",
+      "syntax": "§EACH{id:var} collection body §/EACH{id}",
+      "description": "Iterates over each element in a collection. Type is inferred automatically. Use three-field form §EACH{id:var:type} for explicit typing.",
       "csharpEquivalent": "foreach (var item in collection) { body }"
     },
     "§IV": {

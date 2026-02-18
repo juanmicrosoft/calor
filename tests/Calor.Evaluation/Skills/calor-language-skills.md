@@ -768,7 +768,8 @@ Task: Return `"{prefix}-{sequence:D6}"` (6-digit zero-padded)
 ### Iterating Collections
 
 ```calor
-§EACH{id:var} collection  // Foreach over collection
+§EACH{id:var} collection      // Foreach (type inferred)
+§EACH{id:var:type} collection  // Foreach (explicit type)
   ...body...
 §/EACH{id}
 

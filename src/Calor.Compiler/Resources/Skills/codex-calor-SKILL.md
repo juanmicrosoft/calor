@@ -665,7 +665,8 @@ Async functions and methods use `§AF` and `§AMT` tags:
 ### Iterating Collections
 
 ```
-§EACH{id:var} collection  Foreach over collection
+§EACH{id:var} collection      Foreach (type inferred)
+§EACH{id:var:type} collection  Foreach (explicit type)
   ...body...
 §/EACH{id}
 

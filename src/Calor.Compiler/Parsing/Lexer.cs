@@ -567,7 +567,7 @@ public sealed class Lexer
             }
 
             // Unknown closing tag - provide helpful suggestions
-            ReportUnknownSectionMarker(keyword, isClosing: true);
+            ReportUnknownSectionMarker(keyword);
             return MakeToken(TokenKind.Error);
         }
 
@@ -606,20 +606,17 @@ public sealed class Lexer
         }
 
         // Unknown section keyword - provide helpful suggestions
-        ReportUnknownSectionMarker(fullKeyword, isClosing: false);
+        ReportUnknownSectionMarker(fullKeyword);
         return MakeToken(TokenKind.Error);
     }
 
     /// <summary>
     /// Reports an unknown section marker with helpful suggestions.
     /// </summary>
-    private void ReportUnknownSectionMarker(string keyword, bool isClosing)
+    private void ReportUnknownSectionMarker(string keyword)
     {
-        var displayKeyword = isClosing ? $"/{keyword}" : keyword;
-        var lookupKeyword = isClosing ? $"/{keyword}" : keyword;
-
         // Try to find a similar marker
-        var suggestion = SectionMarkerSuggestions.FindSimilarMarker(lookupKeyword);
+        var suggestion = SectionMarkerSuggestions.FindSimilarMarker(keyword);
 
         if (suggestion != null)
         {
@@ -628,12 +625,12 @@ public sealed class Lexer
                 ? $" ({desc})"
                 : "";
             _diagnostics.ReportError(CurrentSpan(), Diagnostics.DiagnosticCode.UnexpectedCharacter,
-                $"Unknown section marker '§{displayKeyword}'. Did you mean '§{suggestion}'{description}?");
+                $"Unknown section marker '§{keyword}'. Did you mean '§{suggestion}'{description}?");
         }
         else
         {
             _diagnostics.ReportError(CurrentSpan(), Diagnostics.DiagnosticCode.UnexpectedCharacter,
-                $"Unknown section marker '§{displayKeyword}'. Common markers: {SectionMarkerSuggestions.GetCommonMarkers()}");
+                $"Unknown section marker '§{keyword}'. Common markers: {SectionMarkerSuggestions.GetCommonMarkers()}");
         }
     }
 

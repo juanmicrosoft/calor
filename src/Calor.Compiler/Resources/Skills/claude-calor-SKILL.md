@@ -655,7 +655,8 @@ Inline form: `§C{Target} §A arg §/C`
 
 ### Iteration
 ```
-§EACH{id:var} collection      Foreach over collection
+§EACH{id:var} collection      Foreach (type inferred)
+§EACH{id:var:type} collection  Foreach (explicit type)
   ...body...
 §/EACH{id}
 

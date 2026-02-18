@@ -325,7 +325,7 @@ tags.Remove("review");
 foreach (var item in collection) { ... }
 ```
 ```calor
-§EACH{e1:item:collection}
+§EACH{e1:item} collection
 ...
 §/EACH{e1}
 ```
@@ -337,7 +337,7 @@ foreach (var kv in dict) {
 }
 ```
 ```calor
-§EACHKV{e1:k:v:dict}
+§EACHKV{e1:k:v} dict
 §P k
 §P v
 §/EACHKV{e1}

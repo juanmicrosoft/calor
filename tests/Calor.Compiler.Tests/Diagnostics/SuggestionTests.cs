@@ -201,6 +201,33 @@ public class SuggestionTests
     }
 
     [Fact]
+    public void Lexer_UnknownClosingTag_ErrorMessage_ShowsSingleSlash()
+    {
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer("§/NEW", diagnostics);
+        lexer.TokenizeAll();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.IsError);
+        Assert.Contains("§/NEW", error.Message);
+        Assert.DoesNotContain("§//NEW", error.Message);
+    }
+
+    [Fact]
+    public void Lexer_UnknownClosingTag_WithSuggestion_ShowsSingleSlash()
+    {
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer("§M{test} §/MOD{test}", diagnostics);
+        lexer.TokenizeAll();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.IsError);
+        Assert.Contains("§/MOD", error.Message);
+        Assert.DoesNotContain("§//MOD", error.Message);
+        Assert.Contains("Did you mean", error.Message);
+    }
+
+    [Fact]
     public void Lexer_UnknownSectionMarker_NoSuggestion_ShowsCommonMarkers()
     {
         var diagnostics = new DiagnosticBag();
