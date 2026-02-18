@@ -1372,6 +1372,36 @@ public sealed class Parser
             return new StringBuilderOperationNode(span, sbOp.Value, args);
         }
 
+        // Try type operations
+        var typeOp = TypeOpExtensions.FromString(opText);
+        if (typeOp.HasValue)
+        {
+            if (args.Count != 2)
+            {
+                var example = OperatorSuggestions.GetTypeOpExample(opText);
+                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    $"Type operation '{opText}' requires exactly 2 arguments, got {args.Count}. Example: {example}");
+                return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
+            }
+
+            // Extract type name and operand based on operator
+            // cast: (cast Type expr) — type is args[0], operand is args[1]
+            // is/as: (is expr Type) / (as expr Type) — operand is args[0], type is args[1]
+            var (typeArg, operandArg) = typeOp.Value == TypeOp.Cast
+                ? (args[0], args[1])
+                : (args[1], args[0]);
+
+            // Type argument must be a simple identifier (ReferenceNode)
+            if (typeArg is not ReferenceNode typeRef)
+            {
+                _diagnostics.ReportError(typeArg.Span, DiagnosticCode.UnexpectedToken,
+                    $"Expected a type name, got {typeArg.GetType().Name}");
+                return operandArg;
+            }
+
+            return new TypeOperationNode(span, typeOp.Value, operandArg, typeRef.Name);
+        }
+
         // Unknown operator - provide helpful suggestions
         var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
         var suggestion = OperatorSuggestions.FindSimilarOperator(opText);

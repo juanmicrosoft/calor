@@ -1711,14 +1711,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         };
     }
 
-    private BinaryOperationNode ConvertBinaryExpression(BinaryExpressionSyntax binary)
+    private ExpressionNode ConvertBinaryExpression(BinaryExpressionSyntax binary)
     {
-        var left = ConvertExpression(binary.Left);
-        var right = ConvertExpression(binary.Right);
+        if (binary.IsKind(SyntaxKind.AsExpression))
+        {
+            _context.RecordFeatureUsage("as");
+            var left = ConvertExpression(binary.Left);
+            var typeName = TypeMapper.CSharpToCalor(binary.Right.ToString());
+            return new TypeOperationNode(GetTextSpan(binary), TypeOp.As, left, typeName);
+        }
+        if (binary.IsKind(SyntaxKind.IsExpression))
+        {
+            _context.RecordFeatureUsage("is");
+            var left = ConvertExpression(binary.Left);
+            var typeName = TypeMapper.CSharpToCalor(binary.Right.ToString());
+            return new TypeOperationNode(GetTextSpan(binary), TypeOp.Is, left, typeName);
+        }
+
+        var leftExpr = ConvertExpression(binary.Left);
+        var rightExpr = ConvertExpression(binary.Right);
         var op = binary.OperatorToken.Text;
         var binaryOp = BinaryOperatorExtensions.FromString(op) ?? BinaryOperator.Add;
 
-        return new BinaryOperationNode(GetTextSpan(binary), binaryOp, left, right);
+        return new BinaryOperationNode(GetTextSpan(binary), binaryOp, leftExpr, rightExpr);
     }
 
     private ExpressionNode ConvertIsPatternExpression(IsPatternExpressionSyntax isPattern)
@@ -1744,8 +1759,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     left,
                     ConvertExpression(notConstant.Expression)),
             TypePatternSyntax typePattern =>
-                // "x is SomeType" - convert to type check reference
-                new ReferenceNode(GetTextSpan(isPattern), $"({left} is {typePattern.Type})"),
+                // "x is SomeType" - convert to type operation
+                new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left,
+                    TypeMapper.CSharpToCalor(typePattern.Type.ToString())),
+            DeclarationPatternSyntax declPattern =>
+                // "x is SomeType varName" - emit the type check, variable binding is not preserved
+                new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left,
+                    TypeMapper.CSharpToCalor(declPattern.Type.ToString())),
             _ =>
                 // For other patterns, create a fallback expression
                 CreateFallbackExpression(isPattern, "complex-is-pattern")
@@ -2354,12 +2374,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        // Fall back to generic cast call for ambiguous cases
+        // Fall back to type cast operation for ambiguous cases
         var calorType = TypeMapper.CSharpToCalor(targetType);
-        return new CallExpressionNode(
-            span,
-            calorType,
-            new List<ExpressionNode> { innerExpr });
+        return new TypeOperationNode(span, TypeOp.Cast, innerExpr, calorType);
     }
 
     private static bool LooksLikeCharExpression(ExpressionSyntax expr, string exprStr)

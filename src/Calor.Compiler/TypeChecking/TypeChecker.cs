@@ -654,6 +654,7 @@ public sealed class TypeChecker
             CollectionContainsNode contains => InferCollectionContainsType(contains),
             CollectionCountNode count => InferCollectionCountType(count),
             ArrayAccessNode arrayAccess => InferArrayAccessType(arrayAccess),
+            TypeOperationNode typeOp => InferTypeOperationType(typeOp),
             _ => ErrorType.Instance
         };
     }
@@ -849,6 +850,33 @@ public sealed class TypeChecker
         }
 
         return ErrorType.Instance;
+    }
+
+    private CalorType InferTypeOperationType(TypeOperationNode typeOp)
+    {
+        var targetType = ResolveTypeName(typeOp.TargetType, typeOp.Span);
+
+        if (typeOp.Operation == TypeOp.As && IsValueType(targetType))
+        {
+            _diagnostics.ReportWarning(typeOp.Span, DiagnosticCode.TypeMismatch,
+                $"The 'as' operator cannot be used with value type '{typeOp.TargetType}'. " +
+                $"Use '(cast {typeOp.TargetType} ...)' instead.");
+        }
+
+        return typeOp.Operation switch
+        {
+            TypeOp.Is => PrimitiveType.Bool,
+            TypeOp.Cast => targetType,
+            TypeOp.As => targetType,
+            _ => ErrorType.Instance
+        };
+    }
+
+    private static bool IsValueType(CalorType type)
+    {
+        return type.Equals(PrimitiveType.Int)
+            || type.Equals(PrimitiveType.Float)
+            || type.Equals(PrimitiveType.Bool);
     }
 
     private CalorType InferReferenceType(ReferenceNode refNode)

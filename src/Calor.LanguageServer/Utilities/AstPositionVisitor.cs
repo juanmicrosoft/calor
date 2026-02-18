@@ -208,6 +208,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Native operations
     public virtual T Visit(StringOperationNode node) => DefaultVisit(node)!;
     public virtual T Visit(CharOperationNode node) => DefaultVisit(node)!;
+    public virtual T Visit(TypeOperationNode node) => DefaultVisit(node)!;
     public virtual T Visit(StringBuilderOperationNode node) => DefaultVisit(node)!;
 
     // Fallback nodes

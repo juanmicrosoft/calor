@@ -2064,6 +2064,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return args.Any() ? $"({opName} {argsStr})" : $"({opName})";
     }
 
+    public string Visit(TypeOperationNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        return node.Operation switch
+        {
+            TypeOp.Cast => $"(cast {node.TargetType} {operand})",
+            TypeOp.Is => $"(is {operand} {node.TargetType})",
+            TypeOp.As => $"(as {operand} {node.TargetType})",
+            _ => throw new NotSupportedException($"Unknown type operation: {node.Operation}")
+        };
+    }
+
     // Fallback nodes for unsupported C# constructs
 
     public string Visit(FallbackExpressionNode node)

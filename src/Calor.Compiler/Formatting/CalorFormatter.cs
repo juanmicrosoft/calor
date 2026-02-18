@@ -516,6 +516,13 @@ public sealed class CalorFormatter
             NullConditionalNode nc => $"{FormatExpression(nc.Target)}?.{nc.MemberName}",
             ThisExpressionNode => "§THIS",
             BaseExpressionNode => "§BASE",
+            TypeOperationNode typeOp => typeOp.Operation switch
+            {
+                TypeOp.Cast => $"(cast {typeOp.TargetType} {FormatExpression(typeOp.Operand)})",
+                TypeOp.Is => $"(is {FormatExpression(typeOp.Operand)} {typeOp.TargetType})",
+                TypeOp.As => $"(as {FormatExpression(typeOp.Operand)} {typeOp.TargetType})",
+                _ => $"/* TypeOp {typeOp.Operation} */"
+            },
             _ => $"/* {expr.GetType().Name} */"
         };
     }

@@ -1343,6 +1343,12 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         return new CharOperationNode(node.Span, node.Operation, simplifiedArgs);
     }
 
+    public ExpressionNode Visit(TypeOperationNode node)
+    {
+        var simplifiedOperand = node.Operand.Accept(this);
+        return new TypeOperationNode(node.Span, node.Operation, simplifiedOperand, node.TargetType);
+    }
+
     public ExpressionNode Visit(StringBuilderOperationNode node)
     {
         // Simplify arguments but preserve the StringBuilder operation

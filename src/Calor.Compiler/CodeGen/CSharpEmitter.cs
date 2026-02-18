@@ -3126,6 +3126,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
     }
 
+    // Native Type Operations
+
+    public string Visit(TypeOperationNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        var csharpType = MapTypeName(node.TargetType);
+        return node.Operation switch
+        {
+            TypeOp.Cast => $"({csharpType}){operand}",
+            TypeOp.Is => $"{operand} is {csharpType}",
+            TypeOp.As => $"{operand} as {csharpType}",
+            _ => throw new NotSupportedException($"Unknown type operation: {node.Operation}")
+        };
+    }
+
     // Native StringBuilder Operations
 
     public string Visit(StringBuilderOperationNode node)

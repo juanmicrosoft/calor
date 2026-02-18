@@ -234,7 +234,7 @@ public static class OperatorSuggestions
     {
         return "arithmetic (+, -, *, /, %), comparison (==, !=, <, <=, >, >=), " +
                "logical (&&, ||, !), string (len, contains, substr, ...), " +
-               "or char (char-at, is-letter, ...)";
+               "char (char-at, is-letter, ...), or type (cast, is, as)";
     }
 
     /// <summary>
@@ -310,6 +310,20 @@ public static class OperatorSuggestions
             "sb-clear" => "(sb-clear builder)",
             "sb-tostring" => "(sb-tostring builder)",
             "sb-length" => "(sb-length builder)",
+            _ => $"({opName} ...)"
+        };
+    }
+
+    /// <summary>
+    /// Gets a usage example for a type operation.
+    /// </summary>
+    public static string GetTypeOpExample(string opName)
+    {
+        return opName.ToLowerInvariant() switch
+        {
+            "cast" => "(cast i32 expr)",
+            "is" => "(is expr MyType)",
+            "as" => "(as expr str)",
             _ => $"({opName} ...)"
         };
     }
