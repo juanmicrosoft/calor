@@ -8,6 +8,7 @@ namespace Calor.Compiler.Migration.Project;
 /// </summary>
 public sealed class CsprojUpdater
 {
+    private const string ValidateCalorCompilerOverrideTargetName = "ValidateCalorCompilerOverride";
     private const string CompileCalorFilesTargetName = "CompileCalorFiles";
 
     /// <summary>
@@ -125,6 +126,7 @@ public sealed class CsprojUpdater
                   <!-- Calor Compilation Configuration -->
                   <PropertyGroup>
                     <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\calor\</CalorOutputDirectory>
+                    <CalorCompilerPath Condition="'$(CalorCompilerOverride)' != '' and '$(CalorCompilerPath)' == ''">$(CalorCompilerOverride)</CalorCompilerPath>
                     <CalorCompilerPath Condition="'$(CalorCompilerPath)' == ''">calor</CalorCompilerPath>
                   </PropertyGroup>
 
@@ -132,6 +134,15 @@ public sealed class CsprojUpdater
                   <ItemGroup>
                     <CalorCompile Include="**\*.calr" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
                   </ItemGroup>
+
+                  <!-- Validate CalorCompilerOverride (runs unconditionally, not subject to incremental build skip) -->
+                  <Target Name="ValidateCalorCompilerOverride"
+                          BeforeTargets="CompileCalorFiles"
+                          Condition="'$(CalorCompilerOverride)' != '' and '@(CalorCompile)' != ''">
+                    <Error Condition="!Exists('$(CalorCompilerOverride)')"
+                           Text="CalorCompilerOverride points to '$(CalorCompilerOverride)' which does not exist." />
+                    <Warning Text="CalorCompilerOverride is set — using local compiler from '$(CalorCompilerOverride)'" />
+                  </Target>
 
                   <!-- Compile Calor files before C# compilation -->
                   <Target Name="CompileCalorFiles"
@@ -232,6 +243,9 @@ public sealed class CsprojUpdater
                 new XAttribute("Condition", "'$(CalorOutputDirectory)' == ''"),
                 @"$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\calor\"),
             new XElement("CalorCompilerPath",
+                new XAttribute("Condition", "'$(CalorCompilerOverride)' != '' and '$(CalorCompilerPath)' == ''"),
+                "$(CalorCompilerOverride)"),
+            new XElement("CalorCompilerPath",
                 new XAttribute("Condition", "'$(CalorCompilerPath)' == ''"),
                 "calor"));
 
@@ -244,6 +258,19 @@ public sealed class CsprojUpdater
                 new XAttribute("Exclude", "$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)")));
 
         root.Add(itemGroup);
+
+        // Add ValidateCalorCompilerOverride target (no Inputs/Outputs so it always runs)
+        var validateTarget = new XElement("Target",
+            new XAttribute("Name", ValidateCalorCompilerOverrideTargetName),
+            new XAttribute("BeforeTargets", CompileCalorFilesTargetName),
+            new XAttribute("Condition", "'$(CalorCompilerOverride)' != '' and '@(CalorCompile)' != ''"),
+            new XElement("Error",
+                new XAttribute("Condition", "!Exists('$(CalorCompilerOverride)')"),
+                new XAttribute("Text", "CalorCompilerOverride points to '$(CalorCompilerOverride)' which does not exist.")),
+            new XElement("Warning",
+                new XAttribute("Text", "CalorCompilerOverride is set — using local compiler from '$(CalorCompilerOverride)'")));
+
+        root.Add(validateTarget);
 
         // Add CompileCalorFiles target with proper incremental build support
         var compileTarget = new XElement("Target",

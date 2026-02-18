@@ -393,6 +393,36 @@ For example: `obj/Debug/net8.0/calor/MyModule.g.cs`
 
 This keeps generated files out of your source tree while still making them part of the build.
 
+### MSBuild Properties
+
+The following properties control Calor build behavior. Set them in your `.csproj` or pass via `-p:` on the command line.
+
+| Property | Default | Description |
+|:---------|:--------|:------------|
+| `CalorCompilerPath` | `calor` | Path to the Calor CLI executable |
+| `CalorOutputDirectory` | `obj/<Config>/<TFM>/calor/` | Directory for generated `.g.cs` files |
+| `CalorCompilerOverride` | *(empty)* | Override path for a locally-built compiler (see below) |
+
+#### CalorCompilerOverride
+
+When set, `CalorCompilerOverride` derives `CalorCompilerPath` automatically. This is intended for developers working on the Calor compiler itself who want to test local changes without modifying project files:
+
+```bash
+dotnet build -p:CalorCompilerOverride=path/to/Calor.Compiler/bin/Debug/net8.0/calor
+```
+
+**Precedence** (highest to lowest):
+1. Explicit `CalorCompilerPath` set in the project file
+2. `CalorCompilerOverride` (derives `CalorCompilerPath`)
+3. Default (`calor`)
+
+When `CalorCompilerOverride` is set, the build emits a warning confirming which compiler is being used. If the path does not exist, the build fails with an error.
+
+> **Note:** For projects using `Calor.Sdk` (MSBuild task integration) rather than `calor init`, `CalorCompilerOverride` derives `CalorTasksAssembly` instead. Point it at your local `Calor.Tasks.dll`:
+> ```bash
+> dotnet build -p:CalorCompilerOverride=path/to/Calor.Tasks/bin/Debug/net8.0/Calor.Tasks.dll
+> ```
+
 ---
 
 ## Calor/C# Coexistence

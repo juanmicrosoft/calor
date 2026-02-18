@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using Calor.Compiler.Init;
 using Xunit;
 using System.Text.RegularExpressions;
@@ -200,12 +201,106 @@ public class CsprojInitializerTests : IDisposable
     }
 
     [Fact]
+    public async Task InitializeAsync_ContainsCalorCompilerOverride()
+    {
+        // Arrange
+        var csprojPath = Path.Combine(_testDir, "Test.csproj");
+        await File.WriteAllTextAsync(csprojPath, SdkStyleCsproj);
+
+        // Act
+        await _initializer.InitializeAsync(csprojPath);
+
+        // Assert
+        var content = await File.ReadAllTextAsync(csprojPath);
+        Assert.Contains("CalorCompilerOverride", content);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ContainsValidateCalorCompilerOverrideTarget()
+    {
+        // Arrange
+        var csprojPath = Path.Combine(_testDir, "Test.csproj");
+        await File.WriteAllTextAsync(csprojPath, SdkStyleCsproj);
+
+        // Act
+        await _initializer.InitializeAsync(csprojPath);
+
+        // Assert - parse XML and verify the validation target
+        var content = await File.ReadAllTextAsync(csprojPath);
+        var doc = XDocument.Parse(content);
+
+        var validateTarget = doc.Descendants("Target")
+            .FirstOrDefault(t => t.Attribute("Name")?.Value == "ValidateCalorCompilerOverride");
+
+        Assert.NotNull(validateTarget);
+        Assert.Equal("CompileCalorFiles", validateTarget.Attribute("BeforeTargets")?.Value);
+        Assert.Equal("'$(CalorCompilerOverride)' != '' and '@(CalorCompile)' != ''",
+            validateTarget.Attribute("Condition")?.Value);
+
+        // Should have Error and Warning child elements
+        var errorElement = validateTarget.Element("Error");
+        Assert.NotNull(errorElement);
+        Assert.Equal("!Exists('$(CalorCompilerOverride)')", errorElement.Attribute("Condition")?.Value);
+
+        var warningElement = validateTarget.Element("Warning");
+        Assert.NotNull(warningElement);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_CalorCompilerOverride_HasCorrectConditionsAndOrdering()
+    {
+        // Arrange
+        var csprojPath = Path.Combine(_testDir, "Test.csproj");
+        await File.WriteAllTextAsync(csprojPath, SdkStyleCsproj);
+
+        // Act
+        await _initializer.InitializeAsync(csprojPath);
+
+        // Assert - parse XML and verify CalorCompilerPath elements
+        var content = await File.ReadAllTextAsync(csprojPath);
+        var doc = XDocument.Parse(content);
+
+        var compilerPathElements = doc.Descendants("CalorCompilerPath").ToList();
+        Assert.Equal(2, compilerPathElements.Count);
+
+        // First element: override condition
+        var overrideElement = compilerPathElements[0];
+        Assert.Equal("$(CalorCompilerOverride)", overrideElement.Value);
+        Assert.Equal(
+            "'$(CalorCompilerOverride)' != '' and '$(CalorCompilerPath)' == ''",
+            overrideElement.Attribute("Condition")?.Value);
+
+        // Second element: default fallback
+        var defaultElement = compilerPathElements[1];
+        Assert.Equal("calor", defaultElement.Value);
+        Assert.Equal(
+            "'$(CalorCompilerPath)' == ''",
+            defaultElement.Attribute("Condition")?.Value);
+    }
+
+    [Fact]
+    public void GenerateCalorTargetsXml_CalorCompilerOverride_HasCorrectConditionsAndOrdering()
+    {
+        // Act
+        var xml = CsprojInitializer.GenerateCalorTargetsXml();
+
+        // Assert - verify the override line appears before the default line
+        var overrideIndex = xml.IndexOf("'$(CalorCompilerOverride)' != '' and '$(CalorCompilerPath)' == ''", StringComparison.Ordinal);
+        var defaultIndex = xml.IndexOf("<CalorCompilerPath Condition=\"'$(CalorCompilerPath)' == ''\">calor</CalorCompilerPath>", StringComparison.Ordinal);
+
+        Assert.True(overrideIndex >= 0, "Override condition not found in template");
+        Assert.True(defaultIndex >= 0, "Default condition not found in template");
+        Assert.True(overrideIndex < defaultIndex, "Override must appear before default in template");
+    }
+
+    [Fact]
     public void GenerateCalorTargetsXml_ReturnsValidXml()
     {
         // Act
         var xml = CsprojInitializer.GenerateCalorTargetsXml();
 
         // Assert
+        Assert.Contains("ValidateCalorCompilerOverride", xml);
         Assert.Contains("CompileCalorFiles", xml);
         Assert.Contains("IncludeCalorGeneratedFiles", xml);
         Assert.Contains("CleanCalorFiles", xml);
@@ -213,6 +308,7 @@ public class CsprojInitializerTests : IDisposable
         Assert.Contains("calor", xml);
         Assert.Contains("Inputs=\"@(CalorCompile)\"", xml);
         Assert.Contains("Outputs=\"@(CalorCompile->'$(CalorOutputDirectory)%(RecursiveDir)%(Filename).g.cs')\"", xml);
+        Assert.Contains("CalorCompilerOverride", xml);
     }
 
     [Fact]
@@ -228,13 +324,80 @@ public class CsprojInitializerTests : IDisposable
 
         // Assert - should only have one of each target
         var content = await File.ReadAllTextAsync(csprojPath);
+        var validateTargetCount = CountOccurrences(content, "Name=\"ValidateCalorCompilerOverride\"");
         var compileTargetCount = CountOccurrences(content, "Name=\"CompileCalorFiles\"");
         var includeTargetCount = CountOccurrences(content, "Name=\"IncludeCalorGeneratedFiles\"");
         var cleanTargetCount = CountOccurrences(content, "Name=\"CleanCalorFiles\"");
 
+        Assert.Equal(1, validateTargetCount);
         Assert.Equal(1, compileTargetCount);
         Assert.Equal(1, includeTargetCount);
         Assert.Equal(1, cleanTargetCount);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_WithForce_CleansUpManualCalorCompilerOverridePropertyGroup()
+    {
+        // Arrange - a csproj with a manually-added CalorCompilerOverride in a separate PropertyGroup
+        var csprojPath = Path.Combine(_testDir, "Test.csproj");
+        await File.WriteAllTextAsync(csprojPath, SdkStyleCsproj);
+
+        // First initialization
+        await _initializer.InitializeAsync(csprojPath);
+
+        // Manually inject a separate PropertyGroup with CalorCompilerOverride
+        var content = await File.ReadAllTextAsync(csprojPath);
+        var doc = XDocument.Parse(content);
+        doc.Root!.Add(new XElement("PropertyGroup",
+            new XElement("CalorCompilerOverride", "/some/local/path/to/calor")));
+        await File.WriteAllTextAsync(csprojPath, doc.ToString());
+
+        // Verify the manual override element is present before force
+        var beforeDoc = XDocument.Parse(await File.ReadAllTextAsync(csprojPath));
+        Assert.Single(beforeDoc.Descendants("CalorCompilerOverride"));
+
+        // Act - re-initialize with force
+        var result = await _initializer.InitializeAsync(csprojPath, force: true);
+
+        // Assert - manual override PropertyGroup should be removed, only the standard one remains
+        Assert.True(result.IsSuccess);
+        var afterDoc = XDocument.Parse(await File.ReadAllTextAsync(csprojPath));
+
+        // Should have no standalone CalorCompilerOverride element (only the condition reference in CalorCompilerPath)
+        var overrideElements = afterDoc.Descendants("CalorCompilerOverride").ToList();
+        Assert.Empty(overrideElements);
+
+        // CalorCompilerPath should still exist with the standard override condition
+        var compilerPathElements = afterDoc.Descendants("CalorCompilerPath").ToList();
+        Assert.Equal(2, compilerPathElements.Count);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_WithForce_CleansUpSeparateCalorCompilerPathPropertyGroup()
+    {
+        // Arrange - a csproj with CalorCompilerPath manually added in a separate PropertyGroup
+        var csprojPath = Path.Combine(_testDir, "Test.csproj");
+        await File.WriteAllTextAsync(csprojPath, SdkStyleCsproj);
+
+        // First initialization
+        await _initializer.InitializeAsync(csprojPath);
+
+        // Manually inject a separate PropertyGroup with CalorCompilerPath
+        var content = await File.ReadAllTextAsync(csprojPath);
+        var doc = XDocument.Parse(content);
+        doc.Root!.Add(new XElement("PropertyGroup",
+            new XElement("CalorCompilerPath", "/custom/path/to/calor")));
+        await File.WriteAllTextAsync(csprojPath, doc.ToString());
+
+        // Act - re-initialize with force
+        var result = await _initializer.InitializeAsync(csprojPath, force: true);
+
+        // Assert - should have exactly 2 CalorCompilerPath elements (override + default), not 3
+        Assert.True(result.IsSuccess);
+        var afterContent = await File.ReadAllTextAsync(csprojPath);
+        var afterDoc = XDocument.Parse(afterContent);
+        var compilerPathElements = afterDoc.Descendants("CalorCompilerPath").ToList();
+        Assert.Equal(2, compilerPathElements.Count);
     }
 
     private static int CountOccurrences(string source, string substring)

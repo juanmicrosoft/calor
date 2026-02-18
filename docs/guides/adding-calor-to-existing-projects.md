@@ -346,6 +346,16 @@ Warning: Complex LINQ expression at line 42 - manual review recommended
 
 Review these manually and adjust the Calor code as needed.
 
+### Testing a Locally-Built Compiler
+
+If you're developing changes to the Calor compiler itself, use `CalorCompilerOverride` to test your local build without modifying any project files:
+
+```bash
+dotnet build -p:CalorCompilerOverride=path/to/Calor.Compiler/bin/Debug/net8.0/calor
+```
+
+The build will emit a warning confirming the override is active. See [`calor init` - MSBuild Properties](/calor/cli/init/#msbuild-properties) for details.
+
 ### Test Failures After Conversion
 
 1. Compare the generated C# with the original
