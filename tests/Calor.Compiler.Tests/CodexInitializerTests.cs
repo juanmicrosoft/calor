@@ -335,7 +335,7 @@ This should be preserved.
         Assert.True(result.Success);
         Assert.NotEmpty(result.Messages);
         Assert.Contains(result.Messages, m => m.Contains("OpenAI Codex"));
-        Assert.Contains(result.Messages, m => m.Contains("cannot enforce Calor-first development"));
+        Assert.Contains(result.Messages, m => m.Contains("MCP server"));
     }
 
     [Fact]

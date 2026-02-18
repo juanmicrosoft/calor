@@ -202,15 +202,31 @@ Creates the following files:
 |:-----|:--------|
 | `.codex/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
 | `.codex/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
+| `.codex/config.toml` | MCP server configuration for Calor tools |
 | `AGENTS.md` | Project documentation with Calor-first guidelines |
 
-#### Guidance-Based Enforcement
+#### MCP Server Integration
 
-**Important:** Codex CLI does not support hooks like Claude Code. Calor-first development is **guidance-based only**, relying on instructions in `AGENTS.md` and the skill files.
+The `.codex/config.toml` file configures an MCP server that gives Codex direct access to Calor compiler tools (`calor_typecheck`, `calor_verify_contracts`, `calor_analyze`, `calor_convert`, and more):
+
+```toml
+# BEGIN CalorC MCP SECTION - DO NOT EDIT
+[mcp_servers.calor]
+command = "calor"
+args = ["mcp", "--stdio"]
+# END CalorC MCP SECTION
+```
+
+See [`calor mcp`](/calor/cli/mcp/) for the complete list of available tools.
+
+#### Enforcement
+
+Codex CLI does not support hooks like Claude Code. MCP tools provide direct access to Calor compiler features, and Calor-first development is **guidance-based**, relying on instructions in `AGENTS.md` and the skill files.
 
 This means:
 - Codex *should* create `.calr` files based on the instructions
-- However, enforcement is not automatic - Codex may occasionally create `.cs` files
+- MCP tools give Codex native access to compile, verify, and convert
+- Hooks are not supported, so enforcement is not automatic
 - Review file extensions after code generation
 - Use `calor assess` to find any unconverted `.cs` files
 
@@ -226,6 +242,7 @@ After initialization, use these Codex commands:
 ```
 project/
 ├── .codex/
+│   ├── config.toml
 │   └── skills/
 │       ├── calor/
 │       │   └── SKILL.md

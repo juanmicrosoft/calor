@@ -25,20 +25,58 @@ This creates:
 |:-----|:--------|
 | `.codex/skills/calor/SKILL.md` | Teaches Codex Calor syntax for writing new code |
 | `.codex/skills/calor-convert/SKILL.md` | Teaches Codex how to convert C# to Calor |
+| `.codex/config.toml` | MCP server configuration for Calor tools |
 | `AGENTS.md` | Project documentation with Calor-first guidelines |
 
 You can run this command again anytime to update the Calor documentation section in AGENTS.md without losing your custom content.
 
 ---
 
-## Important: Guidance-Based Enforcement
+## MCP Server Integration
 
-Unlike Claude Code which uses hooks to enforce Calor-first development, **Codex CLI does not support hooks**. This means:
+The init command also configures an **MCP (Model Context Protocol) server** that gives Codex direct access to the Calor compiler. This enables Codex to:
 
-- Calor-first development is **guidance-based only**
+- **Type check** code and get semantic errors
+- **Verify contracts** using the Z3 SMT solver
+- **Analyze** code for bugs and migration potential
+- **Convert** between C# and Calor
+
+### How It Works
+
+When you open the project in Codex CLI, the MCP server starts automatically based on the `.codex/config.toml` configuration:
+
+```toml
+# BEGIN CalorC MCP SECTION - DO NOT EDIT
+[mcp_servers.calor]
+command = "calor"
+args = ["mcp", "--stdio"]
+# END CalorC MCP SECTION
+```
+
+### Available Tools
+
+| Tool | Purpose |
+|:-----|:--------|
+| `calor_typecheck` | Semantic type checking with error categorization |
+| `calor_verify_contracts` | Z3-based contract verification |
+| `calor_compile` | Compile Calor source to C# |
+| `calor_analyze` | Advanced bug detection |
+| `calor_convert` | Convert between C# and Calor |
+| `calor_format` | Format source to canonical style |
+| `calor_lint` | Check agent-optimized format issues |
+
+See [`calor mcp`](/calor/cli/mcp/) for the complete list of 19 available tools.
+
+---
+
+## Enforcement
+
+Codex CLI does not support hooks like Claude Code. However, with MCP tools providing direct access to the Calor compiler, Codex can compile, verify, and convert code natively. Calor-first enforcement is still **guidance-based**, relying on instructions in `AGENTS.md` and the skill files:
+
+- MCP tools give Codex direct access to compile, verify, and convert Calor code
 - Codex *should* follow the instructions in AGENTS.md and create `.calr` files
-- However, enforcement is not automatic - Codex may occasionally create `.cs` files
-- Always review file extensions after code generation
+- Hooks are not supported, so enforcement is not automatic
+- Review file extensions after code generation
 - Use `calor assess` to find any unconverted `.cs` files
 
 ---
@@ -133,7 +171,8 @@ The Calor skills teach Codex:
 | Skill file format | `calor.md` | `SKILL.md` with YAML frontmatter |
 | Project instructions | `CLAUDE.md` | `AGENTS.md` |
 | Skill invocation | `/calor` | `$calor` |
-| Calor-first enforcement | **Hooks (enforced)** | **Guidance only** |
+| MCP Tools | Yes | Yes |
+| Calor-first enforcement | **Hooks (enforced)** | **Guidance + MCP tools** |
 | Blocks `.cs` creation | Yes | No |
 
 ---
@@ -218,7 +257,7 @@ Convert src/Services/PaymentService.cs to Calor, adding:
 
 ### Verifying Calor-First Compliance
 
-Since Codex doesn't enforce Calor-first automatically, periodically check for unconverted files:
+Since Codex doesn't have hooks for Calor-first enforcement, periodically check for unconverted files:
 
 ```bash
 # Find C# files that might need conversion
@@ -232,11 +271,12 @@ find . -name "*.cs" -not -name "*.g.cs" -not -path "./obj/*"
 
 ## Best Practices
 
-1. **Review generated files** - Always check that Codex created `.calr` files, not `.cs`
-2. **Use explicit instructions** - Be specific about wanting Calor output
-3. **Include skill reference** - Start prompts with `$calor` or `$calor-convert`
-4. **Run analysis regularly** - Use `calor assess` to find migration candidates
-5. **Convert promptly** - If Codex creates a `.cs` file, convert it immediately
+1. **Use MCP tools** - Leverage MCP tools for compilation and verification
+2. **Review generated files** - Always check that Codex created `.calr` files, not `.cs`
+3. **Use explicit instructions** - Be specific about wanting Calor output
+4. **Include skill reference** - Start prompts with `$calor` or `$calor-convert`
+5. **Run analysis regularly** - Use `calor assess` to find migration candidates
+6. **Convert promptly** - If Codex creates a `.cs` file, convert it immediately
 
 ---
 
@@ -266,4 +306,5 @@ ls -la .codex/skills/calor-convert/SKILL.md
 - [Syntax Reference](/calor/syntax-reference/) - Complete language reference
 - [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Migration guide
 - [calor init](/calor/cli/init/) - Full init command documentation
+- [calor mcp](/calor/cli/mcp/) - MCP server tool documentation
 - [Claude Integration](/calor/getting-started/claude-integration/) - Alternative with enforced Calor-first

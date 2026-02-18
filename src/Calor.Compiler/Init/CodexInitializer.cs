@@ -2,13 +2,16 @@ namespace Calor.Compiler.Init;
 
 /// <summary>
 /// Initializer for OpenAI Codex CLI AI agent.
-/// Creates .codex/skills/ directory with Calor skills and AGENTS.md project file.
+/// Creates .codex/skills/ directory with Calor skills, AGENTS.md project file,
+/// and configures MCP server in .codex/config.toml for Calor compiler tools.
 /// Note: Codex does not support hooks, so Calor-first enforcement is guidance-based only.
 /// </summary>
 public class CodexInitializer : IAiInitializer
 {
     private const string SectionStart = "<!-- BEGIN CalorC SECTION - DO NOT EDIT -->";
     private const string SectionEnd = "<!-- END CalorC SECTION -->";
+    private const string TomlSectionStart = "# BEGIN CalorC MCP SECTION - DO NOT EDIT";
+    private const string TomlSectionEnd = "# END CalorC MCP SECTION";
 
     public string AgentName => "OpenAI Codex";
 
@@ -80,16 +83,28 @@ public class CodexInitializer : IAiInitializer
                 updatedFiles.Add(agentsMdPath);
             }
 
+            // Configure MCP servers in .codex/config.toml
+            var configTomlPath = Path.Combine(targetDirectory, ".codex", "config.toml");
+            var mcpResult = await ConfigureMcpServersAsync(configTomlPath);
+            if (mcpResult == McpConfigResult.Created)
+            {
+                createdFiles.Add(configTomlPath);
+            }
+            else if (mcpResult == McpConfigResult.Updated)
+            {
+                updatedFiles.Add(configTomlPath);
+            }
+
             var allModifiedFiles = createdFiles.Concat(updatedFiles).ToList();
             var messages = new List<string>();
 
             if (allModifiedFiles.Count > 0)
             {
                 messages.Add($"Initialized Calor project for OpenAI Codex (calor v{version})");
+                messages.Add("  - MCP server 'calor' configured for AI agent tools (compile, verify, analyze, convert, typecheck)");
                 messages.Add("");
-                messages.Add("WARNING: OpenAI Codex cannot enforce Calor-first development.");
-                messages.Add("This agent lacks hooks to prevent writing .cs files directly.");
-                messages.Add("For best results, use Claude Code: calor init --ai claude");
+                messages.Add("NOTE: OpenAI Codex does not support hooks for Calor-first enforcement.");
+                messages.Add("MCP tools provide direct access to Calor compiler features; guidance in AGENTS.md handles the rest.");
             }
             else
             {
@@ -164,5 +179,63 @@ public class CodexInitializer : IAiInitializer
 
         await File.WriteAllTextAsync(path, newContent);
         return AgentsMdUpdateResult.Updated;
+    }
+
+    private enum McpConfigResult
+    {
+        Created,
+        Updated,
+        Unchanged
+    }
+
+    private static async Task<McpConfigResult> ConfigureMcpServersAsync(string configTomlPath)
+    {
+        var mcpSection = $"""
+            {TomlSectionStart}
+            [mcp_servers.calor]
+            command = "calor"
+            args = ["mcp", "--stdio"]
+            {TomlSectionEnd}
+            """;
+
+        if (!File.Exists(configTomlPath))
+        {
+            // Ensure directory exists
+            var dir = Path.GetDirectoryName(configTomlPath);
+            if (dir != null)
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            await File.WriteAllTextAsync(configTomlPath, mcpSection + "\n");
+            return McpConfigResult.Created;
+        }
+
+        var existingContent = await File.ReadAllTextAsync(configTomlPath);
+        var startIdx = existingContent.IndexOf(TomlSectionStart, StringComparison.Ordinal);
+        var endIdx = existingContent.IndexOf(TomlSectionEnd, StringComparison.Ordinal);
+
+        string newContent;
+        if (startIdx >= 0 && endIdx > startIdx)
+        {
+            // Replace existing section (inclusive of markers)
+            var before = existingContent[..startIdx];
+            var after = existingContent[(endIdx + TomlSectionEnd.Length)..];
+            newContent = before + mcpSection + after;
+        }
+        else
+        {
+            // Append section at the end
+            newContent = existingContent.TrimEnd() + "\n\n" + mcpSection + "\n";
+        }
+
+        // Normalize trailing whitespace for comparison
+        if (newContent.TrimEnd() == existingContent.TrimEnd())
+        {
+            return McpConfigResult.Unchanged;
+        }
+
+        await File.WriteAllTextAsync(configTomlPath, newContent);
+        return McpConfigResult.Updated;
     }
 }
