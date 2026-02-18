@@ -3,10 +3,21 @@
 
   <!-- Import the Calor.Tasks assembly -->
   <PropertyGroup>
+    <!-- CalorCompilerOverride: point at a local Calor.Tasks.dll to use a dev-built compiler -->
+    <CalorTasksAssembly Condition="'$(CalorCompilerOverride)' != '' and '$(CalorTasksAssembly)' == ''">$(CalorCompilerOverride)</CalorTasksAssembly>
     <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net8.0\Calor.Tasks.dll</CalorTasksAssembly>
   </PropertyGroup>
 
   <UsingTask TaskName="Calor.Tasks.CompileCalor" AssemblyFile="$(CalorTasksAssembly)" />
+
+  <!-- Validate CalorCompilerOverride (runs unconditionally, not subject to incremental build skip) -->
+  <Target Name="ValidateCalorCompilerOverride"
+          BeforeTargets="CompileCalorFiles"
+          Condition="'$(CalorCompilerOverride)' != '' and '@(CalorCompile)' != ''">
+    <Error Condition="!Exists('$(CalorCompilerOverride)')"
+           Text="CalorCompilerOverride points to '$(CalorCompilerOverride)' which does not exist." />
+    <Warning Text="CalorCompilerOverride is set — using local compiler from '$(CalorCompilerOverride)'" />
+  </Target>
 
   <!-- Target to compile Calor files and add them to compilation -->
   <Target Name="CompileCalorFiles"

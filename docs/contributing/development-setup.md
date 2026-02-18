@@ -180,6 +180,22 @@ Then create a pull request on GitHub.
 3. Register in evaluation runner
 4. Add documentation
 
+### Testing Local Compiler Changes
+
+Set `CalorCompilerOverride` to use a locally-built compiler:
+
+```bash
+# For projects using Calor.Sdk (MSBuild task integration)
+dotnet build -p:CalorCompilerOverride=path/to/Calor.Tasks/bin/Debug/net8.0/Calor.Tasks.dll
+
+# For projects using calor init (CLI integration)
+dotnet build -p:CalorCompilerOverride=path/to/Calor.Compiler/bin/Debug/net8.0/calor
+```
+
+This overrides the compiler path without modifying project files. If an explicit
+`CalorTasksAssembly` (SDK path) or `CalorCompilerPath` (CLI path) is already set,
+those take precedence over `CalorCompilerOverride`.
+
 ### Adding a Benchmark
 
 See [Adding Benchmarks](/calor/contributing/adding-benchmarks/).
