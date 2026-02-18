@@ -119,6 +119,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("// Do not modify this file directly.");
         AppendLine("// </auto-generated>");
         AppendLine();
+        AppendLine("#nullable enable");
+        AppendLine();
 
         // Always include System and Calor.Runtime
         var emittedUsings = new HashSet<string>(StringComparer.Ordinal) { "System", "Calor.Runtime" };
@@ -1592,7 +1594,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         var baseList = node.BaseInterfaces.Count > 0
-            ? " : " + string.Join(", ", node.BaseInterfaces.Select(SanitizeIdentifier))
+            ? " : " + string.Join(", ", node.BaseInterfaces)
             : "";
 
         AppendLine($"public interface {name}{typeParams}{baseList}{whereClause}");
@@ -1704,9 +1706,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var baseList = new List<string>();
         if (!string.IsNullOrEmpty(node.BaseClass))
         {
-            baseList.Add(SanitizeIdentifier(node.BaseClass));
+            baseList.Add(node.BaseClass);
         }
-        baseList.AddRange(node.ImplementedInterfaces.Select(SanitizeIdentifier));
+        baseList.AddRange(node.ImplementedInterfaces);
         var inheritance = baseList.Count > 0 ? " : " + string.Join(", ", baseList) : "";
 
         AppendLine($"{modifiers} class {name}{typeParams}{inheritance}{whereClause}");

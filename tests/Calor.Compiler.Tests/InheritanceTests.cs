@@ -264,6 +264,104 @@ public class InheritanceTests
         Assert.Contains("public sealed class FinalClass", result);
     }
 
+    [Fact]
+    public void CodeGen_GenericInterfaceImplementation_PreservesGenericSyntax()
+    {
+        var source = @"
+§M{m1:Test}
+§CL{c1:MyOption:pub}<T>
+  §IMPL{IEquatable<MyOption<T>>}
+§/CL{c1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("IEquatable<MyOption<T>>", result);
+    }
+
+    [Fact]
+    public void CodeGen_GenericBaseClass_PreservesGenericSyntax()
+    {
+        var source = @"
+§M{m1:Test}
+§CL{c1:StringList:pub}
+  §EXT{List<string>}
+§/CL{c1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("StringList : List<string>", result);
+    }
+
+    [Fact]
+    public void CodeGen_InterfaceExtendsGenericInterface_PreservesGenericSyntax()
+    {
+        var source = @"
+§M{m1:Test}
+§IFACE{i1:IMyCollection}<T>
+  §EXT{IEnumerable<T>}
+§/IFACE{i1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("IMyCollection<T> : IEnumerable<T>", result);
+    }
+
+    [Fact]
+    public void CodeGen_DeeplyNestedGenericInheritance_PreservesGenericSyntax()
+    {
+        var source = @"
+§M{m1:Test}
+§CL{c1:MyMapper:pub}<TKey,TValue>
+  §IMPL{IEquatable<Dictionary<TKey,List<TValue>>>}
+§/CL{c1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("IEquatable<Dictionary<TKey,List<TValue>>>", result);
+    }
+
+    [Fact]
+    public void CodeGen_EmittedCode_ContainsNullableEnable()
+    {
+        var source = @"
+§M{m1:Test}
+§CL{c1:Foo:pub}
+§/CL{c1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("#nullable enable", result);
+    }
+
+    [Fact]
+    public void CodeGen_NullableEnable_AppearsBeforeUsings()
+    {
+        var source = @"
+§M{m1:Test}
+§CL{c1:Foo:pub}
+§/CL{c1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        var nullableIndex = result.IndexOf("#nullable enable");
+        var usingIndex = result.IndexOf("using System;");
+        Assert.True(nullableIndex >= 0, "Output should contain #nullable enable");
+        Assert.True(usingIndex >= 0, "Output should contain using System;");
+        Assert.True(nullableIndex < usingIndex, "#nullable enable should appear before using directives");
+    }
+
     #endregion
 
     #region Parser Tests

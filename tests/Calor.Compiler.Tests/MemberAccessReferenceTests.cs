@@ -234,6 +234,63 @@ public class MemberAccessReferenceTests
         Assert.DoesNotMatch(@"\(""[^""]*AttributeTargets\.Method[^""]*""\)", generatedCode);
     }
 
+    [Fact]
+    public void RoundTrip_CalorSource_AttributeWithEnumValue_EmitsUnquoted()
+    {
+        // Parse Calor DSL with an attribute containing a qualified identifier
+        var calorSource = """
+            §M{m001:TestModule}
+              §CL{c001:MyAttribute:pub}[@AttributeUsage(AttributeTargets.Method)]
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        diagnostics.SetFilePath("test.calr");
+        var lexer = new Calor.Compiler.Parsing.Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Calor.Compiler.Parsing.Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        // Emit to C#
+        var emitter = new CSharpEmitter();
+        var emittedCSharp = emitter.Emit(module);
+
+        // The enum value should NOT be quoted as a string literal
+        Assert.Contains("AttributeTargets.Method", emittedCSharp);
+        Assert.DoesNotContain("\"AttributeTargets.Method\"", emittedCSharp);
+    }
+
+    [Fact]
+    public void RoundTrip_CalorSource_AttributeWithSimpleIdentifier_EmitsUnquoted()
+    {
+        // A bare (non-dotted) identifier in an attribute should also be emitted unquoted
+        var calorSource = """
+            §M{m001:TestModule}
+              §CL{c001:TestClass:pub}[@DefaultValue(SomeConstant)]
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        diagnostics.SetFilePath("test.calr");
+        var lexer = new Calor.Compiler.Parsing.Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Calor.Compiler.Parsing.Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var emitter = new CSharpEmitter();
+        var emittedCSharp = emitter.Emit(module);
+
+        // Bare identifier should NOT be quoted
+        Assert.Contains("SomeConstant", emittedCSharp);
+        Assert.DoesNotContain("\"SomeConstant\"", emittedCSharp);
+    }
+
     private static string GetErrorMessage(ConversionResult result)
     {
         if (result.Issues.Count > 0)

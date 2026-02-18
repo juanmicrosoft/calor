@@ -3202,7 +3202,7 @@ public sealed class Parser
                 }
             }
 
-            return text;
+            return new MemberAccessReference(text);
         }
 
         // Unrecognized value - return empty string
