@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Calor.Compiler.Init;
 using Xunit;
 
@@ -6,11 +7,14 @@ namespace Calor.Compiler.Tests;
 public class ClaudeInitializerMcpTests : IDisposable
 {
     private readonly string _testDir;
+    private readonly string _claudeJsonPath;
 
     public ClaudeInitializerMcpTests()
     {
         _testDir = Path.Combine(Path.GetTempPath(), $"calor-test-{Guid.NewGuid()}");
         Directory.CreateDirectory(_testDir);
+        // Use a test-specific claude.json file
+        _claudeJsonPath = Path.Combine(_testDir, ".claude.json");
     }
 
     public void Dispose()
@@ -19,30 +23,41 @@ public class ClaudeInitializerMcpTests : IDisposable
             Directory.Delete(_testDir, recursive: true);
     }
 
-    [Fact]
-    public async Task Initialize_ConfiguresMcpServer_InMcpJson()
+    private ClaudeInitializer CreateInitializer()
     {
-        var initializer = new ClaudeInitializer();
+        return new ClaudeInitializer { ClaudeJsonPathOverride = _claudeJsonPath };
+    }
+
+    [Fact]
+    public async Task Initialize_ConfiguresMcpServer_InClaudeJson()
+    {
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
-        // MCP servers should be in .mcp.json, not settings.json
-        var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
-        Assert.True(File.Exists(mcpJsonPath), ".mcp.json should be created");
+        // MCP servers should be in ~/.claude.json per-project section
+        Assert.True(File.Exists(_claudeJsonPath), ".claude.json should be created");
 
-        var content = await File.ReadAllTextAsync(mcpJsonPath);
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
+        var json = JsonDocument.Parse(content);
 
-        Assert.Contains("mcpServers", content);
-        Assert.Contains("\"calor\"", content);
-        Assert.Contains("\"command\": \"calor\"", content);
-        Assert.Contains("\"mcp\"", content);
-        Assert.Contains("\"--stdio\"", content);
-        Assert.Contains("\"type\": \"stdio\"", content);
+        // Check structure
+        Assert.True(json.RootElement.TryGetProperty("projects", out var projects));
+        Assert.True(projects.TryGetProperty(_testDir, out var project));
+        Assert.True(project.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(mcpServers.TryGetProperty("calor", out var calor));
+
+        // Check calor MCP server config
+        Assert.Equal("stdio", calor.GetProperty("type").GetString());
+        Assert.Equal("calor", calor.GetProperty("command").GetString());
+        var args = calor.GetProperty("args");
+        Assert.Equal("mcp", args[0].GetString());
+        Assert.Equal("--stdio", args[1].GetString());
     }
 
     [Fact]
     public async Task Initialize_SettingsJson_DoesNotContainMcpServers()
     {
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
         // settings.json should only contain hooks, not MCP servers
@@ -56,15 +71,25 @@ public class ClaudeInitializerMcpTests : IDisposable
     [Fact]
     public async Task Initialize_PreservesExistingMcpServers()
     {
-        // Pre-create .mcp.json with existing MCP server
-        await File.WriteAllTextAsync(
-            Path.Combine(_testDir, ".mcp.json"),
-            "{\"mcpServers\": {\"existing-server\": {\"type\": \"stdio\", \"command\": \"existing\"}}}");
+        // Pre-create .claude.json with existing MCP server
+        var existingConfig = $@"{{
+  ""projects"": {{
+    ""{_testDir.Replace("\\", "\\\\")}"": {{
+      ""mcpServers"": {{
+        ""existing-server"": {{
+          ""type"": ""stdio"",
+          ""command"": ""existing""
+        }}
+      }}
+    }}
+  }}
+}}";
+        await File.WriteAllTextAsync(_claudeJsonPath, existingConfig);
 
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
-        var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
 
         Assert.Contains("existing-server", content);
         Assert.Contains("\"calor\"", content);
@@ -73,18 +98,17 @@ public class ClaudeInitializerMcpTests : IDisposable
     [Fact]
     public async Task Initialize_DoesNotDuplicateMcpServer_WhenAlreadyConfigured()
     {
+        var initializer = CreateInitializer();
+
         // First initialization
-        var initializer = new ClaudeInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
         // Second initialization
         await initializer.InitializeAsync(_testDir, force: false);
 
-        var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
-        var content = await File.ReadAllTextAsync(mcpJsonPath);
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
 
-        // Count occurrences of "calor" as a key - should only appear once
-        // We check for "calor": which is the key (not calor in args)
+        // Count occurrences of "calor": - should only appear once
         var count = content.Split("\"calor\":").Length - 1;
         Assert.Equal(1, count);
     }
@@ -92,7 +116,7 @@ public class ClaudeInitializerMcpTests : IDisposable
     [Fact]
     public async Task Initialize_MessagesMentionMcpServer()
     {
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         var result = await initializer.InitializeAsync(_testDir, force: false);
 
         Assert.True(result.Success);
@@ -102,35 +126,34 @@ public class ClaudeInitializerMcpTests : IDisposable
     [Fact]
     public async Task Initialize_McpServerConfigHasCorrectFormat()
     {
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
-        var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
-        var content = await File.ReadAllTextAsync(mcpJsonPath);
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
+        var json = JsonDocument.Parse(content);
 
-        // Verify the JSON structure matches expected Claude Code format
-        Assert.Contains("\"mcpServers\"", content);
-        Assert.Contains("\"calor\"", content);
-        Assert.Contains("\"type\": \"stdio\"", content);
-        Assert.Contains("\"command\": \"calor\"", content);
-        Assert.Contains("\"args\"", content);
-        Assert.Contains("[", content); // args should be an array
+        var projects = json.RootElement.GetProperty("projects");
+        var project = projects.GetProperty(_testDir);
+        var mcpServers = project.GetProperty("mcpServers");
+        var calor = mcpServers.GetProperty("calor");
+
+        Assert.Equal("stdio", calor.GetProperty("type").GetString());
+        Assert.Equal("calor", calor.GetProperty("command").GetString());
+        Assert.Equal(JsonValueKind.Array, calor.GetProperty("args").ValueKind);
     }
 
     [Fact]
-    public async Task Initialize_WithForce_OverwritesInvalidMcpJson()
+    public async Task Initialize_WithForce_OverwritesInvalidClaudeJson()
     {
-        // Pre-create invalid .mcp.json file
-        await File.WriteAllTextAsync(
-            Path.Combine(_testDir, ".mcp.json"),
-            "{ invalid json }");
+        // Pre-create invalid .claude.json file
+        await File.WriteAllTextAsync(_claudeJsonPath, "{ invalid json }");
 
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         var result = await initializer.InitializeAsync(_testDir, force: true);
 
         Assert.True(result.Success);
 
-        var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
         Assert.Contains("mcpServers", content);
         Assert.Contains("\"calor\"", content);
     }
@@ -138,7 +161,7 @@ public class ClaudeInitializerMcpTests : IDisposable
     [Fact]
     public async Task Initialize_HooksAndMcpServers_InSeparateFiles()
     {
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
         // Hooks should be in .claude/settings.json
@@ -148,64 +171,55 @@ public class ClaudeInitializerMcpTests : IDisposable
         Assert.Contains("PreToolUse", settingsContent);
         Assert.Contains("calor hook validate-write", settingsContent);
 
-        // MCP servers should be in .mcp.json
-        var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
-        var mcpContent = await File.ReadAllTextAsync(mcpJsonPath);
+        // MCP servers should be in ~/.claude.json
+        var mcpContent = await File.ReadAllTextAsync(_claudeJsonPath);
         Assert.Contains("mcpServers", mcpContent);
         Assert.Contains("\"calor\"", mcpContent);
     }
 
-    // Edge case tests
-
     [Fact]
     public async Task Initialize_WithEmptyMcpServersObject_AddsCalor()
     {
-        // Pre-create .mcp.json with empty mcpServers object
-        await File.WriteAllTextAsync(
-            Path.Combine(_testDir, ".mcp.json"),
-            "{\"mcpServers\": {}}");
+        // Pre-create .claude.json with empty mcpServers object
+        var existingConfig = $@"{{
+  ""projects"": {{
+    ""{_testDir.Replace("\\", "\\\\")}"": {{
+      ""mcpServers"": {{}}
+    }}
+  }}
+}}";
+        await File.WriteAllTextAsync(_claudeJsonPath, existingConfig);
 
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
-        var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
-        Assert.Contains("\"calor\"", content);
-    }
-
-    [Fact]
-    public async Task Initialize_WithNullMcpServers_AddsCalor()
-    {
-        // Pre-create .mcp.json with null mcpServers
-        await File.WriteAllTextAsync(
-            Path.Combine(_testDir, ".mcp.json"),
-            "{\"mcpServers\": null}");
-
-        var initializer = new ClaudeInitializer();
-        await initializer.InitializeAsync(_testDir, force: false);
-
-        var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
         Assert.Contains("\"calor\"", content);
     }
 
     [Fact]
     public async Task Initialize_WithExistingCalor_DoesNotOverwrite()
     {
-        // Pre-create .mcp.json with calor already configured with custom args
-        var existingConfig = @"{
-  ""mcpServers"": {
-    ""calor"": {
-      ""type"": ""stdio"",
-      ""command"": ""custom-calor"",
-      ""args"": [""custom-arg""]
-    }
-  }
-}";
-        await File.WriteAllTextAsync(Path.Combine(_testDir, ".mcp.json"), existingConfig);
+        // Pre-create .claude.json with calor already configured with custom args
+        var existingConfig = $@"{{
+  ""projects"": {{
+    ""{_testDir.Replace("\\", "\\\\")}"": {{
+      ""mcpServers"": {{
+        ""calor"": {{
+          ""type"": ""stdio"",
+          ""command"": ""custom-calor"",
+          ""args"": [""custom-arg""]
+        }}
+      }}
+    }}
+  }}
+}}";
+        await File.WriteAllTextAsync(_claudeJsonPath, existingConfig);
 
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
-        var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
 
         // Should preserve the existing custom calor configuration
         Assert.Contains("custom-calor", content);
@@ -215,22 +229,26 @@ public class ClaudeInitializerMcpTests : IDisposable
     [Fact]
     public async Task Initialize_RemovesIncorrectCalorLspEntry()
     {
-        // Pre-create .mcp.json with incorrect calor-lsp entry (LSP is not MCP)
-        var existingConfig = @"{
-  ""mcpServers"": {
-    ""calor-lsp"": {
-      ""type"": ""stdio"",
-      ""command"": ""calor"",
-      ""args"": [""lsp""]
-    }
-  }
-}";
-        await File.WriteAllTextAsync(Path.Combine(_testDir, ".mcp.json"), existingConfig);
+        // Pre-create .claude.json with incorrect calor-lsp entry (LSP is not MCP)
+        var existingConfig = $@"{{
+  ""projects"": {{
+    ""{_testDir.Replace("\\", "\\\\")}"": {{
+      ""mcpServers"": {{
+        ""calor-lsp"": {{
+          ""type"": ""stdio"",
+          ""command"": ""calor"",
+          ""args"": [""lsp""]
+        }}
+      }}
+    }}
+  }}
+}}";
+        await File.WriteAllTextAsync(_claudeJsonPath, existingConfig);
 
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
-        var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
 
         // Should remove the incorrect calor-lsp entry
         Assert.DoesNotContain("calor-lsp", content);
@@ -240,91 +258,53 @@ public class ClaudeInitializerMcpTests : IDisposable
     }
 
     [Fact]
-    public async Task Initialize_WithOnlyMcpServers_HooksAddedToSettingsJson()
+    public async Task Initialize_PreservesOtherClaudeJsonProperties()
     {
-        // Pre-create .mcp.json with only mcpServers
-        await File.WriteAllTextAsync(
-            Path.Combine(_testDir, ".mcp.json"),
-            "{\"mcpServers\": {\"other-server\": {\"type\": \"stdio\", \"command\": \"other\"}}}");
+        // Pre-create .claude.json with other properties
+        var existingConfig = @"{
+  ""numStartups"": 42,
+  ""projects"": {}
+}";
+        await File.WriteAllTextAsync(_claudeJsonPath, existingConfig);
 
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
-        var mcpContent = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
-        // Should preserve existing MCP server
-        Assert.Contains("other-server", mcpContent);
-        // Should add calor
-        Assert.Contains("\"calor\"", mcpContent);
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
 
-        var settingsContent = await File.ReadAllTextAsync(Path.Combine(_testDir, ".claude", "settings.json"));
-        // Should add hooks
-        Assert.Contains("hooks", settingsContent);
-        Assert.Contains("PreToolUse", settingsContent);
-    }
-
-    [Fact]
-    public async Task Initialize_WithEmptyMcpJsonObject_AddsCalorMcpServer()
-    {
-        // Pre-create empty .mcp.json object
-        await File.WriteAllTextAsync(
-            Path.Combine(_testDir, ".mcp.json"),
-            "{}");
-
-        var initializer = new ClaudeInitializer();
-        await initializer.InitializeAsync(_testDir, force: false);
-
-        var content = await File.ReadAllTextAsync(Path.Combine(_testDir, ".mcp.json"));
-
+        // Should preserve existing properties
+        Assert.Contains("numStartups", content);
+        Assert.Contains("42", content);
         // Should add MCP servers
-        Assert.Contains("mcpServers", content);
         Assert.Contains("\"calor\"", content);
     }
 
     [Fact]
-    public async Task Initialize_McpJsonHasCorrectJsonStructure()
+    public async Task Initialize_CreatesNewProjectEntry_WhenNotExists()
     {
-        var initializer = new ClaudeInitializer();
-        await initializer.InitializeAsync(_testDir, force: false);
-
-        var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
-        var content = await File.ReadAllTextAsync(mcpJsonPath);
-
-        // Verify it's valid JSON by parsing it
-        var jsonDoc = System.Text.Json.JsonDocument.Parse(content);
-        var root = jsonDoc.RootElement;
-
-        // Verify mcpServers structure
-        Assert.True(root.TryGetProperty("mcpServers", out var mcpServers));
-        Assert.True(mcpServers.TryGetProperty("calor", out var calor));
-        Assert.True(calor.TryGetProperty("type", out var type));
-        Assert.Equal("stdio", type.GetString());
-        Assert.True(calor.TryGetProperty("command", out var command));
-        Assert.Equal("calor", command.GetString());
-        Assert.True(calor.TryGetProperty("args", out var args));
-        Assert.Equal(System.Text.Json.JsonValueKind.Array, args.ValueKind);
-        Assert.Equal("mcp", args[0].GetString());
-        Assert.Equal("--stdio", args[1].GetString());
+        // Pre-create .claude.json without this project
+        var existingConfig = @"{
+  ""projects"": {
+    ""/some/other/path"": {
+      ""mcpServers"": {}
     }
+  }
+}";
+        await File.WriteAllTextAsync(_claudeJsonPath, existingConfig);
 
-    [Fact]
-    public async Task Initialize_ConfiguresCalorMcpServer()
-    {
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateInitializer();
         await initializer.InitializeAsync(_testDir, force: false);
 
-        var mcpJsonPath = Path.Combine(_testDir, ".mcp.json");
-        var content = await File.ReadAllTextAsync(mcpJsonPath);
+        var content = await File.ReadAllTextAsync(_claudeJsonPath);
+        var json = JsonDocument.Parse(content);
 
-        // Should configure calor MCP server
-        Assert.Contains("\"calor\":", content);
+        // Should preserve other project
+        var projects = json.RootElement.GetProperty("projects");
+        Assert.True(projects.TryGetProperty("/some/other/path", out _));
 
-        // Verify the calor MCP server has correct args
-        var jsonDoc = System.Text.Json.JsonDocument.Parse(content);
-        var mcpServers = jsonDoc.RootElement.GetProperty("mcpServers");
-
-        // calor runs "calor mcp --stdio"
-        var calor = mcpServers.GetProperty("calor");
-        Assert.Equal("mcp", calor.GetProperty("args")[0].GetString());
-        Assert.Equal("--stdio", calor.GetProperty("args")[1].GetString());
+        // Should create new project entry
+        Assert.True(projects.TryGetProperty(_testDir, out var project));
+        Assert.True(project.TryGetProperty("mcpServers", out var mcpServers));
+        Assert.True(mcpServers.TryGetProperty("calor", out _));
     }
 }

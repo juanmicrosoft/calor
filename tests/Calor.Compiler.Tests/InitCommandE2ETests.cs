@@ -11,11 +11,18 @@ namespace Calor.Compiler.Tests;
 public class InitCommandE2ETests : IDisposable
 {
     private readonly string _testDirectory;
+    private readonly string _claudeJsonPath;
 
     public InitCommandE2ETests()
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), $"calor-init-e2e-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_testDirectory);
+        _claudeJsonPath = Path.Combine(_testDirectory, ".claude.json");
+    }
+
+    private ClaudeInitializer CreateClaudeInitializer()
+    {
+        return new ClaudeInitializer { ClaudeJsonPathOverride = _claudeJsonPath };
     }
 
     public void Dispose()
@@ -24,6 +31,7 @@ public class InitCommandE2ETests : IDisposable
         {
             Directory.Delete(_testDirectory, recursive: true);
         }
+        // The _claudeJsonPath is inside _testDirectory, so it's already cleaned up
     }
 
     private async Task CreateTestCsproj(string name = "TestApp")
@@ -53,7 +61,7 @@ public class InitCommandE2ETests : IDisposable
         // Act
         var detector = new ProjectDetector();
         var csprojInitializer = new CsprojInitializer(detector);
-        var claudeInitializer = new ClaudeInitializer();
+        var claudeInitializer = CreateClaudeInitializer();
 
         await claudeInitializer.InitializeAsync(_testDirectory, force: false);
         await csprojInitializer.InitializeAsync(csprojPath);
@@ -104,22 +112,23 @@ public class InitCommandE2ETests : IDisposable
         Assert.Contains("calor hook validate-ids", settingsContent);
         Assert.Contains("calor hook post-write-lint", settingsContent);
 
-        // settings.json should NOT contain mcpServers (they go in .mcp.json)
+        // settings.json should NOT contain mcpServers (they go in ~/.claude.json)
         Assert.DoesNotContain("mcpServers", settingsContent);
 
-        // Assert - .mcp.json exists with MCP servers
-        var mcpJsonPath = Path.Combine(_testDirectory, ".mcp.json");
-        Assert.True(File.Exists(mcpJsonPath));
-        var mcpJsonContent = await File.ReadAllTextAsync(mcpJsonPath);
+        // Assert - ~/.claude.json exists with MCP servers (per-project section)
+        Assert.True(File.Exists(_claudeJsonPath));
+        var claudeJsonContent = await File.ReadAllTextAsync(_claudeJsonPath);
 
         // Verify MCP server (only calor MCP, not calor-lsp which is LSP not MCP)
-        Assert.Contains("mcpServers", mcpJsonContent);
-        Assert.Contains("\"calor\":", mcpJsonContent); // The MCP server entry
-        Assert.DoesNotContain("calor-lsp", mcpJsonContent); // LSP is not MCP
+        Assert.Contains("mcpServers", claudeJsonContent);
+        Assert.Contains("\"calor\":", claudeJsonContent); // The MCP server entry
+        Assert.DoesNotContain("calor-lsp", claudeJsonContent); // LSP is not MCP
 
-        // Parse JSON to verify structure
-        var mcpJson = JsonDocument.Parse(mcpJsonContent);
-        var mcpServers = mcpJson.RootElement.GetProperty("mcpServers");
+        // Parse JSON to verify structure - MCP servers are in projects[projectPath].mcpServers
+        var claudeJson = JsonDocument.Parse(claudeJsonContent);
+        var projects = claudeJson.RootElement.GetProperty("projects");
+        var project = projects.GetProperty(_testDirectory);
+        var mcpServers = project.GetProperty("mcpServers");
 
         Assert.True(mcpServers.TryGetProperty("calor", out var mcpServer));
         Assert.Equal("stdio", mcpServer.GetProperty("type").GetString());

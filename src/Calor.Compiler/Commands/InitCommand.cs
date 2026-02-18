@@ -294,8 +294,7 @@ public static class InitCommand
         {
             Console.WriteLine();
             Console.WriteLine("Agent configuration:");
-            Console.WriteLine("  - MCP server 'calor-lsp' configured for language features");
-            Console.WriteLine("  - MCP server 'calor' configured for AI agent tools (compile, verify, analyze, convert, assess)");
+            Console.WriteLine("  - MCP server 'calor' configured in ~/.claude.json (compile, verify, analyze, convert, assess, typecheck)");
         }
 
         // Show skipped/already initialized info

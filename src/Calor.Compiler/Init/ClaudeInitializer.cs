@@ -21,6 +21,11 @@ public class ClaudeInitializer : IAiInitializer
 
     public string AgentName => "Claude Code";
 
+    /// <summary>
+    /// For testing: allows injecting a custom path for ~/.claude.json
+    /// </summary>
+    internal string? ClaudeJsonPathOverride { get; set; }
+
     public async Task<InitResult> InitializeAsync(string targetDirectory, bool force)
     {
         var createdFiles = new List<string>();
@@ -115,16 +120,13 @@ public class ClaudeInitializer : IAiInitializer
                 updatedFiles.Add(settingsPath);
             }
 
-            // Configure MCP servers in .mcp.json (Claude Code reads MCP configs from here, not settings.json)
-            var mcpJsonPath = Path.Combine(targetDirectory, ".mcp.json");
-            var mcpResult = await ConfigureMcpServersAsync(mcpJsonPath, force);
-            if (mcpResult == McpConfigResult.Created)
+            // Configure MCP servers in ~/.claude.json (per-project section)
+            var claudeJsonPath = ClaudeJsonPathOverride ??
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude.json");
+            var mcpResult = await ConfigureMcpServersInClaudeJsonAsync(claudeJsonPath, targetDirectory, force);
+            if (mcpResult == McpConfigResult.Updated)
             {
-                createdFiles.Add(mcpJsonPath);
-            }
-            else if (mcpResult == McpConfigResult.Updated)
-            {
-                updatedFiles.Add(mcpJsonPath);
+                updatedFiles.Add(claudeJsonPath);
             }
 
             var allModifiedFiles = createdFiles.Concat(updatedFiles).ToList();
@@ -380,14 +382,13 @@ public class ClaudeInitializer : IAiInitializer
 
     private enum McpConfigResult
     {
-        Created,
         Updated,
         Unchanged
     }
 
-    private static async Task<McpConfigResult> ConfigureMcpServersAsync(string mcpJsonPath, bool force)
+    private static async Task<McpConfigResult> ConfigureMcpServersInClaudeJsonAsync(string claudeJsonPath, string projectPath, bool force)
     {
-        // MCP server configuration - only the MCP server, not LSP (LSP is a different protocol)
+        // MCP server configuration
         var calorMcpConfig = new McpServerConfig
         {
             Type = "stdio",
@@ -395,61 +396,59 @@ public class ClaudeInitializer : IAiInitializer
             Args = new[] { "mcp", "--stdio" }
         };
 
-        if (!File.Exists(mcpJsonPath))
+        // Normalize the project path to use as key
+        var normalizedProjectPath = Path.GetFullPath(projectPath);
+
+        // Read existing ~/.claude.json or create new structure
+        ClaudeJsonConfig? claudeConfig;
+        string existingJson = "";
+
+        if (File.Exists(claudeJsonPath))
         {
-            // Create new .mcp.json file
-            var mcpConfig = new McpJsonConfig
+            existingJson = await File.ReadAllTextAsync(claudeJsonPath);
+            try
             {
-                McpServers = new Dictionary<string, McpServerConfig>
-                {
-                    ["calor"] = calorMcpConfig
-                }
-            };
-
-            await File.WriteAllTextAsync(mcpJsonPath, JsonSerializer.Serialize(mcpConfig, JsonOptions));
-            return McpConfigResult.Created;
-        }
-
-        // Read existing .mcp.json
-        var existingJson = await File.ReadAllTextAsync(mcpJsonPath);
-        McpJsonConfig? existingConfig;
-
-        try
-        {
-            existingConfig = JsonSerializer.Deserialize<McpJsonConfig>(existingJson, JsonOptions);
-        }
-        catch (JsonException)
-        {
-            if (force)
-            {
-                var mcpConfig = new McpJsonConfig
-                {
-                    McpServers = new Dictionary<string, McpServerConfig>
-                    {
-                        ["calor"] = calorMcpConfig
-                    }
-                };
-                await File.WriteAllTextAsync(mcpJsonPath, JsonSerializer.Serialize(mcpConfig, JsonOptions));
-                return McpConfigResult.Updated;
+                claudeConfig = JsonSerializer.Deserialize<ClaudeJsonConfig>(existingJson, JsonOptions);
             }
-            return McpConfigResult.Unchanged;
+            catch (JsonException)
+            {
+                if (!force)
+                {
+                    return McpConfigResult.Unchanged;
+                }
+                claudeConfig = new ClaudeJsonConfig();
+            }
+        }
+        else
+        {
+            claudeConfig = new ClaudeJsonConfig();
         }
 
-        existingConfig ??= new McpJsonConfig();
-        existingConfig.McpServers ??= new Dictionary<string, McpServerConfig>();
+        claudeConfig ??= new ClaudeJsonConfig();
+        claudeConfig.Projects ??= new Dictionary<string, ClaudeProjectConfig>();
+
+        // Get or create the project entry
+        if (!claudeConfig.Projects.TryGetValue(normalizedProjectPath, out var projectConfig))
+        {
+            projectConfig = new ClaudeProjectConfig();
+            claudeConfig.Projects[normalizedProjectPath] = projectConfig;
+        }
+
+        projectConfig.McpServers ??= new Dictionary<string, McpServerConfig>();
 
         var updated = false;
 
-        // Remove the incorrect calor-lsp entry if it exists (LSP is not MCP)
-        if (existingConfig.McpServers.ContainsKey("calor-lsp"))
+        // Remove any incorrect calor-lsp entry (LSP is not MCP)
+        if (projectConfig.McpServers.ContainsKey("calor-lsp"))
         {
-            existingConfig.McpServers.Remove("calor-lsp");
+            projectConfig.McpServers.Remove("calor-lsp");
             updated = true;
         }
 
-        if (!existingConfig.McpServers.ContainsKey("calor"))
+        // Add calor MCP server if not present
+        if (!projectConfig.McpServers.ContainsKey("calor"))
         {
-            existingConfig.McpServers["calor"] = calorMcpConfig;
+            projectConfig.McpServers["calor"] = calorMcpConfig;
             updated = true;
         }
 
@@ -458,14 +457,15 @@ public class ClaudeInitializer : IAiInitializer
             return McpConfigResult.Unchanged;
         }
 
-        var newJson = JsonSerializer.Serialize(existingConfig, JsonOptions);
+        // Serialize with proper formatting
+        var newJson = JsonSerializer.Serialize(claudeConfig, JsonOptions);
 
         if (newJson.TrimEnd() == existingJson.TrimEnd())
         {
             return McpConfigResult.Unchanged;
         }
 
-        await File.WriteAllTextAsync(mcpJsonPath, newJson);
+        await File.WriteAllTextAsync(claudeJsonPath, newJson);
         return McpConfigResult.Updated;
     }
 }
@@ -505,12 +505,26 @@ internal class ClaudeHook
     public string? Command { get; set; }
 }
 
-// JSON structure for .mcp.json (MCP server configuration)
-// Claude Code reads MCP servers from .mcp.json, not settings.json
-internal class McpJsonConfig
+// JSON structure for ~/.claude.json (user-level Claude Code configuration)
+// MCP servers are configured per-project in the "projects" section
+internal class ClaudeJsonConfig
+{
+    [JsonPropertyName("projects")]
+    public Dictionary<string, ClaudeProjectConfig>? Projects { get; set; }
+
+    // Allow other properties to be preserved (extensionData captures unknown properties)
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+}
+
+internal class ClaudeProjectConfig
 {
     [JsonPropertyName("mcpServers")]
     public Dictionary<string, McpServerConfig>? McpServers { get; set; }
+
+    // Allow other properties to be preserved
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 internal class McpServerConfig
