@@ -91,9 +91,20 @@ public sealed class FloatLiteralNode : ExpressionNode
 {
     public double Value { get; }
 
+    /// <summary>
+    /// When true, this literal represents a C# decimal (suffix m) rather than a double.
+    /// </summary>
+    public bool IsDecimal { get; }
+
     public FloatLiteralNode(TextSpan span, double value) : base(span)
     {
         Value = value;
+    }
+
+    public FloatLiteralNode(TextSpan span, double value, bool isDecimal) : base(span)
+    {
+        Value = value;
+        IsDecimal = isDecimal;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

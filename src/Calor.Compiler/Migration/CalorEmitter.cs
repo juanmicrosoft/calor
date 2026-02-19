@@ -1153,7 +1153,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FloatLiteralNode node)
     {
-        return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return node.IsDecimal
+            ? $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+            : node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public string Visit(StringLiteralNode node)
@@ -1228,12 +1230,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
-        // Handle object initializers
+        // Handle object initializers using §INIT tag syntax
         var initStr = "";
         if (node.Initializers.Count > 0)
         {
-            var inits = node.Initializers.Select(i => $"{i.PropertyName}: {i.Value.Accept(this)}");
-            initStr = $" {{ {string.Join(", ", inits)} }}";
+            var inits = node.Initializers.Select(
+                i => $"§INIT{{{i.PropertyName}}} {i.Value.Accept(this)}");
+            initStr = " " + string.Join(" ", inits);
         }
 
         return $"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}{initStr} §/NEW";
@@ -1335,8 +1338,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.Initializer.Count > 0)
         {
-            var elements = string.Join(", ", node.Initializer.Select(e => e.Accept(this)));
-            return $"{{{elements}}}";
+            var elements = node.Initializer.Select(e => $"§A {e.Accept(this)}");
+            var id = string.IsNullOrEmpty(node.Name) ? "_arr" : node.Name;
+            return $"§ARR{{{elementType}:{id}}} {string.Join(" ", elements)} §/ARR{{{id}}}";
         }
         else if (node.Size != null)
         {

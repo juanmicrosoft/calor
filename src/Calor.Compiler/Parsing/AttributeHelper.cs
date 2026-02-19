@@ -158,7 +158,7 @@ public static class AttributeHelper
             "i8" or "i16" or "i32" or "i64" => true,
             "u8" or "u16" or "u32" or "u64" => true,
             "f32" or "f64" => true,
-            "int" or "float" or "str" or "string" or "bool" or "void" or "char" => true,
+            "int" or "float" or "str" or "string" or "bool" or "void" or "char" or "var" => true,
             _ => value.StartsWith('?') || value.Contains('!') || value.Contains('<')
                  || IsLikelyPascalCaseType(value)
         };

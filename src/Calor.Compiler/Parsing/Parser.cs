@@ -938,6 +938,7 @@ public sealed class Parser
             or TokenKind.StrLiteral
             or TokenKind.BoolLiteral
             or TokenKind.FloatLiteral
+            or TokenKind.DecimalLiteral
             or TokenKind.Identifier
             // Lisp-style expression
             or TokenKind.OpenParen
@@ -989,6 +990,7 @@ public sealed class Parser
             TokenKind.StrLiteral => ParseStringLiteral(),
             TokenKind.BoolLiteral => ParseBoolLiteral(),
             TokenKind.FloatLiteral => ParseFloatLiteral(),
+            TokenKind.DecimalLiteral => ParseDecimalLiteral(),
             TokenKind.Identifier => ParseReference(),
             // Lisp-style expression: (op args...) or inline lambda: () → body
             TokenKind.OpenParen => ParseParenExpressionOrInlineLambda(),
@@ -1588,7 +1590,7 @@ public sealed class Parser
                 // Provide helpful message based on what was found
                 var hint = token.Kind switch
                 {
-                    TokenKind.IntLiteral or TokenKind.FloatLiteral =>
+                    TokenKind.IntLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral =>
                         "Operators come before arguments: (+ 1 2) not (1 + 2)",
                     TokenKind.StrLiteral =>
                         "Operators come before arguments: (contains str \"x\") not (str contains \"x\")",
@@ -1728,6 +1730,9 @@ public sealed class Parser
                 break;
             case TokenKind.FloatLiteral:
                 expr = ParseFloatLiteral();
+                break;
+            case TokenKind.DecimalLiteral:
+                expr = ParseDecimalLiteral();
                 break;
             case TokenKind.Identifier:
                 expr = ParseBareReference(); // Bare variable reference
@@ -1939,6 +1944,13 @@ public sealed class Parser
         var token = Expect(TokenKind.FloatLiteral);
         var value = token.Value is double d ? d : 0.0;
         return new FloatLiteralNode(token.Span, value);
+    }
+
+    private FloatLiteralNode ParseDecimalLiteral()
+    {
+        var token = Expect(TokenKind.DecimalLiteral);
+        var value = token.Value is double d ? d : 0.0;
+        return new FloatLiteralNode(token.Span, value, isDecimal: true);
     }
 
     private ExpressionNode ParseReference()
@@ -2220,7 +2232,8 @@ public sealed class Parser
         }
 
         if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) ||
-            Check(TokenKind.BoolLiteral) || Check(TokenKind.FloatLiteral))
+            Check(TokenKind.BoolLiteral) || Check(TokenKind.FloatLiteral) ||
+            Check(TokenKind.DecimalLiteral))
         {
             var literal = ParseExpression();
             return new LiteralPatternNode(literal.Span, literal);
@@ -2977,7 +2990,7 @@ public sealed class Parser
                     sb.Append(' ');
                 sb.Append(Advance().Value?.ToString() ?? "");
             }
-            else if (Check(TokenKind.FloatLiteral))
+            else if (Check(TokenKind.FloatLiteral) || Check(TokenKind.DecimalLiteral))
             {
                 // Add space before floats if there's content before them
                 if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
@@ -3211,7 +3224,7 @@ public sealed class Parser
         {
             return Advance().Value ?? 0;
         }
-        if (Check(TokenKind.FloatLiteral))
+        if (Check(TokenKind.FloatLiteral) || Check(TokenKind.DecimalLiteral))
         {
             return Advance().Value ?? 0.0;
         }
@@ -4873,6 +4886,17 @@ public sealed class Parser
             }
         }
 
+        // Parse object initializers: §INIT{PropName} value
+        var initializers = new List<ObjectInitializerAssignment>();
+        while (Check(TokenKind.Init))
+        {
+            Advance(); // consume §INIT
+            var initAttrs = ParseAttributes();
+            var propName = initAttrs["_pos0"] ?? "";
+            var value = ParseExpression();
+            initializers.Add(new ObjectInitializerAssignment(propName, value));
+        }
+
         // Check for optional end tag
         var endSpan = startToken.Span;
         if (Check(TokenKind.EndNew))
@@ -4881,7 +4905,7 @@ public sealed class Parser
         }
 
         var span = arguments.Count > 0 ? startToken.Span.Union(arguments[^1].Span) : startToken.Span;
-        return new NewExpressionNode(span, typeName, typeArgs, arguments);
+        return new NewExpressionNode(span, typeName, typeArgs, arguments, initializers);
     }
 
     /// <summary>

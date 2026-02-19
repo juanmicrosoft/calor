@@ -1874,6 +1874,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new FloatLiteralNode(GetTextSpan(literal), doubleVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is float floatVal =>
                 new FloatLiteralNode(GetTextSpan(literal), floatVal),
+            SyntaxKind.NumericLiteralExpression when literal.Token.Value is decimal decVal =>
+                new FloatLiteralNode(GetTextSpan(literal), (double)decVal, isDecimal: true),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is long longVal =>
                 new IntLiteralNode(GetTextSpan(literal), (int)longVal),
             SyntaxKind.StringLiteralExpression =>
@@ -2014,6 +2016,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 SyntaxKind.NumericLiteralExpression when literal.Token.Value is long => "i64",
                 SyntaxKind.NumericLiteralExpression when literal.Token.Value is float => "f32",
                 SyntaxKind.NumericLiteralExpression when literal.Token.Value is double => "f64",
+                SyntaxKind.NumericLiteralExpression when literal.Token.Value is decimal => "decimal",
                 SyntaxKind.TrueLiteralExpression or SyntaxKind.FalseLiteralExpression => "bool",
                 SyntaxKind.CharacterLiteralExpression => "char",
                 _ => null

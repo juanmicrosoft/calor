@@ -7,6 +7,8 @@
 
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace PatternDemo
 {

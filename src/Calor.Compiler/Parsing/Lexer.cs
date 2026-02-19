@@ -680,6 +680,11 @@ public sealed class Lexer
             {
                 return ScanTypedFloatLiteral();
             }
+            // DEC:digits or DEC:-digits or DEC:.digits (decimal literal)
+            if (upperText == "DEC" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
+            {
+                return ScanTypedDecimalLiteral();
+            }
 
             // Not a typed literal - return as identifier (colon is a separate token)
         }
@@ -805,6 +810,55 @@ public sealed class Lexer
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "FLOAT");
+        return MakeToken(TokenKind.Error);
+    }
+
+    private Token ScanTypedDecimalLiteral()
+    {
+        Advance(); // consume ':'
+        var valueStart = _position;
+
+        if (Current == '-')
+        {
+            Advance();
+        }
+
+        while (char.IsDigit(Current))
+        {
+            Advance();
+        }
+
+        if (Current == '.')
+        {
+            Advance();
+            while (char.IsDigit(Current))
+            {
+                Advance();
+            }
+        }
+
+        // Handle scientific notation
+        if (Current is 'e' or 'E')
+        {
+            Advance();
+            if (Current is '+' or '-')
+            {
+                Advance();
+            }
+            while (char.IsDigit(Current))
+            {
+                Advance();
+            }
+        }
+
+        var valueText = _source[valueStart.._position];
+        if (double.TryParse(valueText, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var value))
+        {
+            return MakeToken(TokenKind.DecimalLiteral, value);
+        }
+
+        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "DEC");
         return MakeToken(TokenKind.Error);
     }
 
