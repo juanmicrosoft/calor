@@ -334,6 +334,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case MethodDeclarationSyntax methodSyntax:
                     methods.Add(ConvertMethod(methodSyntax));
                     break;
+                case OperatorDeclarationSyntax opDecl:
+                    methods.Add(ConvertOperator(opDecl));
+                    break;
+                case ConversionOperatorDeclarationSyntax convDecl:
+                    methods.Add(ConvertConversionOperator(convDecl));
+                    break;
                 case EventFieldDeclarationSyntax eventSyntax:
                     events.AddRange(ConvertEventFields(eventSyntax));
                     break;
@@ -410,6 +416,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case MethodDeclarationSyntax methodSyntax:
                     methods.Add(ConvertMethod(methodSyntax));
                     break;
+                case OperatorDeclarationSyntax opDecl:
+                    methods.Add(ConvertOperator(opDecl));
+                    break;
+                case ConversionOperatorDeclarationSyntax convDecl:
+                    methods.Add(ConvertConversionOperator(convDecl));
+                    break;
             }
         }
 
@@ -433,12 +445,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var id = _context.GenerateId("s");
         var name = node.Identifier.Text;
+        var isReadOnly = node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword);
+        var isPartial = node.Modifiers.Any(SyntaxKind.PartialKeyword);
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
+
+        if (isReadOnly)
+            _context.RecordFeatureUsage("readonly-struct");
+        if (isPartial)
+            _context.RecordFeatureUsage("partial-class");
 
         var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
+        var events = new List<EventDefinitionNode>();
 
         foreach (var member in node.Members)
         {
@@ -456,6 +477,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case MethodDeclarationSyntax methodSyntax:
                     methods.Add(ConvertMethod(methodSyntax));
                     break;
+                case OperatorDeclarationSyntax opDecl:
+                    methods.Add(ConvertOperator(opDecl));
+                    break;
+                case ConversionOperatorDeclarationSyntax convDecl:
+                    methods.Add(ConvertConversionOperator(convDecl));
+                    break;
+                case EventFieldDeclarationSyntax eventSyntax:
+                    events.AddRange(ConvertEventFields(eventSyntax));
+                    break;
             }
         }
 
@@ -468,7 +498,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             id,
             name,
             isAbstract: false,
-            isSealed: true,
+            isSealed: false,
+            isPartial: isPartial,
+            isStatic: false,
             baseClass: null,
             interfaces,
             typeParameters,
@@ -476,7 +508,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             properties,
             constructors,
             methods,
-            new AttributeCollection());
+            events,
+            new AttributeCollection(),
+            csharpAttrs,
+            isStruct: true,
+            isReadOnly: isReadOnly);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -550,6 +586,106 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection(),
             csharpAttrs,
             isAsync);
+    }
+
+    private static readonly Dictionary<string, string> OperatorTokenToCilName = new()
+    {
+        ["+"] = "op_Addition",
+        ["-"] = "op_Subtraction",
+        ["*"] = "op_Multiply",
+        ["/"] = "op_Division",
+        ["%"] = "op_Modulus",
+        ["=="] = "op_Equality",
+        ["!="] = "op_Inequality",
+        ["<"] = "op_LessThan",
+        [">"] = "op_GreaterThan",
+        ["<="] = "op_LessThanOrEqual",
+        [">="] = "op_GreaterThanOrEqual",
+        ["!"] = "op_LogicalNot",
+        ["&"] = "op_BitwiseAnd",
+        ["|"] = "op_BitwiseOr",
+        ["^"] = "op_ExclusiveOr",
+    };
+
+    private MethodNode ConvertOperator(OperatorDeclarationSyntax node)
+    {
+        _context.RecordFeatureUsage("operator-overload");
+        var opToken = node.OperatorToken.Text;
+        var paramCount = node.ParameterList.Parameters.Count;
+
+        if (opToken == "==" || opToken == "!=")
+            _context.RecordFeatureUsage("equals-operator");
+
+        // Disambiguate unary vs binary for +/-
+        string cilName;
+        if (opToken == "-" && paramCount == 1)
+            cilName = "op_UnaryNegation";
+        else if (opToken == "+" && paramCount == 1)
+            cilName = "op_UnaryPlus";
+        else
+            cilName = OperatorTokenToCilName.TryGetValue(opToken, out var name)
+                ? name
+                : $"op_Unknown_{opToken}";
+
+        var id = _context.GenerateId("m");
+        var parameters = ConvertParameters(node.ParameterList);
+        var returnType = TypeMapper.CSharpToCalor(node.ReturnType.ToString());
+        var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
+        var body = ConvertMethodBody(node.Body, node.ExpressionBody);
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
+
+        _context.Stats.MethodsConverted++;
+        _context.IncrementConverted();
+
+        return new MethodNode(
+            GetTextSpan(node),
+            id,
+            cilName,
+            Visibility.Public,
+            MethodModifiers.Static,
+            Array.Empty<TypeParameterNode>(),
+            parameters,
+            output,
+            effects: null,
+            preconditions: Array.Empty<RequiresNode>(),
+            postconditions: Array.Empty<EnsuresNode>(),
+            body,
+            new AttributeCollection(),
+            csharpAttrs);
+    }
+
+    private MethodNode ConvertConversionOperator(ConversionOperatorDeclarationSyntax node)
+    {
+        var isImplicit = node.ImplicitOrExplicitKeyword.IsKind(SyntaxKind.ImplicitKeyword);
+        _context.RecordFeatureUsage(isImplicit ? "implicit-conversion" : "explicit-conversion");
+
+        var cilName = isImplicit ? "op_Implicit" : "op_Explicit";
+
+        var id = _context.GenerateId("m");
+        var parameters = ConvertParameters(node.ParameterList);
+        var returnType = TypeMapper.CSharpToCalor(node.Type.ToString());
+        var output = new OutputNode(GetTextSpan(node.Type), returnType);
+        var body = ConvertMethodBody(node.Body, node.ExpressionBody);
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
+
+        _context.Stats.MethodsConverted++;
+        _context.IncrementConverted();
+
+        return new MethodNode(
+            GetTextSpan(node),
+            id,
+            cilName,
+            Visibility.Public,
+            MethodModifiers.Static,
+            Array.Empty<TypeParameterNode>(),
+            parameters,
+            output,
+            effects: null,
+            preconditions: Array.Empty<RequiresNode>(),
+            postconditions: Array.Empty<EnsuresNode>(),
+            body,
+            new AttributeCollection(),
+            csharpAttrs);
     }
 
     private ConstructorNode ConvertConstructor(ConstructorDeclarationSyntax node)
