@@ -206,8 +206,7 @@ public class InheritanceTests
     [Fact]
     public void CodeGen_StaticMethod_GeneratesValidCSharp()
     {
-        // Note: static class modifier is not fully implemented in the parser
-        // This test verifies static methods work correctly
+        // This test verifies static methods in a non-static class (class uses :pub, not :static)
         var source = @"
 §M{m1:Test}
 §CL{c1:MathUtils:pub}
