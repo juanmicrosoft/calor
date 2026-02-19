@@ -67,6 +67,53 @@ public class CodegenBug3_5_6_Tests
     }
 
     [Fact]
+    public void Bug6_PartialClass_EmitsPartialKeyword()
+    {
+        var source = @"
+§M{m1:Test}
+§CL{c1:DataService:partial}
+§/CL{c1}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+        Assert.Contains("public partial class DataService", result);
+    }
+
+    [Fact]
+    public void Bug6_CSharpRoundtrip_PartialClass()
+    {
+        var csharp = """
+            public partial class Foo
+            {
+            }
+            """;
+        var convResult = _converter.Convert(csharp);
+        Assert.True(convResult.Success, GetErrorMessage(convResult));
+        var cls = Assert.Single(convResult.Ast!.Classes);
+        Assert.True(cls.IsPartial, "Converter should set IsPartial");
+
+        // Roundtrip: Calor → C#
+        var compilationResult = Program.Compile(convResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            "Roundtrip parse failed:\n" +
+            string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("partial class Foo", compilationResult.GeneratedCode);
+    }
+
+    [Fact]
+    public void Bug6_StaticPartialClass_EmitsCombinedModifiers()
+    {
+        var source = @"
+§M{m1:Test}
+§CL{c1:Helper:static,partial}
+§/CL{c1}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+        Assert.Contains("public static partial class Helper", result);
+    }
+
+    [Fact]
     public void Bug6_Parser_PartialModifier_SetsIsPartial()
     {
         var source = @"

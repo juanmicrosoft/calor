@@ -226,10 +226,9 @@ public class InheritanceTests
         Assert.Contains("public static int Square(int x)", result);
     }
 
-    [Fact(Skip = "Partial class modifier not fully implemented in parser")]
+    [Fact]
     public void CodeGen_PartialClass_GeneratesValidCSharp()
     {
-        // Note: partial class modifier is not fully implemented in the parser
         var source = @"
 §M{m1:Test}
 §CL{c1:DataService:partial}
