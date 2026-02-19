@@ -494,5 +494,125 @@ public class NewFeatureRoundTripTests
         Assert.Single(reparsed.Functions);
     }
 
+    [Fact]
+    public void RoundTrip_TypedBindStatements_FormatsAndReparses()
+    {
+        // Typed immutable: {type:name}, typed mutable: {~name:type}
+        var source = @"
+§M{m001:Test}
+§F{f001:TypedBindTest:pub}
+§I{i32:x}
+§O{i32}
+§B{i32:count} 0
+§B{~total:i32} 0
+§R count
+§/F{f001}
+§/M{m001}
+";
+        var (original, formatted, reparsed) = FormatAndReparse(source);
+
+        // Immutable typed bind should format as {type:name}
+        Assert.Contains("§B{i32:count}", formatted);
+        // Mutable typed bind should format as {~name:type}
+        Assert.Contains("§B{~total:i32}", formatted);
+
+        // Round-trip preserves semantics
+        var func = Assert.Single(reparsed.Functions);
+        Assert.True(func.Body.Count >= 2);
+
+        var immutableBind = (BindStatementNode)func.Body[0];
+        Assert.Equal("count", immutableBind.Name);
+        Assert.False(immutableBind.IsMutable);
+        Assert.NotNull(immutableBind.TypeName);
+
+        var mutableBind = (BindStatementNode)func.Body[1];
+        Assert.Equal("total", mutableBind.Name);
+        Assert.True(mutableBind.IsMutable);
+        Assert.NotNull(mutableBind.TypeName);
+    }
+
+    [Fact]
+    public void RoundTrip_LegacyConstBind_ParsesAsImmutable()
+    {
+        // Legacy CalorEmitter format: {name:const} should parse as immutable, no type
+        var source = @"
+§M{m001:Test}
+§F{f001:LegacyTest:pub}
+§O{i32}
+§B{count:const} 42
+§R count
+§/F{f001}
+§/M{m001}
+";
+        var parsed = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Legacy :const format should parse without errors.\nErrors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+
+        var func = Assert.Single(parsed.Functions);
+        var bind = (BindStatementNode)func.Body[0];
+        Assert.Equal("count", bind.Name);
+        Assert.False(bind.IsMutable);
+        Assert.Null(bind.TypeName);
+    }
+
+    [Fact]
+    public void RoundTrip_LegacyTypedConstBind_ParsesAsImmutableWithType()
+    {
+        // Legacy format: {type:name:const} should parse as immutable with type
+        var source = @"
+§M{m001:Test}
+§F{f001:LegacyTypedTest:pub}
+§O{i32}
+§B{i32:count:const} 42
+§R count
+§/F{f001}
+§/M{m001}
+";
+        var parsed = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Legacy :const format with type should parse without errors.\nErrors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+
+        var func = Assert.Single(parsed.Functions);
+        var bind = (BindStatementNode)func.Body[0];
+        Assert.Equal("count", bind.Name);
+        Assert.False(bind.IsMutable);
+        Assert.NotNull(bind.TypeName);
+    }
+
+    #endregion
+
+    #region Arrays
+
+    [Fact]
+    public void RoundTrip_ArrayInitialized_FormatsAndReparses()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §ARR{nums:i32} 1 2 3 §/ARR{nums}
+§/F{f001}
+§/M{m1}
+";
+        var (_, formatted, _) = FormatAndReparse(source);
+        Assert.Contains("§ARR", formatted);
+        Assert.Contains("§/ARR", formatted);
+    }
+
+    [Fact]
+    public void RoundTrip_ArraySized_FormatsAndReparses()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §B{[i32]:arr1} §ARR{i32:arr1:10}
+§/F{f001}
+§/M{m1}
+";
+        var (_, formatted, _) = FormatAndReparse(source);
+        Assert.Contains("§ARR", formatted);
+    }
+
     #endregion
 }

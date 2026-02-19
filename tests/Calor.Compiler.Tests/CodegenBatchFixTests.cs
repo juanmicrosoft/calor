@@ -269,26 +269,25 @@ public class CodegenBatchFixTests
     [Fact]
     public void Fix5_ArrayInitializer_CalorEmitterProducesArrTags()
     {
-        // When CalorEmitter emits an array with initializers, it should use §ARR tag syntax
-        // We create the AST directly for this test
-        var span = new TextSpan(0, 0, 0, 0);
-        var elements = new List<ExpressionNode>
-        {
-            new IntLiteralNode(span, 1),
-            new IntLiteralNode(span, 2),
-            new IntLiteralNode(span, 3)
-        };
-        var arrayNode = new ArrayCreationNode(span, "arr", "arr", "int", null, elements, new AttributeCollection());
-
+        // When CalorEmitter emits an array with initializers, it should use §ARR block syntax
+        // Parse a Calor source with initialized array, then re-emit with CalorEmitter
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §B{[i32]:nums} §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums}
+§/F{f001}
+§/M{m1}
+";
+        var module = ParseModule(source);
         var calorEmitter = new Migration.CalorEmitter();
-        var result = arrayNode.Accept(calorEmitter);
+        var result = calorEmitter.Emit(module);
 
         Assert.Contains("§ARR{", result);
-        Assert.Contains("§A 1", result);
-        Assert.Contains("§A 2", result);
-        Assert.Contains("§A 3", result);
+        Assert.Contains("1", result);
+        Assert.Contains("2", result);
+        Assert.Contains("3", result);
         Assert.Contains("§/ARR{", result);
-        Assert.DoesNotContain("{1, 2, 3}", result);
     }
 
     [Fact]

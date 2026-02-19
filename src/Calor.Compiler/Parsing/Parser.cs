@@ -801,6 +801,10 @@ public sealed class Parser
         {
             return ParseSetCreationStatement();
         }
+        else if (Check(TokenKind.Array))
+        {
+            return ParseArrayCreationStatement();
+        }
         else if (Check(TokenKind.Push) || Check(TokenKind.Add))
         {
             return ParseCollectionPush();
@@ -3499,18 +3503,23 @@ public sealed class Parser
         }
         else
         {
-            // No size in attributes - check for a following expression or initializer elements
-            if (IsExpressionStart())
+            // No size in attributes - parse as initialized array (like §LIST)
+            // Support both bare expressions and §A-prefixed elements
+            while (!IsAtEnd && !Check(TokenKind.EndArray))
             {
-                // Size specified as expression after tag: §ARR{a001:i32} (len data)
-                size = ParseExpression();
-            }
-            else
-            {
-                // Check for initializer elements (§A expressions until §/ARR)
-                while (!IsAtEnd && !Check(TokenKind.EndArray) && Check(TokenKind.Arg))
+                if (Check(TokenKind.Arg))
                 {
+                    // §A-prefixed element (backward compat with emitter output)
                     initializer.Add(ParseArgument());
+                }
+                else if (IsExpressionStart())
+                {
+                    // Bare expression (documented syntax: §ARR{id:type} 1 2 3 §/ARR{id})
+                    initializer.Add(ParseExpression());
+                }
+                else
+                {
+                    break;
                 }
             }
         }
@@ -3707,6 +3716,22 @@ public sealed class Parser
             $"List<{listNode.ElementType}>",
             isMutable: false,
             listNode,
+            new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Parses array creation as a statement (emits as var declaration).
+    /// §ARR{nums:i32} 1 2 3 §/ARR{nums}
+    /// </summary>
+    private BindStatementNode ParseArrayCreationStatement()
+    {
+        var arrNode = ParseArrayCreation();
+        return new BindStatementNode(
+            arrNode.Span,
+            arrNode.Name,
+            $"{arrNode.ElementType}[]",
+            isMutable: false,
+            arrNode,
             new AttributeCollection());
     }
 

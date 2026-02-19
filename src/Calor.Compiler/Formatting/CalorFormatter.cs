@@ -382,10 +382,31 @@ public sealed class CalorFormatter
         switch (stmt)
         {
             case BindStatementNode bind:
-                var bindPrefix = bind.IsMutable ? "~" : "";
-                var bindType = bind.TypeName != null ? $":{bind.TypeName}" : "";
+                // Handle arrays specially — emit as standalone §ARR syntax
+                if (bind.Initializer is ArrayCreationNode arrBind)
+                {
+                    if (arrBind.Initializer.Count > 0)
+                    {
+                        var elements = string.Join(" ", arrBind.Initializer.Select(FormatExpression));
+                        AppendLine($"§ARR{{{bind.Name}:{CompactTypeName(arrBind.ElementType)}}} {elements} §/ARR{{{bind.Name}}}");
+                    }
+                    else
+                    {
+                        AppendLine(FormatArrayCreation(arrBind));
+                    }
+                    break;
+                }
                 var bindInit = bind.Initializer != null ? $" {FormatExpression(bind.Initializer)}" : "";
-                AppendLine($"§B{{{bindPrefix}{bind.Name}{bindType}}}{bindInit}");
+                if (bind.IsMutable)
+                {
+                    var bindType = bind.TypeName != null ? $":{CompactTypeName(bind.TypeName)}" : "";
+                    AppendLine($"§B{{~{bind.Name}{bindType}}}{bindInit}");
+                }
+                else
+                {
+                    var bindType = bind.TypeName != null ? $"{CompactTypeName(bind.TypeName)}:" : "";
+                    AppendLine($"§B{{{bindType}{bind.Name}}}{bindInit}");
+                }
                 break;
 
             case CallStatementNode call:
@@ -564,8 +585,13 @@ public sealed class CalorFormatter
 
     private string FormatArrayCreation(ArrayCreationNode arr)
     {
-        var size = arr.Size != null ? FormatExpression(arr.Size) : "";
-        return $"§ARR{{{arr.ElementType}}} {size}".TrimEnd();
+        if (arr.Initializer.Count > 0)
+        {
+            var elements = string.Join(" ", arr.Initializer.Select(FormatExpression));
+            return $"§ARR{{{arr.Name}:{CompactTypeName(arr.ElementType)}}} {elements} §/ARR{{{arr.Name}}}";
+        }
+        var size = arr.Size != null ? $":{FormatExpression(arr.Size)}" : "";
+        return $"§ARR{{{arr.Name}:{CompactTypeName(arr.ElementType)}{size}}}";
     }
 
     private static string FormatCatchAttributes(CatchClauseNode catchClause)
