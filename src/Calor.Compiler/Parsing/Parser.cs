@@ -938,6 +938,7 @@ public sealed class Parser
             or TokenKind.StrLiteral
             or TokenKind.BoolLiteral
             or TokenKind.FloatLiteral
+            or TokenKind.DecimalLiteral
             or TokenKind.Identifier
             // Lisp-style expression
             or TokenKind.OpenParen
@@ -964,6 +965,7 @@ public sealed class Parser
             or TokenKind.Generic
             // Phase 8: Classes
             or TokenKind.New
+            or TokenKind.AnonymousObject
             or TokenKind.This
             or TokenKind.Base
             or TokenKind.Call  // Call expressions (§C[...])
@@ -989,6 +991,7 @@ public sealed class Parser
             TokenKind.StrLiteral => ParseStringLiteral(),
             TokenKind.BoolLiteral => ParseBoolLiteral(),
             TokenKind.FloatLiteral => ParseFloatLiteral(),
+            TokenKind.DecimalLiteral => ParseDecimalLiteral(),
             TokenKind.Identifier => ParseReference(),
             // Lisp-style expression: (op args...) or inline lambda: () → body
             TokenKind.OpenParen => ParseParenExpressionOrInlineLambda(),
@@ -1017,6 +1020,7 @@ public sealed class Parser
             TokenKind.Generic => ParseGenericType(),
             // Phase 8: Classes
             TokenKind.New => ParseNewExpression(),
+            TokenKind.AnonymousObject => ParseAnonymousObjectCreation(),
             TokenKind.This => ParseThisExpression(),
             TokenKind.Base => ParseBaseExpression(),
             TokenKind.Call => ParseCallExpression(),
@@ -1939,6 +1943,13 @@ public sealed class Parser
         var token = Expect(TokenKind.FloatLiteral);
         var value = token.Value is double d ? d : 0.0;
         return new FloatLiteralNode(token.Span, value);
+    }
+
+    private DecimalLiteralNode ParseDecimalLiteral()
+    {
+        var token = Expect(TokenKind.DecimalLiteral);
+        var value = token.Value is decimal d ? d : 0m;
+        return new DecimalLiteralNode(token.Span, value);
     }
 
     private ExpressionNode ParseReference()
@@ -3322,7 +3333,8 @@ public sealed class Parser
 
         if (string.IsNullOrEmpty(id))
         {
-            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ARR", "id");
+            // Auto-generate id for unnamed arrays (e.g., §ARR{:i32} or §ARR{i32})
+            id = $"_arr{startToken.Span.Start}";
         }
 
         ExpressionNode? size = null;
@@ -3350,19 +3362,26 @@ public sealed class Parser
         }
         else
         {
-            // No size in attributes - check for a following expression or initializer elements
-            if (IsExpressionStart())
+            // Check for initializer elements (§A expressions until §/ARR)
+            while (!IsAtEnd && !Check(TokenKind.EndArray) && Check(TokenKind.Arg))
             {
-                // Size specified as expression after tag: §ARR{a001:i32} (len data)
-                size = ParseExpression();
+                initializer.Add(ParseArgument());
             }
-            else
+
+            // Also support inline elements without §A prefix (e.g., §ARR{:i32} 1 2 3 §/ARR)
+            if (initializer.Count == 0)
             {
-                // Check for initializer elements (§A expressions until §/ARR)
-                while (!IsAtEnd && !Check(TokenKind.EndArray) && Check(TokenKind.Arg))
+                while (!IsAtEnd && !Check(TokenKind.EndArray) && IsExpressionStart())
                 {
-                    initializer.Add(ParseArgument());
+                    initializer.Add(ParseExpression());
                 }
+            }
+
+            // If only one element and no end tag coming, it might be a size expression
+            if (initializer.Count == 1 && !Check(TokenKind.EndArray))
+            {
+                size = initializer[0];
+                initializer.Clear();
             }
         }
 
@@ -4873,6 +4892,27 @@ public sealed class Parser
             }
         }
 
+        // Parse object initializer assignments (Identifier = Expression lines before §/NEW)
+        var initializers = new List<ObjectInitializerAssignment>();
+        while (!IsAtEnd && !Check(TokenKind.EndNew) && Check(TokenKind.Identifier))
+        {
+            // Peek ahead to check for "Identifier =" pattern
+            var saved = _position;
+            var identToken = Advance();
+            if (Check(TokenKind.Equals))
+            {
+                Advance(); // consume '='
+                var value = ParseExpression();
+                initializers.Add(new ObjectInitializerAssignment(identToken.Text, value));
+            }
+            else
+            {
+                // Not an initializer — backtrack
+                _position = saved;
+                break;
+            }
+        }
+
         // Check for optional end tag
         var endSpan = startToken.Span;
         if (Check(TokenKind.EndNew))
@@ -4880,8 +4920,60 @@ public sealed class Parser
             endSpan = Advance().Span;
         }
 
-        var span = arguments.Count > 0 ? startToken.Span.Union(arguments[^1].Span) : startToken.Span;
-        return new NewExpressionNode(span, typeName, typeArgs, arguments);
+        var span = endSpan != startToken.Span ? startToken.Span.Union(endSpan)
+            : arguments.Count > 0 ? startToken.Span.Union(arguments[^1].Span)
+            : startToken.Span;
+        return new NewExpressionNode(span, typeName, typeArgs, arguments, initializers);
+    }
+
+    /// <summary>
+    /// Parses an anonymous object creation.
+    /// §ANON
+    ///   PropertyName = expression
+    ///   OtherProp = expression
+    /// §/ANON
+    /// Emits: new { PropertyName = expression, OtherProp = expression }
+    /// </summary>
+    private AnonymousObjectCreationNode ParseAnonymousObjectCreation()
+    {
+        var startToken = Expect(TokenKind.AnonymousObject);
+        var initializers = new List<ObjectInitializerAssignment>();
+
+        while (!IsAtEnd && !Check(TokenKind.EndAnonymousObject))
+        {
+            if (Check(TokenKind.Identifier))
+            {
+                var saved = _position;
+                var identToken = Advance();
+                if (Check(TokenKind.Equals))
+                {
+                    Advance(); // consume '='
+                    var value = ParseExpression();
+                    initializers.Add(new ObjectInitializerAssignment(identToken.Text, value));
+                }
+                else
+                {
+                    // Shorthand: just identifier (inferred property name, e.g., §ANON x y §/ANON → new { x, y })
+                    _position = saved;
+                    var ident = Advance();
+                    initializers.Add(new ObjectInitializerAssignment(ident.Text,
+                        new ReferenceNode(ident.Span, ident.Text)));
+                }
+            }
+            else
+            {
+                // Unexpected token in anonymous object
+                break;
+            }
+        }
+
+        var endSpan = startToken.Span;
+        if (Check(TokenKind.EndAnonymousObject))
+        {
+            endSpan = Advance().Span;
+        }
+
+        return new AnonymousObjectCreationNode(startToken.Span.Union(endSpan), initializers);
     }
 
     /// <summary>

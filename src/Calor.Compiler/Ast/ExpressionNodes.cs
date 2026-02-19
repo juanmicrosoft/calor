@@ -101,6 +101,23 @@ public sealed class FloatLiteralNode : ExpressionNode
 }
 
 /// <summary>
+/// Represents a decimal literal.
+/// DECIMAL:18.00M
+/// </summary>
+public sealed class DecimalLiteralNode : ExpressionNode
+{
+    public decimal Value { get; }
+
+    public DecimalLiteralNode(TextSpan span, decimal value) : base(span)
+    {
+        Value = value;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a reference to a variable or identifier.
 /// </summary>
 public sealed class ReferenceNode : ExpressionNode

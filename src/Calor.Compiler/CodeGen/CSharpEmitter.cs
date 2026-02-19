@@ -542,6 +542,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    public string Visit(DecimalLiteralNode node)
+    {
+        return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "m";
+    }
+
     public string Visit(ReferenceNode node)
     {
         // Handle 'is' pattern expressions like "other is UnitSystem otherUnitSystem"
@@ -2100,7 +2105,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
-        return $"new {typeName}({args})";
+        var result = $"new {typeName}({args})";
+
+        if (node.Initializers.Count > 0)
+        {
+            var inits = node.Initializers.Select(i =>
+                $"{SanitizeIdentifier(i.PropertyName)} = {i.Value.Accept(this)}");
+            result += $" {{ {string.Join(", ", inits)} }}";
+        }
+
+        return result;
+    }
+
+    public string Visit(AnonymousObjectCreationNode node)
+    {
+        var props = node.Initializers.Select(i =>
+            $"{SanitizeIdentifier(i.PropertyName)} = {i.Value.Accept(this)}");
+        return $"new {{ {string.Join(", ", props)} }}";
     }
 
     public string Visit(CallExpressionNode node)

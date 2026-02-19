@@ -177,16 +177,14 @@ public static class FeatureSupport
         ["linq-method"] = new FeatureInfo
         {
             Name = "linq-method",
-            Support = SupportLevel.Partial,
-            Description = "LINQ method syntax is converted but may need review",
-            Workaround = "Consider using explicit loops for complex queries"
+            Support = SupportLevel.Full,
+            Description = "LINQ method syntax is fully supported with chained call decomposition"
         },
         ["linq-query"] = new FeatureInfo
         {
             Name = "linq-query",
-            Support = SupportLevel.Partial,
-            Description = "LINQ query syntax is converted to method syntax",
-            Workaround = "Review converted queries for correctness"
+            Support = SupportLevel.Full,
+            Description = "LINQ query syntax is desugared to equivalent method chains"
         },
         ["ref-parameter"] = new FeatureInfo
         {

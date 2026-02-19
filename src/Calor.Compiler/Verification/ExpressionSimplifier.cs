@@ -38,6 +38,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(StringLiteralNode node) => node;
     public ExpressionNode Visit(BoolLiteralNode node) => node;
     public ExpressionNode Visit(FloatLiteralNode node) => node;
+    public ExpressionNode Visit(DecimalLiteralNode node) => node;
     public ExpressionNode Visit(ReferenceNode node) => node;
 
     #endregion
@@ -800,6 +801,26 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         return argsChanged || initializersChanged
             ? new NewExpressionNode(node.Span, node.TypeName, node.TypeArguments, newArgs, newInitializers)
             : node;
+    }
+
+    public ExpressionNode Visit(AnonymousObjectCreationNode node)
+    {
+        var changed = false;
+        var newInits = new List<ObjectInitializerAssignment>();
+        foreach (var init in node.Initializers)
+        {
+            var simplified = init.Value.Accept(this);
+            if (!ReferenceEquals(simplified, init.Value))
+            {
+                changed = true;
+                newInits.Add(new ObjectInitializerAssignment(init.PropertyName, simplified));
+            }
+            else
+            {
+                newInits.Add(init);
+            }
+        }
+        return changed ? new AnonymousObjectCreationNode(node.Span, newInits) : node;
     }
 
     public ExpressionNode Visit(ThisExpressionNode node) => node;

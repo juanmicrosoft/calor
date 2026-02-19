@@ -1156,6 +1156,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    public string Visit(DecimalLiteralNode node)
+    {
+        return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "M";
+    }
+
     public string Visit(StringLiteralNode node)
     {
         var escaped = node.Value
@@ -1228,15 +1233,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
-        // Handle object initializers
-        var initStr = "";
+        // Handle object initializers (multi-line block format)
         if (node.Initializers.Count > 0)
         {
-            var inits = node.Initializers.Select(i => $"{i.PropertyName}: {i.Value.Accept(this)}");
-            initStr = $" {{ {string.Join(", ", inits)} }}";
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}");
+            foreach (var init in node.Initializers)
+            {
+                sb.Append($"\n  {init.PropertyName} = {init.Value.Accept(this)}");
+            }
+            sb.Append("\n§/NEW");
+            return sb.ToString();
         }
 
-        return $"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}{initStr} §/NEW";
+        return $"§NEW{{{node.TypeName}{typeArgs}}}{argsStr} §/NEW";
+    }
+
+    public string Visit(AnonymousObjectCreationNode node)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("§ANON");
+        foreach (var init in node.Initializers)
+        {
+            sb.Append($"\n  {init.PropertyName} = {init.Value.Accept(this)}");
+        }
+        sb.Append("\n§/ANON");
+        return sb.ToString();
     }
 
     public string Visit(CallExpressionNode node)

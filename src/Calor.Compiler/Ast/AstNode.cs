@@ -33,6 +33,7 @@ public interface IAstVisitor
     void Visit(BoolLiteralNode node);
     void Visit(ConditionalExpressionNode node);
     void Visit(FloatLiteralNode node);
+    void Visit(DecimalLiteralNode node);
     void Visit(ReferenceNode node);
     // Phase 2: Control Flow
     void Visit(ForStatementNode node);
@@ -104,6 +105,7 @@ public interface IAstVisitor
     void Visit(ClassFieldNode node);
     void Visit(MethodNode node);
     void Visit(NewExpressionNode node);
+    void Visit(AnonymousObjectCreationNode node);
     void Visit(CallExpressionNode node);
     void Visit(ThisExpressionNode node);
     void Visit(BaseExpressionNode node);
@@ -206,6 +208,7 @@ public interface IAstVisitor<T>
     T Visit(BoolLiteralNode node);
     T Visit(ConditionalExpressionNode node);
     T Visit(FloatLiteralNode node);
+    T Visit(DecimalLiteralNode node);
     T Visit(ReferenceNode node);
     // Phase 2: Control Flow
     T Visit(ForStatementNode node);
@@ -277,6 +280,7 @@ public interface IAstVisitor<T>
     T Visit(ClassFieldNode node);
     T Visit(MethodNode node);
     T Visit(NewExpressionNode node);
+    T Visit(AnonymousObjectCreationNode node);
     T Visit(CallExpressionNode node);
     T Visit(ThisExpressionNode node);
     T Visit(BaseExpressionNode node);

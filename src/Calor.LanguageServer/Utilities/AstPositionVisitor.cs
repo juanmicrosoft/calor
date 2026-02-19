@@ -45,6 +45,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(StringLiteralNode node) => DefaultVisit(node)!;
     public virtual T Visit(BoolLiteralNode node) => DefaultVisit(node)!;
     public virtual T Visit(FloatLiteralNode node) => DefaultVisit(node)!;
+    public virtual T Visit(DecimalLiteralNode node) => DefaultVisit(node)!;
     public virtual T Visit(ReferenceNode node) => DefaultVisit(node)!;
     public virtual T Visit(ConditionalExpressionNode node) => DefaultVisit(node)!;
 
@@ -126,6 +127,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(ClassFieldNode node) => DefaultVisit(node)!;
     public virtual T Visit(MethodNode node) => DefaultVisit(node)!;
     public virtual T Visit(NewExpressionNode node) => DefaultVisit(node)!;
+    public virtual T Visit(AnonymousObjectCreationNode node) => DefaultVisit(node)!;
     public virtual T Visit(CallExpressionNode node) => DefaultVisit(node)!;
     public virtual T Visit(ThisExpressionNode node) => DefaultVisit(node)!;
     public virtual T Visit(BaseExpressionNode node) => DefaultVisit(node)!;

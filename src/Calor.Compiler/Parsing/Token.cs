@@ -274,11 +274,16 @@ public enum TokenKind
     TaskRef,            // §TASK - Task reference
     DateMarker,         // §DATE - Date marker
 
+    // LINQ Support
+    AnonymousObject,    // §ANON - Anonymous object creation
+    EndAnonymousObject, // §/ANON - End anonymous object
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
     BoolLiteral,        // BOOL:true
     FloatLiteral,       // FLOAT:3.14
+    DecimalLiteral,     // DECIMAL:18.00M or 18.00m
 
     // Identifiers and values
     Identifier,
@@ -308,10 +313,10 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.DateMarker;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndAnonymousObject;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
-        or TokenKind.BoolLiteral or TokenKind.FloatLiteral;
+        or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;
 
     public bool IsTrivia => Kind is TokenKind.Whitespace or TokenKind.Newline;
 
