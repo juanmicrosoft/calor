@@ -158,6 +158,95 @@ public class LinqSupportTests
         Assert.NotNull(result.CalorSource);
     }
 
+    [Fact]
+    public void ArrayInitializer_Converter_BareDoubleArray()
+    {
+        var csharpSource = """
+            double[] arr = { 1.7, 2.3, 1.9 };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§ARR{", result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    [Fact]
+    public void ArrayInitializer_Converter_BareIntArray()
+    {
+        var csharpSource = """
+            int[] nums = { 1, 2, 3, 4, 5 };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    [Fact]
+    public void ArrayInitializer_Converter_BareStringArray()
+    {
+        var csharpSource = """
+            string[] names = { "Alice", "Bob" };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    [Fact]
+    public void ArrayInitializer_Converter_UseDeclaredTypeOverLiteralInference()
+    {
+        // int literals in a double[] should infer f64 from declaration, not i32 from literals
+        var csharpSource = """
+            double[] arr = { 1, 2, 3 };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§ARR{arr:f64}", result.CalorSource);
+    }
+
+    [Fact]
+    public void ArrayInitializer_Converter_EmptyArray()
+    {
+        var csharpSource = """
+            int[] arr = { };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§ARR{i32:", result.CalorSource);
+    }
+
+    [Fact]
+    public void ArrayInitializer_Converter_MultiDimensionalUsesCorrectElementType()
+    {
+        var csharpSource = """
+            int[,] matrix = { { 1, 2 }, { 3, 4 } };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Element type should be inferred from the int[,] declaration
+        Assert.Contains("§ARR{matrix:i32}", result.CalorSource);
+    }
+
     #endregion
 
     #region Feature 3: Object Initializers
@@ -410,6 +499,12 @@ public class LinqSupportTests
     public void FeatureSupport_LinqQuery_IsFullySupported()
     {
         Assert.True(FeatureSupport.IsFullySupported("linq-query"));
+    }
+
+    [Fact]
+    public void FeatureSupport_ArrayInitializer_IsFullySupported()
+    {
+        Assert.True(FeatureSupport.IsFullySupported("array-initializer"));
     }
 
     #endregion

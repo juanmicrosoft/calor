@@ -1863,6 +1863,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             DefaultExpressionSyntax defaultExpr => ConvertDefaultExpression(defaultExpr),
             AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
             QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
+            InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -2836,15 +2837,71 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(ConvertExpression)
             .ToList();
 
-        // Infer element type from first element or use "object"
-        var elementType = "object";
-        if (initializer.Count > 0 && initializer[0] is IntLiteralNode) elementType = "i32";
-        else if (initializer.Count > 0 && initializer[0] is FloatLiteralNode) elementType = "f64";
-        else if (initializer.Count > 0 && initializer[0] is DecimalLiteralNode) elementType = "decimal";
-        else if (initializer.Count > 0 && initializer[0] is StringLiteralNode) elementType = "str";
-        else if (initializer.Count > 0 && initializer[0] is BoolLiteralNode) elementType = "bool";
+        // Try declared type first, fall back to inferring from first element
+        var elementType = TryGetDeclaredArrayElementType(implicitArray);
+        if (elementType == null)
+        {
+            elementType = "object";
+            if (initializer.Count > 0 && initializer[0] is IntLiteralNode) elementType = "i32";
+            else if (initializer.Count > 0 && initializer[0] is FloatLiteralNode) elementType = "f64";
+            else if (initializer.Count > 0 && initializer[0] is DecimalLiteralNode) elementType = "decimal";
+            else if (initializer.Count > 0 && initializer[0] is StringLiteralNode) elementType = "str";
+            else if (initializer.Count > 0 && initializer[0] is BoolLiteralNode) elementType = "bool";
+        }
 
         return new ArrayCreationNode(GetTextSpan(implicitArray), id, id, elementType, null, initializer, new AttributeCollection());
+    }
+
+    private ExpressionNode ConvertInitializerExpression(InitializerExpressionSyntax initExpr)
+    {
+        if (initExpr.Kind() != SyntaxKind.ArrayInitializerExpression)
+            return CreateFallbackExpression(initExpr, "unsupported-initializer");
+
+        _context.RecordFeatureUsage("array-initializer");
+
+        var id = _context.GenerateId("arr");
+        var initializer = initExpr.Expressions
+            .Select(ConvertExpression)
+            .ToList();
+
+        // Try to get element type from the parent variable declaration (e.g. "double[]" -> "f64")
+        var elementType = TryGetDeclaredArrayElementType(initExpr);
+
+        // Fall back to inferring from the first element
+        if (elementType == null)
+        {
+            elementType = "object";
+            if (initializer.Count > 0 && initializer[0] is IntLiteralNode) elementType = "i32";
+            else if (initializer.Count > 0 && initializer[0] is FloatLiteralNode) elementType = "f64";
+            else if (initializer.Count > 0 && initializer[0] is DecimalLiteralNode) elementType = "decimal";
+            else if (initializer.Count > 0 && initializer[0] is StringLiteralNode) elementType = "str";
+            else if (initializer.Count > 0 && initializer[0] is BoolLiteralNode) elementType = "bool";
+        }
+
+        return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType, null, initializer, new AttributeCollection());
+    }
+
+    private static string? TryGetDeclaredArrayElementType(SyntaxNode node)
+    {
+        // Walk up: InitializerExpression -> EqualsValueClause -> VariableDeclarator -> VariableDeclaration
+        if (node.Parent is EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax { Parent: VariableDeclarationSyntax declaration } })
+        {
+            var typeStr = declaration.Type.ToString();
+            // Handle single-dimensional arrays: "double[]"
+            if (typeStr.EndsWith("[]"))
+            {
+                var csharpElement = typeStr[..^2];
+                return TypeMapper.CSharpToCalor(csharpElement);
+            }
+            // Handle multi-dimensional arrays: "int[,]", "int[,,]", etc.
+            var bracketStart = typeStr.IndexOf('[');
+            if (bracketStart > 0 && typeStr.EndsWith("]"))
+            {
+                var csharpElement = typeStr[..bracketStart];
+                return TypeMapper.CSharpToCalor(csharpElement);
+            }
+        }
+        return null;
     }
 
     private ExpressionNode ConvertElementAccess(ElementAccessExpressionSyntax elementAccess)

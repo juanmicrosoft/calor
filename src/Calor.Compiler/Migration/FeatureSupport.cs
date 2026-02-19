@@ -186,6 +186,12 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "LINQ query syntax is desugared to equivalent method chains"
         },
+        ["array-initializer"] = new FeatureInfo
+        {
+            Name = "array-initializer",
+            Support = SupportLevel.Full,
+            Description = "Bare array initializers are converted to Calor array nodes"
+        },
         ["ref-parameter"] = new FeatureInfo
         {
             Name = "ref-parameter",
