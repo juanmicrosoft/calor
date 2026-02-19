@@ -65,7 +65,10 @@ public static class OperatorSuggestions
         "await",
 
         // Type operations
-        "cast", "as", "is"
+        "cast", "as", "is",
+
+        // Increment/decrement operators
+        "inc", "dec", "pre-inc", "post-inc", "pre-dec", "post-dec"
     };
 
     /// <summary>
@@ -99,8 +102,8 @@ public static class OperatorSuggestions
         ["extern"] = "Use §EXTERN for external function declarations",
 
         // C# operators
-        ["++"] = "Use (+ x 1) or (set x (+ x 1))",
-        ["--"] = "Use (- x 1) or (set x (- x 1))",
+        ["++"] = "Use (inc x) for prefix ++x, or (post-inc x) for x++",
+        ["--"] = "Use (dec x) for prefix --x, or (post-dec x) for x--",
         ["+="] = "Use (set x (+ x value))",
         ["-="] = "Use (set x (- x value))",
         ["*="] = "Use (set x (* x value))",

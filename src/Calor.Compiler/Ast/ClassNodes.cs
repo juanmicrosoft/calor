@@ -394,6 +394,8 @@ public sealed class ClassFieldNode : AstNode
     public string Name { get; }
     public string TypeName { get; }
     public Visibility Visibility { get; }
+    public MethodModifiers Modifiers { get; }
+    public bool IsStatic => Modifiers.HasFlag(MethodModifiers.Static);
     public ExpressionNode? DefaultValue { get; }
     public AttributeCollection Attributes { get; }
 
@@ -409,7 +411,7 @@ public sealed class ClassFieldNode : AstNode
         Visibility visibility,
         ExpressionNode? defaultValue,
         AttributeCollection attributes)
-        : this(span, name, typeName, visibility, defaultValue, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, name, typeName, visibility, MethodModifiers.None, defaultValue, attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -421,11 +423,25 @@ public sealed class ClassFieldNode : AstNode
         ExpressionNode? defaultValue,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, name, typeName, visibility, MethodModifiers.None, defaultValue, attributes, csharpAttributes)
+    {
+    }
+
+    public ClassFieldNode(
+        TextSpan span,
+        string name,
+        string typeName,
+        Visibility visibility,
+        MethodModifiers modifiers,
+        ExpressionNode? defaultValue,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         Visibility = visibility;
+        Modifiers = modifiers;
         DefaultValue = defaultValue;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();

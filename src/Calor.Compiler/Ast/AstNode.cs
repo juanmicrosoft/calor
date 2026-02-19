@@ -184,6 +184,8 @@ public interface IAstVisitor
     void Visit(StringBuilderOperationNode node);
     // Native Type Operations
     void Visit(TypeOperationNode node);
+    // Expression statement (bare expression as statement)
+    void Visit(ExpressionStatementNode node);
     // Fallback nodes for unsupported C# constructs
     void Visit(FallbackExpressionNode node);
     void Visit(FallbackCommentNode node);
@@ -355,6 +357,8 @@ public interface IAstVisitor<T>
     T Visit(StringBuilderOperationNode node);
     // Native Type Operations
     T Visit(TypeOperationNode node);
+    // Expression statement (bare expression as statement)
+    T Visit(ExpressionStatementNode node);
     // Fallback nodes for unsupported C# constructs
     T Visit(FallbackExpressionNode node);
     T Visit(FallbackCommentNode node);

@@ -1359,6 +1359,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     // Fallback nodes - cannot be simplified, just return as-is
     public ExpressionNode Visit(FallbackExpressionNode node) => node;
     public ExpressionNode Visit(FallbackCommentNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(ExpressionStatementNode node) => throw new InvalidOperationException();
 
     #endregion
 }

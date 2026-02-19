@@ -2092,6 +2092,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"§ERR{{\"TODO: {node.FeatureName} -- C#: {escapedCode}\"}}";
     }
 
+    public string Visit(ExpressionStatementNode node)
+    {
+        var expr = node.Expression.Accept(this);
+        AppendLine(expr);
+        return "";
+    }
+
     public string Visit(FallbackCommentNode node)
     {
         // Emit as multi-line comment block with TODO

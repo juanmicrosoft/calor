@@ -829,6 +829,12 @@ public sealed class Parser
         {
             return ParseDictionaryForeach();
         }
+        // Expression statement: bare lisp expression like (inc x), (post-dec y)
+        else if (Check(TokenKind.OpenParen))
+        {
+            var expr = ParseExpression();
+            return new ExpressionStatementNode(expr.Span, expr);
+        }
 
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
@@ -1612,6 +1618,10 @@ public sealed class Parser
             "!" or "not" => UnaryOperator.Not,
             "~" => UnaryOperator.BitwiseNot,
             "-" => UnaryOperator.Negate,
+            "inc" or "pre-inc" => UnaryOperator.PreIncrement,
+            "dec" or "pre-dec" => UnaryOperator.PreDecrement,
+            "post-inc" => UnaryOperator.PostIncrement,
+            "post-dec" => UnaryOperator.PostDecrement,
             _ => null
         };
     }
@@ -4410,6 +4420,14 @@ public sealed class Parser
         var isPartial = modifiers.Contains("partial", StringComparison.OrdinalIgnoreCase);
         var isStruct = modifiers.Contains("struct", StringComparison.OrdinalIgnoreCase);
         var isReadOnly = modifiers.Contains("readonly", StringComparison.OrdinalIgnoreCase);
+
+        // Structs cannot be abstract
+        if (isStruct && isAbstract)
+        {
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                "Structs cannot be abstract. The 'abs' modifier will be ignored.");
+            isAbstract = false;
+        }
         var implementedInterfaces = new List<string>();
 
         // NEW: Parse optional type parameters §CL{...}<T, U>
@@ -4527,10 +4545,11 @@ public sealed class Parser
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
-        // Positional: [type:name:visibility?]
+        // Positional: [type:name:visibility?:modifiers?]
         var typeName = attrs["_pos0"] ?? "object";
         var name = attrs["_pos1"] ?? "";
         var visStr = attrs["_pos2"] ?? "private";
+        var modStr = attrs["_pos3"] ?? "";
 
         if (string.IsNullOrEmpty(name))
         {
@@ -4538,6 +4557,7 @@ public sealed class Parser
         }
 
         var visibility = ParseVisibility(visStr);
+        var fieldModifiers = ParseMethodModifiers(modStr);
 
         // Check for optional default value (can be prefixed with = or just a direct expression)
         ExpressionNode? defaultValue = null;
@@ -4552,7 +4572,7 @@ public sealed class Parser
         }
 
         var span = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
-        return new ClassFieldNode(span, name, typeName, visibility, defaultValue, attrs, csharpAttrs);
+        return new ClassFieldNode(span, name, typeName, visibility, fieldModifiers, defaultValue, attrs, csharpAttrs);
     }
 
     /// <summary>
