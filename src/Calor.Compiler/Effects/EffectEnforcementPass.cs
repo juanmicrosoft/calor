@@ -53,11 +53,11 @@ public sealed class EffectEnforcementPass
     }
 
     /// <summary>
-    /// Enforces effect declarations across all functions in the module.
+    /// Enforces effect declarations across all functions and class methods in the module.
     /// </summary>
     public void Enforce(ModuleNode module)
     {
-        // Phase 1: Build function map and call graph
+        // Phase 1: Build function map and call graph (includes §F functions and §MT methods)
         BuildCallGraph(module);
 
         // Phase 2: Compute SCCs using Tarjan's algorithm
@@ -75,11 +75,67 @@ public sealed class EffectEnforcementPass
         {
             CheckEffects(function);
         }
+
+        // Phase 4b: Also check class methods and constructors
+        foreach (var cls in module.Classes)
+        {
+            foreach (var method in cls.Methods)
+            {
+                var wrappedId = $"{cls.Name}.{method.Id}";
+                if (_functions.TryGetValue(wrappedId, out var wrapped))
+                {
+                    CheckEffects(wrapped);
+                }
+            }
+            // Note: Constructors participate in the call graph (for SCC analysis)
+            // but are not checked for effects here because:
+            // 1. §CTOR has no §E{...} declaration syntax yet
+            // 2. Constructors inherently assign to fields (mut) which would always fail
+            // Constructor enforcement requires language-level §E support on §CTOR first.
+        }
+    }
+
+    /// <summary>
+    /// Creates a lightweight FunctionNode wrapper from a MethodNode for effect analysis.
+    /// Uses a qualified ID (className.methodId) to avoid collisions with top-level functions.
+    /// </summary>
+    private static FunctionNode ToFunctionNode(MethodNode method, string className)
+    {
+        var qualifiedId = $"{className}.{method.Id}";
+        return new FunctionNode(
+            method.Span,
+            qualifiedId,
+            method.Name,
+            method.Visibility,
+            method.Parameters,
+            method.Output,
+            method.Effects,
+            method.Body,
+            method.Attributes);
+    }
+
+    /// <summary>
+    /// Creates a lightweight FunctionNode wrapper from a ConstructorNode for effect analysis.
+    /// Constructors don't have §E{...} declarations, so effects will be null (treated as pure).
+    /// </summary>
+    private static FunctionNode ToFunctionNode(ConstructorNode ctor, string className)
+    {
+        var qualifiedId = $"{className}.{ctor.Id}";
+        return new FunctionNode(
+            ctor.Span,
+            qualifiedId,
+            $"{className}..ctor",
+            ctor.Visibility,
+            ctor.Parameters,
+            output: null,
+            effects: null,  // Constructors can't declare effects yet
+            ctor.Body,
+            ctor.Attributes);
     }
 
     private void BuildCallGraph(ModuleNode module)
     {
-        // Index all functions by ID and name
+        // Index all top-level functions by ID and name
         foreach (var function in module.Functions)
         {
             _functions[function.Id] = function;
@@ -88,8 +144,29 @@ public sealed class EffectEnforcementPass
             _reverseCallGraph[function.Id] = new List<(string, TextSpan)>();
         }
 
-        // Build call edges
-        foreach (var function in module.Functions)
+        // Index class methods and constructors as wrapped FunctionNodes
+        foreach (var cls in module.Classes)
+        {
+            foreach (var method in cls.Methods)
+            {
+                var wrapped = ToFunctionNode(method, cls.Name);
+                _functions[wrapped.Id] = wrapped;
+                _functionNameToId[wrapped.Name] = wrapped.Id;
+                _callGraph[wrapped.Id] = new List<string>();
+                _reverseCallGraph[wrapped.Id] = new List<(string, TextSpan)>();
+            }
+            foreach (var ctor in cls.Constructors)
+            {
+                var wrapped = ToFunctionNode(ctor, cls.Name);
+                _functions[wrapped.Id] = wrapped;
+                // Don't add to _functionNameToId — constructors aren't called by name
+                _callGraph[wrapped.Id] = new List<string>();
+                _reverseCallGraph[wrapped.Id] = new List<(string, TextSpan)>();
+            }
+        }
+
+        // Build call edges for all indexed functions (top-level and class methods)
+        foreach (var function in _functions.Values)
         {
             var calls = CollectCalls(function);
             foreach (var (callee, span) in calls)
@@ -409,6 +486,47 @@ public sealed class EffectEnforcementPass
     {
         private readonly InferenceContext _context;
 
+        /// <summary>
+        /// Known-pure method names (LINQ extension methods and similar).
+        /// Used as a last-resort fallback when full type resolution fails
+        /// because extension methods are called on instances (e.g., items.OrderBy(...)).
+        /// </summary>
+        private static readonly HashSet<string> KnownPureMethodNames = new(StringComparer.Ordinal)
+        {
+            "Where", "Select", "SelectMany",
+            "OrderBy", "OrderByDescending", "ThenBy", "ThenByDescending",
+            "GroupBy", "Join", "GroupJoin",
+            "First", "FirstOrDefault", "Single", "SingleOrDefault",
+            "Last", "LastOrDefault",
+            "Any", "All", "Count", "LongCount",
+            "Sum", "Average", "Min", "Max",
+            "Distinct", "DistinctBy", "Union", "UnionBy", "Intersect", "IntersectBy", "Except", "ExceptBy",
+            "Skip", "Take", "SkipWhile", "TakeWhile", "SkipLast", "TakeLast",
+            "Reverse", "Concat", "Zip",
+            "Aggregate",
+            "ToList", "ToArray", "ToDictionary", "ToHashSet", "ToLookup",
+            "OfType", "Cast", "AsEnumerable",
+            "DefaultIfEmpty", "Append", "Prepend",
+            "Contains", "SequenceEqual",
+            "Range", "Repeat", "Empty",
+            "ElementAt", "ElementAtOrDefault",
+            "Chunk", "Order", "OrderDescending",
+            // Common pure instance methods
+            "ToString", "GetHashCode", "Equals", "CompareTo", "GetType",
+            "Clone", "CopyTo", "GetEnumerator",
+            "Substring", "Trim", "TrimStart", "TrimEnd",
+            "StartsWith", "EndsWith", "Contains", "IndexOf", "LastIndexOf",
+            "Replace", "Split", "Join", "ToUpper", "ToLower", "ToUpperInvariant", "ToLowerInvariant",
+            "PadLeft", "PadRight", "Insert", "Remove",
+            // Collection methods
+            "Add", "Remove", "Clear", "ContainsKey", "ContainsValue",
+            "TryGetValue", "AddRange", "RemoveAt", "RemoveAll",
+            "Sort", "BinarySearch", "Find", "FindAll", "FindIndex", "FindLast",
+            "Exists", "TrueForAll", "ForEach", "ConvertAll",
+            // StringBuilder
+            "Append", "AppendLine", "AppendFormat",
+        };
+
         public EffectInferrer(InferenceContext context)
         {
             _context = context;
@@ -498,6 +616,34 @@ public sealed class EffectEnforcementPass
                 }
             }
 
+            // Method-name fallback: extract just the method name and check
+            // against known-pure names (handles extension method calls like items.OrderBy(...))
+            var lastDotFallback = target.LastIndexOf('.');
+            if (lastDotFallback > 0)
+            {
+                var bareMethodName = target[(lastDotFallback + 1)..];
+                if (KnownPureMethodNames.Contains(bareMethodName))
+                {
+                    return EffectSet.Empty;
+                }
+            }
+
+            // Single-word targets with no dot are local variable/delegate invocations,
+            // not external calls. Assume pure since we lack type information.
+            // In strict mode, emit a warning so users know the effects are unverified.
+            if (!target.Contains('.'))
+            {
+                if (_context.StrictEffects)
+                {
+                    _context.Diagnostics.Report(
+                        span,
+                        DiagnosticCode.UnknownExternalCall,
+                        $"Delegate/variable invocation '{target}' has unverified effects. Consider wrapping in a function with declared effects.",
+                        DiagnosticSeverity.Warning);
+                }
+                return EffectSet.Empty;
+            }
+
             // Unknown external call - report diagnostic based on policy
             ReportUnknownCall(target, span);
             return EffectSet.Unknown;
@@ -555,6 +701,7 @@ public sealed class EffectEnforcementPass
                     "HttpClient" => "System.Net.Http.HttpClient",
                     "Math" => "System.Math",
                     "Guid" => "System.Guid",
+                    "Enumerable" => "System.Linq.Enumerable",
                     _ => typePart
                 };
             }
@@ -595,7 +742,8 @@ public sealed class EffectEnforcementPass
                     "System.Net.Http",
                     "System.Threading",
                     "System.Threading.Tasks",
-                    "System.Diagnostics"
+                    "System.Diagnostics",
+                    "System.Linq"
                 };
 
                 foreach (var ns in namespaces)

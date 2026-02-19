@@ -441,7 +441,7 @@ public class CodeGenBugFixTests
   §MT{mt1:Transliterate:pub}
     §I{str:input}
     §O{str}
-    §E{cw}
+    §E{cw,cr}
 
     §B{~dict} §NEW{Dictionary<char,str>}
     §B{[char]:buf} §ARR{char:buf:256}
