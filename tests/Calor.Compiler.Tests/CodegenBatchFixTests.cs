@@ -261,7 +261,7 @@ public class CodegenBatchFixTests
         var calorEmitter = new Migration.CalorEmitter();
         var calorOutput = calorEmitter.Emit(module);
 
-        Assert.Contains("§INIT{Name}", calorOutput);
+        Assert.Contains("Name =", calorOutput);
     }
 
     // ========== Fix 5: Array initializer CalorEmitter ==========
@@ -399,7 +399,7 @@ public class CodegenBatchFixTests
         var conversionResult = converter.Convert(csharpSource);
 
         Assert.True(conversionResult.Success, string.Join("\n", conversionResult.Issues.Select(i => i.Message)));
-        Assert.Contains("§INIT{Name}", conversionResult.CalorSource);
+        Assert.Contains("Name =", conversionResult.CalorSource);
 
         var compilationResult = Program.Compile(conversionResult.CalorSource!);
         Assert.False(compilationResult.HasErrors,

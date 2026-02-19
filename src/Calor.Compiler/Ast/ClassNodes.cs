@@ -606,6 +606,25 @@ public sealed class ObjectInitializerAssignment
 }
 
 /// <summary>
+/// Represents an anonymous object creation expression.
+/// §ANON PropertyName = value ... §/ANON
+/// Emits: new { PropertyName = value, ... }
+/// </summary>
+public sealed class AnonymousObjectCreationNode : ExpressionNode
+{
+    public IReadOnlyList<ObjectInitializerAssignment> Initializers { get; }
+
+    public AnonymousObjectCreationNode(TextSpan span, IReadOnlyList<ObjectInitializerAssignment> initializers)
+        : base(span)
+    {
+        Initializers = initializers ?? throw new ArgumentNullException(nameof(initializers));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a method/function call expression.
 /// §C[target] §A arg1 §A arg2 §/C
 /// </summary>

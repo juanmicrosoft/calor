@@ -242,6 +242,10 @@ public sealed class Lexer
         ["TASK"] = TokenKind.TaskRef,           // §TASK - keep for clarity
         ["DATE"] = TokenKind.DateMarker,        // §DATE - keep for clarity
 
+        // LINQ Support
+        ["ANON"] = TokenKind.AnonymousObject,   // §ANON = Anonymous object
+        ["/ANON"] = TokenKind.EndAnonymousObject, // §/ANON
+
         // Built-in aliases for common operations
         ["P"] = TokenKind.Print,            // §P = Console.WriteLine
         ["Pf"] = TokenKind.PrintF,          // §Pf = Console.Write
@@ -680,8 +684,8 @@ public sealed class Lexer
             {
                 return ScanTypedFloatLiteral();
             }
-            // DEC:digits or DEC:-digits or DEC:.digits (decimal literal)
-            if (upperText == "DEC" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
+            // DECIMAL:digits or DEC:digits (decimal literal)
+            if ((upperText == "DECIMAL" || upperText == "DEC") && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
             {
                 return ScanTypedDecimalLiteral();
             }
@@ -851,14 +855,20 @@ public sealed class Lexer
             }
         }
 
-        var valueText = _source[valueStart.._position];
-        if (double.TryParse(valueText, System.Globalization.NumberStyles.Float,
+        // Consume optional M/m suffix
+        if (Current is 'M' or 'm')
+        {
+            Advance();
+        }
+
+        var valueText = _source[valueStart.._position].TrimEnd('M', 'm');
+        if (decimal.TryParse(valueText, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var value))
         {
             return MakeToken(TokenKind.DecimalLiteral, value);
         }
 
-        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "DEC");
+        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "DECIMAL");
         return MakeToken(TokenKind.Error);
     }
 
@@ -1003,11 +1013,35 @@ public sealed class Lexer
                 Advance();
             }
 
+            // Check for decimal suffix (M/m) on float
+            if (Current is 'M' or 'm')
+            {
+                Advance(); // consume M/m
+                var decText = CurrentText().TrimEnd('M', 'm');
+                if (decimal.TryParse(decText, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var decValue))
+                {
+                    return MakeToken(TokenKind.DecimalLiteral, decValue);
+                }
+            }
+
             var floatText = CurrentText();
             if (double.TryParse(floatText, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var floatValue))
             {
                 return MakeToken(TokenKind.FloatLiteral, floatValue);
+            }
+        }
+
+        // Check for decimal suffix on integers (42M, 100m)
+        if (Current is 'M' or 'm')
+        {
+            Advance(); // consume M/m
+            var decText = CurrentText().TrimEnd('M', 'm');
+            if (decimal.TryParse(decText, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var decValue))
+            {
+                return MakeToken(TokenKind.DecimalLiteral, decValue);
             }
         }
 

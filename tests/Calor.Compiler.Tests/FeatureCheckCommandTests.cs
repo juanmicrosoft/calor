@@ -17,6 +17,8 @@ public class FeatureCheckCommandTests
     [InlineData("async-await", SupportLevel.Full)]
     [InlineData("lambda", SupportLevel.Full)]
     [InlineData("generics", SupportLevel.Full)]
+    [InlineData("linq-method", SupportLevel.Full)]
+    [InlineData("linq-query", SupportLevel.Full)]
     public void FeatureCheck_FullySupported_ReturnsFullLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -28,8 +30,6 @@ public class FeatureCheckCommandTests
     }
 
     [Theory]
-    [InlineData("linq-method", SupportLevel.Partial)]
-    [InlineData("linq-query", SupportLevel.Partial)]
     [InlineData("ref-parameter", SupportLevel.Partial)]
     [InlineData("dynamic", SupportLevel.Partial)]
     public void FeatureCheck_PartiallySupported_ReturnsPartialLevel(string feature, SupportLevel expected)
