@@ -1,5 +1,7 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -1519,6 +1521,116 @@ public class CSharpToCalorConversionTests
 
         // Verify generic type survives the round-trip
         Assert.Contains("IEnumerator<int>", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
+    #region Bind Statement Format Tests
+
+    [Fact]
+    public void Emitter_ImmutableVar_EmitsBindWithoutConst()
+    {
+        var csharpSource = """
+            var count = 42;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should emit §B{name} without :const suffix
+        Assert.Contains("§B{count}", result.CalorSource);
+        Assert.DoesNotContain(":const", result.CalorSource);
+    }
+
+    [Fact]
+    public void Emitter_MutableVar_EmitsTildePrefix()
+    {
+        var csharpSource = """
+            int counter = 0;
+            counter = counter + 1;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Mutable should use ~ prefix
+        Assert.Contains("§B{~counter", result.CalorSource);
+        Assert.DoesNotContain(":const", result.CalorSource);
+    }
+
+    [Fact]
+    public void Emitter_TypedImmutableVar_EmitsTypeFirst()
+    {
+        var csharpSource = """
+            int count = 42;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Explicit type declaration: type-first format {type:name}
+        Assert.Contains("§B{i32:count}", result.CalorSource);
+        Assert.DoesNotContain(":const", result.CalorSource);
+    }
+
+    [Fact]
+    public void Emitter_TypedMutableVar_EmitsTildePrefixWithType()
+    {
+        var csharpSource = """
+            int total = 0;
+            total = total + 1;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Explicit typed mutable: {~name:type} format
+        Assert.Contains("§B{~total:i32}", result.CalorSource);
+        Assert.DoesNotContain(":const", result.CalorSource);
+    }
+
+    [Fact]
+    public void Emitter_EmittedBind_ReParsesWithCorrectSemantics()
+    {
+        // C# with explicit typed mutable and immutable variables
+        var csharpSource = """
+            int x = 10;
+            int y = 20;
+            y = y + x;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Re-parse the emitted Calor
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var reparsed = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Emitter output should re-parse.\nCalor:\n{result.CalorSource}\nErrors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+
+        var func = Assert.Single(reparsed.Functions);
+
+        // x is immutable (not reassigned), y is mutable (reassigned)
+        var bindX = func.Body.OfType<BindStatementNode>().First(b => b.Name == "x");
+        Assert.False(bindX.IsMutable);
+        Assert.NotNull(bindX.TypeName);
+
+        var bindY = func.Body.OfType<BindStatementNode>().First(b => b.Name == "y");
+        Assert.True(bindY.IsMutable);
+        Assert.NotNull(bindY.TypeName);
     }
 
     #endregion

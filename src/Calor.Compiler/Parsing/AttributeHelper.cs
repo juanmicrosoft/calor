@@ -117,6 +117,12 @@ public static class AttributeHelper
             return (pos1, true, ExpandType(pos0));
         }
 
+        // Legacy format: {type:name:const} - immutable with type
+        if (pos2 == "const" && !string.IsNullOrEmpty(pos1))
+        {
+            return (pos1, false, ExpandType(pos0));
+        }
+
         // Check for ~ prefix (original mutable format)
         if (pos0.StartsWith('~'))
         {
@@ -124,6 +130,12 @@ public static class AttributeHelper
             var name = pos0[1..];
             var typeName = !string.IsNullOrEmpty(pos1) ? ExpandType(pos1) : null;
             return (name, true, typeName);
+        }
+
+        // Legacy format: {name:const} - immutable (const is not a type)
+        if (pos1 == "const")
+        {
+            return (pos0, false, null);
         }
 
         // Detect if pos0 is a type and pos1 is a name (skill file format: {type:name})

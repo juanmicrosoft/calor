@@ -650,13 +650,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitSetCreationWithName(setNode, node.Name);
             return "";
         }
+        if (node.Initializer is ArrayCreationNode arrNode)
+        {
+            EmitArrayCreationWithName(arrNode, node.Name);
+            return "";
+        }
 
-        var typePart = node.TypeName != null ? $"{TypeMapper.CSharpToCalor(node.TypeName)}:" : "";
-        var mutPart = node.IsMutable ? "" : ":const";
         // Parser expects: §B[type:name] expression (no = sign)
         var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
 
-        AppendLine($"§B{{{typePart}{node.Name}{mutPart}}}{initPart}");
+        if (node.IsMutable)
+        {
+            // Mutable: {~name} or {~name:type}
+            var typePostfix = node.TypeName != null ? $":{TypeMapper.CSharpToCalor(node.TypeName)}" : "";
+            AppendLine($"§B{{~{node.Name}{typePostfix}}}{initPart}");
+        }
+        else
+        {
+            // Immutable: {name} or {type:name}
+            var typePrefix = node.TypeName != null ? $"{TypeMapper.CSharpToCalor(node.TypeName)}:" : "";
+            AppendLine($"§B{{{typePrefix}{node.Name}}}{initPart}");
+        }
         return "";
     }
 
@@ -709,6 +723,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         Dedent();
         AppendLine($"§/HSET{{{variableName}}}");
+    }
+
+    private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName)
+    {
+        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+
+        if (node.Initializer.Count > 0)
+        {
+            AppendLine($"§ARR{{{variableName}:{elementType}}}");
+            Indent();
+            foreach (var element in node.Initializer)
+            {
+                AppendLine(element.Accept(this));
+            }
+            Dedent();
+            AppendLine($"§/ARR{{{variableName}}}");
+        }
+        else if (node.Size != null)
+        {
+            var size = node.Size.Accept(this);
+            AppendLine($"§B{{[{elementType}]:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
+        }
+        else
+        {
+            AppendLine($"§ARR{{{elementType}:{variableName}}}");
+        }
     }
 
     public string Visit(AssignmentStatementNode node)
@@ -1365,9 +1405,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.Initializer.Count > 0)
         {
-            var elements = node.Initializer.Select(e => $"§A {e.Accept(this)}");
+            // Return inline format so this works in expression context (return, call args, etc.)
+            // Multi-line format is handled by EmitArrayCreationWithName for bind-statement context.
             var id = string.IsNullOrEmpty(node.Name) ? "_arr" : node.Name;
-            return $"§ARR{{{elementType}:{id}}} {string.Join(" ", elements)} §/ARR{{{id}}}";
+            var elements = string.Join(" ", node.Initializer.Select(e => e.Accept(this)));
+            return $"§ARR{{{id}:{elementType}}} {elements} §/ARR{{{id}}}";
         }
         else if (node.Size != null)
         {
