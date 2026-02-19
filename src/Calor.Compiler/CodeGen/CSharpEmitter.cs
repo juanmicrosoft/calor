@@ -143,7 +143,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         AppendLine();
 
-        var namespaceName = SanitizeNamespace(node.Name);
+        var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
+        var namespaceName = isGlobalNamespace ? "" : SanitizeNamespace(node.Name);
 
         // Emit module-level extended metadata as file-level comments
         if (node.Context != null)
@@ -165,9 +166,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
-        AppendLine($"namespace {namespaceName}");
-        AppendLine("{");
-        Indent();
+        if (!isGlobalNamespace)
+        {
+            AppendLine($"namespace {namespaceName}");
+            AppendLine("{");
+            Indent();
+        }
 
         // Emit module-level issues as comments
         foreach (var issue in node.Issues)
@@ -228,9 +232,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Emit module-level functions in a static class
         if (node.Functions.Count > 0)
         {
-            var moduleClassName = SanitizeIdentifier(node.Name.Contains('.')
-                ? node.Name.Split('.').Last()
-                : node.Name) + "Module";
+            var moduleClassName = isGlobalNamespace
+                ? "GlobalModule"
+                : SanitizeIdentifier(node.Name.Contains('.')
+                    ? node.Name.Split('.').Last()
+                    : node.Name) + "Module";
             AppendLine($"public static class {moduleClassName}");
             AppendLine("{");
             Indent();
@@ -245,8 +251,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine("}");
         }
 
-        Dedent();
-        AppendLine("}");
+        if (!isGlobalNamespace)
+        {
+            Dedent();
+            AppendLine("}");
+        }
 
         return _builder.ToString();
     }
@@ -739,6 +748,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var operand = node.Operand.Accept(this);
         var op = node.Operator.ToCSharpOperator();
+        if (node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
+            return $"({operand}{op})";
         return $"({op}{operand})";
     }
 
@@ -1711,7 +1722,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         baseList.AddRange(node.ImplementedInterfaces);
         var inheritance = baseList.Count > 0 ? " : " + string.Join(", ", baseList) : "";
 
-        AppendLine($"{modifiers} class {name}{typeParams}{inheritance}{whereClause}");
+        var typeKeyword = node.IsStruct ? "struct" : "class";
+        AppendLine($"{modifiers} {typeKeyword} {name}{typeParams}{inheritance}{whereClause}");
         AppendLine("{");
         Indent();
 
@@ -1771,17 +1783,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _ => "private"
         };
 
+        var parts = new List<string> { visibility };
+        if (node.IsStatic) parts.Add("static");
+        var fullModifiers = string.Join(" ", parts);
+
         var typeName = MapTypeName(node.TypeName);
         var fieldName = SanitizeIdentifier(node.Name);
 
         if (node.DefaultValue != null)
         {
             var defaultVal = node.DefaultValue.Accept(this);
-            AppendLine($"{visibility} {typeName} {fieldName} = {defaultVal};");
+            AppendLine($"{fullModifiers} {typeName} {fieldName} = {defaultVal};");
         }
         else
         {
-            AppendLine($"{visibility} {typeName} {fieldName};");
+            AppendLine($"{fullModifiers} {typeName} {fieldName};");
         }
 
         return "";
@@ -3214,6 +3230,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         // Emit the original C# code with a TODO comment
         return $"/* TODO: {node.FeatureName} */ {node.OriginalCSharp}";
+    }
+
+    public string Visit(ExpressionStatementNode node)
+    {
+        var expr = node.Expression.Accept(this);
+        AppendLine($"{expr};");
+        return "";
     }
 
     public string Visit(FallbackCommentNode node)

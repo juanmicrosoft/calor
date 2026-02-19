@@ -348,6 +348,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             isSealed,
             isPartial,
             isStatic,
+            isStruct: false,
             baseClass,
             interfaces,
             typeParameters,
@@ -468,7 +469,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             id,
             name,
             isAbstract: false,
-            isSealed: true,
+            isSealed: false,
+            isPartial: false,
+            isStatic: false,
+            isStruct: true,
             baseClass: null,
             interfaces,
             typeParameters,
@@ -476,7 +480,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             properties,
             constructors,
             methods,
-            new AttributeCollection());
+            Array.Empty<EventDefinitionNode>(),
+            new AttributeCollection(),
+            Array.Empty<CalorAttributeNode>());
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)

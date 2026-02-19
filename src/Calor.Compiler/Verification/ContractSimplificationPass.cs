@@ -166,6 +166,7 @@ public sealed class ContractSimplificationPass
             cls.IsSealed,
             cls.IsPartial,
             cls.IsStatic,
+            cls.IsStruct,
             cls.BaseClass,
             cls.ImplementedInterfaces,
             cls.TypeParameters,

@@ -12,7 +12,7 @@ using System.Text;
 
 namespace Transliterator
 {
-    public class TransliteratorBase
+    public abstract class TransliteratorBase
     {
         public abstract string Name { get; set; }
 

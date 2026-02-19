@@ -143,6 +143,10 @@ public enum UnaryOperator
     Negate,         // - (unary minus)
     Not,            // ! (logical not)
     BitwiseNot,     // ~ (bitwise not)
+    PreIncrement,   // ++x (prefix increment)
+    PreDecrement,   // --x (prefix decrement)
+    PostIncrement,  // x++ (postfix increment)
+    PostDecrement,  // x-- (postfix decrement)
 }
 
 /// <summary>
@@ -157,6 +161,10 @@ public static class UnaryOperatorExtensions
             "NEG" or "NEGATE" or "-" => UnaryOperator.Negate,
             "NOT" or "!" => UnaryOperator.Not,
             "BNOT" or "BITWISENOT" or "~" => UnaryOperator.BitwiseNot,
+            "INC" or "++" or "PRE-INC" => UnaryOperator.PreIncrement,
+            "DEC" or "--" or "PRE-DEC" => UnaryOperator.PreDecrement,
+            "POST-INC" => UnaryOperator.PostIncrement,
+            "POST-DEC" => UnaryOperator.PostDecrement,
             _ => null
         };
     }
@@ -168,6 +176,10 @@ public static class UnaryOperatorExtensions
             UnaryOperator.Negate => "-",
             UnaryOperator.Not => "!",
             UnaryOperator.BitwiseNot => "~",
+            UnaryOperator.PreIncrement => "++",
+            UnaryOperator.PreDecrement => "--",
+            UnaryOperator.PostIncrement => "++",
+            UnaryOperator.PostDecrement => "--",
             _ => throw new ArgumentOutOfRangeException(nameof(op))
         };
     }
