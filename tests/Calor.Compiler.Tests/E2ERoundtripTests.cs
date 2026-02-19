@@ -83,7 +83,10 @@ public class E2ERoundtripTests
         Assert.True(conversionResult.Success, $"Conversion failed for {scenarioName}:\n{GetErrorMessage(conversionResult)}");
 
         // Act - Compile Calor back to C#
-        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        // Disable effect enforcement: the C# → Calor converter doesn't generate §E{...}
+        // annotations, so roundtripped code will always lack effect declarations.
+        var compilationResult = Program.Compile(conversionResult.CalorSource!, "roundtrip.calr",
+            new CompilationOptions { EnforceEffects = false });
 
         // Assert
         Assert.False(compilationResult.HasErrors,

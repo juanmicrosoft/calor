@@ -156,4 +156,273 @@ public class EffectEnforcementTests
         Assert.True(result.HasErrors, "Should require cw effect");
         TestHarness.AssertDiagnostic(result.Diagnostics.Errors, DiagnosticCode.ForbiddenEffect, "TestPrint");
     }
+
+    [Fact]
+    public void LinqCallsInFunction_ArePure_CompilesSuccessfully()
+    {
+        // LINQ extension method calls in §F should be recognized as pure
+        var source = @"
+§M{m001:Test}
+§F{f001:SortItems:pub}
+  §O{void}
+  §C{items.OrderByDescending}
+  §/C
+  §C{items.ToArray}
+  §/C
+  §C{items.Where}
+  §/C
+  §C{items.Select}
+  §/C
+  §C{items.First}
+  §/C
+  §C{items.Any}
+  §/C
+  §C{items.Count}
+  §/C
+  §C{items.Distinct}
+  §/C
+  §C{items.ToList}
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"LINQ calls should compile without errors. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void LinqStaticCall_Enumerable_Range_CompilesSuccessfully()
+    {
+        // Static LINQ calls like Enumerable.Range should resolve via type mapping
+        var source = @"
+§M{m001:Test}
+§F{f001:MakeRange:pub}
+  §O{void}
+  §C{Enumerable.Range}
+    §A INT:1
+    §A INT:10
+  §/C
+  §C{Enumerable.Empty}
+  §/C
+  §C{Enumerable.Repeat}
+    §A INT:0
+    §A INT:5
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"Static Enumerable calls should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void LinqOfType_CompilesSuccessfully()
+    {
+        // OfType<T> calls should be recognized as pure
+        var source = @"
+§M{m001:Test}
+§F{f001:FilterTypes:pub}
+  §O{void}
+  §C{items.OfType}
+  §/C
+  §C{items.Cast}
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"OfType/Cast should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void MethodInClass_WithUndeclaredEffect_FailsEnforcement()
+    {
+        // §MT method inside §CL using §P without declaring cw should fail
+        var source = @"
+§M{m001:Test}
+§CL{c001:MyService:pub}
+  §MT{mt001:PrintHello:pub}
+    §O{void}
+    §P ""Hello from method""
+  §/MT{mt001}
+§/CL{c001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors,
+            "§MT method with undeclared effect should fail enforcement");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("PrintHello"));
+    }
+
+    [Fact]
+    public void MethodInClass_WithDeclaredEffect_CompilesSuccessfully()
+    {
+        // §MT method inside §CL using §P with cw declared should pass
+        var source = @"
+§M{m001:Test}
+§CL{c001:MyService:pub}
+  §MT{mt001:PrintHello:pub}
+    §O{void}
+    §E{cw}
+    §P ""Hello from method""
+  §/MT{mt001}
+§/CL{c001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"§MT with declared cw effect should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void MethodInClass_WithLinqCalls_CompilesSuccessfully()
+    {
+        // §MT method with LINQ calls should compile (both class enforcement and LINQ purity)
+        var source = @"
+§M{m001:Test}
+§CL{c001:DataProcessor:pub}
+  §MT{mt001:ProcessItems:pub}
+    §O{void}
+    §C{items.OrderByDescending}
+    §/C
+    §C{items.ToArray}
+    §/C
+    §C{items.Where}
+    §/C
+  §/MT{mt001}
+§/CL{c001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"LINQ calls in §MT should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void MethodInClass_CallingConsoleWriteLine_FailsWithoutEffect()
+    {
+        // §MT method calling Console.WriteLine without §E{cw} should fail
+        var source = @"
+§M{m001:Test}
+§CL{c001:Logger:pub}
+  §MT{mt001:Log:pub}
+    §O{void}
+    §C{Console.WriteLine}
+      §A STR:""log message""
+    §/C
+  §/MT{mt001}
+§/CL{c001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors,
+            "§MT calling Console.WriteLine without cw effect should fail");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Fact]
+    public void PureMethodInClass_WithNoEffects_Compiles()
+    {
+        // §MT method with only pure operations should compile
+        var source = @"
+§M{m001:Test}
+§CL{c001:Calculator:pub}
+  §MT{mt001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+  §/MT{mt001}
+§/CL{c001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"Pure §MT should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void ConstructorWithFieldAssignment_NotFlaggedForEffects()
+    {
+        // §CTOR that assigns to §THIS fields should NOT be flagged for mut effect
+        // since constructors can't declare effects and field assignment is their purpose
+        var source = @"
+§M{m001:Test}
+§CL{c001:Person:pub}
+  §FLD{str:_name:pri}
+  §CTOR{ctor1:pub}
+    §I{str:name}
+    §ASSIGN §THIS._name name
+  §/CTOR{ctor1}
+§/CL{c001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"Constructor field assignment should not fail enforcement. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void DelegateInvocation_SingleWordTarget_DoesNotFail()
+    {
+        // Calling a variable (delegate/Func parameter) should not produce
+        // an "unknown external call" error since it's not an external call
+        var source = @"
+§M{m001:Test}
+§CL{c001:Mapper:pub}
+  §MT{mt001:Apply:pub}
+    §I{i32:value}
+    §O{i32}
+    §R §C{transform} §A value §/C
+  §/MT{mt001}
+§/CL{c001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"Delegate invocation should not fail. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void DelegateInvocation_InStrictMode_EmitsWarning()
+    {
+        // In strict effects mode, delegate invocations should get a warning
+        var source = @"
+§M{m001:Test}
+§F{f001:UseDelegate:pub}
+  §O{void}
+  §C{callback}
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var options = new CompilationOptions
+        {
+            EnforceEffects = true,
+            StrictEffects = true
+        };
+        var result = TestHarness.Compile(source, options);
+
+        // Should not produce errors (delegate invocations are assumed pure)
+        Assert.False(result.HasErrors,
+            $"Delegate invocation should not be an error even in strict mode. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        // But should produce a warning about unverified effects
+        Assert.Contains(result.Diagnostics.Warnings,
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("callback"));
+    }
 }
