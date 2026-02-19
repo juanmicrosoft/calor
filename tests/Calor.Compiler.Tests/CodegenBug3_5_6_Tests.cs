@@ -391,6 +391,207 @@ public class CodegenBug3_5_6_Tests
         Assert.Contains("$\"Hello {name}\"", result);
     }
 
+    [Fact]
+    public void Bug5_IndexerAccess()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${arr[0]}"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        Assert.Contains("$\"{arr[0]}\"", result);
+    }
+
+    [Fact]
+    public void Bug5_MethodCall()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${obj.Method()}"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        Assert.Contains("$\"{obj.Method()}\"", result);
+    }
+
+    [Fact]
+    public void Bug5_ChainedIndexerProperty()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${list[i].Name}"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        Assert.Contains("$\"{list[i].Name}\"", result);
+    }
+
+    [Fact]
+    public void Bug5_MethodWithArgument()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${obj.GetValue(x)}"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        Assert.Contains("$\"{obj.GetValue(x)}\"", result);
+    }
+
+    [Fact]
+    public void Bug5_ArithmeticExpression()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${a + b}"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        Assert.Contains("$\"{a + b}\"", result);
+    }
+
+    [Fact]
+    public void Bug5_FormatPlaceholder_BackwardCompat()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${0}"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        // Format placeholders should NOT be converted to interpolation
+        Assert.DoesNotContain("$\"", result);
+        Assert.Contains("\"${0}\"", result);
+    }
+
+    [Fact]
+    public void Bug5_MultipleInterpolations()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${a} and ${b[0]}"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        Assert.Contains("$\"{a} and {b[0]}\"", result);
+    }
+
+    [Fact]
+    public void Bug5_NestedBraces()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${dict.GetOrAdd(key, () => new V { P = 1 })}"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        Assert.Contains("$\"{dict.GetOrAdd(key, () => new V { P = 1 })}\"", result);
+    }
+
+    [Fact]
+    public void Bug5_UnmatchedDollarBrace()
+    {
+        var source = """
+            §M{m1:Test}
+            §F{f001:Get:pub}
+              §O{str}
+              §B{~result:str} STR:"${incomplete"
+            §/F{f001}
+            §/M{m1}
+            """;
+
+        var result = ParseAndEmit(source);
+        // Unmatched ${ should be treated as literal text, not interpolation
+        Assert.DoesNotContain("$\"", result);
+        Assert.Contains("\"${incomplete\"", result);
+    }
+
+    [Fact]
+    public void Bug5_ConvertInlineInterpolation_EmptyBraces()
+    {
+        // ${} — empty expression, still converted (C# compiler will error, not our concern)
+        var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("${}");
+        Assert.True(hasInterpolation);
+        Assert.Equal("{}", converted);
+    }
+
+    [Fact]
+    public void Bug5_ConvertInlineInterpolation_NestedEmptyBraces()
+    {
+        // ${{}} — inner {} pair, outer closes the interpolation
+        var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("${{}}");
+        Assert.True(hasInterpolation);
+        Assert.Equal("{{}}", converted);
+    }
+
+    [Fact]
+    public void Bug5_ConvertInlineInterpolation_DoubleDollarBrace()
+    {
+        // $${{ — first ${ starts interpolation, second { increments depth, no matching close
+        var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("$${{");
+        Assert.False(hasInterpolation);
+        Assert.Equal("$${{", converted);
+    }
+
+    [Fact]
+    public void Bug5_ConvertInlineInterpolation_NoInterpolation()
+    {
+        // Plain string with no ${ at all — fast path
+        var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("hello world");
+        Assert.False(hasInterpolation);
+        Assert.Equal("hello world", converted);
+    }
+
+    [Fact]
+    public void Bug5_ConvertInlineInterpolation_DollarOnly()
+    {
+        // Lone $ at end of string
+        var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("price is $");
+        Assert.False(hasInterpolation);
+        Assert.Equal("price is $", converted);
+    }
+
+    [Fact]
+    public void Bug5_ConvertInlineInterpolation_EmptyString()
+    {
+        var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("");
+        Assert.False(hasInterpolation);
+        Assert.Equal("", converted);
+    }
+
     #endregion
 
     #region Helpers
