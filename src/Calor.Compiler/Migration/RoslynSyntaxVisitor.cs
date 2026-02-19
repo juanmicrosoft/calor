@@ -1848,6 +1848,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             BaseExpressionSyntax => new BaseExpressionNode(GetTextSpan(expression)),
             ConditionalExpressionSyntax conditional => ConvertConditionalExpression(conditional),
             ArrayCreationExpressionSyntax arrayCreation => ConvertArrayCreation(arrayCreation),
+            ImplicitArrayCreationExpressionSyntax implicitArray => ConvertImplicitArrayCreation(implicitArray),
             ElementAccessExpressionSyntax elementAccess => ConvertElementAccess(elementAccess),
             LambdaExpressionSyntax lambda => ConvertLambdaExpression(lambda),
             AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
@@ -1860,6 +1861,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SwitchExpressionSyntax switchExpr => ConvertSwitchExpression(switchExpr),
             ThrowExpressionSyntax throwExpr => ConvertThrowExpression(throwExpr),
             DefaultExpressionSyntax defaultExpr => ConvertDefaultExpression(defaultExpr),
+            AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
+            QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -1875,7 +1878,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is float floatVal =>
                 new FloatLiteralNode(GetTextSpan(literal), floatVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is decimal decVal =>
-                new FloatLiteralNode(GetTextSpan(literal), (double)decVal, isDecimal: true),
+                new DecimalLiteralNode(GetTextSpan(literal), decVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is long longVal =>
                 new IntLiteralNode(GetTextSpan(literal), (int)longVal),
             SyntaxKind.StringLiteralExpression =>
@@ -2139,6 +2142,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 _context.RecordFeatureUsage("native-stringbuilder-op");
                 return sbOp2;
+            }
+
+            // Handle chained method calls (e.g., products.GroupBy(...).Select(...))
+            // When the target expression is an invocation, recursively convert it
+            // so that each call in the chain is properly represented in Calor
+            if (memberAccess.Expression is InvocationExpressionSyntax innerInvocation)
+            {
+                _context.RecordFeatureUsage("linq-method");
+                var innerConverted = ConvertInvocationExpression(innerInvocation);
+                // Emit inner call as the target prefix, e.g., "§C{collection.GroupBy} ... §/C .Select"
+                var emitter = new CalorEmitter();
+                var innerCalor = innerConverted.Accept(emitter);
+                return new CallExpressionNode(span, $"({innerCalor}).{methodName}", args);
             }
         }
 
@@ -2454,6 +2470,146 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers);
     }
 
+    private AnonymousObjectCreationNode ConvertAnonymousObjectCreation(AnonymousObjectCreationExpressionSyntax anonObj)
+    {
+        _context.RecordFeatureUsage("anonymous-type");
+        var initializers = new List<ObjectInitializerAssignment>();
+
+        foreach (var init in anonObj.Initializers)
+        {
+            var name = init.NameEquals?.Name.Identifier.Text ?? init.Expression.ToString();
+            var value = ConvertExpression(init.Expression);
+            initializers.Add(new ObjectInitializerAssignment(name, value));
+        }
+
+        return new AnonymousObjectCreationNode(GetTextSpan(anonObj), initializers);
+    }
+
+    /// <summary>
+    /// Desugars LINQ query syntax to equivalent method chain calls.
+    /// from x in collection where cond select proj → collection.Where(x => cond).Select(x => proj)
+    /// </summary>
+    private ExpressionNode ConvertQueryExpression(QueryExpressionSyntax query)
+    {
+        _context.RecordFeatureUsage("linq-query");
+        var span = GetTextSpan(query);
+
+        // Start with the from clause's collection
+        var rangeVar = query.FromClause.Identifier.Text;
+        var collection = ConvertExpression(query.FromClause.Expression);
+        var collectionCalor = collection.Accept(new CalorEmitter());
+
+        // Build the method chain from body clauses
+        var currentTarget = collectionCalor;
+
+        var body = query.Body;
+        while (body != null)
+        {
+            // Process body clauses (where, orderby, let, join, additional from)
+            foreach (var clause in body.Clauses)
+            {
+                switch (clause)
+                {
+                    case WhereClauseSyntax whereClause:
+                    {
+                        var condition = ConvertExpression(whereClause.Condition);
+                        var condCalor = condition.Accept(new CalorEmitter());
+                        currentTarget = $"§C{{({currentTarget}).Where}} §A ({rangeVar}) → {condCalor} §/C";
+                        break;
+                    }
+                    case OrderByClauseSyntax orderByClause:
+                    {
+                        var isFirst = true;
+                        foreach (var ordering in orderByClause.Orderings)
+                        {
+                            var keyExpr = ConvertExpression(ordering.Expression);
+                            var keyCalor = keyExpr.Accept(new CalorEmitter());
+                            var isDescending = ordering.AscendingOrDescendingKeyword.IsKind(SyntaxKind.DescendingKeyword);
+
+                            string methodName;
+                            if (isFirst)
+                                methodName = isDescending ? "OrderByDescending" : "OrderBy";
+                            else
+                                methodName = isDescending ? "ThenByDescending" : "ThenBy";
+
+                            currentTarget = $"§C{{({currentTarget}).{methodName}}} §A ({rangeVar}) → {keyCalor} §/C";
+                            isFirst = false;
+                        }
+                        break;
+                    }
+                    case LetClauseSyntax letClause:
+                    {
+                        // let v = expr → .Select(x => new { x, v = expr })
+                        var letVar = letClause.Identifier.Text;
+                        var letExpr = ConvertExpression(letClause.Expression);
+                        var letCalor = letExpr.Accept(new CalorEmitter());
+                        currentTarget = $"§C{{({currentTarget}).Select}} §A ({rangeVar}) → §ANON\n  {rangeVar} = {rangeVar}\n  {letVar} = {letCalor}\n§/ANON §/C";
+                        // After let, the range variable becomes the anonymous type
+                        // but for simplicity we keep the same range var name
+                        break;
+                    }
+                    case JoinClauseSyntax joinClause:
+                    {
+                        var joinVar = joinClause.Identifier.Text;
+                        var joinCollection = ConvertExpression(joinClause.InExpression);
+                        var joinCollCalor = joinCollection.Accept(new CalorEmitter());
+                        var leftKey = ConvertExpression(joinClause.LeftExpression);
+                        var leftKeyCalor = leftKey.Accept(new CalorEmitter());
+                        var rightKey = ConvertExpression(joinClause.RightExpression);
+                        var rightKeyCalor = rightKey.Accept(new CalorEmitter());
+                        currentTarget = $"§C{{({currentTarget}).Join}} §A {joinCollCalor} §A ({rangeVar}) → {leftKeyCalor} §A ({joinVar}) → {rightKeyCalor} §A ({rangeVar}, {joinVar}) → §ANON\n  {rangeVar} = {rangeVar}\n  {joinVar} = {joinVar}\n§/ANON §/C";
+                        break;
+                    }
+                    case FromClauseSyntax additionalFrom:
+                    {
+                        // Additional from → SelectMany
+                        var innerVar = additionalFrom.Identifier.Text;
+                        var innerCollection = ConvertExpression(additionalFrom.Expression);
+                        var innerCalor = innerCollection.Accept(new CalorEmitter());
+                        currentTarget = $"§C{{({currentTarget}).SelectMany}} §A ({rangeVar}) → {innerCalor} §/C";
+                        rangeVar = innerVar;
+                        break;
+                    }
+                }
+            }
+
+            // Process the terminal select or group clause
+            if (body.SelectOrGroup is SelectClauseSyntax selectClause)
+            {
+                var projection = ConvertExpression(selectClause.Expression);
+                var projCalor = projection.Accept(new CalorEmitter());
+                // Only add Select if projection is not just the range variable
+                if (projCalor != rangeVar)
+                {
+                    currentTarget = $"§C{{({currentTarget}).Select}} §A ({rangeVar}) → {projCalor} §/C";
+                }
+            }
+            else if (body.SelectOrGroup is GroupClauseSyntax groupClause)
+            {
+                var groupExpr = ConvertExpression(groupClause.GroupExpression);
+                var groupCalor = groupExpr.Accept(new CalorEmitter());
+                var byExpr = ConvertExpression(groupClause.ByExpression);
+                var byCalor = byExpr.Accept(new CalorEmitter());
+                currentTarget = $"§C{{({currentTarget}).GroupBy}} §A ({rangeVar}) → {byCalor} §/C";
+            }
+
+            // Handle continuation (into g ...)
+            if (body.Continuation != null)
+            {
+                rangeVar = body.Continuation.Identifier.Text;
+                body = body.Continuation.Body;
+            }
+            else
+            {
+                body = null;
+            }
+        }
+
+        // Parse the final Calor string back to an expression node
+        // For now, represent as a ReferenceNode with the full Calor text
+        return new ReferenceNode(span, currentTarget);
+    }
+
     private ListCreationNode ConvertListCreation(ObjectCreationExpressionSyntax objCreation, string elementType)
     {
         var id = _context.GenerateId("list");
@@ -2671,6 +2827,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new ArrayCreationNode(GetTextSpan(arrayCreation), id, name, elementType, size, initializer, new AttributeCollection());
+    }
+
+    private ArrayCreationNode ConvertImplicitArrayCreation(ImplicitArrayCreationExpressionSyntax implicitArray)
+    {
+        var id = _context.GenerateId("arr");
+        var initializer = implicitArray.Initializer.Expressions
+            .Select(ConvertExpression)
+            .ToList();
+
+        // Infer element type from first element or use "object"
+        var elementType = "object";
+        if (initializer.Count > 0 && initializer[0] is IntLiteralNode) elementType = "i32";
+        else if (initializer.Count > 0 && initializer[0] is FloatLiteralNode) elementType = "f64";
+        else if (initializer.Count > 0 && initializer[0] is DecimalLiteralNode) elementType = "decimal";
+        else if (initializer.Count > 0 && initializer[0] is StringLiteralNode) elementType = "str";
+        else if (initializer.Count > 0 && initializer[0] is BoolLiteralNode) elementType = "bool";
+
+        return new ArrayCreationNode(GetTextSpan(implicitArray), id, id, elementType, null, initializer, new AttributeCollection());
     }
 
     private ExpressionNode ConvertElementAccess(ElementAccessExpressionSyntax elementAccess)

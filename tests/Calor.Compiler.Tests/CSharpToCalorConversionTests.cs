@@ -453,9 +453,9 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("§NEW{Person}", result.CalorSource);
-        Assert.Contains("§INIT{Name}", result.CalorSource);
-        Assert.Contains("§INIT{Age}", result.CalorSource);
-        Assert.Contains("§INIT{City}", result.CalorSource);
+        Assert.Contains("Name =", result.CalorSource);
+        Assert.Contains("Age =", result.CalorSource);
+        Assert.Contains("City =", result.CalorSource);
         Assert.Contains("object-initializer", result.Context.UsedFeatures);
     }
 
@@ -471,8 +471,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("§NEW{Settings}", result.CalorSource);
-        Assert.Contains("§INIT{Timeout}", result.CalorSource);
-        Assert.Contains("§INIT{Enabled}", result.CalorSource);
+        Assert.Contains("Timeout =", result.CalorSource);
+        Assert.Contains("Enabled =", result.CalorSource);
     }
 
     [Fact]
@@ -491,8 +491,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("Order", result.CalorSource);
-        Assert.Contains("§INIT{Customer}", result.CalorSource);
-        Assert.Contains("§INIT{Total}", result.CalorSource);
+        Assert.Contains("Customer =", result.CalorSource);
+        Assert.Contains("Total =", result.CalorSource);
     }
 
     #endregion

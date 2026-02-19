@@ -141,6 +141,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(BoolLiteralNode node) { }
     public void Visit(ConditionalExpressionNode node) { }
     public void Visit(FloatLiteralNode node) { }
+    public void Visit(DecimalLiteralNode node) { }
     public void Visit(ReferenceNode node) { }
     public void Visit(ForStatementNode node) { }
     public void Visit(WhileStatementNode node) { }
@@ -198,6 +199,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(GenericTypeNode node) { }
     public void Visit(ClassFieldNode node) { }
     public void Visit(NewExpressionNode node) { }
+    public void Visit(AnonymousObjectCreationNode node) { }
     public void Visit(CallExpressionNode node) { }
     public void Visit(ThisExpressionNode node) { }
     public void Visit(BaseExpressionNode node) { }
