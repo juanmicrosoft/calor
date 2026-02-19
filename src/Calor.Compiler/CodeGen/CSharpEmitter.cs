@@ -2015,6 +2015,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _ => "public"
         };
 
+        var modifiers = new List<string> { visibility };
+        if (node.IsStatic) modifiers.Add("static");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        else if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsSealed && node.IsOverride) modifiers.Add("sealed");
+
+        var modifierStr = string.Join(" ", modifiers);
         var typeName = MapTypeName(node.TypeName);
         var propName = SanitizeIdentifier(node.Name);
 
@@ -2024,17 +2032,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (node.DefaultValue != null)
             {
                 var defaultVal = node.DefaultValue.Accept(this);
-                AppendLine($"{visibility} {typeName} {propName} {{ get; set; }} = {defaultVal};");
+                AppendLine($"{modifierStr} {typeName} {propName} {{ get; set; }} = {defaultVal};");
             }
             else
             {
-                AppendLine($"{visibility} {typeName} {propName} {{ get; set; }}");
+                AppendLine($"{modifierStr} {typeName} {propName} {{ get; set; }}");
             }
             return "";
         }
 
         // Property with accessors
-        AppendLine($"{visibility} {typeName} {propName}");
+        AppendLine($"{modifierStr} {typeName} {propName}");
         AppendLine("{");
         Indent();
 
@@ -3108,6 +3116,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         return node.Operation switch
         {
+            // Literal
+            CharOp.CharLiteral => EmitCharLiteral(args[0]),
+
             // Extraction
             CharOp.CharAt => $"{args[0]}[{args[1]}]",
             CharOp.CharCode => $"(int){args[0]}",
@@ -3125,6 +3136,33 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             CharOp.ToLowerChar => $"char.ToLower({args[0]})",
 
             _ => throw new NotSupportedException($"Unknown char operation: {node.Operation}")
+        };
+    }
+
+    /// <summary>
+    /// Emits a C# char literal from a string literal argument.
+    /// Input is the emitted C# string (e.g., "\"Y\""), output is a char literal (e.g., "'Y'").
+    /// Handles special characters that need different escaping in char vs string context.
+    /// </summary>
+    private static string EmitCharLiteral(string stringArg)
+    {
+        // Strip surrounding double quotes from the emitted string literal
+        var inner = stringArg;
+        if (inner.StartsWith('"') && inner.EndsWith('"'))
+        {
+            inner = inner[1..^1];
+        }
+
+        // Handle characters that need escaping in a char literal
+        return inner switch
+        {
+            "'" => @"'\''",        // single quote needs escaping in char context
+            "\\\\" => @"'\\'",     // already-escaped backslash stays as-is
+            "\\n" => "'\\n'",      // newline
+            "\\r" => "'\\r'",      // carriage return
+            "\\t" => "'\\t'",      // tab
+            "\\0" => "'\\0'",      // null
+            _ => $"'{inner}'"      // normal character
         };
     }
 

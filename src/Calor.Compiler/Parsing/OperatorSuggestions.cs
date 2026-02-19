@@ -42,6 +42,7 @@ public static class OperatorSuggestions
         "regex-test", "regex-match", "regex-replace", "regex-split",
 
         // Char operations
+        "char-lit",
         "char-at", "char-code", "char-from-code",
         "is-letter", "is-digit", "is-whitespace", "is-upper", "is-lower",
         "char-upper", "char-lower",
@@ -281,6 +282,7 @@ public static class OperatorSuggestions
     {
         return opName.ToLowerInvariant() switch
         {
+            "char-lit" => "(char-lit \"X\")",
             "char-at" => "(char-at str index)",
             "char-code" => "(char-code char)",
             "char-from-code" => "(char-from-code int)",

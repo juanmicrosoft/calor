@@ -11,6 +11,7 @@ public sealed class Parser
     private readonly List<Token> _tokens;
     private readonly DiagnosticBag _diagnostics;
     private int _position;
+    private bool _insideArgContext;
 
     public Parser(IEnumerable<Token> tokens, DiagnosticBag diagnostics)
     {
@@ -897,7 +898,16 @@ public sealed class Parser
     {
         Expect(TokenKind.Arg);
 
-        return ParseExpression();
+        var saved = _insideArgContext;
+        _insideArgContext = true;
+        try
+        {
+            return ParseExpression();
+        }
+        finally
+        {
+            _insideArgContext = saved;
+        }
     }
 
     private ReturnStatementNode ParseReturnStatement()
@@ -1348,6 +1358,26 @@ public sealed class Parser
                 var example = OperatorSuggestions.GetCharOpExample(opText);
                 _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
                     $"Char operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}. Example: {example}");
+            }
+
+            // Validate char-lit argument is a single-character string literal
+            if (charOp.Value == CharOp.CharLiteral && args.Count == 1)
+            {
+                if (args[0] is StringLiteralNode strLit)
+                {
+                    // Value is already unescaped by the lexer ("\\" → \, "\n" → newline, etc.)
+                    // so a single character is always length 1
+                    if (strLit.Value.Length != 1)
+                    {
+                        _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                            $"char-lit requires a single character, got \"{strLit.Value}\" ({strLit.Value.Length} characters). Example: (char-lit \"Y\")");
+                    }
+                }
+                else
+                {
+                    _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                        "char-lit requires a string literal argument. Example: (char-lit \"Y\")");
+                }
             }
 
             return new CharOperationNode(span, charOp.Value, args);
@@ -3259,10 +3289,26 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Array);
         var attrs = ParseAttributes();
 
-        // Positional: [id:type:size?] or just [id:type] for initialized arrays
-        var id = attrs["_pos0"] ?? "";
-        var elementType = attrs["_pos1"] ?? "i32";
+        // Positional: [id:type:size?] or [type:id:size?] for initialized arrays
+        var rawPos0 = attrs["_pos0"] ?? "";
+        var rawPos1 = attrs["_pos1"] ?? "i32";
         var sizeStr = attrs["_pos2"];
+
+        string id;
+        string elementType;
+
+        // Detect format: {type:id:size} vs {id:type:size}
+        // If pos0 looks like a type and pos1 doesn't, it's {type:id:size}
+        if (AttributeHelper.IsLikelyType(rawPos0) && !AttributeHelper.IsLikelyType(rawPos1))
+        {
+            elementType = rawPos0;
+            id = rawPos1;
+        }
+        else
+        {
+            id = rawPos0;
+            elementType = rawPos1;
+        }
 
         if (string.IsNullOrEmpty(id))
         {
@@ -3365,28 +3411,26 @@ public sealed class Parser
     /// <summary>
     /// Parses array element access.
     /// §IDX §REF[name=arr] 0                     // arr[0]
+    /// §IDX{arr} 0                               // arr[0] (attribute shorthand)
     /// </summary>
     private ArrayAccessNode ParseArrayAccess()
     {
         var startToken = Expect(TokenKind.Index);
+        var attrs = ParseAttributes();
+        var pos0 = attrs["_pos0"];
 
-        // Detect common error: §IDX{arr} (brace format) instead of §IDX arr
-        if (Check(TokenKind.OpenBrace))
+        ExpressionNode array;
+        if (!string.IsNullOrEmpty(pos0))
         {
-            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                "§IDX does not use braces. Use '§IDX arr index' instead of '§IDX{arr} index'.");
-
-            // Recovery: skip { ... } so we don't cascade into collection-initializer parsing
-            Advance(); // consume {
-            var recoveredArray = ParseExpression();
-            if (Check(TokenKind.CloseBrace))
-                Advance(); // consume }
-            var recoveredIndex = ParseExpression();
-            var recoveredSpan = startToken.Span.Union(recoveredIndex.Span);
-            return new ArrayAccessNode(recoveredSpan, recoveredArray, recoveredIndex);
+            // §IDX{varName} index — attribute contains the array reference
+            array = new ReferenceNode(startToken.Span, pos0);
+        }
+        else
+        {
+            // §IDX §REF[name=arr] index — two separate expressions
+            array = ParseExpression();
         }
 
-        var array = ParseExpression();
         var index = ParseExpression();
 
         var span = startToken.Span.Union(index.Span);
@@ -4728,28 +4772,46 @@ public sealed class Parser
         var attrs = ParseAttributes();
 
         // Positional: [typeName:typeArg1:typeArg2:...]
-        var typeName = attrs["_pos0"] ?? "object";
+        var rawTypeName = attrs["_pos0"] ?? "object";
 
-        // Collect type arguments
+        string typeName;
         var typeArgs = new List<string>();
-        var posCount = attrs["_posCount"];
-        if (int.TryParse(posCount, out var count))
+
+        // Handle generic types in _pos0 like "Dictionary<char,str>"
+        var angleIndex = rawTypeName.IndexOf('<');
+        if (angleIndex >= 0 && rawTypeName.EndsWith('>'))
         {
-            for (int i = 1; i < count; i++)
+            typeName = rawTypeName[..angleIndex];
+            var innerArgs = rawTypeName[(angleIndex + 1)..^1]; // "char,str"
+            typeArgs.AddRange(innerArgs.Split(',').Select(a => a.Trim()));
+        }
+        else
+        {
+            typeName = rawTypeName;
+            // Collect type arguments from positional params (existing behavior: §NEW{Dict:char:str})
+            var posCount = attrs["_posCount"];
+            if (int.TryParse(posCount, out var count))
             {
-                var typeArg = attrs[$"_pos{i}"];
-                if (!string.IsNullOrEmpty(typeArg))
+                for (int i = 1; i < count; i++)
                 {
-                    typeArgs.Add(typeArg);
+                    var typeArg = attrs[$"_pos{i}"];
+                    if (!string.IsNullOrEmpty(typeArg))
+                    {
+                        typeArgs.Add(typeArg);
+                    }
                 }
             }
         }
 
-        // Parse arguments
+        // Parse arguments — only when not inside an argument context
+        // (avoids stealing §A tokens that belong to the enclosing §C)
         var arguments = new List<ExpressionNode>();
-        while (Check(TokenKind.Arg))
+        if (!_insideArgContext)
         {
-            arguments.Add(ParseArgument());
+            while (Check(TokenKind.Arg))
+            {
+                arguments.Add(ParseArgument());
+            }
         }
 
         // Check for optional end tag
@@ -4883,11 +4945,12 @@ public sealed class Parser
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
-        // Positional: [id:name:type:visibility?]
+        // Positional: [id:name:type:visibility?:modifiers?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
         var typeName = attrs["_pos2"] ?? "object";
         var visStr = attrs["_pos3"] ?? "public";
+        var modStr = attrs["_pos4"] ?? "";
 
         if (string.IsNullOrEmpty(id))
         {
@@ -4895,6 +4958,7 @@ public sealed class Parser
         }
 
         var visibility = ParseVisibility(visStr);
+        var modifiers = ParseMethodModifiers(modStr);
 
         PropertyAccessorNode? getter = null;
         PropertyAccessorNode? setter = null;
@@ -4942,7 +5006,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new PropertyNode(span, id, name, typeName, visibility, getter, setter, initer, defaultValue, attrs, csharpAttrs);
+        return new PropertyNode(span, id, name, typeName, visibility, modifiers, getter, setter, initer, defaultValue, attrs, csharpAttrs);
     }
 
     /// <summary>
