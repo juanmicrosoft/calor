@@ -307,23 +307,20 @@ public static class FeatureSupport
         ["operator-overload"] = new FeatureInfo
         {
             Name = "operator-overload",
-            Support = SupportLevel.ManualRequired,
-            Description = "Operator overloading requires manual conversion",
-            Workaround = "Define explicit methods instead"
+            Support = SupportLevel.Full,
+            Description = "Operator overloads are converted to op_ CIL-convention methods"
         },
         ["implicit-conversion"] = new FeatureInfo
         {
             Name = "implicit-conversion",
-            Support = SupportLevel.ManualRequired,
-            Description = "Implicit conversions require manual handling",
-            Workaround = "Use explicit conversion methods"
+            Support = SupportLevel.Full,
+            Description = "Implicit conversions are converted to op_Implicit methods"
         },
         ["explicit-conversion"] = new FeatureInfo
         {
             Name = "explicit-conversion",
-            Support = SupportLevel.ManualRequired,
-            Description = "Explicit conversions require manual handling",
-            Workaround = "Use explicit conversion methods"
+            Support = SupportLevel.Full,
+            Description = "Explicit conversions are converted to op_Explicit methods"
         },
 
         // Additional features based on agent feedback
@@ -351,9 +348,8 @@ public static class FeatureSupport
         ["equals-operator"] = new FeatureInfo
         {
             Name = "equals-operator",
-            Support = SupportLevel.ManualRequired,
-            Description = "Custom == and != operator overloading requires manual conversion",
-            Workaround = "Define an Equals method instead"
+            Support = SupportLevel.Full,
+            Description = "Custom == and != operators are converted to op_Equality/op_Inequality methods"
         },
         ["primary-constructor"] = new FeatureInfo
         {
@@ -523,9 +519,8 @@ public static class FeatureSupport
         ["readonly-struct"] = new FeatureInfo
         {
             Name = "readonly-struct",
-            Support = SupportLevel.NotSupported,
-            Description = "readonly struct types are not supported",
-            Workaround = "Use regular struct; readonly semantics cannot be enforced"
+            Support = SupportLevel.Full,
+            Description = "Readonly structs are converted with struct and readonly modifiers"
         },
 
         // Phase 4 features (C# 11-13)

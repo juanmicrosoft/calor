@@ -64,8 +64,6 @@ public class FeatureCheckCommandTests
 
     [Theory]
     [InlineData("extension-method", SupportLevel.ManualRequired)]
-    [InlineData("operator-overload", SupportLevel.ManualRequired)]
-    [InlineData("implicit-conversion", SupportLevel.ManualRequired)]
     public void FeatureCheck_ManualRequired_ReturnsManualLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);

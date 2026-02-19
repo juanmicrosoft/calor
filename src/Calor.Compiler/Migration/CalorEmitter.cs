@@ -190,6 +190,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsSealed) modifiers.Add("sealed");
         if (node.IsPartial) modifiers.Add("partial");
         if (node.IsStatic) modifiers.Add("static");
+        if (node.IsStruct) modifiers.Add("struct");
+        if (node.IsReadOnly) modifiers.Add("readonly");
 
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
         var baseStr = node.BaseClass != null ? $":{node.BaseClass}" : "";

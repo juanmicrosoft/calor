@@ -4370,6 +4370,8 @@ public sealed class Parser
 
         var isAbstract = modifiers.Contains("abs", StringComparison.OrdinalIgnoreCase);
         var isSealed = modifiers.Contains("seal", StringComparison.OrdinalIgnoreCase);
+        var isStruct = modifiers.Contains("struct", StringComparison.OrdinalIgnoreCase);
+        var isReadOnly = modifiers.Contains("readonly", StringComparison.OrdinalIgnoreCase);
 
         string? baseClass = null;
         var implementedInterfaces = new List<string>();
@@ -4475,7 +4477,8 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass,
-            implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, attrs, csharpAttrs);
+            implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, attrs, csharpAttrs,
+            isStruct: isStruct, isReadOnly: isReadOnly);
     }
 
     /// <summary>

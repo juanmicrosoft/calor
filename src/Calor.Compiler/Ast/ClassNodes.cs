@@ -206,6 +206,16 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public bool IsStatic { get; }
 
     /// <summary>
+    /// True if this is a struct (value type).
+    /// </summary>
+    public bool IsStruct { get; }
+
+    /// <summary>
+    /// True if this is a readonly struct.
+    /// </summary>
+    public bool IsReadOnly { get; }
+
+    /// <summary>
     /// The base class (if any).
     /// </summary>
     public string? BaseClass { get; }
@@ -349,13 +359,17 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodNode> methods,
         IReadOnlyList<EventDefinitionNode> events,
         AttributeCollection attributes,
-        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        bool isStruct = false,
+        bool isReadOnly = false)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
         IsSealed = isSealed;
         IsPartial = isPartial;
         IsStatic = isStatic;
+        IsStruct = isStruct;
+        IsReadOnly = isReadOnly;
         BaseClass = baseClass;
         ImplementedInterfaces = implementedInterfaces ?? throw new ArgumentNullException(nameof(implementedInterfaces));
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
