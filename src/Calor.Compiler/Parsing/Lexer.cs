@@ -864,7 +864,69 @@ public sealed class Lexer
 
     private Token ScanStringLiteral()
     {
+        // Detect triple-quote for multiline strings: """..."""
+        if (Lookahead == '"' && Peek(2) == '"')
+            return ScanMultilineStringLiteral();
         return ScanStringLiteralValue();
+    }
+
+    private Token ScanMultilineStringLiteral()
+    {
+        Advance(); // consume first "
+        Advance(); // consume second "
+        Advance(); // consume third "
+
+        // Optionally skip a leading newline right after the opening triple-quote
+        if (!IsAtEnd && Current == '\r')
+            Advance();
+        if (!IsAtEnd && Current == '\n')
+            Advance();
+
+        var sb = new System.Text.StringBuilder();
+        while (!IsAtEnd)
+        {
+            // Check for closing triple-quote
+            if (Current == '"' && Lookahead == '"' && Peek(2) == '"')
+            {
+                Advance(); // consume first "
+                Advance(); // consume second "
+                Advance(); // consume third "
+                return MakeToken(TokenKind.StrLiteral, sb.ToString());
+            }
+
+            if (Current == '\\')
+            {
+                Advance();
+                var escaped = Current switch
+                {
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    '0' => '\0',
+                    '\\' => '\\',
+                    '"' => '"',
+                    _ => '\x01' // sentinel for invalid escape
+                };
+
+                if (escaped == '\x01')
+                {
+                    _diagnostics.ReportInvalidEscapeSequence(CurrentSpan(), Current);
+                }
+                else
+                {
+                    sb.Append(escaped);
+                }
+                Advance();
+            }
+            else
+            {
+                sb.Append(Current);
+                Advance();
+            }
+        }
+
+        _diagnostics.ReportUnterminatedString(CurrentSpan());
+        return MakeToken(TokenKind.Error);
     }
 
     private Token ScanStringLiteralValue()

@@ -209,6 +209,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(StringOperationNode node) => DefaultVisit(node)!;
     public virtual T Visit(CharOperationNode node) => DefaultVisit(node)!;
     public virtual T Visit(TypeOperationNode node) => DefaultVisit(node)!;
+    public virtual T Visit(IsPatternNode node) => DefaultVisit(node)!;
     public virtual T Visit(StringBuilderOperationNode node) => DefaultVisit(node)!;
 
     // Expression statement
@@ -216,4 +217,9 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Fallback nodes
     public virtual T Visit(FallbackExpressionNode node) => DefaultVisit(node)!;
     public virtual T Visit(FallbackCommentNode node) => DefaultVisit(node)!;
+
+    // Feature 12: typeof expression
+    public virtual T Visit(TypeOfExpressionNode node) => DefaultVisit(node)!;
+    // Feature 9: Expression call targets
+    public virtual T Visit(ExpressionCallNode node) => DefaultVisit(node)!;
 }

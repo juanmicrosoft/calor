@@ -35,6 +35,12 @@ public sealed class StringLiteralNode : ExpressionNode
 {
     public string Value { get; }
 
+    /// <summary>
+    /// True if this string originated from a triple-quote multiline literal (""" ... """).
+    /// Used by the emitter to decide between verbatim and escaped string output.
+    /// </summary>
+    public bool IsMultiline { get; init; }
+
     public StringLiteralNode(TextSpan span, string value) : base(span)
     {
         Value = value ?? throw new ArgumentNullException(nameof(value));

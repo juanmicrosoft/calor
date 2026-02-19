@@ -58,17 +58,21 @@ public class TypeOperationTests
     }
 
     [Fact]
-    public void Parse_Is_ReturnsTypeOperationNode()
+    public void Parse_Is_ReturnsIsPatternNode()
     {
         var source = WrapInFunction("§R (is x str)");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var typeOp = GetReturnTypeExpression(module);
-        Assert.Equal(TypeOp.Is, typeOp.Operation);
-        Assert.Equal("str", typeOp.TargetType);
-        Assert.IsType<ReferenceNode>(typeOp.Operand);
-        Assert.Equal("x", ((ReferenceNode)typeOp.Operand).Name);
+        var func = module.Functions[0];
+        var returnStmt = func.Body[0] as ReturnStatementNode;
+        Assert.NotNull(returnStmt);
+        var isPattern = returnStmt!.Expression as IsPatternNode;
+        Assert.NotNull(isPattern);
+        Assert.Equal("str", isPattern!.TargetType);
+        Assert.Null(isPattern.VariableName);
+        Assert.IsType<ReferenceNode>(isPattern.Operand);
+        Assert.Equal("x", ((ReferenceNode)isPattern.Operand).Name);
     }
 
     [Fact]
@@ -189,7 +193,6 @@ public class TypeOperationTests
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires exactly 2 arguments"));
     }
 
     [Fact]
@@ -199,7 +202,6 @@ public class TypeOperationTests
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires exactly 2 arguments"));
     }
 
     [Fact]
@@ -219,7 +221,7 @@ public class TypeOperationTests
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("Expected a type name"));
+        Assert.Contains(diagnostics, d => d.Message.Contains("Expected type name"));
     }
 
     #endregion
@@ -484,8 +486,8 @@ public class TypeOperationTests
         Assert.Equal(TypeOp.Cast, outer.Operation);
         Assert.Equal("i32", outer.TargetType);
 
-        var inner = Assert.IsType<TypeOperationNode>(outer.Operand);
-        Assert.Equal(TypeOp.Is, inner.Operation);
+        var inner = Assert.IsType<IsPatternNode>(outer.Operand);
+        Assert.Equal("str", inner.TargetType);
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);

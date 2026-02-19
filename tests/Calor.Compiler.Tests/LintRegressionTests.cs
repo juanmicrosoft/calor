@@ -337,10 +337,9 @@ public class LintRegressionTests
 
         Assert.True(parseSuccess);
 
-        // Formatter outputs §LET for immutable, §MUT for mutable bindings
-        // Note: Parser uses §B{name} or §B{~name} for input
-        Assert.Contains("§LET{", formatted);
-        Assert.Contains("§MUT{", formatted);
+        // Formatter outputs §B{name} for immutable and §B{~name} for mutable bindings
+        Assert.Contains("§B{", formatted);
+        Assert.Contains("§B{~", formatted); // mutable binds use ~ prefix
     }
 
     #endregion

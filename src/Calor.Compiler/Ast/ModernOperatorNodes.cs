@@ -171,3 +171,41 @@ public sealed class IndexFromEndNode : ExpressionNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents a typeof expression.
+/// (typeof int) generates: typeof(int)
+/// </summary>
+public sealed class TypeOfExpressionNode : ExpressionNode
+{
+    public string TypeName { get; }
+
+    public TypeOfExpressionNode(TextSpan span, string typeName)
+        : base(span)
+    {
+        TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents a call expression where the target is an expression rather than a string name.
+/// §C §NEW{object}§/NEW.GetType §/C generates: new object().GetType()
+/// </summary>
+public sealed class ExpressionCallNode : ExpressionNode
+{
+    public ExpressionNode TargetExpression { get; }
+    public IReadOnlyList<ExpressionNode> Arguments { get; }
+
+    public ExpressionCallNode(TextSpan span, ExpressionNode targetExpression, IReadOnlyList<ExpressionNode> arguments)
+        : base(span)
+    {
+        TargetExpression = targetExpression ?? throw new ArgumentNullException(nameof(targetExpression));
+        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

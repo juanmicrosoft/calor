@@ -1222,6 +1222,24 @@ public sealed class Parser
             return ParseImplicationExpression(startToken);
         }
 
+        // Handle typeof: (typeof TypeName)
+        if (opText == "typeof")
+        {
+            var typeName = ParseLispTypeName();
+            var typeofEnd = Expect(TokenKind.CloseParen);
+            return new TypeOfExpressionNode(startToken.Span.Union(typeofEnd.Span), typeName);
+        }
+
+        // Handle is/as with special type parsing to support generics
+        if (opText == "is")
+        {
+            return ParseLispIsExpression(startToken);
+        }
+        if (opText == "as")
+        {
+            return ParseLispAsExpression(startToken);
+        }
+
         // Parse arguments until we hit CloseParen
         var args = new List<ExpressionNode>();
         while (!Check(TokenKind.CloseParen) && !IsAtEnd)
@@ -1236,6 +1254,18 @@ public sealed class Parser
         if (opText == "?" && args.Count == 3)
         {
             return new ConditionalExpressionNode(span, args[0], args[1], args[2]);
+        }
+
+        // Handle null-coalescing: (?? x "default")
+        if (opText == "??" && args.Count == 2)
+        {
+            return new NullCoalesceNode(span, args[0], args[1]);
+        }
+        if (opText == "??")
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                $"Null-coalescing '??' requires exactly 2 operands, got {args.Count}");
+            return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
         }
 
         // Determine if this is unary or binary based on argument count and operator
@@ -1546,6 +1576,9 @@ public sealed class Parser
             case TokenKind.Tilde:
                 Advance();
                 return (TokenKind.Tilde, "~", span);
+            case TokenKind.NullCoalesce:
+                Advance();
+                return (TokenKind.NullCoalesce, "??", span);
             case TokenKind.Question:
                 Advance();
                 return (TokenKind.Question, "?", span);
@@ -1772,6 +1805,25 @@ public sealed class Parser
 
         // Handle trailing member access (e.g., §C[...] §/C.Length or run?.Status)
         // and array access (e.g., array{index})
+        expr = ParseTrailingMemberAccess(expr);
+
+        // Handle 'is' pattern expression: expr is Type [variable]
+        // This handles C# pattern matching like "other is UnitSystem otherUnitSystem"
+        if (Check(TokenKind.Identifier) && Current.Text == "is")
+        {
+            expr = ParseIsPatternExpression(expr);
+        }
+
+        return expr;
+    }
+
+    /// <summary>
+    /// Parses trailing member access chains: .Member, ?.Member, {index}
+    /// Shared helper used by ParseLispArgument, ParseNewExpression, ParseCallExpression,
+    /// ParseThisExpression, and ParseBaseExpression.
+    /// </summary>
+    private ExpressionNode ParseTrailingMemberAccess(ExpressionNode expr)
+    {
         while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional) || Check(TokenKind.OpenBrace))
         {
             if (Check(TokenKind.OpenBrace))
@@ -1799,37 +1851,24 @@ public sealed class Parser
                 }
             }
         }
-
-        // Handle 'is' pattern expression: expr is Type [variable]
-        // This handles C# pattern matching like "other is UnitSystem otherUnitSystem"
-        if (Check(TokenKind.Identifier) && Current.Text == "is")
-        {
-            expr = ParseIsPatternExpression(expr);
-        }
-
         return expr;
     }
 
     /// <summary>
-    /// Parses an 'is' pattern expression: expr is Type [variable]
-    /// The expr has already been parsed, we're at the 'is' keyword.
-    /// Returns a ReferenceNode with the full pattern expression.
+    /// Parses a type name in a Lisp expression context, handling qualified names and generics.
+    /// Examples: int, string, List&lt;string&gt;, Dictionary&lt;string, int&gt;, System.Collections.Generic.List&lt;int&gt;
+    /// Used by typeof, is, and as expressions.
     /// </summary>
-    private ExpressionNode ParseIsPatternExpression(ExpressionNode left)
+    private string ParseLispTypeName()
     {
-        var startSpan = left.Span;
-        Advance(); // consume 'is'
-
-        // Parse the type name (possibly qualified: Namespace.Type or generic: Type<T>)
-        var typeBuilder = new System.Text.StringBuilder();
         if (!Check(TokenKind.Identifier))
         {
             _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
-                $"Expected type name after 'is', found '{Current.Text}'");
-            return left;
+                $"Expected type name, found '{Current.Text}'");
+            return "object";
         }
 
-        var typeToken = Current;
+        var typeBuilder = new System.Text.StringBuilder();
         typeBuilder.Append(Current.Text);
         Advance();
 
@@ -1855,16 +1894,116 @@ public sealed class Parser
                 while (depth > 0 && !IsAtEnd)
                 {
                     if (Check(TokenKind.Less))
+                    {
                         depth++;
+                        typeBuilder.Append('<');
+                        Advance();
+                    }
+                    else if (Check(TokenKind.GreaterGreater) && depth >= 2)
+                    {
+                        // >> closes two generic levels at once (e.g., Dictionary<string, List<int>>)
+                        depth -= 2;
+                        typeBuilder.Append(">>");
+                        Advance();
+                    }
                     else if (Check(TokenKind.Greater))
+                    {
                         depth--;
-                    typeBuilder.Append(Current.Text);
-                    Advance();
+                        if (depth > 0)
+                        {
+                            typeBuilder.Append('>');
+                        }
+                        Advance(); // consume '>'
+                    }
+                    else if (depth > 0)
+                    {
+                        typeBuilder.Append(Current.Text);
+                        if (Check(TokenKind.Comma))
+                            typeBuilder.Append(' ');
+                        Advance();
+                    }
+                }
+                if (depth == 0)
+                {
+                    // Only append closing '>' if we didn't already via '>>' handling
+                    if (!typeBuilder.ToString().EndsWith('>'))
+                        typeBuilder.Append('>');
                 }
             }
         }
 
-        var typeName = typeBuilder.ToString();
+        // Handle nullable types: Type?
+        if (Check(TokenKind.Question))
+        {
+            typeBuilder.Append('?');
+            Advance();
+        }
+
+        // Handle array types: Type[]
+        if (Check(TokenKind.OpenBracket) && Peek(1).Kind == TokenKind.CloseBracket)
+        {
+            typeBuilder.Append("[]");
+            Advance(); // consume '['
+            Advance(); // consume ']'
+        }
+
+        return typeBuilder.ToString();
+    }
+
+    /// <summary>
+    /// Parses an 'is' expression in Lisp form: (is expr Type) or (is expr Type variable)
+    /// Handles generic types like List&lt;string&gt; that would fail in general arg parsing.
+    /// </summary>
+    private ExpressionNode ParseLispIsExpression(Token startToken)
+    {
+        // Parse the expression operand
+        var operand = ParseLispArgument();
+
+        // Parse the type name using the shared helper
+        var typeName = ParseLispTypeName();
+
+        // Optionally parse a variable name for pattern matching: (is x MyType varName)
+        string? variableName = null;
+        if (Check(TokenKind.Identifier) && !IsLispOperatorStart(Current.Text))
+        {
+            variableName = Current.Text;
+            Advance();
+        }
+
+        var endToken = Expect(TokenKind.CloseParen);
+        var span = startToken.Span.Union(endToken.Span);
+
+        return new IsPatternNode(span, operand, typeName, variableName);
+    }
+
+    /// <summary>
+    /// Parses an 'as' expression in Lisp form: (as expr Type)
+    /// Handles generic types like List&lt;string&gt; that would fail in general arg parsing.
+    /// </summary>
+    private ExpressionNode ParseLispAsExpression(Token startToken)
+    {
+        // Parse the expression operand
+        var operand = ParseLispArgument();
+
+        // Parse the type name using the shared helper
+        var typeName = ParseLispTypeName();
+
+        var endToken = Expect(TokenKind.CloseParen);
+        var span = startToken.Span.Union(endToken.Span);
+
+        return new TypeOperationNode(span, TypeOp.As, operand, typeName);
+    }
+
+    /// <summary>
+    /// Parses an 'is' pattern expression: expr is Type [variable]
+    /// The expr has already been parsed, we're at the 'is' keyword.
+    /// </summary>
+    private ExpressionNode ParseIsPatternExpression(ExpressionNode left)
+    {
+        var startSpan = left.Span;
+        Advance(); // consume 'is'
+
+        var typeName = ParseLispTypeName();
         string? variableName = null;
 
         // Check for optional variable declaration: is Type variableName
@@ -1875,14 +2014,8 @@ public sealed class Parser
             Advance();
         }
 
-        // Build the full expression as a reference node
-        var leftStr = GetExpressionString(left);
-        var fullExpr = variableName != null
-            ? $"{leftStr} is {typeName} {variableName}"
-            : $"{leftStr} is {typeName}";
-
         var endSpan = Peek(-1).Span;
-        return new ReferenceNode(startSpan.Union(endSpan), fullExpr);
+        return new IsPatternNode(startSpan.Union(endSpan), left, typeName, variableName);
     }
 
     /// <summary>
@@ -1929,7 +2062,10 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.StrLiteral);
         var value = token.Value as string ?? "";
-        return new StringLiteralNode(token.Span, value);
+        return new StringLiteralNode(token.Span, value)
+        {
+            IsMultiline = token.Text.StartsWith("\"\"\"")
+        };
     }
 
     private BoolLiteralNode ParseBoolLiteral()
@@ -4838,7 +4974,7 @@ public sealed class Parser
     /// Parses a new expression.
     /// §NEW[Circle] §A "MyCircle" §A 5.0 §/NEW
     /// </summary>
-    private NewExpressionNode ParseNewExpression()
+    private ExpressionNode ParseNewExpression()
     {
         var startToken = Expect(TokenKind.New);
         var attrs = ParseAttributes();
@@ -4905,7 +5041,10 @@ public sealed class Parser
         }
 
         var span = arguments.Count > 0 ? startToken.Span.Union(arguments[^1].Span) : startToken.Span;
-        return new NewExpressionNode(span, typeName, typeArgs, arguments, initializers);
+        ExpressionNode expr = new NewExpressionNode(span, typeName, typeArgs, arguments, initializers);
+
+        // Handle trailing member access (e.g., §NEW{Type}§/NEW.Method or §NEW{Type}§/NEW?.Prop)
+        return ParseTrailingMemberAccess(expr);
     }
 
     /// <summary>
@@ -4916,30 +5055,7 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.This);
         ExpressionNode expr = new ThisExpressionNode(token.Span);
-
-        // Handle trailing member access (e.g., §THIS.property or §THIS?.property)
-        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
-        {
-            var isNullConditional = Check(TokenKind.NullConditional);
-            Advance(); // consume '.' or '?.'
-            if (!Check(TokenKind.Identifier))
-            {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "member name", Current.Kind);
-                break;
-            }
-            var memberToken = Advance();
-            var span = expr.Span.Union(memberToken.Span);
-            if (isNullConditional)
-            {
-                expr = new NullConditionalNode(span, expr, memberToken.Text);
-            }
-            else
-            {
-                expr = new FieldAccessNode(span, expr, memberToken.Text);
-            }
-        }
-
-        return expr;
+        return ParseTrailingMemberAccess(expr);
     }
 
     /// <summary>
@@ -4950,43 +5066,49 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.Base);
         ExpressionNode expr = new BaseExpressionNode(token.Span);
-
-        // Handle trailing member access (e.g., §BASE.method)
-        while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
-        {
-            var isNullConditional = Check(TokenKind.NullConditional);
-            Advance(); // consume '.' or '?.'
-            if (!Check(TokenKind.Identifier))
-            {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "member name", Current.Kind);
-                break;
-            }
-            var memberToken = Advance();
-            var span = expr.Span.Union(memberToken.Span);
-            if (isNullConditional)
-            {
-                expr = new NullConditionalNode(span, expr, memberToken.Text);
-            }
-            else
-            {
-                expr = new FieldAccessNode(span, expr, memberToken.Text);
-            }
-        }
-
-        return expr;
+        return ParseTrailingMemberAccess(expr);
     }
 
     /// <summary>
     /// Parses a call expression.
     /// §C[target] §A arg1 §A arg2 §/C
     /// </summary>
-    private CallExpressionNode ParseCallExpression()
+    private ExpressionNode ParseCallExpression()
     {
         var startToken = Expect(TokenKind.Call);
         var attrs = ParseAttributes();
 
         // Positional: [target]
         var target = attrs["_pos0"] ?? "";
+
+        // If no bracket attribute target and next token starts an expression,
+        // parse expression-based call target: §C §NEW{object}§/NEW.GetType §/C
+        if (string.IsNullOrEmpty(target) && !Check(TokenKind.Arg) && !Check(TokenKind.EndCall) && IsExpressionStart())
+        {
+            var targetExpr = ParseExpression();
+
+            var exprArgs = new List<ExpressionNode>();
+            while (!IsAtEnd && !Check(TokenKind.EndCall))
+            {
+                if (Check(TokenKind.Arg))
+                {
+                    exprArgs.Add(ParseArgument());
+                }
+                else if (IsExpressionStart())
+                {
+                    exprArgs.Add(ParseExpression());
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            var exprEndToken = Expect(TokenKind.EndCall);
+            var exprSpan = startToken.Span.Union(exprEndToken.Span);
+            ExpressionNode exprCall = new ExpressionCallNode(exprSpan, targetExpr, exprArgs);
+            return ParseTrailingMemberAccess(exprCall);
+        }
 
         var arguments = new List<ExpressionNode>();
 
@@ -5010,7 +5132,10 @@ public sealed class Parser
 
         var endToken = Expect(TokenKind.EndCall);
         var span = startToken.Span.Union(endToken.Span);
-        return new CallExpressionNode(span, target, arguments);
+        ExpressionNode expr = new CallExpressionNode(span, target, arguments);
+
+        // Handle trailing member access (e.g., §C[Method]§/C.Property)
+        return ParseTrailingMemberAccess(expr);
     }
 
     // Phase 9: Properties and Constructors

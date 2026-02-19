@@ -184,11 +184,16 @@ public interface IAstVisitor
     void Visit(StringBuilderOperationNode node);
     // Native Type Operations
     void Visit(TypeOperationNode node);
+    void Visit(IsPatternNode node);
     // Expression statement (bare expression as statement)
     void Visit(ExpressionStatementNode node);
     // Fallback nodes for unsupported C# constructs
     void Visit(FallbackExpressionNode node);
     void Visit(FallbackCommentNode node);
+    // Feature 12: typeof expression
+    void Visit(TypeOfExpressionNode node);
+    // Feature 9: Expression call targets
+    void Visit(ExpressionCallNode node);
 }
 
 /// <summary>
@@ -357,11 +362,16 @@ public interface IAstVisitor<T>
     T Visit(StringBuilderOperationNode node);
     // Native Type Operations
     T Visit(TypeOperationNode node);
+    T Visit(IsPatternNode node);
     // Expression statement (bare expression as statement)
     T Visit(ExpressionStatementNode node);
     // Fallback nodes for unsupported C# constructs
     T Visit(FallbackExpressionNode node);
     T Visit(FallbackCommentNode node);
+    // Feature 12: typeof expression
+    T Visit(TypeOfExpressionNode node);
+    // Feature 9: Expression call targets
+    T Visit(ExpressionCallNode node);
 }
 
 /// <summary>

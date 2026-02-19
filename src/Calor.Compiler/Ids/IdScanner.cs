@@ -259,8 +259,11 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(StringOperationNode node) { }
     public void Visit(CharOperationNode node) { }
     public void Visit(TypeOperationNode node) { }
+    public void Visit(IsPatternNode node) { }
     public void Visit(StringBuilderOperationNode node) { }
     public void Visit(FallbackExpressionNode node) { }
     public void Visit(FallbackCommentNode node) { }
+    public void Visit(TypeOfExpressionNode node) { }
+    public void Visit(ExpressionCallNode node) { }
     public void Visit(ExpressionStatementNode node) { }
 }

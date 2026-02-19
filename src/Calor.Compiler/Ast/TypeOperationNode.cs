@@ -39,6 +39,32 @@ public sealed class TypeOperationNode : ExpressionNode
 }
 
 /// <summary>
+/// Represents an 'is' pattern expression with an optional variable binding.
+/// Example: (is x List&lt;string&gt; items) → x is List&lt;string&gt; items
+/// </summary>
+public sealed class IsPatternNode : ExpressionNode
+{
+    public ExpressionNode Operand { get; }
+    public string TargetType { get; }
+    public string? VariableName { get; }
+
+    public IsPatternNode(
+        TextSpan span,
+        ExpressionNode operand,
+        string targetType,
+        string? variableName = null)
+        : base(span)
+    {
+        Operand = operand ?? throw new ArgumentNullException(nameof(operand));
+        TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
+        VariableName = variableName;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Helper methods for TypeOp enum.
 /// </summary>
 public static class TypeOpExtensions

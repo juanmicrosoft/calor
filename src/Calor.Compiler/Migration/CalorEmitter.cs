@@ -1160,6 +1160,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(StringLiteralNode node)
     {
+        // Multiline strings round-trip as triple-quote
+        if (node.IsMultiline && node.Value.Contains('\n'))
+        {
+            return $"\"\"\"\n{node.Value}\"\"\"";
+        }
+
         var escaped = node.Value
             .Replace("\\", "\\\\")
             .Replace("\"", "\\\"")
@@ -2076,6 +2082,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         };
     }
 
+    public string Visit(IsPatternNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        return node.VariableName != null
+            ? $"(is {operand} {node.TargetType} {node.VariableName})"
+            : $"(is {operand} {node.TargetType})";
+    }
+
     // Fallback nodes for unsupported C# constructs
 
     public string Visit(FallbackExpressionNode node)
@@ -2123,5 +2137,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         return "";
+    }
+
+    public string Visit(TypeOfExpressionNode node)
+    {
+        return $"(typeof {node.TypeName})";
+    }
+
+    public string Visit(ExpressionCallNode node)
+    {
+        var target = node.TargetExpression.Accept(this);
+        var args = node.Arguments.Select(a => $" §A {a.Accept(this)}").ToList();
+        return $"§C {target}{string.Join("", args)} §/C";
     }
 }

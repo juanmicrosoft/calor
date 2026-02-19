@@ -516,6 +516,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return $"$\"{escaped}\"";
         }
 
+        // Multiline strings (from triple-quote """ ... """) emit as C# verbatim strings
+        if (node.IsMultiline && node.Value.Contains('\n'))
+        {
+            var verbatimValue = node.Value.Replace("\"", "\"\"");
+            return $"@\"{verbatimValue}\"";
+        }
+
         // Escape the string for C#
         var escapedValue = node.Value
             .Replace("\\", "\\\\")
@@ -548,13 +555,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
-        // Handle 'is' pattern expressions like "other is UnitSystem otherUnitSystem"
-        // These should be emitted as-is without sanitization
-        if (node.Name.Contains(" is "))
-        {
-            return node.Name;
-        }
-
         // Handle C# keywords that are used as literals (not identifiers)
         if (node.Name is "null" or "true" or "false")
         {
@@ -3324,6 +3324,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
     }
 
+    public string Visit(IsPatternNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        var csharpType = MapTypeName(node.TargetType);
+        return node.VariableName != null
+            ? $"{operand} is {csharpType} {node.VariableName}"
+            : $"{operand} is {csharpType}";
+    }
+
     // Native StringBuilder Operations
 
     public string Visit(StringBuilderOperationNode node)
@@ -3378,6 +3387,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         AppendLine("*/");
         return "";
+    }
+
+    public string Visit(TypeOfExpressionNode node)
+    {
+        return $"typeof({MapTypeName(node.TypeName)})";
+    }
+
+    public string Visit(ExpressionCallNode node)
+    {
+        var target = node.TargetExpression.Accept(this);
+        var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
+        return $"{target}({args})";
     }
 
     /// <summary>

@@ -1349,6 +1349,14 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         return new TypeOperationNode(node.Span, node.Operation, simplifiedOperand, node.TargetType);
     }
 
+    public ExpressionNode Visit(IsPatternNode node)
+    {
+        var simplifiedOperand = node.Operand.Accept(this);
+        return ReferenceEquals(simplifiedOperand, node.Operand)
+            ? node
+            : new IsPatternNode(node.Span, simplifiedOperand, node.TargetType, node.VariableName);
+    }
+
     public ExpressionNode Visit(StringBuilderOperationNode node)
     {
         // Simplify arguments but preserve the StringBuilder operation
@@ -1359,6 +1367,23 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     // Fallback nodes - cannot be simplified, just return as-is
     public ExpressionNode Visit(FallbackExpressionNode node) => node;
     public ExpressionNode Visit(FallbackCommentNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(TypeOfExpressionNode node) => node;
+    public ExpressionNode Visit(ExpressionCallNode node)
+    {
+        var newTarget = node.TargetExpression.Accept(this);
+        var argsChanged = false;
+        var newArgs = new List<ExpressionNode>();
+        foreach (var arg in node.Arguments)
+        {
+            var simplified = arg.Accept(this);
+            newArgs.Add(simplified);
+            if (!ReferenceEquals(simplified, arg))
+                argsChanged = true;
+        }
+        return !ReferenceEquals(newTarget, node.TargetExpression) || argsChanged
+            ? new ExpressionCallNode(node.Span, newTarget, newArgs)
+            : node;
+    }
     public ExpressionNode Visit(ExpressionStatementNode node) => throw new InvalidOperationException();
 
     #endregion
