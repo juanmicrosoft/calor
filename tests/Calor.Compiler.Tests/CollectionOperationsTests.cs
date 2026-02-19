@@ -2490,9 +2490,9 @@ public class CollectionOperationsTests
     }
 
     [Fact]
-    public void Parse_ArrayAccess_BraceFormat_ProducesDiagnostic()
+    public void Parse_ArrayAccess_BraceFormat_IsValidSyntax()
     {
-        // §IDX{arr} 0 (brace format) should produce a diagnostic error
+        // §IDX{arr} 0 (brace format) is valid — the attribute provides the array reference
         var source = """
             §M{m001:Test}
             §F{f001:Get:pub}
@@ -2504,11 +2504,9 @@ public class CollectionOperationsTests
 
         var module = Parse(source, out var diagnostics);
 
-        // Should report an error about brace usage with §IDX
-        Assert.True(diagnostics.HasErrors, "Expected an error for §IDX with braces");
-        Assert.Contains(diagnostics, d => d.Message.Contains("§IDX") && d.Message.Contains("brace"));
+        // Should parse without errors — §IDX{arr} is now valid attribute syntax
+        Assert.False(diagnostics.HasErrors, "§IDX{arr} should be valid syntax");
 
-        // Recovery: should still produce a valid ArrayAccessNode despite the error
         var func = module.Functions[0];
         var returnStmt = func.Body[0] as ReturnStatementNode;
         Assert.NotNull(returnStmt);

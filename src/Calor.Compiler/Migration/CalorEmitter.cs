@@ -190,27 +190,34 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsSealed) modifiers.Add("sealed");
         if (node.IsPartial) modifiers.Add("partial");
         if (node.IsStatic) modifiers.Add("static");
+        if (node.IsStruct) modifiers.Add("struct");
+        if (node.IsReadOnly) modifiers.Add("readonly");
 
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-        var baseStr = node.BaseClass != null ? $":{node.BaseClass}" : "";
 
         var typeParams = node.TypeParameters.Count > 0
             ? $"<{string.Join(",", node.TypeParameters.Select(tp => tp.Name))}>"
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§CL{{{node.Id}:{node.Name}{typeParams}{baseStr}{modStr}}}{attrs}");
+        AppendLine($"§CL{{{node.Id}:{node.Name}{typeParams}{modStr}}}{attrs}");
         Indent();
 
         // Emit type parameter constraints
         EmitTypeParameterConstraints(node.TypeParameters);
+
+        // Emit base class as §EXT tag (not positional)
+        if (node.BaseClass != null)
+        {
+            AppendLine($"§EXT{{{node.BaseClass}}}");
+        }
 
         // Emit implemented interfaces
         foreach (var iface in node.ImplementedInterfaces)
         {
             AppendLine($"§IMPL{{{iface}}}");
         }
-        if (node.ImplementedInterfaces.Count > 0 || node.TypeParameters.Any(tp => tp.Constraints.Count > 0))
+        if (node.BaseClass != null || node.ImplementedInterfaces.Count > 0 || node.TypeParameters.Any(tp => tp.Constraints.Count > 0))
             AppendLine();
 
         // Emit fields
@@ -1146,7 +1153,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FloatLiteralNode node)
     {
-        return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return node.IsDecimal
+            ? $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+            : node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public string Visit(StringLiteralNode node)
@@ -1227,12 +1236,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
-        // Handle object initializers
+        // Handle object initializers using §INIT tag syntax
         var initStr = "";
         if (node.Initializers.Count > 0)
         {
-            var inits = node.Initializers.Select(i => $"{i.PropertyName}: {i.Value.Accept(this)}");
-            initStr = $" {{ {string.Join(", ", inits)} }}";
+            var inits = node.Initializers.Select(
+                i => $"§INIT{{{i.PropertyName}}} {i.Value.Accept(this)}");
+            initStr = " " + string.Join(" ", inits);
         }
 
         return $"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}{initStr} §/NEW";
@@ -1334,8 +1344,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.Initializer.Count > 0)
         {
-            var elements = string.Join(", ", node.Initializer.Select(e => e.Accept(this)));
-            return $"{{{elements}}}";
+            var elements = node.Initializer.Select(e => $"§A {e.Accept(this)}");
+            var id = string.IsNullOrEmpty(node.Name) ? "_arr" : node.Name;
+            return $"§ARR{{{elementType}:{id}}} {string.Join(" ", elements)} §/ARR{{{id}}}";
         }
         else if (node.Size != null)
         {
@@ -2097,6 +2108,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         return $"§ERR{{\"TODO: {node.FeatureName} -- C#: {escapedCode}\"}}";
+    }
+
+    public string Visit(ExpressionStatementNode node)
+    {
+        var expr = node.Expression.Accept(this);
+        AppendLine(expr);
+        return "";
     }
 
     public string Visit(FallbackCommentNode node)

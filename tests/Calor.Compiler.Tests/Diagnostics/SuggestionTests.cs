@@ -53,7 +53,7 @@ public class SuggestionTests
     [InlineData("null", "Option types")]
     [InlineData("ToString", "Use (str expr)")]
     [InlineData("Contains", "Use (contains s substring)")]
-    [InlineData("++", "Use (+ x 1)")]
+    [InlineData("++", "Use (inc x)")]
     [InlineData("??", "Use (?? x default)")]
     public void GetCSharpHint_WithCSharpConstruct_ReturnsHint(string csharpConstruct, string expectedHintPart)
     {

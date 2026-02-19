@@ -1,0 +1,24 @@
+'mock' was not matched. Did you mean one of the following?
+quick
+'2' was not matched. Did you mean one of the following?
+-h
+Unrecognized command or argument 'correctness'.
+Unrecognized command or argument '--provider'.
+Unrecognized command or argument 'mock'.
+Unrecognized command or argument '--output'.
+Unrecognized command or argument '/Users/juanrivera/sources/repos/juanmicrosoft/calor-3/tests/Calor.Evaluation/Skills/benchmark-comparison-results/merged_20260217_113929.json'.
+Unrecognized command or argument '--dry-run'.
+Unrecognized command or argument '--sample'.
+Unrecognized command or argument '2'.
+
+Description:
+  Benchmark and compare Calor and C# code for AI agent effectiveness
+
+Usage:
+  Calor.Evaluation [command] [options]
+
+Options:
+  --version       Show version information
+  -?, -h, --help  Show help and usage information
+
+Commands:

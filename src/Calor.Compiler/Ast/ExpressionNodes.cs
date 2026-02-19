@@ -97,9 +97,20 @@ public sealed class FloatLiteralNode : ExpressionNode
 {
     public double Value { get; }
 
+    /// <summary>
+    /// When true, this literal represents a C# decimal (suffix m) rather than a double.
+    /// </summary>
+    public bool IsDecimal { get; }
+
     public FloatLiteralNode(TextSpan span, double value) : base(span)
     {
         Value = value;
+    }
+
+    public FloatLiteralNode(TextSpan span, double value, bool isDecimal) : base(span)
+    {
+        Value = value;
+        IsDecimal = isDecimal;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -149,6 +160,10 @@ public enum UnaryOperator
     Negate,         // - (unary minus)
     Not,            // ! (logical not)
     BitwiseNot,     // ~ (bitwise not)
+    PreIncrement,   // ++x (prefix increment)
+    PreDecrement,   // --x (prefix decrement)
+    PostIncrement,  // x++ (postfix increment)
+    PostDecrement,  // x-- (postfix decrement)
 }
 
 /// <summary>
@@ -163,6 +178,10 @@ public static class UnaryOperatorExtensions
             "NEG" or "NEGATE" or "-" => UnaryOperator.Negate,
             "NOT" or "!" => UnaryOperator.Not,
             "BNOT" or "BITWISENOT" or "~" => UnaryOperator.BitwiseNot,
+            "INC" or "++" or "PRE-INC" => UnaryOperator.PreIncrement,
+            "DEC" or "--" or "PRE-DEC" => UnaryOperator.PreDecrement,
+            "POST-INC" => UnaryOperator.PostIncrement,
+            "POST-DEC" => UnaryOperator.PostDecrement,
             _ => null
         };
     }
@@ -174,6 +193,10 @@ public static class UnaryOperatorExtensions
             UnaryOperator.Negate => "-",
             UnaryOperator.Not => "!",
             UnaryOperator.BitwiseNot => "~",
+            UnaryOperator.PreIncrement => "++",
+            UnaryOperator.PreDecrement => "--",
+            UnaryOperator.PostIncrement => "++",
+            UnaryOperator.PostDecrement => "--",
             _ => throw new ArgumentOutOfRangeException(nameof(op))
         };
     }

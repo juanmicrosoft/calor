@@ -16,6 +16,7 @@ public sealed class PropertyNode : AstNode
     public string Name { get; }
     public string TypeName { get; }
     public Visibility Visibility { get; }
+    public MethodModifiers Modifiers { get; }
     public PropertyAccessorNode? Getter { get; }
     public PropertyAccessorNode? Setter { get; }
     public PropertyAccessorNode? Initer { get; }
@@ -26,6 +27,12 @@ public sealed class PropertyNode : AstNode
     /// C#-style attributes (e.g., [@JsonProperty("name")], [@Required]).
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
+
+    public bool IsOverride => Modifiers.HasFlag(MethodModifiers.Override);
+    public bool IsVirtual => Modifiers.HasFlag(MethodModifiers.Virtual);
+    public bool IsAbstract => Modifiers.HasFlag(MethodModifiers.Abstract);
+    public bool IsStatic => Modifiers.HasFlag(MethodModifiers.Static);
+    public bool IsSealed => Modifiers.HasFlag(MethodModifiers.Sealed);
 
     public PropertyNode(
         TextSpan span,
@@ -38,7 +45,7 @@ public sealed class PropertyNode : AstNode
         PropertyAccessorNode? initer,
         ExpressionNode? defaultValue,
         AttributeCollection attributes)
-        : this(span, id, name, typeName, visibility, getter, setter, initer, defaultValue, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, id, name, typeName, visibility, MethodModifiers.None, getter, setter, initer, defaultValue, attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -54,12 +61,30 @@ public sealed class PropertyNode : AstNode
         ExpressionNode? defaultValue,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, id, name, typeName, visibility, MethodModifiers.None, getter, setter, initer, defaultValue, attributes, csharpAttributes)
+    {
+    }
+
+    public PropertyNode(
+        TextSpan span,
+        string id,
+        string name,
+        string typeName,
+        Visibility visibility,
+        MethodModifiers modifiers,
+        PropertyAccessorNode? getter,
+        PropertyAccessorNode? setter,
+        PropertyAccessorNode? initer,
+        ExpressionNode? defaultValue,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         Visibility = visibility;
+        Modifiers = modifiers;
         Getter = getter;
         Setter = setter;
         Initer = initer;

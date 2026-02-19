@@ -265,4 +265,5 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(FallbackCommentNode node) { }
     public void Visit(TypeOfExpressionNode node) { }
     public void Visit(ExpressionCallNode node) { }
+    public void Visit(ExpressionStatementNode node) { }
 }

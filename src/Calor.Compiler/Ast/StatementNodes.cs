@@ -78,6 +78,24 @@ public sealed class PrintStatementNode : StatementNode
 }
 
 /// <summary>
+/// Represents a bare expression used as a statement (e.g., (inc x), (post-dec y)).
+/// Emitted as: expression;
+/// </summary>
+public sealed class ExpressionStatementNode : StatementNode
+{
+    public ExpressionNode Expression { get; }
+
+    public ExpressionStatementNode(TextSpan span, ExpressionNode expression)
+        : base(span)
+    {
+        Expression = expression ?? throw new ArgumentNullException(nameof(expression));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a fallback comment for unsupported C# statements.
 /// Emitted as // TODO: Manual conversion needed [feature] with original C# code.
 /// </summary>

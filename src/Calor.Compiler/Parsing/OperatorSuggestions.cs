@@ -42,6 +42,7 @@ public static class OperatorSuggestions
         "regex-test", "regex-match", "regex-replace", "regex-split",
 
         // Char operations
+        "char-lit",
         "char-at", "char-code", "char-from-code",
         "is-letter", "is-digit", "is-whitespace", "is-upper", "is-lower",
         "char-upper", "char-lower",
@@ -68,6 +69,9 @@ public static class OperatorSuggestions
 
         // Type operations
         "cast", "as", "is",
+
+        // Increment/decrement operators
+        "inc", "dec", "pre-inc", "post-inc", "pre-dec", "post-dec",
 
         // Type reflection
         "typeof"
@@ -104,8 +108,8 @@ public static class OperatorSuggestions
         ["extern"] = "Use §EXTERN for external function declarations",
 
         // C# operators
-        ["++"] = "Use (+ x 1) or (set x (+ x 1))",
-        ["--"] = "Use (- x 1) or (set x (- x 1))",
+        ["++"] = "Use (inc x) for prefix ++x, or (post-inc x) for x++",
+        ["--"] = "Use (dec x) for prefix --x, or (post-dec x) for x--",
         ["+="] = "Use (set x (+ x value))",
         ["-="] = "Use (set x (- x value))",
         ["*="] = "Use (set x (* x value))",
@@ -287,6 +291,7 @@ public static class OperatorSuggestions
     {
         return opName.ToLowerInvariant() switch
         {
+            "char-lit" => "(char-lit \"X\")",
             "char-at" => "(char-at str index)",
             "char-code" => "(char-code char)",
             "char-from-code" => "(char-from-code int)",

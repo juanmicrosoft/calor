@@ -7,6 +7,9 @@ namespace Calor.Compiler.Ast;
 /// </summary>
 public enum CharOp
 {
+    // Literal
+    CharLiteral,        // (char-lit "X")        → 'X'
+
     // Extraction
     CharAt,             // (char-at s i)         → s[i]
     CharCode,           // (char-code c)         → (int)c
@@ -60,6 +63,9 @@ public static class CharOpExtensions
     {
         return name?.ToLowerInvariant() switch
         {
+            // Literal
+            "char-lit" => CharOp.CharLiteral,
+
             // Extraction
             "char-at" => CharOp.CharAt,
             "char-code" => CharOp.CharCode,
@@ -87,6 +93,9 @@ public static class CharOpExtensions
     {
         return op switch
         {
+            // Literal
+            CharOp.CharLiteral => "char-lit",
+
             // Extraction
             CharOp.CharAt => "char-at",
             CharOp.CharCode => "char-code",
@@ -115,6 +124,7 @@ public static class CharOpExtensions
         return op switch
         {
             // Single argument operations
+            CharOp.CharLiteral or
             CharOp.CharCode or
             CharOp.CharFromCode or
             CharOp.IsLetter or
@@ -140,6 +150,7 @@ public static class CharOpExtensions
         return op switch
         {
             // Single argument operations
+            CharOp.CharLiteral or
             CharOp.CharCode or
             CharOp.CharFromCode or
             CharOp.IsLetter or

@@ -1,0 +1,9 @@
+{
+  "version": "1.1",
+  "z3Version": "Z3 4.15.7.0",
+  "status": 2,
+  "counterexampleDescription": "Counterexample: value=0, min=2147483647, max=2147483647, result=2147483646",
+  "originalDurationMs": 3.183,
+  "createdAt": "2026-02-15T01:26:55.336695Z",
+  "contractHash": "1a1cf1a3c39ae46d77c9228eaba5404ca0107217d7110a772947518bb0975b76"
+}

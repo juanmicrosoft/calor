@@ -122,10 +122,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("#nullable enable");
         AppendLine();
 
-        // Always include System and Calor.Runtime
-        var emittedUsings = new HashSet<string>(StringComparer.Ordinal) { "System", "Calor.Runtime" };
+        // Always include System, Calor.Runtime, and commonly-needed namespaces
+        var emittedUsings = new HashSet<string>(StringComparer.Ordinal)
+            { "System", "Calor.Runtime", "System.Collections.Generic", "System.Linq" };
         AppendLine("using System;");
         AppendLine("using Calor.Runtime;");
+        AppendLine("using System.Collections.Generic;");
+        AppendLine("using System.Linq;");
 
         // Emit user-defined using directives
         foreach (var usingDirective in node.Usings)
@@ -143,7 +146,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         AppendLine();
 
-        var namespaceName = SanitizeNamespace(node.Name);
+        var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
+        var namespaceName = isGlobalNamespace ? "" : SanitizeNamespace(node.Name);
 
         // Emit module-level extended metadata as file-level comments
         if (node.Context != null)
@@ -165,9 +169,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
-        AppendLine($"namespace {namespaceName}");
-        AppendLine("{");
-        Indent();
+        if (!isGlobalNamespace)
+        {
+            AppendLine($"namespace {namespaceName}");
+            AppendLine("{");
+            Indent();
+        }
 
         // Emit module-level issues as comments
         foreach (var issue in node.Issues)
@@ -228,9 +235,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Emit module-level functions in a static class
         if (node.Functions.Count > 0)
         {
-            var moduleClassName = SanitizeIdentifier(node.Name.Contains('.')
-                ? node.Name.Split('.').Last()
-                : node.Name) + "Module";
+            var moduleClassName = isGlobalNamespace
+                ? "GlobalModule"
+                : SanitizeIdentifier(node.Name.Contains('.')
+                    ? node.Name.Split('.').Last()
+                    : node.Name) + "Module";
             AppendLine($"public static class {moduleClassName}");
             AppendLine("{");
             Indent();
@@ -245,8 +254,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine("}");
         }
 
-        Dedent();
-        AppendLine("}");
+        if (!isGlobalNamespace)
+        {
+            Dedent();
+            AppendLine("}");
+        }
 
         return _builder.ToString();
     }
@@ -487,7 +499,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Check if this is an interpolated string (contains ${identifier})
         // Only match Calor interpolation syntax: ${identifier}, not format placeholders ${0}
         // Calor interpolation uses identifiers (letters, underscores), not numbers
-        var interpolationRegex = new System.Text.RegularExpressions.Regex(@"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}");
+        var interpolationRegex = new System.Text.RegularExpressions.Regex(@"\$\{([a-zA-Z_][a-zA-Z0-9_]*(?:\??\.[a-zA-Z_][a-zA-Z0-9_]*)*)\}");
         if (interpolationRegex.IsMatch(node.Value))
         {
             // Convert Calor interpolation ${expr} to C# interpolation {expr}
@@ -537,7 +549,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(FloatLiteralNode node)
     {
-        return node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var str = node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return node.IsDecimal ? str + "m" : str;
     }
 
     public string Visit(ReferenceNode node)
@@ -739,6 +752,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var operand = node.Operand.Accept(this);
         var op = node.Operator.ToCSharpOperator();
+        if (node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
+            return $"({operand}{op})";
         return $"({op}{operand})";
     }
 
@@ -1678,7 +1693,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var modifiers = "public";
         if (node.IsAbstract) modifiers += " abstract";
-        if (node.IsSealed) modifiers += " sealed";
+        if (!node.IsStruct && node.IsSealed) modifiers += " sealed";
+        if (node.IsStatic) modifiers += " static";
+        if (node.IsReadOnly) modifiers += " readonly";
+
+        var keyword = node.IsStruct ? "struct" : "class";
 
         // Build type parameters
         var typeParams = "";
@@ -1711,7 +1730,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         baseList.AddRange(node.ImplementedInterfaces);
         var inheritance = baseList.Count > 0 ? " : " + string.Join(", ", baseList) : "";
 
-        AppendLine($"{modifiers} class {name}{typeParams}{inheritance}{whereClause}");
+        AppendLine($"{modifiers} {keyword} {name}{typeParams}{inheritance}{whereClause}");
         AppendLine("{");
         Indent();
 
@@ -1771,17 +1790,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _ => "private"
         };
 
+        var parts = new List<string> { visibility };
+        if (node.IsStatic) parts.Add("static");
+        var fullModifiers = string.Join(" ", parts);
+
         var typeName = MapTypeName(node.TypeName);
         var fieldName = SanitizeIdentifier(node.Name);
 
         if (node.DefaultValue != null)
         {
             var defaultVal = node.DefaultValue.Accept(this);
-            AppendLine($"{visibility} {typeName} {fieldName} = {defaultVal};");
+            AppendLine($"{fullModifiers} {typeName} {fieldName} = {defaultVal};");
         }
         else
         {
-            AppendLine($"{visibility} {typeName} {fieldName};");
+            AppendLine($"{fullModifiers} {typeName} {fieldName};");
         }
 
         return "";
@@ -1844,6 +1867,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var parameters = string.Join(", ", node.Parameters.Select(p =>
             $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+
+        // Operator overload detection: op_ prefix methods emit C# operator syntax
+        if (node.Name.StartsWith("op_"))
+        {
+            return EmitOperatorMethod(node, modifiers, mappedReturnType, parameters);
+        }
 
         // Abstract methods have no body
         if (node.IsAbstract)
@@ -1959,6 +1988,113 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    private static readonly Dictionary<string, string> CilNameToOperator = new()
+    {
+        ["op_Addition"] = "+",
+        ["op_Subtraction"] = "-",
+        ["op_Multiply"] = "*",
+        ["op_Division"] = "/",
+        ["op_Modulus"] = "%",
+        ["op_Equality"] = "==",
+        ["op_Inequality"] = "!=",
+        ["op_LessThan"] = "<",
+        ["op_GreaterThan"] = ">",
+        ["op_LessThanOrEqual"] = "<=",
+        ["op_GreaterThanOrEqual"] = ">=",
+        ["op_UnaryNegation"] = "-",
+        ["op_UnaryPlus"] = "+",
+        ["op_LogicalNot"] = "!",
+        ["op_BitwiseAnd"] = "&",
+        ["op_BitwiseOr"] = "|",
+        ["op_ExclusiveOr"] = "^",
+    };
+
+    private string EmitOperatorMethod(MethodNode node, List<string> modifiers, string mappedReturnType, string parameters)
+    {
+        var modStr = string.Join(" ", modifiers);
+
+        if (node.Name == "op_Implicit")
+        {
+            AppendLine($"{modStr} implicit operator {mappedReturnType}({parameters})");
+        }
+        else if (node.Name == "op_Explicit")
+        {
+            AppendLine($"{modStr} explicit operator {mappedReturnType}({parameters})");
+        }
+        else if (CilNameToOperator.TryGetValue(node.Name, out var op))
+        {
+            AppendLine($"{modStr} {mappedReturnType} operator {op}({parameters})");
+        }
+        else
+        {
+            // Unknown operator — fall back to regular method
+            AppendLine($"{modStr} {mappedReturnType} {SanitizeIdentifier(node.Name)}({parameters})");
+        }
+
+        AppendLine("{");
+        Indent();
+
+        // Emit explicit preconditions
+        foreach (var requires in node.Preconditions)
+        {
+            var check = Visit(requires);
+            AppendLine(check);
+        }
+
+        var returnType = node.Output?.TypeName ?? "void";
+        var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+
+        // Handle postconditions
+        if (node.Postconditions.Count > 0 && hasReturnValue)
+        {
+            AppendLine($"{mappedReturnType} __result__ = default;");
+            AppendLine();
+
+            foreach (var statement in node.Body)
+            {
+                if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
+                {
+                    var expr = returnStmt.Expression.Accept(this);
+                    AppendLine($"__result__ = {expr};");
+                }
+                else
+                {
+                    var stmtCode = statement.Accept(this);
+                    AppendLine(stmtCode);
+                }
+            }
+
+            AppendLine();
+
+            foreach (var ensures in node.Postconditions)
+            {
+                var check = Visit(ensures).Replace("result", "__result__");
+                AppendLine(check);
+            }
+
+            AppendLine("return __result__;");
+        }
+        else
+        {
+            foreach (var statement in node.Body)
+            {
+                var stmtCode = statement.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            foreach (var ensures in node.Postconditions)
+            {
+                var check = Visit(ensures);
+                AppendLine(check);
+            }
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
     public string Visit(NewExpressionNode node)
     {
         var typeName = SanitizeIdentifier(node.TypeName);
@@ -1968,7 +2104,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
-        return $"new {typeName}({args})";
+        var result = $"new {typeName}({args})";
+        if (node.Initializers.Count > 0)
+        {
+            var inits = string.Join(", ", node.Initializers.Select(
+                i => $"{i.PropertyName} = {i.Value.Accept(this)}"));
+            result = $"new {typeName}({args}) {{ {inits} }}";
+        }
+        return result;
     }
 
     public string Visit(CallExpressionNode node)
@@ -2015,6 +2158,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _ => "public"
         };
 
+        var modifiers = new List<string> { visibility };
+        if (node.IsStatic) modifiers.Add("static");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        else if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsSealed && node.IsOverride) modifiers.Add("sealed");
+
+        var modifierStr = string.Join(" ", modifiers);
         var typeName = MapTypeName(node.TypeName);
         var propName = SanitizeIdentifier(node.Name);
 
@@ -2024,17 +2175,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (node.DefaultValue != null)
             {
                 var defaultVal = node.DefaultValue.Accept(this);
-                AppendLine($"{visibility} {typeName} {propName} {{ get; set; }} = {defaultVal};");
+                AppendLine($"{modifierStr} {typeName} {propName} {{ get; set; }} = {defaultVal};");
             }
             else
             {
-                AppendLine($"{visibility} {typeName} {propName} {{ get; set; }}");
+                AppendLine($"{modifierStr} {typeName} {propName} {{ get; set; }}");
             }
             return "";
         }
 
         // Property with accessors
-        AppendLine($"{visibility} {typeName} {propName}");
+        AppendLine($"{modifierStr} {typeName} {propName}");
         AppendLine("{");
         Indent();
 
@@ -3108,6 +3259,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         return node.Operation switch
         {
+            // Literal
+            CharOp.CharLiteral => EmitCharLiteral(args[0]),
+
             // Extraction
             CharOp.CharAt => $"{args[0]}[{args[1]}]",
             CharOp.CharCode => $"(int){args[0]}",
@@ -3125,6 +3279,33 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             CharOp.ToLowerChar => $"char.ToLower({args[0]})",
 
             _ => throw new NotSupportedException($"Unknown char operation: {node.Operation}")
+        };
+    }
+
+    /// <summary>
+    /// Emits a C# char literal from a string literal argument.
+    /// Input is the emitted C# string (e.g., "\"Y\""), output is a char literal (e.g., "'Y'").
+    /// Handles special characters that need different escaping in char vs string context.
+    /// </summary>
+    private static string EmitCharLiteral(string stringArg)
+    {
+        // Strip surrounding double quotes from the emitted string literal
+        var inner = stringArg;
+        if (inner.StartsWith('"') && inner.EndsWith('"'))
+        {
+            inner = inner[1..^1];
+        }
+
+        // Handle characters that need escaping in a char literal
+        return inner switch
+        {
+            "'" => @"'\''",        // single quote needs escaping in char context
+            "\\\\" => @"'\\'",     // already-escaped backslash stays as-is
+            "\\n" => "'\\n'",      // newline
+            "\\r" => "'\\r'",      // carriage return
+            "\\t" => "'\\t'",      // tab
+            "\\0" => "'\\0'",      // null
+            _ => $"'{inner}'"      // normal character
         };
     }
 
@@ -3185,6 +3366,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         // Emit the original C# code with a TODO comment
         return $"/* TODO: {node.FeatureName} */ {node.OriginalCSharp}";
+    }
+
+    public string Visit(ExpressionStatementNode node)
+    {
+        var expr = node.Expression.Accept(this);
+        AppendLine($"{expr};");
+        return "";
     }
 
     public string Visit(FallbackCommentNode node)

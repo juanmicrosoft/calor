@@ -128,7 +128,8 @@ public static class AttributeHelper
 
         // Detect if pos0 is a type and pos1 is a name (skill file format: {type:name})
         // Known primitive types that would indicate type-first format
-        if (!string.IsNullOrEmpty(pos1) && IsLikelyType(pos0))
+        // Both must be checked to disambiguate {Type:name} from {name:Type}
+        if (!string.IsNullOrEmpty(pos1) && IsLikelyType(pos0) && !IsLikelyType(pos1))
         {
             // Format: {type:name} - immutable
             return (pos1, false, ExpandType(pos0));
@@ -142,7 +143,7 @@ public static class AttributeHelper
     /// <summary>
     /// Checks if a string is likely a type name (for format detection).
     /// </summary>
-    private static bool IsLikelyType(string value)
+    internal static bool IsLikelyType(string value)
     {
         if (string.IsNullOrEmpty(value))
             return false;
@@ -157,9 +158,25 @@ public static class AttributeHelper
             "i8" or "i16" or "i32" or "i64" => true,
             "u8" or "u16" or "u32" or "u64" => true,
             "f32" or "f64" => true,
-            "int" or "float" or "str" or "string" or "bool" or "void" or "char" => true,
+            "int" or "float" or "str" or "string" or "bool" or "void" or "char" or "var" => true,
             _ => value.StartsWith('?') || value.Contains('!') || value.Contains('<')
+                 || IsLikelyPascalCaseType(value)
         };
+    }
+
+    /// <summary>
+    /// Detects PascalCase type names like ConsoleKeyInfo, StringBuilder, Encoding.
+    /// Returns true if the value looks like a .NET type name (starts uppercase,
+    /// not a single uppercase letter which could be a variable).
+    /// </summary>
+    private static bool IsLikelyPascalCaseType(string value)
+    {
+        // Must start with uppercase letter and have at least 2 chars
+        if (value.Length < 2 || !char.IsUpper(value[0]))
+            return false;
+
+        // Must contain a lowercase letter (not all-caps abbreviation that could be a variable)
+        return value.Any(char.IsLower);
     }
 
     /// <summary>

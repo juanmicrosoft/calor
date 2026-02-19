@@ -31,6 +31,7 @@ public static class DiagnosticCode
     public const string ExpectedExpression = "Calor0104";
     public const string ExpectedClosingTag = "Calor0105";
     public const string InvalidOperator = "Calor0106";
+    public const string InvalidModifier = "Calor0107";
 
     // Semantic errors (Calor0200-0299)
     public const string UndefinedReference = "Calor0200";

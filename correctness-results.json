@@ -1,0 +1,772 @@
+{
+  "results": [
+    {
+      "task": {
+        "id": "boundary-002",
+        "name": "InRange",
+        "category": "boundary-conditions",
+        "difficulty": 1,
+        "prompt": "Write a public function named InRange that returns true if value is between min and max (inclusive), false otherwise.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              5,
+              1,
+              10
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1,
+              1,
+              10
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              1,
+              10
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              1,
+              10
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": true
+          },
+          {
+            "input": [
+              11,
+              1,
+              10
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": true
+          },
+          {
+            "input": [
+              5,
+              5,
+              5
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.3,
+          "testCases": 0.5,
+          "contracts": 0.2,
+          "isValid": true
+        },
+        "description": "Check if value is in inclusive range",
+        "expectedSignature": {
+          "functionName": "InRange",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "bool"
+        },
+        "tags": [
+          "bounds",
+          "conditionals"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "\u00A7M{m001:RangeModule}\n\u00A7F{f001:InRange:pub}\n  \u00A7I{i32:value}\n  \u00A7I{i32:min}\n  \u00A7I{i32:max}\n  \u00A7O{bool}\n  \u00A7Q (\u003C= min max)\n  \u00A7R (\u0026\u0026 (\u003E= value min) (\u003C= value max))\n\u00A7/F{f001}\n\u00A7/M{m001}",
+        "compilationSuccess": true,
+        "compilationErrors": [],
+        "testResults": [
+          {
+            "index": 0,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "True",
+            "expectedValue": "True",
+            "errorMessage": null,
+            "executionTimeMs": 2.3675
+          },
+          {
+            "index": 1,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "True",
+            "expectedValue": "True",
+            "errorMessage": null,
+            "executionTimeMs": 0.3676
+          },
+          {
+            "index": 2,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "True",
+            "expectedValue": "True",
+            "errorMessage": null,
+            "executionTimeMs": 0.175
+          },
+          {
+            "index": 3,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "False",
+            "expectedValue": "False",
+            "errorMessage": null,
+            "executionTimeMs": 0.1596
+          },
+          {
+            "index": 4,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "False",
+            "expectedValue": "False",
+            "errorMessage": null,
+            "executionTimeMs": 0.2187
+          },
+          {
+            "index": 5,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "True",
+            "expectedValue": "True",
+            "errorMessage": null,
+            "executionTimeMs": 0.226
+          }
+        ],
+        "correctnessScore": 1,
+        "edgeCaseScore": 1,
+        "normalCaseScore": 1,
+        "testsPassed": 6,
+        "testsTotal": 6
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "public static class Functions\n{\n    public static bool InRange(int value, int min, int max)\n    {\n        return value \u003E= min \u0026\u0026 value \u003C= max;\n    }\n}",
+        "compilationSuccess": true,
+        "compilationErrors": [],
+        "testResults": [
+          {
+            "index": 0,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "True",
+            "expectedValue": "True",
+            "errorMessage": null,
+            "executionTimeMs": 0.3561
+          },
+          {
+            "index": 1,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "True",
+            "expectedValue": "True",
+            "errorMessage": null,
+            "executionTimeMs": 0.2481
+          },
+          {
+            "index": 2,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "True",
+            "expectedValue": "True",
+            "errorMessage": null,
+            "executionTimeMs": 0.2573
+          },
+          {
+            "index": 3,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "False",
+            "expectedValue": "False",
+            "errorMessage": null,
+            "executionTimeMs": 0.1756
+          },
+          {
+            "index": 4,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "False",
+            "expectedValue": "False",
+            "errorMessage": null,
+            "executionTimeMs": 0.1674
+          },
+          {
+            "index": 5,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "True",
+            "expectedValue": "True",
+            "errorMessage": null,
+            "executionTimeMs": 0.1769
+          }
+        ],
+        "correctnessScore": 1,
+        "edgeCaseScore": 1,
+        "normalCaseScore": 1,
+        "testsPassed": 6,
+        "testsTotal": 6
+      },
+      "advantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "arith-003",
+        "name": "Average",
+        "category": "arithmetic-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named Average that calculates the average of an integer array (using integer division). Return 0 if the array is null or empty.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            ],
+            "expected": 3,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                10
+              ]
+            ],
+            "expected": 10,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                1,
+                2
+              ]
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              []
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": true
+          },
+          {
+            "input": [
+              null
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": true
+          }
+        ],
+        "scoring": {
+          "compilation": 0.3,
+          "testCases": 0.5,
+          "contracts": 0.2,
+          "isValid": true
+        },
+        "description": "Calculate average of array, handle empty array",
+        "expectedSignature": {
+          "functionName": "Average",
+          "parameterTypes": [
+            "int[]"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "division-by-zero",
+          "arrays"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "\u00A7M{m001:AverageModule}\n\u00A7F{f001:Average:pub}\n  \u00A7I{[i32]:arr}\n  \u00A7O{i32}\n  \u00A7IF{if1} (|| (== arr null) (== (len arr) 0)) \u2192 \u00A7R 0\n  \u00A7/I{if1}\n  \u00A7B{sum} 0\n  \u00A7B{i} 0\n  \u00A7WH{wh1} (\u003C i (len arr))\n    \u00A7B{val} \u00A7IDX arr i\n    \u00A7ASSIGN sum (\u002B sum val)\n    \u00A7ASSIGN i (\u002B i 1)\n  \u00A7/WH{wh1}\n  \u00A7R (/ sum (len arr))\n\u00A7/F{f001}\n\u00A7/M{m001}",
+        "compilationSuccess": true,
+        "compilationErrors": [],
+        "testResults": [
+          {
+            "index": 0,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "3",
+            "expectedValue": "3",
+            "errorMessage": null,
+            "executionTimeMs": 0.4099
+          },
+          {
+            "index": 1,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "10",
+            "expectedValue": "10",
+            "errorMessage": null,
+            "executionTimeMs": 0.2662
+          },
+          {
+            "index": 2,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "1",
+            "expectedValue": "1",
+            "errorMessage": null,
+            "executionTimeMs": 0.2532
+          },
+          {
+            "index": 3,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "0",
+            "expectedValue": "0",
+            "errorMessage": null,
+            "executionTimeMs": 0.1606
+          },
+          {
+            "index": 4,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "0",
+            "expectedValue": "0",
+            "errorMessage": null,
+            "executionTimeMs": 0.2221
+          }
+        ],
+        "correctnessScore": 1,
+        "edgeCaseScore": 1,
+        "normalCaseScore": 1,
+        "testsPassed": 5,
+        "testsTotal": 5
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "public static class Functions\n{\n    public static int Average(int[] array)\n    {\n        if (array == null || array.Length == 0)\n            return 0;\n        \n        int sum = 0;\n        for (int i = 0; i \u003C array.Length; i\u002B\u002B)\n        {\n            sum \u002B= array[i];\n        }\n        \n        return sum / array.Length;\n    }\n}",
+        "compilationSuccess": true,
+        "compilationErrors": [],
+        "testResults": [
+          {
+            "index": 0,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "3",
+            "expectedValue": "3",
+            "errorMessage": null,
+            "executionTimeMs": 0.4734
+          },
+          {
+            "index": 1,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "10",
+            "expectedValue": "10",
+            "errorMessage": null,
+            "executionTimeMs": 0.3298
+          },
+          {
+            "index": 2,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "1",
+            "expectedValue": "1",
+            "errorMessage": null,
+            "executionTimeMs": 0.2232
+          },
+          {
+            "index": 3,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "0",
+            "expectedValue": "0",
+            "errorMessage": null,
+            "executionTimeMs": 0.2581
+          },
+          {
+            "index": 4,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "0",
+            "expectedValue": "0",
+            "errorMessage": null,
+            "executionTimeMs": 0.1787
+          }
+        ],
+        "correctnessScore": 1,
+        "edgeCaseScore": 1,
+        "normalCaseScore": 1,
+        "testsPassed": 5,
+        "testsTotal": 5
+      },
+      "advantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "coll-001",
+        "name": "SafeGet",
+        "category": "collection-operations",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeGet that returns the element at the given index in an integer array. Return the defaultValue if the array is null or index is out of bounds.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              [
+                1,
+                2,
+                3
+              ],
+              1,
+              0
+            ],
+            "expected": 2,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                1,
+                2,
+                3
+              ],
+              0,
+              0
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                1,
+                2,
+                3
+              ],
+              2,
+              0
+            ],
+            "expected": 3,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                1,
+                2,
+                3
+              ],
+              5,
+              -1
+            ],
+            "expected": -1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": true
+          },
+          {
+            "input": [
+              [
+                1,
+                2,
+                3
+              ],
+              -1,
+              -1
+            ],
+            "expected": -1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": true
+          },
+          {
+            "input": [
+              [],
+              0,
+              42
+            ],
+            "expected": 42,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": true
+          },
+          {
+            "input": [
+              null,
+              0,
+              99
+            ],
+            "expected": 99,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": true
+          }
+        ],
+        "scoring": {
+          "compilation": 0.3,
+          "testCases": 0.5,
+          "contracts": 0.2,
+          "isValid": true
+        },
+        "description": "Get element at index with default",
+        "expectedSignature": {
+          "functionName": "SafeGet",
+          "parameterTypes": [
+            "int[]",
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "arrays",
+          "bounds"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "\u00A7M{m001:SafeGetModule}\n\u00A7F{f001:SafeGet:pub}\n  \u00A7I{[i32]:arr}\n  \u00A7I{i32:index}\n  \u00A7I{i32:defaultValue}\n  \u00A7O{i32}\n  \u00A7IF{if1} (|| (== arr null) (|| (\u003C index 0) (\u003E= index (len arr))))\n    \u00A7R defaultValue\n  \u00A7/I{if1}\n  \u00A7R \u00A7IDX arr index\n\u00A7/F{f001}\n\u00A7/M{m001}",
+        "compilationSuccess": true,
+        "compilationErrors": [],
+        "testResults": [
+          {
+            "index": 0,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "2",
+            "expectedValue": "2",
+            "errorMessage": null,
+            "executionTimeMs": 0.4423
+          },
+          {
+            "index": 1,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "1",
+            "expectedValue": "1",
+            "errorMessage": null,
+            "executionTimeMs": 0.2608
+          },
+          {
+            "index": 2,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "3",
+            "expectedValue": "3",
+            "errorMessage": null,
+            "executionTimeMs": 0.1967
+          },
+          {
+            "index": 3,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "-1",
+            "expectedValue": "-1",
+            "errorMessage": null,
+            "executionTimeMs": 0.3652
+          },
+          {
+            "index": 4,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "-1",
+            "expectedValue": "-1",
+            "errorMessage": null,
+            "executionTimeMs": 0.1884
+          },
+          {
+            "index": 5,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "42",
+            "expectedValue": "42",
+            "errorMessage": null,
+            "executionTimeMs": 0.1348
+          },
+          {
+            "index": 6,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "99",
+            "expectedValue": "99",
+            "errorMessage": null,
+            "executionTimeMs": 0.5446
+          }
+        ],
+        "correctnessScore": 1,
+        "edgeCaseScore": 1,
+        "normalCaseScore": 1,
+        "testsPassed": 7,
+        "testsTotal": 7
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "public static class Functions\n{\n    public static int SafeGet(int[] array, int index, int defaultValue)\n    {\n        if (array == null || index \u003C 0 || index \u003E= array.Length)\n            return defaultValue;\n        return array[index];\n    }\n}",
+        "compilationSuccess": true,
+        "compilationErrors": [],
+        "testResults": [
+          {
+            "index": 0,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "2",
+            "expectedValue": "2",
+            "errorMessage": null,
+            "executionTimeMs": 0.3905
+          },
+          {
+            "index": 1,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "1",
+            "expectedValue": "1",
+            "errorMessage": null,
+            "executionTimeMs": 0.193
+          },
+          {
+            "index": 2,
+            "isEdgeCase": false,
+            "passed": true,
+            "actualValue": "3",
+            "expectedValue": "3",
+            "errorMessage": null,
+            "executionTimeMs": 0.1751
+          },
+          {
+            "index": 3,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "-1",
+            "expectedValue": "-1",
+            "errorMessage": null,
+            "executionTimeMs": 0.2422
+          },
+          {
+            "index": 4,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "-1",
+            "expectedValue": "-1",
+            "errorMessage": null,
+            "executionTimeMs": 0.2142
+          },
+          {
+            "index": 5,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "42",
+            "expectedValue": "42",
+            "errorMessage": null,
+            "executionTimeMs": 0.1767
+          },
+          {
+            "index": 6,
+            "isEdgeCase": true,
+            "passed": true,
+            "actualValue": "99",
+            "expectedValue": "99",
+            "errorMessage": null,
+            "executionTimeMs": 0.1873
+          }
+        ],
+        "correctnessScore": 1,
+        "edgeCaseScore": 1,
+        "normalCaseScore": 1,
+        "testsPassed": 7,
+        "testsTotal": 7
+      },
+      "advantageRatio": 1
+    }
+  ],
+  "summary": {
+    "totalTasks": 3,
+    "calorWins": 0,
+    "cSharpWins": 0,
+    "ties": 3,
+    "averageCalorScore": 1,
+    "averageCSharpScore": 1,
+    "advantageRatio": 1,
+    "calorEdgeCaseScore": 1,
+    "cSharpEdgeCaseScore": 1,
+    "totalTestsPassed": 36,
+    "totalTests": 36,
+    "byCategory": {
+      "boundary-conditions": {
+        "category": "boundary-conditions",
+        "taskCount": 1,
+        "averageCalorScore": 1,
+        "averageCSharpScore": 1,
+        "calorEdgeCaseScore": 1,
+        "cSharpEdgeCaseScore": 1,
+        "advantageRatio": 1
+      },
+      "arithmetic-safety": {
+        "category": "arithmetic-safety",
+        "taskCount": 1,
+        "averageCalorScore": 1,
+        "averageCSharpScore": 1,
+        "calorEdgeCaseScore": 1,
+        "cSharpEdgeCaseScore": 1,
+        "advantageRatio": 1
+      },
+      "collection-operations": {
+        "category": "collection-operations",
+        "taskCount": 1,
+        "averageCalorScore": 1,
+        "averageCSharpScore": 1,
+        "calorEdgeCaseScore": 1,
+        "cSharpEdgeCaseScore": 1,
+        "advantageRatio": 1
+      }
+    }
+  },
+  "timestamp": "2026-02-17T18:17:05.018263+00:00",
+  "provider": "claude"
+}

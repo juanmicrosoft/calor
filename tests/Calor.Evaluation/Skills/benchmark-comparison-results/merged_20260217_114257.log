@@ -1,0 +1,29 @@
+Correctness Benchmark - Edge Case Handling
+==========================================
+
+This benchmark measures how well code handles edge cases:
+  - Boundary conditions (empty inputs, null values)
+  - Numeric edge cases (min/max values, overflow)
+  - Special cases (division by zero, empty collections)
+  - Pure pass/fail scoring - no language bias
+
+Loading default correctness manifest: /Users/juanrivera/sources/repos/juanmicrosoft/calor-3/tests/Calor.Evaluation/bin/Debug/net8.0/Tasks/task-manifest-correctness.json
+Loaded 25 correctness task definitions
+
+Using mock provider (no actual API calls)
+Cache: 129 entries (122.9 KB)
+
+Dry run mode - estimating costs...
+
+Cost Estimate:
+  Tasks to run:           2
+  Languages:              2 (Calor, C#)
+  Est. input tokens:      1,600
+  Est. output tokens:     1,600
+  Estimated cost:         $0.0000
+  Budget:                 $5.00
+
+Category breakdown:
+  null-handling: 2 tasks, $0.0000
+
+Dry run - no API calls made

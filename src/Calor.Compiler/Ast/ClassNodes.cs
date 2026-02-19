@@ -206,6 +206,16 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public bool IsStatic { get; }
 
     /// <summary>
+    /// True if this is a struct (value type).
+    /// </summary>
+    public bool IsStruct { get; }
+
+    /// <summary>
+    /// True if this is a readonly struct.
+    /// </summary>
+    public bool IsReadOnly { get; }
+
+    /// <summary>
     /// The base class (if any).
     /// </summary>
     public string? BaseClass { get; }
@@ -349,13 +359,17 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodNode> methods,
         IReadOnlyList<EventDefinitionNode> events,
         AttributeCollection attributes,
-        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        bool isStruct = false,
+        bool isReadOnly = false)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
         IsSealed = isSealed;
         IsPartial = isPartial;
         IsStatic = isStatic;
+        IsStruct = isStruct;
+        IsReadOnly = isReadOnly;
         BaseClass = baseClass;
         ImplementedInterfaces = implementedInterfaces ?? throw new ArgumentNullException(nameof(implementedInterfaces));
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
@@ -380,6 +394,8 @@ public sealed class ClassFieldNode : AstNode
     public string Name { get; }
     public string TypeName { get; }
     public Visibility Visibility { get; }
+    public MethodModifiers Modifiers { get; }
+    public bool IsStatic => Modifiers.HasFlag(MethodModifiers.Static);
     public ExpressionNode? DefaultValue { get; }
     public AttributeCollection Attributes { get; }
 
@@ -395,7 +411,7 @@ public sealed class ClassFieldNode : AstNode
         Visibility visibility,
         ExpressionNode? defaultValue,
         AttributeCollection attributes)
-        : this(span, name, typeName, visibility, defaultValue, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, name, typeName, visibility, MethodModifiers.None, defaultValue, attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -407,11 +423,25 @@ public sealed class ClassFieldNode : AstNode
         ExpressionNode? defaultValue,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, name, typeName, visibility, MethodModifiers.None, defaultValue, attributes, csharpAttributes)
+    {
+    }
+
+    public ClassFieldNode(
+        TextSpan span,
+        string name,
+        string typeName,
+        Visibility visibility,
+        MethodModifiers modifiers,
+        ExpressionNode? defaultValue,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         Visibility = visibility;
+        Modifiers = modifiers;
         DefaultValue = defaultValue;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();

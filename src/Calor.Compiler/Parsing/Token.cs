@@ -279,6 +279,7 @@ public enum TokenKind
     StrLiteral,         // STR:"hello"
     BoolLiteral,        // BOOL:true
     FloatLiteral,       // FLOAT:3.14
+    DecimalLiteral,     // DEC:21.35
 
     // Identifiers and values
     Identifier,
@@ -311,7 +312,7 @@ public readonly struct Token : IEquatable<Token>
     public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.DateMarker;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
-        or TokenKind.BoolLiteral or TokenKind.FloatLiteral;
+        or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;
 
     public bool IsTrivia => Kind is TokenKind.Whitespace or TokenKind.Newline;
 

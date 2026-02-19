@@ -1384,6 +1384,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             ? new ExpressionCallNode(node.Span, newTarget, newArgs)
             : node;
     }
+    public ExpressionNode Visit(ExpressionStatementNode node) => throw new InvalidOperationException();
 
     #endregion
 }

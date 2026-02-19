@@ -1,0 +1,62 @@
+§M{m1:Transliterator}
+
+§U{System}
+§U{System.Collections.Generic}
+§U{System.Text}
+
+§CL{c0:TransliteratorBase:pub:abs}
+  §PROP{p001:Name:str:pub:abs}
+    §GET
+    §/GET
+  §/PROP{p001}
+§/CL{c0}
+
+§CL{c1:CyrillicToLatin:pub}
+  §EXT{TransliteratorBase}
+
+  §FLD{str:_mappings:pri}
+
+  §PROP{p001:Name:str:pub:over}
+    §GET
+    §/GET
+  §/PROP{p001}
+
+  §CTOR{ctor1:pub}
+    §I{str:name}
+    §ASSIGN §THIS._mappings name
+  §/CTOR{ctor1}
+
+  §MT{mt1:Transliterate:pub}
+    §I{str:input}
+    §O{str}
+    §E{cw}
+
+    §B{~dict} §NEW{Dictionary<char,str>}
+    §B{[char]:buf} §ARR{char:buf:256}
+    §B{~sb} §NEW{StringBuilder}
+    §B{ConsoleKeyInfo:keyPressed} §C{Console.ReadKey} §/C
+
+    §L{l1:i:0:(len input):1}
+      §B{char:ch} §IDX{input} i
+      §IF{if1} (== ch (char-lit "Y"))
+        §C{sb.Append}
+          §A "Y"
+        §/C
+      §EL
+        §C{sb.Append}
+          §A ch
+        §/C
+      §/I{if1}
+    §/L{l1}
+
+    §C{Console.WriteLine}
+      §A §NEW{StringBuilder}
+      §A §NEW{StringBuilder}
+    §/C
+
+    §R §C{sb.ToString} §/C
+  §/MT{mt1}
+
+§/CL{c1}
+
+§/M{m1}
