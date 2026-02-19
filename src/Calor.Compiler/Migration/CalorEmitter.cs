@@ -652,11 +652,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         var typePart = node.TypeName != null ? $"{TypeMapper.CSharpToCalor(node.TypeName)}:" : "";
-        var mutPart = node.IsMutable ? "" : ":const";
-        // Parser expects: §B[type:name] expression (no = sign)
+        var namePart = node.IsMutable ? $"~{node.Name}" : node.Name;
         var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
 
-        AppendLine($"§B{{{typePart}{node.Name}{mutPart}}}{initPart}");
+        AppendLine($"§B{{{typePart}{namePart}}}{initPart}");
         return "";
     }
 

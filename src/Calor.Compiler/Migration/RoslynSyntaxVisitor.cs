@@ -2149,9 +2149,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // so that each call in the chain is properly represented in Calor
             if (memberAccess.Expression is InvocationExpressionSyntax innerInvocation)
             {
-                _context.RecordFeatureUsage("linq-method");
                 var innerConverted = ConvertInvocationExpression(innerInvocation);
-                // Emit inner call as the target prefix, e.g., "§C{collection.GroupBy} ... §/C .Select"
+
+                // If the inner call converted to a Calor built-in (StringOperationNode, etc.),
+                // it can't be embedded in a §C{} call target string. Fall back to original C# syntax.
+                if (innerConverted is not CallExpressionNode)
+                {
+                    return new CallExpressionNode(span, invocation.Expression.ToString(), args);
+                }
+
+                _context.RecordFeatureUsage("linq-method");
                 var emitter = new CalorEmitter();
                 var innerCalor = innerConverted.Accept(emitter);
                 return new CallExpressionNode(span, $"({innerCalor}).{methodName}", args);
