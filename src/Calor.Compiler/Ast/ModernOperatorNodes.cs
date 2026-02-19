@@ -55,11 +55,15 @@ public sealed class InterpolatedStringTextNode : InterpolatedStringPartNode
 public sealed class InterpolatedStringExpressionNode : InterpolatedStringPartNode
 {
     public ExpressionNode Expression { get; }
+    public string? FormatSpecifier { get; }
+    public string? AlignmentClause { get; }
 
-    public InterpolatedStringExpressionNode(TextSpan span, ExpressionNode expression)
+    public InterpolatedStringExpressionNode(TextSpan span, ExpressionNode expression, string? formatSpecifier = null, string? alignmentClause = null)
         : base(span)
     {
         Expression = expression ?? throw new ArgumentNullException(nameof(expression));
+        FormatSpecifier = formatSpecifier;
+        AlignmentClause = alignmentClause;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
