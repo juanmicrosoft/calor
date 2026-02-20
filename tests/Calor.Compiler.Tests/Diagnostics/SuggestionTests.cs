@@ -240,6 +240,31 @@ public class SuggestionTests
         Assert.Contains("Common markers", error.Message);
     }
 
+    [Fact]
+    public void Lexer_CastSectionMarker_ShowsCastSyntaxHint()
+    {
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer("§CAST", diagnostics);
+        lexer.TokenizeAll();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.IsError);
+        Assert.Contains("(cast", error.Message);
+        Assert.DoesNotContain("Did you mean '§CA", error.Message);
+    }
+
+    [Fact]
+    public void Lexer_CastSectionMarker_CaseInsensitive()
+    {
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer("§Cast", diagnostics);
+        lexer.TokenizeAll();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.IsError);
+        Assert.Contains("(cast", error.Message);
+    }
+
     #endregion
 
     #region Fix Generation Tests

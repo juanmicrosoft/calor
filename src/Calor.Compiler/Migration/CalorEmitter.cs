@@ -1,5 +1,6 @@
 using System.Text;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.Migration;
 
@@ -187,12 +188,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var modifiers = new List<string>();
         if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("sealed");
+        if (node.IsSealed) modifiers.Add("seal");
         if (node.IsPartial) modifiers.Add("partial");
-        if (node.IsStatic) modifiers.Add("static");
+        if (node.IsStatic) modifiers.Add("st");
         if (node.IsStruct) modifiers.Add("struct");
         if (node.IsReadOnly) modifiers.Add("readonly");
 
+        var vis = GetVisibilityShorthand(node.Visibility);
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
         var typeParams = node.TypeParameters.Count > 0
@@ -200,7 +202,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§CL{{{node.Id}:{node.Name}{typeParams}{modStr}}}{attrs}");
+        AppendLine($"§CL{{{node.Id}:{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
         Indent();
 
         // Emit type parameter constraints
@@ -271,7 +273,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§FLD{{{typeName}:{node.Name}:{visibility}}}{attrs}{defaultVal}");
+        var modifiers = new List<string>();
+        if (node.Modifiers.HasFlag(MethodModifiers.Static)) modifiers.Add("stat");
+        if (node.Modifiers.HasFlag(MethodModifiers.Const)) modifiers.Add("const");
+        if (node.Modifiers.HasFlag(MethodModifiers.Readonly)) modifiers.Add("readonly");
+        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+
+        AppendLine($"§FLD{{{typeName}:{node.Name}:{visibility}{modStr}}}{attrs}{defaultVal}");
 
         return "";
     }
@@ -412,7 +420,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsOverride) modifiers.Add("over");
         if (node.IsAbstract) modifiers.Add("abs");
         if (node.IsSealed) modifiers.Add("sealed");
-        if (node.IsStatic) modifiers.Add("static");
+        if (node.IsStatic) modifiers.Add("st");
 
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
@@ -434,8 +442,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Parameters
         foreach (var param in node.Parameters)
         {
-            var paramType = TypeMapper.CSharpToCalor(param.TypeName);
-            AppendLine($"§I{{{paramType}:{param.Name}}}");
+            AppendLine(Visit(param));
         }
 
         // Output
@@ -443,6 +450,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             AppendLine($"§O{{{output}}}");
         }
+
+        // Effects
+        EmitEffects(node.Effects);
 
         // Preconditions
         foreach (var pre in node.Preconditions)
@@ -491,8 +501,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Parameters
         foreach (var param in node.Parameters)
         {
-            var paramType = TypeMapper.CSharpToCalor(param.TypeName);
-            AppendLine($"§I{{{paramType}:{param.Name}}}");
+            AppendLine(Visit(param));
         }
 
         // Output
@@ -500,6 +509,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             AppendLine($"§O{{{output}}}");
         }
+
+        // Effects
+        EmitEffects(node.Effects);
 
         // Preconditions
         foreach (var pre in node.Preconditions)
@@ -528,7 +540,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ParameterNode node)
     {
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
-        return $"§I{{{typeName}:{node.Name}}}";
+        var modifiers = new List<string>();
+        if (node.Modifier.HasFlag(ParameterModifier.This)) modifiers.Add("this");
+        if (node.Modifier.HasFlag(ParameterModifier.Ref)) modifiers.Add("ref");
+        if (node.Modifier.HasFlag(ParameterModifier.Out)) modifiers.Add("out");
+        if (node.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
+        if (node.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
+        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        return $"§I{{{typeName}:{node.Name}{modStr}}}";
     }
 
     public string Visit(RequiresNode node)
@@ -632,6 +651,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(YieldReturnStatementNode node)
+    {
+        if (node.Expression != null)
+        {
+            var expr = node.Expression.Accept(this);
+            AppendLine($"§YIELD {expr}");
+        }
+        else
+        {
+            AppendLine("§YIELD");
+        }
+        return "";
+    }
+
+    public string Visit(YieldBreakStatementNode node)
+    {
+        AppendLine("§YBRK");
+        return "";
+    }
+
     public string Visit(BindStatementNode node)
     {
         // Handle collection initializers specially - emit as collection block syntax
@@ -650,13 +689,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitSetCreationWithName(setNode, node.Name);
             return "";
         }
+        if (node.Initializer is ArrayCreationNode arrNode)
+        {
+            EmitArrayCreationWithName(arrNode, node.Name);
+            return "";
+        }
 
-        var typePart = node.TypeName != null ? $"{TypeMapper.CSharpToCalor(node.TypeName)}:" : "";
-        var mutPart = node.IsMutable ? "" : ":const";
         // Parser expects: §B[type:name] expression (no = sign)
         var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
 
-        AppendLine($"§B{{{typePart}{node.Name}{mutPart}}}{initPart}");
+        if (node.IsMutable)
+        {
+            // Mutable: {~name} or {~name:type}
+            var typePostfix = node.TypeName != null ? $":{TypeMapper.CSharpToCalor(node.TypeName)}" : "";
+            AppendLine($"§B{{~{node.Name}{typePostfix}}}{initPart}");
+        }
+        else
+        {
+            // Immutable: {name} or {type:name}
+            var typePrefix = node.TypeName != null ? $"{TypeMapper.CSharpToCalor(node.TypeName)}:" : "";
+            AppendLine($"§B{{{typePrefix}{node.Name}}}{initPart}");
+        }
         return "";
     }
 
@@ -709,6 +762,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         Dedent();
         AppendLine($"§/HSET{{{variableName}}}");
+    }
+
+    private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName)
+    {
+        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+
+        if (node.Initializer.Count > 0)
+        {
+            AppendLine($"§ARR{{{variableName}:{elementType}}}");
+            Indent();
+            foreach (var element in node.Initializer)
+            {
+                AppendLine(element.Accept(this));
+            }
+            Dedent();
+            AppendLine($"§/ARR{{{variableName}}}");
+        }
+        else if (node.Size != null)
+        {
+            var size = node.Size.Accept(this);
+            AppendLine($"§B{{[{elementType}]:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
+        }
+        else
+        {
+            AppendLine($"§ARR{{{elementType}:{variableName}}}");
+        }
     }
 
     public string Visit(AssignmentStatementNode node)
@@ -869,7 +948,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var collection = node.Collection.Accept(this);
         var varType = TypeMapper.CSharpToCalor(node.VariableType);
 
-        AppendLine($"§EACH{{{node.Id}:{varType}:{node.VariableName}}} {collection}");
+        // Emit as §EACH{id:variable:type} or §EACH{id:variable:type:index}
+        var indexPart = node.IndexVariableName != null ? $":{node.IndexVariableName}" : "";
+        AppendLine($"§EACH{{{node.Id}:{node.VariableName}:{varType}{indexPart}}} {collection}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -1365,9 +1446,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.Initializer.Count > 0)
         {
-            var elements = node.Initializer.Select(e => $"§A {e.Accept(this)}");
+            // Return inline format so this works in expression context (return, call args, etc.)
+            // Multi-line format is handled by EmitArrayCreationWithName for bind-statement context.
             var id = string.IsNullOrEmpty(node.Name) ? "_arr" : node.Name;
-            return $"§ARR{{{elementType}:{id}}} {string.Join(" ", elements)} §/ARR{{{id}}}";
+            var elements = string.Join(" ", node.Initializer.Select(e => e.Accept(this)));
+            return $"§ARR{{{id}:{elementType}}} {elements} §/ARR{{{id}}}";
         }
         else if (node.Size != null)
         {
@@ -1396,45 +1479,61 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(LambdaExpressionNode node)
     {
-        var sb = new System.Text.StringBuilder();
-        var id = node.Id;
-
-        // Build opening tag: §LAM{id:param1:type1:param2:type2}
-        // For async: §LAM{id:async:param1:type1:...}
-        sb.Append($"§LAM{{{id}");
-        if (node.IsAsync) sb.Append(":async");
+        // Build §LAM{id:p1:t1:p2:t2} header
+        // Format: §LAM{id[:async]:param1:type1[:param2:type2:...]}
+        var headerParts = new List<string> { node.Id };
+        if (node.IsAsync)
+        {
+            headerParts.Add("async");
+        }
         foreach (var p in node.Parameters)
         {
-            sb.Append(':');
-            sb.Append(p.Name);
-            sb.Append(':');
-            if (!string.IsNullOrEmpty(p.TypeName))
-                sb.Append(TypeMapper.CSharpToCalor(p.TypeName));
+            headerParts.Add(p.Name);
+            headerParts.Add(p.TypeName != null ? TypeMapper.CSharpToCalor(p.TypeName) : "object");
         }
-        sb.Append('}');
+        var header = string.Join(":", headerParts);
 
         if (node.IsExpressionLambda && node.ExpressionBody != null)
         {
             var body = node.ExpressionBody.Accept(this);
-            sb.Append($" {body}");
+            return $"§LAM{{{header}}} {body} §/LAM{{{node.Id}}}";
         }
         else if (node.StatementBody != null && node.StatementBody.Count > 0)
         {
-            foreach (var stmt in node.StatementBody)
-            {
-                var stmtStr = CaptureStatementOutput(stmt);
-                if (!string.IsNullOrWhiteSpace(stmtStr))
-                {
-                    sb.Append('\n');
-                    sb.Append("  ");
-                    sb.Append(stmtStr.Trim());
-                }
-            }
-            sb.Append('\n');
-        }
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"§LAM{{{header}}}");
 
-        sb.Append($" §/LAM{{{id}}}");
-        return sb.ToString();
+            // For short lambdas (1-2 statements), emit inline
+            if (node.StatementBody.Count <= 2)
+            {
+                var stmts = node.StatementBody.Select(s => CaptureStatementOutput(s).Trim()).ToList();
+                sb.Append(" ");
+                sb.Append(string.Join(" ", stmts));
+                sb.Append($" §/LAM{{{node.Id}}}");
+            }
+            else
+            {
+                // For longer lambdas, emit multi-line
+                sb.AppendLine();
+                var indent = "  ";
+                foreach (var stmt in node.StatementBody)
+                {
+                    var stmtStr = CaptureStatementOutput(stmt);
+                    if (!string.IsNullOrWhiteSpace(stmtStr))
+                    {
+                        sb.Append(indent);
+                        sb.AppendLine(stmtStr.Trim());
+                    }
+                }
+                sb.Append($"§/LAM{{{node.Id}}}");
+            }
+            return sb.ToString();
+        }
+        else
+        {
+            // Empty lambda
+            return $"§LAM{{{header}}} §/LAM{{{node.Id}}}";
+        }
     }
 
     public string Visit(LambdaParameterNode node)
@@ -1915,6 +2014,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Visibility.Private => "priv",
             _ => "priv"
         };
+    }
+
+    private void EmitEffects(EffectsNode? effects)
+    {
+        if (effects == null || effects.Effects.Count == 0)
+            return;
+
+        var effectCodes = effects.Effects
+            .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
+            .Distinct();
+        AppendLine($"§E{{{string.Join(",", effectCodes)}}}");
     }
 
     private static string GetCalorOperatorSymbol(BinaryOperator op) => op switch

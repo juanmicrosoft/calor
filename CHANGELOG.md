@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-02-19
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.18x (Calor leads)
+- **Metrics**: Calor wins 6, C# wins 2
+- **Highlights**:
+  - Comprehension: 1.55x (Calor wins, large effect)
+  - EditPrecision: 1.37x (Calor wins, large effect)
+  - RefactoringStability: 1.37x (Calor wins, large effect)
+  - ErrorDetection: 1.24x (Calor wins, large effect)
+- **Programs Tested**: 40
+
+### Added
+- **Class-level visibility preservation** — `internal class Program` no longer round-trips to `public class Program`; visibility flows through the full AST→converter→parser→emitter pipeline
+- **Effect inference in converter** — The C#→Calor converter now auto-infers side effects from method bodies (e.g., `Console.WriteLine` → `§E{cw}`, `throw` → `§E{throw}`) instead of requiring manual annotation
+- **Shared EffectCodes utility** — `EffectCodes.ToCompact()` centralizes effect category/value → compact code mapping
+- **LINQ query syntax support** — `from`/`where`/`select`/`orderby`/`group by`/`join` expressions
+- **LINQ method chain decomposition** — Chains like `.Where().Select().ToList()` are decomposed into sequential Calor statements
+- **Type operators** — `is`, `as`, `cast` type checking and conversion operators
+- **7 missing language features** — decimal literals, array/object initializers, anonymous types, extension methods, yield return, partial classes, operator overloads
+- **`§USE` syntax** — New using directive format with `--validate-codegen` flag
+- **`CalorCompilerOverride` MSBuild property** — Override compiler path in build
+- **`calor self-test` CLI command** — Automated compiler self-test via CLI and MCP tool
+
+### Fixed
+- **Converter fidelity** — const arrays, built-in method chains, mutable binding `~` prefix, bare array initializers, multi-element `§ARR` arrays, float literal decimal points, complex string interpolation expressions
+- **Effect enforcement** — Resolved `§F` vs `§MT` inconsistency for LINQ calls and method-level effect checking
+- **Code generation** — struct support, static fields, global namespace, increment/decrement operators, class inheritance, static class modifier, readonly struct identity, operator overloads, `§IDX` codegen, generics in inheritance, attribute unquoting, `#nullable enable`
+- **Parser/emitter** — `§EACH` index support, `§CAST` error improvements, partial class modifier emission, stale static class comment, double-slash error message, `§EACH` syntax docs
+- **Init/tooling** — `.proj` file support, git root resolution for MCP, atomic writes for `~/.claude.json`, MCP tools in agent templates
+
 ## [0.2.6] - 2026-02-18
 
 ### Benchmark Results (Statistical: 30 runs)

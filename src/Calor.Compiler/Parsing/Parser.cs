@@ -610,7 +610,18 @@ public sealed class Parser
             attrs.Add("semantic", semantic);
         }
 
-        return new ParameterNode(startToken.Span, paramName, typeName, attrs);
+        // Parse parameter modifier from semantic/pos2 position (this, ref, out, in, params)
+        var modifier = ParameterModifier.None;
+        if (!string.IsNullOrEmpty(semantic))
+        {
+            if (semantic.Contains("this", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.This;
+            if (semantic.Contains("ref", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Ref;
+            if (semantic.Contains("out", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Out;
+            if (semantic.Contains("in", StringComparison.OrdinalIgnoreCase) && !semantic.Contains("this", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.In;
+            if (semantic.Contains("params", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Params;
+        }
+
+        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, Array.Empty<CalorAttributeNode>());
     }
 
     private OutputNode ParseOutput()
@@ -779,6 +790,14 @@ public sealed class Parser
         {
             return ParseContinueStatement();
         }
+        else if (Check(TokenKind.Yield))
+        {
+            return ParseYieldReturnStatement();
+        }
+        else if (Check(TokenKind.YieldBreak))
+        {
+            return ParseYieldBreakStatement();
+        }
         // Print aliases
         else if (Check(TokenKind.Print))
         {
@@ -800,6 +819,10 @@ public sealed class Parser
         else if (Check(TokenKind.HashSet))
         {
             return ParseSetCreationStatement();
+        }
+        else if (Check(TokenKind.Array))
+        {
+            return ParseArrayCreationStatement();
         }
         else if (Check(TokenKind.Push) || Check(TokenKind.Add))
         {
@@ -3437,6 +3460,7 @@ public sealed class Parser
         {
             "public" or "pub" => Visibility.Public,
             "internal" or "int" => Visibility.Internal,
+            "protected" or "prot" => Visibility.Protected,
             "private" or "priv" => Visibility.Private,
             _ => Visibility.Private
         };
@@ -3507,22 +3531,28 @@ public sealed class Parser
         }
         else
         {
-            // Check for initializer elements (§A expressions until §/ARR)
-            while (!IsAtEnd && !Check(TokenKind.EndArray) && Check(TokenKind.Arg))
+            // No size in attributes - parse as initialized array (like §LIST)
+            // Support both bare expressions and §A-prefixed elements
+            while (!IsAtEnd && !Check(TokenKind.EndArray))
             {
-                initializer.Add(ParseArgument());
-            }
-
-            // Also support inline elements without §A prefix (e.g., §ARR{:i32} 1 2 3 §/ARR)
-            if (initializer.Count == 0)
-            {
-                while (!IsAtEnd && !Check(TokenKind.EndArray) && IsExpressionStart())
+                if (Check(TokenKind.Arg))
                 {
+                    // §A-prefixed element (backward compat with emitter output)
+                    initializer.Add(ParseArgument());
+                }
+                else if (IsExpressionStart())
+                {
+                    // Bare expression (documented syntax: §ARR{id:type} 1 2 3 §/ARR{id})
                     initializer.Add(ParseExpression());
+                }
+                else
+                {
+                    break;
                 }
             }
 
             // If only one element and no end tag coming, it might be a size expression
+            // e.g., §ARR{id:type} 10 (no §/ARR) → treat 10 as size, not initializer
             if (initializer.Count == 1 && !Check(TokenKind.EndArray))
             {
                 size = initializer[0];
@@ -3636,10 +3666,11 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Foreach);
         var attrs = ParseAttributes();
 
-        // Positional: [id:variable:type]
+        // Positional: [id:variable:type] or [id:variable:type:index]
         var id = attrs["_pos0"] ?? "";
         var variableName = attrs["_pos1"] ?? "item";
         var variableType = attrs["_pos2"] ?? "var";
+        var indexVariableName = attrs["_pos3"]; // null if not provided
 
         if (string.IsNullOrEmpty(id))
         {
@@ -3662,7 +3693,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ForeachStatementNode(span, id, variableName, variableType, collection, body, attrs);
+        return new ForeachStatementNode(span, id, variableName, variableType, collection, body, attrs, indexVariableName);
     }
 
     // Phase 6 Extended: Collections (List, Dictionary, HashSet)
@@ -3722,6 +3753,22 @@ public sealed class Parser
             $"List<{listNode.ElementType}>",
             isMutable: false,
             listNode,
+            new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Parses array creation as a statement (emits as var declaration).
+    /// §ARR{nums:i32} 1 2 3 §/ARR{nums}
+    /// </summary>
+    private BindStatementNode ParseArrayCreationStatement()
+    {
+        var arrNode = ParseArrayCreation();
+        return new BindStatementNode(
+            arrNode.Span,
+            arrNode.Name,
+            $"{arrNode.ElementType}[]",
+            isMutable: false,
+            arrNode,
             new AttributeCollection());
     }
 
@@ -4544,17 +4591,19 @@ public sealed class Parser
         }
 
         // Disambiguate positionals:
-        // 4 positionals (pos3 exists): pos2 is baseClass (or visibility to ignore), pos3 is modifiers
+        // 4 positionals (pos3 exists): pos2 is visibility, pos3 is modifiers — OR pos2 is baseClass, pos3 is modifiers
         // 3 positionals (pos3 null): if pos2 is all known modifiers/visibility → modifiers; else baseClass
         string modifiers;
         string? baseClass = null;
+        Visibility visibility = Visibility.Internal;
 
         if (pos3 != null)
         {
-            // 4 positionals: §CL{id:name:BaseClass:modifiers}
+            // 4 positionals: §CL{id:name:vis:modifiers} or §CL{id:name:BaseClass:modifiers}
             if (IsVisibilityKeyword(pos2))
             {
-                // pos2 is a visibility like "pub" — ignore it, modifiers = pos3
+                // pos2 is a visibility like "pub", "int", etc.
+                visibility = ParseVisibility(pos2);
                 modifiers = pos3;
             }
             else
@@ -4565,10 +4614,12 @@ public sealed class Parser
         }
         else
         {
-            // 3 positionals: §CL{id:name:modifiers_or_base}
+            // 3 positionals: §CL{id:name:modifiers_or_vis_or_base}
             if (IsClassModifierOrVisibility(pos2))
             {
+                // Extract visibility from the modifiers string if present
                 modifiers = pos2;
+                visibility = ExtractVisibilityFromModifiers(ref modifiers);
             }
             else
             {
@@ -4578,16 +4629,18 @@ public sealed class Parser
             }
         }
 
-        var modTokens = new HashSet<string>(
-            modifiers.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(m => m.Trim()),
-            StringComparer.OrdinalIgnoreCase);
-        var isAbstract = modTokens.Contains("abs") || modTokens.Contains("abstract");
-        var isSealed = modTokens.Contains("seal") || modTokens.Contains("sealed");
-        var isStatic = modTokens.Contains("st") || modTokens.Contains("stat") || modTokens.Contains("static");
-        var isPartial = modTokens.Contains("partial");
-        var isStruct = modTokens.Contains("struct");
-        var isReadOnly = modTokens.Contains("readonly");
+        // Token-based matching: split modifiers and check each token against known abbreviations
+        var modifierTokens = modifiers.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        var isAbstract = modifierTokens.Any(t => t.Equals("abs", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("abstract", StringComparison.OrdinalIgnoreCase));
+        var isSealed = modifierTokens.Any(t => t.Equals("seal", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("sealed", StringComparison.OrdinalIgnoreCase));
+        var isStatic = modifierTokens.Any(t => t.Equals("st", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("stat", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("static", StringComparison.OrdinalIgnoreCase));
+        var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.OrdinalIgnoreCase));
+        var isStruct = modifierTokens.Any(t => t.Equals("struct", StringComparison.OrdinalIgnoreCase));
+        var isReadOnly = modifierTokens.Any(t => t.Equals("readonly", StringComparison.OrdinalIgnoreCase));
 
         // Structs cannot be abstract
         if (isStruct && isAbstract)
@@ -4700,7 +4753,7 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
             implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, attrs, csharpAttrs,
-            isStruct: isStruct, isReadOnly: isReadOnly);
+            isStruct: isStruct, isReadOnly: isReadOnly, visibility: visibility);
     }
 
     /// <summary>
@@ -4980,16 +5033,34 @@ public sealed class Parser
 
     private static MethodModifiers ParseMethodModifiers(string modStr)
     {
-        var tokens = new HashSet<string>(
-            modStr.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(m => m.Trim()),
-            StringComparer.OrdinalIgnoreCase);
         var mods = MethodModifiers.None;
-        if (tokens.Contains("virt") || tokens.Contains("virtual")) mods |= MethodModifiers.Virtual;
-        if (tokens.Contains("over") || tokens.Contains("override")) mods |= MethodModifiers.Override;
-        if (tokens.Contains("abs") || tokens.Contains("abstract")) mods |= MethodModifiers.Abstract;
-        if (tokens.Contains("seal") || tokens.Contains("sealed")) mods |= MethodModifiers.Sealed;
-        if (tokens.Contains("st") || tokens.Contains("stat") || tokens.Contains("static")) mods |= MethodModifiers.Static;
+        // Token-based matching: split on commas/spaces and check each token
+        var tokens = modStr.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var token in tokens)
+        {
+            if (token.Equals("vr", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("virt", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("virtual", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Virtual;
+            else if (token.Equals("ov", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("over", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("override", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Override;
+            else if (token.Equals("abs", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("abstract", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Abstract;
+            else if (token.Equals("seal", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("sealed", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Sealed;
+            else if (token.Equals("st", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("stat", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("static", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Static;
+            else if (token.Equals("const", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Const;
+            else if (token.Equals("readonly", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Readonly;
+        }
         return mods;
     }
 
@@ -5695,6 +5766,34 @@ public sealed class Parser
         var token = Expect(TokenKind.RawCSharp);
         var content = token.Value as string ?? "";
         return new RawCSharpNode(token.Span, content);
+    }
+
+    /// <summary>
+    /// Parses a yield return statement.
+    /// §YIELD expression
+    /// </summary>
+    private YieldReturnStatementNode ParseYieldReturnStatement()
+    {
+        var startToken = Expect(TokenKind.Yield);
+
+        ExpressionNode? expression = null;
+        if (IsExpressionStart())
+        {
+            expression = ParseExpression();
+        }
+
+        var span = expression != null ? startToken.Span.Union(expression.Span) : startToken.Span;
+        return new YieldReturnStatementNode(span, expression);
+    }
+
+    /// <summary>
+    /// Parses a yield break statement.
+    /// §YBRK
+    /// </summary>
+    private YieldBreakStatementNode ParseYieldBreakStatement()
+    {
+        var token = Expect(TokenKind.YieldBreak);
+        return new YieldBreakStatementNode(token.Span);
     }
 
     // Phase 11: Lambdas, Delegates, Events
@@ -7054,6 +7153,8 @@ public sealed class Parser
         return value.Equals("pub", StringComparison.OrdinalIgnoreCase)
             || value.Equals("pri", StringComparison.OrdinalIgnoreCase)
             || value.Equals("pro", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("prot", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("priv", StringComparison.OrdinalIgnoreCase)
             || value.Equals("int", StringComparison.OrdinalIgnoreCase)
             || value.Equals("public", StringComparison.OrdinalIgnoreCase)
             || value.Equals("private", StringComparison.OrdinalIgnoreCase)
@@ -7061,11 +7162,49 @@ public sealed class Parser
             || value.Equals("internal", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static readonly HashSet<string> VisibilityKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "pub", "pri", "pro", "prot", "priv", "int",
+        "public", "private", "protected", "internal"
+    };
+
+    /// <summary>
+    /// Extracts a visibility keyword from a comma/space-separated modifiers string,
+    /// removes it from the modifiers, and returns the parsed visibility.
+    /// </summary>
+    private static Visibility ExtractVisibilityFromModifiers(ref string modifiers)
+    {
+        if (string.IsNullOrEmpty(modifiers))
+            return Visibility.Internal;
+
+        var parts = modifiers.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        Visibility vis = Visibility.Internal;
+        bool found = false;
+        var remaining = new List<string>();
+
+        foreach (var part in parts)
+        {
+            var trimmed = part.Trim();
+            if (!found && VisibilityKeywords.Contains(trimmed))
+            {
+                vis = ParseVisibility(trimmed);
+                found = true;
+            }
+            else
+            {
+                remaining.Add(trimmed);
+            }
+        }
+
+        modifiers = string.Join(",", remaining);
+        return vis;
+    }
+
     private static readonly HashSet<string> ClassModifierKeywords = new(StringComparer.OrdinalIgnoreCase)
     {
         "abs", "abstract", "seal", "sealed", "st", "stat", "static",
         "partial", "struct", "readonly",
-        "pub", "pri", "pro", "int",
+        "pub", "pri", "pro", "prot", "priv", "int",
         "public", "private", "protected", "internal"
     };
 

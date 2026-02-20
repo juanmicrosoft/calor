@@ -141,6 +141,11 @@ public sealed class ForeachStatementNode : StatementNode
 
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// Optional index variable name for indexed foreach (e.g., Select with index).
+    /// </summary>
+    public string? IndexVariableName { get; }
+
     public ForeachStatementNode(
         TextSpan span,
         string id,
@@ -148,7 +153,8 @@ public sealed class ForeachStatementNode : StatementNode
         string variableType,
         ExpressionNode collection,
         IReadOnlyList<StatementNode> body,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        string? indexVariableName = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -157,6 +163,7 @@ public sealed class ForeachStatementNode : StatementNode
         Collection = collection ?? throw new ArgumentNullException(nameof(collection));
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        IndexVariableName = indexVariableName;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

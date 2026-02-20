@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Calor.Compiler.Ast;
@@ -118,9 +119,24 @@ public sealed class CSharpToCalorConverter
                 };
             }
 
-            // Step 2: Visit C# AST and build Calor AST
+            // Step 2: Create semantic model for type inference (best-effort)
+            SemanticModel? semanticModel = null;
+            try
+            {
+                var compilation = CSharpCompilation.Create("ConversionAnalysis",
+                    new[] { syntaxTree },
+                    GetBasicMetadataReferences(),
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                semanticModel = compilation.GetSemanticModel(syntaxTree);
+            }
+            catch
+            {
+                // Semantic model creation is best-effort; proceed without it
+            }
+
+            // Visit C# AST and build Calor AST
             var moduleName = _options.ModuleName ?? DeriveModuleName(sourceFile, root);
-            var visitor = new RoslynSyntaxVisitor(context);
+            var visitor = new RoslynSyntaxVisitor(context, semanticModel);
             var calorAst = visitor.Convert(root, moduleName);
 
             if (context.HasErrors)
@@ -228,6 +244,40 @@ public sealed class CSharpToCalorConverter
             ModuleName = _options.ModuleName,
             GracefulFallback = _options.GracefulFallback
         };
+    }
+
+    private static MetadataReference[] GetBasicMetadataReferences()
+    {
+        var refs = new List<MetadataReference>();
+
+        // Add core runtime assembly
+        var objectLocation = typeof(object).Assembly.Location;
+        if (!string.IsNullOrEmpty(objectLocation))
+            refs.Add(MetadataReference.CreateFromFile(objectLocation));
+
+        // Add System.Linq for LINQ method resolution
+        var linqLocation = typeof(System.Linq.Enumerable).Assembly.Location;
+        if (!string.IsNullOrEmpty(linqLocation))
+            refs.Add(MetadataReference.CreateFromFile(linqLocation));
+
+        // Add System.Runtime for core types
+        var runtimeDir = System.IO.Path.GetDirectoryName(objectLocation);
+        if (runtimeDir != null)
+        {
+            var runtimePath = System.IO.Path.Combine(runtimeDir, "System.Runtime.dll");
+            if (System.IO.File.Exists(runtimePath))
+                refs.Add(MetadataReference.CreateFromFile(runtimePath));
+
+            var collectionsPath = System.IO.Path.Combine(runtimeDir, "System.Collections.dll");
+            if (System.IO.File.Exists(collectionsPath))
+                refs.Add(MetadataReference.CreateFromFile(collectionsPath));
+
+            var consolePath = System.IO.Path.Combine(runtimeDir, "System.Console.dll");
+            if (System.IO.File.Exists(consolePath))
+                refs.Add(MetadataReference.CreateFromFile(consolePath));
+        }
+
+        return refs.ToArray();
     }
 
     private static string DeriveModuleName(string? sourceFile, CompilationUnitSyntax root)

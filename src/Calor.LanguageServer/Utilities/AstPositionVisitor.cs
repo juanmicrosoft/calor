@@ -224,6 +224,9 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(TypeOfExpressionNode node) => DefaultVisit(node)!;
     // Feature 9: Expression call targets
     public virtual T Visit(ExpressionCallNode node) => DefaultVisit(node)!;
+    // Yield support
+    public virtual T Visit(YieldReturnStatementNode node) => DefaultVisit(node)!;
+    public virtual T Visit(YieldBreakStatementNode node) => DefaultVisit(node)!;
     // Raw C# passthrough
     public virtual T Visit(RawCSharpNode node) => DefaultVisit(node)!;
 }

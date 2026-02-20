@@ -274,6 +274,36 @@ public sealed class BreakStatementNode : StatementNode
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
 
+/// <summary>
+/// Represents a yield return statement.
+/// §YIELD expression
+/// </summary>
+public sealed class YieldReturnStatementNode : StatementNode
+{
+    public ExpressionNode? Expression { get; }
+
+    public YieldReturnStatementNode(TextSpan span, ExpressionNode? expression)
+        : base(span)
+    {
+        Expression = expression;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents a yield break statement.
+/// §YBRK
+/// </summary>
+public sealed class YieldBreakStatementNode : StatementNode
+{
+    public YieldBreakStatementNode(TextSpan span) : base(span) { }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
 public static class BinaryOperatorExtensions
 {
     public static BinaryOperator? FromString(string? value)

@@ -17,7 +17,7 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Shape:abs}
+§CL{c1:Shape:pub:abs}
   §MT{mt1:Area:pub:abs}
     §O{double}
   §/MT{mt1}
@@ -40,7 +40,7 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Shape:abs}
+§CL{c1:Shape:pub:abs}
   §MT{mt1:Area:pub:abs}
     §O{double}
   §/MT{mt1}
@@ -206,8 +206,7 @@ public class InheritanceTests
     [Fact]
     public void CodeGen_StaticMethod_GeneratesValidCSharp()
     {
-        // Note: static class modifier is not fully implemented in the parser
-        // This test verifies static methods work correctly
+        // This test verifies static methods in a non-static class (class uses :pub, not :static)
         var source = @"
 §M{m1:Test}
 §CL{c1:MathUtils:pub}
@@ -231,7 +230,7 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:DataService:partial}
+§CL{c1:DataService:pub:partial}
   §MT{mt1:GetData:pub}
     §O{str}
     §R ""data""
@@ -250,7 +249,7 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:FinalClass:seal}
+§CL{c1:FinalClass:pub:seal}
   §MT{mt1:DoWork:pub}
     §O{void}
   §/MT{mt1}

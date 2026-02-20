@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Migration;
@@ -13,6 +14,7 @@ namespace Calor.Compiler.Migration;
 public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 {
     private readonly ConversionContext _context;
+    private readonly SemanticModel? _semanticModel;
     private readonly List<UsingDirectiveNode> _usings = new();
     private readonly List<InterfaceDefinitionNode> _interfaces = new();
     private readonly List<ClassDefinitionNode> _classes = new();
@@ -23,13 +25,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private HashSet<string> _reassignedVariables = new();
 
     /// <summary>
+    /// Accumulates hoisted statements from expression-level chain decomposition.
+    /// When ConvertInvocationExpression encounters a chained call that can't be handled by
+    /// native operations, it hoists the inner call to a temp bind and adds it here.
+    /// ConvertBlock and VisitGlobalStatement flush these before the containing statement.
+    /// </summary>
+    private readonly List<StatementNode> _pendingStatements = new();
+
+    /// <summary>
     /// Gets the top-level statements collected during conversion (C# 9+ feature).
     /// </summary>
     public IReadOnlyList<StatementNode> TopLevelStatements => _topLevelStatements;
 
-    public RoslynSyntaxVisitor(ConversionContext context) : base(SyntaxWalkerDepth.Node)
+    public RoslynSyntaxVisitor(ConversionContext context, SemanticModel? semanticModel = null) : base(SyntaxWalkerDepth.Node)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _semanticModel = semanticModel;
     }
 
     /// <summary>
@@ -62,7 +73,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 visibility: Visibility.Public,
                 parameters: new List<ParameterNode>(),
                 output: null, // void return type
-                effects: null,
+                effects: InferEffectsFromBody(_topLevelStatements),
                 body: _topLevelStatements,
                 attributes: new AttributeCollection());
 
@@ -123,9 +134,45 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     public override void VisitGlobalStatement(GlobalStatementSyntax node)
     {
         _context.RecordFeatureUsage("top-level-statement");
+        _pendingStatements.Clear();
+
+        // Handle chained method calls in local declarations (e.g., var x = a.Where(...).First())
+        // Skip chains handled by native operations (string, StringBuilder, regex, char)
+        if (node.Statement is LocalDeclarationStatementSyntax chainDecl
+            && chainDecl.Declaration.Variables.Count == 1
+            && chainDecl.Declaration.Variables[0].Initializer?.Value is InvocationExpressionSyntax chainInit
+            && IsChainedInvocation(chainInit)
+            && !WouldChainUseNativeOps(chainInit))
+        {
+            foreach (var stmt in DecomposeChainedLocalDeclaration(chainDecl))
+            {
+                _topLevelStatements.Add(stmt);
+            }
+            FlushPendingStatements(_topLevelStatements);
+            _context.IncrementConverted();
+            return;
+        }
+
+        // Handle chained method calls in expression statements
+        // Skip chains handled by native operations (string, StringBuilder, regex, char)
+        if (node.Statement is ExpressionStatementSyntax exprStmt
+            && exprStmt.Expression is InvocationExpressionSyntax chainExpr
+            && IsChainedInvocation(chainExpr)
+            && !WouldChainUseNativeOps(chainExpr))
+        {
+            foreach (var stmt in DecomposeChainedExpressionStatement(exprStmt))
+            {
+                _topLevelStatements.Add(stmt);
+            }
+            FlushPendingStatements(_topLevelStatements);
+            return;
+        }
+
         var statement = ConvertStatement(node.Statement);
         if (statement != null)
         {
+            // Flush any hoisted temp binds from expression-level chains
+            FlushPendingStatements(_topLevelStatements);
             _topLevelStatements.Add(statement);
             _context.IncrementConverted();
         }
@@ -279,6 +326,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var isPartial = node.Modifiers.Any(SyntaxKind.PartialKeyword);
         var isStatic = node.Modifiers.Any(SyntaxKind.StaticKeyword);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
+        var defaultVis = node.Parent is TypeDeclarationSyntax ? Visibility.Private : Visibility.Internal;
+        var visibility = GetVisibility(node.Modifiers, defaultVis);
 
         if (isPartial) _context.RecordFeatureUsage("partial-class");
         if (isStatic) _context.RecordFeatureUsage("static-class");
@@ -363,13 +412,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             methods,
             events,
             new AttributeCollection(),
-            csharpAttrs);
+            csharpAttrs,
+            visibility: visibility);
     }
 
     private ClassDefinitionNode ConvertRecord(RecordDeclarationSyntax node)
     {
         var id = _context.GenerateId("r");
         var name = node.Identifier.Text;
+        var defaultVis = node.Parent is TypeDeclarationSyntax ? Visibility.Private : Visibility.Internal;
+        var visibility = GetVisibility(node.Modifiers, defaultVis);
 
         var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
@@ -431,6 +483,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             name,
             isAbstract: false,
             isSealed: true,
+            isPartial: false,
+            isStatic: false,
             baseClass: null,
             implementedInterfaces: new List<string>(),
             typeParameters,
@@ -438,7 +492,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             properties,
             constructors,
             methods,
-            new AttributeCollection());
+            Array.Empty<EventDefinitionNode>(),
+            new AttributeCollection(),
+            Array.Empty<CalorAttributeNode>(),
+            visibility: visibility);
     }
 
     private ClassDefinitionNode ConvertStruct(StructDeclarationSyntax node)
@@ -448,6 +505,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var isReadOnly = node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword);
         var isPartial = node.Modifiers.Any(SyntaxKind.PartialKeyword);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
+        var defaultVis = node.Parent is TypeDeclarationSyntax ? Visibility.Private : Visibility.Internal;
+        var visibility = GetVisibility(node.Modifiers, defaultVis);
 
         if (isReadOnly)
             _context.RecordFeatureUsage("readonly-struct");
@@ -512,7 +571,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection(),
             csharpAttrs,
             isStruct: true,
-            isReadOnly: isReadOnly);
+            isReadOnly: isReadOnly,
+            visibility: visibility);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -579,7 +639,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             typeParameters,
             parameters,
             output,
-            effects: null,
+            effects: InferEffectsFromBody(body),
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -646,7 +706,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<TypeParameterNode>(),
             parameters,
             output,
-            effects: null,
+            effects: InferEffectsFromBody(body),
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -680,7 +740,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<TypeParameterNode>(),
             parameters,
             output,
-            effects: null,
+            effects: InferEffectsFromBody(body),
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -736,6 +796,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeName = TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
+        var modifiers = MethodModifiers.None;
+        if (node.Modifiers.Any(SyntaxKind.ConstKeyword))
+            modifiers |= MethodModifiers.Const;
+        if (node.Modifiers.Any(SyntaxKind.StaticKeyword))
+            modifiers |= MethodModifiers.Static;
+        if (node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword))
+            modifiers |= MethodModifiers.Readonly;
+
         foreach (var variable in node.Declaration.Variables)
         {
             var defaultValue = variable.Initializer != null
@@ -747,6 +815,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 variable.Identifier.Text,
                 typeName,
                 visibility,
+                modifiers,
                 defaultValue,
                 new AttributeCollection(),
                 csharpAttrs));
@@ -926,21 +995,79 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         foreach (var statement in block.Statements)
         {
+            // Clear pending statements before each statement conversion.
+            // Expression-level chain hoisting in ConvertInvocationExpression may add
+            // temp bind statements here; they must be flushed before the containing statement.
+            _pendingStatements.Clear();
+
             // Handle local declarations with multiple variables specially
             if (statement is LocalDeclarationStatementSyntax localDecl && localDecl.Declaration.Variables.Count > 1)
             {
                 statements.AddRange(ConvertLocalDeclarationMultiple(localDecl));
+                FlushPendingStatements(statements);
+                continue;
+            }
+
+            // Handle chained method calls in local declarations (e.g., var x = a.Where(...).First())
+            // Skip chains handled by native operations (string, StringBuilder, regex, char)
+            if (statement is LocalDeclarationStatementSyntax chainDecl
+                && chainDecl.Declaration.Variables.Count == 1
+                && chainDecl.Declaration.Variables[0].Initializer?.Value is InvocationExpressionSyntax chainInit
+                && IsChainedInvocation(chainInit)
+                && !WouldChainUseNativeOps(chainInit))
+            {
+                statements.AddRange(DecomposeChainedLocalDeclaration(chainDecl));
+                FlushPendingStatements(statements);
+                continue;
+            }
+
+            // Handle chained method calls in expression statements (e.g., a.Where(...).ToList())
+            // Skip chains handled by native operations (string, StringBuilder, regex, char)
+            if (statement is ExpressionStatementSyntax exprStmt
+                && exprStmt.Expression is InvocationExpressionSyntax chainExpr
+                && IsChainedInvocation(chainExpr)
+                && !WouldChainUseNativeOps(chainExpr))
+            {
+                statements.AddRange(DecomposeChainedExpressionStatement(exprStmt));
+                FlushPendingStatements(statements);
+                continue;
+            }
+
+            // Handle chained method calls in return statements (e.g., return items.Where(...).First())
+            // Skip chains handled by native operations (string, StringBuilder, regex, char)
+            if (statement is ReturnStatementSyntax returnStmt
+                && returnStmt.Expression is InvocationExpressionSyntax returnChain
+                && IsChainedInvocation(returnChain)
+                && !WouldChainUseNativeOps(returnChain))
+            {
+                statements.AddRange(DecomposeChainedReturnStatement(returnStmt));
+                FlushPendingStatements(statements);
                 continue;
             }
 
             var converted = ConvertStatement(statement);
             if (converted != null)
             {
+                // Flush any hoisted temp binds from expression-level chains BEFORE the statement
+                FlushPendingStatements(statements);
                 statements.Add(converted);
             }
         }
 
         return statements;
+    }
+
+    /// <summary>
+    /// Flushes any pending hoisted statements (from expression-level chain decomposition)
+    /// into the target list, then clears the pending list.
+    /// </summary>
+    private void FlushPendingStatements(List<StatementNode> target)
+    {
+        if (_pendingStatements.Count > 0)
+        {
+            target.AddRange(_pendingStatements);
+            _pendingStatements.Clear();
+        }
     }
 
     private StatementNode? ConvertStatement(StatementSyntax statement)
@@ -964,6 +1091,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             BreakStatementSyntax breakStmt => ConvertBreakStatement(breakStmt),
             ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
             UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
+            YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
             _ => HandleUnsupportedStatement(statement)
         };
     }
@@ -1007,6 +1135,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("break");
         _context.IncrementConverted();
         return new BreakStatementNode(GetTextSpan(node));
+    }
+
+    private StatementNode ConvertYieldStatement(YieldStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("yield-return");
+        _context.IncrementConverted();
+
+        if (node.ReturnOrBreakKeyword.IsKind(SyntaxKind.BreakKeyword))
+        {
+            return new YieldBreakStatementNode(GetTextSpan(node));
+        }
+
+        var expr = node.Expression != null ? ConvertExpression(node.Expression) : null;
+        return new YieldReturnStatementNode(GetTextSpan(node), expr);
     }
 
     private StatementNode ConvertExpressionStatement(ExpressionStatementSyntax node)
@@ -1322,6 +1464,280 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 isMutable,
                 initializer,
                 new AttributeCollection()));
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Checks if an expression is a chained method invocation (e.g., a.Where(...).First()).
+    /// </summary>
+    private static bool IsChainedInvocation(ExpressionSyntax expression)
+    {
+        return expression is InvocationExpressionSyntax invocation
+            && invocation.Expression is MemberAccessExpressionSyntax memberAccess
+            && memberAccess.Expression is InvocationExpressionSyntax;
+    }
+
+    /// <summary>
+    /// Checks if a chained invocation would be handled by native operations (string, StringBuilder,
+    /// regex, char) in ConvertInvocationExpression. If so, decomposition should be skipped to
+    /// preserve the native operation output.
+    ///
+    /// COUPLING NOTE: This heuristic mirrors the native-op detection in ConvertInvocationExpression
+    /// (lines ~2489-2568). The two must stay aligned:
+    ///   - StringBuilder detection here (line ~1456) ↔ TryGetStringBuilderOperation calls (lines ~2491-2514)
+    ///   - String method list here (line ~1462) ↔ TryGetStringOperation (line ~2501)
+    ///   - Static string/Regex/Char patterns here ↔ static checks (lines ~2532-2568)
+    /// If a new native op category is added to ConvertInvocationExpression, add a corresponding
+    /// check here, or those chains will be incorrectly decomposed instead of using native ops.
+    /// See also: CSharpToCalorConversionTests.StringBuilderChainPreservesNativeOps_* tests.
+    /// </summary>
+    private static bool WouldChainUseNativeOps(InvocationExpressionSyntax invocation)
+    {
+        if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess)
+            return false;
+
+        var methodName = memberAccess.Name.Identifier.Text;
+        var targetStr = memberAccess.Expression.ToString();
+
+        // StringBuilder operations: target contains "StringBuilder" or starts with "sb"/"_sb"
+        if (targetStr.Contains("StringBuilder") || targetStr.StartsWith("sb") || targetStr.StartsWith("_sb"))
+        {
+            return methodName is "Append" or "AppendLine" or "Insert" or "Remove" or "Clear" or "ToString";
+        }
+
+        // String methods
+        if (methodName is "Contains" or "StartsWith" or "EndsWith" or "IndexOf" or "Replace"
+            or "Trim" or "TrimStart" or "TrimEnd" or "ToUpper" or "ToLower" or "Substring"
+            or "Split" or "Join" or "PadLeft" or "PadRight" or "ToString" or "ToCharArray"
+            or "Insert" or "Remove" or "Length" or "IsNullOrEmpty" or "IsNullOrWhiteSpace")
+        {
+            return true;
+        }
+
+        // Static string methods
+        if (targetStr.StartsWith("string.") || targetStr.StartsWith("String."))
+            return true;
+
+        // Regex methods
+        if (targetStr.StartsWith("Regex.") || targetStr.Contains("RegularExpressions.Regex."))
+            return true;
+
+        // Char methods
+        if (targetStr.StartsWith("char.") || targetStr.StartsWith("Char."))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Collects all steps in a method chain from innermost to outermost.
+    /// For a.Where(...).Select(...).First(), returns:
+    ///   [("a", "Where", args1), (null, "Select", args2), (null, "First", args3)]
+    /// where null target means "use previous step's result".
+    /// </summary>
+    private List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)> CollectChainSteps(
+        InvocationExpressionSyntax invocation)
+    {
+        var steps = new List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)>();
+        var current = invocation;
+
+        while (current.Expression is MemberAccessExpressionSyntax memberAccess)
+        {
+            var methodName = memberAccess.Name.Identifier.Text;
+            var args = current.ArgumentList.Arguments
+                .Select(a => ConvertExpression(a.Expression))
+                .ToList();
+            var span = GetTextSpan(current);
+
+            if (memberAccess.Expression is InvocationExpressionSyntax inner)
+            {
+                // Intermediate step — target comes from previous chain step
+                steps.Add((null, methodName, args, span));
+                current = inner;
+            }
+            else
+            {
+                // Base of the chain — has a concrete target
+                var baseTarget = memberAccess.Expression.ToString();
+                steps.Add((baseTarget, methodName, args, span));
+                break;
+            }
+        }
+
+        // Reverse so innermost (base) is first
+        steps.Reverse();
+        return steps;
+    }
+
+    /// <summary>
+    /// Decomposes a chained invocation in a local declaration into multiple bind statements.
+    /// var result = products.Where(...).First()
+    /// becomes:
+    ///   var _chain1 = products.Where(...)
+    ///   var result = _chain1.First()
+    /// </summary>
+    private IReadOnlyList<StatementNode> DecomposeChainedLocalDeclaration(LocalDeclarationStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("linq-method-chain");
+
+        var variable = node.Declaration.Variables.First();
+        var finalName = variable.Identifier.Text;
+        var finalTypeName = node.Declaration.Type.IsVar
+            ? null
+            : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
+        var finalIsMutable = _reassignedVariables.Contains(finalName);
+
+        var chainInvocation = (InvocationExpressionSyntax)variable.Initializer!.Value;
+        var steps = CollectChainSteps(chainInvocation);
+
+        return EmitChainSteps(steps, finalName, finalTypeName, finalIsMutable, GetTextSpan(node));
+    }
+
+    /// <summary>
+    /// Decomposes a chained invocation in an expression statement into bind + call statements.
+    /// products.Where(...).ToList()
+    /// becomes:
+    ///   var _chain1 = products.Where(...)
+    ///   _chain1.ToList()
+    /// </summary>
+    private IReadOnlyList<StatementNode> DecomposeChainedExpressionStatement(ExpressionStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("linq-method-chain");
+        _context.IncrementConverted();
+
+        var chainInvocation = (InvocationExpressionSyntax)node.Expression;
+        var steps = CollectChainSteps(chainInvocation);
+
+        if (steps.Count < 2)
+        {
+            // Not actually chained, convert normally
+            return new[] { ConvertExpressionStatement(node) };
+        }
+
+        var results = new List<StatementNode>();
+        var span = GetTextSpan(node);
+        string? prevTempName = null;
+
+        // Emit all steps except the last as bind statements
+        for (int i = 0; i < steps.Count - 1; i++)
+        {
+            var step = steps[i];
+            var target = i == 0 ? step.baseTarget! : prevTempName!;
+            var tempName = _context.GenerateId("_chain");
+
+            var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
+            results.Add(new BindStatementNode(span, tempName, null, false, callExpr, new AttributeCollection()));
+            prevTempName = tempName;
+        }
+
+        // Last step becomes a call statement (no assignment, expression statement)
+        var lastStep = steps[^1];
+        var lastTarget = prevTempName!;
+        results.Add(new CallStatementNode(
+            span,
+            $"{lastTarget}.{lastStep.methodName}",
+            false,
+            lastStep.args,
+            new AttributeCollection()));
+
+        return results;
+    }
+
+    /// <summary>
+    /// Decomposes a chained invocation in a return statement into bind statements + final return.
+    /// return products.Where(...).First()
+    /// becomes:
+    ///   var _chain1 = products.Where(...)
+    ///   return _chain1.First()
+    /// </summary>
+    private IReadOnlyList<StatementNode> DecomposeChainedReturnStatement(ReturnStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("linq-method-chain");
+        _context.IncrementConverted();
+
+        var chainInvocation = (InvocationExpressionSyntax)node.Expression!;
+        var steps = CollectChainSteps(chainInvocation);
+
+        if (steps.Count < 2)
+        {
+            // Not actually chained, convert normally
+            return new[] { ConvertReturnStatement(node) };
+        }
+
+        var results = new List<StatementNode>();
+        var span = GetTextSpan(node);
+        string? prevTempName = null;
+
+        // Emit all steps except the last as bind statements
+        for (int i = 0; i < steps.Count - 1; i++)
+        {
+            var step = steps[i];
+            var target = i == 0 ? step.baseTarget! : prevTempName!;
+            var tempName = _context.GenerateId("_chain");
+
+            var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
+            results.Add(new BindStatementNode(span, tempName, null, false, callExpr, new AttributeCollection()));
+            prevTempName = tempName;
+        }
+
+        // Last step becomes the return value
+        var lastStep = steps[^1];
+        var lastTarget = prevTempName!;
+        var lastCallExpr = new CallExpressionNode(lastStep.span, $"{lastTarget}.{lastStep.methodName}", lastStep.args);
+        results.Add(new ReturnStatementNode(span, lastCallExpr));
+
+        return results;
+    }
+
+    /// <summary>
+    /// Emits bind statements for chain steps, with the final step using the provided name and type.
+    /// </summary>
+    private IReadOnlyList<StatementNode> EmitChainSteps(
+        List<(string? baseTarget, string methodName, List<ExpressionNode> args, TextSpan span)> steps,
+        string finalName,
+        string? finalTypeName,
+        bool finalIsMutable,
+        TextSpan statementSpan)
+    {
+        if (steps.Count < 2)
+        {
+            // Not actually chained — fall back to single bind
+            var step = steps[0];
+            var callExpr = new CallExpressionNode(step.span, $"{step.baseTarget}.{step.methodName}", step.args);
+            return new[]
+            {
+                new BindStatementNode(statementSpan, finalName, finalTypeName, finalIsMutable, callExpr, new AttributeCollection())
+            };
+        }
+
+        var results = new List<StatementNode>();
+        string? prevTempName = null;
+
+        for (int i = 0; i < steps.Count; i++)
+        {
+            _context.IncrementConverted();
+            var step = steps[i];
+            var target = i == 0 ? step.baseTarget! : prevTempName!;
+            var isLast = i == steps.Count - 1;
+
+            var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
+
+            if (isLast)
+            {
+                // Final step uses the original variable name and type
+                results.Add(new BindStatementNode(
+                    statementSpan, finalName, finalTypeName, finalIsMutable, callExpr, new AttributeCollection()));
+            }
+            else
+            {
+                // Intermediate step uses a generated temp name with no type
+                var tempName = _context.GenerateId("_chain");
+                results.Add(new BindStatementNode(
+                    statementSpan, tempName, null, false, callExpr, new AttributeCollection()));
+                prevTempName = tempName;
+            }
         }
 
         return results;
@@ -1863,6 +2279,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             DefaultExpressionSyntax defaultExpr => ConvertDefaultExpression(defaultExpr),
             AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
             QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
+            InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -2145,16 +2562,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
 
             // Handle chained method calls (e.g., products.GroupBy(...).Select(...))
-            // When the target expression is an invocation, recursively convert it
-            // so that each call in the chain is properly represented in Calor
+            // Hoist inner call to a temp bind so the outer call has a clean target.
+            // The temp bind is added to _pendingStatements which ConvertBlock flushes
+            // before the containing statement.
+            // CAVEAT: When the containing statement is a loop (while/for), the hoisted bind
+            // is emitted once before the loop rather than re-evaluated per iteration. This is
+            // semantically correct for LINQ's lazy IEnumerable chains (Where/Select/etc.
+            // return deferred iterators), but would change behavior for eagerly-evaluated
+            // chains. In practice this is acceptable — the alternative was non-functional Calor.
+            // NOTE: Native ops (string, StringBuilder, regex, char) above may already have
+            // returned, so this only fires for non-native chains. Statement-level decomposition
+            // in ConvertBlock uses WouldChainUseNativeOps to stay aligned — see its doc comment.
             if (memberAccess.Expression is InvocationExpressionSyntax innerInvocation)
             {
                 _context.RecordFeatureUsage("linq-method");
                 var innerConverted = ConvertInvocationExpression(innerInvocation);
-                // Emit inner call as the target prefix, e.g., "§C{collection.GroupBy} ... §/C .Select"
-                var emitter = new CalorEmitter();
-                var innerCalor = innerConverted.Accept(emitter);
-                return new CallExpressionNode(span, $"({innerCalor}).{methodName}", args);
+                var tempName = _context.GenerateId("_chain");
+                _pendingStatements.Add(new BindStatementNode(
+                    span, tempName, null, false, innerConverted, new AttributeCollection()));
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
             }
         }
 
@@ -2903,15 +3329,91 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(ConvertExpression)
             .ToList();
 
-        // Infer element type from first element or use "object"
-        var elementType = "object";
-        if (initializer.Count > 0 && initializer[0] is IntLiteralNode) elementType = "i32";
-        else if (initializer.Count > 0 && initializer[0] is FloatLiteralNode) elementType = "f64";
-        else if (initializer.Count > 0 && initializer[0] is DecimalLiteralNode) elementType = "decimal";
-        else if (initializer.Count > 0 && initializer[0] is StringLiteralNode) elementType = "str";
-        else if (initializer.Count > 0 && initializer[0] is BoolLiteralNode) elementType = "bool";
+        // Try declared type first, fall back to inferring from first element
+        var elementType = TryGetDeclaredArrayElementType(implicitArray) ?? InferElementType(initializer);
 
         return new ArrayCreationNode(GetTextSpan(implicitArray), id, id, elementType, null, initializer, new AttributeCollection());
+    }
+
+    private ExpressionNode ConvertInitializerExpression(InitializerExpressionSyntax initExpr)
+    {
+        if (initExpr.Kind() != SyntaxKind.ArrayInitializerExpression)
+            return CreateFallbackExpression(initExpr, "unsupported-initializer");
+
+        _context.RecordFeatureUsage("array-initializer");
+
+        var id = _context.GenerateId("arr");
+        var initializer = initExpr.Expressions
+            .Select(ConvertExpression)
+            .ToList();
+
+        // Try declared type first, fall back to inferring from first element
+        var elementType = TryGetDeclaredArrayElementType(initExpr) ?? InferElementType(initializer);
+
+        return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType, null, initializer, new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Tries to infer the type of a lambda parameter using the semantic model.
+    /// Returns null if the semantic model is unavailable or the type cannot be resolved.
+    /// </summary>
+    private string? TryInferLambdaParameterType(ParameterSyntax parameter)
+    {
+        if (_semanticModel == null) return null;
+
+        try
+        {
+            var symbol = _semanticModel.GetDeclaredSymbol(parameter);
+            if (symbol is IParameterSymbol paramSymbol && paramSymbol.Type != null
+                && paramSymbol.Type.SpecialType != SpecialType.System_Object)
+            {
+                return TypeMapper.CSharpToCalor(paramSymbol.Type.ToDisplayString());
+            }
+        }
+        catch
+        {
+            // Semantic model queries can fail if compilation has errors; fall through gracefully
+        }
+
+        return null;
+    }
+
+    private static string? TryGetDeclaredArrayElementType(SyntaxNode node)
+    {
+        // Walk up: InitializerExpression -> EqualsValueClause -> VariableDeclarator -> VariableDeclaration
+        if (node.Parent is EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax { Parent: VariableDeclarationSyntax declaration } })
+        {
+            var typeStr = declaration.Type.ToString();
+            // Handle single-dimensional arrays: "double[]"
+            if (typeStr.EndsWith("[]"))
+            {
+                var csharpElement = typeStr[..^2];
+                return TypeMapper.CSharpToCalor(csharpElement);
+            }
+            // Handle multi-dimensional arrays: "int[,]", "int[,,]", etc.
+            var bracketStart = typeStr.IndexOf('[');
+            if (bracketStart > 0 && typeStr.EndsWith("]"))
+            {
+                var csharpElement = typeStr[..bracketStart];
+                return TypeMapper.CSharpToCalor(csharpElement);
+            }
+        }
+        return null;
+    }
+
+
+    private static string InferElementType(List<ExpressionNode> elements)
+    {
+        if (elements.Count == 0) return "object";
+        return elements[0] switch
+        {
+            IntLiteralNode => "i32",
+            FloatLiteralNode => "f64",
+            DecimalLiteralNode => "decimal",
+            StringLiteralNode => "str",
+            BoolLiteralNode => "bool",
+            _ => "object"
+        };
     }
 
     private ExpressionNode ConvertElementAccess(ElementAccessExpressionSyntax elementAccess)
@@ -2946,16 +3448,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 parameters.Add(new LambdaParameterNode(
                     GetTextSpan(simple.Parameter),
                     simple.Parameter.Identifier.Text,
-                    null));
+                    TryInferLambdaParameterType(simple.Parameter)));
                 break;
 
             case ParenthesizedLambdaExpressionSyntax paren:
                 foreach (var param in paren.ParameterList.Parameters)
                 {
+                    var typeName = param.Type != null
+                        ? TypeMapper.CSharpToCalor(param.Type.ToString())
+                        : TryInferLambdaParameterType(param);
                     parameters.Add(new LambdaParameterNode(
                         GetTextSpan(param),
                         param.Identifier.Text,
-                        param.Type != null ? TypeMapper.CSharpToCalor(param.Type.ToString()) : null));
+                        typeName));
                 }
                 break;
         }
@@ -3120,11 +3625,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private IReadOnlyList<ParameterNode> ConvertParameters(ParameterListSyntax paramList)
     {
         return paramList.Parameters
-            .Select(p => new ParameterNode(
-                GetTextSpan(p),
-                p.Identifier.Text,
-                TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
-                new AttributeCollection()))
+            .Select(p =>
+            {
+                var modifier = ParameterModifier.None;
+                if (p.Modifiers.Any(SyntaxKind.ThisKeyword)) modifier |= ParameterModifier.This;
+                if (p.Modifiers.Any(SyntaxKind.RefKeyword)) modifier |= ParameterModifier.Ref;
+                if (p.Modifiers.Any(SyntaxKind.OutKeyword)) modifier |= ParameterModifier.Out;
+                if (p.Modifiers.Any(SyntaxKind.InKeyword)) modifier |= ParameterModifier.In;
+                if (p.Modifiers.Any(SyntaxKind.ParamsKeyword)) modifier |= ParameterModifier.Params;
+                return new ParameterNode(
+                    GetTextSpan(p),
+                    p.Identifier.Text,
+                    TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
+                    modifier,
+                    new AttributeCollection(),
+                    Array.Empty<CalorAttributeNode>());
+            })
             .ToList();
     }
 
@@ -3137,6 +3653,166 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (modifiers.Any(SyntaxKind.ProtectedKeyword))
             return Visibility.Protected;
         return Visibility.Private;
+    }
+
+    private static Visibility GetVisibility(SyntaxTokenList modifiers, Visibility defaultVisibility)
+    {
+        if (modifiers.Any(SyntaxKind.PublicKeyword))
+            return Visibility.Public;
+        if (modifiers.Any(SyntaxKind.InternalKeyword))
+            return Visibility.Internal;
+        if (modifiers.Any(SyntaxKind.ProtectedKeyword))
+            return Visibility.Protected;
+        if (modifiers.Any(SyntaxKind.PrivateKeyword))
+            return Visibility.Private;
+        return defaultVisibility;
+    }
+
+    /// <summary>
+    /// Walks already-converted AST statements and infers effects.
+    /// Returns an EffectsNode if any effects are found, null otherwise.
+    /// </summary>
+    private static EffectsNode? InferEffectsFromBody(IReadOnlyList<StatementNode> body)
+    {
+        var effects = new Dictionary<string, string>();
+        InferEffectsFromStatements(body, effects);
+        if (effects.Count == 0)
+            return null;
+        return new EffectsNode(new TextSpan(0, 0, 0, 0), effects);
+    }
+
+    private static void InferEffectsFromStatements(IEnumerable<StatementNode> statements, Dictionary<string, string> effects)
+    {
+        foreach (var stmt in statements)
+        {
+            InferEffectsFromStatement(stmt, effects);
+        }
+    }
+
+    /// <summary>
+    /// Adds an effect value to a category, appending comma-separated if the category already has a value.
+    /// </summary>
+    private static void AddEffect(Dictionary<string, string> effects, string category, string value)
+    {
+        if (effects.TryGetValue(category, out var existing))
+        {
+            // Check if this value is already present (avoid duplicates)
+            var existingValues = existing.Split(',');
+            if (!existingValues.Contains(value, StringComparer.Ordinal))
+            {
+                effects[category] = existing + "," + value;
+            }
+        }
+        else
+        {
+            effects[category] = value;
+        }
+    }
+
+    private static void InferEffectsFromStatement(StatementNode statement, Dictionary<string, string> effects)
+    {
+        switch (statement)
+        {
+            case PrintStatementNode:
+                AddEffect(effects, "io", "console_write");
+                break;
+            case ThrowStatementNode:
+            case RethrowStatementNode:
+                AddEffect(effects, "exception", "intentional");
+                break;
+            case CallStatementNode call:
+                InferEffectsFromCallTarget(call.Target, effects);
+                foreach (var arg in call.Arguments)
+                    InferEffectsFromExpression(arg, effects);
+                break;
+            case IfStatementNode ifStmt:
+                InferEffectsFromStatements(ifStmt.ThenBody, effects);
+                foreach (var elseIf in ifStmt.ElseIfClauses)
+                    InferEffectsFromStatements(elseIf.Body, effects);
+                if (ifStmt.ElseBody != null)
+                    InferEffectsFromStatements(ifStmt.ElseBody, effects);
+                InferEffectsFromExpression(ifStmt.Condition, effects);
+                break;
+            case ForStatementNode forStmt:
+                InferEffectsFromStatements(forStmt.Body, effects);
+                break;
+            case WhileStatementNode whileStmt:
+                InferEffectsFromStatements(whileStmt.Body, effects);
+                InferEffectsFromExpression(whileStmt.Condition, effects);
+                break;
+            case DoWhileStatementNode doWhileStmt:
+                InferEffectsFromStatements(doWhileStmt.Body, effects);
+                InferEffectsFromExpression(doWhileStmt.Condition, effects);
+                break;
+            case ForeachStatementNode foreachStmt:
+                InferEffectsFromStatements(foreachStmt.Body, effects);
+                break;
+            case TryStatementNode tryStmt:
+                InferEffectsFromStatements(tryStmt.TryBody, effects);
+                foreach (var catchClause in tryStmt.CatchClauses)
+                    InferEffectsFromStatements(catchClause.Body, effects);
+                if (tryStmt.FinallyBody != null)
+                    InferEffectsFromStatements(tryStmt.FinallyBody, effects);
+                break;
+            case MatchStatementNode matchStmt:
+                foreach (var matchCase in matchStmt.Cases)
+                    InferEffectsFromStatements(matchCase.Body, effects);
+                break;
+            case BindStatementNode bind:
+                if (bind.Initializer != null)
+                    InferEffectsFromExpression(bind.Initializer, effects);
+                break;
+            case ReturnStatementNode ret:
+                if (ret.Expression != null)
+                    InferEffectsFromExpression(ret.Expression, effects);
+                break;
+            case AssignmentStatementNode assign:
+                InferEffectsFromExpression(assign.Value, effects);
+                break;
+        }
+    }
+
+    private static void InferEffectsFromExpression(ExpressionNode expr, Dictionary<string, string> effects)
+    {
+        switch (expr)
+        {
+            case CallExpressionNode callExpr:
+                InferEffectsFromCallTarget(callExpr.Target, effects);
+                foreach (var arg in callExpr.Arguments)
+                    InferEffectsFromExpression(arg, effects);
+                break;
+            case BinaryOperationNode binOp:
+                InferEffectsFromExpression(binOp.Left, effects);
+                InferEffectsFromExpression(binOp.Right, effects);
+                break;
+            case ConditionalExpressionNode condExpr:
+                InferEffectsFromExpression(condExpr.Condition, effects);
+                InferEffectsFromExpression(condExpr.WhenTrue, effects);
+                InferEffectsFromExpression(condExpr.WhenFalse, effects);
+                break;
+            case MatchExpressionNode matchExpr:
+                foreach (var matchCase in matchExpr.Cases)
+                    InferEffectsFromStatements(matchCase.Body, effects);
+                break;
+        }
+    }
+
+    private static void InferEffectsFromCallTarget(string target, Dictionary<string, string> effects)
+    {
+        var effectInfo = EffectChecker.TryGetKnownEffect(target);
+        if (effectInfo != null)
+        {
+            var category = effectInfo.Kind switch
+            {
+                EffectKind.IO => "io",
+                EffectKind.Mutation => "mutation",
+                EffectKind.Nondeterminism => "nondeterminism",
+                EffectKind.Exception => "exception",
+                EffectKind.Memory => "memory",
+                _ => "unknown"
+            };
+            AddEffect(effects, category, effectInfo.Value);
+        }
     }
 
     private static MethodModifiers GetMethodModifiers(SyntaxTokenList modifiers)

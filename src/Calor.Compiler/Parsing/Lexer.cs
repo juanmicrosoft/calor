@@ -242,6 +242,10 @@ public sealed class Lexer
         ["TASK"] = TokenKind.TaskRef,           // §TASK - keep for clarity
         ["DATE"] = TokenKind.DateMarker,        // §DATE - keep for clarity
 
+        // Yield support
+        ["YIELD"] = TokenKind.Yield,            // §YIELD = yield return
+        ["YBRK"] = TokenKind.YieldBreak,        // §YBRK = yield break
+
         // LINQ Support
         ["ANON"] = TokenKind.AnonymousObject,   // §ANON = Anonymous object
         ["/ANON"] = TokenKind.EndAnonymousObject, // §/ANON
@@ -674,6 +678,15 @@ public sealed class Lexer
     /// </summary>
     private void ReportUnknownSectionMarker(string keyword)
     {
+        // Special case: §CAST is a common mistake — casting uses Lisp syntax
+        if (keyword.Equals("CAST", StringComparison.OrdinalIgnoreCase))
+        {
+            _diagnostics.ReportError(CurrentSpan(), Diagnostics.DiagnosticCode.UnexpectedCharacter,
+                $"Unknown section marker '§{keyword}'. Calor uses Lisp syntax for casts: " +
+                $"(cast TargetType expr). Example: (cast i32 myFloat)");
+            return;
+        }
+
         // Try to find a similar marker
         var suggestion = SectionMarkerSuggestions.FindSimilarMarker(keyword);
 

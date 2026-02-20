@@ -186,6 +186,30 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "LINQ query syntax is desugared to equivalent method chains"
         },
+        ["array-initializer"] = new FeatureInfo
+        {
+            Name = "array-initializer",
+            Support = SupportLevel.Full,
+            Description = "Bare array initializers are converted to Calor array nodes"
+        },
+        ["object-initializer"] = new FeatureInfo
+        {
+            Name = "object-initializer",
+            Support = SupportLevel.Full,
+            Description = "Object initializers are converted to Calor §NEW with property assignments"
+        },
+        ["anonymous-type"] = new FeatureInfo
+        {
+            Name = "anonymous-type",
+            Support = SupportLevel.Full,
+            Description = "Anonymous types are converted to Calor §ANON blocks"
+        },
+        ["foreach-index"] = new FeatureInfo
+        {
+            Name = "foreach-index",
+            Support = SupportLevel.Full,
+            Description = "Indexed foreach via §EACH with optional index variable"
+        },
         ["ref-parameter"] = new FeatureInfo
         {
             Name = "ref-parameter",
@@ -298,9 +322,8 @@ public static class FeatureSupport
         ["extension-method"] = new FeatureInfo
         {
             Name = "extension-method",
-            Support = SupportLevel.ManualRequired,
-            Description = "Extension methods require manual conversion to regular methods or traits",
-            Workaround = "Convert to instance methods or Calor traits"
+            Support = SupportLevel.Full,
+            Description = "Extension methods are converted with 'this' parameter modifier preserved"
         },
         ["operator-overload"] = new FeatureInfo
         {
@@ -325,9 +348,8 @@ public static class FeatureSupport
         ["yield-return"] = new FeatureInfo
         {
             Name = "yield-return",
-            Support = SupportLevel.NotSupported,
-            Description = "Yield return (iterator methods) is not supported",
-            Workaround = "Use explicit List<T> construction and return the complete list"
+            Support = SupportLevel.Full,
+            Description = "Yield return/break statements are converted to Calor yield syntax"
         },
         ["is-type-pattern"] = new FeatureInfo
         {

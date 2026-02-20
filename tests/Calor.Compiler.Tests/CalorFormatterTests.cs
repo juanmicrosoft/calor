@@ -430,4 +430,61 @@ public class CalorFormatterTests
     }
 
     #endregion
+
+    #region Foreach Formatting
+
+    [Fact]
+    public void Format_ForeachWithIndex_EmitsForeachBlock()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §EACH{e001:item:i32:idx} items
+                §P item
+              §/EACH{e001}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var formatter = new CalorFormatter();
+        var result = formatter.Format(module);
+
+        // Formatter should emit §EACH with variable:type:index order
+        Assert.Contains("§EACH{", result);
+        Assert.Contains("item:i32:idx", result);
+        Assert.Contains("§/EACH{", result);
+    }
+
+    [Fact]
+    public void Format_ForeachWithoutIndex_EmitsForeachBlockWithoutIndex()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §EACH{e001:item:i32} items
+                §P item
+              §/EACH{e001}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var formatter = new CalorFormatter();
+        var result = formatter.Format(module);
+
+        Assert.Contains("§EACH{", result);
+        Assert.Contains("item:i32", result);
+        // Should NOT contain a trailing colon after type (no index)
+        Assert.DoesNotContain("item:i32:", result);
+        Assert.Contains("§/EACH{", result);
+    }
+
+    #endregion
 }

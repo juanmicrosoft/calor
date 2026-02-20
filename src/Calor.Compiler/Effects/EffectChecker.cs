@@ -47,6 +47,13 @@ public sealed class EffectChecker
     }
 
     /// <summary>
+    /// Looks up a known effect for a given call target (e.g. "Console.WriteLine").
+    /// Returns null if the target has no known effects.
+    /// </summary>
+    internal static EffectInfo? TryGetKnownEffect(string target)
+        => KnownEffects.TryGetValue(target, out var effect) ? effect : null;
+
+    /// <summary>
     /// Checks all functions in a module for effect correctness.
     /// </summary>
     public void Check(ModuleNode module)
@@ -285,4 +292,54 @@ public sealed class EffectInfo : IEquatable<EffectInfo>
         => HashCode.Combine(Kind, Value);
 
     public override string ToString() => $"{Kind}:{Value}";
+}
+
+/// <summary>
+/// Shared utility for converting internal effect category/value pairs to compact surface codes.
+/// Used by both CalorEmitter and CalorFormatter to ensure consistent serialization.
+/// </summary>
+public static class EffectCodes
+{
+    /// <summary>
+    /// Convert internal effect category/value to compact code.
+    /// E.g., ("io", "console_write") → "cw", ("io", "filesystem_read") → "fs:r"
+    /// </summary>
+    public static string ToCompact(string category, string value)
+    {
+        return (category.ToLowerInvariant(), value.ToLowerInvariant()) switch
+        {
+            // Console I/O
+            ("io", "console_write") => "cw",
+            ("io", "console_read") => "cr",
+            // File I/O (new converter-produced values)
+            ("io", "filesystem_write") => "fs:w",
+            ("io", "filesystem_read") => "fs:r",
+            // File I/O (legacy formatter values)
+            ("io", "file_write") => "fw",
+            ("io", "file_read") => "fr",
+            ("io", "file_delete") => "fd",
+            // Network
+            ("io", "network") => "net",
+            ("io", "network_read") => "net:r",
+            ("io", "network_write") => "net:w",
+            ("io", "http") => "http",
+            // Database
+            ("io", "database") => "db",
+            ("io", "database_read") => "dbr",
+            ("io", "database_write") => "dbw",
+            // Environment / process
+            ("io", "environment") => "env",
+            ("io", "process") => "proc",
+            // Mutation
+            ("mutation", "collection") => "mut:col",
+            // Memory
+            ("memory", "allocation") => "alloc",
+            // Nondeterminism
+            ("nondeterminism", "time") => "time",
+            ("nondeterminism", "random") => "rand",
+            // Exception
+            ("exception", "intentional") => "throw",
+            _ => value // Pass through unknown values
+        };
+    }
 }

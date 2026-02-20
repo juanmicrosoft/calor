@@ -946,4 +946,122 @@ public class ConverterImprovementTests
     }
 
     #endregion
+
+    #region Const/Readonly Field Detection
+
+    [Fact]
+    public void Migration_ConstField_DetectsConstModifier()
+    {
+        var csharp = """
+            public class Config
+            {
+                public const int MaxRetries = 3;
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var field = Assert.Single(cls.Fields);
+        Assert.Equal("MaxRetries", field.Name);
+        Assert.True(field.Modifiers.HasFlag(MethodModifiers.Const));
+    }
+
+    [Fact]
+    public void Migration_ReadonlyField_DetectsReadonlyModifier()
+    {
+        var csharp = """
+            public class Config
+            {
+                private readonly string _name = "test";
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var field = Assert.Single(cls.Fields);
+        Assert.Equal("_name", field.Name);
+        Assert.True(field.Modifiers.HasFlag(MethodModifiers.Readonly));
+    }
+
+    [Fact]
+    public void Migration_StaticReadonlyField_DetectsBothModifiers()
+    {
+        var csharp = """
+            public class Config
+            {
+                public static readonly int DefaultTimeout = 30;
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var field = Assert.Single(cls.Fields);
+        Assert.True(field.Modifiers.HasFlag(MethodModifiers.Static));
+        Assert.True(field.Modifiers.HasFlag(MethodModifiers.Readonly));
+    }
+
+    [Fact]
+    public void CSharpEmitter_ConstField_EmitsConstKeyword()
+    {
+        var csharp = """
+            public class Config
+            {
+                public const int MaxRetries = 3;
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new Calor.Compiler.CodeGen.CSharpEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        Assert.Contains("public const int MaxRetries = 3;", output);
+    }
+
+    [Fact]
+    public void CSharpEmitter_ReadonlyField_EmitsReadonlyKeyword()
+    {
+        var csharp = """
+            public class Config
+            {
+                private readonly string _name = "test";
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new Calor.Compiler.CodeGen.CSharpEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        Assert.Contains("private readonly string _name", output);
+    }
+
+    [Fact]
+    public void CalorEmitter_ConstField_EmitsConstModifier()
+    {
+        var csharp = """
+            public class Config
+            {
+                public const int MaxRetries = 3;
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new Calor.Compiler.Migration.CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        Assert.Contains("const", output);
+    }
+
+    #endregion
 }

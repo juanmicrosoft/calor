@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -440,7 +441,7 @@ public class CodeGenBugFixTests
   §MT{mt1:Transliterate:pub}
     §I{str:input}
     §O{str}
-    §E{cw}
+    §E{cw,cr}
 
     §B{~dict} §NEW{Dictionary<char,str>}
     §B{[char]:buf} §ARR{char:buf:256}
@@ -760,7 +761,438 @@ public class CodeGenBugFixTests
         Assert.Contains("'\\n'", result);
     }
 
+    #region Bind :const Backward Compatibility
+
+    [Fact]
+    public void InterpretBindAttributes_NameConst_ParsesAsImmutableNoType()
+    {
+        // Legacy format: {name:const}
+        var attrs = new AttributeCollection();
+        attrs.Add("_pos0", "count");
+        attrs.Add("_pos1", "const");
+        attrs.Add("_posCount", "2");
+
+        var (name, mutable, typeName) = AttributeHelper.InterpretBindAttributes(attrs);
+
+        Assert.Equal("count", name);
+        Assert.False(mutable);
+        Assert.Null(typeName);
+    }
+
+    [Fact]
+    public void InterpretBindAttributes_TypeNameConst_ParsesAsImmutableWithType()
+    {
+        // Legacy format: {type:name:const}
+        var attrs = new AttributeCollection();
+        attrs.Add("_pos0", "i32");
+        attrs.Add("_pos1", "count");
+        attrs.Add("_pos2", "const");
+        attrs.Add("_posCount", "3");
+
+        var (name, mutable, typeName) = AttributeHelper.InterpretBindAttributes(attrs);
+
+        Assert.Equal("count", name);
+        Assert.False(mutable);
+        Assert.NotNull(typeName);
+        Assert.Equal("INT", typeName);
+    }
+
+    #endregion
+
+    #region CalorEmitter Bind Format
+
+    private static TextSpan DummySpan => new(0, 1, 1, 1);
+
+    private static ModuleNode MakeModuleWithBinds(params BindStatementNode[] binds)
+    {
+        var func = new FunctionNode(
+            DummySpan, "f001", "Test", Visibility.Public,
+            Array.Empty<ParameterNode>(),
+            new OutputNode(DummySpan, "VOID"),
+            null,
+            binds,
+            new AttributeCollection());
+        return new ModuleNode(
+            DummySpan, "m001", "Test",
+            Array.Empty<UsingDirectiveNode>(),
+            new[] { func },
+            new AttributeCollection());
+    }
+
+    [Fact]
+    public void CalorEmitter_UntypedImmutableBind_EmitsNameOnly()
+    {
+        var bind = new BindStatementNode(DummySpan, "count", null, false,
+            new IntLiteralNode(DummySpan, 42), new AttributeCollection());
+        var module = MakeModuleWithBinds(bind);
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(module);
+
+        Assert.Contains("§B{count} 42", output);
+        Assert.DoesNotContain(":const", output);
+    }
+
+    [Fact]
+    public void CalorEmitter_UntypedMutableBind_EmitsTildePrefix()
+    {
+        var bind = new BindStatementNode(DummySpan, "counter", null, true,
+            new IntLiteralNode(DummySpan, 0), new AttributeCollection());
+        var module = MakeModuleWithBinds(bind);
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(module);
+
+        Assert.Contains("§B{~counter} 0", output);
+    }
+
+    [Fact]
+    public void CalorEmitter_TypedImmutableBind_EmitsTypeFirst()
+    {
+        // TypeName in the emitter is a C# type; TypeMapper.CSharpToCalor maps it
+        var bind = new BindStatementNode(DummySpan, "count", "int", false,
+            new IntLiteralNode(DummySpan, 42), new AttributeCollection());
+        var module = MakeModuleWithBinds(bind);
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(module);
+
+        // Immutable typed: {type:name} format
+        Assert.Contains("§B{i32:count} 42", output);
+        Assert.DoesNotContain(":const", output);
+    }
+
+    [Fact]
+    public void CalorEmitter_TypedMutableBind_EmitsTildePrefixWithType()
+    {
+        var bind = new BindStatementNode(DummySpan, "total", "int", true,
+            new IntLiteralNode(DummySpan, 0), new AttributeCollection());
+        var module = MakeModuleWithBinds(bind);
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(module);
+
+        // Mutable typed: {~name:type} format
+        Assert.Contains("§B{~total:i32} 0", output);
+    }
+
+    [Fact]
+    public void CalorEmitter_BindOutput_ReParsesCorrectly()
+    {
+        // Construct AST with all 4 bind variants
+        var binds = new[]
+        {
+            new BindStatementNode(DummySpan, "a", null, false,
+                new IntLiteralNode(DummySpan, 1), new AttributeCollection()),
+            new BindStatementNode(DummySpan, "b", null, true,
+                new IntLiteralNode(DummySpan, 2), new AttributeCollection()),
+            new BindStatementNode(DummySpan, "c", "int", false,
+                new IntLiteralNode(DummySpan, 3), new AttributeCollection()),
+            new BindStatementNode(DummySpan, "d", "int", true,
+                new IntLiteralNode(DummySpan, 4), new AttributeCollection()),
+        };
+        var module = MakeModuleWithBinds(binds);
+
+        // Emit via CalorEmitter
+        var emitter = new CalorEmitter();
+        var calor = emitter.Emit(module);
+
+        // Re-parse the emitted output
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calor, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var reparsed = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Emitter output should re-parse without errors.\nOutput:\n{calor}\nErrors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+
+        var func = Assert.Single(reparsed.Functions);
+        Assert.Equal(4, func.Body.Count);
+
+        // Immutable, no type
+        var bindA = (BindStatementNode)func.Body[0];
+        Assert.Equal("a", bindA.Name);
+        Assert.False(bindA.IsMutable);
+        Assert.Null(bindA.TypeName);
+
+        // Mutable, no type
+        var bindB = (BindStatementNode)func.Body[1];
+        Assert.Equal("b", bindB.Name);
+        Assert.True(bindB.IsMutable);
+        Assert.Null(bindB.TypeName);
+
+        // Immutable, with type
+        var bindC = (BindStatementNode)func.Body[2];
+        Assert.Equal("c", bindC.Name);
+        Assert.False(bindC.IsMutable);
+        Assert.NotNull(bindC.TypeName);
+
+        // Mutable, with type
+        var bindD = (BindStatementNode)func.Body[3];
+        Assert.Equal("d", bindD.Name);
+        Assert.True(bindD.IsMutable);
+        Assert.NotNull(bindD.TypeName);
+    }
+
+    #endregion
+
+    #region Array Initialized Tests
+
+    [Fact]
+    public void Array_BareElementInitialized_ParsesCorrectly()
+    {
+        // §ARR{nums:i32} 1 2 3 §/ARR{nums} → 3 elements, no size
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §ARR{nums:i32} 1 2 3 §/ARR{nums}
+§/F{f001}
+§/M{m1}
+";
+        var module = ParseModule(source);
+        var func = Assert.Single(module.Functions);
+        var bind = (BindStatementNode)func.Body[0];
+        Assert.Equal("nums", bind.Name);
+        var arr = (ArrayCreationNode)bind.Initializer!;
+        Assert.Equal(3, arr.Initializer.Count);
+        Assert.Null(arr.Size);
+        Assert.Equal("i32", arr.ElementType);
+    }
+
+    [Fact]
+    public void Array_StandaloneStatement_ParsesWithoutError()
+    {
+        // §ARR at statement level (no §B wrapper)
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §ARR{nums:i32} 1 2 3 §/ARR{nums}
+§/F{f001}
+§/M{m1}
+";
+        var diagnostics = ParseWithDiagnostics(source);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+    }
+
+    [Fact]
+    public void Array_ArgPrefixedElements_BackwardCompat()
+    {
+        // §A-prefixed elements still work
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §B{[i32]:nums} §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums}
+§/F{f001}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+        Assert.Contains("new int[]", result);
+        Assert.Contains("1", result);
+        Assert.Contains("2", result);
+        Assert.Contains("3", result);
+    }
+
+    [Fact]
+    public void Array_BareElements_EmitsCorrectCSharp()
+    {
+        // Bare element syntax → correct C# generation
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §ARR{nums:i32} 1 2 3 §/ARR{nums}
+§/F{f001}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+        Assert.Contains("new int[]", result);
+        Assert.Contains("1", result);
+        Assert.Contains("2", result);
+        Assert.Contains("3", result);
+    }
+
+    [Fact]
+    public void Array_SizedArray_StillWorks()
+    {
+        // §ARR{a1:i32:10} unchanged behavior
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §B{[i32]:arr1} §ARR{i32:arr1:10}
+§/F{f001}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+        Assert.Contains("new int[10]", result);
+    }
+
+    [Fact]
+    public void Array_CSharpInit_EmitterRoundTrip()
+    {
+        // C# array init → converter → Calor → parse → emit C#
+        var converter = new CSharpToCalorConverter();
+        var conversionResult = converter.Convert("int[] nums = new int[] { 1, 2, 3 };");
+
+        Assert.True(conversionResult.Success,
+            string.Join("\n", conversionResult.Issues.Select(i => i.Message)));
+
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        Assert.Contains("new int[]", compilationResult.GeneratedCode);
+        Assert.Contains("1", compilationResult.GeneratedCode);
+        Assert.Contains("2", compilationResult.GeneratedCode);
+        Assert.Contains("3", compilationResult.GeneratedCode);
+    }
+
+    [Fact]
+    public void Array_InitializedInReturnExprContext_CalorEmitterInline()
+    {
+        // Initialized array in return (expression context) should emit inline §ARR, not break
+        var source = @"
+§M{m1:Test}
+§F{f001:GetNums:pub}
+  §O{[i32]}
+  §R §ARR{nums:i32} 1 2 3 §/ARR{nums}
+§/F{f001}
+§/M{m1}
+";
+        var module = ParseModule(source);
+        var calorEmitter = new Migration.CalorEmitter();
+        var result = calorEmitter.Emit(module);
+
+        // The §R and §ARR should be on the same line (inline), not split
+        Assert.Contains("§R §ARR{", result);
+        Assert.Contains("§/ARR{nums}", result);
+    }
+
+    [Fact]
+    public void Array_InitializedInReturnExprContext_RoundTrip()
+    {
+        // return new int[] { 1, 2, 3 } → parse → emit C# should produce correct code
+        var source = @"
+§M{m1:Test}
+§F{f001:GetNums:pub}
+  §O{[i32]}
+  §R §ARR{nums:i32} 1 2 3 §/ARR{nums}
+§/F{f001}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+        Assert.Contains("return new int[]", result);
+        Assert.Contains("1", result);
+        Assert.Contains("2", result);
+        Assert.Contains("3", result);
+    }
+
+    #endregion
+
+    #region Static Class :st Modifier
+
+    [Fact]
+    public void StaticClass_StModifier_ParsedCorrectly()
+    {
+        // §CL{c1:Utils:st} should produce a static class
+        var source = @"
+§M{m1:Test}
+§CL{c1:Utils:st}
+  §MT{mt1:Add:pub:stat}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+  §/MT{mt1}
+§/CL{c1}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("static class Utils", result);
+    }
+
+    [Fact]
+    public void StaticClass_StatModifier_StillWorks()
+    {
+        // Backward compat: §CL{c1:Utils:stat} should still work
+        var source = @"
+§M{m1:Test}
+§CL{c1:Utils:stat}
+  §MT{mt1:Add:pub:stat}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+  §/MT{mt1}
+§/CL{c1}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("static class Utils", result);
+    }
+
+    [Fact]
+    public void StaticClass_StaticModifier_StillWorks()
+    {
+        // Backward compat: §CL{c1:Utils:static} should still work
+        var source = @"
+§M{m1:Test}
+§CL{c1:Utils:static}
+  §MT{mt1:Add:pub:stat}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+  §/MT{mt1}
+§/CL{c1}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("static class Utils", result);
+    }
+
+    [Fact]
+    public void StaticClass_StModifier_DoesNotMatchStruct()
+    {
+        // §CL{c1:Point:struct} should NOT produce a static class
+        var source = @"
+§M{m1:Test}
+§CL{c1:Point:struct}
+  §FLD{i32:X:pub}
+  §FLD{i32:Y:pub}
+§/CL{c1}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+
+        Assert.DoesNotContain("static class", result);
+        Assert.Contains("struct Point", result);
+    }
+
+    #endregion
+
     #region Helper
+
+    private static ModuleNode ParseModule(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath("test.calr");
+
+        var lexer = new Lexer(source, diagnostics);
+        var tokens = lexer.TokenizeAll();
+
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        return module;
+    }
 
     private static string ParseAndEmit(string source)
     {

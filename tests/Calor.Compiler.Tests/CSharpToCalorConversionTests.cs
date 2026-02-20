@@ -1,5 +1,7 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -556,7 +558,7 @@ public class CSharpToCalorConversionTests
         Assert.True(cls.IsPartial);
         Assert.True(cls.IsStatic);
         Assert.Contains("partial", result.CalorSource);
-        Assert.Contains("static", result.CalorSource);
+        Assert.Contains("st", result.CalorSource);
     }
 
     #endregion
@@ -1519,6 +1521,1048 @@ public class CSharpToCalorConversionTests
 
         // Verify generic type survives the round-trip
         Assert.Contains("IEnumerator<int>", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
+    #region Bind Statement Format Tests
+
+    [Fact]
+    public void Emitter_ImmutableVar_EmitsBindWithoutConst()
+    {
+        var csharpSource = """
+            var count = 42;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should emit §B{name} without :const suffix
+        Assert.Contains("§B{count}", result.CalorSource);
+        Assert.DoesNotContain(":const", result.CalorSource);
+    }
+
+    [Fact]
+    public void Emitter_MutableVar_EmitsTildePrefix()
+    {
+        var csharpSource = """
+            int counter = 0;
+            counter = counter + 1;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Mutable should use ~ prefix
+        Assert.Contains("§B{~counter", result.CalorSource);
+        Assert.DoesNotContain(":const", result.CalorSource);
+    }
+
+    [Fact]
+    public void Emitter_TypedImmutableVar_EmitsTypeFirst()
+    {
+        var csharpSource = """
+            int count = 42;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Explicit type declaration: type-first format {type:name}
+        Assert.Contains("§B{i32:count}", result.CalorSource);
+        Assert.DoesNotContain(":const", result.CalorSource);
+    }
+
+    [Fact]
+    public void Emitter_TypedMutableVar_EmitsTildePrefixWithType()
+    {
+        var csharpSource = """
+            int total = 0;
+            total = total + 1;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Explicit typed mutable: {~name:type} format
+        Assert.Contains("§B{~total:i32}", result.CalorSource);
+        Assert.DoesNotContain(":const", result.CalorSource);
+    }
+
+    [Fact]
+    public void Emitter_EmittedBind_ReParsesWithCorrectSemantics()
+    {
+        // C# with explicit typed mutable and immutable variables
+        var csharpSource = """
+            int x = 10;
+            int y = 20;
+            y = y + x;
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Re-parse the emitted Calor
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var reparsed = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Emitter output should re-parse.\nCalor:\n{result.CalorSource}\nErrors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+
+        var func = Assert.Single(reparsed.Functions);
+
+        // x is immutable (not reassigned), y is mutable (reassigned)
+        var bindX = func.Body.OfType<BindStatementNode>().First(b => b.Name == "x");
+        Assert.False(bindX.IsMutable);
+        Assert.NotNull(bindX.TypeName);
+
+        var bindY = func.Body.OfType<BindStatementNode>().First(b => b.Name == "y");
+        Assert.True(bindY.IsMutable);
+        Assert.NotNull(bindY.TypeName);
+    }
+
+    #endregion
+
+    #region Array Shorthand Initializer Tests
+
+    [Fact]
+    public void Convert_ArrayShorthandInitializer_NoFallbackError()
+    {
+        // int[] nums = { 1, 2, 3 }; uses InitializerExpressionSyntax, not ArrayCreationExpressionSyntax
+        var csharpSource = """
+            int[] nums = { 1, 2, 3 };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Should NOT contain §ERR (fallback)
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§ARR", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_ArrayShorthandInitializer_Roundtrip()
+    {
+        var csharpSource = """
+            int[] nums = { 1, 2, 3 };
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        Assert.Contains("new int[]", compilationResult.GeneratedCode);
+    }
+
+    [Fact]
+    public void Convert_StringArrayShorthandInitializer_NoFallbackError()
+    {
+        var csharpSource = """
+            string[] names = { "Alice", "Bob" };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_BareArrayInitializer_InfersElementType()
+    {
+        var csharpSource = """
+            double[] values = { 1.0, 2.5, 3.7 };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§ARR{", result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_BareArrayInitializer_RoundtripsSuccessfully()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    int[] numbers = { 5, 4, 1, 3, 9, 8, 6, 7, 2, 0 };
+                }
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.DoesNotContain("§ERR", conversionResult.CalorSource);
+
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
+    #endregion
+
+    #region LINQ Method Chain Decomposition Tests
+
+    [Fact]
+    public void Convert_LinqChainedCall_DecomposesIntoSeparateStatements()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            var numbers = new[] { 1, 2, 3, 4, 5 };
+            var result = numbers.Where(n => n > 2).First();
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Should NOT contain raw C# embedded in Calor (the old buggy behavior)
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        // Should contain the chain feature usage
+        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+    }
+
+    [Fact]
+    public void Convert_LinqChainedCall_ProducesMultipleBindStatements()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            var numbers = new[] { 1, 2, 3, 4, 5 };
+            var result = numbers.Where(n => n > 2).First();
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var mainFunc = result.Ast.Functions[0];
+        // Should have more than 2 statements: numbers decl + chain intermediate + result
+        Assert.True(mainFunc.Body.Count >= 3,
+            $"Expected at least 3 statements (decomposed chain), got {mainFunc.Body.Count}");
+    }
+
+    [Fact]
+    public void Convert_LinqChainedCall_IntermediateBindsHaveNoType()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            var numbers = new[] { 1, 2, 3 };
+            var result = numbers.Where(n => n > 1).Select(n => n * 2).ToList();
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var mainFunc = result.Ast.Functions[0];
+        // Find intermediate chain binds (they have generated names like _chain001)
+        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
+            .Where(b => b.Name.StartsWith("_chain"))
+            .ToList();
+
+        Assert.True(chainBinds.Count >= 2, $"Expected at least 2 intermediate chain binds, got {chainBinds.Count}");
+        foreach (var bind in chainBinds)
+        {
+            Assert.Null(bind.TypeName); // Intermediate binds should have no explicit type
+        }
+    }
+
+    [Fact]
+    public void Convert_LinqChainedCall_Roundtrip()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            var numbers = new[] { 1, 2, 3, 4, 5 };
+            var result = numbers.Where(n => n > 2).First();
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+
+        // Disable effect enforcement since LINQ calls are external
+        var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
+            new CompilationOptions { EnforceEffects = false });
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
+    [Fact]
+    public void Convert_SingleMethodCall_NotDecomposed()
+    {
+        // A single method call (not chained) should NOT be decomposed
+        var csharpSource = """
+            using System.Linq;
+
+            var numbers = new[] { 1, 2, 3 };
+            var first = numbers.First();
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var mainFunc = result.Ast.Functions[0];
+        // Should not contain chain intermediates
+        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
+            .Where(b => b.Name.StartsWith("_chain"))
+            .ToList();
+        Assert.Empty(chainBinds);
+    }
+
+    #endregion
+
+    #region Property Setter Verification Tests
+
+    [Fact]
+    public void Convert_ObjectInitializer_NoSetterPrefix()
+    {
+        // Verify property initializers don't generate §C{set_Prop} patterns
+        var csharpSource = """
+            var product = new Product { Id = 1, Name = "Widget" };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Should NOT contain set_ prefix for property setters
+        Assert.DoesNotContain("set_", result.CalorSource);
+    }
+
+    #endregion
+
+    #region Static Class Roundtrip Tests
+
+    [Fact]
+    public void Convert_StaticClass_RoundtripProducesStaticKeyword()
+    {
+        var csharpSource = """
+            public static class Utilities
+            {
+                public static int Add(int a, int b) => a + b;
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+
+        Assert.Contains("static class Utilities", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
+    #region LINQ Chain Decomposition — Edge Case Tests
+
+    [Fact]
+    public void Convert_LinqChainInMethodBody_DecomposesCorrectly()
+    {
+        // Chain inside a method body (non-top-level), exercises ConvertBlock path
+        var csharpSource = """
+            public class Service
+            {
+                public int GetFirst(int[] numbers)
+                {
+                    var result = numbers.Where(n => n > 0).First();
+                    return result;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Should contain decomposed chain, not embedded C#
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+    }
+
+    [Fact]
+    public void Convert_LinqChainInMethodBody_IntermediateBindsHaveNoType()
+    {
+        var csharpSource = """
+            public class Service
+            {
+                public void Process(int[] numbers)
+                {
+                    var result = numbers.Where(n => n > 0).Select(n => n * 2).ToList();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var cls = result.Ast.Classes[0];
+        var method = cls.Methods[0];
+        var chainBinds = method.Body.OfType<BindStatementNode>()
+            .Where(b => b.Name.StartsWith("_chain"))
+            .ToList();
+
+        Assert.True(chainBinds.Count >= 2, $"Expected at least 2 intermediate chain binds, got {chainBinds.Count}");
+        foreach (var bind in chainBinds)
+        {
+            Assert.Null(bind.TypeName); // Intermediate binds should have no explicit type
+        }
+    }
+
+    [Fact]
+    public void Convert_LinqChainInReturnStatement_DecomposesCorrectly()
+    {
+        // Chain in a return statement exercises DecomposeChainedReturnStatement
+        var csharpSource = """
+            public class Service
+            {
+                public int GetFirst(int[] numbers)
+                {
+                    return numbers.Where(n => n > 0).First();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+
+        // Should have intermediate bind + return in the method body
+        var cls = result.Ast!.Classes[0];
+        var method = cls.Methods[0];
+        Assert.True(method.Body.Count >= 2,
+            $"Expected at least 2 statements (intermediate bind + return), got {method.Body.Count}");
+
+        // Last statement should be a return
+        Assert.IsType<ReturnStatementNode>(method.Body[^1]);
+        // Previous statements should be intermediate chain binds
+        var chainBinds = method.Body.OfType<BindStatementNode>()
+            .Where(b => b.Name.StartsWith("_chain"))
+            .ToList();
+        Assert.NotEmpty(chainBinds);
+    }
+
+    [Fact]
+    public void Convert_LinqChainInReturnStatement_Roundtrip()
+    {
+        var csharpSource = """
+            public class Service
+            {
+                public int GetFirst(int[] numbers)
+                {
+                    return numbers.Where(n => n > 0).First();
+                }
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+
+        var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
+            new CompilationOptions { EnforceEffects = false });
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
+    [Fact]
+    public void Convert_TypedLinqChainDeclaration_IntermediatesUntyped()
+    {
+        // Explicitly typed declaration: intermediate binds should be untyped (var)
+        var csharpSource = """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            IEnumerable<int> result = numbers.Where(n => n > 0).Select(n => n * 2);
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var mainFunc = result.Ast.Functions[0];
+        // Intermediate chain binds should have null type
+        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
+            .Where(b => b.Name.StartsWith("_chain"))
+            .ToList();
+        Assert.NotEmpty(chainBinds);
+        foreach (var bind in chainBinds)
+        {
+            Assert.Null(bind.TypeName);
+        }
+
+        // Final bind ("result") should have the declared type
+        var resultBind = mainFunc.Body.OfType<BindStatementNode>()
+            .FirstOrDefault(b => b.Name == "result");
+        Assert.NotNull(resultBind);
+        Assert.NotNull(resultBind.TypeName);
+    }
+
+    [Fact]
+    public void Convert_ThreeStepChain_ProducesCorrectIntermediates()
+    {
+        // Three-step chain: numbers.Where(...).OrderBy(...).ToList()
+        var csharpSource = """
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
+            var sorted = numbers.Where(n => n > 0).OrderBy(n => n).ToList();
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var mainFunc = result.Ast.Functions[0];
+        // Should have: numbers decl + 2 intermediate binds + final bind = 4 statements
+        Assert.True(mainFunc.Body.Count >= 4,
+            $"Expected at least 4 statements for 3-step chain, got {mainFunc.Body.Count}");
+
+        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
+            .Where(b => b.Name.StartsWith("_chain"))
+            .ToList();
+        Assert.Equal(2, chainBinds.Count);
+    }
+
+    [Fact]
+    public void Convert_StringBuilderChain_PreservesNativeOps()
+    {
+        // StringBuilder chains should be handled by native sb-* operations, not decomposed
+        var csharpSource = """
+            using System.Text;
+
+            public class Test
+            {
+                public string M()
+                {
+                    return new StringBuilder().Append("a").Append("b").ToString();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Should use native StringBuilder operations (not chain decomposition)
+        Assert.Contains("sb-append", result.CalorSource);
+        Assert.Contains("sb-tostring", result.CalorSource);
+        // Should NOT have chain intermediates
+        Assert.DoesNotContain("_chain", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_StringBuilderChainInLocalDecl_PreservesNativeOps()
+    {
+        // StringBuilder chain in a local declaration should use native ops
+        var csharpSource = """
+            using System.Text;
+
+            var sb = new StringBuilder();
+            var result = sb.Append("hello").ToString();
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("_chain", result.CalorSource);
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+    }
+
+    #endregion
+
+    #region Expression-Level Chain Hoisting Tests
+
+    [Fact]
+    public void Convert_LinqChainInIfCondition_HoistsToTempBind()
+    {
+        var csharpSource = """
+            if (numbers.Where(n => n > 0).Any())
+            {
+                Console.WriteLine("found");
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // The chain should be hoisted: a temp _chain bind before the if
+        Assert.Contains("_chain", result.CalorSource);
+        // Should NOT contain the broken CalorEmitter serialization pattern
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LinqChainAsMethodArgument_HoistsToTempBind()
+    {
+        var csharpSource = """
+            Console.WriteLine(numbers.Where(n => n > 0).Count());
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // The chain should be hoisted: a temp _chain bind before the call
+        Assert.Contains("_chain", result.CalorSource);
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LinqChainInWhileCondition_HoistsToTempBind()
+    {
+        var csharpSource = """
+            while (items.Where(x => x.Active).Any())
+            {
+                break;
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("_chain", result.CalorSource);
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LinqChainInAssignment_HoistsToTempBind()
+    {
+        var csharpSource = """
+            var x = 0;
+            x = numbers.Where(n => n > 0).First();
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("_chain", result.CalorSource);
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_ThreeDeepChainInArgument_HoistsAllLevels()
+    {
+        var csharpSource = """
+            Console.WriteLine(numbers.Where(n => n > 0).OrderBy(n => n).First());
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // A 3-deep chain should produce at least 2 temp binds (_chain for Where, _chain for OrderBy)
+        var chainCount = System.Text.RegularExpressions.Regex.Matches(result.CalorSource!, "_chain").Count;
+        Assert.True(chainCount >= 2, $"Expected at least 2 _chain temp binds, got {chainCount}. Calor:\n{result.CalorSource}");
+        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+    }
+
+    #endregion
+
+    #region Lambda §LAM Emission Tests
+
+    [Fact]
+    public void Convert_SingleParamExpressionLambda_EmitsLamBlock()
+    {
+        var csharpSource = """
+            var numbers = new[] { 1, 2, 3, 4, 5 };
+            var doubled = numbers.Select(x => x * 2);
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§LAM{", result.CalorSource);
+        Assert.Contains("§/LAM{", result.CalorSource);
+        // Should NOT contain arrow notation
+        Assert.DoesNotContain("→", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_MultiParamLambda_EmitsLamBlockWithAllParams()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var list = new List<int> { 3, 1, 2 };
+                    list.Sort((a, b) => a - b);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§LAM{", result.CalorSource);
+        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.DoesNotContain("→", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LambdaAsLinqArg_ParsesSuccessfully()
+    {
+        var csharpSource = """
+            var numbers = new[] { 1, 2, 3, 4, 5 };
+            var evens = numbers.Where(n => n % 2 == 0);
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+        Assert.Contains("§LAM{", conversionResult.CalorSource);
+
+        // Verify the emitted Calor re-parses
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(conversionResult.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Lambda Calor output should re-parse.\nCalor:\n{conversionResult.CalorSource}\nErrors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+    }
+
+    [Fact]
+    public void Convert_StatementBodyLambda_EmitsLamBlock()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var list = new List<int> { 1, 2, 3 };
+                    list.ForEach(x =>
+                    {
+                        var doubled = x * 2;
+                        Console.WriteLine(doubled);
+                    });
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§LAM{", result.CalorSource);
+        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.DoesNotContain("→", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LambdaParamType_InferredFromSemanticModel()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            public class Test
+            {
+                public void Run()
+                {
+                    var numbers = new int[] { 1, 2, 3 };
+                    var evens = numbers.Where(n => n % 2 == 0);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Lambda parameter should be inferred as i32, not object
+        Assert.Contains(":i32}", result.CalorSource);
+        Assert.DoesNotContain(":object}", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_MultiParamLambdaType_InferredFromSemanticModel()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            public class Test
+            {
+                public void Run()
+                {
+                    var numbers = new int[] { 5, 4, 1, 3, 9 };
+                    var result = numbers.TakeWhile((n, index) => n >= index);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Both n and index should be inferred as i32
+        Assert.Contains("n:i32", result.CalorSource);
+        Assert.Contains("index:i32", result.CalorSource);
+        Assert.DoesNotContain(":object", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LambdaHeavy_FullRoundtrip()
+    {
+        var csharpSource = """
+            public class LinqDemo
+            {
+                public void Run()
+                {
+                    var numbers = new int[] { 5, 4, 1, 3, 9, 8, 6, 7, 2, 0 };
+                    var evens = numbers.Where(n => n % 2 == 0);
+                    var sorted = evens.OrderBy(n => n);
+                    var doubled = sorted.Select(n => n * 2);
+                }
+            }
+            """;
+
+        // C# -> Calor
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+        Assert.Contains("§LAM{", conversionResult.CalorSource);
+        Assert.DoesNotContain("§ERR", conversionResult.CalorSource);
+        Assert.DoesNotContain("→", conversionResult.CalorSource);
+
+        // Calor -> C#
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Lambda roundtrip failed:\nCalor:\n{conversionResult.CalorSource}\nErrors:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
+    [Fact]
+    public void Convert_AsyncLambda_EmitsLamBlockWithAsync()
+    {
+        var csharpSource = """
+            using System.Threading.Tasks;
+
+            public class Test
+            {
+                public void Run()
+                {
+                    Func<int, Task<int>> asyncDoubler = async x => {
+                        await Task.Delay(1);
+                        return x * 2;
+                    };
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§LAM{", result.CalorSource);
+        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("async", result.CalorSource);
+        Assert.DoesNotContain("→", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_StaticMethod_RoundtripsWithStModifier()
+    {
+        var csharpSource = """
+            public static class MathHelper
+            {
+                public static int Add(int a, int b) => a + b;
+                public static int Multiply(int a, int b) => a * b;
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+
+        // Verify :st appears for both class and methods
+        var stCount = conversionResult.CalorSource!.Split(":st").Length - 1;
+        Assert.True(stCount >= 3, $"Expected at least 3 :st occurrences (1 class + 2 methods), got {stCount}");
+
+        // Full roundtrip
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Static roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        Assert.Contains("static class", compilationResult.GeneratedCode);
+        Assert.Contains("static int Add", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
+    #region Method Modifier Abbreviation Tests
+
+    [Fact]
+    public void Parse_MethodWithVrAbbreviation_SetsVirtual()
+    {
+        var calorSource = """
+            §M{m1:TestModule}
+              §CL{c001:Base:pub}
+                §MT{m001:GetName:pub:vr}
+                  §O{str}
+                  §R "base"
+                §/MT{m001}
+              §/CL{c001}
+            §/M{m1}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var ast = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+        var method = ast.Classes[0].Methods[0];
+        Assert.True(method.IsVirtual, "Method with :vr modifier should have IsVirtual == true");
+    }
+
+    [Fact]
+    public void Parse_MethodWithOvAbbreviation_SetsOverride()
+    {
+        var calorSource = """
+            §M{m1:TestModule}
+              §CL{c001:Derived:pub}
+                §EXT{Base}
+                §MT{m001:GetName:pub:ov}
+                  §O{str}
+                  §R "derived"
+                §/MT{m001}
+              §/CL{c001}
+            §/M{m1}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var ast = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+        var method = ast.Classes[0].Methods[0];
+        Assert.True(method.IsOverride, "Method with :ov modifier should have IsOverride == true");
+    }
+
+    [Fact]
+    public void Parse_MethodWithStAbbreviation_SetsStatic()
+    {
+        var calorSource = """
+            §M{m1:TestModule}
+              §CL{c001:Utils:pub:st}
+                §MT{m001:Add:pub:st}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
+                §/MT{m001}
+              §/CL{c001}
+            §/M{m1}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var ast = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+        var method = ast.Classes[0].Methods[0];
+        Assert.True(method.IsStatic, "Method with :st modifier should have IsStatic == true");
+    }
+
+    [Fact]
+    public void Roundtrip_VirtualAndOverride_PreservesModifiers()
+    {
+        var csharpSource = """
+            public class Animal
+            {
+                public virtual string Speak() { return "..."; }
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+        // Emitter uses "virt" abbreviation for virtual
+        Assert.Contains(":virt", conversionResult.CalorSource);
+
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Virtual roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        Assert.Contains("virtual", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
+    #region Static Class :st Parse Tests
+
+    [Fact]
+    public void Parse_ClassWithStAbbreviation_SetsIsStaticTrue()
+    {
+        var calorSource = """
+            §M{m1:TestModule}
+              §F{main:Main:pub}
+                §O{void}
+              §/F{main}
+              §CL{c001:Foo:pub:st}
+              §/CL{c001}
+            §/M{m1}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var ast = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+        Assert.Single(ast.Classes);
+        Assert.True(ast.Classes[0].IsStatic, "Class with :st modifier should have IsStatic == true");
     }
 
     #endregion

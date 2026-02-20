@@ -2543,4 +2543,153 @@ public class CollectionOperationsTests
     }
 
     #endregion
+
+    #region Foreach With Index Tests
+
+    [Fact]
+    public void Parse_ForeachWithIndex_ParsesIndexVariable()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §EACH{e1:item:i32:idx} items
+                §P item
+              §/EACH{e1}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        var func = module.Functions[0];
+        var foreachStmt = Assert.IsType<ForeachStatementNode>(func.Body[0]);
+        Assert.Equal("item", foreachStmt.VariableName);
+        Assert.Equal("i32", foreachStmt.VariableType);
+        Assert.Equal("idx", foreachStmt.IndexVariableName);
+    }
+
+    [Fact]
+    public void Parse_ForeachWithoutIndex_IndexIsNull()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §EACH{e1:item:i32} items
+                §P item
+              §/EACH{e1}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        var func = module.Functions[0];
+        var foreachStmt = Assert.IsType<ForeachStatementNode>(func.Body[0]);
+        Assert.Equal("item", foreachStmt.VariableName);
+        Assert.Equal("i32", foreachStmt.VariableType);
+        Assert.Null(foreachStmt.IndexVariableName);
+    }
+
+    [Fact]
+    public void Emit_ForeachWithIndex_GeneratesIndexCounter()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §EACH{e1:item:i32:idx} items
+                §P item
+              §/EACH{e1}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+
+        var emitter = new CSharpEmitter();
+        var code = emitter.Emit(module);
+
+        Assert.Contains("var idx = -1;", code);
+        Assert.Contains("foreach (int item in items)", code);
+        Assert.Contains("idx++;", code);
+    }
+
+    [Fact]
+    public void Emit_ForeachWithIndex_IndexIncrementsBeforeBody()
+    {
+        // The index increment must appear at the top of the loop body so that
+        // a `continue` doesn't skip the increment — matching C#'s
+        // Select((item, index) => ...) semantics.
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §EACH{e1:item:i32:idx} items
+                §P item
+              §/EACH{e1}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+
+        var emitter = new CSharpEmitter();
+        var code = emitter.Emit(module);
+
+        // idx++ should appear before the body (Console.WriteLine), not after
+        var idxIncrPos = code.IndexOf("idx++;");
+        var printPos = code.IndexOf("Console.WriteLine(item);");
+        Assert.True(idxIncrPos >= 0, "idx++ should be present");
+        Assert.True(printPos >= 0, "Console.WriteLine should be present");
+        Assert.True(idxIncrPos < printPos, "idx++ should appear before body statements");
+    }
+
+    [Fact]
+    public void RoundTrip_ForeachWithIndex_EmitsValidCalor()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §O{void}
+              §EACH{e1:item:i32:idx} items
+                §P item
+              §/EACH{e1}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+
+        // Emit back to Calor
+        var emitter = new CalorEmitter();
+        var calorOutput = emitter.Emit(module);
+
+        // Verify the emitted Calor contains the index variable
+        Assert.Contains("item:i32:idx", calorOutput);
+
+        // Re-parse the emitted Calor
+        var reparsed = Parse(calorOutput, out var rediagnostics);
+        Assert.False(rediagnostics.HasErrors, $"Round-trip failed: {string.Join(", ", rediagnostics.Select(d => d.Message))}");
+
+        // Verify structure preserved
+        var func = reparsed.Functions[0];
+        var foreachStmt = Assert.IsType<ForeachStatementNode>(func.Body[0]);
+        Assert.Equal("item", foreachStmt.VariableName);
+        Assert.Equal("idx", foreachStmt.IndexVariableName);
+    }
+
+    [Fact]
+    public void FeatureSupport_ForeachIndex_IsFullySupported()
+    {
+        Assert.True(FeatureSupport.IsFullySupported("foreach-index"));
+    }
+
+    #endregion
 }

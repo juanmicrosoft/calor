@@ -13,7 +13,9 @@ public enum MethodModifiers
     Override = 2,
     Abstract = 4,
     Sealed = 8,
-    Static = 16
+    Static = 16,
+    Const = 32,
+    Readonly = 64
 }
 
 /// <summary>
@@ -216,6 +218,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public bool IsReadOnly { get; }
 
     /// <summary>
+    /// The visibility level of this class (public, internal, protected, private).
+    /// </summary>
+    public Visibility Visibility { get; }
+
+    /// <summary>
     /// The base class (if any).
     /// </summary>
     public string? BaseClass { get; }
@@ -361,7 +368,8 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         bool isStruct = false,
-        bool isReadOnly = false)
+        bool isReadOnly = false,
+        Visibility visibility = Visibility.Internal)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
@@ -370,6 +378,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IsStatic = isStatic;
         IsStruct = isStruct;
         IsReadOnly = isReadOnly;
+        Visibility = visibility;
         BaseClass = baseClass;
         ImplementedInterfaces = implementedInterfaces ?? throw new ArgumentNullException(nameof(implementedInterfaces));
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));

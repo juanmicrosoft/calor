@@ -353,6 +353,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var returnType = node.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
+        // Wrap in IEnumerable if body contains yield statements
+        var isIterator = ContainsYieldStatements(node.Body);
+        if (isIterator)
+        {
+            mappedReturnType = WrapInIEnumerable(mappedReturnType);
+        }
         // Wrap in Task if async
         if (node.IsAsync)
         {
@@ -360,8 +366,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
 
-        var parameters = string.Join(", ", node.Parameters.Select(p =>
-            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+        var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
         var methodName = SanitizeIdentifier(node.Name);
 
@@ -467,7 +472,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ParameterNode node)
     {
-        return $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}";
+        var prefix = "";
+        if (node.Modifier.HasFlag(ParameterModifier.This)) prefix += "this ";
+        if (node.Modifier.HasFlag(ParameterModifier.Ref)) prefix += "ref ";
+        if (node.Modifier.HasFlag(ParameterModifier.Out)) prefix += "out ";
+        if (node.Modifier.HasFlag(ParameterModifier.In)) prefix += "in ";
+        if (node.Modifier.HasFlag(ParameterModifier.Params)) prefix += "params ";
+        return $"{prefix}{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}";
     }
 
     public string Visit(CallStatementNode node)
@@ -858,6 +869,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(BreakStatementNode node)
     {
         return "break;";
+    }
+
+    public string Visit(YieldReturnStatementNode node)
+    {
+        if (node.Expression == null)
+        {
+            return "yield return;";
+        }
+        var expr = node.Expression.Accept(this);
+        return $"yield return {expr};";
+    }
+
+    public string Visit(YieldBreakStatementNode node)
+    {
+        return "yield break;";
     }
 
     // Phase 3: Type System
@@ -1462,18 +1488,42 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var varName = SanitizeIdentifier(node.VariableName);
         var collection = node.Collection.Accept(this);
 
-        AppendLine($"foreach ({varType} {varName} in {collection})");
-        AppendLine("{");
-        Indent();
-
-        foreach (var stmt in node.Body)
+        if (node.IndexVariableName != null)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
-        }
+            // Index starts at -1 and increments at the top of each iteration so that
+            // `continue` statements in the body don't skip the increment — matching
+            // the semantics of C#'s Select((item, index) => ...).
+            var indexName = SanitizeIdentifier(node.IndexVariableName);
+            AppendLine($"var {indexName} = -1;");
+            AppendLine($"foreach ({varType} {varName} in {collection})");
+            AppendLine("{");
+            Indent();
+            AppendLine($"{indexName}++;");
 
-        Dedent();
-        AppendLine("}");
+            foreach (var stmt in node.Body)
+            {
+                var stmtCode = stmt.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            Dedent();
+            AppendLine("}");
+        }
+        else
+        {
+            AppendLine($"foreach ({varType} {varName} in {collection})");
+            AppendLine("{");
+            Indent();
+
+            foreach (var stmt in node.Body)
+            {
+                var stmtCode = stmt.Accept(this);
+                AppendLine(stmtCode);
+            }
+
+            Dedent();
+            AppendLine("}");
+        }
 
         return "";
     }
@@ -1763,8 +1813,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
         }
 
-        var parameters = string.Join(", ", node.Parameters.Select(p =>
-            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+        var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
         AppendLine($"{mappedReturnType} {methodName}{typeParams}({parameters}){whereClause};");
 
@@ -1777,7 +1826,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var name = SanitizeIdentifier(node.Name);
 
-        var modifiers = "public";
+        var modifiers = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
+            Visibility.Private => "private",
+            _ => "internal"
+        };
         if (node.IsAbstract) modifiers += " abstract";
         if (!node.IsStruct && node.IsSealed) modifiers += " sealed";
         if (node.IsStatic) modifiers += " static";
@@ -1873,12 +1929,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             Visibility.Public => "public",
             Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
             Visibility.Private => "private",
             _ => "private"
         };
 
         var parts = new List<string> { visibility };
-        if (node.IsStatic) parts.Add("static");
+        if (node.Modifiers.HasFlag(MethodModifiers.Const)) parts.Add("const");
+        else if (node.IsStatic) parts.Add("static");
+        if (node.Modifiers.HasFlag(MethodModifiers.Readonly)) parts.Add("readonly");
         var fullModifiers = string.Join(" ", parts);
 
         var typeName = MapTypeName(node.TypeName);
@@ -1908,6 +1967,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             Visibility.Public => "public",
             Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
             Visibility.Private => "private",
             _ => "private"
         };
@@ -1922,6 +1982,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var returnType = node.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
+        // Wrap in IEnumerable if body contains yield statements
+        if (ContainsYieldStatements(node.Body))
+        {
+            mappedReturnType = WrapInIEnumerable(mappedReturnType);
+        }
         // Wrap in Task if async
         if (node.IsAsync)
         {
@@ -1952,8 +2017,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
         }
 
-        var parameters = string.Join(", ", node.Parameters.Select(p =>
-            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+        var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
         // Operator overload detection: op_ prefix methods emit C# operator syntax
         if (node.Name.StartsWith("op_"))
@@ -2365,14 +2429,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             Visibility.Public => "public",
             Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
             Visibility.Private => "private",
             _ => "public"
         };
 
         // Constructor name is the class name
         var ctorName = _currentClassName ?? "UnknownClass";
-        var parameters = string.Join(", ", node.Parameters.Select(p =>
-            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+        var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
         var initializerStr = "";
         if (node.Initializer != null)
@@ -2594,8 +2658,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var name = SanitizeIdentifier(node.Name);
         var returnType = node.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
-        var parameters = string.Join(", ", node.Parameters.Select(p =>
-            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+        var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
         AppendLine($"public delegate {mappedReturnType} {name}({parameters});");
         return "";
@@ -3098,6 +3161,65 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         // void -> Task, T -> Task<T>
         return returnType == "void" ? "Task" : $"Task<{returnType}>";
+    }
+
+    /// <summary>
+    /// Wraps a return type in IEnumerable for iterator methods.
+    /// </summary>
+    private static string WrapInIEnumerable(string returnType)
+    {
+        // Don't wrap types that are already IEnumerable/IEnumerator
+        if (returnType.StartsWith("IEnumerable<", StringComparison.Ordinal) ||
+            returnType == "IEnumerable" ||
+            returnType.StartsWith("IEnumerator<", StringComparison.Ordinal) ||
+            returnType == "IEnumerator")
+        {
+            return returnType;
+        }
+
+        // void -> IEnumerable, T -> IEnumerable<T>
+        return returnType == "void" ? "IEnumerable" : $"IEnumerable<{returnType}>";
+    }
+
+    /// <summary>
+    /// Checks whether a statement list contains any yield statements.
+    /// </summary>
+    private static bool ContainsYieldStatements(IReadOnlyList<StatementNode> statements)
+    {
+        foreach (var stmt in statements)
+        {
+            if (stmt is YieldReturnStatementNode or YieldBreakStatementNode)
+                return true;
+            // Check nested blocks
+            if (stmt is IfStatementNode ifStmt)
+            {
+                if (ContainsYieldStatements(ifStmt.ThenBody)) return true;
+                if (ifStmt.ElseBody != null && ContainsYieldStatements(ifStmt.ElseBody)) return true;
+                foreach (var elseIf in ifStmt.ElseIfClauses)
+                    if (ContainsYieldStatements(elseIf.Body)) return true;
+            }
+            else if (stmt is ForStatementNode forStmt)
+            {
+                if (ContainsYieldStatements(forStmt.Body)) return true;
+            }
+            else if (stmt is WhileStatementNode whileStmt)
+            {
+                if (ContainsYieldStatements(whileStmt.Body)) return true;
+            }
+            else if (stmt is ForeachStatementNode foreachStmt)
+            {
+                if (ContainsYieldStatements(foreachStmt.Body)) return true;
+            }
+            else if (stmt is DoWhileStatementNode doWhileStmt)
+            {
+                if (ContainsYieldStatements(doWhileStmt.Body)) return true;
+            }
+            else if (stmt is TryStatementNode tryStmt)
+            {
+                if (ContainsYieldStatements(tryStmt.TryBody)) return true;
+            }
+        }
+        return false;
     }
 
     private static string SanitizeIdentifier(string name)
