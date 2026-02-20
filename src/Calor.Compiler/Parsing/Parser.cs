@@ -1812,6 +1812,30 @@ public sealed class Parser
             case TokenKind.Await:
                 expr = ParseAwaitExpression(); // Await expression inside Lisp
                 break;
+            case TokenKind.Has:
+                expr = ParseCollectionContains(); // §HAS inside Lisp (e.g., (! §HAS{list} val))
+                break;
+            case TokenKind.Index:
+                expr = ParseArrayAccess(); // §IDX inside Lisp
+                break;
+            case TokenKind.Count:
+                expr = ParseCollectionCount(); // §CNT inside Lisp
+                break;
+            case TokenKind.Length:
+                expr = ParseArrayLength(); // §LEN inside Lisp
+                break;
+            case TokenKind.Some:
+                expr = ParseSomeExpression(); // §SOME inside Lisp
+                break;
+            case TokenKind.None:
+                expr = ParseNoneExpression(); // §NONE inside Lisp
+                break;
+            case TokenKind.If:
+                expr = ParseIfExpression(); // §IF inside Lisp (conditional expression)
+                break;
+            case TokenKind.This:
+                expr = ParseThisExpression(); // §THIS inside Lisp
+                break;
             default:
                 // Provide helpful message for unexpected tokens
                 var hint = Current.Kind switch

@@ -425,4 +425,46 @@ public class EffectEnforcementTests
         Assert.Contains(result.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("callback"));
     }
+
+    // === §HAS/§IDX/§CNT inside lisp expressions (Issue 319) ===
+
+    [Fact]
+    public void HasInsideLispNegation_CompilesSuccessfully()
+    {
+        // §HAS should be usable inside lisp-style prefix expressions: (! §HAS{...} ...)
+        var source = @"
+§M{m001:Test}
+§F{f001:NotContains:pub}
+  §I{str:items}
+  §O{bool}
+  §R (! §HAS{items} ""key"")
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"§HAS inside (! ...) should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        Assert.Contains("!items.Contains", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void HasInsideLispAnd_CompilesSuccessfully()
+    {
+        // §HAS should be usable inside lisp-style boolean expressions: (&& §HAS{...} expr)
+        var source = @"
+§M{m001:Test}
+§F{f001:CheckBoth:pub}
+  §I{str:items}
+  §I{bool:flag}
+  §O{bool}
+  §R (&& §HAS{items} ""a"" flag)
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"§HAS inside (&&) should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
 }
