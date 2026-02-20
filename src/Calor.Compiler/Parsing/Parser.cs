@@ -4439,6 +4439,7 @@ public sealed class Parser
 
         var baseInterfaces = new List<string>();
         var methods = new List<MethodSignatureNode>();
+        var properties = new List<PropertyNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndInterface))
         {
@@ -4464,9 +4465,13 @@ public sealed class Parser
             {
                 methods.Add(ParseMethodSignature());
             }
+            else if (Check(TokenKind.Property))
+            {
+                properties.Add(ParseProperty());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "EXT, METHOD, or END_IFACE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "EXT, METHOD, PROP, or END_IFACE", Current.Kind);
                 Advance();
             }
         }
@@ -4481,7 +4486,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new InterfaceDefinitionNode(span, id, name, baseInterfaces, typeParameters, methods, attrs, csharpAttrs);
+        return new InterfaceDefinitionNode(span, id, name, baseInterfaces, typeParameters, methods, properties, attrs, csharpAttrs);
     }
 
     /// <summary>

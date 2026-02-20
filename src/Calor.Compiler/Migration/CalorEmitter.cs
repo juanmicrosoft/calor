@@ -157,6 +157,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         AppendLine($"§IFACE{{{node.Id}:{node.Name}{baseList}}}{attrs}");
         Indent();
 
+        foreach (var prop in node.Properties)
+        {
+            Visit(prop);
+        }
+
         foreach (var method in node.Methods)
         {
             Visit(method);

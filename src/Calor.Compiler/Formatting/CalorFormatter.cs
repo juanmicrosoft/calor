@@ -188,6 +188,11 @@ public sealed class CalorFormatter
             : "";
         AppendLine($"§IFACE{{{ifaceId}:{iface.Name}{baseList}}}");
 
+        foreach (var prop in iface.Properties)
+        {
+            FormatProperty(prop);
+        }
+
         foreach (var method in iface.Methods)
         {
             FormatMethodSignature(method);

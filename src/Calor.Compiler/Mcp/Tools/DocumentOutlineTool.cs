@@ -293,6 +293,17 @@ public sealed class DocumentOutlineTool : McpToolBase
     {
         var children = new List<OutlineSymbol>();
 
+        foreach (var prop in iface.Properties)
+        {
+            children.Add(new OutlineSymbol
+            {
+                Name = prop.Name,
+                Kind = "property",
+                Line = prop.Span.Line,
+                Detail = prop.TypeName
+            });
+        }
+
         foreach (var method in iface.Methods)
         {
             var parameters = string.Join(", ", method.Parameters.Select(p => $"{p.Name}: {p.TypeName}"));

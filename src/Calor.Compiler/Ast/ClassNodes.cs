@@ -32,6 +32,11 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
     public IReadOnlyList<MethodSignatureNode> Methods { get; }
 
     /// <summary>
+    /// Interface properties.
+    /// </summary>
+    public IReadOnlyList<PropertyNode> Properties { get; }
+
+    /// <summary>
     /// Interfaces this interface extends.
     /// </summary>
     public IReadOnlyList<string> BaseInterfaces { get; }
@@ -53,7 +58,7 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<string> baseInterfaces,
         IReadOnlyList<MethodSignatureNode> methods,
         AttributeCollection attributes)
-        : this(span, id, name, baseInterfaces, Array.Empty<TypeParameterNode>(), methods, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, id, name, baseInterfaces, Array.Empty<TypeParameterNode>(), methods, Array.Empty<PropertyNode>(), attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -65,7 +70,7 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodSignatureNode> methods,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
-        : this(span, id, name, baseInterfaces, Array.Empty<TypeParameterNode>(), methods, attributes, csharpAttributes)
+        : this(span, id, name, baseInterfaces, Array.Empty<TypeParameterNode>(), methods, Array.Empty<PropertyNode>(), attributes, csharpAttributes)
     {
     }
 
@@ -78,11 +83,26 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MethodSignatureNode> methods,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, id, name, baseInterfaces, typeParameters, methods, Array.Empty<PropertyNode>(), attributes, csharpAttributes)
+    {
+    }
+
+    public InterfaceDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        IReadOnlyList<string> baseInterfaces,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<MethodSignatureNode> methods,
+        IReadOnlyList<PropertyNode> properties,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span, id, name, attributes)
     {
         BaseInterfaces = baseInterfaces ?? throw new ArgumentNullException(nameof(baseInterfaces));
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
+        Properties = properties ?? Array.Empty<PropertyNode>();
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 

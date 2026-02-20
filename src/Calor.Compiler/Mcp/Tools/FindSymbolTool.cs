@@ -260,6 +260,26 @@ public sealed class FindSymbolTool : McpToolBase
                     });
                 }
 
+                // Search interface properties
+                if (kindFilter == null || kindFilter == "property")
+                {
+                    foreach (var prop in iface.Properties)
+                    {
+                        if (MatchesQuery(prop.Name, queryLower))
+                        {
+                            results.Add(new SymbolMatch
+                            {
+                                Name = prop.Name,
+                                Kind = "property",
+                                ContainerName = iface.Name,
+                                FilePath = filePath,
+                                Line = prop.Span.Line,
+                                Column = prop.Span.Column
+                            });
+                        }
+                    }
+                }
+
                 // Search interface methods
                 if (kindFilter == null || kindFilter == "method")
                 {
