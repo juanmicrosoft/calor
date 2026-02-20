@@ -1221,8 +1221,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var matchCase in node.Cases)
         {
-            var pattern = EmitPattern(matchCase.Pattern);
-            AppendLine($"case {pattern}:");
+            if (matchCase.Pattern is WildcardPatternNode)
+            {
+                AppendLine("default:");
+            }
+            else
+            {
+                var pattern = EmitPattern(matchCase.Pattern);
+                AppendLine($"case {pattern}:");
+            }
             Indent();
 
             foreach (var stmt in matchCase.Body)
