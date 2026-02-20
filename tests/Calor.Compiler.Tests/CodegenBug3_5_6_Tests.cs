@@ -37,7 +37,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:static}
+§CL{c1:Helper:pub:static}
 §/CL{c1}
 §/M{m1}
 ";
@@ -71,7 +71,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:DataService:partial}
+§CL{c1:DataService:pub:partial}
 §/CL{c1}
 §/M{m1}
 ";
@@ -105,7 +105,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:static,partial}
+§CL{c1:Helper:pub:static,partial}
 §/CL{c1}
 §/M{m1}
 ";

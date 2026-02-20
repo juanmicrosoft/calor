@@ -43,7 +43,6 @@ public class FeatureCheckCommandTests
     }
 
     [Theory]
-    [InlineData("yield-return", SupportLevel.NotSupported)]
     [InlineData("goto", SupportLevel.NotSupported)]
     [InlineData("unsafe", SupportLevel.NotSupported)]
     [InlineData("primary-constructor", SupportLevel.NotSupported)]
@@ -63,15 +62,16 @@ public class FeatureCheckCommandTests
     }
 
     [Theory]
-    [InlineData("extension-method", SupportLevel.ManualRequired)]
-    public void FeatureCheck_ManualRequired_ReturnsManualLevel(string feature, SupportLevel expected)
+    [InlineData("yield-return", SupportLevel.Full)]
+    [InlineData("extension-method", SupportLevel.Full)]
+    public void FeatureCheck_NewlyFullySupported_ReturnsFullLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
 
         Assert.NotNull(info);
         Assert.Equal(expected, info.Support);
-        Assert.False(FeatureSupport.IsFullySupported(feature));
-        Assert.False(FeatureSupport.IsSupported(feature));
+        Assert.True(FeatureSupport.IsFullySupported(feature));
+        Assert.True(FeatureSupport.IsSupported(feature));
     }
 
     #endregion
@@ -116,7 +116,6 @@ public class FeatureCheckCommandTests
     #region Workarounds
 
     [Theory]
-    [InlineData("yield-return")]
     [InlineData("goto")]
     [InlineData("primary-constructor")]
     [InlineData("lock-statement")]
@@ -133,10 +132,10 @@ public class FeatureCheckCommandTests
     [Fact]
     public void FeatureCheck_GetWorkaround_ReturnsWorkaroundText()
     {
-        var workaround = FeatureSupport.GetWorkaround("yield-return");
+        var workaround = FeatureSupport.GetWorkaround("goto");
 
         Assert.NotNull(workaround);
-        Assert.Contains("List", workaround);
+        Assert.NotEmpty(workaround);
     }
 
     #endregion
@@ -167,13 +166,14 @@ public class FeatureCheckCommandTests
     [Fact]
     public void FeatureCheck_AllLevelsHaveFeatures()
     {
-        var levels = Enum.GetValues<SupportLevel>();
+        // At least the main levels (Full, Partial, NotSupported) should have features
+        var fullFeatures = FeatureSupport.GetFeaturesBySupport(SupportLevel.Full).ToList();
+        var partialFeatures = FeatureSupport.GetFeaturesBySupport(SupportLevel.Partial).ToList();
+        var notSupportedFeatures = FeatureSupport.GetFeaturesBySupport(SupportLevel.NotSupported).ToList();
 
-        foreach (var level in levels)
-        {
-            var features = FeatureSupport.GetFeaturesBySupport(level).ToList();
-            Assert.NotEmpty(features);
-        }
+        Assert.NotEmpty(fullFeatures);
+        Assert.NotEmpty(partialFeatures);
+        Assert.NotEmpty(notSupportedFeatures);
     }
 
     #endregion

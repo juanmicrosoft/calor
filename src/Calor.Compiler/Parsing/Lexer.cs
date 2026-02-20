@@ -242,6 +242,10 @@ public sealed class Lexer
         ["TASK"] = TokenKind.TaskRef,           // §TASK - keep for clarity
         ["DATE"] = TokenKind.DateMarker,        // §DATE - keep for clarity
 
+        // Yield support
+        ["YIELD"] = TokenKind.Yield,            // §YIELD = yield return
+        ["YBRK"] = TokenKind.YieldBreak,        // §YBRK = yield break
+
         // LINQ Support
         ["ANON"] = TokenKind.AnonymousObject,   // §ANON = Anonymous object
         ["/ANON"] = TokenKind.EndAnonymousObject, // §/ANON

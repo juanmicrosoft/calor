@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Migration;
@@ -70,7 +71,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 visibility: Visibility.Public,
                 parameters: new List<ParameterNode>(),
                 output: null, // void return type
-                effects: null,
+                effects: InferEffectsFromBody(_topLevelStatements),
                 body: _topLevelStatements,
                 attributes: new AttributeCollection());
 
@@ -323,6 +324,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var isPartial = node.Modifiers.Any(SyntaxKind.PartialKeyword);
         var isStatic = node.Modifiers.Any(SyntaxKind.StaticKeyword);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
+        var defaultVis = node.Parent is TypeDeclarationSyntax ? Visibility.Private : Visibility.Internal;
+        var visibility = GetVisibility(node.Modifiers, defaultVis);
 
         if (isPartial) _context.RecordFeatureUsage("partial-class");
         if (isStatic) _context.RecordFeatureUsage("static-class");
@@ -407,13 +410,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             methods,
             events,
             new AttributeCollection(),
-            csharpAttrs);
+            csharpAttrs,
+            visibility: visibility);
     }
 
     private ClassDefinitionNode ConvertRecord(RecordDeclarationSyntax node)
     {
         var id = _context.GenerateId("r");
         var name = node.Identifier.Text;
+        var defaultVis = node.Parent is TypeDeclarationSyntax ? Visibility.Private : Visibility.Internal;
+        var visibility = GetVisibility(node.Modifiers, defaultVis);
 
         var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
@@ -475,6 +481,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             name,
             isAbstract: false,
             isSealed: true,
+            isPartial: false,
+            isStatic: false,
             baseClass: null,
             implementedInterfaces: new List<string>(),
             typeParameters,
@@ -482,7 +490,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             properties,
             constructors,
             methods,
-            new AttributeCollection());
+            Array.Empty<EventDefinitionNode>(),
+            new AttributeCollection(),
+            Array.Empty<CalorAttributeNode>(),
+            visibility: visibility);
     }
 
     private ClassDefinitionNode ConvertStruct(StructDeclarationSyntax node)
@@ -492,6 +503,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var isReadOnly = node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword);
         var isPartial = node.Modifiers.Any(SyntaxKind.PartialKeyword);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
+        var defaultVis = node.Parent is TypeDeclarationSyntax ? Visibility.Private : Visibility.Internal;
+        var visibility = GetVisibility(node.Modifiers, defaultVis);
 
         if (isReadOnly)
             _context.RecordFeatureUsage("readonly-struct");
@@ -556,7 +569,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection(),
             csharpAttrs,
             isStruct: true,
-            isReadOnly: isReadOnly);
+            isReadOnly: isReadOnly,
+            visibility: visibility);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -623,7 +637,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             typeParameters,
             parameters,
             output,
-            effects: null,
+            effects: InferEffectsFromBody(body),
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -690,7 +704,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<TypeParameterNode>(),
             parameters,
             output,
-            effects: null,
+            effects: InferEffectsFromBody(body),
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -724,7 +738,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<TypeParameterNode>(),
             parameters,
             output,
-            effects: null,
+            effects: InferEffectsFromBody(body),
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -780,6 +794,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeName = TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
+        var modifiers = MethodModifiers.None;
+        if (node.Modifiers.Any(SyntaxKind.ConstKeyword))
+            modifiers |= MethodModifiers.Const;
+        if (node.Modifiers.Any(SyntaxKind.StaticKeyword))
+            modifiers |= MethodModifiers.Static;
+        if (node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword))
+            modifiers |= MethodModifiers.Readonly;
+
         foreach (var variable in node.Declaration.Variables)
         {
             var defaultValue = variable.Initializer != null
@@ -791,6 +813,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 variable.Identifier.Text,
                 typeName,
                 visibility,
+                modifiers,
                 defaultValue,
                 new AttributeCollection(),
                 csharpAttrs));
@@ -1066,6 +1089,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             BreakStatementSyntax breakStmt => ConvertBreakStatement(breakStmt),
             ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
             UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
+            YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
             _ => HandleUnsupportedStatement(statement)
         };
     }
@@ -1109,6 +1133,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("break");
         _context.IncrementConverted();
         return new BreakStatementNode(GetTextSpan(node));
+    }
+
+    private StatementNode ConvertYieldStatement(YieldStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("yield-return");
+        _context.IncrementConverted();
+
+        if (node.ReturnOrBreakKeyword.IsKind(SyntaxKind.BreakKeyword))
+        {
+            return new YieldBreakStatementNode(GetTextSpan(node));
+        }
+
+        var expr = node.Expression != null ? ConvertExpression(node.Expression) : null;
+        return new YieldReturnStatementNode(GetTextSpan(node), expr);
     }
 
     private StatementNode ConvertExpressionStatement(ExpressionStatementSyntax node)
@@ -3490,11 +3528,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private IReadOnlyList<ParameterNode> ConvertParameters(ParameterListSyntax paramList)
     {
         return paramList.Parameters
-            .Select(p => new ParameterNode(
-                GetTextSpan(p),
-                p.Identifier.Text,
-                TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
-                new AttributeCollection()))
+            .Select(p =>
+            {
+                var modifier = ParameterModifier.None;
+                if (p.Modifiers.Any(SyntaxKind.ThisKeyword)) modifier |= ParameterModifier.This;
+                if (p.Modifiers.Any(SyntaxKind.RefKeyword)) modifier |= ParameterModifier.Ref;
+                if (p.Modifiers.Any(SyntaxKind.OutKeyword)) modifier |= ParameterModifier.Out;
+                if (p.Modifiers.Any(SyntaxKind.InKeyword)) modifier |= ParameterModifier.In;
+                if (p.Modifiers.Any(SyntaxKind.ParamsKeyword)) modifier |= ParameterModifier.Params;
+                return new ParameterNode(
+                    GetTextSpan(p),
+                    p.Identifier.Text,
+                    TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
+                    modifier,
+                    new AttributeCollection(),
+                    Array.Empty<CalorAttributeNode>());
+            })
             .ToList();
     }
 
@@ -3507,6 +3556,166 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (modifiers.Any(SyntaxKind.ProtectedKeyword))
             return Visibility.Protected;
         return Visibility.Private;
+    }
+
+    private static Visibility GetVisibility(SyntaxTokenList modifiers, Visibility defaultVisibility)
+    {
+        if (modifiers.Any(SyntaxKind.PublicKeyword))
+            return Visibility.Public;
+        if (modifiers.Any(SyntaxKind.InternalKeyword))
+            return Visibility.Internal;
+        if (modifiers.Any(SyntaxKind.ProtectedKeyword))
+            return Visibility.Protected;
+        if (modifiers.Any(SyntaxKind.PrivateKeyword))
+            return Visibility.Private;
+        return defaultVisibility;
+    }
+
+    /// <summary>
+    /// Walks already-converted AST statements and infers effects.
+    /// Returns an EffectsNode if any effects are found, null otherwise.
+    /// </summary>
+    private static EffectsNode? InferEffectsFromBody(IReadOnlyList<StatementNode> body)
+    {
+        var effects = new Dictionary<string, string>();
+        InferEffectsFromStatements(body, effects);
+        if (effects.Count == 0)
+            return null;
+        return new EffectsNode(new TextSpan(0, 0, 0, 0), effects);
+    }
+
+    private static void InferEffectsFromStatements(IEnumerable<StatementNode> statements, Dictionary<string, string> effects)
+    {
+        foreach (var stmt in statements)
+        {
+            InferEffectsFromStatement(stmt, effects);
+        }
+    }
+
+    /// <summary>
+    /// Adds an effect value to a category, appending comma-separated if the category already has a value.
+    /// </summary>
+    private static void AddEffect(Dictionary<string, string> effects, string category, string value)
+    {
+        if (effects.TryGetValue(category, out var existing))
+        {
+            // Check if this value is already present (avoid duplicates)
+            var existingValues = existing.Split(',');
+            if (!existingValues.Contains(value, StringComparer.Ordinal))
+            {
+                effects[category] = existing + "," + value;
+            }
+        }
+        else
+        {
+            effects[category] = value;
+        }
+    }
+
+    private static void InferEffectsFromStatement(StatementNode statement, Dictionary<string, string> effects)
+    {
+        switch (statement)
+        {
+            case PrintStatementNode:
+                AddEffect(effects, "io", "console_write");
+                break;
+            case ThrowStatementNode:
+            case RethrowStatementNode:
+                AddEffect(effects, "exception", "intentional");
+                break;
+            case CallStatementNode call:
+                InferEffectsFromCallTarget(call.Target, effects);
+                foreach (var arg in call.Arguments)
+                    InferEffectsFromExpression(arg, effects);
+                break;
+            case IfStatementNode ifStmt:
+                InferEffectsFromStatements(ifStmt.ThenBody, effects);
+                foreach (var elseIf in ifStmt.ElseIfClauses)
+                    InferEffectsFromStatements(elseIf.Body, effects);
+                if (ifStmt.ElseBody != null)
+                    InferEffectsFromStatements(ifStmt.ElseBody, effects);
+                InferEffectsFromExpression(ifStmt.Condition, effects);
+                break;
+            case ForStatementNode forStmt:
+                InferEffectsFromStatements(forStmt.Body, effects);
+                break;
+            case WhileStatementNode whileStmt:
+                InferEffectsFromStatements(whileStmt.Body, effects);
+                InferEffectsFromExpression(whileStmt.Condition, effects);
+                break;
+            case DoWhileStatementNode doWhileStmt:
+                InferEffectsFromStatements(doWhileStmt.Body, effects);
+                InferEffectsFromExpression(doWhileStmt.Condition, effects);
+                break;
+            case ForeachStatementNode foreachStmt:
+                InferEffectsFromStatements(foreachStmt.Body, effects);
+                break;
+            case TryStatementNode tryStmt:
+                InferEffectsFromStatements(tryStmt.TryBody, effects);
+                foreach (var catchClause in tryStmt.CatchClauses)
+                    InferEffectsFromStatements(catchClause.Body, effects);
+                if (tryStmt.FinallyBody != null)
+                    InferEffectsFromStatements(tryStmt.FinallyBody, effects);
+                break;
+            case MatchStatementNode matchStmt:
+                foreach (var matchCase in matchStmt.Cases)
+                    InferEffectsFromStatements(matchCase.Body, effects);
+                break;
+            case BindStatementNode bind:
+                if (bind.Initializer != null)
+                    InferEffectsFromExpression(bind.Initializer, effects);
+                break;
+            case ReturnStatementNode ret:
+                if (ret.Expression != null)
+                    InferEffectsFromExpression(ret.Expression, effects);
+                break;
+            case AssignmentStatementNode assign:
+                InferEffectsFromExpression(assign.Value, effects);
+                break;
+        }
+    }
+
+    private static void InferEffectsFromExpression(ExpressionNode expr, Dictionary<string, string> effects)
+    {
+        switch (expr)
+        {
+            case CallExpressionNode callExpr:
+                InferEffectsFromCallTarget(callExpr.Target, effects);
+                foreach (var arg in callExpr.Arguments)
+                    InferEffectsFromExpression(arg, effects);
+                break;
+            case BinaryOperationNode binOp:
+                InferEffectsFromExpression(binOp.Left, effects);
+                InferEffectsFromExpression(binOp.Right, effects);
+                break;
+            case ConditionalExpressionNode condExpr:
+                InferEffectsFromExpression(condExpr.Condition, effects);
+                InferEffectsFromExpression(condExpr.WhenTrue, effects);
+                InferEffectsFromExpression(condExpr.WhenFalse, effects);
+                break;
+            case MatchExpressionNode matchExpr:
+                foreach (var matchCase in matchExpr.Cases)
+                    InferEffectsFromStatements(matchCase.Body, effects);
+                break;
+        }
+    }
+
+    private static void InferEffectsFromCallTarget(string target, Dictionary<string, string> effects)
+    {
+        var effectInfo = EffectChecker.TryGetKnownEffect(target);
+        if (effectInfo != null)
+        {
+            var category = effectInfo.Kind switch
+            {
+                EffectKind.IO => "io",
+                EffectKind.Mutation => "mutation",
+                EffectKind.Nondeterminism => "nondeterminism",
+                EffectKind.Exception => "exception",
+                EffectKind.Memory => "memory",
+                _ => "unknown"
+            };
+            AddEffect(effects, category, effectInfo.Value);
+        }
     }
 
     private static MethodModifiers GetMethodModifiers(SyntaxTokenList modifiers)

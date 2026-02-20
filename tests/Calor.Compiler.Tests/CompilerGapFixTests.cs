@@ -53,7 +53,7 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§CL{c1:MyPoint:struct}
+§CL{c1:MyPoint:pub:struct}
   §FLD{i32:X:pub}
   §FLD{i32:Y:pub}
 §/CL{c1}
@@ -105,7 +105,7 @@ public class CompilerGapFixTests
         // C# structs are implicitly sealed, so "sealed" is correctly omitted from output
         var source = @"
 §M{m1:TestMod}
-§CL{c1:MyVal:struct seal}
+§CL{c1:MyVal:pub:struct seal}
 §/CL{c1}
 §/M{m1}
 ";

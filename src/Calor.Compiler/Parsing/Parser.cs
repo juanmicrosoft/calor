@@ -610,7 +610,18 @@ public sealed class Parser
             attrs.Add("semantic", semantic);
         }
 
-        return new ParameterNode(startToken.Span, paramName, typeName, attrs);
+        // Parse parameter modifier from semantic/pos2 position (this, ref, out, in, params)
+        var modifier = ParameterModifier.None;
+        if (!string.IsNullOrEmpty(semantic))
+        {
+            if (semantic.Contains("this", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.This;
+            if (semantic.Contains("ref", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Ref;
+            if (semantic.Contains("out", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Out;
+            if (semantic.Contains("in", StringComparison.OrdinalIgnoreCase) && !semantic.Contains("this", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.In;
+            if (semantic.Contains("params", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Params;
+        }
+
+        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, Array.Empty<CalorAttributeNode>());
     }
 
     private OutputNode ParseOutput()
@@ -778,6 +789,14 @@ public sealed class Parser
         else if (Check(TokenKind.Continue))
         {
             return ParseContinueStatement();
+        }
+        else if (Check(TokenKind.Yield))
+        {
+            return ParseYieldReturnStatement();
+        }
+        else if (Check(TokenKind.YieldBreak))
+        {
+            return ParseYieldBreakStatement();
         }
         // Print aliases
         else if (Check(TokenKind.Print))
@@ -3436,6 +3455,7 @@ public sealed class Parser
         {
             "public" or "pub" => Visibility.Public,
             "internal" or "int" => Visibility.Internal,
+            "protected" or "prot" => Visibility.Protected,
             "private" or "priv" => Visibility.Private,
             _ => Visibility.Private
         };
@@ -4566,17 +4586,19 @@ public sealed class Parser
         }
 
         // Disambiguate positionals:
-        // 4 positionals (pos3 exists): pos2 is baseClass (or visibility to ignore), pos3 is modifiers
+        // 4 positionals (pos3 exists): pos2 is visibility, pos3 is modifiers — OR pos2 is baseClass, pos3 is modifiers
         // 3 positionals (pos3 null): if pos2 is all known modifiers/visibility → modifiers; else baseClass
         string modifiers;
         string? baseClass = null;
+        Visibility visibility = Visibility.Internal;
 
         if (pos3 != null)
         {
-            // 4 positionals: §CL{id:name:BaseClass:modifiers}
+            // 4 positionals: §CL{id:name:vis:modifiers} or §CL{id:name:BaseClass:modifiers}
             if (IsVisibilityKeyword(pos2))
             {
-                // pos2 is a visibility like "pub" — ignore it, modifiers = pos3
+                // pos2 is a visibility like "pub", "int", etc.
+                visibility = ParseVisibility(pos2);
                 modifiers = pos3;
             }
             else
@@ -4587,10 +4609,12 @@ public sealed class Parser
         }
         else
         {
-            // 3 positionals: §CL{id:name:modifiers_or_base}
+            // 3 positionals: §CL{id:name:modifiers_or_vis_or_base}
             if (IsClassModifierOrVisibility(pos2))
             {
+                // Extract visibility from the modifiers string if present
                 modifiers = pos2;
+                visibility = ExtractVisibilityFromModifiers(ref modifiers);
             }
             else
             {
@@ -4720,7 +4744,7 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
             implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, attrs, csharpAttrs,
-            isStruct: isStruct, isReadOnly: isReadOnly);
+            isStruct: isStruct, isReadOnly: isReadOnly, visibility: visibility);
     }
 
     /// <summary>
@@ -5006,6 +5030,8 @@ public sealed class Parser
         if (modStr.Contains("abs", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Abstract;
         if (modStr.Contains("seal", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Sealed;
         if (modStr.Contains("stat", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Static;
+        if (modStr.Contains("const", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Const;
+        if (modStr.Contains("readonly", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Readonly;
         return mods;
     }
 
@@ -5700,6 +5726,34 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.Continue);
         return new ContinueStatementNode(token.Span);
+    }
+
+    /// <summary>
+    /// Parses a yield return statement.
+    /// §YIELD expression
+    /// </summary>
+    private YieldReturnStatementNode ParseYieldReturnStatement()
+    {
+        var startToken = Expect(TokenKind.Yield);
+
+        ExpressionNode? expression = null;
+        if (IsExpressionStart())
+        {
+            expression = ParseExpression();
+        }
+
+        var span = expression != null ? startToken.Span.Union(expression.Span) : startToken.Span;
+        return new YieldReturnStatementNode(span, expression);
+    }
+
+    /// <summary>
+    /// Parses a yield break statement.
+    /// §YBRK
+    /// </summary>
+    private YieldBreakStatementNode ParseYieldBreakStatement()
+    {
+        var token = Expect(TokenKind.YieldBreak);
+        return new YieldBreakStatementNode(token.Span);
     }
 
     // Phase 11: Lambdas, Delegates, Events
@@ -7059,6 +7113,8 @@ public sealed class Parser
         return value.Equals("pub", StringComparison.OrdinalIgnoreCase)
             || value.Equals("pri", StringComparison.OrdinalIgnoreCase)
             || value.Equals("pro", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("prot", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("priv", StringComparison.OrdinalIgnoreCase)
             || value.Equals("int", StringComparison.OrdinalIgnoreCase)
             || value.Equals("public", StringComparison.OrdinalIgnoreCase)
             || value.Equals("private", StringComparison.OrdinalIgnoreCase)
@@ -7066,11 +7122,49 @@ public sealed class Parser
             || value.Equals("internal", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static readonly HashSet<string> VisibilityKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "pub", "pri", "pro", "prot", "priv", "int",
+        "public", "private", "protected", "internal"
+    };
+
+    /// <summary>
+    /// Extracts a visibility keyword from a comma/space-separated modifiers string,
+    /// removes it from the modifiers, and returns the parsed visibility.
+    /// </summary>
+    private static Visibility ExtractVisibilityFromModifiers(ref string modifiers)
+    {
+        if (string.IsNullOrEmpty(modifiers))
+            return Visibility.Internal;
+
+        var parts = modifiers.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        Visibility vis = Visibility.Internal;
+        bool found = false;
+        var remaining = new List<string>();
+
+        foreach (var part in parts)
+        {
+            var trimmed = part.Trim();
+            if (!found && VisibilityKeywords.Contains(trimmed))
+            {
+                vis = ParseVisibility(trimmed);
+                found = true;
+            }
+            else
+            {
+                remaining.Add(trimmed);
+            }
+        }
+
+        modifiers = string.Join(",", remaining);
+        return vis;
+    }
+
     private static readonly HashSet<string> ClassModifierKeywords = new(StringComparer.OrdinalIgnoreCase)
     {
         "abs", "abstract", "seal", "sealed", "st", "stat", "static",
         "partial", "struct", "readonly",
-        "pub", "pri", "pro", "int",
+        "pub", "pri", "pro", "prot", "priv", "int",
         "public", "private", "protected", "internal"
     };
 

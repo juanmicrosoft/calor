@@ -274,6 +274,10 @@ public enum TokenKind
     TaskRef,            // §TASK - Task reference
     DateMarker,         // §DATE - Date marker
 
+    // Yield support
+    Yield,              // §YIELD - yield return
+    YieldBreak,         // §YBRK - yield break
+
     // LINQ Support
     AnonymousObject,    // §ANON - Anonymous object creation
     EndAnonymousObject, // §/ANON - End anonymous object

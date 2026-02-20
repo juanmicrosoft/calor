@@ -196,6 +196,9 @@ public interface IAstVisitor
     void Visit(TypeOfExpressionNode node);
     // Feature 9: Expression call targets
     void Visit(ExpressionCallNode node);
+    // Yield support
+    void Visit(YieldReturnStatementNode node);
+    void Visit(YieldBreakStatementNode node);
 }
 
 /// <summary>
@@ -376,6 +379,9 @@ public interface IAstVisitor<T>
     T Visit(TypeOfExpressionNode node);
     // Feature 9: Expression call targets
     T Visit(ExpressionCallNode node);
+    // Yield support
+    T Visit(YieldReturnStatementNode node);
+    T Visit(YieldBreakStatementNode node);
 }
 
 /// <summary>

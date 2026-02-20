@@ -228,6 +228,20 @@ public sealed class FunctionNode : AstNode
 }
 
 /// <summary>
+/// Parameter modifiers for method parameters.
+/// </summary>
+[Flags]
+public enum ParameterModifier
+{
+    None = 0,
+    This = 1,
+    Ref = 2,
+    Out = 4,
+    In = 8,
+    Params = 16,
+}
+
+/// <summary>
 /// Represents a function parameter.
 /// §IN[name=xxx][type=xxx]
 /// </summary>
@@ -235,6 +249,7 @@ public sealed class ParameterNode : AstNode
 {
     public string Name { get; }
     public string TypeName { get; }
+    public ParameterModifier Modifier { get; }
     public AttributeCollection Attributes { get; }
 
     /// <summary>
@@ -247,7 +262,7 @@ public sealed class ParameterNode : AstNode
         string name,
         string typeName,
         AttributeCollection attributes)
-        : this(span, name, typeName, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, name, typeName, ParameterModifier.None, attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -257,10 +272,22 @@ public sealed class ParameterNode : AstNode
         string typeName,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, name, typeName, ParameterModifier.None, attributes, csharpAttributes)
+    {
+    }
+
+    public ParameterNode(
+        TextSpan span,
+        string name,
+        string typeName,
+        ParameterModifier modifier,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        Modifier = modifier;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }

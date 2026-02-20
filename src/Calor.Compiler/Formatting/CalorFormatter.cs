@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.Formatting;
 

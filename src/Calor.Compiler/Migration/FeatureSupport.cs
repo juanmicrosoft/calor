@@ -322,9 +322,8 @@ public static class FeatureSupport
         ["extension-method"] = new FeatureInfo
         {
             Name = "extension-method",
-            Support = SupportLevel.ManualRequired,
-            Description = "Extension methods require manual conversion to regular methods or traits",
-            Workaround = "Convert to instance methods or Calor traits"
+            Support = SupportLevel.Full,
+            Description = "Extension methods are converted with 'this' parameter modifier preserved"
         },
         ["operator-overload"] = new FeatureInfo
         {
@@ -349,9 +348,8 @@ public static class FeatureSupport
         ["yield-return"] = new FeatureInfo
         {
             Name = "yield-return",
-            Support = SupportLevel.NotSupported,
-            Description = "Yield return (iterator methods) is not supported",
-            Workaround = "Use explicit List<T> construction and return the complete list"
+            Support = SupportLevel.Full,
+            Description = "Yield return/break statements are converted to Calor yield syntax"
         },
         ["is-type-pattern"] = new FeatureInfo
         {

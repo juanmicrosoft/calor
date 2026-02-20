@@ -1,5 +1,6 @@
 using System.Text;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.Migration;
 
@@ -187,12 +188,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var modifiers = new List<string>();
         if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("sealed");
+        if (node.IsSealed) modifiers.Add("seal");
         if (node.IsPartial) modifiers.Add("partial");
-        if (node.IsStatic) modifiers.Add("static");
+        if (node.IsStatic) modifiers.Add("stat");
         if (node.IsStruct) modifiers.Add("struct");
         if (node.IsReadOnly) modifiers.Add("readonly");
 
+        var vis = GetVisibilityShorthand(node.Visibility);
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
         var typeParams = node.TypeParameters.Count > 0
@@ -200,7 +202,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§CL{{{node.Id}:{node.Name}{typeParams}{modStr}}}{attrs}");
+        AppendLine($"§CL{{{node.Id}:{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
         Indent();
 
         // Emit type parameter constraints
@@ -271,7 +273,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§FLD{{{typeName}:{node.Name}:{visibility}}}{attrs}{defaultVal}");
+        var modifiers = new List<string>();
+        if (node.Modifiers.HasFlag(MethodModifiers.Static)) modifiers.Add("stat");
+        if (node.Modifiers.HasFlag(MethodModifiers.Const)) modifiers.Add("const");
+        if (node.Modifiers.HasFlag(MethodModifiers.Readonly)) modifiers.Add("readonly");
+        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+
+        AppendLine($"§FLD{{{typeName}:{node.Name}:{visibility}{modStr}}}{attrs}{defaultVal}");
 
         return "";
     }
@@ -434,8 +442,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Parameters
         foreach (var param in node.Parameters)
         {
-            var paramType = TypeMapper.CSharpToCalor(param.TypeName);
-            AppendLine($"§I{{{paramType}:{param.Name}}}");
+            AppendLine(Visit(param));
         }
 
         // Output
@@ -443,6 +450,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             AppendLine($"§O{{{output}}}");
         }
+
+        // Effects
+        EmitEffects(node.Effects);
 
         // Preconditions
         foreach (var pre in node.Preconditions)
@@ -491,8 +501,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Parameters
         foreach (var param in node.Parameters)
         {
-            var paramType = TypeMapper.CSharpToCalor(param.TypeName);
-            AppendLine($"§I{{{paramType}:{param.Name}}}");
+            AppendLine(Visit(param));
         }
 
         // Output
@@ -500,6 +509,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             AppendLine($"§O{{{output}}}");
         }
+
+        // Effects
+        EmitEffects(node.Effects);
 
         // Preconditions
         foreach (var pre in node.Preconditions)
@@ -528,7 +540,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ParameterNode node)
     {
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
-        return $"§I{{{typeName}:{node.Name}}}";
+        var modifiers = new List<string>();
+        if (node.Modifier.HasFlag(ParameterModifier.This)) modifiers.Add("this");
+        if (node.Modifier.HasFlag(ParameterModifier.Ref)) modifiers.Add("ref");
+        if (node.Modifier.HasFlag(ParameterModifier.Out)) modifiers.Add("out");
+        if (node.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
+        if (node.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
+        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        return $"§I{{{typeName}:{node.Name}{modStr}}}";
     }
 
     public string Visit(RequiresNode node)
@@ -629,6 +648,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(BreakStatementNode node)
     {
         AppendLine("§BK");
+        return "";
+    }
+
+    public string Visit(YieldReturnStatementNode node)
+    {
+        if (node.Expression != null)
+        {
+            var expr = node.Expression.Accept(this);
+            AppendLine($"§YIELD {expr}");
+        }
+        else
+        {
+            AppendLine("§YIELD");
+        }
+        return "";
+    }
+
+    public string Visit(YieldBreakStatementNode node)
+    {
+        AppendLine("§YBRK");
         return "";
     }
 
@@ -1967,6 +2006,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Visibility.Private => "priv",
             _ => "priv"
         };
+    }
+
+    private void EmitEffects(EffectsNode? effects)
+    {
+        if (effects == null || effects.Effects.Count == 0)
+            return;
+
+        var effectCodes = effects.Effects
+            .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
+            .Distinct();
+        AppendLine($"§E{{{string.Join(",", effectCodes)}}}");
     }
 
     private static string GetCalorOperatorSymbol(BinaryOperator op) => op switch
