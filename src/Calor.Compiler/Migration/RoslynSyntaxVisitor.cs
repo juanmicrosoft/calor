@@ -14,6 +14,7 @@ namespace Calor.Compiler.Migration;
 public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 {
     private readonly ConversionContext _context;
+    private readonly SemanticModel? _semanticModel;
     private readonly List<UsingDirectiveNode> _usings = new();
     private readonly List<InterfaceDefinitionNode> _interfaces = new();
     private readonly List<ClassDefinitionNode> _classes = new();
@@ -36,9 +37,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     public IReadOnlyList<StatementNode> TopLevelStatements => _topLevelStatements;
 
-    public RoslynSyntaxVisitor(ConversionContext context) : base(SyntaxWalkerDepth.Node)
+    public RoslynSyntaxVisitor(ConversionContext context, SemanticModel? semanticModel = null) : base(SyntaxWalkerDepth.Node)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _semanticModel = semanticModel;
     }
 
     /// <summary>
@@ -3284,6 +3286,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType, null, initializer, new AttributeCollection());
     }
 
+    /// <summary>
+    /// Tries to infer the type of a lambda parameter using the semantic model.
+    /// Returns null if the semantic model is unavailable or the type cannot be resolved.
+    /// </summary>
+    private string? TryInferLambdaParameterType(ParameterSyntax parameter)
+    {
+        if (_semanticModel == null) return null;
+
+        try
+        {
+            var symbol = _semanticModel.GetDeclaredSymbol(parameter);
+            if (symbol is IParameterSymbol paramSymbol && paramSymbol.Type != null
+                && paramSymbol.Type.SpecialType != SpecialType.System_Object)
+            {
+                return TypeMapper.CSharpToCalor(paramSymbol.Type.ToDisplayString());
+            }
+        }
+        catch
+        {
+            // Semantic model queries can fail if compilation has errors; fall through gracefully
+        }
+
+        return null;
+    }
+
     private static string? TryGetDeclaredArrayElementType(SyntaxNode node)
     {
         // Walk up: InitializerExpression -> EqualsValueClause -> VariableDeclarator -> VariableDeclaration
@@ -3354,16 +3381,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 parameters.Add(new LambdaParameterNode(
                     GetTextSpan(simple.Parameter),
                     simple.Parameter.Identifier.Text,
-                    null));
+                    TryInferLambdaParameterType(simple.Parameter)));
                 break;
 
             case ParenthesizedLambdaExpressionSyntax paren:
                 foreach (var param in paren.ParameterList.Parameters)
                 {
+                    var typeName = param.Type != null
+                        ? TypeMapper.CSharpToCalor(param.Type.ToString())
+                        : TryInferLambdaParameterType(param);
                     parameters.Add(new LambdaParameterNode(
                         GetTextSpan(param),
                         param.Identifier.Text,
-                        param.Type != null ? TypeMapper.CSharpToCalor(param.Type.ToString()) : null));
+                        typeName));
                 }
                 break;
         }

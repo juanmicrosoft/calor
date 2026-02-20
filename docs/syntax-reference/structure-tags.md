@@ -232,50 +232,61 @@ Emits: `var data = await client.GetAsync(url).ConfigureAwait(false);`
 
 ## Lambda Expressions
 
-Lambda expressions create anonymous functions.
+Lambda expressions create anonymous functions using `§LAM`/`§/LAM` blocks.
 
-### Inline Lambda Syntax
-
-For simple expression-body lambdas:
+### Syntax
 
 ```
-(param) → expression
-(param1, param2) → expression
-() → expression
+§LAM{id:param1:type1}              // single parameter
+§LAM{id:param1:type1:param2:type2} // multiple parameters
+§LAM{id}                           // no parameters
 ```
 
-### Examples
+The header encodes parameters as colon-separated `name:type` pairs after the ID.
+Parameters without known types use `object` as the default type.
 
-**Single parameter:**
-```
-§B{doubler} (x) → (* x 2)
-```
-
-Emits: `var doubler = x => x * 2;`
-
-**Multiple parameters:**
-```
-§B{add} (a, b) → (+ a b)
-```
-
-Emits: `var add = (a, b) => a + b;`
-
-**No parameters:**
-```
-§B{getTime} () → §C{DateTime.Now} §/C
-```
-
-### Block Lambda Syntax
-
-For statement-body lambdas, use `§LAM`/`§/LAM`:
+### Single Parameter
 
 ```
-§LAM{id:param1:type1:param2:type2}
-  // statements
-§/LAM{id}
+§B{doubler} §LAM{lam1:x:i32} (* x 2) §/LAM{lam1}
 ```
 
-**Example:**
+Emits: `var doubler = (int x) => x * 2;`
+
+### Multiple Parameters
+
+Parameters are listed as consecutive `name:type` pairs:
+
+```
+§B{add} §LAM{lam1:a:i32:b:i32} (+ a b) §/LAM{lam1}
+```
+
+Emits: `var add = (int a, int b) => a + b;`
+
+**Three parameters:**
+```
+§B{combine} §LAM{lam1:x:i32:y:str:z:bool} §C{Process} §A x §A y §A z §/C §/LAM{lam1}
+```
+
+### No Parameters
+
+```
+§B{getTime} §LAM{lam1} §C{DateTime.Now} §/C §/LAM{lam1}
+```
+
+### As LINQ Arguments
+
+Lambdas are commonly used as arguments inside `§C{...}` calls:
+
+```
+§C{numbers.Where} §A §LAM{lam1:n:i32} (!= (% n 3) 0) §/LAM{lam1} §/C
+§C{items.Select} §A §LAM{lam2:x:i32} (* x 2) §/LAM{lam2} §/C
+```
+
+### Statement Body Lambdas
+
+For multi-statement bodies, include statements between the tags:
+
 ```
 §B{printer} §LAM{lam1:x:i32}
   §P x
@@ -285,7 +296,7 @@ For statement-body lambdas, use `§LAM`/`§/LAM`:
 
 ### Async Lambdas
 
-Add `async` before parameters:
+Add `async` after the ID, before parameters:
 
 ```
 §LAM{lam1:async:x:i32}
@@ -293,6 +304,10 @@ Add `async` before parameters:
   §R result
 §/LAM{lam1}
 ```
+
+> **Note:** `§I{type:name}` inline parameter declarations are NOT supported inside
+> `§LAM` headers. All parameters must be encoded in the header using the
+> `name:type` pair format.
 
 ---
 

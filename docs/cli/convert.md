@@ -231,6 +231,46 @@ Review the converted file src/Services/UserService.calr and:
 
 ---
 
+## File Coexistence (.cs and .calr)
+
+After converting a `.cs` file to `.calr`, both files will exist in your project. When you compile the `.calr` file, Calor generates a `.g.cs` file. If the original `.cs` file is still included in compilation, you will get **CS0101 duplicate type** errors because both files define the same types.
+
+### Resolution strategies
+
+**1. Exclude originals from compilation (recommended for incremental migration)**
+
+Add the original `.cs` files to your `.csproj` exclusion list:
+
+```xml
+<ItemGroup>
+  <Compile Remove="MyService.cs" />
+</ItemGroup>
+```
+
+**2. Move originals to a reference directory**
+
+```bash
+mkdir -p .csharp-originals
+mv MyService.cs .csharp-originals/
+```
+
+This preserves the originals for reference while removing them from compilation.
+
+**3. Delete originals after verification**
+
+Once you've verified the Calor version roundtrips correctly:
+
+```bash
+# Verify roundtrip first
+calor convert MyService.calr -o /tmp/MyService.check.cs
+diff MyService.cs /tmp/MyService.check.cs
+
+# If satisfied, remove the original
+rm MyService.cs
+```
+
+---
+
 ## Limitations
 
 The converter may not perfectly handle:
