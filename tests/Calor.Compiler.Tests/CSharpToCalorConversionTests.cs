@@ -2417,9 +2417,9 @@ public class CSharpToCalorConversionTests
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
         Assert.NotNull(conversionResult.CalorSource);
 
-        // Verify :st appears for both class and methods
-        var stCount = conversionResult.CalorSource!.Split(":st").Length - 1;
-        Assert.True(stCount >= 3, $"Expected at least 3 :st occurrences (1 class + 2 methods), got {stCount}");
+        // Verify :stat appears for both class and methods
+        var statCount = conversionResult.CalorSource!.Split(":stat").Length - 1;
+        Assert.True(statCount >= 3, $"Expected at least 3 :stat occurrences (1 class + 2 methods), got {statCount}");
 
         // Full roundtrip
         var compilationResult = Program.Compile(conversionResult.CalorSource!);

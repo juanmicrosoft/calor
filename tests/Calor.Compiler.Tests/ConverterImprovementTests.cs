@@ -1199,6 +1199,35 @@ public class ConverterImprovementTests
         Assert.DoesNotContain(":static}", output);
     }
 
+    [Fact]
+    public void RoundTrip_StaticProperty_PreservesModifier()
+    {
+        var source = """
+            §M{m1:TestMod}
+            §CL{c1:Counter:pub}
+              §PROP{p1:Instance:Counter:pub:stat}
+                §GET
+                §SET
+              §/PROP{p1}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        // Parse → emit → reparse
+        var ast = Parse(source);
+        var emitter = new CalorEmitter();
+        var emitted = emitter.Emit(ast);
+        var ast2 = Parse(emitted);
+
+        var prop = Assert.Single(ast2.Classes[0].Properties);
+        Assert.True(prop.IsStatic);
+
+        // Also verify generated C# has static keyword
+        var csharpEmitter = new Calor.Compiler.CodeGen.CSharpEmitter();
+        var csharp = csharpEmitter.Emit(ast2);
+        Assert.Contains("static Counter Instance", csharp);
+    }
+
     private static ModuleNode Parse(string source)
     {
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
