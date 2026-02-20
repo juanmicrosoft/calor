@@ -1064,4 +1064,149 @@ public class ConverterImprovementTests
     }
 
     #endregion
+
+    #region Modifier Abbreviation Tests
+
+    [Fact]
+    public void CalorEmitter_StaticClass_EmitsStatAbbreviation()
+    {
+        var source = """
+            §M{m1:TestMod}
+            §CL{c1:Helper:pub:stat}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var ast = Parse(source);
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(ast);
+
+        Assert.Contains(":stat}", output);
+        Assert.DoesNotContain(":static}", output);
+    }
+
+    [Fact]
+    public void CalorEmitter_SealedClass_EmitsSealAbbreviation()
+    {
+        var source = """
+            §M{m1:TestMod}
+            §CL{c1:Final:pub:seal}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var ast = Parse(source);
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(ast);
+
+        Assert.Contains(":seal}", output);
+        Assert.DoesNotContain(":sealed}", output);
+    }
+
+    [Fact]
+    public void RoundTrip_StaticClass_PreservesModifier()
+    {
+        var source = """
+            §M{m1:TestMod}
+            §CL{c1:Helper:pub:stat}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        // Step 1: Parse original
+        var ast = Parse(source);
+        Assert.Single(ast.Classes);
+        Assert.True(ast.Classes[0].IsStatic);
+
+        // Step 2: Emit back to Calor
+        var emitter = new CalorEmitter();
+        var emitted = emitter.Emit(ast);
+
+        // Step 3: Re-parse the emitted Calor
+        var ast2 = Parse(emitted);
+        Assert.Single(ast2.Classes);
+        Assert.True(ast2.Classes[0].IsStatic);
+    }
+
+    [Fact]
+    public void CalorEmitter_SealedMethod_EmitsSealAbbreviation()
+    {
+        // Use C# converter to get a sealed override method in the AST,
+        // then verify CalorEmitter emits "seal" not "sealed"
+        var converter = new CSharpToCalorConverter();
+        var csharp = """
+            public class Base
+            {
+                public virtual int Compute() => 0;
+            }
+            public class Derived : Base
+            {
+                public sealed override int Compute() => 42;
+            }
+            """;
+
+        var result = converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        Assert.Contains("seal", output);
+        Assert.DoesNotContain("sealed", output);
+    }
+
+    [Fact]
+    public void CalorEmitter_StaticField_EmitsStatAbbreviation()
+    {
+        var source = """
+            §M{m1:TestMod}
+            §CL{c1:Counter:pub}
+              §FLD{i32:Count:pub:stat}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var ast = Parse(source);
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(ast);
+
+        Assert.Contains(":stat}", output);
+        Assert.DoesNotContain(":static}", output);
+    }
+
+    [Fact]
+    public void CalorEmitter_StaticProperty_EmitsStatAbbreviation()
+    {
+        // Parse Calor source with a static property, verify CalorEmitter
+        // emits "stat" in the PROP tag (not "static")
+        var source = """
+            §M{m1:TestMod}
+            §CL{c1:Counter:pub}
+              §PROP{p1:Count:i32:pub:stat}
+                §GET
+                §SET
+              §/PROP{p1}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var ast = Parse(source);
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(ast);
+
+        // Property tag should include stat modifier
+        Assert.Contains(":stat}", output);
+        Assert.DoesNotContain(":static}", output);
+    }
+
+    private static ModuleNode Parse(string source)
+    {
+        var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var lexer = new Calor.Compiler.Parsing.Lexer(source, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Calor.Compiler.Parsing.Parser(tokens, diagnostics);
+        return parser.Parse();
+    }
+
+    #endregion
 }

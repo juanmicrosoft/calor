@@ -558,7 +558,7 @@ public class CSharpToCalorConversionTests
         Assert.True(cls.IsPartial);
         Assert.True(cls.IsStatic);
         Assert.Contains("partial", result.CalorSource);
-        Assert.Contains("st", result.CalorSource);
+        Assert.Contains("stat", result.CalorSource);
     }
 
     #endregion

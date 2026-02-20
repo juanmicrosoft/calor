@@ -25,6 +25,8 @@ Calor has a simple type system with primitives, optionals, results, and arrays.
 | `f64` | 64-bit floating point | `double` | ±1.8 × 10³⁰⁸ |
 | `str` | String | `string` | UTF-16 text |
 | `bool` | Boolean | `bool` | `true` or `false` |
+| `char` | Single Unicode character | `char` | U+0000 to U+FFFF |
+| `decimal` | 128-bit precise decimal | `decimal` | ±7.9 × 10²⁸ |
 | `void` | No value | `void` | (return type only) |
 
 ---
@@ -49,6 +51,16 @@ Calor has a simple type system with primitives, optionals, results, and arrays.
 §O{str}             // returns string
 §O{void}            // returns nothing
 §O{[u8]}            // returns byte[]
+```
+
+### Decimal Literals
+
+Calor supports two forms for decimal literals:
+
+```
+§B{~price:decimal} DECIMAL:18.0000    // prefix form
+§B{~total:decimal} 100m               // suffix form (m or M)
+§B{~rate:decimal} DEC:0.05            // short prefix form
 ```
 
 ---
@@ -381,6 +393,8 @@ Types matter in contracts for proper comparisons:
 | `f64` | `3.14`, `2.718` |
 | `str` | `"hello"`, `"world"` |
 | `bool` | `true`, `false` |
+| `char` | `'A'`, `'x'` |
+| `decimal` | `DECIMAL:18.0`, `DEC:0.05`, `100m` |
 
 ---
 
