@@ -199,6 +199,8 @@ public interface IAstVisitor
     // Yield support
     void Visit(YieldReturnStatementNode node);
     void Visit(YieldBreakStatementNode node);
+    // Raw C# passthrough
+    void Visit(RawCSharpNode node);
 }
 
 /// <summary>
@@ -382,6 +384,8 @@ public interface IAstVisitor<T>
     // Yield support
     T Visit(YieldReturnStatementNode node);
     T Visit(YieldBreakStatementNode node);
+    // Raw C# passthrough
+    T Visit(RawCSharpNode node);
 }
 
 /// <summary>

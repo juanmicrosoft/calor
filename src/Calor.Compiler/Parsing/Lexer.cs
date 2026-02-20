@@ -613,6 +613,12 @@ public sealed class Lexer
         var fullText = CurrentText();
         var fullKeyword = fullText.Length > 1 ? fullText[1..] : "";
 
+        // Special handling for §RAW: scan to §/RAW and capture everything as raw content
+        if (fullKeyword.Equals("RAW", StringComparison.Ordinal))
+        {
+            return ScanRawBlock();
+        }
+
         if (Keywords.TryGetValue(fullKeyword, out var keywordKind))
         {
             return MakeToken(keywordKind);
@@ -620,6 +626,50 @@ public sealed class Lexer
 
         // Unknown section keyword - provide helpful suggestions
         ReportUnknownSectionMarker(fullKeyword);
+        return MakeToken(TokenKind.Error);
+    }
+
+    /// <summary>
+    /// Scans a raw C# passthrough block. Called after §RAW has been consumed.
+    /// Captures everything until §/RAW as raw content.
+    /// </summary>
+    private Token ScanRawBlock()
+    {
+        // Skip optional whitespace/newline after §RAW
+        if (Current == '\n') Advance();
+        else if (Current == '\r' && Lookahead == '\n') { Advance(); Advance(); }
+
+        var contentStart = _position;
+        const string endMarker = "§/RAW";
+
+        // Scan forward to find §/RAW
+        while (!IsAtEnd)
+        {
+            if (Current == '§' && _position + endMarker.Length <= _source.Length
+                && _source.Substring(_position, endMarker.Length) == endMarker)
+            {
+                // Found the end marker — capture content up to here
+                var rawContent = _source[contentStart.._position];
+
+                // Trim trailing newline from content if present
+                if (rawContent.EndsWith("\r\n"))
+                    rawContent = rawContent[..^2];
+                else if (rawContent.EndsWith("\n"))
+                    rawContent = rawContent[..^1];
+
+                // Advance past §/RAW
+                for (int i = 0; i < endMarker.Length; i++)
+                    Advance();
+
+                return MakeToken(TokenKind.RawCSharp, rawContent);
+            }
+
+            Advance();
+        }
+
+        // Reached end of file without finding §/RAW
+        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedRawBlock,
+            "Unterminated §RAW block: expected §/RAW before end of file.");
         return MakeToken(TokenKind.Error);
     }
 

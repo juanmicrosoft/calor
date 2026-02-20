@@ -22,6 +22,7 @@ public static class DiagnosticCode
     public const string UnterminatedString = "Calor0002";
     public const string InvalidTypedLiteral = "Calor0003";
     public const string InvalidEscapeSequence = "Calor0004";
+    public const string UnterminatedRawBlock = "Calor0005";
 
     // Parser errors (Calor0100-0199)
     public const string UnexpectedToken = "Calor0100";

@@ -127,3 +127,25 @@ public sealed class FallbackCommentNode : StatementNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents a raw C# passthrough block.
+/// §RAW ... §/RAW
+/// Content is emitted verbatim as C# code without any transformation.
+/// </summary>
+public sealed class RawCSharpNode : StatementNode
+{
+    /// <summary>
+    /// The raw C# source code to emit verbatim.
+    /// </summary>
+    public string CSharpCode { get; }
+
+    public RawCSharpNode(TextSpan span, string csharpCode)
+        : base(span)
+    {
+        CSharpCode = csharpCode ?? throw new ArgumentNullException(nameof(csharpCode));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

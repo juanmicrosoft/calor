@@ -2912,7 +2912,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>
-    /// Desugars LINQ query syntax to equivalent method chain calls.
+    /// Desugars LINQ query syntax to equivalent method chain calls using proper AST nodes.
     /// from x in collection where cond select proj → collection.Where(x => cond).Select(x => proj)
     /// </summary>
     private ExpressionNode ConvertQueryExpression(QueryExpressionSyntax query)
@@ -2922,25 +2922,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         // Start with the from clause's collection
         var rangeVar = query.FromClause.Identifier.Text;
-        var collection = ConvertExpression(query.FromClause.Expression);
-        var collectionCalor = collection.Accept(new CalorEmitter());
-
-        // Build the method chain from body clauses
-        var currentTarget = collectionCalor;
+        var currentExpr = ConvertExpression(query.FromClause.Expression);
 
         var body = query.Body;
         while (body != null)
         {
             // Process body clauses (where, orderby, let, join, additional from)
+            // Track the last join variable so we can fold the select into the join's result selector
+            string? lastJoinVar = null;
             foreach (var clause in body.Clauses)
             {
+                lastJoinVar = null; // Reset — only set if the LAST clause is a join
+
                 switch (clause)
                 {
                     case WhereClauseSyntax whereClause:
                     {
                         var condition = ConvertExpression(whereClause.Condition);
-                        var condCalor = condition.Accept(new CalorEmitter());
-                        currentTarget = $"§C{{({currentTarget}).Where}} §A ({rangeVar}) → {condCalor} §/C";
+                        var lambda = MakeLinqLambda(span, rangeVar, condition);
+                        currentExpr = MakeChainedCall(span, currentExpr, "Where", new ExpressionNode[] { lambda });
                         break;
                     }
                     case OrderByClauseSyntax orderByClause:
@@ -2949,7 +2949,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         foreach (var ordering in orderByClause.Orderings)
                         {
                             var keyExpr = ConvertExpression(ordering.Expression);
-                            var keyCalor = keyExpr.Accept(new CalorEmitter());
                             var isDescending = ordering.AscendingOrDescendingKeyword.IsKind(SyntaxKind.DescendingKeyword);
 
                             string methodName;
@@ -2958,7 +2957,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             else
                                 methodName = isDescending ? "ThenByDescending" : "ThenBy";
 
-                            currentTarget = $"§C{{({currentTarget}).{methodName}}} §A ({rangeVar}) → {keyCalor} §/C";
+                            var lambda = MakeLinqLambda(span, rangeVar, keyExpr);
+                            currentExpr = MakeChainedCall(span, currentExpr, methodName, new ExpressionNode[] { lambda });
                             isFirst = false;
                         }
                         break;
@@ -2968,8 +2968,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         // let v = expr → .Select(x => new { x, v = expr })
                         var letVar = letClause.Identifier.Text;
                         var letExpr = ConvertExpression(letClause.Expression);
-                        var letCalor = letExpr.Accept(new CalorEmitter());
-                        currentTarget = $"§C{{({currentTarget}).Select}} §A ({rangeVar}) → §ANON\n  {rangeVar} = {rangeVar}\n  {letVar} = {letCalor}\n§/ANON §/C";
+                        var anonObj = new AnonymousObjectCreationNode(span, new List<ObjectInitializerAssignment>
+                        {
+                            new ObjectInitializerAssignment(rangeVar, new ReferenceNode(span, rangeVar)),
+                            new ObjectInitializerAssignment(letVar, letExpr)
+                        });
+                        var lambda = MakeLinqLambda(span, rangeVar, anonObj);
+                        currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { lambda });
                         // After let, the range variable becomes the anonymous type
                         // but for simplicity we keep the same range var name
                         break;
@@ -2978,12 +2983,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     {
                         var joinVar = joinClause.Identifier.Text;
                         var joinCollection = ConvertExpression(joinClause.InExpression);
-                        var joinCollCalor = joinCollection.Accept(new CalorEmitter());
                         var leftKey = ConvertExpression(joinClause.LeftExpression);
-                        var leftKeyCalor = leftKey.Accept(new CalorEmitter());
                         var rightKey = ConvertExpression(joinClause.RightExpression);
-                        var rightKeyCalor = rightKey.Accept(new CalorEmitter());
-                        currentTarget = $"§C{{({currentTarget}).Join}} §A {joinCollCalor} §A ({rangeVar}) → {leftKeyCalor} §A ({joinVar}) → {rightKeyCalor} §A ({rangeVar}, {joinVar}) → §ANON\n  {rangeVar} = {rangeVar}\n  {joinVar} = {joinVar}\n§/ANON §/C";
+                        // Default result selector: anonymous object with both range vars.
+                        // This will be replaced if a select clause immediately follows.
+                        var resultProjection = new AnonymousObjectCreationNode(span, new List<ObjectInitializerAssignment>
+                        {
+                            new ObjectInitializerAssignment(rangeVar, new ReferenceNode(span, rangeVar)),
+                            new ObjectInitializerAssignment(joinVar, new ReferenceNode(span, joinVar))
+                        });
+
+                        var outerKeyLambda = MakeLinqLambda(span, rangeVar, leftKey);
+                        var innerKeyLambda = MakeLinqLambda(span, joinVar, rightKey);
+                        var resultLambda = MakeLinqLambda2(span, rangeVar, joinVar, resultProjection);
+
+                        currentExpr = MakeChainedCall(span, currentExpr, "Join", new ExpressionNode[]
+                        {
+                            joinCollection, outerKeyLambda, innerKeyLambda, resultLambda
+                        });
+                        lastJoinVar = joinVar;
                         break;
                     }
                     case FromClauseSyntax additionalFrom:
@@ -2991,8 +3009,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         // Additional from → SelectMany
                         var innerVar = additionalFrom.Identifier.Text;
                         var innerCollection = ConvertExpression(additionalFrom.Expression);
-                        var innerCalor = innerCollection.Accept(new CalorEmitter());
-                        currentTarget = $"§C{{({currentTarget}).SelectMany}} §A ({rangeVar}) → {innerCalor} §/C";
+                        var lambda = MakeLinqLambda(span, rangeVar, innerCollection);
+                        currentExpr = MakeChainedCall(span, currentExpr, "SelectMany", new ExpressionNode[] { lambda });
                         rangeVar = innerVar;
                         break;
                     }
@@ -3003,20 +3021,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (body.SelectOrGroup is SelectClauseSyntax selectClause)
             {
                 var projection = ConvertExpression(selectClause.Expression);
-                var projCalor = projection.Accept(new CalorEmitter());
-                // Only add Select if projection is not just the range variable
-                if (projCalor != rangeVar)
+
+                if (lastJoinVar != null
+                    && currentExpr is CallExpressionNode joinCall
+                    && joinCall.Arguments.Count == 4)
                 {
-                    currentTarget = $"§C{{({currentTarget}).Select}} §A ({rangeVar}) → {projCalor} §/C";
+                    // Fold the select projection into the Join's result selector (4th arg),
+                    // matching how C# compiles join...select into a single .Join() call.
+                    var newResultLambda = MakeLinqLambda2(span, rangeVar, lastJoinVar, projection);
+                    currentExpr = new CallExpressionNode(span, joinCall.Target, new ExpressionNode[]
+                    {
+                        joinCall.Arguments[0], joinCall.Arguments[1], joinCall.Arguments[2], newResultLambda
+                    });
+                }
+                else if (projection is not ReferenceNode refNode || refNode.Name != rangeVar)
+                {
+                    // Only add Select if projection is not just the range variable
+                    var lambda = MakeLinqLambda(span, rangeVar, projection);
+                    currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { lambda });
                 }
             }
             else if (body.SelectOrGroup is GroupClauseSyntax groupClause)
             {
-                var groupExpr = ConvertExpression(groupClause.GroupExpression);
-                var groupCalor = groupExpr.Accept(new CalorEmitter());
                 var byExpr = ConvertExpression(groupClause.ByExpression);
-                var byCalor = byExpr.Accept(new CalorEmitter());
-                currentTarget = $"§C{{({currentTarget}).GroupBy}} §A ({rangeVar}) → {byCalor} §/C";
+                var lambda = MakeLinqLambda(span, rangeVar, byExpr);
+                currentExpr = MakeChainedCall(span, currentExpr, "GroupBy", new ExpressionNode[] { lambda });
             }
 
             // Handle continuation (into g ...)
@@ -3031,9 +3060,47 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        // Parse the final Calor string back to an expression node
-        // For now, represent as a ReferenceNode with the full Calor text
-        return new ReferenceNode(span, currentTarget);
+        return currentExpr;
+    }
+
+    /// <summary>
+    /// Creates a single-parameter lambda expression node for LINQ operations.
+    /// </summary>
+    private LambdaExpressionNode MakeLinqLambda(TextSpan span, string paramName, ExpressionNode body)
+    {
+        var id = _context.GenerateId("lam");
+        var parameters = new List<LambdaParameterNode>
+        {
+            new LambdaParameterNode(span, paramName, null)
+        };
+        return new LambdaExpressionNode(span, id, parameters, effects: null, isAsync: false,
+            expressionBody: body, statementBody: null, attributes: new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Creates a two-parameter lambda expression node for LINQ join result selectors.
+    /// </summary>
+    private LambdaExpressionNode MakeLinqLambda2(TextSpan span, string param1, string param2, ExpressionNode body)
+    {
+        var id = _context.GenerateId("lam");
+        var parameters = new List<LambdaParameterNode>
+        {
+            new LambdaParameterNode(span, param1, null),
+            new LambdaParameterNode(span, param2, null)
+        };
+        return new LambdaExpressionNode(span, id, parameters, effects: null, isAsync: false,
+            expressionBody: body, statementBody: null, attributes: new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Creates a chained method call node (e.g., collection.Where(...)).
+    /// The receiver expression is emitted to Calor to form the target string.
+    /// </summary>
+    private CallExpressionNode MakeChainedCall(TextSpan span, ExpressionNode receiver, string methodName, IReadOnlyList<ExpressionNode> arguments)
+    {
+        var receiverCalor = receiver.Accept(new CalorEmitter());
+        var target = $"({receiverCalor}).{methodName}";
+        return new CallExpressionNode(span, target, arguments);
     }
 
     private ListCreationNode ConvertListCreation(ObjectCreationExpressionSyntax objCreation, string elementType)

@@ -227,4 +227,6 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Yield support
     public virtual T Visit(YieldReturnStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(YieldBreakStatementNode node) => DefaultVisit(node)!;
+    // Raw C# passthrough
+    public virtual T Visit(RawCSharpNode node) => DefaultVisit(node)!;
 }

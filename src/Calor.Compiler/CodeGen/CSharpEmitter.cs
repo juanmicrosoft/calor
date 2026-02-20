@@ -3631,6 +3631,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return $"{target}({args})";
     }
 
+    public string Visit(RawCSharpNode node)
+    {
+        // Emit raw C# content verbatim without applying scope indentation,
+        // since the raw content has its own formatting.
+        foreach (var line in node.CSharpCode.Split('\n'))
+        {
+            _builder.AppendLine(line.TrimEnd('\r'));
+        }
+        return "";
+    }
+
     /// <summary>
     /// Represents a single variable's finite range.
     /// </summary>

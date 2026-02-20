@@ -852,6 +852,11 @@ public sealed class Parser
         {
             return ParseDictionaryForeach();
         }
+        // Raw C# passthrough
+        else if (Check(TokenKind.RawCSharp))
+        {
+            return ParseRawCSharpStatement();
+        }
         // Expression statement: bare lisp expression like (inc x), (post-dec y)
         else if (Check(TokenKind.OpenParen))
         {
@@ -5765,6 +5770,17 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.Continue);
         return new ContinueStatementNode(token.Span);
+    }
+
+    /// <summary>
+    /// Parses a raw C# passthrough block.
+    /// §RAW ... §/RAW (content already captured by lexer as single token)
+    /// </summary>
+    private RawCSharpNode ParseRawCSharpStatement()
+    {
+        var token = Expect(TokenKind.RawCSharp);
+        var content = token.Value as string ?? "";
+        return new RawCSharpNode(token.Span, content);
     }
 
     /// <summary>

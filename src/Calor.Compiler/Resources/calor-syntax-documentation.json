@@ -85,20 +85,20 @@
       "id": "lambda_expression",
       "csharpConstruct": "lambda expression",
       "keywords": ["lambda", "arrow", "=>", "anonymous", "closure", "delegate", "action", "func"],
-      "calorSyntax": "§LAM{id} §I{type:param}... §O{returnType} body §/LAM  —or—  (param) → expr",
-      "description": "Creates an anonymous function/lambda expression. Block form uses §LAM tags; inline form uses arrow syntax for simple expressions.",
+      "calorSyntax": "§LAM{id:param1:type1:param2:type2} body §/LAM{id}",
+      "description": "Creates an anonymous function/lambda expression. The id is required. Parameters are positional pairs (name:type) after the id. Can capture variables from enclosing scope.",
       "examples": [
         {
           "csharp": "x => x * 2",
-          "calor": "(x) → x * 2"
+          "calor": "§LAM{lam1:x:i32}\n  x * 2\n§/LAM{lam1}"
         },
         {
           "csharp": "(a, b) => a + b",
-          "calor": "§LAM{l1}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  (+ a b)\n§/LAM"
+          "calor": "§LAM{lam1:a:i32:b:i32}\n  a + b\n§/LAM{lam1}"
         },
         {
           "csharp": "items.Where(x => x > 5)",
-          "calor": "§!{items.Where}((x) → (> x 5))§/!"
+          "calor": "§C{items.Where} §A §LAM{lam1:x:i32} x > 5 §/LAM{lam1} §/C"
         }
       ]
     },
@@ -106,20 +106,37 @@
       "id": "property_definition",
       "csharpConstruct": "property definition",
       "keywords": ["property", "get", "set", "getter", "setter", "accessor", "prop"],
-      "calorSyntax": "§PROP{id:type:name:visibility} §GET body §/GET §SET body §/SET §/PROP",
-      "description": "Defines a property with optional getter and setter. Auto-properties use shorthand syntax.",
+      "calorSyntax": "§PROP{id:name:type:visibility:modifiers} §GET body §/GET §SET body §/SET §/PROP",
+      "description": "Defines a property with optional getter and setter. Auto-properties use shorthand syntax. The optional 5th positional arg is modifiers (e.g., 'stat' for static).",
       "examples": [
         {
           "csharp": "public string Name { get; set; }",
-          "calor": "§PROP{1:str:Name:pub}§/PROP"
+          "calor": "§PROP{1:Name:str:pub}§/PROP"
         },
         {
           "csharp": "public int Count { get; private set; }",
-          "calor": "§PROP{1:i32:Count:pub}\n  §GET §/GET\n  §SET:priv §/SET\n§/PROP"
+          "calor": "§PROP{1:Count:i32:pub}\n  §GET §/GET\n  §SET:priv §/SET\n§/PROP"
         },
         {
           "csharp": "public int Value { get { return _value; } set { _value = value; } }",
-          "calor": "§PROP{1:i32:Value:pub}\n  §GET §R _value §/R §/GET\n  §SET _value = value §/SET\n§/PROP"
+          "calor": "§PROP{1:Value:i32:pub}\n  §GET §R _value §/R §/GET\n  §SET _value = value §/SET\n§/PROP"
+        }
+      ]
+    },
+    {
+      "id": "property_access_vs_method_call",
+      "csharpConstruct": "property access vs method call",
+      "keywords": ["property access", "member access", "method call", "call", "parentheses", "getter"],
+      "calorSyntax": "Property: use bare member expression (e.g., obj.Property). Method: use §C{obj.Method} §/C.",
+      "description": "§C{...}§/C always emits parentheses, making it a method call. For property or field access (no parentheses), use a bare dotted expression in a binding (§B{var} obj.Property) or directly as an expression. Do NOT use §C for property access — it will emit obj.Property() with unwanted parens.",
+      "examples": [
+        {
+          "csharp": "var items = Data.Products;",
+          "calor": "§B{~items} Data.Products"
+        },
+        {
+          "csharp": "var items = Data.GetProducts();",
+          "calor": "§B{~items} §C{Data.GetProducts} §/C"
         }
       ]
     },
@@ -542,16 +559,16 @@
       "id": "linq_query",
       "csharpConstruct": "LINQ query",
       "keywords": ["linq", "query", "where", "select", "orderby", "from"],
-      "calorSyntax": "Use method syntax with lambdas: §!{collection.Method}(§LAM{}...§/LAM)§/!",
-      "description": "LINQ queries use method syntax with lambdas in Calor.",
+      "calorSyntax": "Use method syntax with lambdas: §C{collection.Method} §A §LAM{id:param:type} body §/LAM{id} §/C",
+      "description": "LINQ queries use method-chain syntax with §C (call) and §LAM (lambda) in Calor. Each LINQ operator becomes a §C call with a lambda argument.",
       "examples": [
         {
           "csharp": "items.Where(x => x > 5).Select(x => x * 2)",
-          "calor": "§!{items.Where}(§LAM{} §I{i32:x} §O{bool} x > 5 §/LAM)§/!\n  .Select(§LAM{} §I{i32:x} §O{i32} x * 2 §/LAM)"
+          "calor": "§C{§C{items.Where} §A §LAM{lam1:x:i32} x > 5 §/LAM{lam1} §/C.Select} §A §LAM{lam2:x:i32} x * 2 §/LAM{lam2} §/C"
         },
         {
           "csharp": "from item in items where item.Active select item.Name",
-          "calor": "§!{items.Where}(§LAM{} §I{Item:item} §O{bool} item.Active §/LAM)§/!\n  .Select(§LAM{} §I{Item:item} §O{str} item.Name §/LAM)"
+          "calor": "§C{§C{items.Where} §A §LAM{lam1:item:Item} item.Active §/LAM{lam1} §/C.Select} §A §LAM{lam2:item:Item} item.Name §/LAM{lam2} §/C"
         }
       ]
     },
@@ -559,16 +576,20 @@
       "id": "string_interpolation",
       "csharpConstruct": "string interpolation",
       "keywords": ["interpolation", "format", "$\"", "string format", "template string"],
-      "calorSyntax": "§STR{...{expression}...}§/STR",
-      "description": "String interpolation with embedded expressions.",
+      "calorSyntax": "Inline: STR:\"text ${expression} text\" or Block: §INTERP \"text\" §EXP expression \"text\" §/INTERP",
+      "description": "String interpolation with embedded expressions. Two forms: (1) inline ${} within string literals for simple cases, (2) §INTERP/§/INTERP block form with §EXP markers for complex cases. Note: ${0}, ${1} etc. are treated as format placeholders, not interpolation.",
       "examples": [
         {
           "csharp": "$\"Hello, {name}!\"",
-          "calor": "§STR{Hello, {name}!}§/STR"
+          "calor": "STR:\"Hello ${name}!\""
         },
         {
           "csharp": "$\"Total: {price:C2}\"",
-          "calor": "§STR{Total: {price:C2}}§/STR"
+          "calor": "§INTERP \"Total: \" §EXP (fmt \"{0:C2}\" price) §/INTERP"
+        },
+        {
+          "csharp": "$\"{firstName} {lastName}\"",
+          "calor": "STR:\"${firstName} ${lastName}\""
         }
       ]
     },
@@ -1043,8 +1064,8 @@
     },
     "§PROP": {
       "name": "Property",
-      "syntax": "§PROP{id:type:name:visibility} body §/PROP",
-      "description": "Defines a property with optional getter and setter.",
+      "syntax": "§PROP{id:name:type:visibility:modifiers} body §/PROP",
+      "description": "Defines a property with optional getter and setter. Positional args: id, name, type, visibility (pub/pri/pro/int), optional modifiers (e.g., stat for static). Example: §PROP{p001:Count:i32:pub:stat} for a public static int property.",
       "csharpEquivalent": "public Type Name { get; set; }"
     },
     "§GET": {
@@ -1168,9 +1189,9 @@
       "csharpEquivalent": "public record Name { ... }"
     },
     "§STR": {
-      "name": "String Interpolation (alias)",
-      "syntax": "§STR ... §/STR",
-      "description": "Alias for §INTERP. See §INTERP for correct syntax.",
+      "name": "String Interpolation (NOT IMPLEMENTED)",
+      "syntax": "NOT VALID — use inline ${} or §INTERP instead",
+      "description": "§STR is not a valid section marker. For string interpolation, use: (1) inline ${} within string literals, e.g., STR:\"Hello ${name}\", or (2) §INTERP \"text\" §EXP expr §/INTERP block form. See §INTERP.",
       "csharpEquivalent": "$\"text {expression} text\""
     },
     "§INTERP": {
@@ -1179,6 +1200,12 @@
       "description": "Builds an interpolated string from literal parts and §EXP expression parts. Strings are opaque — expressions cannot be embedded inside quotes. Use separate \"literal\" and §EXP expr parts.",
       "csharpEquivalent": "$\"literal{expr}literal\""
     },
+    "§RAW": {
+      "name": "Raw C# Passthrough",
+      "syntax": "§RAW\n  C# code here\n§/RAW",
+      "description": "Embeds raw C# code that is emitted verbatim without any transformation. Use this escape hatch for C# constructs that Calor does not yet support (e.g., LINQ query syntax, complex expression trees). Content between §RAW and §/RAW is not tokenized or parsed as Calor.",
+      "csharpEquivalent": "(content emitted as-is)"
+    },
     "§M": {
       "name": "Module",
       "syntax": "§M{id:name} body §/M",
@@ -1186,10 +1213,10 @@
       "csharpEquivalent": "namespace Name { ... }"
     },
     "§C": {
-      "name": "Call (Internal)",
-      "syntax": "§C{functionName} args",
-      "description": "Calls an internal function. Use §!{...}§/! for external/effectful calls.",
-      "csharpEquivalent": "functionName(args)"
+      "name": "Call",
+      "syntax": "§C{target} §A arg1 §A arg2 §/C",
+      "description": "Calls a function or method. Target can be a function name, a method chain (e.g., obj.Method), or a nested expression. Arguments are marked with §A. Always emits parentheses — for property access, use bare member expressions instead.",
+      "csharpEquivalent": "target(arg1, arg2)"
     },
     "§U": {
       "name": "Using Import",

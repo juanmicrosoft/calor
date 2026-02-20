@@ -127,6 +127,69 @@ public class CodegenBug3_5_6_Tests
         Assert.True(cls.IsPartial, "IsPartial should be true");
     }
 
+    [Fact]
+    public void Bug6_Parser_StShortFormModifier_SetsIsStatic()
+    {
+        // R1: "st" short form should be recognized as "static"
+        var source = @"
+§M{m1:Test}
+§CL{c1:Helper:st}
+§/CL{c1}
+§/M{m1}
+";
+        var module = ParseModule(source);
+        var cls = Assert.Single(module.Classes);
+        Assert.True(cls.IsStatic, "IsStatic should be true for 'st' short-form modifier");
+    }
+
+    [Fact]
+    public void Bug6_ParseAndEmit_StShortForm_EmitsStaticKeyword()
+    {
+        // R1: "st" short form should emit as "static" in C#
+        var source = @"
+§M{m1:Test}
+§CL{c1:Helper:pub:st}
+§/CL{c1}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+        Assert.Contains("public static class Helper", result);
+    }
+
+    [Fact]
+    public void Bug6_Parser_StWithOtherModifiers_WorksCorrectly()
+    {
+        // R1: "st" combined with other modifiers
+        var source = @"
+§M{m1:Test}
+§CL{c1:Helper:st,partial}
+§/CL{c1}
+§/M{m1}
+";
+        var module = ParseModule(source);
+        var cls = Assert.Single(module.Classes);
+        Assert.True(cls.IsStatic, "IsStatic should be true for 'st' in comma-separated modifiers");
+        Assert.True(cls.IsPartial, "IsPartial should also be true");
+    }
+
+    [Fact]
+    public void Bug6_Parser_InvalidModifier_IsIgnoredGracefully()
+    {
+        // An unrecognized modifier like "foo" should not set any known flags
+        var source = @"
+§M{m1:Test}
+§CL{c1:Helper:foo}
+§/CL{c1}
+§/M{m1}
+";
+        var module = ParseModule(source);
+        var cls = Assert.Single(module.Classes);
+        Assert.False(cls.IsStatic, "Unknown modifier should not set IsStatic");
+        Assert.False(cls.IsAbstract, "Unknown modifier should not set IsAbstract");
+        Assert.False(cls.IsSealed, "Unknown modifier should not set IsSealed");
+        Assert.False(cls.IsPartial, "Unknown modifier should not set IsPartial");
+    }
+
     #endregion
 
     #region Bug 3: Class inheritance lost in roundtrip

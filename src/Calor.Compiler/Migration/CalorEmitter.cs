@@ -2293,4 +2293,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var args = node.Arguments.Select(a => $" §A {a.Accept(this)}").ToList();
         return $"§C {target}{string.Join("", args)} §/C";
     }
+
+    public string Visit(RawCSharpNode node)
+    {
+        return $"§RAW\n{node.CSharpCode}\n§/RAW";
+    }
 }
