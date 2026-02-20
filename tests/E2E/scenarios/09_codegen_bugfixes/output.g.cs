@@ -15,14 +15,14 @@ namespace Transliterator
 {
     public abstract class TransliteratorBase
     {
-        public abstract string Name { get; set; }
+        public abstract string Name { get; }
 
     }
 
     public class CyrillicToLatin : TransliteratorBase
     {
         private string _mappings;
-        public override string Name { get; set; }
+        public override string Name { get; }
 
         public CyrillicToLatin(string name)
         {
