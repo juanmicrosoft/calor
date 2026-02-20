@@ -3259,7 +3259,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             result = "_" + result;
         }
 
-        // Handle reserved words
+        // Handle reserved words — prefix with @ to make valid C# identifiers.
+        // Exclude this/base/null/true/false — they are C# keywords with special
+        // meaning and should not appear as user-defined identifiers.
         return result switch
         {
             "class" or "struct" or "interface" or "enum" or
@@ -3268,7 +3270,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             "int" or "string" or "bool" or "float" or "double" or
             "return" or "if" or "else" or "for" or "while" or
             "do" or "switch" or "case" or "break" or "continue" or
-            "new" or "this" or "base" or "null" or "true" or "false"
+            "new"
             => "@" + result,
             _ => result
         };
