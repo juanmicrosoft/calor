@@ -2734,6 +2734,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 sb.Append("{");
                 sb.Append(exprPart.Expression.Accept(this));
+                if (!string.IsNullOrEmpty(exprPart.AlignmentClause))
+                {
+                    sb.Append(",");
+                    sb.Append(exprPart.AlignmentClause);
+                }
+                if (!string.IsNullOrEmpty(exprPart.FormatSpecifier))
+                {
+                    sb.Append(":");
+                    sb.Append(exprPart.FormatSpecifier);
+                }
                 sb.Append("}");
             }
         }
@@ -2751,7 +2761,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(InterpolatedStringExpressionNode node)
     {
         // This is typically only called standalone, not as part of interpolation
-        return node.Expression.Accept(this);
+        var alignment = !string.IsNullOrEmpty(node.AlignmentClause) ? $",{node.AlignmentClause}" : "";
+        var format = !string.IsNullOrEmpty(node.FormatSpecifier) ? $":{node.FormatSpecifier}" : "";
+        return $"{node.Expression.Accept(this)}{alignment}{format}";
     }
 
     public string Visit(NullCoalesceNode node)

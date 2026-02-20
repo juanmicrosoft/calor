@@ -1574,6 +1574,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
             {
                 parts.Append("${");
                 parts.Append(exprPart.Expression.Accept(this));
+                if (!string.IsNullOrEmpty(exprPart.AlignmentClause))
+                {
+                    parts.Append(",");
+                    parts.Append(exprPart.AlignmentClause);
+                }
+                if (!string.IsNullOrEmpty(exprPart.FormatSpecifier))
+                {
+                    parts.Append(":");
+                    parts.Append(exprPart.FormatSpecifier);
+                }
                 parts.Append("}");
             }
         }
@@ -1589,7 +1599,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(InterpolatedStringExpressionNode node)
     {
-        return $"${{{node.Expression.Accept(this)}}}";
+        var alignment = !string.IsNullOrEmpty(node.AlignmentClause) ? $",{node.AlignmentClause}" : "";
+        var format = !string.IsNullOrEmpty(node.FormatSpecifier) ? $":{node.FormatSpecifier}" : "";
+        return $"${{{node.Expression.Accept(this)}{alignment}{format}}}";
     }
 
     public string Visit(NullCoalesceNode node)

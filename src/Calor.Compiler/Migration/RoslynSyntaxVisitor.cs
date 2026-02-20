@@ -3444,9 +3444,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     break;
 
                 case InterpolationSyntax interp:
+                    var formatSpec = interp.FormatClause?.FormatStringToken.Text;
+                    var alignmentClause = interp.AlignmentClause?.Value.ToString();
                     parts.Add(new InterpolatedStringExpressionNode(
                         GetTextSpan(interp),
-                        ConvertExpression(interp.Expression)));
+                        ConvertExpression(interp.Expression),
+                        formatSpec,
+                        alignmentClause));
                     break;
             }
         }
@@ -3805,6 +3809,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         _context.RecordUnsupportedFeature(featureName, node.ToString(), line, suggestion);
 
+        // Also populate the issues list so fallback nodes are visible in conversion results
+        if (_context.GracefulFallback)
+        {
+            _context.AddWarning(
+                $"Unsupported feature [{featureName}] replaced with fallback: {(node.ToString().Length > 80 ? node.ToString().Substring(0, 77) + "..." : node.ToString())}",
+                feature: featureName, line: line, suggestion: suggestion);
+        }
+
         return new FallbackExpressionNode(GetTextSpan(node), node.ToString(), featureName, suggestion);
     }
 
@@ -3819,6 +3831,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var suggestion = FeatureSupport.GetWorkaround(featureName);
 
         _context.RecordUnsupportedFeature(featureName, node.ToString(), line, suggestion);
+
+        // Also populate the issues list so fallback nodes are visible in conversion results
+        if (_context.GracefulFallback)
+        {
+            _context.AddWarning(
+                $"Unsupported feature [{featureName}] replaced with fallback: {(node.ToString().Length > 80 ? node.ToString().Substring(0, 77) + "..." : node.ToString())}",
+                feature: featureName, line: line, suggestion: suggestion);
+        }
 
         return new FallbackCommentNode(GetTextSpan(node), node.ToString(), featureName, suggestion);
     }

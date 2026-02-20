@@ -43,9 +43,9 @@ public static class TypeMapper
         ["double"] = "f64",
         ["Double"] = "f64",
         ["System.Double"] = "f64",
-        ["decimal"] = "decimal",
-        ["Decimal"] = "decimal",
-        ["System.Decimal"] = "decimal",
+        ["decimal"] = "dec",
+        ["Decimal"] = "dec",
+        ["System.Decimal"] = "dec",
 
         // Boolean
         ["bool"] = "bool",
@@ -141,6 +141,7 @@ public static class TypeMapper
         // Calor floating point
         ["f32"] = "float",
         ["f64"] = "double",
+        ["dec"] = "decimal",
         ["decimal"] = "decimal",
 
         // C# floating point (for backward compatibility)

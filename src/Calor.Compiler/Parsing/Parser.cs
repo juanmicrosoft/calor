@@ -5100,6 +5100,21 @@ public sealed class Parser
             }
         }
 
+        // Handle optional empty parens: §NEW{X}() — consume silently
+        if (Check(TokenKind.OpenParen))
+        {
+            var saved = _position;
+            Advance(); // consume '('
+            if (Check(TokenKind.CloseParen))
+            {
+                Advance(); // consume ')'
+            }
+            else
+            {
+                _position = saved; // not empty parens — backtrack
+            }
+        }
+
         // Parse arguments — only when not inside an argument context
         // (avoids stealing §A tokens that belong to the enclosing §C)
         var arguments = new List<ExpressionNode>();
