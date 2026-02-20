@@ -190,7 +190,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsAbstract) modifiers.Add("abs");
         if (node.IsSealed) modifiers.Add("seal");
         if (node.IsPartial) modifiers.Add("partial");
-        if (node.IsStatic) modifiers.Add("stat");
+        if (node.IsStatic) modifiers.Add("st");
         if (node.IsStruct) modifiers.Add("struct");
         if (node.IsReadOnly) modifiers.Add("readonly");
 
@@ -420,7 +420,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsOverride) modifiers.Add("over");
         if (node.IsAbstract) modifiers.Add("abs");
         if (node.IsSealed) modifiers.Add("sealed");
-        if (node.IsStatic) modifiers.Add("static");
+        if (node.IsStatic) modifiers.Add("st");
 
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
@@ -1479,21 +1479,29 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(LambdaExpressionNode node)
     {
-        var asyncPart = node.IsAsync ? "async " : "";
-        var paramList = string.Join(", ", node.Parameters.Select(p =>
-            p.TypeName != null ? $"{TypeMapper.CSharpToCalor(p.TypeName)}:{p.Name}" : p.Name));
+        // Build §LAM{id:p1:t1:p2:t2} header
+        // Format: §LAM{id[:async]:param1:type1[:param2:type2:...]}
+        var headerParts = new List<string> { node.Id };
+        if (node.IsAsync)
+        {
+            headerParts.Add("async");
+        }
+        foreach (var p in node.Parameters)
+        {
+            headerParts.Add(p.Name);
+            headerParts.Add(p.TypeName != null ? TypeMapper.CSharpToCalor(p.TypeName) : "object");
+        }
+        var header = string.Join(":", headerParts);
 
         if (node.IsExpressionLambda && node.ExpressionBody != null)
         {
             var body = node.ExpressionBody.Accept(this);
-            return $"{asyncPart}({paramList}) → {body}";
+            return $"§LAM{{{header}}} {body} §/LAM{{{node.Id}}}";
         }
         else if (node.StatementBody != null && node.StatementBody.Count > 0)
         {
-            // Emit statement lambda with block syntax
-            // Use CaptureStatementOutput to avoid appending to main builder
             var sb = new System.Text.StringBuilder();
-            sb.Append($"{asyncPart}({paramList}) → {{");
+            sb.Append($"§LAM{{{header}}}");
 
             // For short lambdas (1-2 statements), emit inline
             if (node.StatementBody.Count <= 2)
@@ -1501,7 +1509,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 var stmts = node.StatementBody.Select(s => CaptureStatementOutput(s).Trim()).ToList();
                 sb.Append(" ");
                 sb.Append(string.Join(" ", stmts));
-                sb.Append(" }");
+                sb.Append($" §/LAM{{{node.Id}}}");
             }
             else
             {
@@ -1517,14 +1525,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
                         sb.AppendLine(stmtStr.Trim());
                     }
                 }
-                sb.Append("}");
+                sb.Append($"§/LAM{{{node.Id}}}");
             }
             return sb.ToString();
         }
         else
         {
             // Empty lambda
-            return $"{asyncPart}({paramList}) → {{ }}";
+            return $"§LAM{{{header}}} §/LAM{{{node.Id}}}";
         }
     }
 

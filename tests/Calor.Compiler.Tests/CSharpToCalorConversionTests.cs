@@ -558,7 +558,7 @@ public class CSharpToCalorConversionTests
         Assert.True(cls.IsPartial);
         Assert.True(cls.IsStatic);
         Assert.Contains("partial", result.CalorSource);
-        Assert.Contains("static", result.CalorSource);
+        Assert.Contains("st", result.CalorSource);
     }
 
     #endregion
@@ -1684,6 +1684,43 @@ public class CSharpToCalorConversionTests
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
 
+    [Fact]
+    public void Convert_BareArrayInitializer_InfersElementType()
+    {
+        var csharpSource = """
+            double[] values = { 1.0, 2.5, 3.7 };
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§ARR{", result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_BareArrayInitializer_RoundtripsSuccessfully()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    int[] numbers = { 5, 4, 1, 3, 9, 8, 6, 7, 2, 0 };
+                }
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.DoesNotContain("§ERR", conversionResult.CalorSource);
+
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
     #endregion
 
     #region LINQ Method Chain Decomposition Tests
@@ -2158,6 +2195,374 @@ public class CSharpToCalorConversionTests
         var chainCount = System.Text.RegularExpressions.Regex.Matches(result.CalorSource!, "_chain").Count;
         Assert.True(chainCount >= 2, $"Expected at least 2 _chain temp binds, got {chainCount}. Calor:\n{result.CalorSource}");
         Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+    }
+
+    #endregion
+
+    #region Lambda §LAM Emission Tests
+
+    [Fact]
+    public void Convert_SingleParamExpressionLambda_EmitsLamBlock()
+    {
+        var csharpSource = """
+            var numbers = new[] { 1, 2, 3, 4, 5 };
+            var doubled = numbers.Select(x => x * 2);
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§LAM{", result.CalorSource);
+        Assert.Contains("§/LAM{", result.CalorSource);
+        // Should NOT contain arrow notation
+        Assert.DoesNotContain("→", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_MultiParamLambda_EmitsLamBlockWithAllParams()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var list = new List<int> { 3, 1, 2 };
+                    list.Sort((a, b) => a - b);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§LAM{", result.CalorSource);
+        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.DoesNotContain("→", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LambdaAsLinqArg_ParsesSuccessfully()
+    {
+        var csharpSource = """
+            var numbers = new[] { 1, 2, 3, 4, 5 };
+            var evens = numbers.Where(n => n % 2 == 0);
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+        Assert.Contains("§LAM{", conversionResult.CalorSource);
+
+        // Verify the emitted Calor re-parses
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(conversionResult.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Lambda Calor output should re-parse.\nCalor:\n{conversionResult.CalorSource}\nErrors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+    }
+
+    [Fact]
+    public void Convert_StatementBodyLambda_EmitsLamBlock()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Run()
+                {
+                    var list = new List<int> { 1, 2, 3 };
+                    list.ForEach(x =>
+                    {
+                        var doubled = x * 2;
+                        Console.WriteLine(doubled);
+                    });
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§LAM{", result.CalorSource);
+        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.DoesNotContain("→", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LambdaParamType_InferredFromSemanticModel()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            public class Test
+            {
+                public void Run()
+                {
+                    var numbers = new int[] { 1, 2, 3 };
+                    var evens = numbers.Where(n => n % 2 == 0);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Lambda parameter should be inferred as i32, not object
+        Assert.Contains(":i32}", result.CalorSource);
+        Assert.DoesNotContain(":object}", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_MultiParamLambdaType_InferredFromSemanticModel()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            public class Test
+            {
+                public void Run()
+                {
+                    var numbers = new int[] { 5, 4, 1, 3, 9 };
+                    var result = numbers.TakeWhile((n, index) => n >= index);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Both n and index should be inferred as i32
+        Assert.Contains("n:i32", result.CalorSource);
+        Assert.Contains("index:i32", result.CalorSource);
+        Assert.DoesNotContain(":object", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_LambdaHeavy_FullRoundtrip()
+    {
+        var csharpSource = """
+            public class LinqDemo
+            {
+                public void Run()
+                {
+                    var numbers = new int[] { 5, 4, 1, 3, 9, 8, 6, 7, 2, 0 };
+                    var evens = numbers.Where(n => n % 2 == 0);
+                    var sorted = evens.OrderBy(n => n);
+                    var doubled = sorted.Select(n => n * 2);
+                }
+            }
+            """;
+
+        // C# -> Calor
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+        Assert.Contains("§LAM{", conversionResult.CalorSource);
+        Assert.DoesNotContain("§ERR", conversionResult.CalorSource);
+        Assert.DoesNotContain("→", conversionResult.CalorSource);
+
+        // Calor -> C#
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Lambda roundtrip failed:\nCalor:\n{conversionResult.CalorSource}\nErrors:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+    }
+
+    [Fact]
+    public void Convert_AsyncLambda_EmitsLamBlockWithAsync()
+    {
+        var csharpSource = """
+            using System.Threading.Tasks;
+
+            public class Test
+            {
+                public void Run()
+                {
+                    Func<int, Task<int>> asyncDoubler = async x => {
+                        await Task.Delay(1);
+                        return x * 2;
+                    };
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§LAM{", result.CalorSource);
+        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("async", result.CalorSource);
+        Assert.DoesNotContain("→", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_StaticMethod_RoundtripsWithStModifier()
+    {
+        var csharpSource = """
+            public static class MathHelper
+            {
+                public static int Add(int a, int b) => a + b;
+                public static int Multiply(int a, int b) => a * b;
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+
+        // Verify :st appears for both class and methods
+        var stCount = conversionResult.CalorSource!.Split(":st").Length - 1;
+        Assert.True(stCount >= 3, $"Expected at least 3 :st occurrences (1 class + 2 methods), got {stCount}");
+
+        // Full roundtrip
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Static roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        Assert.Contains("static class", compilationResult.GeneratedCode);
+        Assert.Contains("static int Add", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
+    #region Method Modifier Abbreviation Tests
+
+    [Fact]
+    public void Parse_MethodWithVrAbbreviation_SetsVirtual()
+    {
+        var calorSource = """
+            §M{m1:TestModule}
+              §CL{c001:Base:pub}
+                §MT{m001:GetName:pub:vr}
+                  §O{str}
+                  §R "base"
+                §/MT{m001}
+              §/CL{c001}
+            §/M{m1}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var ast = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+        var method = ast.Classes[0].Methods[0];
+        Assert.True(method.IsVirtual, "Method with :vr modifier should have IsVirtual == true");
+    }
+
+    [Fact]
+    public void Parse_MethodWithOvAbbreviation_SetsOverride()
+    {
+        var calorSource = """
+            §M{m1:TestModule}
+              §CL{c001:Derived:pub}
+                §EXT{Base}
+                §MT{m001:GetName:pub:ov}
+                  §O{str}
+                  §R "derived"
+                §/MT{m001}
+              §/CL{c001}
+            §/M{m1}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var ast = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+        var method = ast.Classes[0].Methods[0];
+        Assert.True(method.IsOverride, "Method with :ov modifier should have IsOverride == true");
+    }
+
+    [Fact]
+    public void Parse_MethodWithStAbbreviation_SetsStatic()
+    {
+        var calorSource = """
+            §M{m1:TestModule}
+              §CL{c001:Utils:pub:st}
+                §MT{m001:Add:pub:st}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
+                §/MT{m001}
+              §/CL{c001}
+            §/M{m1}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var ast = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+        var method = ast.Classes[0].Methods[0];
+        Assert.True(method.IsStatic, "Method with :st modifier should have IsStatic == true");
+    }
+
+    [Fact]
+    public void Roundtrip_VirtualAndOverride_PreservesModifiers()
+    {
+        var csharpSource = """
+            public class Animal
+            {
+                public virtual string Speak() { return "..."; }
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+        // Emitter uses "virt" abbreviation for virtual
+        Assert.Contains(":virt", conversionResult.CalorSource);
+
+        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        Assert.False(compilationResult.HasErrors,
+            $"Virtual roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        Assert.Contains("virtual", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
+    #region Static Class :st Parse Tests
+
+    [Fact]
+    public void Parse_ClassWithStAbbreviation_SetsIsStaticTrue()
+    {
+        var calorSource = """
+            §M{m1:TestModule}
+              §F{main:Main:pub}
+                §O{void}
+              §/F{main}
+              §CL{c001:Foo:pub:st}
+              §/CL{c001}
+            §/M{m1}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var ast = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors: {string.Join("\n", diagnostics.Select(d => d.Message))}");
+        Assert.Single(ast.Classes);
+        Assert.True(ast.Classes[0].IsStatic, "Class with :st modifier should have IsStatic == true");
     }
 
     #endregion

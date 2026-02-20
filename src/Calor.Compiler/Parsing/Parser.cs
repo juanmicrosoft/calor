@@ -4624,14 +4624,18 @@ public sealed class Parser
             }
         }
 
-        var isAbstract = modifiers.Contains("abs", StringComparison.OrdinalIgnoreCase);
-        var isSealed = modifiers.Contains("seal", StringComparison.OrdinalIgnoreCase);
-        var isStatic = modifiers.Contains("stat", StringComparison.OrdinalIgnoreCase)
-                    || modifiers.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                        .Any(p => p.Equals("st", StringComparison.OrdinalIgnoreCase));
-        var isPartial = modifiers.Contains("partial", StringComparison.OrdinalIgnoreCase);
-        var isStruct = modifiers.Contains("struct", StringComparison.OrdinalIgnoreCase);
-        var isReadOnly = modifiers.Contains("readonly", StringComparison.OrdinalIgnoreCase);
+        // Token-based matching: split modifiers and check each token against known abbreviations
+        var modifierTokens = modifiers.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        var isAbstract = modifierTokens.Any(t => t.Equals("abs", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("abstract", StringComparison.OrdinalIgnoreCase));
+        var isSealed = modifierTokens.Any(t => t.Equals("seal", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("sealed", StringComparison.OrdinalIgnoreCase));
+        var isStatic = modifierTokens.Any(t => t.Equals("st", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("stat", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("static", StringComparison.OrdinalIgnoreCase));
+        var isPartial = modifierTokens.Any(t => t.Equals("partial", StringComparison.OrdinalIgnoreCase));
+        var isStruct = modifierTokens.Any(t => t.Equals("struct", StringComparison.OrdinalIgnoreCase));
+        var isReadOnly = modifierTokens.Any(t => t.Equals("readonly", StringComparison.OrdinalIgnoreCase));
 
         // Structs cannot be abstract
         if (isStruct && isAbstract)
@@ -5025,13 +5029,33 @@ public sealed class Parser
     private static MethodModifiers ParseMethodModifiers(string modStr)
     {
         var mods = MethodModifiers.None;
-        if (modStr.Contains("virt", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Virtual;
-        if (modStr.Contains("over", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Override;
-        if (modStr.Contains("abs", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Abstract;
-        if (modStr.Contains("seal", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Sealed;
-        if (modStr.Contains("stat", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Static;
-        if (modStr.Contains("const", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Const;
-        if (modStr.Contains("readonly", StringComparison.OrdinalIgnoreCase)) mods |= MethodModifiers.Readonly;
+        // Token-based matching: split on commas/spaces and check each token
+        var tokens = modStr.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var token in tokens)
+        {
+            if (token.Equals("vr", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("virt", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("virtual", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Virtual;
+            else if (token.Equals("ov", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("over", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("override", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Override;
+            else if (token.Equals("abs", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("abstract", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Abstract;
+            else if (token.Equals("seal", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("sealed", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Sealed;
+            else if (token.Equals("st", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("stat", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("static", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Static;
+            else if (token.Equals("const", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Const;
+            else if (token.Equals("readonly", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Readonly;
+        }
         return mods;
     }
 
