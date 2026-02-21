@@ -45,7 +45,6 @@ public class FeatureCheckCommandTests
     [Theory]
     [InlineData("goto", SupportLevel.NotSupported)]
     [InlineData("unsafe", SupportLevel.NotSupported)]
-    [InlineData("primary-constructor", SupportLevel.NotSupported)]
     [InlineData("lock-statement", SupportLevel.NotSupported)]
     [InlineData("await-foreach", SupportLevel.NotSupported)]
     [InlineData("collection-expression", SupportLevel.NotSupported)]
@@ -117,7 +116,6 @@ public class FeatureCheckCommandTests
 
     [Theory]
     [InlineData("goto")]
-    [InlineData("primary-constructor")]
     [InlineData("lock-statement")]
     [InlineData("collection-expression")]
     public void FeatureCheck_UnsupportedFeature_HasWorkaround(string feature)
