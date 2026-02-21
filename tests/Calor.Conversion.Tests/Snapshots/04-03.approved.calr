@@ -1,0 +1,31 @@
+§M{m007:Test_04_03}
+  §U{System}
+
+  §CL{c001:Shape:pub}
+    §MT{m002:Area:pub:virt}
+      §O{f64}
+      §R 0
+    §/MT{m002}
+
+  §/CL{c001}
+
+  §CL{c003:Circle:pub}
+    §EXT{Shape}
+
+    §PROP{p004:Radius:f64:pub}
+      §GET{pub}
+    §/PROP{p004}
+
+    §CTOR{ctor005:pub}
+      §I{f64:radius}
+      §ASSIGN Radius radius
+    §/CTOR{ctor005}
+
+    §MT{m006:Area:pub:over}
+      §O{f64}
+      §R (* (* Math.PI Radius) Radius)
+    §/MT{m006}
+
+  §/CL{c003}
+
+§/M{m007}

@@ -1,0 +1,16 @@
+§M{m004:Test_03_04}
+  §CL{c001:Router:pub}
+    §MT{m002:Route:pub}
+      §I{i32:code}
+      §O{str}
+      §W{match003} code
+        §K 200 → "OK"
+        §K 404 → "Not Found"
+        §K 500 → "Server Error"
+        §K _ → "Unknown"
+      §/W{match003}
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m004}

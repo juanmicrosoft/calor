@@ -1,0 +1,11 @@
+§M{m004:Test_07_02}
+  §U{System}
+
+  §CL{c001:LambdaDemo:pub}
+    §MT{m002:Test:pub}
+      §B{Func<i32, i32>:doubler} §LAM{lam003:x:i32} (* x 2) §/LAM{lam003}
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m004}

@@ -1,0 +1,18 @@
+§M{m005:Test_02_02}
+  §U{System.Collections.Generic}
+
+  §IFACE{i001:IRepository<T>}
+    §WHERE T : class
+    §MT{m002:GetById}
+      §I{i32:id}
+      §O{T}
+    §/MT{m002}
+    §MT{m003:Save}
+      §I{T:entity}
+    §/MT{m003}
+    §MT{m004:GetAll}
+      §O{Seq<T>}
+    §/MT{m004}
+  §/IFACE{i001}
+
+§/M{m005}

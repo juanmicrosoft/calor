@@ -1,0 +1,17 @@
+§M{m004:Test_03_01}
+  §CL{c001:Guard:pub}
+    §MT{m002:Classify:pub}
+      §I{i32:value}
+      §O{str}
+      §IF{if003} (> value 0)
+        §R "positive"
+      §EI (< value 0)
+        §R "negative"
+      §EL
+        §R "zero"
+      §/I{if003}
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m004}

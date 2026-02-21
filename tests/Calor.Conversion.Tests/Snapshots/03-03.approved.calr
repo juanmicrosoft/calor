@@ -1,0 +1,16 @@
+§M{m004:Test_03_03}
+  §CL{c001:Loops:pub}
+    §MT{m002:CountDown:pub}
+      §I{i32:start}
+      §O{i32}
+      §B{~count:i32} 0
+      §WH{while003} (> start 0)
+        §ASSIGN start (- start 1)
+        §ASSIGN count (+ count 1)
+      §/WH{while003}
+      §R count
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m004}

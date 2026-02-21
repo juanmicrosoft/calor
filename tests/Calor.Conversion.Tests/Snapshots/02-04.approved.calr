@@ -1,0 +1,8 @@
+§M{m002:Test_02_04}
+  §EN{e001:HttpStatus}
+    Ok = 200
+    NotFound = 404
+    ServerError = 500
+  §/EN{e001}
+
+§/M{m002}

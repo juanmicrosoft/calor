@@ -1,0 +1,14 @@
+§M{m005:Test_04_04}
+  §IFACE{i001:IProducer<out T>}
+    §MT{m002:Produce}
+      §O{T}
+    §/MT{m002}
+  §/IFACE{i001}
+
+  §IFACE{i003:IConsumer<in T>}
+    §MT{m004:Consume}
+      §I{T:item}
+    §/MT{m004}
+  §/IFACE{i003}
+
+§/M{m005}

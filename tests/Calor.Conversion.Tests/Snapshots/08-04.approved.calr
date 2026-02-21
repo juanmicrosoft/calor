@@ -1,0 +1,11 @@
+§M{m003:Test_08_04}
+  §CL{c001:NullDemo:pub}
+    §MT{m002:GetValue:pub}
+      §I{?str:input}
+      §O{str}
+      §R (? (== input null) "default" input)
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m003}

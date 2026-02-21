@@ -1,0 +1,8 @@
+§M{m003:Test_02_01}
+  §IFACE{i001:IAnimal}
+    §MT{m002:Speak}
+      §O{str}
+    §/MT{m002}
+  §/IFACE{i001}
+
+§/M{m003}

@@ -1,0 +1,10 @@
+§M{m003:Test_08_02}
+  §CL{c001:TupleDemo:pub}
+    §MT{m002:GetPair:pub}
+      §O{(int, string)}
+      §R (42, "hello")
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m003}

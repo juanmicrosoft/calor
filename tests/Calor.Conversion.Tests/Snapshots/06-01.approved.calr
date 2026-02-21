@@ -1,0 +1,16 @@
+§M{m004:Test_06_01}
+  §CL{c001:Grader:pub}
+    §MT{m002:GetGrade:pub}
+      §I{i32:score}
+      §O{str}
+      §W{match003:expr} score
+        §K §PREL{gte} 90 → "A"
+        §K §PREL{gte} 80 → "B"
+        §K §PREL{gte} 70 → "C"
+        §K _ → "F"
+      §/W{match003}
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m004}

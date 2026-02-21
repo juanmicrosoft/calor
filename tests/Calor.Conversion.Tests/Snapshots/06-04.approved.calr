@@ -1,0 +1,14 @@
+§M{m004:Test_06_04}
+  §CL{c001:Combinators:pub}
+    §MT{m002:Check:pub}
+      §I{any:obj}
+      §O{str}
+      §IF{if003} (!= obj null)
+        §R "has value"
+      §/I{if003}
+      §R "null"
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m004}

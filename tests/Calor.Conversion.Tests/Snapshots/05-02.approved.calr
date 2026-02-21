@@ -1,0 +1,15 @@
+§M{m005:Test_05_02}
+  §U{System.Linq}
+  §U{System.Collections.Generic}
+
+  §CL{c001:Filter:pub}
+    §MT{m002:GetPositive:pub}
+      §I{List<i32>:items}
+      §O{List<i32>}
+      §B{_chain004} §C{items.Where} §A §LAM{lam003:x:i32} (> x 0) §/LAM{lam003} §/C
+      §R §C{_chain004.ToList} §/C
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m005}

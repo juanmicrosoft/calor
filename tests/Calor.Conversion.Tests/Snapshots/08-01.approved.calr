@@ -1,0 +1,18 @@
+§M{m005:Test_08_01}
+  §CL{c001:UserDto:pub}
+    §PROP{p002:Name:str:pub:req}
+      §GET{pub}
+      §SET{pub}
+    §/PROP{p002}
+    §PROP{p003:Age:i32:pub:req}
+      §GET{pub}
+      §SET{pub}
+    §/PROP{p003}
+    §PROP{p004:Email:?str:pub}
+      §GET{pub}
+      §SET{pub}
+    §/PROP{p004}
+
+  §/CL{c001}
+
+§/M{m005}

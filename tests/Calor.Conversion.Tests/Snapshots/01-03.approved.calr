@@ -1,0 +1,20 @@
+§M{m004:Test_01_03}
+  §CL{c001:Account:pub}
+    §FLD{str:_id:priv:readonly}
+    §FLD{dec:_balance:priv}
+
+    §CTOR{ctor002:pub}
+      §I{str:id}
+      §I{dec:initialBalance}
+      §ASSIGN _id id
+      §ASSIGN _balance initialBalance
+    §/CTOR{ctor002}
+
+    §MT{m003:GetBalance:pub}
+      §O{dec}
+      §R _balance
+    §/MT{m003}
+
+  §/CL{c001}
+
+§/M{m004}

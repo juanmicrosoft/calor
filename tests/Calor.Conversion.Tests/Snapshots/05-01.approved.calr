@@ -1,0 +1,13 @@
+§M{m003:Test_05_01}
+  §U{System.Threading.Tasks}
+
+  §CL{c001:DataService:pub}
+    §AMT{m002:FetchDataAsync:pub}
+      §O{str}
+      §B{_} §AWAIT §C{Task.Delay} §A 100 §/C
+      §R "data"
+    §/AMT{m002}
+
+  §/CL{c001}
+
+§/M{m003}

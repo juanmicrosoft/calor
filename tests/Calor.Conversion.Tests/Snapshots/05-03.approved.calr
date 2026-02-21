@@ -1,0 +1,17 @@
+§M{m009:Test_05_03}
+  §U{System.Linq}
+  §U{System.Collections.Generic}
+
+  §CL{c001:Transform:pub}
+    §MT{m002:GetNames:pub}
+      §I{List<str>:items}
+      §O{List<str>}
+      §B{_chain006} §C{items.Where} §A §LAM{lam005:s:str} (> (len s) 0) §/LAM{lam005} §/C
+      §B{_chain007} §C{_chain006.Select} §A §LAM{lam004:s:str} (upper s) §/LAM{lam004} §/C
+      §B{_chain008} §C{_chain007.OrderBy} §A §LAM{lam003:s:str} s §/LAM{lam003} §/C
+      §R §C{_chain008.ToList} §/C
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m009}

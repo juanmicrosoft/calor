@@ -1,0 +1,17 @@
+§M{m004:Test_04_01}
+  §CL{c001:Box<T>:pub}
+    §WHERE T : notnull
+
+    §PROP{p002:Value:T:pub}
+      §GET{pub}
+      §SET{pub}
+    §/PROP{p002}
+
+    §CTOR{ctor003:pub}
+      §I{T:value}
+      §ASSIGN Value value
+    §/CTOR{ctor003}
+
+  §/CL{c001}
+
+§/M{m004}

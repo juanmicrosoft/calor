@@ -1,0 +1,17 @@
+§M{m005:Test_08_03}
+  §U{System.Collections.Generic}
+
+  §CL{c001:Container:pub}
+    §LIST{list002:any}
+    §/LIST{list002}
+    §PROP{p004:Items:List<str>:pub}
+      §GET{pub}
+      §SET{pub}
+      §LIST{list002:any}
+      §/LIST{list002}
+      = 
+    §/PROP{p004}
+
+  §/CL{c001}
+
+§/M{m005}
