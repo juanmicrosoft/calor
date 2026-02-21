@@ -668,4 +668,27 @@ public class Example
     }
 
     #endregion
+
+    #region Issue 365: ValueTask<T> silently downgraded to Task<T>
+
+    [Fact]
+    public void Convert_ValueTaskReturnType_PreservesValueTask()
+    {
+        var csharp = @"
+using System.Threading.Tasks;
+class Test
+{
+    async ValueTask<int> GetValue()
+    {
+        return 42;
+    }
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        // Should preserve ValueTask, not downgrade to Task
+        Assert.DoesNotContain("Task<i32>", calor);
+    }
+
+    #endregion
 }
