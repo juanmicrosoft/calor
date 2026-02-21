@@ -467,4 +467,45 @@ public class EffectEnforcementTests
         Assert.False(result.HasErrors,
             $"§HAS inside (&&) should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
+
+    [Fact]
+    public void IdxInsideLispAdd_CompilesSuccessfully()
+    {
+        // §IDX should be usable inside lisp expressions: (+ sum §IDX arr i)
+        var source = @"
+§M{m001:Test}
+§F{f001:SumFirst:pub}
+  §I{[i32]:arr}
+  §O{i32}
+  §B{val} §IDX arr 0
+  §R (+ val §IDX arr 1)
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"§IDX inside (+ ...) should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        Assert.Contains("arr[1]", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void CntInsideLispComparison_CompilesSuccessfully()
+    {
+        // §CNT should be usable inside lisp expressions: (> §CNT{list} 0)
+        var source = @"
+§M{m001:Test}
+§F{f001:HasItems:pub}
+  §I{List<i32>:items}
+  §O{bool}
+  §R (> §CNT{items} 0)
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"§CNT inside (> ...) should compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        Assert.Contains("items.Count", result.GeneratedCode);
+    }
 }
