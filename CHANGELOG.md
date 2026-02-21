@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-02-21
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.18x (Calor leads)
+- **Metrics**: Calor wins 6, C# wins 2
+- **Highlights**:
+  - Comprehension: 1.55x (Calor wins, large effect)
+  - EditPrecision: 1.37x (Calor wins, large effect)
+  - RefactoringStability: 1.37x (Calor wins, large effect)
+  - ErrorDetection: 1.24x (Calor wins, large effect)
+- **Programs Tested**: 40
+
+### Added
+- **C# to Calor Conversion Campaign** — Converted 30 C# sample projects, producing 54 recommendations and 18 merged fixes
+- **Cross-class method call effect inference** — Dotted call targets like `_calculator.Add` now resolve to internal functions for effect propagation, with name collision detection via multi-map
+- **Local function support in converter** — C# local functions are hoisted to module-level `§F` functions during conversion
+- **`§HAS`/`§IDX`/`§CNT`/`§LEN` inside lisp expressions** — Collection operations can now appear as arguments in prefix expressions like `(+ val §IDX arr 1)`
+- **LINQ extension method effect recognition** — Common LINQ methods (Where, Select, OrderBy, ToList, etc.) recognized as pure in effect system
+- **Async I/O and Math functions in effect catalog** — `TextWriter.WriteLineAsync`, `StreamReader.ReadLineAsync`, `Math.Floor/Clamp/Sin/Round/Log` added to known effects
+- **`§PROP` inside `§IFACE`** — Interface properties now emit correctly instead of being treated as methods
+- **Tuple deconstruction conversion** — `(_a, _b) = (x, y)` converts to individual `§ASSIGN` statements
+- **Line comment and char literal support in lexer** — `//` comments and single-quoted char literals no longer crash the lexer
+
+### Fixed
+- **Emitter**: `default:` instead of `case _:` for wildcard switch, read-only properties emit `{ get; }`, `@` prefix removed from `this`/`base`/keywords, namespace dots preserved in type names, decimal type bind attribute parsing
+- **Converter**: `nameof()` → string literal, `string.Empty` → `""`, postfix/prefix increment → `§ASSIGN (+ var 1)`, `§MT` instead of `§SIG` for interface methods, `§FLD` instead of `§DICT`/`§LIST` for collection fields, `@`-prefixed C# identifiers stripped
+
 ## [0.2.7] - 2026-02-19
 
 ### Benchmark Results (Statistical: 30 runs)

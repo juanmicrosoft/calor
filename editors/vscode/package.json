@@ -2,7 +2,7 @@
   "name": "calor",
   "displayName": "Calor Language",
   "description": "Language support for the Calor programming language",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "publisher": "calor-dev",
   "license": "Apache-2.0",
   "icon": "icons/calor-icon.png",
