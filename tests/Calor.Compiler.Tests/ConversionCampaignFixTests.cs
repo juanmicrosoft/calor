@@ -1976,4 +1976,130 @@ public partial class MyClass
     }
 
     #endregion
+
+    #region Batch 12: Chain hoisting and §NEW in call arguments
+
+    [Fact]
+    public void Convert_ChainInIfCondition_HoistedBeforeIf()
+    {
+        var csharp = @"
+using System.Linq;
+using System.Collections.Generic;
+
+public class Demo
+{
+    public void Work(List<int> items)
+    {
+        if (items.Where(x => x > 0).Any())
+        {
+            System.Console.WriteLine(""Found"");
+        }
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // The chain binding should be on its own line BEFORE the §IF
+        // and the §IF condition should reference the bound variable
+        var lines = calor.Split('\n');
+        var chainLine = lines.FirstOrDefault(l => l.Contains("_chain") && (l.TrimStart().StartsWith("§B") || l.Contains("Where")));
+        var ifLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("§IF"));
+
+        // Both should exist — if chain decomposition worked, there's a §B{_chainXXX} line
+        Assert.True(chainLine != null, $"Expected chain binding before §IF. Output:\n{calor}");
+        Assert.NotNull(ifLine);
+
+        // Chain line should come before IF line
+        var chainIdx = Array.IndexOf(lines, chainLine);
+        var ifIdx = Array.IndexOf(lines, ifLine);
+        Assert.True(chainIdx < ifIdx, $"Chain binding (line {chainIdx}) should come before §IF (line {ifIdx}). Output:\n{calor}");
+    }
+
+    [Fact]
+    public void Convert_ChainInIfCondition_RoundTrip()
+    {
+        var csharp = @"
+using System.Linq;
+using System.Collections.Generic;
+
+public class Demo
+{
+    public bool Work(List<int> items)
+    {
+        if (items.Where(x => x > 0).Any())
+        {
+            return true;
+        }
+        return false;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should compile without errors
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        // The compiled C# should still have the chain structure
+        Assert.Contains("Where", compiled);
+        Assert.Contains("Any", compiled);
+    }
+
+    [Fact]
+    public void Convert_NewInCallArgument_HoistedToTempBinding()
+    {
+        var csharp = @"
+public class Args { public Args(string ctx) { } }
+
+public class Demo
+{
+    public void Process(Args args) { }
+
+    public void Work(string ctx)
+    {
+        Process(new Args(ctx));
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // The §NEW should be hoisted to a temp binding, not inlined in §C
+        Assert.Contains("_new", calor);
+        Assert.Contains("§NEW", calor);
+
+        // Compile round-trip
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        Assert.Contains("new Args", compiled);
+        Assert.Contains("Process", compiled);
+    }
+
+    [Fact]
+    public void Convert_IsPatternInIfCondition_BindingStaysInThenBody()
+    {
+        var csharp = @"
+public class Demo
+{
+    public void Work(object obj)
+    {
+        if (obj is string s)
+        {
+            System.Console.WriteLine(s);
+        }
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Compile round-trip
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        // The pattern variable 's' should be available inside the if body
+        Assert.Contains("string", compiled);
+    }
+
+    #endregion
 }

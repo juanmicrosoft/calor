@@ -1576,6 +1576,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var args = invocation.ArgumentList.Arguments
                 .Select(a => ConvertExpression(a.Expression))
                 .ToList();
+
+            // Hoist §NEW arguments to temp bindings — the parser cannot handle §NEW nested inside §C
+            for (int i = 0; i < args.Count; i++)
+            {
+                if (args[i] is NewExpressionNode)
+                {
+                    var tempName = _context.GenerateId("_new");
+                    _pendingStatements.Add(new BindStatementNode(
+                        args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                    args[i] = new ReferenceNode(args[i].Span, tempName);
+                }
+            }
+
             var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
             var stmtArgNames = hasNamedArgs
                 ? invocation.ArgumentList.Arguments
@@ -2021,12 +2034,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("if");
         var condition = ConvertExpression(node.Condition);
 
-        // Collect any pending statements from declaration pattern variable bindings
-        // These need to be injected at the START of the then-body, not before the if
+        // Separate pending statements into two categories:
+        // 1. Chain bindings (_chain*, _cast*) → must go BEFORE the if (condition depends on them)
+        // 2. Pattern variable bindings (from `is` patterns) → go inside then-body
         var patternBindings = new List<StatementNode>();
+        var chainBindings = new List<StatementNode>();
         if (_pendingStatements.Count > 0)
         {
-            patternBindings.AddRange(_pendingStatements);
+            foreach (var stmt in _pendingStatements)
+            {
+                if (stmt is BindStatementNode bind && (bind.Name.StartsWith("_chain") || bind.Name.StartsWith("_cast") || bind.Name.StartsWith("_pre")))
+                    chainBindings.Add(stmt);
+                else
+                    patternBindings.Add(stmt);
+            }
             _pendingStatements.Clear();
         }
 
@@ -2070,6 +2091,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 currentElse = null;
             }
         }
+
+        // Restore chain bindings to _pendingStatements AFTER all body conversions
+        // (body ConvertBlock calls clear _pendingStatements, so we must restore last)
+        // ConvertBlock's FlushPendingStatements will emit these before the if statement
+        _pendingStatements.AddRange(chainBindings);
 
         return new IfStatementNode(
             GetTextSpan(node),
@@ -3044,6 +3070,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var args = invocation.ArgumentList.Arguments
             .Select(a => ConvertExpression(a.Expression))
             .ToList();
+
+        // Hoist §NEW arguments to temp bindings — the parser cannot handle §NEW nested inside §C
+        for (int i = 0; i < args.Count; i++)
+        {
+            if (args[i] is NewExpressionNode)
+            {
+                var tempName = _context.GenerateId("_new");
+                _pendingStatements.Add(new BindStatementNode(
+                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                args[i] = new ReferenceNode(args[i].Span, tempName);
+            }
+        }
+
         var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
         var argNames = hasNamedArgs
             ? invocation.ArgumentList.Arguments
