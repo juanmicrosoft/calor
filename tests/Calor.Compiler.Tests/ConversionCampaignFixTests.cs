@@ -109,6 +109,21 @@ public class ConversionCampaignFixTests
 §PROP{p001:Name:str:pub}
 §GET §/GET
 §/PROP{p001}
+    #endregion
+
+    #region Issue 291: Remove @ prefix from this and double/float keywords
+
+    [Fact]
+    public void Emit_ThisMemberAccess_NoAtPrefix()
+    {
+        var source = @"
+§M{m001:Test}
+§CL{c001:Account:pub}
+§FLD{str:_name:priv}
+§MT{m001:SetName:pub}
+§I{str:name}
+§ASSIGN this._name name
+§/MT{m001}
 §/CL{c001}
 §/M{m001}
 ";
@@ -127,11 +142,28 @@ public class ConversionCampaignFixTests
 §GET §/GET
 §SET §/SET
 §/PROP{p001}
+        Assert.Contains("this._name", csharp);
+        Assert.DoesNotContain("@this", csharp);
+    }
+
+    [Fact]
+    public void Emit_ThisInConstructor_NoAtPrefix()
+    {
+        var source = @"
+§M{m001:Test}
+§CL{c001:Account:pub}
+§FLD{str:_id:priv}
+§CTOR{ctor1:pub}
+§I{str:id}
+§ASSIGN this._id id
+§/CTOR{ctor1}
 §/CL{c001}
 §/M{m001}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("get; set;", csharp);
+        Assert.Contains("this._id", csharp);
+        Assert.DoesNotContain("@this", csharp);
     }
 
     #endregion
