@@ -192,7 +192,7 @@ public class ConverterImprovementTests
         // First statement should be a bind statement with a NewExpressionNode
         var bindStmt = Assert.IsType<BindStatementNode>(method.Body[0]);
         var newExpr = Assert.IsType<NewExpressionNode>(bindStmt.Initializer);
-        Assert.Equal("object", newExpr.TypeName);
+        Assert.Equal("List<i32>", newExpr.TypeName); // Type inferred from declaration
         Assert.Single(newExpr.Arguments);
     }
 
@@ -414,7 +414,7 @@ public class ConverterImprovementTests
         var method = Assert.Single(service.Methods);
         var bindStmt = Assert.IsType<BindStatementNode>(method.Body[0]);
         var newExpr = Assert.IsType<NewExpressionNode>(bindStmt.Initializer);
-        Assert.Equal("object", newExpr.TypeName);
+        Assert.Equal("Options", newExpr.TypeName); // Type inferred from declaration
         Assert.Single(newExpr.Arguments);
         Assert.Single(newExpr.Initializers);
         Assert.Equal("Verbose", newExpr.Initializers[0].PropertyName);
