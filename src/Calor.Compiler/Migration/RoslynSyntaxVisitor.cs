@@ -626,7 +626,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _reassignedVariables = CollectReassignedVariables(node);
 
         var id = _context.GenerateId("m");
-        var name = node.Identifier.Text;
+        // Preserve explicit interface qualifier (e.g., IDisposable.Dispose)
+        var name = node.ExplicitInterfaceSpecifier != null
+            ? $"{node.ExplicitInterfaceSpecifier.Name}.{node.Identifier.Text}"
+            : node.Identifier.Text;
         var visibility = GetVisibility(node.Modifiers);
         var modifiers = GetMethodModifiers(node.Modifiers);
         var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
@@ -2782,15 +2785,34 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
+        // Try to infer the target type from the surrounding syntax context
+        var inferredType = InferTargetType(implicitNew);
+
         // Convert target-typed new: new() or new(args)
-        // Use "default" for parameterless, otherwise emit NewExpressionNode with "object" placeholder
         if (implicitNew.ArgumentList == null || implicitNew.ArgumentList.Arguments.Count == 0)
         {
+            if (inferredType != null)
+            {
+                _context.RecordFeatureUsage("target-typed-new");
+                _context.IncrementConverted();
+                var inits = new List<ObjectInitializerAssignment>();
+                if (implicitNew.Initializer != null)
+                {
+                    foreach (var expr in implicitNew.Initializer.Expressions)
+                    {
+                        if (expr is AssignmentExpressionSyntax assignment)
+                            inits.Add(new ObjectInitializerAssignment(
+                                assignment.Left.ToString(), ConvertExpression(assignment.Right)));
+                    }
+                }
+                return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits);
+            }
             return new ReferenceNode(GetTextSpan(implicitNew), "default");
         }
 
         _context.RecordFeatureUsage("target-typed-new");
         _context.IncrementConverted();
+        var typeName = inferredType ?? "object";
         var args = implicitNew.ArgumentList.Arguments
             .Select(a => ConvertExpression(a.Expression)).ToList();
         var initializers = new List<ObjectInitializerAssignment>();
@@ -2803,7 +2825,48 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         assignment.Left.ToString(), ConvertExpression(assignment.Right)));
             }
         }
-        return new NewExpressionNode(GetTextSpan(implicitNew), "object", new List<string>(), args, initializers);
+        return new NewExpressionNode(GetTextSpan(implicitNew), typeName, new List<string>(), args, initializers);
+    }
+
+    /// <summary>
+    /// Tries to infer the target type for a target-typed new() expression
+    /// by walking up the syntax tree to the declaring context.
+    /// </summary>
+    private string? InferTargetType(ImplicitObjectCreationExpressionSyntax implicitNew)
+    {
+        var parent = implicitNew.Parent;
+
+        // Case 1: Variable declaration: Type x = new();
+        if (parent is EqualsValueClauseSyntax equalsValue)
+        {
+            if (equalsValue.Parent is VariableDeclaratorSyntax declarator
+                && declarator.Parent is VariableDeclarationSyntax declaration
+                && !declaration.Type.IsVar)
+            {
+                return TypeMapper.CSharpToCalor(declaration.Type.ToString());
+            }
+            // Property initializer: Type Prop { get; } = new();
+            if (equalsValue.Parent is PropertyDeclarationSyntax property)
+            {
+                return TypeMapper.CSharpToCalor(property.Type.ToString());
+            }
+        }
+
+        // Case 2: Assignment: x = new();
+        if (parent is AssignmentExpressionSyntax)
+        {
+            // Can't infer type from assignment without semantic model
+            return null;
+        }
+
+        // Case 3: Return statement in method — use method return type
+        if (parent is ReturnStatementSyntax || parent is ArrowExpressionClauseSyntax)
+        {
+            // Would need method context; skip for now
+            return null;
+        }
+
+        return null;
     }
 
     private ExpressionNode ConvertThrowExpression(ThrowExpressionSyntax throwExpr)
@@ -2865,14 +2928,32 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return operand;
         }
 
-        // Convert postfix ++ and -- to UnaryOperationNode
+        // Convert postfix ++ and -- when used as sub-expressions:
+        // Hoist the increment to a pending statement and return the pre-increment value
         if (postfix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken))
         {
-            return new UnaryOperationNode(GetTextSpan(postfix), UnaryOperator.PostIncrement, operand);
+            // Save original value, then increment via pending statement
+            var tempName = _context.GenerateId("_pre");
+            _pendingStatements.Add(new BindStatementNode(
+                GetTextSpan(postfix), tempName, null, false, operand, new AttributeCollection()));
+            _pendingStatements.Add(new AssignmentStatementNode(
+                GetTextSpan(postfix), operand,
+                new BinaryOperationNode(GetTextSpan(postfix), BinaryOperator.Add,
+                    new ReferenceNode(GetTextSpan(postfix), tempName),
+                    new IntLiteralNode(GetTextSpan(postfix), 1))));
+            return new ReferenceNode(GetTextSpan(postfix), tempName);
         }
         if (postfix.OperatorToken.IsKind(SyntaxKind.MinusMinusToken))
         {
-            return new UnaryOperationNode(GetTextSpan(postfix), UnaryOperator.PostDecrement, operand);
+            var tempName = _context.GenerateId("_pre");
+            _pendingStatements.Add(new BindStatementNode(
+                GetTextSpan(postfix), tempName, null, false, operand, new AttributeCollection()));
+            _pendingStatements.Add(new AssignmentStatementNode(
+                GetTextSpan(postfix), operand,
+                new BinaryOperationNode(GetTextSpan(postfix), BinaryOperator.Subtract,
+                    new ReferenceNode(GetTextSpan(postfix), tempName),
+                    new IntLiteralNode(GetTextSpan(postfix), 1))));
+            return new ReferenceNode(GetTextSpan(postfix), tempName);
         }
 
         // For other postfix operators, use fallback
@@ -2919,6 +3000,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 _context.RecordFeatureUsage("native-stringbuilder-op");
                 return sbOp2;
+            }
+
+            // Handle cast-then-call pattern: ((SomeType)expr).Method()
+            // Hoist the cast to a temp bind so the method call has a clean target.
+            if (memberAccess.Expression is CastExpressionSyntax castExpr
+                || (memberAccess.Expression is ParenthesizedExpressionSyntax parenExpr
+                    && parenExpr.Expression is CastExpressionSyntax))
+            {
+                var castConverted = targetExpr; // already converted via ConvertExpression above
+                var tempName = _context.GenerateId("_cast");
+                _pendingStatements.Add(new BindStatementNode(
+                    span, tempName, null, false, castConverted, new AttributeCollection()));
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
             }
 
             // Handle chained method calls (e.g., products.GroupBy(...).Select(...))

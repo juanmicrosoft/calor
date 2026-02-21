@@ -1321,4 +1321,94 @@ public class Logger
     }
 
     #endregion
+
+    #region Batch 6 — Explicit Interface, Postfix Sub-Expr, Target-Typed New, Cast-Then-Call
+
+    [Fact]
+    public void Convert_ExplicitInterfaceImplementation_PreservesQualifier()
+    {
+        var csharp = @"
+using System;
+public class MyResource : IDisposable
+{
+    void IDisposable.Dispose()
+    {
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should preserve the interface qualifier
+        Assert.Contains("IDisposable.Dispose", calor);
+    }
+
+    [Fact]
+    public void Convert_PostfixIncrementSubExpression_NoERR()
+    {
+        var csharp = @"
+public class Example
+{
+    public int Test()
+    {
+        int i = 0;
+        int x = i++;
+        return x;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should not contain ERR
+        Assert.DoesNotContain("ERR", calor);
+        // Should have both i and x
+        Assert.Contains("§B", calor);
+    }
+
+    [Fact]
+    public void Convert_TargetTypedNew_InfersTypeFromDeclaration()
+    {
+        var csharp = @"
+using System.Collections.Generic;
+public class Example
+{
+    public void Test()
+    {
+        List<string> items = new();
+        Dictionary<string, int> map = new();
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should infer List type, not emit "default"
+        Assert.Contains("§NEW", calor);
+        Assert.DoesNotContain("default", calor);
+    }
+
+    [Fact]
+    public void Convert_CastThenCall_HoistsToTemp()
+    {
+        var csharp = @"
+using System;
+public class Example
+{
+    public string Test(object obj)
+    {
+        return ((IFormattable)obj).ToString(""N"", null);
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should not contain ERR
+        Assert.DoesNotContain("ERR", calor);
+        // Should have a temp bind for the cast
+        Assert.Contains("_cast", calor);
+    }
+
+    #endregion
 }
