@@ -668,4 +668,43 @@ public class Example
     }
 
     #endregion
+
+    #region Issue 374: int.MaxValue / primitive type static members
+
+    [Fact]
+    public void Convert_IntMaxValue_EmitsLiteral()
+    {
+        var csharp = @"
+class Test
+{
+    int GetMax()
+    {
+        return int.MaxValue;
+    }
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        Assert.DoesNotContain("§ERR", calor);
+        Assert.Contains("2147483647", calor);
+    }
+
+    [Fact]
+    public void Convert_StringEmpty_NoError()
+    {
+        var csharp = @"
+class Test
+{
+    string GetEmpty()
+    {
+        return string.Empty;
+    }
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        Assert.DoesNotContain("§ERR", calor);
+    }
+
+    #endregion
 }

@@ -2408,6 +2408,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
             QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
             InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
+            // Predefined types as expressions (string.Empty, int.MaxValue, etc.)
+            PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -2966,6 +2968,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 return new StringLiteralNode(span, "");
             }
+        }
+
+        // Convert primitive type static constants (int.MaxValue, int.MinValue, etc.)
+        if (memberName is "MaxValue" or "MinValue")
+        {
+            var targetStr = memberAccess.Expression.ToString();
+            var constVal = (targetStr, memberName) switch
+            {
+                ("int" or "Int32", "MaxValue") => (ExpressionNode?)new IntLiteralNode(span, int.MaxValue),
+                ("int" or "Int32", "MinValue") => new IntLiteralNode(span, int.MinValue),
+                ("long" or "Int64", "MaxValue") => new ReferenceNode(span, "long.MaxValue"), // pass through — Calor int can't hold this
+                ("byte" or "Byte", "MaxValue") => new IntLiteralNode(span, byte.MaxValue),
+                ("byte" or "Byte", "MinValue") => new IntLiteralNode(span, byte.MinValue),
+                ("short" or "Int16", "MaxValue") => new IntLiteralNode(span, short.MaxValue),
+                ("short" or "Int16", "MinValue") => new IntLiteralNode(span, short.MinValue),
+                _ => null
+            };
+            if (constVal != null) return constVal;
         }
 
         // Convert string.Length to native string operation
