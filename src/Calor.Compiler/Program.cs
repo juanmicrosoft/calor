@@ -51,6 +51,11 @@ public class Program
             description: "Promote unknown external call warnings (Calor0411) to errors",
             getDefaultValue: () => false);
 
+        var permissiveEffectsOption = new Option<bool>(
+            aliases: ["--permissive-effects"],
+            description: "Permissive effect mode: unknown calls assumed pure, forbidden effects demoted to warnings. Designed for converted code.",
+            getDefaultValue: () => false);
+
         var contractModeOption = new Option<string>(
             aliases: ["--contract-mode"],
             description: "Contract enforcement mode: off, debug, or release (default: debug)",
@@ -98,6 +103,7 @@ public class Program
             requireDocsOption,
             enforceEffectsOption,
             strictEffectsOption,
+            permissiveEffectsOption,
             contractModeOption,
             verifyOption,
             noCacheOption,
@@ -128,6 +134,7 @@ public class Program
             var requireDocs = ctx.ParseResult.GetValueForOption(requireDocsOption);
             var enforceEffects = ctx.ParseResult.GetValueForOption(enforceEffectsOption);
             var strictEffects = ctx.ParseResult.GetValueForOption(strictEffectsOption);
+            var permissiveEffects = ctx.ParseResult.GetValueForOption(permissiveEffectsOption);
             var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
             var verify = ctx.ParseResult.GetValueForOption(verifyOption);
             var noCache = ctx.ParseResult.GetValueForOption(noCacheOption);
@@ -141,6 +148,7 @@ public class Program
                 ["requireDocs"] = requireDocs.ToString(),
                 ["enforceEffects"] = enforceEffects.ToString(),
                 ["strictEffects"] = strictEffects.ToString(),
+                ["permissiveEffects"] = permissiveEffects.ToString(),
                 ["contractMode"] = contractMode,
                 ["verify"] = verify.ToString(),
                 ["noCache"] = noCache.ToString(),
@@ -150,7 +158,7 @@ public class Program
 
             try
             {
-                await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze);
+                await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze);
             }
             catch (Exception ex)
             {
@@ -210,7 +218,7 @@ public class Program
         return result;
     }
 
-    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze)
+    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze)
     {
         try
         {
@@ -235,6 +243,7 @@ public class Program
                 Console.WriteLine("  --require-docs    Require documentation on public functions");
                 Console.WriteLine("  --enforce-effects Enforce effect declarations (default: true)");
                 Console.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
+                Console.WriteLine("  --permissive-effects  Permissive mode for converted code (suppress effect errors)");
                 Console.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
                 Console.WriteLine("  --verify          Enable static contract verification with Z3");
                 Console.WriteLine("  --verification-timeout  Z3 solver timeout per contract in ms (default: 5000)");
@@ -278,6 +287,7 @@ public class Program
                 RequireDocs = requireDocs,
                 EnforceEffects = enforceEffects,
                 StrictEffects = strictEffects,
+                UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
                 ContractMode = parsedContractMode,
                 VerifyContracts = verify,
                 ProjectDirectory = Path.GetDirectoryName(input.FullName),

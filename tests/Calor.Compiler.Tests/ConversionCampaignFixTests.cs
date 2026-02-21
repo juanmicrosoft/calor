@@ -2382,4 +2382,108 @@ public class Demo
     }
 
     #endregion
+
+    #region Issue 340: Permissive effect inference mode
+
+    [Fact]
+    public void PermissiveMode_UnknownCall_NoDiagnostics()
+    {
+        // In permissive mode, unknown external calls should not produce Calor0411
+        var source = @"
+§M{m001:TestModule}
+§F{f001:doStuff}
+  §O{void}
+  §C{SomeUnknown.ExternalMethod} §/C
+§/F{f001}
+§/M{m001}";
+
+        var ast = ParseCalor(source);
+        var diag = new DiagnosticBag();
+        var pass = new EffectEnforcementPass(diag, policy: UnknownCallPolicy.Permissive);
+        pass.Enforce(ast);
+
+        var unknownCallErrors = diag.Errors.Where(d =>
+            d.Code == DiagnosticCode.UnknownExternalCall).ToList();
+        var unknownCallWarnings = diag.Warnings.Where(d =>
+            d.Code == DiagnosticCode.UnknownExternalCall).ToList();
+        Assert.Empty(unknownCallErrors);
+        Assert.Empty(unknownCallWarnings);
+    }
+
+    [Fact]
+    public void PermissiveMode_ForbiddenEffect_DemotedToWarning()
+    {
+        // In permissive mode, Calor0410 (forbidden effect) should be a warning, not an error
+        var source = @"
+§M{m001:TestModule}
+§F{f001:greet}
+  §O{void}
+  §P ""hello""
+§/F{f001}
+§/M{m001}";
+
+        var ast = ParseCalor(source);
+        var diag = new DiagnosticBag();
+        var pass = new EffectEnforcementPass(diag, policy: UnknownCallPolicy.Permissive);
+        pass.Enforce(ast);
+
+        // Should not have errors (demoted to warnings)
+        var errors = diag.Errors.Where(d =>
+            d.Code == DiagnosticCode.ForbiddenEffect).ToList();
+        Assert.Empty(errors);
+
+        // Should have warnings instead
+        var warnings = diag.Warnings.Where(d =>
+            d.Code == DiagnosticCode.ForbiddenEffect).ToList();
+        Assert.Single(warnings);
+        Assert.Contains("cw", warnings[0].Message);
+    }
+
+    [Fact]
+    public void PermissiveMode_CompilationSucceeds_WithEffectWarnings()
+    {
+        // Permissive mode should allow compilation to succeed even with undeclared effects
+        var source = @"
+§M{m001:TestModule}
+§F{f001:doIO}
+  §O{void}
+  §P ""writing to console""
+  §C{SomeExternal.DoNetworkCall} §/C
+§/F{f001}
+§/M{m001}";
+
+        var result = Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            UnknownCallPolicy = UnknownCallPolicy.Permissive
+        });
+
+        // Should compile successfully (no errors)
+        Assert.False(result.HasErrors, $"Expected no errors but got: {string.Join(", ", result.Diagnostics.Where(d => d.IsError).Select(d => d.Message))}");
+        Assert.NotNull(result.GeneratedCode);
+        Assert.NotEmpty(result.GeneratedCode);
+    }
+
+    [Fact]
+    public void StrictMode_UnknownCall_ProducesError()
+    {
+        // Verify that strict mode still produces errors (baseline comparison)
+        var source = @"
+§M{m001:TestModule}
+§F{f001:doStuff}
+  §O{void}
+  §C{SomeUnknown.ExternalMethod} §/C
+§/F{f001}
+§/M{m001}";
+
+        var ast = ParseCalor(source);
+        var diag = new DiagnosticBag();
+        var pass = new EffectEnforcementPass(diag, strictEffects: true);
+        pass.Enforce(ast);
+
+        var unknownCallErrors = diag.Errors.Where(d =>
+            d.Code == DiagnosticCode.UnknownExternalCall).ToList();
+        Assert.NotEmpty(unknownCallErrors);
+    }
+
+    #endregion
 }

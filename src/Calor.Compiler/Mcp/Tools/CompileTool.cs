@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
 
@@ -45,6 +46,12 @@ public sealed class CompileTool : McpToolBase
                             "enum": ["off", "debug", "release"],
                             "default": "debug",
                             "description": "Contract enforcement mode"
+                        },
+                        "effectMode": {
+                            "type": "string",
+                            "enum": ["strict", "default", "permissive"],
+                            "default": "default",
+                            "description": "Effect enforcement mode: strict (errors for unknown calls), default (warnings), permissive (suppress all effect errors, for converted code)"
                         }
                     }
                 }
@@ -67,6 +74,7 @@ public sealed class CompileTool : McpToolBase
         var verify = GetBool(options, "verify");
         var analyze = GetBool(options, "analyze");
         var contractModeStr = GetString(options, "contractMode") ?? "debug";
+        var effectModeStr = GetString(options, "effectMode") ?? "default";
 
         var contractMode = contractModeStr.ToLowerInvariant() switch
         {
@@ -75,11 +83,20 @@ public sealed class CompileTool : McpToolBase
             _ => ContractMode.Debug
         };
 
+        var (unknownCallPolicy, strictEffects) = effectModeStr.ToLowerInvariant() switch
+        {
+            "strict" => (UnknownCallPolicy.Strict, true),
+            "permissive" => (UnknownCallPolicy.Permissive, false),
+            _ => (UnknownCallPolicy.Strict, false)
+        };
+
         try
         {
             var compileOptions = new CompilationOptions
             {
                 ContractMode = contractMode,
+                UnknownCallPolicy = unknownCallPolicy,
+                StrictEffects = strictEffects,
                 VerifyContracts = verify,
                 EnableVerificationAnalyses = analyze,
                 VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }

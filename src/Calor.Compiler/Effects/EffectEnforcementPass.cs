@@ -414,6 +414,11 @@ public sealed class EffectEnforcementPass
         {
             var forbidden = computedEffects.Except(declaredEffects).ToList();
 
+            // In permissive mode, demote forbidden-effect errors to warnings
+            var severity = _policy == UnknownCallPolicy.Permissive
+                ? DiagnosticSeverity.Warning
+                : DiagnosticSeverity.Error;
+
             foreach (var (kind, value) in forbidden)
             {
                 // Find the call chain that leads to this effect
@@ -424,7 +429,7 @@ public sealed class EffectEnforcementPass
                     function.Effects?.Span ?? function.Span,
                     DiagnosticCode.ForbiddenEffect,
                     $"Function '{function.Name}' uses effect '{EffectSetExtensions.ToSurfaceCode(kind, value)}' but does not declare it{chainStr}",
-                    DiagnosticSeverity.Error);
+                    severity);
             }
         }
     }
@@ -724,6 +729,12 @@ public sealed class EffectEnforcementPass
                         $"Delegate/variable invocation '{target}' has unverified effects. Consider wrapping in a function with declared effects.",
                         DiagnosticSeverity.Warning);
                 }
+                return EffectSet.Empty;
+            }
+
+            // Permissive mode: assume pure for unknown calls (no diagnostic)
+            if (_context.Policy == UnknownCallPolicy.Permissive)
+            {
                 return EffectSet.Empty;
             }
 
@@ -1184,7 +1195,14 @@ public enum UnknownCallPolicy
     /// <summary>
     /// Unknown calls are errors unless stubbed.
     /// </summary>
-    StubRequired
+    StubRequired,
+
+    /// <summary>
+    /// Unknown calls are silently assumed pure.
+    /// Forbidden-effect checks (Calor0410) are demoted to warnings.
+    /// Designed for converted code that lacks effect annotations.
+    /// </summary>
+    Permissive
 }
 
 /// <summary>
