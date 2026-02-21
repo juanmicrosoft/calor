@@ -87,7 +87,7 @@ public static class TypeMapper
 
         // Async types
         ["Task"] = "Task",
-        ["ValueTask"] = "Task",
+        ["ValueTask"] = "ValueTask",
 
         // Date/Time types
         ["DateTime"] = "datetime",
