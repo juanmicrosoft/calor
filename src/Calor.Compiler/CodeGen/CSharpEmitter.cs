@@ -377,7 +377,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
 
             // Build where clauses
             var whereClauses = new List<string>();
@@ -1066,7 +1066,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (method.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", method.TypeParameters.Select(tp => tp.Name)) + ">";
+            typeParams = "<" + string.Join(", ", method.TypeParameters.Select(tp => tp.Accept(this))) + ">";
 
             var whereClauses = new List<string>();
             foreach (var tp in method.TypeParameters)
@@ -1695,7 +1695,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(TypeParameterNode node)
     {
         // Type parameters are handled in function/method signature emission
-        return node.Name;
+        var variance = node.Variance switch
+        {
+            VarianceKind.In => "in ",
+            VarianceKind.Out => "out ",
+            _ => ""
+        };
+        return $"{variance}{node.Name}";
     }
 
     public string Visit(TypeConstraintNode node)
@@ -1742,7 +1748,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
 
             // Build where clauses
             var whereClauses = new List<string>();
@@ -1817,7 +1823,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
 
             // Build where clauses
             var whereClauses = new List<string>();
@@ -1870,7 +1876,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
 
             var whereClauses = new List<string>();
             foreach (var tp in node.TypeParameters)
@@ -2025,7 +2031,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Name)) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
 
             var whereClauses = new List<string>();
             foreach (var tp in node.TypeParameters)
