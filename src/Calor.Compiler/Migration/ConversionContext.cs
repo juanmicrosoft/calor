@@ -46,6 +46,16 @@ public sealed class ConversionExplanation
     public required List<string> ManualRequiredFeatures { get; init; }
 
     /// <summary>
+    /// Returns feature names and occurrence counts only (no source code).
+    /// </summary>
+    public Dictionary<string, int> GetFeatureCounts()
+    {
+        return UnsupportedFeatures.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.Count);
+    }
+
+    /// <summary>
     /// Formats the explanation as a human-readable string for CLI output.
     /// </summary>
     public string FormatForCli()

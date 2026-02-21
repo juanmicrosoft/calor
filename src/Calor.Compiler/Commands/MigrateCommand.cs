@@ -149,6 +149,19 @@ public static class MigrateCommand
 
             var report = await migrator.ExecuteAsync(plan, dryRun: false, progress);
 
+            if (telemetry != null)
+            {
+                var featureCounts = report.FileResults
+                    .SelectMany(f => f.Issues)
+                    .Where(i => i.Feature != null)
+                    .GroupBy(i => i.Feature!)
+                    .ToDictionary(g => g.Key, g => g.Count());
+                if (featureCounts.Count > 0)
+                {
+                    telemetry.TrackUnsupportedFeatures(featureCounts, featureCounts.Values.Sum());
+                }
+            }
+
             if (!verbose)
             {
                 Console.WriteLine(); // New line after progress bar

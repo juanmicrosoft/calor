@@ -88,13 +88,25 @@ public static class ConvertCommand
 
         try
         {
+            ConversionResult? conversionResult = null;
             if (direction == ConversionDirection.CSharpToCalor)
             {
-                await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback);
+                conversionResult = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback);
             }
             else
             {
                 await ConvertCalorToCSharpAsync(input.FullName, outputPath, verbose);
+            }
+
+            if (conversionResult != null && telemetry != null)
+            {
+                var explanation = conversionResult.Context.GetExplanation();
+                if (explanation.TotalUnsupportedCount > 0)
+                {
+                    telemetry.TrackUnsupportedFeatures(
+                        explanation.GetFeatureCounts(),
+                        explanation.TotalUnsupportedCount);
+                }
             }
         }
         catch (Exception ex)
@@ -117,7 +129,7 @@ public static class ConvertCommand
         }
     }
 
-    private static async Task ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback)
+    private static async Task<ConversionResult?> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
@@ -137,7 +149,7 @@ public static class ConvertCommand
                 Console.Error.WriteLine($"  {issue}");
             }
             Environment.ExitCode = 1;
-            return;
+            return result;
         }
 
         // Write output
@@ -181,6 +193,8 @@ public static class ConvertCommand
 
         Console.WriteLine();
         Console.WriteLine($"Output: {outputPath}");
+
+        return result;
     }
 
     private static async Task ConvertCalorToCSharpAsync(string inputPath, string outputPath, bool verbose)

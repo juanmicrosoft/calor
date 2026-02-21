@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -88,6 +89,18 @@ public sealed class ConvertTool : McpToolBase
                     PartialFeatures = explanation.PartialFeatures,
                     ManualRequiredFeatures = explanation.ManualRequiredFeatures
                 };
+            }
+
+            // Track unsupported features in telemetry
+            if (CalorTelemetry.IsInitialized)
+            {
+                var telExplanation = result.Context.GetExplanation();
+                if (telExplanation.TotalUnsupportedCount > 0)
+                {
+                    CalorTelemetry.Instance.TrackUnsupportedFeatures(
+                        telExplanation.GetFeatureCounts(),
+                        telExplanation.TotalUnsupportedCount);
+                }
             }
 
             // Post-conversion validation: re-parse the generated Calor to catch invalid output

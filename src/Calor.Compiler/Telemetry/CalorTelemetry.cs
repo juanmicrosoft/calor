@@ -48,6 +48,16 @@ public sealed class CalorTelemetry : IDisposable
     /// </summary>
     public static bool IsInitialized => _instance != null;
 
+    /// <summary>
+    /// Internal constructor for unit testing with a custom TelemetryClient.
+    /// </summary>
+    internal CalorTelemetry(TelemetryClient client)
+    {
+        _operationId = Guid.NewGuid().ToString("N")[..12];
+        _sessionTimer = Stopwatch.StartNew();
+        _client = client;
+    }
+
     private CalorTelemetry(bool enabled)
     {
         _operationId = Guid.NewGuid().ToString("N")[..12];
@@ -265,6 +275,39 @@ public sealed class CalorTelemetry : IDisposable
                     telemetry.Properties[kvp.Key] = kvp.Value;
                 }
             }
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    /// <summary>
+    /// Tracks unsupported C# features encountered during conversion.
+    /// Sends one event per conversion with feature names and counts (no user source code).
+    /// </summary>
+    public void TrackUnsupportedFeatures(Dictionary<string, int> featureCounts, int totalCount)
+    {
+        if (_client == null || totalCount == 0) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("UnsupportedFeatures");
+            telemetry.Properties["totalUnsupportedCount"] = totalCount.ToString();
+            telemetry.Properties["distinctFeatureCount"] = featureCounts.Count.ToString();
+
+            var i = 0;
+            foreach (var (feature, count) in featureCounts.OrderByDescending(kv => kv.Value))
+            {
+                if (i >= 50) break;
+                telemetry.Properties[$"feature:{feature}"] = count.ToString();
+                i++;
+            }
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
 
             _client.TrackEvent(telemetry);
         }
