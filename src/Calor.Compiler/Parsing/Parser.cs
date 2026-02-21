@@ -4285,6 +4285,7 @@ public sealed class Parser
                 "class" => (TypeConstraintKind.Class, (string?)null),
                 "struct" => (TypeConstraintKind.Struct, (string?)null),
                 "new" or "new()" => (TypeConstraintKind.New, (string?)null),
+                "notnull" => (TypeConstraintKind.NotNull, (string?)null),
                 _ => (TypeConstraintKind.TypeName, constraintText)
             };
 
@@ -4327,7 +4328,7 @@ public sealed class Parser
         if (Check(TokenKind.Identifier))
         {
             var text = Current.Text.ToLowerInvariant();
-            if (text == "class" || text == "struct")
+            if (text == "class" || text == "struct" || text == "notnull")
             {
                 Advance();
                 return text;
@@ -5903,6 +5904,7 @@ public sealed class Parser
         // Positional: [id:param1:type1:param2:type2:...] or [id:async:param1:type1:...]
         var id = attrs["_pos0"] ?? "";
         var isAsync = false;
+        var isStatic = false;
 
         if (string.IsNullOrEmpty(id))
         {
@@ -5915,12 +5917,24 @@ public sealed class Parser
         if (int.TryParse(posCount, out var count))
         {
             int i = 1;
-            // Check for async modifier
-            var firstPos = attrs["_pos1"];
-            if (firstPos?.Equals("async", StringComparison.OrdinalIgnoreCase) == true)
+            // Check for static/async modifiers
+            while (i < count)
             {
-                isAsync = true;
-                i = 2;
+                var pos = attrs[$"_pos{i}"];
+                if (pos?.Equals("static", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    isStatic = true;
+                    i++;
+                }
+                else if (pos?.Equals("async", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    isAsync = true;
+                    i++;
+                }
+                else
+                {
+                    break;
+                }
             }
 
             // Parse parameter pairs: name:type
@@ -5977,7 +5991,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new LambdaExpressionNode(span, id, parameters, effects, isAsync, expressionBody, statementBody, attrs);
+        return new LambdaExpressionNode(span, id, parameters, effects, isAsync, expressionBody, statementBody, attrs, isStatic);
     }
 
     /// <summary>

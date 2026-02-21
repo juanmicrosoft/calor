@@ -1741,6 +1741,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             TypeConstraintKind.Interface => constraint.TypeName ?? "object",
             TypeConstraintKind.BaseClass => constraint.TypeName ?? "object",
             TypeConstraintKind.TypeName => MapTypeName(constraint.TypeName ?? "object"),
+            TypeConstraintKind.NotNull => "notnull",
             _ => "object"
         };
     }
@@ -2689,6 +2690,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(LambdaExpressionNode node)
     {
+        var staticMod = node.IsStatic ? "static " : "";
         var async = node.IsAsync ? "async " : "";
         var parameters = node.Parameters.Count switch
         {
@@ -2700,12 +2702,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.IsExpressionLambda && node.ExpressionBody != null)
         {
             var body = node.ExpressionBody.Accept(this);
-            return $"{async}{parameters} => {body}";
+            return $"{staticMod}{async}{parameters} => {body}";
         }
         else if (node.StatementBody != null && node.StatementBody.Count > 0)
         {
             var sb = new StringBuilder();
-            sb.Append($"{async}{parameters} => {{\n");
+            sb.Append($"{staticMod}{async}{parameters} => {{\n");
             foreach (var stmt in node.StatementBody)
             {
                 sb.Append($"    {stmt.Accept(this)}\n");
@@ -2714,7 +2716,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return sb.ToString();
         }
 
-        return $"{async}{parameters} => default";
+        return $"{staticMod}{async}{parameters} => default";
     }
 
     public string Visit(DelegateDefinitionNode node)

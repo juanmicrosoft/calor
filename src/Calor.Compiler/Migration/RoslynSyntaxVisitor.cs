@@ -4030,6 +4030,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("lam");
         var parameters = new List<LambdaParameterNode>();
         var isAsync = lambda.AsyncKeyword.IsKind(SyntaxKind.AsyncKeyword);
+        var isStatic = lambda.Modifiers.Any(SyntaxKind.StaticKeyword);
 
         switch (lambda)
         {
@@ -4087,7 +4088,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             isAsync,
             exprBody,
             stmtBody,
-            new AttributeCollection());
+            new AttributeCollection(),
+            isStatic);
     }
 
     private AwaitExpressionNode ConvertAwaitExpression(AwaitExpressionSyntax awaitExpr)
@@ -4223,6 +4225,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             ConstructorConstraintSyntax =>
                 new TypeConstraintNode(span, TypeConstraintKind.New),
+
+            // C# 8+ 'notnull' constraint: where T : notnull
+            // In Roslyn, this comes through as TypeConstraintSyntax with type text "notnull"
+            TypeConstraintSyntax typeConstraint when typeConstraint.Type.ToString() == "notnull" =>
+                new TypeConstraintNode(span, TypeConstraintKind.NotNull),
 
             TypeConstraintSyntax typeConstraint =>
                 new TypeConstraintNode(span, TypeConstraintKind.TypeName, typeConstraint.Type.ToString()),
