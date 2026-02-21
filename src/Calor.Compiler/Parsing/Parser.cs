@@ -1294,7 +1294,7 @@ public sealed class Parser
         }
         if (opText == "??")
         {
-            _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+            _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                 $"Null-coalescing '??' requires exactly 2 operands, got {args.Count}");
             return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
         }
@@ -1331,7 +1331,7 @@ public sealed class Parser
             if (binaryOp.HasValue)
             {
                 // This is likely an error - binary op with only one argument
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"Binary operator '{opText}' requires at least two operands");
                 return args[0];
             }
@@ -1360,12 +1360,12 @@ public sealed class Parser
                 comparisonMode = StringComparisonModeExtensions.FromKeyword(keywordArg.Name);
                 if (comparisonMode == null)
                 {
-                    _diagnostics.ReportError(keywordArg.Span, DiagnosticCode.UnexpectedToken,
+                    _diagnostics.ReportError(keywordArg.Span, DiagnosticCode.InvalidComparisonMode,
                         $"Unknown comparison mode ':{keywordArg.Name}'. Valid modes: ordinal, ignore-case, invariant, invariant-ignore-case");
                 }
                 else if (!StringOperationNode.SupportsComparisonMode(stringOp.Value))
                 {
-                    _diagnostics.ReportError(keywordArg.Span, DiagnosticCode.UnexpectedToken,
+                    _diagnostics.ReportError(keywordArg.Span, DiagnosticCode.InvalidComparisonMode,
                         $"Operation '{opText}' does not support comparison modes");
                     comparisonMode = null;
                 }
@@ -1396,13 +1396,13 @@ public sealed class Parser
             if (nonKeywordArgs.Count < minArgs)
             {
                 var example = OperatorSuggestions.GetStringOpExample(opText);
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"String operation '{opText}' requires at least {minArgs} argument(s), got {nonKeywordArgs.Count}. Example: {example}");
             }
             else if (nonKeywordArgs.Count > maxArgs)
             {
                 var example = OperatorSuggestions.GetStringOpExample(opText);
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"String operation '{opText}' accepts at most {maxArgs} argument(s), got {nonKeywordArgs.Count}. Example: {example}");
             }
 
@@ -1419,13 +1419,13 @@ public sealed class Parser
             if (args.Count < minArgs)
             {
                 var example = OperatorSuggestions.GetCharOpExample(opText);
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"Char operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}. Example: {example}");
             }
             else if (args.Count > maxArgs)
             {
                 var example = OperatorSuggestions.GetCharOpExample(opText);
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"Char operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}. Example: {example}");
             }
 
@@ -1438,13 +1438,13 @@ public sealed class Parser
                     // so a single character is always length 1
                     if (strLit.Value.Length != 1)
                     {
-                        _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                        _diagnostics.ReportError(span, DiagnosticCode.InvalidCharLiteral,
                             $"char-lit requires a single character, got \"{strLit.Value}\" ({strLit.Value.Length} characters). Example: (char-lit \"Y\")");
                     }
                 }
                 else
                 {
-                    _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                    _diagnostics.ReportError(span, DiagnosticCode.InvalidCharLiteral,
                         "char-lit requires a string literal argument. Example: (char-lit \"Y\")");
                 }
             }
@@ -1462,13 +1462,13 @@ public sealed class Parser
             if (args.Count < minArgs)
             {
                 var example = OperatorSuggestions.GetStringBuilderOpExample(opText);
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"StringBuilder operation '{opText}' requires at least {minArgs} argument(s), got {args.Count}. Example: {example}");
             }
             else if (args.Count > maxArgs)
             {
                 var example = OperatorSuggestions.GetStringBuilderOpExample(opText);
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"StringBuilder operation '{opText}' accepts at most {maxArgs} argument(s), got {args.Count}. Example: {example}");
             }
 
@@ -1482,7 +1482,7 @@ public sealed class Parser
             if (args.Count != 2)
             {
                 var example = OperatorSuggestions.GetTypeOpExample(opText);
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"Type operation '{opText}' requires exactly 2 arguments, got {args.Count}. Example: {example}");
                 return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
             }
@@ -1497,7 +1497,7 @@ public sealed class Parser
             // Type argument must be a simple identifier (ReferenceNode)
             if (typeArg is not ReferenceNode typeRef)
             {
-                _diagnostics.ReportError(typeArg.Span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(typeArg.Span, DiagnosticCode.ExpectedTypeName,
                     $"Expected a type name, got {typeArg.GetType().Name}");
                 return operandArg;
             }
@@ -1664,7 +1664,7 @@ public sealed class Parser
                         "Unexpected closing parenthesis. Check parentheses balance.",
                     _ => $"Valid operators: {OperatorSuggestions.GetOperatorCategories()}"
                 };
-                _diagnostics.ReportError(span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(span, DiagnosticCode.InvalidLispExpression,
                     $"Expected operator in Lisp expression, found '{token.Text}'. {hint}");
                 Advance();
                 return (token.Kind, text, span);
@@ -1775,7 +1775,7 @@ public sealed class Parser
                 return new KeywordArgNode(span, keywordName);
             }
             // Standalone colon - error
-            _diagnostics.ReportError(colonToken.Span, DiagnosticCode.UnexpectedToken,
+            _diagnostics.ReportError(colonToken.Span, DiagnosticCode.InvalidLispExpression,
                 "Expected identifier after ':' for keyword argument");
             return new IntLiteralNode(colonToken.Span, 0);
         }
@@ -1839,7 +1839,7 @@ public sealed class Parser
                         "Unexpected closing parenthesis. Check expression structure.",
                     _ => "Expected a value (number, string, variable) or nested expression"
                 };
-                _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                _diagnostics.ReportError(Current.Span, DiagnosticCode.InvalidLispExpression,
                     $"Unexpected token '{Current.Text}' in expression argument. {hint}");
                 Advance();
                 expr = new IntLiteralNode(Current.Span, 0); // Recovery: return dummy value
@@ -1906,7 +1906,7 @@ public sealed class Parser
     {
         if (!Check(TokenKind.Identifier))
         {
-            _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.ExpectedTypeName,
                 $"Expected type name, found '{Current.Text}'");
             return "object";
         }
@@ -2630,7 +2630,7 @@ public sealed class Parser
         // Expect arrow and then expression
         if (!Check(TokenKind.Arrow))
         {
-            _diagnostics.ReportError(Current.Span, "Calor0100", "Expected '→' after IF condition in expression context");
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.ExpectedExpression, "Expected '→' after IF condition in expression context");
             return new IntLiteralNode(startToken.Span, 0);
         }
         Advance(); // consume →
@@ -4311,7 +4311,7 @@ public sealed class Parser
         var typeParamIndex = typeParameters.FindIndex(tp => tp.Name == typeParamName);
         if (typeParamIndex < 0)
         {
-            _diagnostics.ReportError(startToken.Span, DiagnosticCode.UnexpectedToken,
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.TypeParameterNotFound,
                 $"Type parameter '{typeParamName}' not found");
             return;
         }
