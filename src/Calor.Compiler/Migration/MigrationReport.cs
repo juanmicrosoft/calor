@@ -1,6 +1,4 @@
 using System.Text.Json.Serialization;
-using Calor.Compiler.Analysis;
-using Calor.Compiler.Verification.Z3;
 
 namespace Calor.Compiler.Migration;
 
@@ -16,8 +14,6 @@ public sealed class MigrationReport
     public List<FileMigrationResult> FileResults { get; init; } = new();
     public BenchmarkSummary? Benchmark { get; init; }
     public List<string> Recommendations { get; init; } = new();
-    public AnalysisSummaryReport? Analysis { get; init; }
-    public VerificationSummaryReport? Verification { get; init; }
 }
 
 /// <summary>
@@ -58,8 +54,6 @@ public sealed class FileMigrationResult
     public TimeSpan Duration { get; init; }
     public List<ConversionIssue> Issues { get; init; } = new();
     public FileMetrics? Metrics { get; init; }
-    public FileAnalysisResult? Analysis { get; init; }
-    public FileVerificationSummary? Verification { get; set; }
 }
 
 /// <summary>
@@ -111,64 +105,4 @@ public sealed class BenchmarkSummary
         ? (double)TotalOriginalTokens / TotalOutputTokens : 1.0;
 
     public Dictionary<string, double> CategoryAdvantages { get; init; } = new();
-}
-
-/// <summary>
-/// Aggregated analysis summary for the migration report.
-/// </summary>
-public sealed class AnalysisSummaryReport
-{
-    public int FilesAnalyzed { get; init; }
-    public double AverageScore { get; init; }
-    public Dictionary<MigrationPriority, int> PriorityBreakdown { get; init; } = new();
-    public Dictionary<ScoreDimension, double> DimensionAverages { get; init; } = new();
-    public TimeSpan Duration { get; init; }
-    public List<FileAnalysisResult> FileResults { get; init; } = new();
-}
-
-/// <summary>
-/// Per-file analysis result included in the migration report.
-/// </summary>
-public sealed class FileAnalysisResult
-{
-    public required string FilePath { get; init; }
-    public double Score { get; init; }
-    public MigrationPriority Priority { get; init; }
-    public Dictionary<ScoreDimension, double> DimensionScores { get; init; } = new();
-    public List<UnsupportedConstruct> UnsupportedConstructs { get; init; } = new();
-}
-
-/// <summary>
-/// Aggregated verification summary for the migration report.
-/// </summary>
-public sealed class VerificationSummaryReport
-{
-    public int FilesVerified { get; init; }
-    public int FilesSkipped { get; init; }
-    public int TotalContracts { get; init; }
-    public int Proven { get; init; }
-    public int Unproven { get; init; }
-    public int Disproven { get; init; }
-    public int Unsupported { get; init; }
-    public int ContractsSkipped { get; init; }
-    public bool Z3Available { get; init; }
-    public TimeSpan Duration { get; init; }
-    public List<FileVerificationSummary> FileResults { get; init; } = new();
-
-    public double ProvenRate => TotalContracts > 0 ? (double)Proven / TotalContracts * 100 : 0;
-}
-
-/// <summary>
-/// Per-file verification summary included in the migration report.
-/// </summary>
-public sealed class FileVerificationSummary
-{
-    public required string CalorPath { get; init; }
-    public int TotalContracts { get; init; }
-    public int Proven { get; init; }
-    public int Unproven { get; init; }
-    public int Disproven { get; init; }
-    public List<string> DisprovenDetails { get; init; } = new();
-
-    public double ProvenRate => TotalContracts > 0 ? (double)Proven / TotalContracts * 100 : 0;
 }

@@ -1,12 +1,9 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
-using Calor.Compiler.Analysis;
 using Calor.Compiler.Init;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Calor.Compiler.Telemetry;
-using Calor.Compiler.Verification.Z3;
 
 namespace Calor.Compiler.Commands;
 
@@ -47,19 +44,6 @@ public static class MigrateCommand
             aliases: new[] { "--verbose", "-v" },
             description: "Enable verbose output");
 
-        var skipAnalyzeOption = new Option<bool>(
-            aliases: new[] { "--skip-analyze" },
-            description: "Skip the migration analysis phase");
-
-        var skipVerifyOption = new Option<bool>(
-            aliases: new[] { "--skip-verify" },
-            description: "Skip the Z3 contract verification phase");
-
-        var verificationTimeoutOption = new Option<int>(
-            aliases: new[] { "--verification-timeout" },
-            description: "Z3 verification timeout per contract in milliseconds",
-            getDefaultValue: () => (int)VerificationOptions.DefaultTimeoutMs);
-
         var command = new Command("migrate", "Migrate an entire project between C# and Calor")
         {
             pathArgument,
@@ -68,28 +52,10 @@ public static class MigrateCommand
             directionOption,
             parallelOption,
             reportOption,
-            verboseOption,
-            skipAnalyzeOption,
-            skipVerifyOption,
-            verificationTimeoutOption
+            verboseOption
         };
 
-        command.SetHandler(async (InvocationContext ctx) =>
-        {
-            var path = ctx.ParseResult.GetValueForArgument(pathArgument);
-            var dryRun = ctx.ParseResult.GetValueForOption(dryRunOption);
-            var benchmark = ctx.ParseResult.GetValueForOption(benchmarkOption);
-            var direction = ctx.ParseResult.GetValueForOption(directionOption)!;
-            var parallel = ctx.ParseResult.GetValueForOption(parallelOption);
-            var reportPath = ctx.ParseResult.GetValueForOption(reportOption);
-            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-            var skipAnalyze = ctx.ParseResult.GetValueForOption(skipAnalyzeOption);
-            var skipVerify = ctx.ParseResult.GetValueForOption(skipVerifyOption);
-            var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
-
-            await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
-                reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout);
-        });
+        command.SetHandler(ExecuteAsync, pathArgument, dryRunOption, benchmarkOption, directionOption, parallelOption, reportOption, verboseOption);
 
         return command;
     }
@@ -101,10 +67,7 @@ public static class MigrateCommand
         string direction,
         bool parallel,
         FileInfo? reportPath,
-        bool verbose,
-        bool skipAnalyze,
-        bool skipVerify,
-        uint verificationTimeout)
+        bool verbose)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("migrate");
@@ -132,67 +95,31 @@ public static class MigrateCommand
         var options = new MigrationPlanOptions
         {
             Parallel = parallel,
-            IncludeBenchmark = benchmark,
-            SkipAnalyze = skipAnalyze,
-            SkipVerify = skipVerify,
-            VerificationTimeoutMs = verificationTimeout
+            IncludeBenchmark = benchmark
         };
 
         var migrator = new ProjectMigrator(options);
-        VerificationSummaryReport? verificationSummary = null;
 
         try
         {
-            // ── Phase 1/4: Discovering files ──
-            Console.WriteLine("Phase 1/4: Discovering files...");
+            // Create migration plan
+            Console.WriteLine($"Analyzing project: {path.FullName}");
+            Console.WriteLine();
 
             var plan = await migrator.CreatePlanAsync(path.FullName, migrationDirection);
 
+            // Show plan summary
+            Console.WriteLine("Migration Plan:");
             Console.WriteLine($"  Files to convert: {plan.ConvertibleFiles}");
             Console.WriteLine($"  Files needing review: {plan.PartialFiles}");
             Console.WriteLine($"  Files to skip: {plan.SkippedFiles}");
             Console.WriteLine($"  Estimated issues: {plan.EstimatedIssues}");
             Console.WriteLine();
 
-            if (plan.ConvertibleFiles == 0 && plan.PartialFiles == 0)
+            if (plan.ConvertibleFiles == 0)
             {
                 Console.WriteLine("No files to migrate.");
                 return;
-            }
-
-            // ── Phase 2/4: Analyzing migration potential ──
-            AnalysisSummaryReport? analysisSummary = null;
-            var shouldAnalyze = !skipAnalyze && migrationDirection == MigrationDirection.CSharpToCalor;
-
-            if (shouldAnalyze)
-            {
-                Console.WriteLine("Phase 2/4: Analyzing migration potential...");
-
-                var analysisProgress = verbose
-                    ? new Progress<string>(msg => Console.WriteLine($"  {msg}"))
-                    : null;
-
-                analysisSummary = await migrator.AnalyzeAsync(plan, analysisProgress);
-
-                Console.WriteLine($"  Average score: {analysisSummary.AverageScore:F1}/100");
-                if (analysisSummary.PriorityBreakdown.Count > 0)
-                {
-                    var parts = new List<string>();
-                    foreach (var priority in new[] { MigrationPriority.Critical, MigrationPriority.High, MigrationPriority.Medium, MigrationPriority.Low })
-                    {
-                        if (analysisSummary.PriorityBreakdown.TryGetValue(priority, out var count))
-                        {
-                            parts.Add($"{count} {FileMigrationScore.GetPriorityLabel(priority)}");
-                        }
-                    }
-                    Console.WriteLine($"  Priority: {string.Join(", ", parts)}");
-                }
-                Console.WriteLine();
-            }
-            else
-            {
-                Console.WriteLine("Phase 2/4: Analyzing migration potential... skipped");
-                Console.WriteLine();
             }
 
             if (dryRun)
@@ -203,8 +130,8 @@ public static class MigrateCommand
                 return;
             }
 
-            // ── Phase 3/4: Converting files ──
-            Console.Write("Phase 3/4: Converting files... ");
+            // Execute migration
+            Console.Write("Migrating... ");
 
             var progress = new Progress<MigrationProgress>(p =>
             {
@@ -214,8 +141,9 @@ public static class MigrateCommand
                 }
                 else
                 {
+                    // Show progress bar
                     var percent = (int)p.PercentComplete;
-                    Console.Write($"\rPhase 3/4: Converting files... [{new string('#', percent / 5)}{new string('.', 20 - percent / 5)}] {percent}%");
+                    Console.Write($"\rMigrating... [{new string('█', percent / 5)}{new string('░', 20 - percent / 5)}] {percent}%");
                 }
             });
 
@@ -236,111 +164,60 @@ public static class MigrateCommand
 
             if (!verbose)
             {
-                Console.WriteLine();
+                Console.WriteLine(); // New line after progress bar
             }
 
+            // Show results
+            Console.WriteLine();
+            Console.WriteLine("Results:");
             Console.WriteLine($"  Successful: {report.Summary.SuccessfulFiles}");
             if (report.Summary.PartialFiles > 0)
                 Console.WriteLine($"  Partial: {report.Summary.PartialFiles} (need review)");
             if (report.Summary.FailedFiles > 0)
                 Console.WriteLine($"  Failed: {report.Summary.FailedFiles}");
-            Console.WriteLine();
-
-            // ── Phase 4/4: Verifying contracts ──
-            var shouldVerify = !skipVerify && migrationDirection == MigrationDirection.CSharpToCalor;
-
-            if (shouldVerify)
-            {
-                Console.Write("Phase 4/4: Verifying contracts...");
-
-                var verifyProgress = verbose
-                    ? new Progress<string>(msg => Console.WriteLine($"  {msg}"))
-                    : null;
-
-                verificationSummary = await migrator.VerifyAsync(report, verificationTimeout, verifyProgress);
-
-                Console.WriteLine();
-
-                if (!verificationSummary.Z3Available)
-                {
-                    Console.WriteLine("  Z3 solver not available - verification skipped.");
-                }
-                else
-                {
-                    Console.WriteLine($"  Contracts: {verificationSummary.TotalContracts} total");
-                    if (verificationSummary.TotalContracts > 0)
-                    {
-                        Console.WriteLine($"  Proven: {verificationSummary.Proven}, Unproven: {verificationSummary.Unproven}, Disproven: {verificationSummary.Disproven}");
-                        Console.WriteLine($"  Proven rate: {verificationSummary.ProvenRate:F1}%");
-                    }
-                }
-                Console.WriteLine();
-
-                // Verification telemetry is merged into the final "migrate" TrackCommand below
-            }
-            else
-            {
-                Console.WriteLine("Phase 4/4: Verifying contracts... skipped");
-                Console.WriteLine();
-            }
-
-            // ── Build enriched report via builder ──
-            var enrichedBuilder = new MigrationReportBuilder()
-                .SetDirection(report.Direction)
-                .IncludeBenchmark(benchmark);
-
-            foreach (var fr in report.FileResults)
-                enrichedBuilder.AddFileResult(fr);
-            foreach (var rec in report.Recommendations)
-                enrichedBuilder.AddRecommendation(rec);
-
-            if (analysisSummary != null)
-                enrichedBuilder.SetAnalysisSummary(analysisSummary);
-            if (verificationSummary != null)
-                enrichedBuilder.SetVerificationSummary(verificationSummary);
-
-            var enrichedReport = enrichedBuilder.Build();
 
             // Show benchmark if requested
-            if (benchmark && enrichedReport.Benchmark != null)
+            if (benchmark && report.Benchmark != null)
             {
-                Console.WriteLine("Benchmark Summary:");
-                Console.WriteLine($"  Total tokens: {enrichedReport.Benchmark.TotalOriginalTokens:N0} -> {enrichedReport.Benchmark.TotalOutputTokens:N0} ({enrichedReport.Benchmark.TokenSavingsPercent:F1}% savings)");
-                Console.WriteLine($"  Total lines: {enrichedReport.Benchmark.TotalOriginalLines:N0} -> {enrichedReport.Benchmark.TotalOutputLines:N0} ({enrichedReport.Benchmark.LineSavingsPercent:F1}% savings)");
-                Console.WriteLine($"  Overall Calor advantage: {enrichedReport.Benchmark.OverallAdvantage:F2}x");
                 Console.WriteLine();
+                Console.WriteLine("Benchmark Summary:");
+                Console.WriteLine($"  Total tokens: {report.Benchmark.TotalOriginalTokens:N0} → {report.Benchmark.TotalOutputTokens:N0} ({report.Benchmark.TokenSavingsPercent:F1}% savings)");
+                Console.WriteLine($"  Total lines: {report.Benchmark.TotalOriginalLines:N0} → {report.Benchmark.TotalOutputLines:N0} ({report.Benchmark.LineSavingsPercent:F1}% savings)");
+                Console.WriteLine($"  Overall Calor advantage: {report.Benchmark.OverallAdvantage:F2}x");
             }
 
             // Save report if requested
             if (reportPath != null)
             {
-                var generator = new MigrationReportGenerator(enrichedReport);
+                var generator = new MigrationReportGenerator(report);
                 var format = reportPath.Extension.ToLowerInvariant() == ".json"
                     ? ReportFormat.Json
                     : ReportFormat.Markdown;
 
                 await generator.SaveAsync(reportPath.FullName, format);
+                Console.WriteLine();
                 Console.WriteLine($"Report saved: {reportPath.FullName}");
             }
 
             // Show errors/warnings summary
-            if (enrichedReport.Summary.TotalErrors > 0 || enrichedReport.Summary.TotalWarnings > 0)
+            if (report.Summary.TotalErrors > 0 || report.Summary.TotalWarnings > 0)
             {
-                Console.WriteLine($"Issues: {enrichedReport.Summary.TotalErrors} error(s), {enrichedReport.Summary.TotalWarnings} warning(s)");
+                Console.WriteLine();
+                Console.WriteLine($"Issues: {report.Summary.TotalErrors} error(s), {report.Summary.TotalWarnings} warning(s)");
 
-                if (verbose && enrichedReport.Summary.MostCommonIssues.Count > 0)
+                if (verbose && report.Summary.MostCommonIssues.Count > 0)
                 {
                     Console.WriteLine();
                     Console.WriteLine("Most common issues:");
-                    foreach (var issue in enrichedReport.Summary.MostCommonIssues.Take(5))
+                    foreach (var issue in report.Summary.MostCommonIssues.Take(5))
                     {
-                        Console.WriteLine($"  - {issue}");
+                        Console.WriteLine($"  • {issue}");
                     }
                 }
             }
 
             // Set exit code based on results
-            if (enrichedReport.Summary.FailedFiles > 0)
+            if (report.Summary.FailedFiles > 0)
             {
                 Environment.ExitCode = 1;
             }
@@ -358,18 +235,10 @@ public static class MigrateCommand
         finally
         {
             sw.Stop();
-            var telemetryProps = new Dictionary<string, string>
+            telemetry?.TrackCommand("migrate", Environment.ExitCode, new Dictionary<string, string>
             {
                 ["durationMs"] = sw.ElapsedMilliseconds.ToString()
-            };
-            if (verificationSummary is { Z3Available: true })
-            {
-                telemetryProps["verifyContracts"] = verificationSummary.TotalContracts.ToString();
-                telemetryProps["verifyProven"] = verificationSummary.Proven.ToString();
-                telemetryProps["verifyDisproven"] = verificationSummary.Disproven.ToString();
-                telemetryProps["verifyDurationMs"] = verificationSummary.Duration.TotalMilliseconds.ToString("F0");
-            }
-            telemetry?.TrackCommand("migrate", Environment.ExitCode, telemetryProps);
+            });
             if (Environment.ExitCode != 0)
             {
                 IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "migrate", "Migration failed");
@@ -388,11 +257,7 @@ public static class MigrateCommand
             Console.WriteLine("Files to convert:");
             foreach (var entry in fullConvert.Take(verbose ? 100 : 10))
             {
-                Console.WriteLine($"  + {Path.GetFileName(entry.SourcePath)}");
-                if (verbose && entry.AnalysisScore != null && !entry.AnalysisScore.WasSkipped)
-                {
-                    Console.WriteLine($"      Score: {entry.AnalysisScore.TotalScore:F1} ({FileMigrationScore.GetPriorityLabel(entry.AnalysisScore.Priority)})");
-                }
+                Console.WriteLine($"  ✓ {Path.GetFileName(entry.SourcePath)}");
             }
             if (!verbose && fullConvert.Count > 10)
             {
@@ -406,7 +271,7 @@ public static class MigrateCommand
             Console.WriteLine("Files needing review:");
             foreach (var entry in partial.Take(verbose ? 100 : 5))
             {
-                Console.WriteLine($"  ~ {Path.GetFileName(entry.SourcePath)}");
+                Console.WriteLine($"  ⚠ {Path.GetFileName(entry.SourcePath)}");
                 foreach (var issue in entry.PotentialIssues.Take(2))
                 {
                     Console.WriteLine($"      {issue}");
@@ -425,7 +290,7 @@ public static class MigrateCommand
             foreach (var entry in skip.Take(10))
             {
                 var reason = entry.SkipReason ?? "excluded by pattern";
-                Console.WriteLine($"  - {Path.GetFileName(entry.SourcePath)}: {reason}");
+                Console.WriteLine($"  ⊘ {Path.GetFileName(entry.SourcePath)}: {reason}");
             }
             if (skip.Count > 10)
             {

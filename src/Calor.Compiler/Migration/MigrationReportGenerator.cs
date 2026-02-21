@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using Calor.Compiler.Analysis;
 
 namespace Calor.Compiler.Migration;
 
@@ -45,46 +44,6 @@ public sealed class MigrationReportGenerator
         sb.AppendLine($"| Total Warnings | {_report.Summary.TotalWarnings} |");
         sb.AppendLine($"| Duration | {FormatDuration(_report.Summary.TotalDuration)} |");
         sb.AppendLine();
-
-        // Analysis summary
-        if (_report.Analysis != null)
-        {
-            sb.AppendLine("## Analysis Summary");
-            sb.AppendLine();
-            sb.AppendLine($"**Files Analyzed:** {_report.Analysis.FilesAnalyzed}");
-            sb.AppendLine($"**Average Score:** {_report.Analysis.AverageScore:F1}/100");
-            sb.AppendLine($"**Duration:** {FormatDuration(_report.Analysis.Duration)}");
-            sb.AppendLine();
-
-            if (_report.Analysis.PriorityBreakdown.Count > 0)
-            {
-                sb.AppendLine("### Priority Breakdown");
-                sb.AppendLine();
-                sb.AppendLine("| Priority | Files |");
-                sb.AppendLine("|----------|-------|");
-                foreach (var priority in new[] { MigrationPriority.Critical, MigrationPriority.High, MigrationPriority.Medium, MigrationPriority.Low })
-                {
-                    if (_report.Analysis.PriorityBreakdown.TryGetValue(priority, out var count))
-                    {
-                        sb.AppendLine($"| {FileMigrationScore.GetPriorityLabel(priority)} | {count} |");
-                    }
-                }
-                sb.AppendLine();
-            }
-
-            if (_report.Analysis.DimensionAverages.Count > 0)
-            {
-                sb.AppendLine("### Dimension Averages");
-                sb.AppendLine();
-                sb.AppendLine("| Dimension | Average Score |");
-                sb.AppendLine("|-----------|--------------|");
-                foreach (var (dim, avg) in _report.Analysis.DimensionAverages.OrderByDescending(kv => kv.Value))
-                {
-                    sb.AppendLine($"| {dim} | {avg:F1} |");
-                }
-                sb.AppendLine();
-            }
-        }
 
         // Benchmark results
         if (_report.Benchmark != null)
@@ -167,52 +126,6 @@ public sealed class MigrationReportGenerator
                     }
                 }
                 sb.AppendLine();
-            }
-        }
-
-        // Verification summary
-        if (_report.Verification != null)
-        {
-            sb.AppendLine("## Verification Summary");
-            sb.AppendLine();
-
-            if (!_report.Verification.Z3Available)
-            {
-                sb.AppendLine("*Z3 solver not available — verification skipped.*");
-                sb.AppendLine();
-            }
-            else
-            {
-                sb.AppendLine("| Metric | Value |");
-                sb.AppendLine("|--------|-------|");
-                sb.AppendLine($"| Files Verified | {_report.Verification.FilesVerified} |");
-                if (_report.Verification.FilesSkipped > 0)
-                    sb.AppendLine($"| Files Skipped | {_report.Verification.FilesSkipped} |");
-                sb.AppendLine($"| Total Contracts | {_report.Verification.TotalContracts} |");
-                sb.AppendLine($"| Proven | {_report.Verification.Proven} |");
-                sb.AppendLine($"| Unproven | {_report.Verification.Unproven} |");
-                sb.AppendLine($"| Disproven | {_report.Verification.Disproven} |");
-                sb.AppendLine($"| Proven Rate | {_report.Verification.ProvenRate:F1}% |");
-                sb.AppendLine($"| Duration | {FormatDuration(_report.Verification.Duration)} |");
-                sb.AppendLine();
-
-                var disprovenFiles = _report.Verification.FileResults
-                    .Where(f => f.Disproven > 0)
-                    .ToList();
-                if (disprovenFiles.Count > 0)
-                {
-                    sb.AppendLine("### Disproven Contracts");
-                    sb.AppendLine();
-                    foreach (var file in disprovenFiles)
-                    {
-                        sb.AppendLine($"- `{Path.GetFileName(file.CalorPath)}`");
-                        foreach (var detail in file.DisprovenDetails)
-                        {
-                            sb.AppendLine($"  - {detail}");
-                        }
-                    }
-                    sb.AppendLine();
-                }
             }
         }
 
@@ -368,8 +281,6 @@ public sealed class MigrationReportBuilder
     private readonly List<string> _recommendations = new();
     private MigrationDirection _direction = MigrationDirection.CSharpToCalor;
     private bool _includeBenchmark;
-    private AnalysisSummaryReport? _analysisSummary;
-    private VerificationSummaryReport? _verificationSummary;
 
     public MigrationReportBuilder SetDirection(MigrationDirection direction)
     {
@@ -395,18 +306,6 @@ public sealed class MigrationReportBuilder
         return this;
     }
 
-    public MigrationReportBuilder SetAnalysisSummary(AnalysisSummaryReport summary)
-    {
-        _analysisSummary = summary;
-        return this;
-    }
-
-    public MigrationReportBuilder SetVerificationSummary(VerificationSummaryReport summary)
-    {
-        _verificationSummary = summary;
-        return this;
-    }
-
     public MigrationReport Build()
     {
         var summary = BuildSummary();
@@ -420,9 +319,7 @@ public sealed class MigrationReportBuilder
             Summary = summary,
             FileResults = _fileResults.ToList(),
             Benchmark = benchmark,
-            Recommendations = _recommendations.ToList(),
-            Analysis = _analysisSummary,
-            Verification = _verificationSummary
+            Recommendations = _recommendations.ToList()
         };
     }
 

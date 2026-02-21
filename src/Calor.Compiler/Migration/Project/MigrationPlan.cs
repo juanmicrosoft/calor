@@ -1,5 +1,3 @@
-using Calor.Compiler.Analysis;
-
 namespace Calor.Compiler.Migration.Project;
 
 /// <summary>
@@ -37,11 +35,6 @@ public sealed class MigrationPlanEntry
     public int EstimatedIssues { get; init; }
     public long FileSizeBytes { get; init; }
     public string? SkipReason { get; init; }
-
-    /// <summary>
-    /// Analysis score from MigrationAnalyzer, populated during the analyze phase.
-    /// </summary>
-    public FileMigrationScore? AnalysisScore { get; set; }
 }
 
 /// <summary>
@@ -88,13 +81,4 @@ public sealed class MigrationPlanOptions
 
     /// <summary>Whether to include benchmark metrics.</summary>
     public bool IncludeBenchmark { get; set; } = false;
-
-    /// <summary>Whether to skip the migration analysis phase.</summary>
-    public bool SkipAnalyze { get; set; } = false;
-
-    /// <summary>Whether to skip the Z3 contract verification phase.</summary>
-    public bool SkipVerify { get; set; } = false;
-
-    /// <summary>Z3 verification timeout in milliseconds.</summary>
-    public uint VerificationTimeoutMs { get; set; } = Verification.Z3.VerificationOptions.DefaultTimeoutMs;
 }
