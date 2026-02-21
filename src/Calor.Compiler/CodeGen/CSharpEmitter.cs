@@ -346,7 +346,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
             Visibility.Private => "private",
             _ => "private"
         };
@@ -478,7 +480,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.Modifier.HasFlag(ParameterModifier.Out)) prefix += "out ";
         if (node.Modifier.HasFlag(ParameterModifier.In)) prefix += "in ";
         if (node.Modifier.HasFlag(ParameterModifier.Params)) prefix += "params ";
-        return $"{prefix}{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}";
+        var result = $"{prefix}{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}";
+        if (node.DefaultValue != null)
+        {
+            result += $" = {node.DefaultValue.Accept(this)}";
+        }
+        return result;
     }
 
     public string Visit(CallStatementNode node)
@@ -1011,7 +1018,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibility = method.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
             Visibility.Private => "private",
             _ => "public"
         };
@@ -1842,6 +1851,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var modifiers = node.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
             Visibility.Protected => "protected",
             Visibility.Private => "private",
@@ -1941,6 +1951,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
             Visibility.Protected => "protected",
             Visibility.Private => "private",
@@ -1979,6 +1990,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
             Visibility.Protected => "protected",
             Visibility.Private => "private",
@@ -2326,7 +2338,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
             Visibility.Private => "private",
             _ => "public"
         };
@@ -2399,6 +2413,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibilityPrefix = node.Visibility switch
         {
             Visibility.Private => "private ",
+            Visibility.ProtectedInternal => "protected internal ",
             Visibility.Internal => "internal ",
             Visibility.Protected => "protected ",
             _ => ""
@@ -2444,6 +2459,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
             Visibility.Protected => "protected",
             Visibility.Private => "private",
@@ -2685,7 +2701,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
             Visibility.Private => "private",
             _ => "public"
         };

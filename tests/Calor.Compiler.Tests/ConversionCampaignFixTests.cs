@@ -61,6 +61,27 @@ public class ConversionCampaignFixTests
 
     private readonly CSharpToCalorConverter _converter = new();
 
+    /// <summary>
+    /// Compiles Calor source back to C# (for round-trip testing).
+    /// Returns null if there are parse errors.
+    /// </summary>
+    private static string? Compile(string calorSource)
+    {
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath("test.calr");
+
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        if (diagnostics.HasErrors) return null;
+
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        if (diagnostics.HasErrors) return null;
+
+        var emitter = new CSharpEmitter();
+        return emitter.Emit(module);
+    }
+
     #endregion
 
     #region Issue 289: Emit default: instead of case _: in switch
@@ -1140,6 +1161,163 @@ public class DerivedService(string connectionString) : BaseService
 
         Assert.Contains("connectionString", calor);
         Assert.Contains("§FLD", calor);
+    }
+
+    #endregion
+
+    #region Batch 5 — Protected Internal, Unchecked, Default Params, Chained Assignment
+
+    [Fact]
+    public void Convert_ProtectedInternalMethod_PreservesCompoundModifier()
+    {
+        var csharp = @"
+public class MyClass
+{
+    protected internal void DoWork() { }
+    protected internal int Value { get; set; }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Verify it converts without error
+        Assert.Contains("DoWork", calor);
+        Assert.Contains("Value", calor);
+
+        // Compile back to C# and verify protected internal is preserved
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        Assert.Contains("protected internal", compiled!);
+    }
+
+    [Fact]
+    public void Convert_UncheckedBlock_PreservesBody()
+    {
+        var csharp = @"
+public class MathHelper
+{
+    public int Overflow(int x)
+    {
+        unchecked
+        {
+            int result = x * x;
+            return result;
+        }
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Body should be preserved
+        Assert.Contains("result", calor);
+        Assert.Contains("§R", calor);
+    }
+
+    [Fact]
+    public void Convert_DefaultParameterValues_PreservedInAst()
+    {
+        var csharp = @"
+public class Formatter
+{
+    public string Format(string text, int width = 80, bool uppercase = false)
+    {
+        return text;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        Assert.Contains("text", calor);
+        Assert.Contains("width", calor);
+
+        // Verify AST has defaults by checking the module's class methods
+        Assert.NotNull(result.Ast);
+        var classNode = result.Ast!.Classes.FirstOrDefault();
+        Assert.NotNull(classNode);
+        var method = classNode!.Methods.FirstOrDefault(m => m.Name == "Format");
+        Assert.NotNull(method);
+        var widthParam = method!.Parameters.FirstOrDefault(p => p.Name == "width");
+        Assert.NotNull(widthParam);
+        Assert.NotNull(widthParam!.DefaultValue);
+        var uppercaseParam = method.Parameters.FirstOrDefault(p => p.Name == "uppercase");
+        Assert.NotNull(uppercaseParam);
+        Assert.NotNull(uppercaseParam!.DefaultValue);
+    }
+
+    [Fact]
+    public void Convert_ChainedAssignment_ProducesStatements()
+    {
+        var csharp = @"
+public class Example
+{
+    public void Test()
+    {
+        int a, b;
+        a = b = 5;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should not contain ERR — the chained assignment should convert
+        Assert.DoesNotContain("ERR", calor);
+        // Should contain assignment for both a and b
+        Assert.Contains("§ASSIGN", calor);
+    }
+
+    [Fact]
+    public void Convert_CheckedBlock_PreservesBody()
+    {
+        var csharp = @"
+public class Calculator
+{
+    public int Safe(int x, int y)
+    {
+        checked
+        {
+            return x + y;
+        }
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        Assert.Contains("§R", calor);
+    }
+
+    [Fact]
+    public void Convert_DefaultParameterStringAndNull_PreservedInAst()
+    {
+        var csharp = @"
+public class Logger
+{
+    public void Log(string message, string level = ""info"", object? context = null)
+    {
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        Assert.Contains("message", calor);
+        Assert.Contains("level", calor);
+
+        // Verify AST preserves defaults
+        Assert.NotNull(result.Ast);
+        var classNode = result.Ast!.Classes.FirstOrDefault();
+        Assert.NotNull(classNode);
+        var method = classNode!.Methods.FirstOrDefault(m => m.Name == "Log");
+        Assert.NotNull(method);
+        var levelParam = method!.Parameters.FirstOrDefault(p => p.Name == "level");
+        Assert.NotNull(levelParam);
+        Assert.NotNull(levelParam!.DefaultValue);
+        var contextParam = method.Parameters.FirstOrDefault(p => p.Name == "context");
+        Assert.NotNull(contextParam);
+        Assert.NotNull(contextParam!.DefaultValue);
     }
 
     #endregion

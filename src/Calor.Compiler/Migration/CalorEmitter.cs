@@ -2051,6 +2051,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return visibility switch
         {
             Visibility.Public => "pub",
+            Visibility.ProtectedInternal => "prot-int",
             Visibility.Protected => "prot",
             Visibility.Internal => "int",
             Visibility.Private => "priv",

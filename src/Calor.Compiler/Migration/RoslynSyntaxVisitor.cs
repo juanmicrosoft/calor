@@ -1206,6 +1206,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
             YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
             LockStatementSyntax lockStmt => ConvertLockStatement(lockStmt),
+            CheckedStatementSyntax checkedStmt => ConvertCheckedStatement(checkedStmt),
             _ => HandleUnsupportedStatement(statement)
         };
     }
@@ -1285,6 +1286,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Return a fallback comment node indicating the lock
         var lockExpr = node.Expression.ToString();
         return new FallbackCommentNode(GetTextSpan(node), $"lock({lockExpr})", "lock", "Lock semantics are preserved but lock keyword is not emitted");
+    }
+
+    private StatementNode ConvertCheckedStatement(CheckedStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("checked-block");
+        _context.IncrementConverted();
+
+        // Strip the checked/unchecked wrapper and convert the body statements
+        var bodyStatements = ConvertBlock(node.Block);
+        foreach (var stmt in bodyStatements)
+        {
+            _pendingStatements.Add(stmt);
+        }
+
+        var keyword = node.IsKind(SyntaxKind.CheckedStatement) ? "checked" : "unchecked";
+        return new FallbackCommentNode(GetTextSpan(node), keyword, "checked-block",
+            "Checked/unchecked semantics stripped; handle overflow manually if needed");
     }
 
     private StatementNode ConvertExpressionStatement(ExpressionStatementSyntax node)
@@ -2508,6 +2526,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             TypeOfExpressionSyntax typeOf => new TypeOfExpressionNode(GetTextSpan(typeOf), TypeMapper.CSharpToCalor(typeOf.Type.ToString())),
             PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
             DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
+            AssignmentExpressionSyntax assignExpr => ConvertAssignmentExpression(assignExpr),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -2810,6 +2829,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             "string" or "String" => new ReferenceNode(GetTextSpan(defaultExpr), "null"),
             _ => new ReferenceNode(GetTextSpan(defaultExpr), "default")
         };
+    }
+
+    private ExpressionNode ConvertAssignmentExpression(AssignmentExpressionSyntax assignment)
+    {
+        // Handle assignment expressions in expression context (e.g., chained: a = b = value)
+        // Hoist the assignment to _pendingStatements and return the assigned value
+        _context.IncrementConverted();
+        var target = ConvertExpression(assignment.Left);
+        var value = ConvertExpression(assignment.Right);
+
+        _pendingStatements.Add(new AssignmentStatementNode(
+            GetTextSpan(assignment), target, value));
+
+        // Return the value so chained assignments work: a = (b = value) → assign b value, then return value for a
+        return value;
     }
 
     private UnaryOperationNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)
@@ -4020,13 +4054,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 if (p.Modifiers.Any(SyntaxKind.OutKeyword)) modifier |= ParameterModifier.Out;
                 if (p.Modifiers.Any(SyntaxKind.InKeyword)) modifier |= ParameterModifier.In;
                 if (p.Modifiers.Any(SyntaxKind.ParamsKeyword)) modifier |= ParameterModifier.Params;
+                ExpressionNode? defaultValue = p.Default != null
+                    ? ConvertExpression(p.Default.Value)
+                    : null;
                 return new ParameterNode(
                     GetTextSpan(p),
                     p.Identifier.ValueText,
                     TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
                     modifier,
                     new AttributeCollection(),
-                    Array.Empty<CalorAttributeNode>());
+                    Array.Empty<CalorAttributeNode>(),
+                    defaultValue);
             })
             .ToList();
     }
@@ -4035,6 +4073,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (modifiers.Any(SyntaxKind.PublicKeyword))
             return Visibility.Public;
+        // Check compound modifiers before individual ones
+        if (modifiers.Any(SyntaxKind.ProtectedKeyword) && modifiers.Any(SyntaxKind.InternalKeyword))
+            return Visibility.ProtectedInternal;
         if (modifiers.Any(SyntaxKind.InternalKeyword))
             return Visibility.Internal;
         if (modifiers.Any(SyntaxKind.ProtectedKeyword))
@@ -4046,6 +4087,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (modifiers.Any(SyntaxKind.PublicKeyword))
             return Visibility.Public;
+        // Check compound modifiers before individual ones
+        if (modifiers.Any(SyntaxKind.ProtectedKeyword) && modifiers.Any(SyntaxKind.InternalKeyword))
+            return Visibility.ProtectedInternal;
         if (modifiers.Any(SyntaxKind.InternalKeyword))
             return Visibility.Internal;
         if (modifiers.Any(SyntaxKind.ProtectedKeyword))

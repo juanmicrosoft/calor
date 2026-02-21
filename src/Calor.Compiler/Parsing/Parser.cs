@@ -3061,6 +3061,14 @@ public sealed class Parser
                 }
             }
 
+            // Handle hyphenated identifiers like prot-int (protected internal)
+            while (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.Identifier)
+            {
+                sb.Append('-');
+                Advance(); // consume '-'
+                sb.Append(Advance().Text); // consume identifier
+            }
+
             // Handle comma-separated values like partial,static for modifiers
             // Only consume comma if followed by an identifier (not a colon or close brace)
             while (Check(TokenKind.Comma) && Peek(1).Kind == TokenKind.Identifier)
@@ -3459,6 +3467,7 @@ public sealed class Parser
         return value?.ToLowerInvariant() switch
         {
             "public" or "pub" => Visibility.Public,
+            "protected-internal" or "prot-int" => Visibility.ProtectedInternal,
             "internal" or "int" => Visibility.Internal,
             "protected" or "prot" => Visibility.Protected,
             "private" or "priv" => Visibility.Private,

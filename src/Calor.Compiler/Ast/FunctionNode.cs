@@ -10,6 +10,7 @@ public enum Visibility
     Private,
     Protected,
     Internal,
+    ProtectedInternal,
     Public
 }
 
@@ -257,12 +258,17 @@ public sealed class ParameterNode : AstNode
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
+    /// <summary>
+    /// Optional default value for the parameter (from C# = value syntax).
+    /// </summary>
+    public ExpressionNode? DefaultValue { get; }
+
     public ParameterNode(
         TextSpan span,
         string name,
         string typeName,
         AttributeCollection attributes)
-        : this(span, name, typeName, ParameterModifier.None, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, name, typeName, ParameterModifier.None, attributes, Array.Empty<CalorAttributeNode>(), null)
     {
     }
 
@@ -272,7 +278,7 @@ public sealed class ParameterNode : AstNode
         string typeName,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
-        : this(span, name, typeName, ParameterModifier.None, attributes, csharpAttributes)
+        : this(span, name, typeName, ParameterModifier.None, attributes, csharpAttributes, null)
     {
     }
 
@@ -283,6 +289,18 @@ public sealed class ParameterNode : AstNode
         ParameterModifier modifier,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, name, typeName, modifier, attributes, csharpAttributes, null)
+    {
+    }
+
+    public ParameterNode(
+        TextSpan span,
+        string name,
+        string typeName,
+        ParameterModifier modifier,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        ExpressionNode? defaultValue)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -290,6 +308,7 @@ public sealed class ParameterNode : AstNode
         Modifier = modifier;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
+        DefaultValue = defaultValue;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

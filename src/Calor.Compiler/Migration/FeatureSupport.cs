@@ -453,9 +453,9 @@ public static class FeatureSupport
         ["checked-block"] = new FeatureInfo
         {
             Name = "checked-block",
-            Support = SupportLevel.NotSupported,
-            Description = "checked/unchecked blocks are not supported",
-            Workaround = "Remove checked/unchecked wrapper; handle overflow manually if needed"
+            Support = SupportLevel.Partial,
+            Description = "checked/unchecked wrapper stripped, body statements preserved",
+            Workaround = "Handle overflow manually if needed; body code is preserved"
         },
         ["with-expression"] = new FeatureInfo
         {
