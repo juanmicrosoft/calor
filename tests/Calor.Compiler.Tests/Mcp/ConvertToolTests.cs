@@ -115,10 +115,92 @@ public class ConvertToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithInterface_ReportsParseValidationIssues()
+    public async Task ExecuteAsync_WithLocalFunction_HoistsToModuleLevel()
     {
-        // Interface conversion generates §SIG tags that the parser doesn't yet recognize.
-        // Post-conversion validation (R5) now correctly reports this instead of false success.
+        var args = JsonDocument.Parse("""
+            {
+                "source": "public class Example { public int Calculate(int x) { int Square(int n) => n * n; return Square(x); } }",
+                "moduleName": "LocalFuncTest"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError, $"Local function conversion should succeed");
+        var text = result.Content[0].Text!;
+        var json = JsonDocument.Parse(text);
+        var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
+        Assert.Contains("\u00A7F{", calorSource);  // Hoisted to module-level §F function
+        Assert.Contains("Square", calorSource);
+        Assert.DoesNotContain("localfunction", calorSource);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithLocalFunction_RoundTripCompiles()
+    {
+        // Round-trip test: C# → Calor → C# should produce valid C# output.
+        var convertArgs = JsonDocument.Parse("""
+            {
+                "source": "public class Math { public int Calculate(int x) { int Double(int n) { return n * 2; } return Double(x); } }",
+                "moduleName": "RoundTrip"
+            }
+            """).RootElement;
+
+        var convertResult = await _tool.ExecuteAsync(convertArgs);
+        Assert.False(convertResult.IsError, "Conversion should succeed");
+
+        var convertJson = JsonDocument.Parse(convertResult.Content[0].Text!);
+        var calorSource = convertJson.RootElement.GetProperty("calorSource").GetString()!;
+
+        // Now compile the Calor source back to C#
+        var compileTool = new CompileTool();
+        var compileArgs = JsonDocument.Parse($$"""
+            {
+                "source": {{JsonSerializer.Serialize(calorSource)}}
+            }
+            """).RootElement;
+
+        var compileResult = await compileTool.ExecuteAsync(compileArgs);
+        var compileText = compileResult.Content[0].Text!;
+        var compileJson = JsonDocument.Parse(compileText);
+
+        // The compiled C# should contain the hoisted function
+        Assert.True(compileJson.RootElement.TryGetProperty("generatedCode", out var csharpProp),
+            $"Round-trip compile should produce C# output. Result: {compileText}");
+        var csharp = csharpProp.GetString()!;
+        Assert.Contains("Double", csharp);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithLocalFunction_ClosureNotCaptured()
+    {
+        // Known limitation: local functions that capture outer variables are hoisted
+        // to module level, which means the captured variable is out of scope.
+        // The converter still hoists the function but the round-trip compile may fail
+        // because the variable reference cannot be resolved.
+        var args = JsonDocument.Parse("""
+            {
+                "source": "public class Example { public int Compute(int x) { int multiplier = 3; int Multiply(int n) { return n * multiplier; } return Multiply(x); } }",
+                "moduleName": "ClosureTest"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        // Conversion itself succeeds (the local function is hoisted)
+        Assert.False(result.IsError, "Conversion should succeed even with closure");
+        var text = result.Content[0].Text!;
+        var json = JsonDocument.Parse(text);
+        var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
+        Assert.Contains("Multiply", calorSource);
+        // Note: The hoisted function references 'multiplier' which is not in scope.
+        // This is a known limitation documented in Issue #315.
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInterface_SucceedsWithMTTags()
+    {
+        // Interface conversion now generates §MT tags (not §SIG) which the parser recognizes.
         var args = JsonDocument.Parse("""
             {
                 "source": "public interface IService { void Process(); string GetValue(); }"
@@ -127,10 +209,9 @@ public class ConvertToolTests
 
         var result = await _tool.ExecuteAsync(args);
 
-        Assert.True(result.IsError);
+        Assert.False(result.IsError);
         var text = result.Content[0].Text!;
-        Assert.Contains("issues", text);
-        Assert.Contains("Generated Calor failed to parse", text);
+        Assert.Contains("success", text);
         Assert.Contains("interfacesConverted", text);
     }
 }

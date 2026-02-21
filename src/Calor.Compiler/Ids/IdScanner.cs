@@ -74,6 +74,9 @@ public sealed class IdScanner : IAstVisitor
     {
         AddEntry(node.Id, IdKind.Interface, node.Name, node.Span);
 
+        foreach (var prop in node.Properties)
+            prop.Accept(this);
+
         foreach (var method in node.Methods)
             method.Accept(this);
     }

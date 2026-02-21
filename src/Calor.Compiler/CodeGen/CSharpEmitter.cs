@@ -1759,6 +1759,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        foreach (var prop in node.Properties)
+        {
+            Visit(prop);
+            AppendLine();
+        }
+
         foreach (var method in node.Methods)
         {
             Visit(method);
@@ -2339,14 +2345,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Auto-property with default value
         if (node.IsAutoProperty)
         {
+            var accessors = node.Setter != null ? "get; set;" :
+                            node.Initer != null ? "get; init;" :
+                            "get;";
             if (node.DefaultValue != null)
             {
                 var defaultVal = node.DefaultValue.Accept(this);
-                AppendLine($"{modifierStr} {typeName} {propName} {{ get; set; }} = {defaultVal};");
+                AppendLine($"{modifierStr} {typeName} {propName} {{ {accessors} }} = {defaultVal};");
             }
             else
             {
-                AppendLine($"{modifierStr} {typeName} {propName} {{ get; set; }}");
+                AppendLine($"{modifierStr} {typeName} {propName} {{ {accessors} }}");
             }
             return "";
         }
@@ -3254,7 +3263,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
             else if (c == '.')
             {
-                sb.Append('_');
+                sb.Append('.');
             }
         }
 
@@ -3266,7 +3275,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             result = "_" + result;
         }
 
-        // Handle reserved words
+        // Handle reserved words — prefix with @ to make valid C# identifiers.
+        // Exclude this/base/null/true/false — they are C# keywords with special
+        // meaning and should not appear as user-defined identifiers.
         return result switch
         {
             "class" or "struct" or "interface" or "enum" or
@@ -3275,7 +3286,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             "int" or "string" or "bool" or "float" or "double" or
             "return" or "if" or "else" or "for" or "while" or
             "do" or "switch" or "case" or "break" or "continue" or
-            "new" or "this" or "base" or "null" or "true" or "false"
+            "new"
             => "@" + result,
             _ => result
         };

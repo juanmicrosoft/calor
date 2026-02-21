@@ -351,7 +351,7 @@ public sealed class Lexer
             // v2 Lisp-style operator symbols
             '+' => ScanSingle(TokenKind.Plus),
             '*' => ScanStarOrOperator(),
-            '/' => ScanSingle(TokenKind.Slash),
+            '/' => ScanSlashOrComment(),
             '\\' => ScanSingle(TokenKind.Backslash),
             '%' => ScanSingle(TokenKind.Percent),
             '<' => ScanLessOrOperator(),
@@ -367,6 +367,7 @@ public sealed class Lexer
             '∀' => ScanUnicodeQuantifier("forall"),
             '∃' => ScanUnicodeQuantifier("exists"),
             '`' => ScanBacktickIdentifier(),
+            '\'' => ScanCharLiteralOrSkip(),
             _ when char.IsLetter(Current) || Current == '_' => ScanIdentifierOrTypedLiteral(),
             _ when char.IsDigit(Current) => ScanNumber(),
             _ => ScanError()
@@ -474,6 +475,19 @@ public sealed class Lexer
             return MakeToken(TokenKind.PipePipe);
         }
         return MakeToken(TokenKind.Pipe);
+    }
+
+    private Token ScanSlashOrComment()
+    {
+        if (Lookahead == '/')
+        {
+            // Line comment: skip to end of line
+            while (Current != '\n' && Current != '\r' && Current != '\0')
+                Advance();
+            return NextToken(); // skip comment entirely, return next real token
+        }
+        Advance();
+        return MakeToken(TokenKind.Slash);
     }
 
     private Token ScanMinusOrArrowOrNumber()
@@ -932,6 +946,31 @@ public sealed class Lexer
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "DECIMAL");
+        return MakeToken(TokenKind.Error);
+    }
+
+    /// <summary>
+    /// Handles single-quote character: scans a char literal like 'a' or '\n',
+    /// and returns it as a string literal token. If malformed, reports an error.
+    /// </summary>
+    private Token ScanCharLiteralOrSkip()
+    {
+        Advance(); // consume opening '
+        if (Current == '\\')
+        {
+            Advance(); // consume backslash
+            Advance(); // consume escape char
+        }
+        else if (Current != '\'' && Current != '\0' && Current != '\n')
+        {
+            Advance(); // consume the character
+        }
+        if (Current == '\'')
+        {
+            Advance(); // consume closing '
+            return MakeToken(TokenKind.StrLiteral, _source[(_tokenStart + 1)..(_position - 1)]);
+        }
+        // Malformed — recover by continuing
         return MakeToken(TokenKind.Error);
     }
 

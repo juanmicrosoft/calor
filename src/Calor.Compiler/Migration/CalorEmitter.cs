@@ -157,6 +157,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         AppendLine($"§IFACE{{{node.Id}:{node.Name}{baseList}}}{attrs}");
         Indent();
 
+        foreach (var prop in node.Properties)
+        {
+            Visit(prop);
+        }
+
         foreach (var method in node.Methods)
         {
             Visit(method);
@@ -173,13 +178,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var typeParams = node.TypeParameters.Count > 0
             ? $"<{string.Join(",", node.TypeParameters.Select(tp => tp.Name))}>"
             : "";
-
-        var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
-        var paramList = string.Join(",", node.Parameters.Select(p =>
-            $"{TypeMapper.CSharpToCalor(p.TypeName)}:{p.Name}"));
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§SIG{{{node.Id}:{node.Name}{typeParams}}}{attrs} ({paramList}) → {output}");
+        AppendLine($"§MT{{{node.Id}:{node.Name}{typeParams}}}{attrs}");
+        Indent();
+
+        foreach (var param in node.Parameters)
+        {
+            AppendLine($"§I{{{TypeMapper.CSharpToCalor(param.TypeName)}:{param.Name}}}");
+        }
+        if (node.Output != null)
+        {
+            AppendLine($"§O{{{TypeMapper.CSharpToCalor(node.Output.TypeName)}}}");
+        }
+
+        Dedent();
+        AppendLine($"§/MT{{{node.Id}}}");
 
         return "";
     }
@@ -270,7 +284,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var visibility = GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
-        var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
+        // For collection creation defaults (Dict/List/Set), emit "= default" instead of
+        // the full §DICT/§LIST/§SET block, since the type is already on the §FLD tag.
+        string defaultVal;
+        if (node.DefaultValue is DictionaryCreationNode or ListCreationNode or SetCreationNode)
+            defaultVal = " = default";
+        else if (node.DefaultValue != null)
+            defaultVal = $" = {node.DefaultValue.Accept(this)}";
+        else
+            defaultVal = "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var modifiers = new List<string>();
