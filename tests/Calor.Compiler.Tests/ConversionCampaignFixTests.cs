@@ -668,4 +668,76 @@ public class Example
     }
 
     #endregion
+
+    #region Issue 339: Null-coalescing operator ?? silently converted to arithmetic +
+
+    [Fact]
+    public void Convert_NullCoalescing_EmitsConditionalNotArithmetic()
+    {
+        var csharp = @"
+class Test
+{
+    string GetValue(string? input)
+    {
+        return input ?? ""default"";
+    }
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        // Must NOT produce (+ input "default") — that's arithmetic addition
+        Assert.DoesNotContain("(+ input", calor);
+
+        // Should produce a conditional: (if (== input null) "default" input)
+        Assert.Contains("== input null", calor);
+        Assert.Contains("\"default\"", calor);
+    }
+
+    [Fact]
+    public void Convert_NullCoalescing_RoundTripProducesValidCalor()
+    {
+        var csharp = @"
+class Test
+{
+    string GetValue(string? input)
+    {
+        var result = input ?? ""fallback"";
+        return result;
+    }
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        // The Calor output should not contain any '+' operator for the coalescing
+        Assert.DoesNotContain("(+ input", calor);
+    }
+
+    #endregion
+
+    #region Issue 350: Null-coalescing assignment ??= not supported
+
+    [Fact]
+    public void Convert_NullCoalescingAssignment_EmitsIfNullAssign()
+    {
+        var csharp = @"
+using System.Collections.Generic;
+class Test
+{
+    void Init()
+    {
+        List<string>? items = null;
+        items ??= new List<string>();
+    }
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        // Should contain a null check and assignment, not arithmetic
+        Assert.DoesNotContain("(+ items", calor);
+        // Should have an if-null-assign pattern
+        Assert.Contains("== items null", calor);
+        Assert.Contains("§ASSIGN", calor);
+    }
+
+    #endregion
 }

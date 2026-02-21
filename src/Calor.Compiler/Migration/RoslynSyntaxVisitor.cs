@@ -1411,6 +1411,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     ConvertExpression(assignment.Right));
             }
 
+            // Handle null-coalescing assignment: x ??= y → if (== x null) { x = y }
+            if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
+            {
+                _context.RecordFeatureUsage("null-coalescing-assignment");
+                var target = ConvertExpression(assignment.Left);
+                var value = ConvertExpression(assignment.Right);
+                var nullCheck = new BinaryOperationNode(
+                    GetTextSpan(node),
+                    BinaryOperator.Equal,
+                    target,
+                    new ReferenceNode(GetTextSpan(node), "null"));
+                var assignStmt = new AssignmentStatementNode(
+                    GetTextSpan(node),
+                    ConvertExpression(assignment.Left),
+                    value);
+                return new IfStatementNode(
+                    GetTextSpan(node),
+                    _context.GenerateId("if"),
+                    nullCheck,
+                    new List<StatementNode> { assignStmt },
+                    Array.Empty<ElseIfClauseNode>(),
+                    null,
+                    new AttributeCollection());
+            }
+
             return new AssignmentStatementNode(
                 GetTextSpan(node),
                 ConvertExpression(assignment.Left),
@@ -2457,6 +2482,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var left = ConvertExpression(binary.Left);
             var typeName = TypeMapper.CSharpToCalor(binary.Right.ToString());
             return new TypeOperationNode(GetTextSpan(binary), TypeOp.Is, left, typeName);
+        }
+
+        // Handle null-coalescing operator: x ?? y → (if (== x null) y x)
+        if (binary.IsKind(SyntaxKind.CoalesceExpression))
+        {
+            _context.RecordFeatureUsage("null-coalescing");
+            var left = ConvertExpression(binary.Left);
+            var right = ConvertExpression(binary.Right);
+            var nullCheck = new BinaryOperationNode(
+                GetTextSpan(binary),
+                BinaryOperator.Equal,
+                left,
+                new ReferenceNode(GetTextSpan(binary), "null"));
+            return new ConditionalExpressionNode(GetTextSpan(binary), nullCheck, right, left);
         }
 
         var leftExpr = ConvertExpression(binary.Left);

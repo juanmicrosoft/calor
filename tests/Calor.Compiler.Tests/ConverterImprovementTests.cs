@@ -38,9 +38,11 @@ public class ConverterImprovementTests
         var method = Assert.Single(cls.Methods);
         var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
 
-        // The null-coalescing (??) is converted as BinaryOperationNode; right side should be ErrExpressionNode
-        var binary = Assert.IsType<BinaryOperationNode>(ret.Expression);
-        Assert.IsType<ErrExpressionNode>(binary.Right);
+        // The null-coalescing (??) is converted as ConditionalExpressionNode:
+        // (if (== input null) <throw-expr> input)
+        var conditional = Assert.IsType<ConditionalExpressionNode>(ret.Expression);
+        // WhenTrue is the throw expression (ERR), WhenFalse is the input variable
+        Assert.IsType<ErrExpressionNode>(conditional.WhenTrue);
     }
 
     [Fact]
@@ -344,10 +346,12 @@ public class ConverterImprovementTests
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
         var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
-        var binary = Assert.IsType<BinaryOperationNode>(ret.Expression);
 
+        // The null-coalescing (??) is now a ConditionalExpressionNode:
+        // (if (== input null) <throw-expr> input)
+        var conditional = Assert.IsType<ConditionalExpressionNode>(ret.Expression);
         // throw ex → ErrExpressionNode wrapping a ReferenceNode
-        var err = Assert.IsType<ErrExpressionNode>(binary.Right);
+        var err = Assert.IsType<ErrExpressionNode>(conditional.WhenTrue);
         Assert.IsType<ReferenceNode>(err.Error);
     }
 
