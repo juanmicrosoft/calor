@@ -756,7 +756,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("ctor");
         var visibility = GetVisibility(node.Modifiers);
         var parameters = ConvertParameters(node.ParameterList);
-        var body = node.Body != null ? ConvertBlock(node.Body) : new List<StatementNode>();
+        var body = ConvertMethodBody(node.Body, node.ExpressionBody);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         ConstructorInitializerNode? initializer = null;
@@ -939,12 +939,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.IncrementConverted();
 
         var propId = _context.GenerateId("p");
+        var modifiers = GetMethodModifiers(node.Modifiers);
         return new PropertyNode(
             GetTextSpan(node),
             propId,
             name,
             typeName,
             visibility,
+            modifiers,
             getter,
             setter,
             initer,
@@ -979,6 +981,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         else if (expressionBody != null)
         {
+            // Check if expression body is an assignment (e.g., void Method() => _field = value)
+            if (expressionBody.Expression is AssignmentExpressionSyntax exprAssign)
+            {
+                var target = ConvertExpression(exprAssign.Left);
+                var value = ConvertExpression(exprAssign.Right);
+                return new List<StatementNode> { new AssignmentStatementNode(GetTextSpan(expressionBody), target, value) };
+            }
             return new List<StatementNode>
             {
                 new ReturnStatementNode(
@@ -1174,6 +1183,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
             UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
             YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
+            LockStatementSyntax lockStmt => ConvertLockStatement(lockStmt),
             _ => HandleUnsupportedStatement(statement)
         };
     }
@@ -1231,6 +1241,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var expr = node.Expression != null ? ConvertExpression(node.Expression) : null;
         return new YieldReturnStatementNode(GetTextSpan(node), expr);
+    }
+
+    private StatementNode ConvertLockStatement(LockStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("lock");
+        _context.IncrementConverted();
+
+        // Calor doesn't have a lock construct, so we preserve the body statements
+        // with a comment annotation indicating the lock
+        var bodyStatements = node.Statement is BlockSyntax block
+            ? ConvertBlock(block)
+            : new List<StatementNode> { ConvertStatement(node.Statement)! };
+
+        // Add body statements to pending so they're emitted inline
+        foreach (var stmt in bodyStatements)
+        {
+            _pendingStatements.Add(stmt);
+        }
+
+        // Return a fallback comment node indicating the lock
+        var lockExpr = node.Expression.ToString();
+        return new FallbackCommentNode(GetTextSpan(node), $"lock({lockExpr})", "lock", "Lock semantics are preserved but lock keyword is not emitted");
     }
 
     private StatementNode ConvertExpressionStatement(ExpressionStatementSyntax node)
@@ -2433,6 +2465,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
             QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
             InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
+            TypeOfExpressionSyntax typeOf => new TypeOfExpressionNode(GetTextSpan(typeOf), TypeMapper.CSharpToCalor(typeOf.Type.ToString())),
+            PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -2545,10 +2579,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode ConvertCollectionExpression(CollectionExpressionSyntax collection)
     {
         // Convert C# 12 collection expressions: [] or [1, 2, 3]
-        // Empty collection: output as reference to "default" which works for most cases
+        // Empty collection: output as empty list creation
+        // Using "default" was wrong because default for reference types is null, not empty collection
         if (collection.Elements.Count == 0)
         {
-            return new ReferenceNode(GetTextSpan(collection), "default");
+            var emptyId = _context.GenerateId("list");
+            var emptyName = _context.GenerateId("list");
+            return new ListCreationNode(
+                GetTextSpan(collection),
+                emptyId,
+                emptyName,
+                "object",
+                Array.Empty<ExpressionNode>(),
+                new AttributeCollection());
         }
 
         // Convert collection expression to ArrayCreationNode
@@ -3004,6 +3047,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (targetStr == "string" || targetStr == "String")
             {
                 return new StringLiteralNode(span, "");
+            }
+        }
+
+        // Convert primitive type static members (int.MaxValue, byte.MinValue, etc.)
+        if (memberName is "MaxValue" or "MinValue" && memberAccess.Expression is PredefinedTypeSyntax predefinedType)
+        {
+            var keyword = predefinedType.Keyword.Text;
+            switch (keyword)
+            {
+                case "int" when memberName == "MaxValue":
+                    return new IntLiteralNode(span, int.MaxValue);
+                case "int" when memberName == "MinValue":
+                    return new IntLiteralNode(span, int.MinValue);
+                case "byte" when memberName == "MaxValue":
+                    return new IntLiteralNode(span, byte.MaxValue);
+                case "byte" when memberName == "MinValue":
+                    return new IntLiteralNode(span, byte.MinValue);
+                case "short" when memberName == "MaxValue":
+                    return new IntLiteralNode(span, short.MaxValue);
+                case "short" when memberName == "MinValue":
+                    return new IntLiteralNode(span, short.MinValue);
+                default:
+                    // For long, float, double, etc. — pass through as reference
+                    return new ReferenceNode(span, $"{keyword}.{memberName}");
             }
         }
 
@@ -3667,7 +3734,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         if (lambda.ExpressionBody != null)
         {
-            exprBody = ConvertExpression(lambda.ExpressionBody);
+            // Check if expression body is an assignment (e.g., x => obj.Prop = x)
+            if (lambda.ExpressionBody is AssignmentExpressionSyntax lambdaAssign)
+            {
+                var assignTarget = ConvertExpression(lambdaAssign.Left);
+                var assignValue = ConvertExpression(lambdaAssign.Right);
+                stmtBody = new List<StatementNode>
+                {
+                    new AssignmentStatementNode(GetTextSpan(lambdaAssign), assignTarget, assignValue)
+                };
+            }
+            else
+            {
+                exprBody = ConvertExpression(lambda.ExpressionBody);
+            }
         }
         else if (lambda.Body is BlockSyntax block)
         {

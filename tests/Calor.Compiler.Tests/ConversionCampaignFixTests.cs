@@ -740,4 +740,236 @@ class Test
     }
 
     #endregion
+
+    #region Issue 341: typeof() expression not converted
+
+    [Fact]
+    public void Convert_TypeOfExpression_EmitsTypeOf()
+    {
+        var csharp = @"
+using System;
+class Test
+{
+    Type GetType() => typeof(string);
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.DoesNotContain("§ERR", calor);
+        Assert.Contains("(typeof", calor);
+    }
+
+    #endregion
+
+    #region Issue 344: lock statement body completely lost
+
+    [Fact]
+    public void Convert_LockStatement_PreservesBody()
+    {
+        var csharp = @"
+class Test
+{
+    private readonly object _lock = new object();
+    void DoWork()
+    {
+        lock (_lock)
+        {
+            var x = 1;
+        }
+    }
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        // Body should be preserved (the variable declaration inside lock)
+        Assert.Contains("x", calor);
+        // Should NOT produce an ERR for lock
+        Assert.DoesNotContain("§ERR", calor);
+    }
+
+    #endregion
+
+    #region Issue 353: Lambda assignment body dropped
+
+    [Fact]
+    public void Convert_LambdaAssignmentBody_EmitsAssign()
+    {
+        var csharp = @"
+using System;
+class Test
+{
+    int _value;
+    void SetValue()
+    {
+        Action<int> setter = x => _value = x;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.Contains("§ASSIGN", calor);
+    }
+
+    #endregion
+
+    #region Issue 356: Expression-bodied constructor assignment
+
+    [Fact]
+    public void Convert_ExpressionBodyCtor_EmitsAssignment()
+    {
+        var csharp = @"
+class Test
+{
+    string _name;
+    Test(string name) => _name = name;
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.NotNull(calor);
+        Assert.Contains("§ASSIGN", calor);
+        Assert.DoesNotContain("§R", calor!.Split('\n').Where(l => l.Contains("_name")).FirstOrDefault() ?? "");
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodyMethod_WithAssignment_EmitsAssign()
+    {
+        var csharp = @"
+class Test
+{
+    string _name;
+    void SetName(string name) => _name = name;
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.Contains("§ASSIGN", calor);
+    }
+
+    #endregion
+
+    #region Issue 365: ValueTask mapped to Task
+
+    [Fact]
+    public void Convert_ValueTask_PreservesValueTask()
+    {
+        var csharp = @"
+using System.Threading.Tasks;
+class Test
+{
+    async ValueTask<int> GetValueAsync() => 42;
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        // Should NOT downgrade ValueTask to Task
+        Assert.DoesNotContain("Task<", calor);
+    }
+
+    #endregion
+
+    #region Issue 372: Empty collection [] emits default
+
+    [Fact]
+    public void Convert_EmptyCollectionExpression_EmitsEmptyList()
+    {
+        var csharp = @"
+using System.Collections.Generic;
+class Container
+{
+    public List<string> Items { get; set; } = [];
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.DoesNotContain("default", calor);
+        Assert.Contains("§LIST", calor);
+    }
+
+    [Fact]
+    public void Convert_EmptyCollectionExpressionInMethod_EmitsEmptyList()
+    {
+        var csharp = @"
+using System.Collections.Generic;
+class Processor
+{
+    public List<int> GetEmpty()
+    {
+        return [];
+    }
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.DoesNotContain("default", calor);
+        Assert.Contains("§LIST", calor);
+    }
+
+    #endregion
+
+    #region Issue 374: PredefinedTypeSyntax (int.MaxValue, string.Empty)
+
+    [Fact]
+    public void Convert_IntMaxValue_EmitsLiteral()
+    {
+        var csharp = @"
+class Test
+{
+    int GetMax() => int.MaxValue;
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.Contains("2147483647", calor);
+    }
+
+    [Fact]
+    public void Convert_StringEmpty_EmitsEmptyLiteral()
+    {
+        var csharp = @"
+class Test
+{
+    string GetEmpty() => string.Empty;
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.Contains("\"\"", calor);
+    }
+
+    #endregion
+
+    #region Issue 388: Static properties lose static modifier
+
+    [Fact]
+    public void Convert_StaticProperty_PreservesStaticModifier()
+    {
+        var csharp = @"
+class Config
+{
+    public static string DefaultName { get; set; } = ""test"";
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.Contains(":stat", calor);
+    }
+
+    [Fact]
+    public void Convert_StaticProperty_RoundTrips()
+    {
+        var csharp = @"
+class Config
+{
+    public static int MaxRetries { get; set; } = 3;
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        Assert.NotNull(calor);
+        var emittedCSharp = ParseAndEmit(calor!);
+        Assert.Contains("static", emittedCSharp);
+    }
+
+    #endregion
 }
