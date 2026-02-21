@@ -3003,18 +3003,21 @@ public sealed class Parser
 
                 // Parse generic type arguments (may be nested)
                 var depth = 1;
+                var lastWasIdentifier = false;
                 while (!IsAtEnd && depth > 0)
                 {
                     if (Check(TokenKind.Less))
                     {
                         sb.Append('<');
                         depth++;
+                        lastWasIdentifier = false;
                         Advance();
                     }
                     else if (Check(TokenKind.Greater))
                     {
                         sb.Append('>');
                         depth--;
+                        lastWasIdentifier = false;
                         Advance();
                     }
                     else if (Check(TokenKind.GreaterGreater))
@@ -3022,25 +3025,32 @@ public sealed class Parser
                         // Handle >> from nested generics like Task<List<int>>
                         sb.Append(">>");
                         depth -= 2;
+                        lastWasIdentifier = false;
                         Advance();
                     }
                     else if (Check(TokenKind.Identifier))
                     {
+                        // Add space between consecutive identifiers (e.g., "out T", "in T")
+                        if (lastWasIdentifier) sb.Append(' ');
                         sb.Append(Advance().Text);
+                        lastWasIdentifier = true;
                     }
                     else if (Check(TokenKind.Comma))
                     {
                         sb.Append(',');
+                        lastWasIdentifier = false;
                         Advance();
                     }
                     else if (Check(TokenKind.Question))
                     {
                         sb.Append('?');
+                        lastWasIdentifier = false;
                         Advance();
                     }
                     else if (Current.Text == ".")
                     {
                         sb.Append('.');
+                        lastWasIdentifier = false;
                         Advance();
                     }
                     else
@@ -4160,10 +4170,18 @@ public sealed class Parser
 
         do
         {
+            // Check for variance modifiers: in/out before the type parameter name
+            var variance = Ast.VarianceKind.None;
+            if (Check(TokenKind.Identifier) && Current.Text is "in" or "out")
+            {
+                variance = Current.Text == "out" ? Ast.VarianceKind.Out : Ast.VarianceKind.In;
+                Advance(); // consume in/out
+            }
+
             if (Check(TokenKind.Identifier))
             {
                 var nameToken = Advance();
-                typeParams.Add(new TypeParameterNode(nameToken.Span, nameToken.Text, Array.Empty<TypeConstraintNode>()));
+                typeParams.Add(new TypeParameterNode(nameToken.Span, nameToken.Text, Array.Empty<TypeConstraintNode>(), variance));
             }
             else
             {
@@ -4446,6 +4464,41 @@ public sealed class Parser
         // NEW: Parse optional type parameters §IFACE{...}<T, U>
         var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
 
+        // Legacy: Extract type parameters from name if present (e.g., IProducer<out T>)
+        if (typeParameters.Count == 0)
+        {
+            var typeParamStart = name.IndexOf('<');
+            if (typeParamStart >= 0)
+            {
+                var typeParamEnd = name.LastIndexOf('>');
+                if (typeParamEnd > typeParamStart)
+                {
+                    var typeParamStr = name.Substring(typeParamStart + 1, typeParamEnd - typeParamStart - 1);
+                    name = name.Substring(0, typeParamStart);
+
+                    foreach (var tpName in typeParamStr.Split(','))
+                    {
+                        var trimmed = tpName.Trim();
+                        if (!string.IsNullOrEmpty(trimmed))
+                        {
+                            var variance = Ast.VarianceKind.None;
+                            if (trimmed.StartsWith("out "))
+                            {
+                                variance = Ast.VarianceKind.Out;
+                                trimmed = trimmed.Substring(4);
+                            }
+                            else if (trimmed.StartsWith("in "))
+                            {
+                                variance = Ast.VarianceKind.In;
+                                trimmed = trimmed.Substring(3);
+                            }
+                            typeParameters.Add(new TypeParameterNode(startToken.Span, trimmed, Array.Empty<TypeConstraintNode>(), variance));
+                        }
+                    }
+                }
+            }
+        }
+
         var baseInterfaces = new List<string>();
         var methods = new List<MethodSignatureNode>();
         var properties = new List<PropertyNode>();
@@ -4680,13 +4733,24 @@ public sealed class Parser
                     var typeParamStr = name.Substring(typeParamStart + 1, typeParamEnd - typeParamStart - 1);
                     name = name.Substring(0, typeParamStart);
 
-                    // Parse type parameter names (comma-separated)
+                    // Parse type parameter names (comma-separated), with optional variance
                     foreach (var tpName in typeParamStr.Split(','))
                     {
                         var trimmedName = tpName.Trim();
                         if (!string.IsNullOrEmpty(trimmedName))
                         {
-                            typeParameters.Add(new TypeParameterNode(startToken.Span, trimmedName, Array.Empty<TypeConstraintNode>()));
+                            var variance = Ast.VarianceKind.None;
+                            if (trimmedName.StartsWith("out "))
+                            {
+                                variance = Ast.VarianceKind.Out;
+                                trimmedName = trimmedName.Substring(4);
+                            }
+                            else if (trimmedName.StartsWith("in "))
+                            {
+                                variance = Ast.VarianceKind.In;
+                                trimmedName = trimmedName.Substring(3);
+                            }
+                            typeParameters.Add(new TypeParameterNode(startToken.Span, trimmedName, Array.Empty<TypeConstraintNode>(), variance));
                         }
                     }
                 }

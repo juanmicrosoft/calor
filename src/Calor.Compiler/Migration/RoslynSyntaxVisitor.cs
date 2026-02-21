@@ -190,6 +190,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(t => t.Type.ToString())
             .ToList() ?? new List<string>();
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
 
         var methods = new List<MethodSignatureNode>();
         foreach (var member in node.Members)
@@ -205,6 +206,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             id,
             name,
             baseInterfaces,
+            typeParameters,
             methods,
             new AttributeCollection(),
             csharpAttrs);
@@ -1146,6 +1148,37 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         GetTextSpan(tupleStmt),
                         leftExpr,
                         rightExpr));
+                }
+                FlushPendingStatements(statements);
+                continue;
+            }
+
+            // Handle var (a, b) = expr → bind a temp, then §B for each variable
+            // Roslyn represents this as: AssignmentExpression(DeclarationExpression(ParenthesizedVariableDesignation), expr)
+            if (statement is ExpressionStatementSyntax deconstructStmt
+                && deconstructStmt.Expression is AssignmentExpressionSyntax deconstructAssign
+                && deconstructAssign.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                && deconstructAssign.Left is DeclarationExpressionSyntax deconstructDecl
+                && deconstructDecl.Designation is ParenthesizedVariableDesignationSyntax parenDesignation)
+            {
+                _context.RecordFeatureUsage("tuple-deconstruction");
+                _context.IncrementConverted();
+                var rhs = ConvertExpression(deconstructAssign.Right);
+                var tempName = _context.GenerateId("_tup");
+                var span = GetTextSpan(deconstructStmt);
+                // Bind the tuple to a temp: §B _tup expr
+                statements.Add(new BindStatementNode(span, tempName, null, false, rhs, new AttributeCollection()));
+                // Bind each variable: §B a _tup.Item1, §B b _tup.Item2
+                for (int i = 0; i < parenDesignation.Variables.Count; i++)
+                {
+                    var designation = parenDesignation.Variables[i];
+                    if (designation is SingleVariableDesignationSyntax singleVar)
+                    {
+                        var varName = singleVar.Identifier.Text;
+                        statements.Add(new BindStatementNode(span, varName, null, false,
+                            new FieldAccessNode(span, new ReferenceNode(span, tempName), $"Item{i + 1}"),
+                            new AttributeCollection()));
+                    }
                 }
                 FlushPendingStatements(statements);
                 continue;
@@ -2527,6 +2560,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
             InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
             TypeOfExpressionSyntax typeOf => new TypeOfExpressionNode(GetTextSpan(typeOf), TypeMapper.CSharpToCalor(typeOf.Type.ToString())),
+            GenericNameSyntax generic => new ReferenceNode(GetTextSpan(generic),
+                $"{generic.Identifier.Text}<{string.Join(", ", generic.TypeArgumentList.Arguments.Select(a => TypeMapper.CSharpToCalor(a.ToString())))}>"),
             PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
             DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
             AssignmentExpressionSyntax assignExpr => ConvertAssignmentExpression(assignExpr),
@@ -2668,6 +2703,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (declExpr.Designation is DiscardDesignationSyntax)
         {
             return new ReferenceNode(GetTextSpan(declExpr), "_");
+        }
+
+        // Parenthesized variable designation: var (a, b) in expression context
+        if (declExpr.Designation is ParenthesizedVariableDesignationSyntax parenVar)
+        {
+            _context.RecordFeatureUsage("tuple-deconstruction");
+            // Hoist individual variable declarations
+            foreach (var variable in parenVar.Variables)
+            {
+                if (variable is SingleVariableDesignationSyntax sv)
+                {
+                    _pendingStatements.Add(new BindStatementNode(
+                        GetTextSpan(declExpr),
+                        sv.Identifier.Text,
+                        null,
+                        isMutable: true,
+                        initializer: null,
+                        new AttributeCollection()));
+                }
+            }
+            // Return a reference to the first variable as the expression value
+            var firstName = parenVar.Variables.OfType<SingleVariableDesignationSyntax>().FirstOrDefault()?.Identifier.Text ?? "_";
+            return new ReferenceNode(GetTextSpan(declExpr), firstName);
         }
 
         return CreateFallbackExpression(declExpr, "complex-declaration");
@@ -3274,14 +3332,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var memberName = memberAccess.Name.Identifier.Text;
         var span = GetTextSpan(memberAccess);
 
-        // Convert string.Empty to empty string literal ""
+        // Convert string.Empty and System.String.Empty to empty string literal ""
         if (memberName == "Empty")
         {
             var targetStr = memberAccess.Expression.ToString();
-            if (targetStr == "string" || targetStr == "String")
+            if (targetStr is "string" or "String" or "System.String")
             {
                 return new StringLiteralNode(span, "");
             }
+        }
+
+        // Handle generic static member access: GenericType<T>.Member → GenericType<T>.Member
+        // e.g., EqualityComparer<int>.Default, Array.Empty<string>()
+        if (memberAccess.Expression is GenericNameSyntax genericName)
+        {
+            var typeName = genericName.Identifier.Text;
+            var typeArgs = string.Join(", ", genericName.TypeArgumentList.Arguments.Select(a => TypeMapper.CSharpToCalor(a.ToString())));
+            return new ReferenceNode(span, $"{typeName}<{typeArgs}>.{memberName}");
         }
 
         // Convert primitive type static members (int.MaxValue, byte.MinValue, etc.)
@@ -4103,12 +4170,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return typeParamList.Parameters
-            .Select(p => new TypeParameterNode(
-                GetTextSpan(p),
-                p.Identifier.Text,
-                constraintMap.TryGetValue(p.Identifier.Text, out var constraints)
-                    ? constraints
-                    : Array.Empty<TypeConstraintNode>()))
+            .Select(p =>
+            {
+                var variance = p.VarianceKeyword.IsKind(SyntaxKind.OutKeyword) ? Ast.VarianceKind.Out
+                    : p.VarianceKeyword.IsKind(SyntaxKind.InKeyword) ? Ast.VarianceKind.In
+                    : Ast.VarianceKind.None;
+                return new TypeParameterNode(
+                    GetTextSpan(p),
+                    p.Identifier.Text,
+                    constraintMap.TryGetValue(p.Identifier.Text, out var constraints)
+                        ? constraints
+                        : Array.Empty<TypeConstraintNode>(),
+                    variance);
+            })
             .ToList();
     }
 

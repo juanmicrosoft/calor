@@ -1411,4 +1411,144 @@ public class Example
     }
 
     #endregion
+
+    #region Batch 7: Tuples, Generic Static Access, Variance
+
+    [Fact]
+    public void Convert_TupleDeconstruction_ProducesBindStatements()
+    {
+        var csharp = @"
+public class Example
+{
+    public (int, string) GetPair() => (1, ""hello"");
+    public void Test()
+    {
+        var (a, b) = GetPair();
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should produce temp bind and individual item binds
+        Assert.Contains("_tup", calor);
+        Assert.Contains("Item1", calor);
+        Assert.Contains("Item2", calor);
+        // The deconstruction should produce bind statements, not an ERR for "var (a, b)"
+        Assert.DoesNotContain("var (a, b)", calor);
+    }
+
+    [Fact]
+    public void Convert_GenericStaticMemberAccess_Preserved()
+    {
+        var csharp = @"
+using System.Collections.Generic;
+public class Example
+{
+    public IEqualityComparer<string> GetComparer()
+    {
+        return EqualityComparer<string>.Default;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should not produce an ERR for generic static member access
+        Assert.DoesNotContain("ERR", calor);
+        // Should preserve the generic type and member
+        Assert.Contains("EqualityComparer", calor);
+        Assert.Contains("Default", calor);
+    }
+
+    [Fact]
+    public void Convert_VarianceModifiers_PreservedInAst()
+    {
+        var csharp = @"
+public interface IProducer<out T>
+{
+    T Produce();
+}
+public interface IConsumer<in T>
+{
+    void Consume(T item);
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+
+        // Check the IProducer interface has out variance on T
+        var producer = result.Ast!.Interfaces.FirstOrDefault(i => i.Name == "IProducer");
+        Assert.NotNull(producer);
+        Assert.Single(producer!.TypeParameters);
+        Assert.Equal(Calor.Compiler.Ast.VarianceKind.Out, producer.TypeParameters[0].Variance);
+
+        // Check the IConsumer interface has in variance on T
+        var consumer = result.Ast.Interfaces.FirstOrDefault(i => i.Name == "IConsumer");
+        Assert.NotNull(consumer);
+        Assert.Single(consumer!.TypeParameters);
+        Assert.Equal(Calor.Compiler.Ast.VarianceKind.In, consumer.TypeParameters[0].Variance);
+    }
+
+    [Fact]
+    public void Convert_VarianceModifiers_RoundTripEmitsInOut()
+    {
+        var csharp = @"
+public interface IReadOnly<out T>
+{
+    T Get();
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Calor source should contain 'out T' in the type parameter list
+        Assert.Contains("out T", calor);
+
+        // Compile Calor back to C# and verify variance is preserved
+        var compiled = Compile(calor);
+        Assert.Contains("out T", compiled);
+    }
+
+    [Fact]
+    public void Convert_SystemStringEmpty_ToEmptyLiteral()
+    {
+        var csharp = @"
+public class Example
+{
+    public string Test()
+    {
+        return System.String.Empty;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should produce empty string literal, not a field access
+        Assert.DoesNotContain("System.String.Empty", calor);
+        Assert.Contains("\"\"", calor);
+    }
+
+    [Fact]
+    public void Convert_GenericNameExpression_NotFallback()
+    {
+        var csharp = @"
+using System;
+using System.Collections.Generic;
+public class Example
+{
+    public string[] Test()
+    {
+        return Array.Empty<string>();
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should not produce ERR for generic method invocation
+        Assert.DoesNotContain("ERR", calor);
+    }
+
+    #endregion
 }

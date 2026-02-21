@@ -149,13 +149,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(InterfaceDefinitionNode node)
     {
+        var typeParams = node.TypeParameters.Count > 0
+            ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
+            : "";
         var baseList = node.BaseInterfaces.Count > 0
             ? $":{string.Join(",", node.BaseInterfaces)}"
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§IFACE{{{node.Id}:{node.Name}{baseList}}}{attrs}");
+        AppendLine($"§IFACE{{{node.Id}:{node.Name}{typeParams}{baseList}}}{attrs}");
         Indent();
+
+        EmitTypeParameterConstraints(node.TypeParameters);
 
         foreach (var prop in node.Properties)
         {
@@ -176,7 +181,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(MethodSignatureNode node)
     {
         var typeParams = node.TypeParameters.Count > 0
-            ? $"<{string.Join(",", node.TypeParameters.Select(tp => tp.Name))}>"
+            ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -212,7 +217,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
         var typeParams = node.TypeParameters.Count > 0
-            ? $"<{string.Join(",", node.TypeParameters.Select(tp => tp.Name))}>"
+            ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -455,7 +460,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
         var typeParams = node.TypeParameters.Count > 0
-            ? $"<{string.Join(",", node.TypeParameters.Select(tp => tp.Name))}>"
+            ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
 
         var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
@@ -515,7 +520,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var visibility = GetVisibilityShorthand(node.Visibility);
         var typeParams = node.TypeParameters.Count > 0
-            ? $"<{string.Join(",", node.TypeParameters.Select(tp => tp.Name))}>"
+            ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
 
         var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
@@ -1800,7 +1805,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     // Generic type nodes
-    public string Visit(TypeParameterNode node) => node.Name;
+    public string Visit(TypeParameterNode node)
+    {
+        var variance = node.Variance switch
+        {
+            VarianceKind.In => "in ",
+            VarianceKind.Out => "out ",
+            _ => ""
+        };
+        return $"{variance}{node.Name}";
+    }
 
     public string Visit(TypeConstraintNode node)
     {

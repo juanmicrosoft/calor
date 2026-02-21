@@ -3,6 +3,19 @@ using Calor.Compiler.Parsing;
 namespace Calor.Compiler.Ast;
 
 /// <summary>
+/// Variance modifier for type parameters.
+/// </summary>
+public enum VarianceKind
+{
+    /// <summary>No variance (invariant)</summary>
+    None,
+    /// <summary>Covariant (out T)</summary>
+    Out,
+    /// <summary>Contravariant (in T)</summary>
+    In
+}
+
+/// <summary>
 /// Represents a type parameter declaration.
 /// New syntax: §F{id:name:pub}&lt;T&gt; or §CL{id:name:pub}&lt;T, U&gt;
 /// Legacy: §TP[T] (no longer supported in new code)
@@ -15,15 +28,21 @@ public sealed class TypeParameterNode : AstNode
     public string Name { get; }
 
     /// <summary>
+    /// The variance modifier (in/out) for this type parameter.
+    /// </summary>
+    public VarianceKind Variance { get; }
+
+    /// <summary>
     /// The constraints on this type parameter (from WHERE clauses).
     /// </summary>
     public IReadOnlyList<TypeConstraintNode> Constraints { get; }
 
-    public TypeParameterNode(TextSpan span, string name, IReadOnlyList<TypeConstraintNode> constraints)
+    public TypeParameterNode(TextSpan span, string name, IReadOnlyList<TypeConstraintNode> constraints, VarianceKind variance = VarianceKind.None)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Constraints = constraints ?? throw new ArgumentNullException(nameof(constraints));
+        Variance = variance;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
