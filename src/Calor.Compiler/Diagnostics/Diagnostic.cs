@@ -34,6 +34,14 @@ public static class DiagnosticCode
     public const string InvalidOperator = "Calor0106";
     public const string InvalidModifier = "Calor0107";
 
+    // Parser validation errors (Calor0110-0119)
+    public const string OperatorArgumentCount = "Calor0110";
+    public const string InvalidComparisonMode = "Calor0111";
+    public const string InvalidCharLiteral = "Calor0112";
+    public const string ExpectedTypeName = "Calor0113";
+    public const string InvalidLispExpression = "Calor0114";
+    public const string TypeParameterNotFound = "Calor0115";
+
     // Semantic errors (Calor0200-0299)
     public const string UndefinedReference = "Calor0200";
     public const string DuplicateDefinition = "Calor0201";
