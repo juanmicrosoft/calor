@@ -1843,8 +1843,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             else
             {
                 // Base of the chain — has a concrete target
-                var baseTarget = memberAccess.Expression.ToString();
-                steps.Add((baseTarget, methodName, args, span));
+                // If the base is an object creation (new Foo()), hoist to a temp bind
+                // so the chain decomposition produces §NEW + bind instead of raw text
+                if (memberAccess.Expression is ObjectCreationExpressionSyntax
+                    || memberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
+                {
+                    var newConverted = ConvertExpression(memberAccess.Expression);
+                    var tempName = _context.GenerateId("_new");
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, tempName, null, false, newConverted, new AttributeCollection()));
+                    steps.Add((tempName, methodName, args, span));
+                }
+                else
+                {
+                    var baseTarget = memberAccess.Expression.ToString();
+                    steps.Add((baseTarget, methodName, args, span));
+                }
                 break;
             }
         }
@@ -2839,8 +2853,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             else if (element is SpreadElementSyntax spread)
             {
-                // Spread elements like ..otherArray - not supported in Calor
-                return CreateFallbackExpression(collection, "collection-spread");
+                // Spread-only collection [..expr] → convert to expr.ToList()
+                if (collection.Elements.Count == 1)
+                {
+                    _context.RecordFeatureUsage("collection-spread");
+                    var spreadTarget = spread.Expression.ToString();
+                    return new CallExpressionNode(GetTextSpan(collection),
+                        $"{spreadTarget}.ToList", Array.Empty<ExpressionNode>());
+                }
+                // Mixed spread [1, 2, ..expr] — not yet supported
+                return CreateFallbackExpression(collection, "collection-spread-mixed");
             }
         }
 
@@ -3157,6 +3179,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_chain");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, innerConverted, new AttributeCollection()));
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+            }
+
+            // Handle new-then-call pattern: new Foo(...).Method(...)
+            // Hoist the §NEW to a temp bind so the method call has a clean target.
+            if (memberAccess.Expression is ObjectCreationExpressionSyntax
+                || memberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
+            {
+                var newConverted = targetExpr; // already converted via ConvertExpression above
+                var tempName = _context.GenerateId("_new");
+                _pendingStatements.Add(new BindStatementNode(
+                    span, tempName, null, false, newConverted, new AttributeCollection()));
                 return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
             }
         }

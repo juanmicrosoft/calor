@@ -605,9 +605,9 @@ public static class FeatureSupport
         ["collection-spread"] = new FeatureInfo
         {
             Name = "collection-spread",
-            Support = SupportLevel.NotSupported,
+            Support = SupportLevel.Full,
             Description = "Collection spread operator (..)",
-            Workaround = "Use explicit collection concatenation methods"
+            Workaround = "Spread-only [..expr] converts to expr.ToList(); mixed spreads need manual conversion"
         },
         ["implicit-new-with-args"] = new FeatureInfo
         {

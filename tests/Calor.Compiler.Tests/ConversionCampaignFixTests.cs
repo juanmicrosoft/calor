@@ -2102,4 +2102,88 @@ public class Demo
     }
 
     #endregion
+
+    #region Batch 13: Collection spread and fluent chain fixes
+
+    [Fact]
+    public void Convert_CollectionSpreadOnly_ConvertsToToList()
+    {
+        var csharp = @"
+using System.Collections.Generic;
+using System.Linq;
+
+public class Demo
+{
+    public List<string> Work(IEnumerable<string> items)
+    {
+        return [..items];
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Should NOT contain ERR
+        Assert.DoesNotContain("ERR", calor);
+        // Should contain a ToList call
+        Assert.Contains("ToList", calor);
+    }
+
+    [Fact]
+    public void Convert_FluentChainOnNew_HoistsNewToBinding()
+    {
+        var csharp = @"
+public class Builder
+{
+    public Builder WithName(string n) { return this; }
+    public string Build() { return n; }
+}
+
+public class Demo
+{
+    public string Work()
+    {
+        return new Builder().WithName(""test"").Build();
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // The §NEW should be hoisted to a temp binding, not inlined in call target
+        Assert.DoesNotContain("new Builder()", calor);
+        // Should have a proper chain decomposition
+        Assert.Contains("_new", calor);
+        Assert.Contains("§NEW{Builder}", calor);
+    }
+
+    [Fact]
+    public void Convert_FluentChainOnNew_RoundTrip()
+    {
+        var csharp = @"
+public class Builder
+{
+    public Builder WithName(string n) { return this; }
+    public string Build() { return """"; }
+}
+
+public class Demo
+{
+    public string Work()
+    {
+        return new Builder().WithName(""test"").Build();
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        Assert.Contains("Builder", compiled);
+        Assert.Contains("WithName", compiled);
+        Assert.Contains("Build", compiled);
+    }
+
+    #endregion
 }
