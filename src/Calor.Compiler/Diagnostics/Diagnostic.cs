@@ -23,6 +23,8 @@ public static class DiagnosticCode
     public const string InvalidTypedLiteral = "Calor0003";
     public const string InvalidEscapeSequence = "Calor0004";
     public const string UnterminatedRawBlock = "Calor0005";
+    public const string UnknownSectionMarker = "Calor0006";
+    public const string InvalidSectionOperator = "Calor0007";
 
     // Parser errors (Calor0100-0199)
     public const string UnexpectedToken = "Calor0100";

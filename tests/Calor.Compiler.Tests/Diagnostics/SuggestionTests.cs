@@ -265,6 +265,58 @@ public class SuggestionTests
         Assert.Contains("(cast", error.Message);
     }
 
+    [Fact]
+    public void Lexer_UnknownSectionMarker_EmitsCalor0006()
+    {
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer("§UNKNOWN", diagnostics);
+        lexer.TokenizeAll();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.IsError);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, error.Code);
+    }
+
+    [Fact]
+    public void Lexer_CastSectionMarker_EmitsCalor0006()
+    {
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer("§CAST", diagnostics);
+        lexer.TokenizeAll();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.IsError);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, error.Code);
+    }
+
+    [Fact]
+    public void Lexer_InvalidSectionOperator_EmitsCalor0007()
+    {
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer("§?X", diagnostics);
+        lexer.TokenizeAll();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.IsError);
+        Assert.Equal(DiagnosticCode.InvalidSectionOperator, error.Code);
+        Assert.Contains("§?", error.Message);
+        Assert.Contains("§??", error.Message);
+        Assert.Contains("§?.", error.Message);
+    }
+
+    [Fact]
+    public void Lexer_TrulyUnexpectedCharacter_StillEmitsCalor0001()
+    {
+        var diagnostics = new DiagnosticBag();
+        // Use a character that isn't handled by any lexer branch
+        var lexer = new Lexer("©", diagnostics);
+        lexer.TokenizeAll();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.IsError);
+        Assert.Equal(DiagnosticCode.UnexpectedCharacter, error.Code);
+    }
+
     #endregion
 
     #region Fix Generation Tests

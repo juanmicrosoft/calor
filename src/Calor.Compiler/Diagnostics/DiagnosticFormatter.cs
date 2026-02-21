@@ -391,6 +391,8 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
     private static string GetRuleDescription(string code) => code switch
     {
         DiagnosticCode.UnexpectedCharacter => "Unexpected character in source",
+        DiagnosticCode.UnknownSectionMarker => "Unknown section marker",
+        DiagnosticCode.InvalidSectionOperator => "Invalid section operator",
         DiagnosticCode.UnterminatedString => "Unterminated string literal",
         DiagnosticCode.UnexpectedToken => "Unexpected token",
         DiagnosticCode.MismatchedId => "Mismatched construct IDs",
