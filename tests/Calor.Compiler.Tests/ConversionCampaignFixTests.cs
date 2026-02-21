@@ -2187,6 +2187,79 @@ public class Demo
 
     #endregion
 
+    #region Batch 15: §HAS/§IDX/§LEN/§CNT inside lisp expressions (#319)
+
+    [Fact]
+    public void Has_InsideNegation_Compiles()
+    {
+        var calor = @"
+§M{m001:HasTest}
+  §F{f001:Check:pub}
+    §I{Dict<str,i32>:cache}
+    §I{str:key}
+    §O{bool}
+    §R (! §HAS{cache} §KEY key)
+  §/F{f001}
+§/M{m001}
+";
+        var compiled = ParseAndEmit(calor);
+        Assert.Contains("ContainsKey", compiled);
+        Assert.Contains("!", compiled);
+    }
+
+    [Fact]
+    public void Idx_InsideArithmetic_Compiles()
+    {
+        var calor = @"
+§M{m001:IdxTest}
+  §F{f001:AddFirst:pub}
+    §I{i32:val}
+    §O{i32}
+    §B{items} §LIST{l001:i32} 10 20 30 §/LIST{l001}
+    §R (+ val §IDX items 0)
+  §/F{f001}
+§/M{m001}
+";
+        var compiled = ParseAndEmit(calor);
+        Assert.Contains("[0]", compiled);
+        Assert.Contains("+", compiled);
+    }
+
+    [Fact]
+    public void Cnt_InsideComparison_Compiles()
+    {
+        var calor = @"
+§M{m001:CntTest}
+  §F{f001:IsEmpty:pub}
+    §I{List<i32>:items}
+    §O{bool}
+    §R (== §CNT items 0)
+  §/F{f001}
+§/M{m001}
+";
+        var compiled = ParseAndEmit(calor);
+        Assert.Contains(".Count", compiled);
+        Assert.Contains("== ", compiled);
+    }
+
+    [Fact]
+    public void Len_InsideComparison_Compiles()
+    {
+        var calor = @"
+§M{m001:LenTest}
+  §F{f001:IsLong:pub}
+    §I{List<str>:arr}
+    §O{bool}
+    §R (> §LEN arr 10)
+  §/F{f001}
+§/M{m001}
+";
+        var compiled = ParseAndEmit(calor);
+        Assert.Contains(".Length", compiled);
+    }
+
+    #endregion
+
     #region Batch 14: Pattern combinators and negated type patterns (#324)
 
     [Fact]
