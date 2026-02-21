@@ -367,6 +367,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var methods = new List<MethodNode>();
         var events = new List<EventDefinitionNode>();
 
+        // Convert C# 12 primary constructor parameters to readonly fields
+        if (node.ParameterList != null)
+        {
+            _context.RecordFeatureUsage("primary-constructor");
+            foreach (var param in node.ParameterList.Parameters)
+            {
+                var fieldName = param.Identifier.Text;
+                var fieldTypeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
+                var fieldCsharpAttrs = ConvertAttributes(param.AttributeLists);
+
+                fields.Add(new ClassFieldNode(
+                    GetTextSpan(param),
+                    fieldName,
+                    fieldTypeName,
+                    Visibility.Private,
+                    MethodModifiers.Readonly,
+                    param.Default != null ? ConvertExpression(param.Default.Value) : null,
+                    new AttributeCollection(),
+                    fieldCsharpAttrs));
+            }
+        }
+
         foreach (var member in node.Members)
         {
             switch (member)

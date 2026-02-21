@@ -374,9 +374,9 @@ public static class FeatureSupport
         ["primary-constructor"] = new FeatureInfo
         {
             Name = "primary-constructor",
-            Support = SupportLevel.NotSupported,
-            Description = "Primary constructors (class Foo(int x)) are not supported",
-            Workaround = "Use traditional constructor syntax"
+            Support = SupportLevel.Full,
+            Description = "Primary constructors (class Foo(int x)) are converted to readonly fields",
+            Workaround = null
         },
         ["range-expression"] = new FeatureInfo
         {

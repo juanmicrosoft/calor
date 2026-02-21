@@ -1099,4 +1099,48 @@ class Test
     }
 
     #endregion
+
+    #region Issue 355: Primary constructor parameters lost
+
+    [Fact]
+    public void Convert_PrimaryConstructor_EmitsFields()
+    {
+        var csharp = @"
+public class Service(string name, int retries)
+{
+    public string GetName() => name;
+    public int GetRetries() => retries;
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Primary constructor parameters should appear as fields
+        Assert.Contains("name", calor);
+        Assert.Contains("retries", calor);
+        // Should contain field declarations
+        Assert.Contains("§FLD", calor);
+    }
+
+    [Fact]
+    public void Convert_PrimaryConstructor_WithBase_EmitsFields()
+    {
+        var csharp = @"
+public class BaseService
+{
+}
+
+public class DerivedService(string connectionString) : BaseService
+{
+    public string GetConnection() => connectionString;
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        Assert.Contains("connectionString", calor);
+        Assert.Contains("§FLD", calor);
+    }
+
+    #endregion
 }
