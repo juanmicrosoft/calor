@@ -972,4 +972,131 @@ class Config
     }
 
     #endregion
+
+    #region Issue 339+: Declaration pattern variable binding (is Type var)
+
+    [Fact]
+    public void Convert_DeclarationPattern_BindsVariable()
+    {
+        var csharp = @"
+class Test
+{
+    string Describe(object value)
+    {
+        if (value is string s)
+        {
+            return s;
+        }
+        return ""unknown"";
+    }
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        // Should bind the variable 's' via a cast
+        Assert.Contains("s", calor);
+        // Should contain a type check
+        Assert.Contains("(is value str)", calor);
+        // Should contain a bind for the pattern variable
+        Assert.Contains("§B", calor);
+    }
+
+    [Fact]
+    public void Convert_DeclarationPattern_CastsVariable()
+    {
+        var csharp = @"
+class Test
+{
+    int GetLength(object value)
+    {
+        if (value is string text)
+        {
+            return text.Length;
+        }
+        return 0;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        // Should have a cast for the pattern variable
+        Assert.Contains("cast", calor);
+        Assert.Contains("text", calor);
+    }
+
+    #endregion
+
+    #region Issue 346+: out var declarations
+
+    [Fact]
+    public void Convert_OutVar_PreDeclaresVariable()
+    {
+        var csharp = @"
+class Test
+{
+    bool Check(string input)
+    {
+        return int.TryParse(input, out var result);
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result);
+        // If conversion crashed, show error details
+        if (result.CalorSource == null)
+        {
+            var issues = result.Issues?.Select(i => i.ToString()) ?? Array.Empty<string>();
+            Assert.Fail($"Conversion produced null CalorSource. Issues: {string.Join("; ", issues)}");
+        }
+        var calor = result.CalorSource!;
+
+        // Should NOT produce ERR for the out var declaration
+        Assert.DoesNotContain("§ERR", calor);
+        // Should reference 'result'
+        Assert.Contains("result", calor);
+    }
+
+    [Fact]
+    public void Convert_OutVarTyped_PreDeclaresVariable()
+    {
+        var csharp = @"
+class Test
+{
+    bool Parse(string input)
+    {
+        return int.TryParse(input, out int result);
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result);
+        var calor = result.CalorSource;
+
+        Assert.NotNull(calor);
+        Assert.DoesNotContain("§ERR", calor!);
+        Assert.Contains("result", calor);
+    }
+
+    #endregion
+
+    #region Issue 361+: Method groups as arguments
+
+    [Fact]
+    public void Convert_MethodGroupOnPredefinedType_NoERR()
+    {
+        var csharp = @"
+using System.Linq;
+class Test
+{
+    bool AllUpper(string input)
+    {
+        return input.All(char.IsUpper);
+    }
+}";
+        var result = _converter.Convert(csharp);
+        var calor = result.CalorSource;
+
+        // char.IsUpper should not produce ERR (PredefinedTypeSyntax now handled)
+        Assert.DoesNotContain("§ERR", calor);
+    }
+
+    #endregion
 }

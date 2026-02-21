@@ -1935,9 +1935,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var id = _context.GenerateId("if");
         var condition = ConvertExpression(node.Condition);
+
+        // Collect any pending statements from declaration pattern variable bindings
+        // These need to be injected at the START of the then-body, not before the if
+        var patternBindings = new List<StatementNode>();
+        if (_pendingStatements.Count > 0)
+        {
+            patternBindings.AddRange(_pendingStatements);
+            _pendingStatements.Clear();
+        }
+
         var thenBody = node.Statement is BlockSyntax block
             ? ConvertBlock(block)
             : new List<StatementNode> { ConvertStatement(node.Statement)! };
+
+        // Inject pattern variable bindings at the start of the then-body
+        if (patternBindings.Count > 0)
+        {
+            var combined = new List<StatementNode>(patternBindings);
+            combined.AddRange(thenBody);
+            thenBody = combined;
+        }
 
         var elseIfClauses = new List<ElseIfClauseNode>();
         IReadOnlyList<StatementNode>? elseBody = null;
@@ -2467,6 +2485,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
             TypeOfExpressionSyntax typeOf => new TypeOfExpressionNode(GetTextSpan(typeOf), TypeMapper.CSharpToCalor(typeOf.Type.ToString())),
             PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
+            DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -2567,13 +2586,78 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left,
                     TypeMapper.CSharpToCalor(typePattern.Type.ToString())),
             DeclarationPatternSyntax declPattern =>
-                // "x is SomeType varName" - emit the type check, variable binding is not preserved
-                new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left,
-                    TypeMapper.CSharpToCalor(declPattern.Type.ToString())),
+                ConvertDeclarationPattern(isPattern, left, declPattern),
             _ =>
                 // For other patterns, create a fallback expression
                 CreateFallbackExpression(isPattern, "complex-is-pattern")
         };
+    }
+
+    /// <summary>
+    /// Converts `out var x` or `out Type x` declaration expressions.
+    /// Hoists a variable declaration via _pendingStatements, returns a reference to the variable.
+    /// </summary>
+    private ExpressionNode ConvertDeclarationExpression(DeclarationExpressionSyntax declExpr)
+    {
+        _context.RecordFeatureUsage("out-var");
+
+        if (declExpr.Designation is SingleVariableDesignationSyntax singleVar)
+        {
+            var varName = singleVar.Identifier.Text;
+            var typeName = declExpr.Type.IsVar
+                ? (string?)null
+                : TypeMapper.CSharpToCalor(declExpr.Type.ToString());
+
+            // Hoist a variable declaration: §B{varName:Type} default
+            _pendingStatements.Add(new BindStatementNode(
+                GetTextSpan(declExpr),
+                varName,
+                typeName,
+                isMutable: true,
+                initializer: null,
+                new AttributeCollection()));
+
+            return new ReferenceNode(GetTextSpan(declExpr), varName);
+        }
+
+        // Discard pattern: `out _`
+        if (declExpr.Designation is DiscardDesignationSyntax)
+        {
+            return new ReferenceNode(GetTextSpan(declExpr), "_");
+        }
+
+        return CreateFallbackExpression(declExpr, "complex-declaration");
+    }
+
+    /// <summary>
+    /// Converts "x is SomeType varName" to a type check expression and hoists a variable binding.
+    /// The type check (is) is returned as the expression value for use in conditions.
+    /// The variable binding (§B{varName} (cast SomeType x)) is hoisted via _pendingStatements
+    /// so it appears before the containing statement.
+    /// </summary>
+    private ExpressionNode ConvertDeclarationPattern(
+        IsPatternExpressionSyntax isPattern,
+        ExpressionNode left,
+        DeclarationPatternSyntax declPattern)
+    {
+        var calorType = TypeMapper.CSharpToCalor(declPattern.Type.ToString());
+
+        // Hoist a variable binding: §B{varName} (cast Type expr)
+        if (declPattern.Designation is SingleVariableDesignationSyntax singleVar)
+        {
+            var varName = singleVar.Identifier.Text;
+            var castExpr = new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Cast, left, calorType);
+            _pendingStatements.Add(new BindStatementNode(
+                GetTextSpan(isPattern),
+                varName,
+                calorType,
+                isMutable: false,
+                castExpr,
+                new AttributeCollection()));
+        }
+
+        // Return the type check as the expression
+        return new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left, calorType);
     }
 
     private ExpressionNode ConvertCollectionExpression(CollectionExpressionSyntax collection)

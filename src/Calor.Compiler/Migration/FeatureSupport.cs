@@ -437,9 +437,9 @@ public static class FeatureSupport
         ["out-var"] = new FeatureInfo
         {
             Name = "out-var",
-            Support = SupportLevel.NotSupported,
-            Description = "Inline out variable declarations (out var x) are not supported",
-            Workaround = "Declare the variable before the method call"
+            Support = SupportLevel.Full,
+            Description = "Inline out variable declarations (out var x) are pre-declared as bindings",
+            Workaround = null
         },
 
         // Phase 2 features
