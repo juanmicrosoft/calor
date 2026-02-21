@@ -668,4 +668,69 @@ public class Example
     }
 
     #endregion
+
+    #region Issue 356: Constructor expression body silently dropped
+
+    [Fact]
+    public void Convert_ExpressionBodyCtor_EmitsAssignment()
+    {
+        var csharp = @"
+class RetryOptions
+{
+    public string Name { get; set; } = """";
+    public RetryOptions() => Name = ""DefaultRetry"";
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        // Should contain an assignment, not an ERR
+        Assert.DoesNotContain("§ERR", calor);
+        Assert.Contains("§ASSIGN", calor);
+        Assert.Contains("DefaultRetry", calor);
+    }
+
+    #endregion
+
+    #region Issue 366: Expression-bodied methods with assignment body
+
+    [Fact]
+    public void Convert_ExpressionBodyMethodWithAssignment_EmitsAssignment()
+    {
+        var csharp = @"
+class Widget
+{
+    public int Index { get; set; }
+    public void ResetState() => Index = 0;
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        // Should produce §ASSIGN, not §R §ERR{...}
+        Assert.DoesNotContain("§ERR", calor);
+        Assert.Contains("§ASSIGN", calor);
+    }
+
+    #endregion
+
+    #region Issue 381: string.Empty not recognized / Issue 374: int.MaxValue
+
+    [Fact]
+    public void Convert_StringEmpty_EmitsEmptyStringLiteral()
+    {
+        var csharp = @"
+class Test
+{
+    string GetDefault()
+    {
+        return string.Empty;
+    }
+}";
+        var result = _converter.Convert(csharp, "test");
+        var calor = result.CalorSource;
+
+        // string.Empty should be converted to ""
+        Assert.DoesNotContain("§ERR", calor);
+    }
+
+    #endregion
 }

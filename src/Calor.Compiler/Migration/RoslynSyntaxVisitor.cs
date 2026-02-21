@@ -756,7 +756,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("ctor");
         var visibility = GetVisibility(node.Modifiers);
         var parameters = ConvertParameters(node.ParameterList);
-        var body = node.Body != null ? ConvertBlock(node.Body) : new List<StatementNode>();
+        var body = ConvertMethodBody(node.Body, node.ExpressionBody);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         ConstructorInitializerNode? initializer = null;
@@ -979,6 +979,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         else if (expressionBody != null)
         {
+            // Expression-bodied methods/constructors with assignment body
+            // (e.g., => Name = "default" or => Index = 0) should emit §ASSIGN, not §R §ERR
+            if (expressionBody.Expression is AssignmentExpressionSyntax exprAssign)
+            {
+                var target = ConvertExpression(exprAssign.Left);
+                var value = ConvertExpression(exprAssign.Right);
+                return new List<StatementNode>
+                {
+                    new AssignmentStatementNode(GetTextSpan(expressionBody), target, value)
+                };
+            }
+
             return new List<StatementNode>
             {
                 new ReturnStatementNode(
