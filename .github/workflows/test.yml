@@ -76,6 +76,127 @@ jobs:
       - name: Run semantics tests
         run: dotnet test tests/Calor.Semantics.Tests -c Release --no-build --verbosity detailed
 
+  conversion-scorecard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Run scorecard tests
+        run: >-
+          dotnet test tests/Calor.Evaluation -c Release --no-build
+          --filter "FullyQualifiedName~ConversionScorecardTests"
+          --verbosity normal
+
+      - name: Generate scorecard report
+        run: >-
+          dotnet run --project tests/Calor.Evaluation -c Release --
+          scorecard --format both -o conversion-scorecard
+
+      - name: Upload scorecard artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conversion-scorecard
+          path: |
+            conversion-scorecard.json
+            conversion-scorecard.md
+
+      - name: Post PR comment with scorecard
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const md = fs.readFileSync('conversion-scorecard.md', 'utf8');
+            const marker = '<!-- calor-conversion-scorecard -->';
+            const body = `${marker}\n${md}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Check for regressions against baseline
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const current = JSON.parse(fs.readFileSync('conversion-scorecard.json', 'utf8'));
+
+            // Load committed baseline
+            const baselinePath = 'tests/Calor.Evaluation/Scorecard/baseline.json';
+            if (!fs.existsSync(baselinePath)) {
+              core.warning('No baseline.json found — skipping regression check');
+              return;
+            }
+            const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+
+            // Compare round-trip counts
+            const baselineRt = baseline.roundTripPassing;
+            const currentRt = current.roundTripPassing;
+            const delta = currentRt - baselineRt;
+
+            core.info(`Baseline round-trip: ${baselineRt}/${baseline.total}`);
+            core.info(`Current round-trip:  ${currentRt}/${current.total}`);
+            core.info(`Delta: ${delta >= 0 ? '+' : ''}${delta}`);
+
+            // Detect per-snippet regressions
+            const baselineById = {};
+            for (const r of baseline.results) baselineById[r.id] = r;
+
+            const regressions = [];
+            for (const r of current.results) {
+              const b = baselineById[r.id];
+              if (!b) continue;
+              const bPass = b.conversionSuccess && b.compilationSuccess && b.roslynParseSuccess;
+              const cPass = r.conversionSuccess && r.compilationSuccess && r.roslynParseSuccess;
+              if (bPass && !cPass) regressions.push(r.id);
+            }
+
+            if (regressions.length > 0) {
+              core.setFailed(`Conversion regressions detected in snippets: ${regressions.join(', ')}`);
+            } else if (currentRt < baselineRt) {
+              core.setFailed(`Round-trip count dropped: ${baselineRt} → ${currentRt}`);
+            } else {
+              core.info('No regressions detected');
+            }
+
   id-validation:
     runs-on: ubuntu-latest
 

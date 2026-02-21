@@ -6,6 +6,7 @@ using Calor.Evaluation.LlmTasks;
 using Calor.Evaluation.LlmTasks.Caching;
 using Calor.Evaluation.LlmTasks.Providers;
 using Calor.Evaluation.Reports;
+using Calor.Evaluation.Scorecard;
 
 namespace Calor.Evaluation;
 
@@ -460,6 +461,34 @@ public static class Program
         });
 
         rootCommand.AddCommand(correctnessCommand);
+
+        // Scorecard command — C# → Calor → C# round-trip conversion scorecard
+        var scorecardCommand = new Command("scorecard", "Run C# to Calor conversion scorecard on the CSharpImport corpus");
+
+        var scorecardOutputOption = new Option<string>(
+            aliases: new[] { "--output", "-o" },
+            description: "Output file base path (without extension)",
+            getDefaultValue: () => "conversion-scorecard");
+
+        var scorecardFormatOption = new Option<string>(
+            aliases: new[] { "--format", "-f" },
+            description: "Output format (json, markdown, both)",
+            getDefaultValue: () => "both");
+
+        var scorecardBaselineOption = new Option<string?>(
+            aliases: new[] { "--baseline", "-b" },
+            description: "Path to baseline scorecard JSON for regression comparison");
+
+        scorecardCommand.AddOption(scorecardOutputOption);
+        scorecardCommand.AddOption(scorecardFormatOption);
+        scorecardCommand.AddOption(scorecardBaselineOption);
+
+        scorecardCommand.SetHandler(async (output, format, baseline) =>
+        {
+            await RunScorecardAsync(output, format, baseline);
+        }, scorecardOutputOption, scorecardFormatOption, scorecardBaselineOption);
+
+        rootCommand.AddCommand(scorecardCommand);
 
         // Default: run benchmarks if no command specified
         rootCommand.SetHandler(async () =>
@@ -1757,4 +1786,115 @@ public static class Program
 
         return result;
     }
+
+    private static async Task RunScorecardAsync(string output, string format, string? baselinePath)
+    {
+        Console.WriteLine("Calor Conversion Scorecard");
+        Console.WriteLine("=========================");
+        Console.WriteLine();
+
+        // Find test data directory
+        var testDataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData", "CSharpImport");
+        if (!Directory.Exists(testDataDir))
+        {
+            var projectDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", ".."));
+            testDataDir = Path.Combine(projectDir, "TestData", "CSharpImport");
+        }
+
+        if (!Directory.Exists(testDataDir))
+        {
+            Console.Error.WriteLine($"Cannot find CSharpImport test data directory");
+            return;
+        }
+
+        Console.WriteLine($"Test data: {testDataDir}");
+
+        // Get commit hash
+        string? commitHash = null;
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("git", "rev-parse --short HEAD")
+            {
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            var proc = System.Diagnostics.Process.Start(psi);
+            if (proc != null)
+            {
+                commitHash = (await proc.StandardOutput.ReadToEndAsync()).Trim();
+                await proc.WaitForExitAsync();
+                if (proc.ExitCode != 0) commitHash = null;
+            }
+        }
+        catch { /* ignore */ }
+
+        Console.WriteLine("Running scorecard...");
+        Console.WriteLine();
+
+        var runner = new ConversionScorecardRunner();
+        var scorecard = runner.Run(testDataDir, commitHash);
+
+        // Print summary
+        Console.WriteLine($"Total snippets:       {scorecard.Total}");
+        Console.WriteLine($"Fully converted:      {scorecard.FullyConverted} ({Pct(scorecard.FullyConverted, scorecard.Total)})");
+        Console.WriteLine($"Partially converted:  {scorecard.PartiallyConverted} ({Pct(scorecard.PartiallyConverted, scorecard.Total)})");
+        Console.WriteLine($"Blocked:              {scorecard.Blocked} ({Pct(scorecard.Blocked, scorecard.Total)})");
+        Console.WriteLine($"Crashed:              {scorecard.Crashed} ({Pct(scorecard.Crashed, scorecard.Total)})");
+        Console.WriteLine($"Round-trip verified:   {scorecard.RoundTripPassing} ({Pct(scorecard.RoundTripPassing, scorecard.Total)})");
+        Console.WriteLine();
+
+        Console.WriteLine("By Level:");
+        foreach (var (level, breakdown) in scorecard.ByLevel.OrderBy(kv => kv.Key))
+        {
+            Console.WriteLine($"  Level {level}: {breakdown.Passed}/{breakdown.Total} ({breakdown.Rate:P0})");
+        }
+        Console.WriteLine();
+
+        // Save reports
+        await ScorecardReportGenerator.SaveAsync(scorecard, output, format);
+
+        if (format is "json" or "both")
+            Console.WriteLine($"JSON report: {output}.json");
+        if (format is "markdown" or "md" or "both")
+            Console.WriteLine($"Markdown report: {output}.md");
+
+        // Compare with baseline if provided
+        if (!string.IsNullOrEmpty(baselinePath) && File.Exists(baselinePath))
+        {
+            Console.WriteLine();
+            Console.WriteLine("Baseline Comparison");
+            Console.WriteLine("-------------------");
+
+            var baseline = await ScorecardComparison.LoadBaselineAsync(baselinePath);
+            var diff = ScorecardComparison.Compare(baseline, scorecard);
+
+            Console.WriteLine($"Conversion delta:  {diff.ConversionDelta:+#;-#;0}");
+            Console.WriteLine($"Round-trip delta:   {diff.RoundTripDelta:+#;-#;0}");
+            Console.WriteLine($"Regressions:        {diff.Regressions.Count}");
+            Console.WriteLine($"Improvements:       {diff.Improvements.Count}");
+
+            if (diff.HasRegressions)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine();
+                Console.WriteLine("REGRESSIONS:");
+                foreach (var id in diff.Regressions)
+                    Console.WriteLine($"  - {id}");
+                Console.ResetColor();
+            }
+
+            if (diff.Improvements.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine();
+                Console.WriteLine("IMPROVEMENTS:");
+                foreach (var id in diff.Improvements)
+                    Console.WriteLine($"  + {id}");
+                Console.ResetColor();
+            }
+        }
+    }
+
+    private static string Pct(int count, int total)
+        => total > 0 ? $"{(double)count / total:P0}" : "0%";
 }

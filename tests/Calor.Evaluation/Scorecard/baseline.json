@@ -1,0 +1,3228 @@
+{
+  "timestamp": "2026-02-21T20:31:26.109817Z",
+  "commitHash": "b9409fd",
+  "version": "1.0",
+  "total": 100,
+  "fullyConverted": 96,
+  "partiallyConverted": 4,
+  "blocked": 0,
+  "crashed": 0,
+  "roundTripPassing": 96,
+  "byLevel": {
+    "1": {
+      "total": 20,
+      "passed": 20,
+      "rate": 1
+    },
+    "2": {
+      "total": 20,
+      "passed": 20,
+      "rate": 1
+    },
+    "3": {
+      "total": 20,
+      "passed": 19,
+      "rate": 0.95
+    },
+    "4": {
+      "total": 20,
+      "passed": 20,
+      "rate": 1
+    },
+    "5": {
+      "total": 20,
+      "passed": 17,
+      "rate": 0.85
+    }
+  },
+  "byFeature": {
+    "namespace": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "static_class": {
+      "total": 3,
+      "passed": 3,
+      "rate": 1
+    },
+    "main_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "console_write": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "return_statement": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "int_literal": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "string_literal": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "multiple_methods": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "negative_number": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "zero": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "bool_literal": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "true": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "false": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "double_literal": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "floating_point": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "binary_expression": {
+      "total": 6,
+      "passed": 6,
+      "rate": 1
+    },
+    "addition": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "parameters": {
+      "total": 4,
+      "passed": 4,
+      "rate": 1
+    },
+    "subtraction": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "multiplication": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "division": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "modulo": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "string_concatenation": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "local_variable": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "variable_declaration": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "assignment": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "var_keyword": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "type_inference": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "comparison": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "equals": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "not_equals": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "greater_than": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "less_than": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "logical_and": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "logical_or": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "logical_not": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "unary_minus": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "unary_plus": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "parenthesized_expression": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "operator_precedence": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "multiple_statements": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "statement_sequence": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "arithmetic": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "if_statement": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "conditional": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "if_else": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "if_elseif_else": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "chained_conditional": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "for_loop": {
+      "total": 6,
+      "passed": 6,
+      "rate": 1
+    },
+    "loop_variable": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "increment": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "while_loop": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "do_while_loop": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "nested_loops": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "to_string": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "accumulator": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "recursion": {
+      "total": 3,
+      "passed": 3,
+      "rate": 1
+    },
+    "multiple_variables": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "binary_recursion": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "switch_statement": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "case": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "default": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "switch_expression": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "pattern_matching": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "break": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "continue": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "ternary_operator": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "conditional_expression": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "nested_if": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "multiple_conditions": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "early_return": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "guard_clause": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "complex_conditions": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "logical_operators": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "class": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "fields": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "new_expression": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "public_fields": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "instance_methods": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "auto_properties": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "get_set": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "record": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "positional_record": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "enum": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "enum_member": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "explicit_values": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "cast": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "array": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "array_access": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "array_length": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "array_initializer": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "collection_initializer": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "list": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "generic_type": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "add_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "dictionary": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "indexer": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "struct": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "value_type": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "nullable": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "has_value": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "value": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "constructor": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "this": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "decimal": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "inheritance": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "base_class": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "derived_class": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "interface": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "implements": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "abstract_class": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "abstract_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "override": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "readonly_field": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "nested_class": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "inner_class": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "tuple": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "named_tuple": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "tuple_access": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "object_initializer": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "multiple_parameters": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "three_params": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "optional_parameters": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "default_values": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "ref_parameter": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "out_parameter": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "method_overloading": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "expression_bodied_member": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "private_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "accessibility": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "static_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "instance_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "static_field": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "method_chaining": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "fluent_interface": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "return_this": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "void_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "params": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "variable_arguments": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "named_arguments": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "tail_recursion": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "local_function": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "extension_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "this_parameter": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "virtual_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "property_getter": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "property_setter": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "backing_field": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "operator_overload": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "implicit_conversion": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "explicit_conversion": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "async": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "await": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1
+    },
+    "task": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "lambda": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "func": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "action": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "linq": {
+      "total": 5,
+      "passed": 5,
+      "rate": 1
+    },
+    "select": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "ienumerable": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "where": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "filter": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "generic_class": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "type_parameter": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "generic_method": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "type_constraint": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "try_catch": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "exception": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "finally": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "using_statement": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "idisposable": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "sum": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "average": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "max": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "min": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "orderby": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "thenby": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "groupby": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "igrouping": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "event": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "eventhandler": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "event_args": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "delegate": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "multicast_delegate": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "is_expression": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "null_coalescing": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "null_conditional": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "null_assignment": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "string_interpolation": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "format_string": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "task_whenall": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "parallel": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "generic_constraint": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "where_clause": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "new_constraint": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "deconstruction": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "tuple_deconstruct": {
+      "total": 1,
+      "passed": 0,
+      "rate": 0
+    },
+    "with_expression": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    },
+    "computed_property": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1
+    }
+  },
+  "results": [
+    {
+      "id": "001",
+      "fileName": "Level1_Basic/001_HelloWorld.cs",
+      "level": 1,
+      "features": [
+        "namespace",
+        "static_class",
+        "main_method",
+        "console_write"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0981105",
+      "compilationDuration": "00:00:00.0524960",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "002",
+      "fileName": "Level1_Basic/002_ReturnValue.cs",
+      "level": 1,
+      "features": [
+        "namespace",
+        "static_class",
+        "return_statement",
+        "int_literal"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0048451",
+      "compilationDuration": "00:00:00.0029039",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "003",
+      "fileName": "Level1_Basic/003_StringLiteral.cs",
+      "level": 1,
+      "features": [
+        "string_literal",
+        "multiple_methods"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0029755",
+      "compilationDuration": "00:00:00.0027651",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "004",
+      "fileName": "Level1_Basic/004_IntLiteral.cs",
+      "level": 1,
+      "features": [
+        "int_literal",
+        "negative_number",
+        "zero"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0039812",
+      "compilationDuration": "00:00:00.0052366",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "005",
+      "fileName": "Level1_Basic/005_BoolLiteral.cs",
+      "level": 1,
+      "features": [
+        "bool_literal",
+        "true",
+        "false"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0031708",
+      "compilationDuration": "00:00:00.0019347",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "006",
+      "fileName": "Level1_Basic/006_DoubleLiteral.cs",
+      "level": 1,
+      "features": [
+        "double_literal",
+        "floating_point"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0056566",
+      "compilationDuration": "00:00:00.0062711",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "007",
+      "fileName": "Level1_Basic/007_SimpleAddition.cs",
+      "level": 1,
+      "features": [
+        "binary_expression",
+        "addition",
+        "parameters"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0063900",
+      "compilationDuration": "00:00:00.0034213",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "008",
+      "fileName": "Level1_Basic/008_SimpleSubtraction.cs",
+      "level": 1,
+      "features": [
+        "binary_expression",
+        "subtraction",
+        "parameters"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0031652",
+      "compilationDuration": "00:00:00.0022692",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "009",
+      "fileName": "Level1_Basic/009_SimpleMultiplication.cs",
+      "level": 1,
+      "features": [
+        "binary_expression",
+        "multiplication",
+        "parameters"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0033946",
+      "compilationDuration": "00:00:00.0021430",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "010",
+      "fileName": "Level1_Basic/010_SimpleDivision.cs",
+      "level": 1,
+      "features": [
+        "binary_expression",
+        "division",
+        "parameters"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0027232",
+      "compilationDuration": "00:00:00.0022202",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "011",
+      "fileName": "Level1_Basic/011_Modulo.cs",
+      "level": 1,
+      "features": [
+        "binary_expression",
+        "modulo"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0048489",
+      "compilationDuration": "00:00:00.0018549",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "012",
+      "fileName": "Level1_Basic/012_StringConcat.cs",
+      "level": 1,
+      "features": [
+        "string_concatenation",
+        "binary_expression"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0035247",
+      "compilationDuration": "00:00:00.0024361",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "013",
+      "fileName": "Level1_Basic/013_LocalVariable.cs",
+      "level": 1,
+      "features": [
+        "local_variable",
+        "variable_declaration",
+        "assignment"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0078200",
+      "compilationDuration": "00:00:00.0027530",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "014",
+      "fileName": "Level1_Basic/014_VarKeyword.cs",
+      "level": 1,
+      "features": [
+        "var_keyword",
+        "type_inference"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0029970",
+      "compilationDuration": "00:00:00.0019636",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "015",
+      "fileName": "Level1_Basic/015_ComparisonOperators.cs",
+      "level": 1,
+      "features": [
+        "comparison",
+        "equals",
+        "not_equals",
+        "greater_than",
+        "less_than"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0031345",
+      "compilationDuration": "00:00:00.0024995",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "016",
+      "fileName": "Level1_Basic/016_LogicalOperators.cs",
+      "level": 1,
+      "features": [
+        "logical_and",
+        "logical_or",
+        "logical_not"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0037759",
+      "compilationDuration": "00:00:00.0022401",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "017",
+      "fileName": "Level1_Basic/017_UnaryOperators.cs",
+      "level": 1,
+      "features": [
+        "unary_minus",
+        "unary_plus"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0025867",
+      "compilationDuration": "00:00:00.0023828",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "018",
+      "fileName": "Level1_Basic/018_ParenthesizedExpr.cs",
+      "level": 1,
+      "features": [
+        "parenthesized_expression",
+        "operator_precedence"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0045751",
+      "compilationDuration": "00:00:00.0028037",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "019",
+      "fileName": "Level1_Basic/019_MultipleStatements.cs",
+      "level": 1,
+      "features": [
+        "multiple_statements",
+        "statement_sequence"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0043430",
+      "compilationDuration": "00:00:00.0020293",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "020",
+      "fileName": "Level1_Basic/020_BasicCalculator.cs",
+      "level": 1,
+      "features": [
+        "multiple_methods",
+        "arithmetic"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0050818",
+      "compilationDuration": "00:00:00.0018475",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "021",
+      "fileName": "Level2_ControlFlow/021_SimpleIf.cs",
+      "level": 2,
+      "features": [
+        "if_statement",
+        "conditional"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0044521",
+      "compilationDuration": "00:00:00.0028519",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "022",
+      "fileName": "Level2_ControlFlow/022_IfElse.cs",
+      "level": 2,
+      "features": [
+        "if_else",
+        "conditional"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0046144",
+      "compilationDuration": "00:00:00.0026713",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "023",
+      "fileName": "Level2_ControlFlow/023_IfElseIfElse.cs",
+      "level": 2,
+      "features": [
+        "if_elseif_else",
+        "chained_conditional"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0039078",
+      "compilationDuration": "00:00:00.0021983",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "024",
+      "fileName": "Level2_ControlFlow/024_ForLoop.cs",
+      "level": 2,
+      "features": [
+        "for_loop",
+        "loop_variable",
+        "increment"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0059292",
+      "compilationDuration": "00:00:00.0031964",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "025",
+      "fileName": "Level2_ControlFlow/025_WhileLoop.cs",
+      "level": 2,
+      "features": [
+        "while_loop"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0064571",
+      "compilationDuration": "00:00:00.0021163",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "026",
+      "fileName": "Level2_ControlFlow/026_DoWhileLoop.cs",
+      "level": 2,
+      "features": [
+        "do_while_loop"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0034870",
+      "compilationDuration": "00:00:00.0023202",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "027",
+      "fileName": "Level2_ControlFlow/027_NestedLoops.cs",
+      "level": 2,
+      "features": [
+        "nested_loops",
+        "for_loop"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0031089",
+      "compilationDuration": "00:00:00.0019135",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "028",
+      "fileName": "Level2_ControlFlow/028_FizzBuzz.cs",
+      "level": 2,
+      "features": [
+        "if_else",
+        "modulo",
+        "to_string"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0064027",
+      "compilationDuration": "00:00:00.0030633",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "029",
+      "fileName": "Level2_ControlFlow/029_FactorialIterative.cs",
+      "level": 2,
+      "features": [
+        "for_loop",
+        "accumulator"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0029507",
+      "compilationDuration": "00:00:00.0019385",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "030",
+      "fileName": "Level2_ControlFlow/030_FactorialRecursive.cs",
+      "level": 2,
+      "features": [
+        "recursion",
+        "if_statement"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0042852",
+      "compilationDuration": "00:00:00.0025421",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "031",
+      "fileName": "Level2_ControlFlow/031_FibonacciIterative.cs",
+      "level": 2,
+      "features": [
+        "for_loop",
+        "multiple_variables"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0040209",
+      "compilationDuration": "00:00:00.0024285",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "032",
+      "fileName": "Level2_ControlFlow/032_FibonacciRecursive.cs",
+      "level": 2,
+      "features": [
+        "recursion",
+        "binary_recursion"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0038233",
+      "compilationDuration": "00:00:00.0021457",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "033",
+      "fileName": "Level2_ControlFlow/033_SwitchStatement.cs",
+      "level": 2,
+      "features": [
+        "switch_statement",
+        "case",
+        "default"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0086547",
+      "compilationDuration": "00:00:00.0031848",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "034",
+      "fileName": "Level2_ControlFlow/034_SwitchExpression.cs",
+      "level": 2,
+      "features": [
+        "switch_expression",
+        "pattern_matching"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0051180",
+      "compilationDuration": "00:00:00.0022085",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "035",
+      "fileName": "Level2_ControlFlow/035_BreakStatement.cs",
+      "level": 2,
+      "features": [
+        "break",
+        "for_loop"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0029445",
+      "compilationDuration": "00:00:00.0021963",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "036",
+      "fileName": "Level2_ControlFlow/036_ContinueStatement.cs",
+      "level": 2,
+      "features": [
+        "continue",
+        "for_loop"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0056123",
+      "compilationDuration": "00:00:00.0018059",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "037",
+      "fileName": "Level2_ControlFlow/037_TernaryOperator.cs",
+      "level": 2,
+      "features": [
+        "ternary_operator",
+        "conditional_expression"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0038735",
+      "compilationDuration": "00:00:00.0022309",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "038",
+      "fileName": "Level2_ControlFlow/038_NestedConditions.cs",
+      "level": 2,
+      "features": [
+        "nested_if",
+        "multiple_conditions"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0058942",
+      "compilationDuration": "00:00:00.0018005",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "039",
+      "fileName": "Level2_ControlFlow/039_EarlyReturn.cs",
+      "level": 2,
+      "features": [
+        "early_return",
+        "guard_clause"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0032838",
+      "compilationDuration": "00:00:00.0057964",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "040",
+      "fileName": "Level2_ControlFlow/040_ComplexConditions.cs",
+      "level": 2,
+      "features": [
+        "complex_conditions",
+        "logical_operators"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0026508",
+      "compilationDuration": "00:00:00.0024567",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "041",
+      "fileName": "Level3_Types/041_SimpleClass.cs",
+      "level": 3,
+      "features": [
+        "class",
+        "fields",
+        "new_expression"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0070878",
+      "compilationDuration": "00:00:00.0029308",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "042",
+      "fileName": "Level3_Types/042_ClassWithFields.cs",
+      "level": 3,
+      "features": [
+        "class",
+        "public_fields",
+        "instance_methods"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0039246",
+      "compilationDuration": "00:00:00.0028201",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "043",
+      "fileName": "Level3_Types/043_ClassWithProperties.cs",
+      "level": 3,
+      "features": [
+        "auto_properties",
+        "get_set"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0068575",
+      "compilationDuration": "00:00:00.0024252",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "044",
+      "fileName": "Level3_Types/044_Record.cs",
+      "level": 3,
+      "features": [
+        "record",
+        "positional_record"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0044848",
+      "compilationDuration": "00:00:00.0017564",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "045",
+      "fileName": "Level3_Types/045_Enum.cs",
+      "level": 3,
+      "features": [
+        "enum",
+        "enum_member"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0048043",
+      "compilationDuration": "00:00:00.0021680",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "046",
+      "fileName": "Level3_Types/046_EnumWithValues.cs",
+      "level": 3,
+      "features": [
+        "enum",
+        "explicit_values",
+        "cast"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0039455",
+      "compilationDuration": "00:00:00.0021755",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "047",
+      "fileName": "Level3_Types/047_ArrayDeclaration.cs",
+      "level": 3,
+      "features": [
+        "array",
+        "array_access",
+        "array_length"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0067300",
+      "compilationDuration": "00:00:00.0027452",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "048",
+      "fileName": "Level3_Types/048_ArrayInitializer.cs",
+      "level": 3,
+      "features": [
+        "array_initializer",
+        "collection_initializer"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 2,
+      "conversionIssues": [
+        "Warning [unknown-expression] (line 7): Unsupported feature [unknown-expression] replaced with fallback: ",
+        "Warning [unknown-expression] (line 12): Unsupported feature [unknown-expression] replaced with fallback: "
+      ],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0047660",
+      "compilationDuration": "00:00:00.0024719",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "049",
+      "fileName": "Level3_Types/049_ListUsage.cs",
+      "level": 3,
+      "features": [
+        "list",
+        "generic_type",
+        "add_method"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0054754",
+      "compilationDuration": "00:00:00.0031024",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "050",
+      "fileName": "Level3_Types/050_DictionaryUsage.cs",
+      "level": 3,
+      "features": [
+        "dictionary",
+        "generic_type",
+        "indexer"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0051010",
+      "compilationDuration": "00:00:00.0028233",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "051",
+      "fileName": "Level3_Types/051_Struct.cs",
+      "level": 3,
+      "features": [
+        "struct",
+        "value_type"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0062759",
+      "compilationDuration": "00:00:00.0026428",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "052",
+      "fileName": "Level3_Types/052_NullableTypes.cs",
+      "level": 3,
+      "features": [
+        "nullable",
+        "has_value",
+        "value"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0043455",
+      "compilationDuration": "00:00:00.0024175",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "053",
+      "fileName": "Level3_Types/053_ClassWithConstructor.cs",
+      "level": 3,
+      "features": [
+        "constructor",
+        "this",
+        "decimal"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0053196",
+      "compilationDuration": "00:00:00.0026048",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "054",
+      "fileName": "Level3_Types/054_Inheritance.cs",
+      "level": 3,
+      "features": [
+        "inheritance",
+        "base_class",
+        "derived_class"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0043335",
+      "compilationDuration": "00:00:00.0019098",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "055",
+      "fileName": "Level3_Types/055_Interface.cs",
+      "level": 3,
+      "features": [
+        "interface",
+        "implements"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0056122",
+      "compilationDuration": "00:00:00.0043846",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "056",
+      "fileName": "Level3_Types/056_AbstractClass.cs",
+      "level": 3,
+      "features": [
+        "abstract_class",
+        "abstract_method",
+        "override"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0032090",
+      "compilationDuration": "00:00:00.0021762",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "057",
+      "fileName": "Level3_Types/057_StaticClass.cs",
+      "level": 3,
+      "features": [
+        "static_class",
+        "readonly_field"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0043508",
+      "compilationDuration": "00:00:00.0024607",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "058",
+      "fileName": "Level3_Types/058_NestedClass.cs",
+      "level": 3,
+      "features": [
+        "nested_class",
+        "inner_class"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0034148",
+      "compilationDuration": "00:00:00.0020231",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "059",
+      "fileName": "Level3_Types/059_Tuple.cs",
+      "level": 3,
+      "features": [
+        "tuple",
+        "named_tuple",
+        "tuple_access"
+      ],
+      "status": "PartiallyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": false,
+      "compilationErrors": 7,
+      "compilationDiagnostics": [
+        "scorecard.calr(8,14): error Calor0100: Unexpected token \u0027,\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(8,13): error Calor0106: Unknown operator \u0027a\u0027. Did you mean \u0027\u002B\u0027?",
+        "scorecard.calr(10,12): error Calor0100: Unexpected token \u0027,\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(10,11): error Calor0106: Unknown operator \u0027b\u0027. Did you mean \u0027\u002B\u0027?",
+        "scorecard.calr(15,11): error Calor0100: Expected operator in Lisp expression, found \u0027\u0022Alice\u0022\u0027. Operators come before arguments: (contains str \u0022x\u0022) not (str contains \u0022x\u0022)",
+        "scorecard.calr(15,18): error Calor0100: Unexpected token \u0027,\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(15,11): error Calor0106: Unknown operator \u0027\u0022Alice\u0022\u0027. Valid operators include: arithmetic (\u002B, -, *, /, %), comparison (==, !=, \u003C, \u003C=, \u003E, \u003E=), logical (\u0026\u0026, ||, !), string (len, contains, substr, ...), char (char-at, is-letter, ...), or type (cast, is, as)"
+      ],
+      "roslynParseSuccess": false,
+      "conversionDuration": "00:00:00.0051175",
+      "compilationDuration": "00:00:00.0014258",
+      "roundTripSuccess": false
+    },
+    {
+      "id": "060",
+      "fileName": "Level3_Types/060_ObjectInitializer.cs",
+      "level": 3,
+      "features": [
+        "object_initializer"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0042548",
+      "compilationDuration": "00:00:00.0028156",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "061",
+      "fileName": "Level4_Methods/061_MultipleParameters.cs",
+      "level": 4,
+      "features": [
+        "multiple_parameters",
+        "three_params"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0042832",
+      "compilationDuration": "00:00:00.0020437",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "062",
+      "fileName": "Level4_Methods/062_OptionalParameters.cs",
+      "level": 4,
+      "features": [
+        "optional_parameters",
+        "default_values"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0031144",
+      "compilationDuration": "00:00:00.0022017",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "063",
+      "fileName": "Level4_Methods/063_RefParameters.cs",
+      "level": 4,
+      "features": [
+        "ref_parameter"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0034170",
+      "compilationDuration": "00:00:00.0020756",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "064",
+      "fileName": "Level4_Methods/064_OutParameters.cs",
+      "level": 4,
+      "features": [
+        "out_parameter"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0027743",
+      "compilationDuration": "00:00:00.0020495",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "065",
+      "fileName": "Level4_Methods/065_MethodOverloads.cs",
+      "level": 4,
+      "features": [
+        "method_overloading"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0028700",
+      "compilationDuration": "00:00:00.0018880",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "066",
+      "fileName": "Level4_Methods/066_ExpressionBodied.cs",
+      "level": 4,
+      "features": [
+        "expression_bodied_member"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0032792",
+      "compilationDuration": "00:00:00.0025975",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "067",
+      "fileName": "Level4_Methods/067_PrivateMethods.cs",
+      "level": 4,
+      "features": [
+        "private_method",
+        "accessibility"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0033079",
+      "compilationDuration": "00:00:00.0026454",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "068",
+      "fileName": "Level4_Methods/068_StaticVsInstance.cs",
+      "level": 4,
+      "features": [
+        "static_method",
+        "instance_method",
+        "static_field"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0031268",
+      "compilationDuration": "00:00:00.0017337",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "069",
+      "fileName": "Level4_Methods/069_MethodChaining.cs",
+      "level": 4,
+      "features": [
+        "method_chaining",
+        "fluent_interface",
+        "return_this"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0036849",
+      "compilationDuration": "00:00:00.0020784",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "070",
+      "fileName": "Level4_Methods/070_VoidMethods.cs",
+      "level": 4,
+      "features": [
+        "void_method",
+        "console_write"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0032032",
+      "compilationDuration": "00:00:00.0020057",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "071",
+      "fileName": "Level4_Methods/071_ParamsArray.cs",
+      "level": 4,
+      "features": [
+        "params",
+        "variable_arguments"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0033486",
+      "compilationDuration": "00:00:00.0054451",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "072",
+      "fileName": "Level4_Methods/072_NamedArguments.cs",
+      "level": 4,
+      "features": [
+        "named_arguments"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0041614",
+      "compilationDuration": "00:00:00.0050951",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "073",
+      "fileName": "Level4_Methods/073_RecursiveMethods.cs",
+      "level": 4,
+      "features": [
+        "recursion",
+        "tail_recursion"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0034112",
+      "compilationDuration": "00:00:00.0025263",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "074",
+      "fileName": "Level4_Methods/074_LocalFunctions.cs",
+      "level": 4,
+      "features": [
+        "local_function"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0094920",
+      "compilationDuration": "00:00:00.0063778",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "075",
+      "fileName": "Level4_Methods/075_ExtensionMethods.cs",
+      "level": 4,
+      "features": [
+        "extension_method",
+        "this_parameter"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0049017",
+      "compilationDuration": "00:00:00.0036209",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "076",
+      "fileName": "Level4_Methods/076_VirtualMethods.cs",
+      "level": 4,
+      "features": [
+        "virtual_method",
+        "override"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0041675",
+      "compilationDuration": "00:00:00.0036303",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "077",
+      "fileName": "Level4_Methods/077_PropertyGetSet.cs",
+      "level": 4,
+      "features": [
+        "property_getter",
+        "property_setter",
+        "backing_field"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0041807",
+      "compilationDuration": "00:00:00.0039518",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "078",
+      "fileName": "Level4_Methods/078_IndexerProperty.cs",
+      "level": 4,
+      "features": [
+        "indexer"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0053251",
+      "compilationDuration": "00:00:00.0034142",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "079",
+      "fileName": "Level4_Methods/079_OperatorOverload.cs",
+      "level": 4,
+      "features": [
+        "operator_overload"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0055902",
+      "compilationDuration": "00:00:00.0033416",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "080",
+      "fileName": "Level4_Methods/080_ImplicitExplicitConversion.cs",
+      "level": 4,
+      "features": [
+        "implicit_conversion",
+        "explicit_conversion"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0061036",
+      "compilationDuration": "00:00:00.0037568",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "081",
+      "fileName": "Level5_Advanced/081_AsyncMethod.cs",
+      "level": 5,
+      "features": [
+        "async",
+        "await",
+        "task"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0053959",
+      "compilationDuration": "00:00:00.0040932",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "082",
+      "fileName": "Level5_Advanced/082_Lambda.cs",
+      "level": 5,
+      "features": [
+        "lambda",
+        "func",
+        "action"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.3024493",
+      "compilationDuration": "00:00:00.0017012",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "083",
+      "fileName": "Level5_Advanced/083_LinqSelect.cs",
+      "level": 5,
+      "features": [
+        "linq",
+        "select",
+        "ienumerable"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0361841",
+      "compilationDuration": "00:00:00.0006511",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "084",
+      "fileName": "Level5_Advanced/084_LinqWhere.cs",
+      "level": 5,
+      "features": [
+        "linq",
+        "where",
+        "filter"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0086033",
+      "compilationDuration": "00:00:00.0006398",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "085",
+      "fileName": "Level5_Advanced/085_GenericClass.cs",
+      "level": 5,
+      "features": [
+        "generic_class",
+        "type_parameter"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0039381",
+      "compilationDuration": "00:00:00.0007442",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "086",
+      "fileName": "Level5_Advanced/086_GenericMethod.cs",
+      "level": 5,
+      "features": [
+        "generic_method",
+        "type_constraint"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0043066",
+      "compilationDuration": "00:00:00.0014992",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "087",
+      "fileName": "Level5_Advanced/087_TryCatch.cs",
+      "level": 5,
+      "features": [
+        "try_catch",
+        "exception",
+        "finally"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0057609",
+      "compilationDuration": "00:00:00.0013674",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "088",
+      "fileName": "Level5_Advanced/088_UsingStatement.cs",
+      "level": 5,
+      "features": [
+        "using_statement",
+        "idisposable"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0050498",
+      "compilationDuration": "00:00:00.0009258",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "089",
+      "fileName": "Level5_Advanced/089_LinqAggregate.cs",
+      "level": 5,
+      "features": [
+        "linq",
+        "sum",
+        "average",
+        "max",
+        "min"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0034841",
+      "compilationDuration": "00:00:00.0005912",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "090",
+      "fileName": "Level5_Advanced/090_LinqOrderBy.cs",
+      "level": 5,
+      "features": [
+        "linq",
+        "orderby",
+        "thenby"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0115298",
+      "compilationDuration": "00:00:00.0006922",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "091",
+      "fileName": "Level5_Advanced/091_LinqGroupBy.cs",
+      "level": 5,
+      "features": [
+        "linq",
+        "groupby",
+        "igrouping"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0119136",
+      "compilationDuration": "00:00:00.0007565",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "092",
+      "fileName": "Level5_Advanced/092_Events.cs",
+      "level": 5,
+      "features": [
+        "event",
+        "eventhandler",
+        "event_args"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0044939",
+      "compilationDuration": "00:00:00.0006500",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "093",
+      "fileName": "Level5_Advanced/093_Delegates.cs",
+      "level": 5,
+      "features": [
+        "delegate",
+        "multicast_delegate"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0047909",
+      "compilationDuration": "00:00:00.0042310",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "094",
+      "fileName": "Level5_Advanced/094_PatternMatching.cs",
+      "level": 5,
+      "features": [
+        "pattern_matching",
+        "is_expression",
+        "switch_expression"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0072511",
+      "compilationDuration": "00:00:00.0045575",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "095",
+      "fileName": "Level5_Advanced/095_NullCoalescing.cs",
+      "level": 5,
+      "features": [
+        "null_coalescing",
+        "null_conditional",
+        "null_assignment"
+      ],
+      "status": "PartiallyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": false,
+      "compilationErrors": 29,
+      "compilationDiagnostics": [
+        "scorecard.calr(33,40): error Calor0100: Expected operator in Lisp expression, found \u0027)\u0027. Unexpected closing parenthesis. Check parentheses balance.",
+        "scorecard.calr(33,40): error Calor0106: Unknown operator \u0027)\u0027. Did you mean \u0027\u002B\u0027?",
+        "scorecard.calr(33,78): error Calor0100: Expected operator in Lisp expression, found \u0027)\u0027. Unexpected closing parenthesis. Check parentheses balance.",
+        "scorecard.calr(33,78): error Calor0106: Unknown operator \u0027)\u0027. Did you mean \u0027\u002B\u0027?",
+        "scorecard.calr(34,5): error Calor0100: Unexpected token \u0027\u00A7/MT\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(36,5): error Calor0100: Unexpected token \u0027\u00A7MT\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(36,13): error Calor0100: Expected CloseBrace but found Colon",
+        "scorecard.calr(36,32): error Calor0100: Unexpected token \u0027}\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(37,7): error Calor0100: Unexpected token \u0027\u00A7I\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(37,13): error Calor0100: Expected CloseBrace but found Colon",
+        "scorecard.calr(37,23): error Calor0100: Unexpected token \u0027}\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(38,7): error Calor0100: Unexpected token \u0027\u00A7I\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(38,13): error Calor0100: Expected CloseBrace but found Colon",
+        "scorecard.calr(38,22): error Calor0100: Unexpected token \u0027}\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(39,7): error Calor0100: Unexpected token \u0027\u00A7IF\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(40,9): error Calor0100: Unexpected token \u0027\u00A7ASSIGN\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(41,7): error Calor0100: Unexpected token \u0027\u00A7/I\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(42,5): error Calor0100: Unexpected token \u0027\u00A7/MT\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(44,3): error Calor0100: Unexpected token \u0027\u00A7/CL\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(46,1): error Calor0100: Unexpected token \u0027\u00A7/M\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(47,1): error Calor0100: Expected CloseParen but found Eof",
+        "scorecard.calr(47,1): error Calor0100: Expected CloseParen but found Eof",
+        "scorecard.calr(33,11): error Calor0106: Unknown operator \u0027?\u0027. Did you mean \u0027\u002B\u0027?",
+        "scorecard.calr(47,1): error Calor0100: Expected EndMethod but found Eof",
+        "scorecard.calr(47,1): error Calor0101: END_METHOD id \u0027\u0027 does not match METHOD id \u0027m006\u0027",
+        "scorecard.calr(47,1): error Calor0100: Expected EndClass but found Eof",
+        "scorecard.calr(47,1): error Calor0101: END_CLASS id \u0027\u0027 does not match CLASS id \u0027c001\u0027",
+        "scorecard.calr(47,1): error Calor0100: Expected EndModule but found Eof",
+        "scorecard.calr(47,1): error Calor0101: END_MODULE id \u0027\u0027 does not match MODULE id \u0027m009\u0027"
+      ],
+      "roslynParseSuccess": false,
+      "conversionDuration": "00:00:00.0042631",
+      "compilationDuration": "00:00:00.0051850",
+      "roundTripSuccess": false
+    },
+    {
+      "id": "096",
+      "fileName": "Level5_Advanced/096_StringInterpolation.cs",
+      "level": 5,
+      "features": [
+        "string_interpolation",
+        "format_string"
+      ],
+      "status": "PartiallyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": false,
+      "compilationErrors": 3,
+      "compilationDiagnostics": [
+        "scorecard.calr(33,10): error Calor0002: Unterminated string literal",
+        "scorecard.calr(34,7): error Calor0001: Unexpected character \u0027$\u0027",
+        "scorecard.calr(34,14): error Calor0002: Unterminated string literal"
+      ],
+      "roslynParseSuccess": false,
+      "conversionDuration": "00:00:00.0079709",
+      "compilationDuration": "00:00:00.0001222",
+      "roundTripSuccess": false
+    },
+    {
+      "id": "097",
+      "fileName": "Level5_Advanced/097_AsyncAwaitChain.cs",
+      "level": 5,
+      "features": [
+        "async",
+        "await",
+        "task_whenall",
+        "parallel"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 1,
+      "conversionIssues": [
+        "Warning [unknown-expression] (line 41): Unsupported feature [unknown-expression] replaced with fallback: "
+      ],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0031519",
+      "compilationDuration": "00:00:00.0006365",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "098",
+      "fileName": "Level5_Advanced/098_GenericConstraints.cs",
+      "level": 5,
+      "features": [
+        "generic_constraint",
+        "where_clause",
+        "new_constraint"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0036500",
+      "compilationDuration": "00:00:00.0007380",
+      "roundTripSuccess": true
+    },
+    {
+      "id": "099",
+      "fileName": "Level5_Advanced/099_Deconstruction.cs",
+      "level": 5,
+      "features": [
+        "deconstruction",
+        "tuple_deconstruct"
+      ],
+      "status": "PartiallyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 0,
+      "conversionIssues": [],
+      "compilationSuccess": false,
+      "compilationErrors": 3,
+      "compilationDiagnostics": [
+        "scorecard.calr(31,11): error Calor0100: Expected operator in Lisp expression, found \u002710\u0027. Operators come before arguments: (\u002B 1 2) not (1 \u002B 2)",
+        "scorecard.calr(31,13): error Calor0100: Unexpected token \u0027,\u0027 in expression argument. Expected a value (number, string, variable) or nested expression",
+        "scorecard.calr(31,11): error Calor0106: Unknown operator \u002710\u0027. Did you mean \u0027\u002B\u0027?"
+      ],
+      "roslynParseSuccess": false,
+      "conversionDuration": "00:00:00.0040096",
+      "compilationDuration": "00:00:00.0001740",
+      "roundTripSuccess": false
+    },
+    {
+      "id": "100",
+      "fileName": "Level5_Advanced/100_RecordWithMethods.cs",
+      "level": 5,
+      "features": [
+        "record",
+        "with_expression",
+        "computed_property"
+      ],
+      "status": "FullyConverted",
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 1,
+      "conversionIssues": [
+        "Warning [unknown-expression] (line 11): Unsupported feature [unknown-expression] replaced with fallback: this with { Age = newAge }"
+      ],
+      "compilationSuccess": true,
+      "compilationErrors": 0,
+      "compilationDiagnostics": [],
+      "roslynParseSuccess": true,
+      "conversionDuration": "00:00:00.0039202",
+      "compilationDuration": "00:00:00.0010681",
+      "roundTripSuccess": true
+    }
+  ]
+}
