@@ -4803,6 +4803,7 @@ public sealed class Parser
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
         var events = new List<EventDefinitionNode>();
+        var operatorOverloads = new List<OperatorOverloadNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndClass))
         {
@@ -4842,6 +4843,10 @@ public sealed class Parser
             {
                 constructors.Add(ParseConstructor());
             }
+            else if (Check(TokenKind.OperatorOverload))
+            {
+                operatorOverloads.Add(ParseOperatorOverload());
+            }
             else if (Check(TokenKind.Method))
             {
                 methods.Add(ParseMethodDefinition());
@@ -4856,7 +4861,7 @@ public sealed class Parser
             }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, METHOD, AMT, EVT, or END_CLASS", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, OP, METHOD, AMT, EVT, or END_CLASS", Current.Kind);
                 Advance();
             }
         }
@@ -4872,7 +4877,7 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
-            implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, attrs, csharpAttrs,
+            implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, operatorOverloads, attrs, csharpAttrs,
             isStruct: isStruct, isReadOnly: isReadOnly, visibility: visibility);
     }
 
@@ -5659,6 +5664,170 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs);
+    }
+
+    /// <summary>
+    /// Parses an operator overload definition.
+    /// §OP{id:operator:visibility}
+    ///   §I{Type:param}...
+    ///   §O{ReturnType}
+    ///   §Q precondition
+    ///   §S postcondition
+    ///   body
+    /// §/OP{id}
+    /// </summary>
+    private OperatorOverloadNode ParseOperatorOverload()
+    {
+        var startToken = Expect(TokenKind.OperatorOverload);
+
+        // Parse {id:operator:visibility}
+        Expect(TokenKind.OpenBrace);
+        var id = ParseValue();
+
+        Expect(TokenKind.Colon);
+        var operatorToken = ParseOperatorToken();
+
+        var visStr = "pub";
+        if (Check(TokenKind.Colon))
+        {
+            Advance();
+            visStr = ParseValue();
+        }
+
+        Expect(TokenKind.CloseBrace);
+
+        var csharpAttrs = ParseCSharpAttributes();
+        var visibility = ParseVisibility(visStr);
+
+        var parameters = new List<ParameterNode>();
+        var preconditions = new List<RequiresNode>();
+        var postconditions = new List<EnsuresNode>();
+        OutputNode? output = null;
+        var body = new List<StatementNode>();
+
+        while (!IsAtEnd && !Check(TokenKind.EndOperatorOverload))
+        {
+            if (Check(TokenKind.In))
+            {
+                parameters.Add(ParseParameter());
+            }
+            else if (Check(TokenKind.Out))
+            {
+                output = ParseOutput();
+            }
+            else if (Check(TokenKind.Requires))
+            {
+                preconditions.Add(ParseRequires());
+            }
+            else if (Check(TokenKind.Ensures))
+            {
+                postconditions.Add(ParseEnsures());
+            }
+            else
+            {
+                var stmt = ParseStatement();
+                if (stmt != null)
+                {
+                    body.Add(stmt);
+                }
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndOperatorOverload);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (endId != id)
+        {
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "OP", id, "END_OP", endId);
+        }
+
+        var kind = OperatorOverloadNode.ResolveOperatorKind(operatorToken, parameters.Count);
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new OperatorOverloadNode(span, id, operatorToken, kind, visibility, parameters, output,
+            preconditions, postconditions, body, new AttributeCollection(), csharpAttrs);
+    }
+
+    /// <summary>
+    /// Parses an operator token in the context of §OP{id:operator:vis}.
+    /// Handles multi-character operators like ++, --, ==, !=, etc.
+    /// </summary>
+    private string ParseOperatorToken()
+    {
+        var token = Current;
+        switch (token.Kind)
+        {
+            case TokenKind.Plus:
+                Advance();
+                if (Check(TokenKind.Plus)) { Advance(); return "++"; }
+                return "+";
+            case TokenKind.Minus:
+                Advance();
+                if (Check(TokenKind.Minus)) { Advance(); return "--"; }
+                return "-";
+            case TokenKind.Star:
+                Advance();
+                return "*";
+            case TokenKind.Slash:
+                Advance();
+                return "/";
+            case TokenKind.Percent:
+                Advance();
+                return "%";
+            case TokenKind.EqualEqual:
+                Advance();
+                return "==";
+            case TokenKind.BangEqual:
+                Advance();
+                return "!=";
+            case TokenKind.Less:
+                Advance();
+                return "<";
+            case TokenKind.Greater:
+                Advance();
+                return ">";
+            case TokenKind.LessEqual:
+                Advance();
+                return "<=";
+            case TokenKind.GreaterEqual:
+                Advance();
+                return ">=";
+            case TokenKind.Amp:
+                Advance();
+                return "&";
+            case TokenKind.Pipe:
+                Advance();
+                return "|";
+            case TokenKind.Caret:
+                Advance();
+                return "^";
+            case TokenKind.LessLess:
+                Advance();
+                return "<<";
+            case TokenKind.GreaterGreater:
+                Advance();
+                return ">>";
+            case TokenKind.Exclamation:
+                Advance();
+                return "!";
+            case TokenKind.Tilde:
+                Advance();
+                return "~";
+            case TokenKind.BoolLiteral:
+                var text = token.Text;
+                Advance();
+                return text;
+            case TokenKind.Identifier when token.Text is "implicit" or "explicit":
+                var convText = token.Text;
+                Advance();
+                return convText;
+            default:
+                _diagnostics.ReportError(token.Span, DiagnosticCode.UnexpectedToken,
+                    $"Expected operator token in §OP, found '{token.Text}'");
+                Advance();
+                return token.Text;
+        }
     }
 
     /// <summary>

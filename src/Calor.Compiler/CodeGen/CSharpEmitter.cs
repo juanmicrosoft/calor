@@ -1960,6 +1960,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit operator overloads
+        foreach (var op in node.OperatorOverloads)
+        {
+            Visit(op);
+            AppendLine();
+        }
+
         // Emit events
         foreach (var evt in node.Events)
         {
@@ -2540,6 +2547,79 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var stmt in node.Body)
         {
             AppendLine(stmt.Accept(this));
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(OperatorOverloadNode node)
+    {
+        _declaredVariablesInCurrentScope.Clear();
+
+        EmitCSharpAttributes(node.CSharpAttributes);
+
+        var returnType = node.Output != null ? MapTypeName(node.Output.TypeName) : "void";
+        var parameters = string.Join(", ", node.Parameters.Select(p =>
+            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+
+        if (node.IsConversion)
+        {
+            // implicit/explicit operator: public static implicit operator TargetType(SourceType value)
+            AppendLine($"public static {node.OperatorToken} operator {returnType}({parameters})");
+        }
+        else
+        {
+            AppendLine($"public static {returnType} operator {node.OperatorToken}({parameters})");
+        }
+
+        AppendLine("{");
+        Indent();
+
+        foreach (var pre in node.Preconditions)
+        {
+            AppendLine(Visit(pre));
+        }
+
+        if (node.Postconditions.Count > 0)
+        {
+            // When postconditions exist, capture the result
+            // Emit body statements except for the last return
+            for (int i = 0; i < node.Body.Count; i++)
+            {
+                var stmt = node.Body[i];
+                if (i == node.Body.Count - 1 && stmt is ReturnStatementNode returnStmt)
+                {
+                    var resultExpr = returnStmt.Expression?.Accept(this) ?? "default";
+                    AppendLine($"var __result__ = {resultExpr};");
+                    foreach (var post in node.Postconditions)
+                    {
+                        AppendLine(Visit(post));
+                    }
+                    AppendLine("return __result__;");
+                }
+                else
+                {
+                    AppendLine(stmt.Accept(this));
+                }
+            }
+
+            if (node.Body.Count == 0 || node.Body[^1] is not ReturnStatementNode)
+            {
+                foreach (var post in node.Postconditions)
+                {
+                    AppendLine(Visit(post));
+                }
+            }
+        }
+        else
+        {
+            foreach (var stmt in node.Body)
+            {
+                AppendLine(stmt.Accept(this));
+            }
         }
 
         Dedent();

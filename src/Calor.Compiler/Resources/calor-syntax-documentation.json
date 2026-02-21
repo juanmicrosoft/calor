@@ -833,6 +833,31 @@
       ]
     },
     {
+      "id": "operator_overload",
+      "csharpConstruct": "operator overload",
+      "keywords": ["operator", "overload", "+", "-", "==", "!=", "implicit", "explicit", "conversion"],
+      "calorSyntax": "§OP{id:operator:visibility} §I{type:param}... §O{returnType} body §/OP{id}",
+      "description": "Defines an operator overload for a class or struct. Supports binary operators (+, -, *, /, ==, etc.), unary operators (-, !, ~, ++, --), and conversion operators (implicit, explicit).",
+      "examples": [
+        {
+          "csharp": "public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }",
+          "calor": "§OP{1:+:pub}\n  §I{MyType:left}\n  §I{MyType:right}\n  §O{MyType}\n  §R §NEW{MyType}((+ (. left Value) (. right Value)))§/NEW\n§/OP{1}"
+        },
+        {
+          "csharp": "public static MyType operator-(MyType value) { return new MyType(-value.Value); }",
+          "calor": "§OP{1:-:pub}\n  §I{MyType:value}\n  §O{MyType}\n  §R §NEW{MyType}((- (. value Value)))§/NEW\n§/OP{1}"
+        },
+        {
+          "csharp": "public static implicit operator int(MyType value) { return value.Value; }",
+          "calor": "§OP{1:implicit:pub}\n  §I{MyType:value}\n  §O{i32}\n  §R (. value Value)\n§/OP{1}"
+        },
+        {
+          "csharp": "public static explicit operator MyType(int value) { return new MyType(value); }",
+          "calor": "§OP{1:explicit:pub}\n  §I{i32:value}\n  §O{MyType}\n  §R §NEW{MyType}(value)§/NEW\n§/OP{1}"
+        }
+      ]
+    },
+    {
       "id": "decimal_literal",
       "csharpConstruct": "decimal literal",
       "keywords": ["decimal", "money", "precise", "DEC", "DECIMAL", "m suffix"],

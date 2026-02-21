@@ -114,6 +114,7 @@ public interface IAstVisitor
     void Visit(PropertyNode node);
     void Visit(PropertyAccessorNode node);
     void Visit(ConstructorNode node);
+    void Visit(OperatorOverloadNode node);
     void Visit(ConstructorInitializerNode node);
     void Visit(AssignmentStatementNode node);
     void Visit(CompoundAssignmentStatementNode node);
@@ -303,6 +304,7 @@ public interface IAstVisitor<T>
     T Visit(PropertyNode node);
     T Visit(PropertyAccessorNode node);
     T Visit(ConstructorNode node);
+    T Visit(OperatorOverloadNode node);
     T Visit(ConstructorInitializerNode node);
     T Visit(AssignmentStatementNode node);
     T Visit(CompoundAssignmentStatementNode node);

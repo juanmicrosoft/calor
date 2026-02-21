@@ -17,6 +17,10 @@ public class FeatureCheckCommandTests
     [InlineData("async-await", SupportLevel.Full)]
     [InlineData("lambda", SupportLevel.Full)]
     [InlineData("generics", SupportLevel.Full)]
+    [InlineData("operator-overload", SupportLevel.Full)]
+    [InlineData("implicit-conversion", SupportLevel.Full)]
+    [InlineData("explicit-conversion", SupportLevel.Full)]
+    [InlineData("equals-operator", SupportLevel.Full)]
     [InlineData("linq-method", SupportLevel.Full)]
     [InlineData("linq-query", SupportLevel.Full)]
     public void FeatureCheck_FullySupported_ReturnsFullLevel(string feature, SupportLevel expected)

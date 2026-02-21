@@ -48,6 +48,11 @@ public static class IdGenerator
     public const string EnumPrefix = "e_";
 
     /// <summary>
+    /// The prefix for operator overload IDs.
+    /// </summary>
+    public const string OperatorOverloadPrefix = "op_";
+
+    /// <summary>
     /// Generates a new ID for the specified declaration kind.
     /// </summary>
     /// <param name="kind">The kind of declaration.</param>
@@ -84,6 +89,7 @@ public static class IdGenerator
         IdKind.Method => MethodPrefix,
         IdKind.Constructor => ConstructorPrefix,
         IdKind.Enum => EnumPrefix,
+        IdKind.OperatorOverload => OperatorOverloadPrefix,
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -100,6 +106,8 @@ public static class IdGenerator
         // Check prefixes in order from longest to shortest to avoid partial matches
         if (id.StartsWith(ConstructorPrefix))
             return IdKind.Constructor;
+        if (id.StartsWith(OperatorOverloadPrefix))
+            return IdKind.OperatorOverload;
         if (id.StartsWith(MethodPrefix))
             return IdKind.Method;
         if (id.StartsWith(ModulePrefix))

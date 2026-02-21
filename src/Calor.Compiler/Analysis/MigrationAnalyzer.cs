@@ -392,27 +392,7 @@ public sealed class MigrationAnalyzer
             });
         }
 
-        if (visitor.OperatorOverloadCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "operator-overload",
-                Description = "Operator overloading requires manual conversion",
-                Count = visitor.OperatorOverloadCount,
-                Examples = visitor.OperatorOverloadExamples
-            });
-        }
-
-        if (visitor.ConversionOperatorCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "implicit-conversion",
-                Description = "Implicit/explicit conversion operators require manual conversion",
-                Count = visitor.ConversionOperatorCount,
-                Examples = visitor.ConversionOperatorExamples
-            });
-        }
+        // operator-overload and implicit-conversion are now fully supported via §OP tags
 
         if (visitor.ExtensionMethodCount > 0)
         {

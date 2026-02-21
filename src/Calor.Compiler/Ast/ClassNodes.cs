@@ -285,6 +285,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public IReadOnlyList<EventDefinitionNode> Events { get; }
 
     /// <summary>
+    /// Operator overloads defined in this class.
+    /// </summary>
+    public IReadOnlyList<OperatorOverloadNode> OperatorOverloads { get; }
+
+    /// <summary>
     /// C#-style attributes (e.g., [@Route("api/[controller]")], [@ApiController]).
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
@@ -303,7 +308,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         AttributeCollection attributes)
         : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
                typeParameters, fields, Array.Empty<PropertyNode>(), Array.Empty<ConstructorNode>(), methods,
-               Array.Empty<EventDefinitionNode>(), attributes, Array.Empty<CalorAttributeNode>())
+               Array.Empty<EventDefinitionNode>(), Array.Empty<OperatorOverloadNode>(), attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -323,7 +328,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         AttributeCollection attributes)
         : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
                typeParameters, fields, properties, constructors, methods,
-               Array.Empty<EventDefinitionNode>(), attributes, Array.Empty<CalorAttributeNode>())
+               Array.Empty<EventDefinitionNode>(), Array.Empty<OperatorOverloadNode>(), attributes, Array.Empty<CalorAttributeNode>())
     {
     }
 
@@ -344,7 +349,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : this(span, id, name, isAbstract, isSealed, isPartial: false, isStatic: false, baseClass, implementedInterfaces,
                typeParameters, fields, properties, constructors, methods,
-               Array.Empty<EventDefinitionNode>(), attributes, csharpAttributes)
+               Array.Empty<EventDefinitionNode>(), Array.Empty<OperatorOverloadNode>(), attributes, csharpAttributes)
     {
     }
 
@@ -367,7 +372,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : this(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass, implementedInterfaces,
                typeParameters, fields, properties, constructors, methods,
-               Array.Empty<EventDefinitionNode>(), attributes, csharpAttributes)
+               Array.Empty<EventDefinitionNode>(), Array.Empty<OperatorOverloadNode>(), attributes, csharpAttributes)
     {
     }
 
@@ -387,6 +392,31 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<ConstructorNode> constructors,
         IReadOnlyList<MethodNode> methods,
         IReadOnlyList<EventDefinitionNode> events,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass, implementedInterfaces,
+               typeParameters, fields, properties, constructors, methods,
+               events, Array.Empty<OperatorOverloadNode>(), attributes, csharpAttributes)
+    {
+    }
+
+    public ClassDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        bool isAbstract,
+        bool isSealed,
+        bool isPartial,
+        bool isStatic,
+        string? baseClass,
+        IReadOnlyList<string> implementedInterfaces,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<ClassFieldNode> fields,
+        IReadOnlyList<PropertyNode> properties,
+        IReadOnlyList<ConstructorNode> constructors,
+        IReadOnlyList<MethodNode> methods,
+        IReadOnlyList<EventDefinitionNode> events,
+        IReadOnlyList<OperatorOverloadNode> operatorOverloads,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         bool isStruct = false,
@@ -409,6 +439,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         Constructors = constructors ?? throw new ArgumentNullException(nameof(constructors));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
         Events = events ?? Array.Empty<EventDefinitionNode>();
+        OperatorOverloads = operatorOverloads ?? Array.Empty<OperatorOverloadNode>();
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
@@ -575,6 +606,160 @@ public sealed class MethodNode : AstNode
     public bool IsStatic => (Modifiers & MethodModifiers.Static) != 0;
     public bool IsPartial => (Modifiers & MethodModifiers.Partial) != 0;
     public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// The kind of operator overload.
+/// </summary>
+public enum OperatorOverloadKind
+{
+    // Binary operators
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Equality,
+    Inequality,
+    LessThan,
+    GreaterThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    LeftShift,
+    RightShift,
+    // Unary operators
+    UnaryPlus,
+    UnaryNegate,
+    LogicalNot,
+    BitwiseNot,
+    Increment,
+    Decrement,
+    True,
+    False,
+    // Conversion operators
+    Implicit,
+    Explicit
+}
+
+/// <summary>
+/// Represents an operator overload declaration.
+/// §OP{id:operator:visibility}
+///   §I{MyType:left}
+///   §I{MyType:right}
+///   §O{MyType}
+///   §Q (>= (. left Value) 0)
+///   §S (>= (. result Value) 0)
+///   §R §NEW{MyType}((+ (. left Value) (. right Value)))§/NEW
+/// §/OP{id}
+/// </summary>
+public sealed class OperatorOverloadNode : AstNode
+{
+    public string Id { get; }
+    public string OperatorToken { get; }
+    public OperatorOverloadKind Kind { get; }
+    public Visibility Visibility { get; }
+    public IReadOnlyList<ParameterNode> Parameters { get; }
+    public OutputNode? Output { get; }
+    public IReadOnlyList<RequiresNode> Preconditions { get; }
+    public IReadOnlyList<EnsuresNode> Postconditions { get; }
+    public IReadOnlyList<StatementNode> Body { get; }
+    public AttributeCollection Attributes { get; }
+    public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
+
+    public bool IsConversion => Kind == OperatorOverloadKind.Implicit || Kind == OperatorOverloadKind.Explicit;
+    public bool IsUnary => Kind is OperatorOverloadKind.UnaryPlus or OperatorOverloadKind.UnaryNegate
+        or OperatorOverloadKind.LogicalNot or OperatorOverloadKind.BitwiseNot
+        or OperatorOverloadKind.Increment or OperatorOverloadKind.Decrement
+        or OperatorOverloadKind.True or OperatorOverloadKind.False;
+    public bool IsBinary => !IsConversion && !IsUnary;
+
+    public OperatorOverloadNode(
+        TextSpan span,
+        string id,
+        string operatorToken,
+        OperatorOverloadKind kind,
+        Visibility visibility,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes)
+        : this(span, id, operatorToken, kind, visibility, parameters, output, preconditions, postconditions, body, attributes, Array.Empty<CalorAttributeNode>())
+    {
+    }
+
+    public OperatorOverloadNode(
+        TextSpan span,
+        string id,
+        string operatorToken,
+        OperatorOverloadKind kind,
+        Visibility visibility,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output,
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : base(span)
+    {
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        OperatorToken = operatorToken ?? throw new ArgumentNullException(nameof(operatorToken));
+        Kind = kind;
+        Visibility = visibility;
+        Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+        Output = output;
+        Preconditions = preconditions ?? Array.Empty<RequiresNode>();
+        Postconditions = postconditions ?? Array.Empty<EnsuresNode>();
+        Body = body ?? throw new ArgumentNullException(nameof(body));
+        Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
+    }
+
+    /// <summary>
+    /// Resolves the operator kind from a token string and parameter count.
+    /// Ambiguous operators like + and - are resolved based on parameter count.
+    /// </summary>
+    public static OperatorOverloadKind ResolveOperatorKind(string token, int paramCount)
+    {
+        return token switch
+        {
+            "+" when paramCount == 1 => OperatorOverloadKind.UnaryPlus,
+            "+" => OperatorOverloadKind.Add,
+            "-" when paramCount == 1 => OperatorOverloadKind.UnaryNegate,
+            "-" => OperatorOverloadKind.Subtract,
+            "*" => OperatorOverloadKind.Multiply,
+            "/" => OperatorOverloadKind.Divide,
+            "%" => OperatorOverloadKind.Modulo,
+            "==" => OperatorOverloadKind.Equality,
+            "!=" => OperatorOverloadKind.Inequality,
+            "<" => OperatorOverloadKind.LessThan,
+            ">" => OperatorOverloadKind.GreaterThan,
+            "<=" => OperatorOverloadKind.LessThanOrEqual,
+            ">=" => OperatorOverloadKind.GreaterThanOrEqual,
+            "&" => OperatorOverloadKind.BitwiseAnd,
+            "|" => OperatorOverloadKind.BitwiseOr,
+            "^" => OperatorOverloadKind.BitwiseXor,
+            "<<" => OperatorOverloadKind.LeftShift,
+            ">>" => OperatorOverloadKind.RightShift,
+            "!" => OperatorOverloadKind.LogicalNot,
+            "~" => OperatorOverloadKind.BitwiseNot,
+            "++" => OperatorOverloadKind.Increment,
+            "--" => OperatorOverloadKind.Decrement,
+            "true" => OperatorOverloadKind.True,
+            "false" => OperatorOverloadKind.False,
+            "implicit" => OperatorOverloadKind.Implicit,
+            "explicit" => OperatorOverloadKind.Explicit,
+            _ => throw new ArgumentException($"Unknown operator token: {token}", nameof(token))
+        };
+    }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);

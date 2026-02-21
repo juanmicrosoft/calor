@@ -144,6 +144,8 @@ public sealed class Lexer
         ["INIT"] = TokenKind.Init,
         ["CTOR"] = TokenKind.Constructor,
         ["/CTOR"] = TokenKind.EndConstructor,
+        ["OP"] = TokenKind.OperatorOverload,
+        ["/OP"] = TokenKind.EndOperatorOverload,
         ["ASSIGN"] = TokenKind.Assign,
         ["DEFAULT"] = TokenKind.Default,
 

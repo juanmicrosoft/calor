@@ -329,19 +329,19 @@ public static class FeatureSupport
         {
             Name = "operator-overload",
             Support = SupportLevel.Full,
-            Description = "Operator overloads are converted to op_ CIL-convention methods"
+            Description = "Operator overloads are fully supported via §OP tags and converted to op_ CIL-convention methods"
         },
         ["implicit-conversion"] = new FeatureInfo
         {
             Name = "implicit-conversion",
             Support = SupportLevel.Full,
-            Description = "Implicit conversions are converted to op_Implicit methods"
+            Description = "Implicit conversions are fully supported via §OP tags and converted to op_Implicit methods"
         },
         ["explicit-conversion"] = new FeatureInfo
         {
             Name = "explicit-conversion",
             Support = SupportLevel.Full,
-            Description = "Explicit conversions are converted to op_Explicit methods"
+            Description = "Explicit conversions are fully supported via §OP tags and converted to op_Explicit methods"
         },
 
         // Additional features based on agent feedback
@@ -369,7 +369,7 @@ public static class FeatureSupport
         {
             Name = "equals-operator",
             Support = SupportLevel.Full,
-            Description = "Custom == and != operators are converted to op_Equality/op_Inequality methods"
+            Description = "Custom == and != operators are fully supported via §OP tags and converted to op_Equality/op_Inequality methods"
         },
         ["primary-constructor"] = new FeatureInfo
         {

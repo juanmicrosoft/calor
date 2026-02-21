@@ -137,6 +137,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(PropertyNode node) => DefaultVisit(node)!;
     public virtual T Visit(PropertyAccessorNode node) => DefaultVisit(node)!;
     public virtual T Visit(ConstructorNode node) => DefaultVisit(node)!;
+    public virtual T Visit(OperatorOverloadNode node) => DefaultVisit(node)!;
     public virtual T Visit(ConstructorInitializerNode node) => DefaultVisit(node)!;
     public virtual T Visit(AssignmentStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(CompoundAssignmentStatementNode node) => DefaultVisit(node)!;

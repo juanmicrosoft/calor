@@ -227,10 +227,9 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        var opMethod = cls.Methods.FirstOrDefault(m => m.Name == "op_Addition");
-        Assert.NotNull(opMethod);
-        Assert.True(opMethod.IsStatic, "Operator should be static");
-        Assert.Equal(Visibility.Public, opMethod.Visibility);
+        var op = cls.OperatorOverloads.FirstOrDefault(o => o.Kind == OperatorOverloadKind.Add);
+        Assert.NotNull(op);
+        Assert.Equal(Visibility.Public, op.Visibility);
     }
 
     [Fact]
@@ -255,8 +254,8 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        Assert.Contains(cls.Methods, m => m.Name == "op_Equality");
-        Assert.Contains(cls.Methods, m => m.Name == "op_Inequality");
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Equality);
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Inequality);
     }
 
     [Fact]
@@ -277,10 +276,9 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        var opMethod = cls.Methods.FirstOrDefault(m => m.Name == "op_Implicit");
-        Assert.NotNull(opMethod);
-        Assert.True(opMethod.IsStatic);
-        Assert.Equal("f64", opMethod.Output!.TypeName);
+        var op = cls.OperatorOverloads.FirstOrDefault(o => o.Kind == OperatorOverloadKind.Implicit);
+        Assert.NotNull(op);
+        Assert.Equal("f64", op.Output!.TypeName);
     }
 
     [Fact]
@@ -301,10 +299,9 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        var opMethod = cls.Methods.FirstOrDefault(m => m.Name == "op_Explicit");
-        Assert.NotNull(opMethod);
-        Assert.True(opMethod.IsStatic);
-        Assert.Equal("i32", opMethod.Output!.TypeName);
+        var op = cls.OperatorOverloads.FirstOrDefault(o => o.Kind == OperatorOverloadKind.Explicit);
+        Assert.NotNull(op);
+        Assert.Equal("i32", op.Output!.TypeName);
     }
 
     [Fact]
@@ -431,8 +428,8 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        Assert.Contains(cls.Methods, m => m.Name == "op_Addition");
-        Assert.Contains(cls.Methods, m => m.Name == "op_Subtraction");
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Add);
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Subtract);
     }
 
     [Fact]
@@ -460,9 +457,9 @@ public class StructAndOperatorTests
             "Roundtrip parse failed:\n" +
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 
-        // Should have the op_Addition method preserved
+        // Should have the operator overload preserved
         var cls = Assert.Single(compilationResult.Ast!.Classes);
-        Assert.Contains(cls.Methods, m => m.Name == "op_Addition");
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Add);
 
         // Generate C# from roundtripped AST
         var emitter = new CSharpEmitter();
@@ -494,9 +491,9 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        var opMethod = cls.Methods.FirstOrDefault(m => m.Name == "op_UnaryNegation");
-        Assert.NotNull(opMethod);
-        Assert.Single(opMethod.Parameters);
+        var op = cls.OperatorOverloads.FirstOrDefault(o => o.Kind == OperatorOverloadKind.UnaryNegate);
+        Assert.NotNull(op);
+        Assert.Single(op.Parameters);
     }
 
     [Fact]
@@ -517,9 +514,9 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        var opMethod = cls.Methods.FirstOrDefault(m => m.Name == "op_UnaryPlus");
-        Assert.NotNull(opMethod);
-        Assert.Single(opMethod.Parameters);
+        var op = cls.OperatorOverloads.FirstOrDefault(o => o.Kind == OperatorOverloadKind.UnaryPlus);
+        Assert.NotNull(op);
+        Assert.Single(op.Parameters);
     }
 
     [Fact]
@@ -544,8 +541,8 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        Assert.Contains(cls.Methods, m => m.Name == "op_Subtraction");
-        Assert.Contains(cls.Methods, m => m.Name == "op_UnaryNegation");
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Subtract);
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.UnaryNegate);
     }
 
     [Fact]
@@ -593,7 +590,7 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        Assert.Contains(cls.Methods, m => m.Name == "op_Addition");
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Add);
     }
 
     [Fact]
@@ -613,7 +610,7 @@ public class StructAndOperatorTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        Assert.Contains(cls.Methods, m => m.Name == "op_Implicit");
+        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Implicit);
     }
 
     #endregion
