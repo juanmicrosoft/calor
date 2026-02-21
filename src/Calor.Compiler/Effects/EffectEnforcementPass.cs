@@ -525,6 +525,10 @@ public sealed class EffectEnforcementPass
             "Exists", "TrueForAll", "ForEach", "ConvertAll",
             // StringBuilder
             "Append", "AppendLine", "AppendFormat",
+            // Math functions
+            "Abs", "Sqrt", "Pow", "Floor", "Ceiling", "Round",
+            "Log", "Log10", "Log2", "Sin", "Cos", "Tan",
+            "Clamp", "Sign", "Truncate",
         };
 
         public EffectInferrer(InferenceContext context)
