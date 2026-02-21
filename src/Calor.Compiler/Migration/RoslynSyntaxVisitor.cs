@@ -989,6 +989,56 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return Array.Empty<StatementNode>();
     }
 
+    /// <summary>
+    /// Converts a C# local function to a module-level §F function.
+    /// Local functions are hoisted out of the containing method body since
+    /// Calor doesn't have nested function declarations.
+    /// </summary>
+    private FunctionNode ConvertLocalFunction(LocalFunctionStatementSyntax node)
+    {
+        var id = _context.GenerateId("f");
+        var name = node.Identifier.ValueText;
+        var parameters = ConvertParameters(node.ParameterList);
+
+        var isAsync = node.Modifiers.Any(SyntaxKind.AsyncKeyword);
+        var returnTypeStr = node.ReturnType.ToString();
+
+        if (isAsync)
+        {
+            returnTypeStr = UnwrapTaskType(returnTypeStr);
+        }
+
+        var returnType = TypeMapper.CSharpToCalor(returnTypeStr);
+        var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
+        var body = ConvertMethodBody(node.Body, node.ExpressionBody);
+
+        _context.Stats.MethodsConverted++;
+        _context.IncrementConverted();
+
+        return new FunctionNode(
+            GetTextSpan(node),
+            id,
+            name,
+            Visibility.Private,
+            Array.Empty<TypeParameterNode>(),
+            parameters,
+            output,
+            effects: InferEffectsFromBody(body),
+            Array.Empty<RequiresNode>(),
+            Array.Empty<EnsuresNode>(),
+            body,
+            new AttributeCollection(),
+            Array.Empty<ExampleNode>(),
+            Array.Empty<IssueNode>(),
+            null, null,
+            Array.Empty<AssumeNode>(),
+            null, null, null,
+            Array.Empty<BreakingChangeNode>(),
+            Array.Empty<PropertyTestNode>(),
+            null, null, null,
+            isAsync);
+    }
+
     private IReadOnlyList<StatementNode> ConvertBlock(BlockSyntax block)
     {
         var statements = new List<StatementNode>();
@@ -1063,6 +1113,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         leftExpr,
                         rightExpr));
                 }
+                FlushPendingStatements(statements);
+                continue;
+            }
+
+            // Handle local functions by hoisting to module-level §F functions
+            if (statement is LocalFunctionStatementSyntax localFunc)
+            {
+                _context.RecordFeatureUsage("local-function");
+                var hoisted = ConvertLocalFunction(localFunc);
+                _functions.Add(hoisted);
                 FlushPendingStatements(statements);
                 continue;
             }
