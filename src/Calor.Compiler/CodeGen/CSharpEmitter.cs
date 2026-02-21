@@ -2339,14 +2339,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Auto-property with default value
         if (node.IsAutoProperty)
         {
+            var accessors = node.Setter != null ? "get; set;" :
+                            node.Initer != null ? "get; init;" :
+                            "get;";
             if (node.DefaultValue != null)
             {
                 var defaultVal = node.DefaultValue.Accept(this);
-                AppendLine($"{modifierStr} {typeName} {propName} {{ get; set; }} = {defaultVal};");
+                AppendLine($"{modifierStr} {typeName} {propName} {{ {accessors} }} = {defaultVal};");
             }
             else
             {
-                AppendLine($"{modifierStr} {typeName} {propName} {{ get; set; }}");
+                AppendLine($"{modifierStr} {typeName} {propName} {{ {accessors} }}");
             }
             return "";
         }

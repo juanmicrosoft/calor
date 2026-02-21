@@ -97,4 +97,42 @@ public class ConversionCampaignFixTests
     }
 
     #endregion
+
+    #region Issue 290: Read-only properties should emit { get; } not { get; set; }
+
+    [Fact]
+    public void Emit_ReadOnlyAutoProperty_EmitsGetOnly()
+    {
+        var source = @"
+§M{m001:Test}
+§CL{c001:Foo:pub}
+§PROP{p001:Name:str:pub}
+§GET §/GET
+§/PROP{p001}
+§/CL{c001}
+§/M{m001}
+";
+        var csharp = ParseAndEmit(source);
+        Assert.Contains("{ get; }", csharp);
+        Assert.DoesNotContain("get; set;", csharp);
+    }
+
+    [Fact]
+    public void Emit_ReadWriteAutoProperty_EmitsGetSet()
+    {
+        var source = @"
+§M{m001:Test}
+§CL{c001:Foo:pub}
+§PROP{p001:Name:str:pub}
+§GET §/GET
+§SET §/SET
+§/PROP{p001}
+§/CL{c001}
+§/M{m001}
+";
+        var csharp = ParseAndEmit(source);
+        Assert.Contains("get; set;", csharp);
+    }
+
+    #endregion
 }
