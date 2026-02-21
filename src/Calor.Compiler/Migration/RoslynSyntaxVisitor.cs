@@ -1574,6 +1574,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var args = invocation.ArgumentList.Arguments
                 .Select(a => ConvertExpression(a.Expression))
                 .ToList();
+            var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
+            var stmtArgNames = hasNamedArgs
+                ? invocation.ArgumentList.Arguments
+                    .Select(a => a.NameColon?.Name.Identifier.Text)
+                    .ToList()
+                : null;
 
             // Check for Console.WriteLine as special case
             if (target == "Console.WriteLine" || target == "System.Console.WriteLine")
@@ -1596,7 +1602,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 target,
                 fallible: false,
                 args,
-                new AttributeCollection());
+                new AttributeCollection(),
+                stmtArgNames);
         }
 
         // Handle postfix increment/decrement as compound assignment statements
@@ -2565,6 +2572,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
             DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
             AssignmentExpressionSyntax assignExpr => ConvertAssignmentExpression(assignExpr),
+            TupleExpressionSyntax tupleExpr => ConvertTupleExpression(tupleExpr),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -2952,6 +2960,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         };
     }
 
+    private ExpressionNode ConvertTupleExpression(TupleExpressionSyntax tuple)
+    {
+        _context.RecordFeatureUsage("tuple-literal");
+        _context.IncrementConverted();
+        var elements = tuple.Arguments
+            .Select(a => ConvertExpression(a.Expression))
+            .ToList();
+        return new TupleLiteralNode(GetTextSpan(tuple), elements);
+    }
+
     private ExpressionNode ConvertAssignmentExpression(AssignmentExpressionSyntax assignment)
     {
         // Handle assignment expressions in expression context (e.g., chained: a = b = value)
@@ -3024,6 +3042,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var args = invocation.ArgumentList.Arguments
             .Select(a => ConvertExpression(a.Expression))
             .ToList();
+        var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
+        var argNames = hasNamedArgs
+            ? invocation.ArgumentList.Arguments
+                .Select(a => a.NameColon?.Name.Identifier.Text)
+                .ToList()
+            : null;
 
         // Try to convert common string methods to native StringOperationNode
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
@@ -3145,7 +3169,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new StringLiteralNode(GetTextSpan(invocation), nameText);
         }
 
-        return new CallExpressionNode(GetTextSpan(invocation), target, args);
+        return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames);
     }
 
     private StringOperationNode? TryGetRegexOperation(

@@ -206,6 +206,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(CallExpressionNode node) { }
     public void Visit(ThisExpressionNode node) { }
     public void Visit(BaseExpressionNode node) { }
+    public void Visit(TupleLiteralNode node) { }
     public void Visit(PropertyAccessorNode node) { }
     public void Visit(ConstructorInitializerNode node) { }
     public void Visit(AssignmentStatementNode node) { }

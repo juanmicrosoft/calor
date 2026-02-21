@@ -662,11 +662,25 @@ public sealed class CallExpressionNode : ExpressionNode
     public string Target { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
 
+    /// <summary>
+    /// Optional named argument labels, parallel to Arguments list.
+    /// Null entry means positional; non-null means named (e.g., "createIfNotExists").
+    /// </summary>
+    public IReadOnlyList<string?>? ArgumentNames { get; }
+
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+    }
+
+    public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames)
+        : base(span)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        ArgumentNames = argumentNames;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -692,6 +706,24 @@ public sealed class ThisExpressionNode : ExpressionNode
 public sealed class BaseExpressionNode : ExpressionNode
 {
     public BaseExpressionNode(TextSpan span) : base(span) { }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents a tuple literal expression.
+/// (expr1, expr2, ...) → C# (expr1, expr2, ...)
+/// </summary>
+public sealed class TupleLiteralNode : ExpressionNode
+{
+    public IReadOnlyList<ExpressionNode> Elements { get; }
+
+    public TupleLiteralNode(TextSpan span, IReadOnlyList<ExpressionNode> elements)
+        : base(span)
+    {
+        Elements = elements ?? throw new ArgumentNullException(nameof(elements));
+    }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);

@@ -491,7 +491,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(CallStatementNode node)
     {
         var target = node.Target;
-        var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
+        var argStrings = new List<string>();
+        for (int i = 0; i < node.Arguments.Count; i++)
+        {
+            var argStr = node.Arguments[i].Accept(this);
+            if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
+            {
+                argStr = $"{node.ArgumentNames[i]}: {argStr}";
+            }
+            argStrings.Add(argStr);
+        }
+        var args = string.Join(", ", argStrings);
 
         return $"{target}({args});";
     }
@@ -2309,7 +2319,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         // Unescape braces that were escaped for Calor syntax: \{ -> { and \} -> }
         var target = UnescapeBraces(node.Target);
-        var args = string.Join(", ", node.Arguments.Select(a => a.Accept(this)));
+        var argStrings = new List<string>();
+        for (int i = 0; i < node.Arguments.Count; i++)
+        {
+            var argStr = node.Arguments[i].Accept(this);
+            if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
+            {
+                argStr = $"{node.ArgumentNames[i]}: {argStr}";
+            }
+            argStrings.Add(argStr);
+        }
+        var args = string.Join(", ", argStrings);
         return $"{target}({args})";
     }
 
@@ -2333,6 +2353,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(BaseExpressionNode node)
     {
         return "base";
+    }
+
+    public string Visit(TupleLiteralNode node)
+    {
+        var elements = string.Join(", ", node.Elements.Select(e => e.Accept(this)));
+        return $"({elements})";
     }
 
     // Phase 9: Properties and Constructors

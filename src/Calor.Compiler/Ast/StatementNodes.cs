@@ -21,6 +21,11 @@ public sealed class CallStatementNode : StatementNode
     public IReadOnlyList<ExpressionNode> Arguments { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// Optional named argument labels, parallel to Arguments list.
+    /// </summary>
+    public IReadOnlyList<string?>? ArgumentNames { get; }
+
     public CallStatementNode(
         TextSpan span,
         string target,
@@ -33,6 +38,18 @@ public sealed class CallStatementNode : StatementNode
         Fallible = fallible;
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+    }
+
+    public CallStatementNode(
+        TextSpan span,
+        string target,
+        bool fallible,
+        IReadOnlyList<ExpressionNode> arguments,
+        AttributeCollection attributes,
+        IReadOnlyList<string?>? argumentNames)
+        : this(span, target, fallible, arguments, attributes)
+    {
+        ArgumentNames = argumentNames;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

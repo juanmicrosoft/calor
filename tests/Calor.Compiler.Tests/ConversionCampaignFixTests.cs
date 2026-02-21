@@ -1551,4 +1551,118 @@ public class Example
     }
 
     #endregion
+
+    #region Batch 8: Named Args, Getter-Only Props, Tuple Literals
+
+    [Fact]
+    public void Convert_NamedArguments_PreservedInAst()
+    {
+        var csharp = @"
+public class Example
+{
+    public void Target(int x, bool flag) { }
+    public void Test()
+    {
+        Target(x: 42, flag: true);
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+
+        // Find the CallStatementNode in the Test method (standalone invocations become CallStatementNode)
+        var testMethod = result.Ast!.Classes[0].Methods.First(m => m.Name == "Test");
+        var callStmt = testMethod.Body.OfType<Calor.Compiler.Ast.CallStatementNode>().First();
+        Assert.NotNull(callStmt.ArgumentNames);
+        Assert.Equal(2, callStmt.ArgumentNames!.Count);
+        Assert.Equal("x", callStmt.ArgumentNames[0]);
+        Assert.Equal("flag", callStmt.ArgumentNames[1]);
+    }
+
+    [Fact]
+    public void Convert_GetterOnlyProperty_NoSetterInRoundTrip()
+    {
+        var csharp = @"
+public class Example
+{
+    public int ReadOnly { get; }
+    public int ReadWrite { get; set; }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Compile round-trip
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        // ReadOnly should NOT have set
+        Assert.Contains("ReadOnly { get; }", compiled);
+        // ReadWrite SHOULD have set
+        Assert.Contains("ReadWrite { get; set; }", compiled);
+    }
+
+    [Fact]
+    public void Convert_TupleLiteral_NotFallback()
+    {
+        var csharp = @"
+public class Example
+{
+    public (int, string) GetPair()
+    {
+        return (42, ""hello"");
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Tuple literal should not produce ERR
+        Assert.DoesNotContain("ERR", calor);
+        // Should contain the tuple elements
+        Assert.Contains("42", calor);
+        Assert.Contains("hello", calor);
+    }
+
+    [Fact]
+    public void Convert_TupleLiteral_InAst()
+    {
+        var csharp = @"
+public class Example
+{
+    public object GetPair()
+    {
+        return (1, 2, 3);
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+
+        // Find the return statement and check for TupleLiteralNode
+        var method = result.Ast!.Classes[0].Methods.First(m => m.Name == "GetPair");
+        var returnStmt = method.Body.OfType<Calor.Compiler.Ast.ReturnStatementNode>().First();
+        var tuple = returnStmt.Expression as Calor.Compiler.Ast.TupleLiteralNode;
+        Assert.NotNull(tuple);
+        Assert.Equal(3, tuple!.Elements.Count);
+    }
+
+    [Fact]
+    public void Convert_VerbatimStringRegex_RoundTrip()
+    {
+        var csharp = @"
+public class Example
+{
+    const string pattern = @""(\p{Lu}?\p{Ll}+)"";
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Compile round-trip
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        // Should contain the regex pattern (escaped correctly for C#)
+        Assert.Contains(@"\\p{Lu}", compiled);
+        Assert.Contains(@"\\p{Ll}", compiled);
+    }
+
+    #endregion
 }

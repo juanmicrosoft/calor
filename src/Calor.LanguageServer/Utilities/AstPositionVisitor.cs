@@ -131,6 +131,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(CallExpressionNode node) => DefaultVisit(node)!;
     public virtual T Visit(ThisExpressionNode node) => DefaultVisit(node)!;
     public virtual T Visit(BaseExpressionNode node) => DefaultVisit(node)!;
+    public virtual T Visit(TupleLiteralNode node) => DefaultVisit(node)!;
 
     // Properties and constructors
     public virtual T Visit(PropertyNode node) => DefaultVisit(node)!;

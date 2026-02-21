@@ -825,6 +825,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
 
     public ExpressionNode Visit(ThisExpressionNode node) => node;
     public ExpressionNode Visit(BaseExpressionNode node) => node;
+    public ExpressionNode Visit(TupleLiteralNode node) => node;
 
     public ExpressionNode Visit(CollectionContainsNode node)
     {

@@ -1419,6 +1419,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "§BASE";
     }
 
+    public string Visit(TupleLiteralNode node)
+    {
+        var elements = string.Join(", ", node.Elements.Select(e => e.Accept(this)));
+        return $"({elements})";
+    }
+
     public string Visit(MatchExpressionNode node)
     {
         // Use block syntax that the Calor parser can understand
