@@ -110,6 +110,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit delegate declarations
+        foreach (var del in node.Delegates)
+        {
+            Visit(del);
+            AppendLine();
+        }
+
         // Emit classes
         foreach (var cls in node.Classes)
         {
@@ -582,7 +589,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
         if (node.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-        return $"§I{{{typeName}:{node.Name}{modStr}}}";
+        var attrs = EmitCSharpAttributes(node.CSharpAttributes);
+        return $"§I{{{typeName}:{node.Name}{modStr}}}{attrs}";
     }
 
     public string Visit(RequiresNode node)
@@ -1868,10 +1876,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
     // Delegate and event nodes
     public string Visit(DelegateDefinitionNode node)
     {
-        var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
-        var paramList = string.Join(", ", node.Parameters.Select(p =>
-            $"{TypeMapper.CSharpToCalor(p.TypeName)}:{p.Name}"));
-        AppendLine($"§DEL{{{node.Name}}} ({paramList}) → {output}");
+        AppendLine($"§DEL{{{node.Id}:{node.Name}}}");
+        Indent();
+
+        foreach (var param in node.Parameters)
+        {
+            AppendLine($"§I{{{TypeMapper.CSharpToCalor(param.TypeName)}:{param.Name}}}");
+        }
+        if (node.Output != null)
+        {
+            AppendLine($"§O{{{TypeMapper.CSharpToCalor(node.Output.TypeName)}}}");
+        }
+        if (node.Effects != null)
+        {
+            var effects = string.Join(",", node.Effects.Effects);
+            AppendLine($"§E{{{effects}}}");
+        }
+
+        Dedent();
+        AppendLine($"§/DEL{{{node.Id}}}");
         return "";
     }
 

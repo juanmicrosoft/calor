@@ -4256,13 +4256,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ExpressionNode? defaultValue = p.Default != null
                     ? ConvertExpression(p.Default.Value)
                     : null;
+                var paramAttrs = ConvertAttributes(p.AttributeLists);
                 return new ParameterNode(
                     GetTextSpan(p),
                     p.Identifier.ValueText,
                     TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
                     modifier,
                     new AttributeCollection(),
-                    Array.Empty<CalorAttributeNode>(),
+                    paramAttrs,
                     defaultValue);
             })
             .ToList();

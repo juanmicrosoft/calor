@@ -474,13 +474,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ParameterNode node)
     {
+        var attrPrefix = "";
+        if (node.CSharpAttributes.Count > 0)
+        {
+            var attrs = node.CSharpAttributes.Select(a =>
+            {
+                var args = a.Arguments.Count > 0 ? $"({string.Join(", ", a.Arguments)})" : "";
+                return $"[{a.Name}{args}]";
+            });
+            attrPrefix = string.Join(" ", attrs) + " ";
+        }
         var prefix = "";
         if (node.Modifier.HasFlag(ParameterModifier.This)) prefix += "this ";
         if (node.Modifier.HasFlag(ParameterModifier.Ref)) prefix += "ref ";
         if (node.Modifier.HasFlag(ParameterModifier.Out)) prefix += "out ";
         if (node.Modifier.HasFlag(ParameterModifier.In)) prefix += "in ";
         if (node.Modifier.HasFlag(ParameterModifier.Params)) prefix += "params ";
-        var result = $"{prefix}{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}";
+        var result = $"{attrPrefix}{prefix}{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}";
         if (node.DefaultValue != null)
         {
             result += $" = {node.DefaultValue.Accept(this)}";

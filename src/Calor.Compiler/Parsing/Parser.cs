@@ -621,7 +621,8 @@ public sealed class Parser
             if (semantic.Contains("params", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Params;
         }
 
-        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, Array.Empty<CalorAttributeNode>());
+        var csharpAttrs = ParseCSharpAttributes();
+        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, csharpAttrs);
     }
 
     private OutputNode ParseOutput()

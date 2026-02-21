@@ -1771,4 +1771,93 @@ public class Dict<TKey, TValue> where TKey : notnull where TValue : class
     }
 
     #endregion
+
+    #region Batch 10: delegates, parameter attributes, generic interface overloads
+
+    [Fact]
+    public void Convert_DelegateDeclaration_RoundTrip()
+    {
+        var csharp = @"
+public delegate void MyHandler(int x);
+public delegate bool Predicate<T>(T item);";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+        Assert.NotNull(result.CalorSource);
+
+        // Verify delegates are in the AST
+        Assert.Equal(2, result.Ast!.Delegates.Count);
+        Assert.Equal("MyHandler", result.Ast.Delegates[0].Name);
+
+        // Verify delegates appear in Calor output
+        var calor = result.CalorSource!;
+        Assert.Contains("§DEL", calor);
+
+        // Compile round-trip
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        Assert.Contains("delegate", compiled);
+        Assert.Contains("MyHandler", compiled);
+    }
+
+    [Fact]
+    public void Convert_ParameterAttributes_Preserved()
+    {
+        var csharp = @"
+using System.ComponentModel;
+public class Example
+{
+    public void Process([Description(""The input value"")] string input, [Obsolete] int count) { }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+
+        var method = result.Ast!.Classes[0].Methods.First(m => m.Name == "Process");
+        // First param should have Description attribute
+        Assert.NotEmpty(method.Parameters[0].CSharpAttributes);
+        Assert.Contains(method.Parameters[0].CSharpAttributes, a => a.Name.Contains("Description"));
+        // Second param should have Obsolete attribute
+        Assert.NotEmpty(method.Parameters[1].CSharpAttributes);
+        Assert.Contains(method.Parameters[1].CSharpAttributes, a => a.Name.Contains("Obsolete"));
+    }
+
+    [Fact]
+    public void Convert_GenericInterfaceOverloads_BothPreserved()
+    {
+        var csharp = @"
+public interface IValidator { void Validate(); }
+public interface IValidator<T> { void Validate(T item); }";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+
+        // Both interfaces should be in the AST
+        Assert.Equal(2, result.Ast!.Interfaces.Count);
+
+        // One should have type parameters, one should not
+        var nonGeneric = result.Ast.Interfaces.First(i => i.TypeParameters.Count == 0);
+        var generic = result.Ast.Interfaces.First(i => i.TypeParameters.Count > 0);
+        Assert.Equal("IValidator", nonGeneric.Name);
+        Assert.Equal("IValidator", generic.Name);
+        Assert.Single(generic.TypeParameters);
+    }
+
+    [Fact]
+    public void Convert_ParameterAttributes_RoundTrip()
+    {
+        var csharp = @"
+public class Api
+{
+    public void Handle([Obsolete] string input) { }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Compile round-trip
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        // Attribute should survive the round-trip
+        Assert.Contains("Obsolete", compiled);
+    }
+
+    #endregion
 }
