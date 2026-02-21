@@ -205,6 +205,8 @@ public interface IAstVisitor
     void Visit(YieldBreakStatementNode node);
     // Raw C# passthrough
     void Visit(RawCSharpNode node);
+    // C# interop blocks (member-level raw C#)
+    void Visit(CSharpInteropBlockNode node);
 }
 
 /// <summary>
@@ -394,6 +396,8 @@ public interface IAstVisitor<T>
     T Visit(YieldBreakStatementNode node);
     // Raw C# passthrough
     T Visit(RawCSharpNode node);
+    // C# interop blocks (member-level raw C#)
+    T Visit(CSharpInteropBlockNode node);
 }
 
 /// <summary>

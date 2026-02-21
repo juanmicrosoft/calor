@@ -26,6 +26,7 @@ public sealed class McpMessageHandler
         RegisterTool(new VerifyTool());
         RegisterTool(new AnalyzeTool());
         RegisterTool(new ConvertTool());
+        RegisterTool(new AnalyzeConvertibilityTool());
         RegisterTool(new SyntaxHelpTool());
         RegisterTool(new LintTool());
         RegisterTool(new FormatTool());

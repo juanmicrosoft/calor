@@ -1413,6 +1413,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(YieldReturnStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(YieldBreakStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RawCSharpNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(CSharpInteropBlockNode node) => throw new InvalidOperationException();
 
     #endregion
 }

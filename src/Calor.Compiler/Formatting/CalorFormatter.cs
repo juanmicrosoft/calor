@@ -107,6 +107,12 @@ public sealed class CalorFormatter
             FormatFunction(func);
         }
 
+        // C# interop blocks
+        foreach (var interop in module.InteropBlocks)
+        {
+            AppendLine($"§CSHARP{{{interop.CSharpCode}}}§/CSHARP");
+        }
+
         // Closing module tag
         AppendLine($"§/M{{{moduleId}}}");
 
@@ -260,6 +266,12 @@ public sealed class CalorFormatter
         foreach (var method in cls.Methods)
         {
             FormatMethod(method);
+        }
+
+        // C# interop blocks
+        foreach (var interop in cls.InteropBlocks)
+        {
+            AppendLine($"§CSHARP{{{interop.CSharpCode}}}§/CSHARP");
         }
 
         AppendLine($"§/CL{{{clsId}}}");

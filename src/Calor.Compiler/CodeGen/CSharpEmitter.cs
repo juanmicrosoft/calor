@@ -232,6 +232,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit C# interop blocks
+        foreach (var interop in node.InteropBlocks)
+        {
+            Visit(interop);
+            AppendLine();
+        }
+
         // Emit module-level functions in a static class
         if (node.Functions.Count > 0)
         {
@@ -1964,6 +1971,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var evt in node.Events)
         {
             Visit(evt);
+        }
+
+        // Emit C# interop blocks
+        foreach (var interop in node.InteropBlocks)
+        {
+            Visit(interop);
+            AppendLine();
         }
 
         _currentClassName = null;
@@ -3738,6 +3752,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         // Emit raw C# content verbatim without applying scope indentation,
         // since the raw content has its own formatting.
+        foreach (var line in node.CSharpCode.Split('\n'))
+        {
+            _builder.AppendLine(line.TrimEnd('\r'));
+        }
+        return "";
+    }
+
+    public string Visit(CSharpInteropBlockNode node)
+    {
+        // Emit raw C# content verbatim, same as RawCSharpNode
         foreach (var line in node.CSharpCode.Split('\n'))
         {
             _builder.AppendLine(line.TrimEnd('\r'));

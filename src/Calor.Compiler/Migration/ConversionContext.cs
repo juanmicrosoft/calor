@@ -155,6 +155,7 @@ public sealed class ConversionStats
     public int FieldsConverted { get; set; }
     public int StatementsConverted { get; set; }
     public int ExpressionsConverted { get; set; }
+    public int InteropBlocksEmitted { get; set; }
 
     public double ConversionRate => TotalNodes > 0 ? (double)ConvertedNodes / TotalNodes * 100 : 0;
 }
@@ -206,6 +207,11 @@ public sealed class ConversionContext
     /// The module name to use (derived from file name if not set).
     /// </summary>
     public string? ModuleName { get; set; }
+
+    /// <summary>
+    /// Conversion mode controlling how unsupported constructs are handled.
+    /// </summary>
+    public ConversionMode Mode { get; set; } = ConversionMode.Standard;
 
     /// <summary>
     /// Current namespace being processed.
@@ -538,5 +544,6 @@ public sealed class ConversionContext
         Stats.FieldsConverted = 0;
         Stats.StatementsConverted = 0;
         Stats.ExpressionsConverted = 0;
+        Stats.InteropBlocksEmitted = 0;
     }
 }

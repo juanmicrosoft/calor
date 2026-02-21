@@ -634,6 +634,12 @@ public sealed class Lexer
             return ScanRawBlock();
         }
 
+        // Special handling for §CSHARP: scan to }§/CSHARP and capture everything as interop content
+        if (fullKeyword.Equals("CSHARP", StringComparison.Ordinal))
+        {
+            return ScanCSharpInteropBlock();
+        }
+
         if (Keywords.TryGetValue(fullKeyword, out var keywordKind))
         {
             return MakeToken(keywordKind);
@@ -685,6 +691,59 @@ public sealed class Lexer
         // Reached end of file without finding §/RAW
         _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedRawBlock,
             "Unterminated §RAW block: expected §/RAW before end of file.");
+        return MakeToken(TokenKind.Error);
+    }
+
+    /// <summary>
+    /// Scans a C# interop block. Called after §CSHARP has been consumed.
+    /// Expects { immediately after, then captures everything until }§/CSHARP.
+    /// </summary>
+    private Token ScanCSharpInteropBlock()
+    {
+        // Expect opening brace
+        if (Current != '{')
+        {
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedCSharpInteropBlock,
+                "Expected '{' after §CSHARP.");
+            return MakeToken(TokenKind.Error);
+        }
+        Advance(); // consume '{'
+
+        // Skip optional whitespace/newline after {
+        if (Current == '\n') Advance();
+        else if (Current == '\r' && Lookahead == '\n') { Advance(); Advance(); }
+
+        var contentStart = _position;
+        const string endMarker = "}§/CSHARP";
+
+        // Scan forward to find }§/CSHARP
+        while (!IsAtEnd)
+        {
+            if (Current == '}' && _position + endMarker.Length <= _source.Length
+                && _source.Substring(_position, endMarker.Length) == endMarker)
+            {
+                // Found the end marker — capture content up to here
+                var rawContent = _source[contentStart.._position];
+
+                // Trim trailing newline from content if present
+                if (rawContent.EndsWith("\r\n"))
+                    rawContent = rawContent[..^2];
+                else if (rawContent.EndsWith("\n"))
+                    rawContent = rawContent[..^1];
+
+                // Advance past }§/CSHARP
+                for (int i = 0; i < endMarker.Length; i++)
+                    Advance();
+
+                return MakeToken(TokenKind.CSharpInterop, rawContent);
+            }
+
+            Advance();
+        }
+
+        // Reached end of file without finding }§/CSHARP
+        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedCSharpInteropBlock,
+            "Unterminated §CSHARP block: expected }§/CSHARP before end of file.");
         return MakeToken(TokenKind.Error);
     }
 

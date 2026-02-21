@@ -22,6 +22,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<DelegateDefinitionNode> _delegates = new();
     private readonly List<FunctionNode> _functions = new();
     private readonly List<StatementNode> _topLevelStatements = new();
+    private readonly List<CSharpInteropBlockNode> _moduleInteropBlocks = new();
     private HashSet<string> _reassignedVariables = new();
 
     /// <summary>
@@ -55,6 +56,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _delegates.Clear();
         _functions.Clear();
         _topLevelStatements.Clear();
+        _moduleInteropBlocks.Clear();
         _reassignedVariables = CollectReassignedVariables(root);
 
         // Visit all nodes
@@ -89,6 +91,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _interfaces,
             _classes,
             _enums,
+            Array.Empty<EnumExtensionNode>(),
             _delegates,
             functions,
             new AttributeCollection(),
@@ -96,7 +99,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<AssumeNode>(),
             Array.Empty<InvariantNode>(),
             Array.Empty<DecisionNode>(),
-            null);
+            null,
+            _moduleInteropBlocks.Count > 0 ? _moduleInteropBlocks.ToList() : null);
     }
 
     public override void VisitUsingDirective(UsingDirectiveSyntax node)
@@ -183,140 +187,186 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("interface");
         _context.EnterType(node.Identifier.Text);
-
-        var id = _context.GenerateId("i");
-        var name = node.Identifier.Text;
-        var baseInterfaces = node.BaseList?.Types
-            .Select(t => t.Type.ToString())
-            .ToList() ?? new List<string>();
-        var csharpAttrs = ConvertAttributes(node.AttributeLists);
-        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
-
-        var methods = new List<MethodSignatureNode>();
-        foreach (var member in node.Members)
+        try
         {
-            if (member is MethodDeclarationSyntax methodSyntax)
+            var id = _context.GenerateId("i");
+            var name = node.Identifier.Text;
+            var baseInterfaces = node.BaseList?.Types
+                .Select(t => t.Type.ToString())
+                .ToList() ?? new List<string>();
+            var csharpAttrs = ConvertAttributes(node.AttributeLists);
+            var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
+
+            var methods = new List<MethodSignatureNode>();
+            foreach (var member in node.Members)
             {
-                methods.Add(ConvertMethodSignature(methodSyntax));
+                if (member is MethodDeclarationSyntax methodSyntax)
+                {
+                    methods.Add(ConvertMethodSignature(methodSyntax));
+                }
             }
+
+            var interfaceNode = new InterfaceDefinitionNode(
+                GetTextSpan(node),
+                id,
+                name,
+                baseInterfaces,
+                typeParameters,
+                methods,
+                new AttributeCollection(),
+                csharpAttrs);
+
+            _interfaces.Add(interfaceNode);
+            _context.Stats.InterfacesConverted++;
+            _context.IncrementConverted();
         }
-
-        var interfaceNode = new InterfaceDefinitionNode(
-            GetTextSpan(node),
-            id,
-            name,
-            baseInterfaces,
-            typeParameters,
-            methods,
-            new AttributeCollection(),
-            csharpAttrs);
-
-        _interfaces.Add(interfaceNode);
-        _context.Stats.InterfacesConverted++;
-        _context.IncrementConverted();
-        _context.ExitType();
+        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        {
+            _moduleInteropBlocks.Add(CreateInteropBlock(node, "interface", InteropMemberKind.Class));
+        }
+        finally
+        {
+            _context.ExitType();
+        }
     }
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("class");
         _context.EnterType(node.Identifier.Text);
-
-        var classNode = ConvertClass(node);
-        _classes.Add(classNode);
-        _context.Stats.ClassesConverted++;
-        _context.IncrementConverted();
-        _context.ExitType();
+        try
+        {
+            var classNode = ConvertClass(node);
+            _classes.Add(classNode);
+            _context.Stats.ClassesConverted++;
+            _context.IncrementConverted();
+        }
+        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        {
+            _moduleInteropBlocks.Add(CreateInteropBlock(node, "class", InteropMemberKind.Class));
+        }
+        finally
+        {
+            _context.ExitType();
+        }
     }
 
     public override void VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("record");
         _context.EnterType(node.Identifier.Text);
-
-        // Treat records as classes for conversion
-        var classNode = ConvertRecord(node);
-        _classes.Add(classNode);
-        _context.Stats.ClassesConverted++;
-        _context.IncrementConverted();
-        _context.ExitType();
+        try
+        {
+            var classNode = ConvertRecord(node);
+            _classes.Add(classNode);
+            _context.Stats.ClassesConverted++;
+            _context.IncrementConverted();
+        }
+        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        {
+            _moduleInteropBlocks.Add(CreateInteropBlock(node, "record", InteropMemberKind.Class));
+        }
+        finally
+        {
+            _context.ExitType();
+        }
     }
 
     public override void VisitStructDeclaration(StructDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("struct");
         _context.EnterType(node.Identifier.Text);
-
-        // Treat structs as classes for conversion
-        var classNode = ConvertStruct(node);
-        _classes.Add(classNode);
-        _context.Stats.ClassesConverted++;
-        _context.IncrementConverted();
-        _context.ExitType();
+        try
+        {
+            var classNode = ConvertStruct(node);
+            _classes.Add(classNode);
+            _context.Stats.ClassesConverted++;
+            _context.IncrementConverted();
+        }
+        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        {
+            _moduleInteropBlocks.Add(CreateInteropBlock(node, "struct", InteropMemberKind.Class));
+        }
+        finally
+        {
+            _context.ExitType();
+        }
     }
 
     public override void VisitEnumDeclaration(EnumDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("enum");
-
-        var id = _context.GenerateId("e");
-        var name = node.Identifier.Text;
-
-        // Get the underlying type if specified (e.g., : byte, : int)
-        string? underlyingType = null;
-        if (node.BaseList?.Types.Count > 0)
+        try
         {
-            var baseTypeName = node.BaseList.Types.First().Type.ToString();
-            underlyingType = TypeMapper.CSharpToCalor(baseTypeName);
-        }
+            var id = _context.GenerateId("e");
+            var name = node.Identifier.Text;
 
-        // Convert enum members
-        var members = new List<EnumMemberNode>();
-        foreach (var member in node.Members)
+            // Get the underlying type if specified (e.g., : byte, : int)
+            string? underlyingType = null;
+            if (node.BaseList?.Types.Count > 0)
+            {
+                var baseTypeName = node.BaseList.Types.First().Type.ToString();
+                underlyingType = TypeMapper.CSharpToCalor(baseTypeName);
+            }
+
+            // Convert enum members
+            var members = new List<EnumMemberNode>();
+            foreach (var member in node.Members)
+            {
+                var memberName = member.Identifier.Text;
+                var memberValue = member.EqualsValue?.Value.ToString();
+                members.Add(new EnumMemberNode(GetTextSpan(member), memberName, memberValue));
+            }
+
+            var enumNode = new EnumDefinitionNode(
+                GetTextSpan(node),
+                id,
+                name,
+                underlyingType,
+                members,
+                new AttributeCollection());
+
+            _enums.Add(enumNode);
+            _context.Stats.EnumsConverted++;
+            _context.IncrementConverted();
+        }
+        catch (Exception) when (_context.Mode == ConversionMode.Interop)
         {
-            var memberName = member.Identifier.Text;
-            var memberValue = member.EqualsValue?.Value.ToString();
-            members.Add(new EnumMemberNode(GetTextSpan(member), memberName, memberValue));
+            _moduleInteropBlocks.Add(CreateInteropBlock(node, "enum", InteropMemberKind.Other));
         }
-
-        var enumNode = new EnumDefinitionNode(
-            GetTextSpan(node),
-            id,
-            name,
-            underlyingType,
-            members,
-            new AttributeCollection());
-
-        _enums.Add(enumNode);
-        _context.Stats.EnumsConverted++;
-        _context.IncrementConverted();
     }
 
     public override void VisitDelegateDeclaration(DelegateDeclarationSyntax node)
     {
         _context.RecordFeatureUsage("delegate");
+        try
+        {
+            var id = _context.GenerateId("del");
+            var name = node.Identifier.Text;
 
-        var id = _context.GenerateId("del");
-        var name = node.Identifier.Text;
+            // Convert parameters
+            var parameters = ConvertParameters(node.ParameterList);
 
-        // Convert parameters
-        var parameters = ConvertParameters(node.ParameterList);
+            // Convert return type
+            var returnType = TypeMapper.CSharpToCalor(node.ReturnType.ToString());
+            var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
 
-        // Convert return type
-        var returnType = TypeMapper.CSharpToCalor(node.ReturnType.ToString());
-        var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
+            var delegateNode = new DelegateDefinitionNode(
+                GetTextSpan(node),
+                id,
+                name,
+                parameters,
+                output,
+                effects: null,
+                new AttributeCollection());
 
-        var delegateNode = new DelegateDefinitionNode(
-            GetTextSpan(node),
-            id,
-            name,
-            parameters,
-            output,
-            effects: null,
-            new AttributeCollection());
-
-        _delegates.Add(delegateNode);
-        _context.IncrementConverted();
+            _delegates.Add(delegateNode);
+            _context.IncrementConverted();
+        }
+        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        {
+            _moduleInteropBlocks.Add(CreateInteropBlock(node, "delegate", InteropMemberKind.Other));
+        }
     }
 
     private ClassDefinitionNode ConvertClass(ClassDeclarationSyntax node)
@@ -391,31 +441,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
+        var interopBlocks = new List<CSharpInteropBlockNode>();
+
         foreach (var member in node.Members)
         {
-            switch (member)
+            try
             {
-                case FieldDeclarationSyntax fieldSyntax:
-                    fields.AddRange(ConvertFields(fieldSyntax));
-                    break;
-                case PropertyDeclarationSyntax propertySyntax:
-                    properties.Add(ConvertProperty(propertySyntax));
-                    break;
-                case ConstructorDeclarationSyntax ctorSyntax:
-                    constructors.Add(ConvertConstructor(ctorSyntax));
-                    break;
-                case MethodDeclarationSyntax methodSyntax:
-                    methods.Add(ConvertMethod(methodSyntax));
-                    break;
-                case OperatorDeclarationSyntax opDecl:
-                    methods.Add(ConvertOperator(opDecl));
-                    break;
-                case ConversionOperatorDeclarationSyntax convDecl:
-                    methods.Add(ConvertConversionOperator(convDecl));
-                    break;
-                case EventFieldDeclarationSyntax eventSyntax:
-                    events.AddRange(ConvertEventFields(eventSyntax));
-                    break;
+                ConvertClassMember(member, fields, properties, constructors, methods, events);
+            }
+            catch (Exception) when (_context.Mode == ConversionMode.Interop)
+            {
+                var kind = member switch
+                {
+                    MethodDeclarationSyntax => InteropMemberKind.Method,
+                    PropertyDeclarationSyntax => InteropMemberKind.Property,
+                    FieldDeclarationSyntax => InteropMemberKind.Field,
+                    ConstructorDeclarationSyntax => InteropMemberKind.Constructor,
+                    EventFieldDeclarationSyntax => InteropMemberKind.Event,
+                    _ => InteropMemberKind.Other
+                };
+                interopBlocks.Add(CreateInteropBlock(member, null, kind));
             }
         }
 
@@ -437,7 +482,48 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             events,
             new AttributeCollection(),
             csharpAttrs,
-            visibility: visibility);
+            visibility: visibility,
+            interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null);
+    }
+
+    private void ConvertClassMember(
+        MemberDeclarationSyntax member,
+        List<ClassFieldNode> fields,
+        List<PropertyNode> properties,
+        List<ConstructorNode> constructors,
+        List<MethodNode> methods,
+        List<EventDefinitionNode> events)
+    {
+        switch (member)
+        {
+            case FieldDeclarationSyntax fieldSyntax:
+                fields.AddRange(ConvertFields(fieldSyntax));
+                break;
+            case PropertyDeclarationSyntax propertySyntax:
+                properties.Add(ConvertProperty(propertySyntax));
+                break;
+            case ConstructorDeclarationSyntax ctorSyntax:
+                constructors.Add(ConvertConstructor(ctorSyntax));
+                break;
+            case MethodDeclarationSyntax methodSyntax:
+                methods.Add(ConvertMethod(methodSyntax));
+                break;
+            case OperatorDeclarationSyntax opDecl:
+                methods.Add(ConvertOperator(opDecl));
+                break;
+            case ConversionOperatorDeclarationSyntax convDecl:
+                methods.Add(ConvertConversionOperator(convDecl));
+                break;
+            case EventFieldDeclarationSyntax eventSyntax:
+                events.AddRange(ConvertEventFields(eventSyntax));
+                break;
+            default:
+                if (_context.Mode == ConversionMode.Interop)
+                {
+                    throw new NotSupportedException($"Unsupported member type: {member.Kind()}");
+                }
+                break;
+        }
     }
 
     private ClassDefinitionNode ConvertRecord(RecordDeclarationSyntax node)
@@ -1264,6 +1350,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             line: lineSpan.StartLinePosition.Line + 1,
             column: lineSpan.StartLinePosition.Character + 1);
         _context.IncrementSkipped();
+
+        // In Interop mode, preserve unsupported statements as raw C# passthrough
+        if (_context.Mode == ConversionMode.Interop)
+        {
+            return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
+        }
 
         // Return a fallback comment node instead of null
         return CreateFallbackStatement(statement, featureName);
@@ -4632,6 +4724,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new FallbackCommentNode(GetTextSpan(node), node.ToString(), featureName, suggestion);
+    }
+
+    /// <summary>
+    /// Creates a CSharpInteropBlockNode wrapping an unsupported member's source code.
+    /// Used in Interop conversion mode.
+    /// </summary>
+    private CSharpInteropBlockNode CreateInteropBlock(SyntaxNode node, string? featureName, InteropMemberKind kind)
+    {
+        var sourceCode = node.ToFullString();
+        var lineSpan = node.GetLocation().GetLineSpan();
+        var line = lineSpan.StartLinePosition.Line + 1;
+
+        // Determine feature name from syntax kind if not provided
+        featureName ??= node.Kind().ToString().Replace("Declaration", "").Replace("Syntax", "").ToLowerInvariant();
+
+        var reason = $"Unsupported {kind}: {(node.ToString().Length > 80 ? node.ToString().Substring(0, 77) + "..." : node.ToString())}";
+
+        _context.RecordUnsupportedFeature(featureName, node.ToString(), line);
+        _context.Stats.InteropBlocksEmitted++;
+        _context.AddInfo($"C# interop block preserved for [{featureName}]", feature: featureName, line: line);
+
+        return new CSharpInteropBlockNode(GetTextSpan(node), sourceCode, featureName, reason, kind);
     }
 
     /// <summary>

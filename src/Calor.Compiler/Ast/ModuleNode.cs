@@ -29,6 +29,8 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<DecisionNode> Decisions { get; }
     // Extended Features: Partial View Markers
     public ContextNode? Context { get; }
+    // C# Interop Blocks (member-level raw C# preserved during partial conversion)
+    public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
 
     public ModuleNode(
         TextSpan span,
@@ -162,7 +164,8 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<AssumeNode> assumptions,
         IReadOnlyList<InvariantNode> invariants,
         IReadOnlyList<DecisionNode> decisions,
-        ContextNode? context)
+        ContextNode? context,
+        IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -180,6 +183,7 @@ public sealed class ModuleNode : AstNode
         Invariants = invariants ?? throw new ArgumentNullException(nameof(invariants));
         Decisions = decisions ?? throw new ArgumentNullException(nameof(decisions));
         Context = context;
+        InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
     }
 
     /// <summary>

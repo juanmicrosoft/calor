@@ -22,6 +22,23 @@ public sealed class ConversionResult
 }
 
 /// <summary>
+/// Conversion mode controlling how unsupported constructs are handled.
+/// </summary>
+public enum ConversionMode
+{
+    /// <summary>
+    /// Standard mode: unsupported constructs produce FallbackCommentNode (TODO comments).
+    /// </summary>
+    Standard,
+
+    /// <summary>
+    /// Interop mode: unsupported members are wrapped in §CSHARP{...}§/CSHARP blocks,
+    /// preserving the original C# code verbatim for round-trip compilation.
+    /// </summary>
+    Interop
+}
+
+/// <summary>
 /// Options for C# to Calor conversion.
 /// </summary>
 public sealed class ConversionOptions
@@ -64,6 +81,13 @@ public sealed class ConversionOptions
     /// When true, conversion results include a detailed explanation of what was not converted.
     /// </summary>
     public bool Explain { get; set; }
+
+    /// <summary>
+    /// Conversion mode controlling how unsupported constructs are handled.
+    /// Standard: produces FallbackCommentNode (TODO comments).
+    /// Interop: wraps unsupported members in §CSHARP{...}§/CSHARP blocks.
+    /// </summary>
+    public ConversionMode Mode { get; set; } = ConversionMode.Standard;
 }
 
 /// <summary>
@@ -242,7 +266,8 @@ public sealed class CSharpToCalorConverter
             PreserveComments = _options.PreserveComments,
             AutoGenerateIds = _options.AutoGenerateIds,
             ModuleName = _options.ModuleName,
-            GracefulFallback = _options.GracefulFallback
+            GracefulFallback = _options.GracefulFallback,
+            Mode = _options.Mode
         };
     }
 
