@@ -32,6 +32,7 @@ public sealed class LambdaExpressionNode : ExpressionNode
     public IReadOnlyList<LambdaParameterNode> Parameters { get; }
     public EffectsNode? Effects { get; }
     public bool IsAsync { get; }
+    public bool IsStatic { get; }
 
     /// <summary>
     /// The body can be either an expression (for expression lambdas)
@@ -50,13 +51,15 @@ public sealed class LambdaExpressionNode : ExpressionNode
         bool isAsync,
         ExpressionNode? expressionBody,
         IReadOnlyList<StatementNode>? statementBody,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        bool isStatic = false)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Effects = effects;
         IsAsync = isAsync;
+        IsStatic = isStatic;
         ExpressionBody = expressionBody;
         StatementBody = statementBody;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));

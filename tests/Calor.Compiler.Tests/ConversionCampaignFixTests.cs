@@ -1665,4 +1665,110 @@ public class Example
     }
 
     #endregion
+
+    #region Batch 9: notnull constraint, static lambdas
+
+    [Fact]
+    public void Convert_NotNullConstraint_PreservedInAst()
+    {
+        var csharp = @"
+public class Box<T> where T : notnull
+{
+    public T Value { get; set; }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+
+        var classNode = result.Ast!.Classes[0];
+        var typeParam = classNode.TypeParameters[0];
+        Assert.Single(typeParam.Constraints);
+        Assert.Equal(Calor.Compiler.Ast.TypeConstraintKind.NotNull, typeParam.Constraints[0].Kind);
+    }
+
+    [Fact]
+    public void Convert_NotNullConstraint_RoundTrip()
+    {
+        var csharp = @"
+public class Box<T> where T : notnull
+{
+    public T Value { get; set; }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Compile back to C#
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        Assert.Contains("where T : notnull", compiled);
+    }
+
+    [Fact]
+    public void Convert_StaticLambda_PreservedInAst()
+    {
+        var csharp = @"
+using System;
+public class Example
+{
+    public void Test()
+    {
+        Func<int, int> doubler = static (int x) => x * 2;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+
+        // Find the lambda in the AST
+        var method = result.Ast!.Classes[0].Methods.First(m => m.Name == "Test");
+        var bind = method.Body.OfType<Calor.Compiler.Ast.BindStatementNode>().First();
+        var lambda = bind.Initializer as Calor.Compiler.Ast.LambdaExpressionNode;
+        Assert.NotNull(lambda);
+        Assert.True(lambda!.IsStatic);
+    }
+
+    [Fact]
+    public void Convert_StaticLambda_EmitsStaticKeyword()
+    {
+        var csharp = @"
+using System;
+public class Example
+{
+    public void Test()
+    {
+        Func<int, int> doubler = static (int x) => x * 2;
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.CalorSource);
+        var calor = result.CalorSource!;
+
+        // Compile back to C# and check static is emitted
+        var compiled = Compile(calor);
+        Assert.NotNull(compiled);
+        Assert.Contains("static", compiled);
+    }
+
+    [Fact]
+    public void Convert_NotNullWithOtherConstraints_PreservedInAst()
+    {
+        var csharp = @"
+public class Dict<TKey, TValue> where TKey : notnull where TValue : class
+{
+}";
+        var result = _converter.Convert(csharp);
+        Assert.NotNull(result.Ast);
+
+        var classNode = result.Ast!.Classes[0];
+        Assert.Equal(2, classNode.TypeParameters.Count);
+
+        var keyParam = classNode.TypeParameters.First(tp => tp.Name == "TKey");
+        Assert.Single(keyParam.Constraints);
+        Assert.Equal(Calor.Compiler.Ast.TypeConstraintKind.NotNull, keyParam.Constraints[0].Kind);
+
+        var valueParam = classNode.TypeParameters.First(tp => tp.Name == "TValue");
+        Assert.Single(valueParam.Constraints);
+        Assert.Equal(Calor.Compiler.Ast.TypeConstraintKind.Class, valueParam.Constraints[0].Kind);
+    }
+
+    #endregion
 }

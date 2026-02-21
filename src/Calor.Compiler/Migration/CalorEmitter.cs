@@ -1523,6 +1523,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Build §LAM{id:p1:t1:p2:t2} header
         // Format: §LAM{id[:async]:param1:type1[:param2:type2:...]}
         var headerParts = new List<string> { node.Id };
+        if (node.IsStatic)
+        {
+            headerParts.Add("static");
+        }
         if (node.IsAsync)
         {
             headerParts.Add("async");
@@ -1832,6 +1836,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             TypeConstraintKind.Interface => node.TypeName ?? "",
             TypeConstraintKind.BaseClass => node.TypeName ?? "",
             TypeConstraintKind.TypeName => node.TypeName ?? "",
+            TypeConstraintKind.NotNull => "notnull",
             _ => node.TypeName ?? ""
         };
     }

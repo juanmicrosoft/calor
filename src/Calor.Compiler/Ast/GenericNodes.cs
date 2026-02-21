@@ -65,7 +65,9 @@ public enum TypeConstraintKind
     /// <summary>Type must derive from a base class</summary>
     BaseClass,
     /// <summary>Type must be or derive from the specified type</summary>
-    TypeName
+    TypeName,
+    /// <summary>Type must not be null (notnull constraint)</summary>
+    NotNull
 }
 
 /// <summary>
