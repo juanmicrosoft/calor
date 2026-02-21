@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-02-21
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.18x (Calor leads)
+- **Metrics**: Calor wins 6, C# wins 2
+- **Highlights**:
+  - Comprehension: 1.55x (Calor wins, large effect)
+  - EditPrecision: 1.37x (Calor wins, large effect)
+  - RefactoringStability: 1.37x (Calor wins, large effect)
+  - ErrorDetection: 1.24x (Calor wins, large effect)
+- **Programs Tested**: 40
+
+### Added
+- **Unsupported feature telemetry** — Track unsupported C# constructs (goto, unsafe, etc.) in Application Insights during conversion, enabling data-driven prioritization of converter improvements
+- **Pattern combinators** — `not`, `or`, and `and` pattern combinators and negated type patterns in C# converter
+- **Collection spread-only conversion** — Spread expressions and fluent chain-on-new hoisting in converter
+- **Required modifier and partial methods** — Support for `required` property modifier and partial method declarations
+- **Delegate emission** — Delegate types, parameter attributes, and generic interface overloads in converter
+- **Named arguments and tuple literals** — Named arguments, tuple literals, getter-only properties, and verbatim strings
+- **Primary constructor parameters** — C# 12 primary constructors converted to readonly fields
+- **`notnull` generic constraint** — Support for `notnull` constraint and static lambda conversion
+- **Permissive effect inference** — New mode for converted code to avoid strict effect enforcement on generated output
+
+### Fixed
+- **Converter**: null-coalescing `??` → conditional (not arithmetic), declaration pattern variable binding, `out var` support, method groups, explicit interface implementations, target-typed new inference, cast-then-call chains, `protected internal`, `unchecked` blocks, default parameters, chained assignments, `typeof`, `lock`, lambda assignment, expression-bodied constructors, `int.MaxValue`, `ValueTask`, empty `[]`, static properties
+- **Diagnostics**: Broke monolithic `Calor0100` (UnexpectedToken) into 6 specific error codes for clearer error messages
+- **Parser**: `§HAS`/`§IDX`/`§LEN`/`§CNT` inside lisp expressions, tuple deconstruction, generic static access, variance modifiers, interface type params
+- **Converter hoisting**: Chain bindings hoisted before `if` conditions, `§NEW` args hoisted to temp vars
+
 ## [0.2.8] - 2026-02-21
 
 ### Benchmark Results (Statistical: 30 runs)
