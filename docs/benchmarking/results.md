@@ -1,6 +1,6 @@
 <!-- THIS FILE IS AUTO-GENERATED. DO NOT EDIT MANUALLY. -->
 <!-- Generated from website/public/data/benchmark-results.json by CI/CD -->
-<!-- Last generated: 2026-02-09T16:02:37.317Z -->
+<!-- Last generated: 2026-02-21T20:12:12.701Z -->
 
 ---
 layout: default
@@ -11,9 +11,9 @@ nav_order: 2
 
 # Benchmark Results
 
-Evaluated across 28 paired Calor/C# programs.
+Evaluated across 40 paired Calor/C# programs.
 
-**Last updated:** February 7, 2026 (commit: ac93d09)
+**Last updated:** February 21, 2026 (commit: 7f76e6e)
 
 ---
 
@@ -21,14 +21,14 @@ Evaluated across 28 paired Calor/C# programs.
 
 | Category | Calor vs C# | Winner | Interpretation |
 |:---------|:-----------|:-------|:---------------|
-| Comprehension | **1.46x** | Calor | Explicit structure aids understanding |
-| Error Detection | **1.45x** | Calor | Contracts surface invariant violations |
-| Edit Precision | **1.36x** | Calor | Unique IDs enable targeted changes |
-| Refactoring Stability | **1.46x** | Calor | Structural IDs preserve refactoring intent |
-| Generation Accuracy | 0.94x | C# | Mature tooling, familiar patterns |
-| Task Completion | 0.86x | C# | Ecosystem maturity advantage |
-| Token Economics | 0.63x | C# | Calor's explicit syntax uses more tokens |
-| Information Density | 0.09x | C# | Calor trades density for explicitness |
+| Comprehension | **1.51x** | Calor | Explicit structure aids understanding |
+| Error Detection | **1.22x** | Calor | Contracts surface invariant violations |
+| Edit Precision | **1.37x** | Calor | Unique IDs enable targeted changes |
+| Refactoring Stability | **1.36x** | Calor | Structural IDs preserve refactoring intent |
+| Generation Accuracy | 0.97x | C# | Mature tooling, familiar patterns |
+| Task Completion | **1.00x** | Calor | Better task completion rate |
+| Token Economics | 0.83x | C# | Calor's explicit syntax uses more tokens |
+| Information Density | 1.00x | C# |  |
 
 ---
 
@@ -36,7 +36,7 @@ Evaluated across 28 paired Calor/C# programs.
 
 ### Where Calor Wins
 
-#### Comprehension (1.46x)
+#### Comprehension (1.51x)
 
 Calor's explicit structure provides clear signals for understanding:
 
@@ -47,7 +47,7 @@ Calor's explicit structure provides clear signals for understanding:
 | Side effects | Explicit `§E{cw,db:rw}` | Must infer from code |
 | Contracts | First-class `§Q`, `§S` | Comments or assertions |
 
-#### Error Detection (1.45x)
+#### Error Detection (1.22x)
 
 Contracts make invariants explicit:
 
@@ -61,7 +61,7 @@ if (x < 0) throw new ArgumentException();
 Debug.Assert(result >= 0);
 ```
 
-#### Edit Precision (1.36x)
+#### Edit Precision (1.37x)
 
 Unique IDs enable precise targeting:
 
@@ -73,23 +73,23 @@ Unique IDs enable precise targeting:
 for (int i = 0; i < 100; i++)
 ```
 
-#### Refactoring Stability (1.46x)
+#### Refactoring Stability (1.36x)
 
 Structural IDs maintain references across refactoring operations, enabling reliable multi-step transformations.
+
+#### Task Completion (1.00x)
+
+Calor benefits when tasks require understanding code behavior through contracts.
 
 ---
 
 ### Where C# Wins
 
-#### Generation Accuracy (0.94x)
+#### Generation Accuracy (0.97x)
 
 C# benefits from extensive LLM training data and familiar patterns.
 
-#### Task Completion (0.86x)
-
-C# benefits from ecosystem maturity and token efficiency.
-
-#### Token Economics (0.63x)
+#### Token Economics (0.83x)
 
 C# is more compact:
 
@@ -101,10 +101,6 @@ C# is more compact:
 
 Average: Calor uses ~1.5x more tokens than C#.
 
-#### Information Density (0.09x)
-
-C# packs more semantic content per token by using implicit information and familiar shorthand.
-
 ---
 
 ## The Tradeoff Visualized
@@ -112,16 +108,16 @@ C# packs more semantic content per token by using implicit information and famil
 ```
                     Calor better <-  -> C# better
                          |
-Comprehension     ████████████░░░░  1.46x
-Error Detection   ████████████░░░░  1.45x
-Edit Precision    ███████████░░░░░  1.36x
-Refactoring Stability████████████░░░░  1.46x
+Comprehension     ████████████░░░░  1.51x
+Error Detection   ██████████░░░░░░  1.22x
+Edit Precision    ███████████░░░░░  1.37x
+Refactoring Stability███████████░░░░░  1.36x
                          |
-Generation Accuracy░░░░░░░░████████  0.94x
-Task Completion   ░░░░░░░░░███████  0.86x
+Generation Accuracy░░░░░░░░████████  0.97x
+Task Completion   ████████░░░░░░░░  1.00x
                          |
-Token Economics   ░░░░░░░░░░░█████  0.63x
-Information Density░░░░░░░░░░░░░░██  0.09x
+Token Economics   ░░░░░░░░░███████  0.83x
+Information Density████████░░░░░░░░  1.00x
 ```
 
 ---

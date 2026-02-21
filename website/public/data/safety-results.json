@@ -1,0 +1,3261 @@
+{
+  "results": [
+    {
+      "task": {
+        "id": "safety-001",
+        "name": "Division by Zero Prevention",
+        "category": "precondition-enforcement",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeDivide that divides integer a by integer b. Division by zero must not be allowed.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              10,
+              2
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              15,
+              3
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              5
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              0
+            ],
+            "expected": null,
+            "description": "Division by zero",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeDivide",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "division"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj4vCPZtyUMuy7HwAf\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj5PiZ9QHk39yvDXGj\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-002",
+        "name": "Positive Square Root Input",
+        "category": "precondition-enforcement",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeSqrtInt that returns the integer square root of n. The input must be non-negative.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              4
+            ],
+            "expected": 2,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              16
+            ],
+            "expected": 4,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1
+            ],
+            "expected": null,
+            "description": "Negative input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeSqrtInt",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "math"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj5fbNWcgDdZrL8dSs\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj5zgbi2ScS6oSv9Q1\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-003",
+        "name": "Modulo by Zero Prevention",
+        "category": "precondition-enforcement",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeModulo that returns a % b. The divisor b must not be zero.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              10,
+              3
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              15,
+              5
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              7,
+              4
+            ],
+            "expected": 3,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              0
+            ],
+            "expected": null,
+            "description": "Modulo by zero",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeModulo",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "math"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj6MmKi2vbyWDvrPd1\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj6eNszFnVzzWYevoT\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-004",
+        "name": "Factorial Non-Negative Input",
+        "category": "precondition-enforcement",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeFactorial that computes the factorial of n. The input must be non-negative.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5
+            ],
+            "expected": 120,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1
+            ],
+            "expected": null,
+            "description": "Negative factorial",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeFactorial",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "recursion"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj6wyvtevgr2BvvvLm\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj7WiTw1k8wpWsgERS\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-005",
+        "name": "Positive GCD Inputs",
+        "category": "precondition-enforcement",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeGcd that computes the greatest common divisor of two integers. Both inputs must be positive.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              12,
+              8
+            ],
+            "expected": 4,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              17,
+              13
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              48,
+              18
+            ],
+            "expected": 6,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              5
+            ],
+            "expected": null,
+            "description": "Zero input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -5,
+              10
+            ],
+            "expected": null,
+            "description": "Negative input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeGcd",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "math"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj7yjvN9yB2z5tzg6N\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj8WF81W23XTEuwAqV\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-006",
+        "name": "Array Index Validation",
+        "category": "precondition-enforcement",
+        "difficulty": 2,
+        "prompt": "Write a public function named ValidateIndex that returns true if index is valid for an array of given size (0 \u003C= index \u003C size). The size must be positive.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0,
+              5
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              4,
+              5
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5,
+              5
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1,
+              5
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              0
+            ],
+            "expected": null,
+            "description": "Zero size",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              -1
+            ],
+            "expected": null,
+            "description": "Negative size",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "ValidateIndex",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "bool"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "bounds"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj8n7sPiCyxezEy23f\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj9BRbdjp71UbjQeK7\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-007",
+        "name": "Percentage Range Validation",
+        "category": "precondition-enforcement",
+        "difficulty": 2,
+        "prompt": "Write a public function named ApplyPercentage that returns (value * percent) / 100. The percent must be between 0 and 100 inclusive.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              200,
+              50
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100,
+              100
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100,
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100,
+              -1
+            ],
+            "expected": null,
+            "description": "Negative percent",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100,
+              101
+            ],
+            "expected": null,
+            "description": "Percent over 100",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "ApplyPercentage",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "range"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj9ajo6Rru3LYnx8UQ\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpj9znqMd8kUAh8feA8\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-008",
+        "name": "Decrement Positive Only",
+        "category": "precondition-enforcement",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeDecrement that returns n - 1. The input must be positive (greater than zero).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              1
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5
+            ],
+            "expected": 4,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100
+            ],
+            "expected": 99,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0
+            ],
+            "expected": null,
+            "description": "Zero input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1
+            ],
+            "expected": null,
+            "description": "Negative input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeDecrement",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjAJ9KoXofocq4LTEQ\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjAbkd8Je8ha5ZyUez\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-009",
+        "name": "Half of Even Number",
+        "category": "precondition-enforcement",
+        "difficulty": 2,
+        "prompt": "Write a public function named HalfEven that returns n / 2. The input must be even (divisible by 2).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -4
+            ],
+            "expected": -2,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1
+            ],
+            "expected": null,
+            "description": "Odd input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              7
+            ],
+            "expected": null,
+            "description": "Odd input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "HalfEven",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "parity"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjAvr7NJDCLXuw37BR\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjBGBk9g7K1SUfJXPX\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-010",
+        "name": "Ordered Range Validation",
+        "category": "precondition-enforcement",
+        "difficulty": 2,
+        "prompt": "Write a public function named InRange that returns true if value is between min and max inclusive. The min must be less than or equal to max.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              5,
+              0,
+              10
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              0,
+              10
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              0,
+              10
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              11,
+              0,
+              10
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5,
+              10,
+              0
+            ],
+            "expected": null,
+            "description": "min \u003E max",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "InRange",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "bool"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "range"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjBanqMqKFf3UccJwX\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjByMFeUYexsTTsjgn\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-011",
+        "name": "Absolute Value Non-Negative Result",
+        "category": "postcondition-verification",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeAbs that returns the absolute value of n. The result must always be non-negative.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              5
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -5
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -100
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeAbs",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "safety",
+          "math"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjCPA4d2ovD7t2jwQB\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjChkjgocYwQ9NzPcL\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-012",
+        "name": "Clamp Result Bounds",
+        "category": "postcondition-verification",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeClamp that clamps value between min and max. The min must be \u003C= max. The result must always be \u003E= min and \u003C= max.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              5,
+              0,
+              10
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -5,
+              0,
+              10
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              15,
+              0,
+              10
+            ],
+            "expected": 10,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              0,
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5,
+              10,
+              0
+            ],
+            "expected": null,
+            "description": "min \u003E max",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeClamp",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "precondition",
+          "safety",
+          "bounds"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjCxtAqxwNdNGgrdpM\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjDHjCp2TnWdioYjXd\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-013",
+        "name": "Positive Difference Result",
+        "category": "postcondition-verification",
+        "difficulty": 1,
+        "prompt": "Write a public function named PositiveDiff that returns the absolute difference between a and b. The result must always be non-negative.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              10,
+              3
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              3,
+              10
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5,
+              5
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -5,
+              5
+            ],
+            "expected": 10,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "PositiveDiff",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "safety",
+          "math"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjDdZepVbEXNMXhJfN\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjDxAeBD4h5JXFic9f\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-014",
+        "name": "Square Non-Negative Result",
+        "category": "postcondition-verification",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeSquare that returns n * n. The result must always be non-negative.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              3
+            ],
+            "expected": 9,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -3
+            ],
+            "expected": 9,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeSquare",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "safety",
+          "math"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjEJ1BDNq1e1N3VBCD\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjEZd5HRVCB6w42Sog\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-015",
+        "name": "Normalized Score Bounds",
+        "category": "postcondition-verification",
+        "difficulty": 2,
+        "prompt": "Write a public function named NormalizeScore that normalizes a score to 0-100 using formula (score * 100) / maxScore. The maxScore must be positive, score must be non-negative and not exceed maxScore. The result must be between 0 and 100.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              50,
+              100
+            ],
+            "expected": 50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              25,
+              50
+            ],
+            "expected": 50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              100
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100,
+              100
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              50,
+              0
+            ],
+            "expected": null,
+            "description": "Zero maxScore",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1,
+              100
+            ],
+            "expected": null,
+            "description": "Negative score",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              101,
+              100
+            ],
+            "expected": null,
+            "description": "Score \u003E maxScore",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "NormalizeScore",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "precondition",
+          "safety",
+          "range"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjEqzRzWNifQHwxW1h\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjF7cWzhiHdr73D2GL\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-016",
+        "name": "Sign Function Bounds",
+        "category": "postcondition-verification",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeSign that returns -1 if n \u003C 0, 0 if n == 0, or 1 if n \u003E 0. The result must always be -1, 0, or 1.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              5
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -5
+            ],
+            "expected": -1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -100
+            ],
+            "expected": -1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeSign",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "safety",
+          "math"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjFPz1bQ5kAKAhWB7s\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjFdd5Unj3fEjFFuFH\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-017",
+        "name": "GCD Positive Result",
+        "category": "postcondition-verification",
+        "difficulty": 2,
+        "prompt": "Write a public function named GcdPositive that computes the GCD of two positive integers. Both inputs must be positive. The result must also be positive.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              12,
+              8
+            ],
+            "expected": 4,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              17,
+              13
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100,
+              25
+            ],
+            "expected": 25,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              5
+            ],
+            "expected": null,
+            "description": "Zero input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "GcdPositive",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "precondition",
+          "safety",
+          "math"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjG2BcbtNeCn1vAksy\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjGLXwffb2qiwSZoMH\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-018",
+        "name": "Max At Least Inputs",
+        "category": "postcondition-verification",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeMax that returns the maximum of a and b. The result must be \u003E= a and \u003E= b.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              5,
+              3
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              3,
+              5
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1,
+              -5
+            ],
+            "expected": -1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              7,
+              7
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeMax",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "safety",
+          "comparison"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjGbfPAnSPtxFujwvd\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjGtGku7CW2xA5v6pN\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-019",
+        "name": "Min At Most Inputs",
+        "category": "postcondition-verification",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeMin that returns the minimum of a and b. The result must be \u003C= a and \u003C= b.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              5,
+              3
+            ],
+            "expected": 3,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              3,
+              5
+            ],
+            "expected": 3,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1,
+              -5
+            ],
+            "expected": -5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              7,
+              7
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeMin",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "safety",
+          "comparison"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjHLJxYW4KD8Tfcng5\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjHnbuKvQg5kcRr6Sr\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-020",
+        "name": "Factorial Positive Result",
+        "category": "postcondition-verification",
+        "difficulty": 2,
+        "prompt": "Write a public function named FactorialPositive that computes factorial of n. Input must be non-negative. The result must be at least 1.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5
+            ],
+            "expected": 120,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1
+            ],
+            "expected": null,
+            "description": "Negative input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "FactorialPositive",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "postcondition",
+          "precondition",
+          "safety",
+          "recursion"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjJ8vyG7sRxeJgnf3M\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjJQ4KR3Tqhh4kJ5EX\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-021",
+        "name": "Multiply Bounded",
+        "category": "edge-case-handling",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeMultiply that multiplies a and b. Both inputs must be small enough to avoid overflow (between -1000 and 1000).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              10,
+              5
+            ],
+            "expected": 50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -10,
+              5
+            ],
+            "expected": -50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              1000
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1001,
+              1
+            ],
+            "expected": null,
+            "description": "Input too large",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1001,
+              1
+            ],
+            "expected": null,
+            "description": "Input too small",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeMultiply",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjJgfu9YvUS3y6CprE\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjK1XC2mFxFA49Bn8v\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-022",
+        "name": "Power Bounded Exponent",
+        "category": "edge-case-handling",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafePower that computes base^exp. The exponent must be non-negative and at most 20 to avoid overflow.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              2,
+              0
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              2,
+              10
+            ],
+            "expected": 1024,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              3,
+              5
+            ],
+            "expected": 243,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              2,
+              -1
+            ],
+            "expected": null,
+            "description": "Negative exponent",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              2,
+              21
+            ],
+            "expected": null,
+            "description": "Exponent too large",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafePower",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjKLccm1VrUAudArgz\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjKkRFjsxs1gXMt5L3\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-023",
+        "name": "Sum Bounded Inputs",
+        "category": "edge-case-handling",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeAdd that adds a and b. Both inputs must be between -1000000 and 1000000 to avoid overflow.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              100,
+              200
+            ],
+            "expected": 300,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -100,
+              100
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1000000,
+              0
+            ],
+            "expected": 1000000,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1000001,
+              0
+            ],
+            "expected": null,
+            "description": "Input too large",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeAdd",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjL2Hhi6qEEQVQxLFr\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjLHujTVD7uSXojxG3\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-024",
+        "name": "Fibonacci Bounded Input",
+        "category": "edge-case-handling",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeFibonacci that computes the nth Fibonacci number. Input must be non-negative and at most 45 to avoid overflow.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10
+            ],
+            "expected": 55,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1
+            ],
+            "expected": null,
+            "description": "Negative input",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              46
+            ],
+            "expected": null,
+            "description": "Input too large",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeFibonacci",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjLbX7N8idKdbToge9\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjLz5o9H6mX1m38DyV\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-025",
+        "name": "Bounded Increment",
+        "category": "edge-case-handling",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeIncrement that returns n \u002B 1. Input must be less than 2147483646 to avoid overflow.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              99
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -100
+            ],
+            "expected": -99,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              2147483646
+            ],
+            "expected": 2147483647,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeIncrement",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjMLR7KVfWC34FPhLZ\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjMfWfN6q8Ns8rS1T3\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-026",
+        "name": "Bounded Double",
+        "category": "edge-case-handling",
+        "difficulty": 1,
+        "prompt": "Write a public function named SafeDouble that returns n * 2. Input must be between -1073741823 and 1073741823 to avoid overflow.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              50
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -25
+            ],
+            "expected": -50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1073741824
+            ],
+            "expected": null,
+            "description": "Input too large",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeDouble",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjMueSB2g9typhic5g\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjND1Dj3nAqs4tYiXh\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-027",
+        "name": "Average Without Overflow",
+        "category": "edge-case-handling",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeAverage that returns the integer average of a and b. Both inputs must be between -1000000 and 1000000.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              10,
+              20
+            ],
+            "expected": 15,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5,
+              5
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              7,
+              8
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1000001,
+              0
+            ],
+            "expected": null,
+            "description": "Input too large",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeAverage",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjNY6bqBV3oqV1qzH5\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjNoE3M1nu8tsBhrtH\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-028",
+        "name": "Subtraction Bounded",
+        "category": "edge-case-handling",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeSubtract that returns a - b. Both inputs must be between -1000000 and 1000000 to avoid overflow.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              10,
+              3
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              3,
+              10
+            ],
+            "expected": -7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1000001,
+              0
+            ],
+            "expected": null,
+            "description": "Input too large",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeSubtract",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjP7puZV8YYWv4rc4c\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjQ7r68GCtfgCt2epP\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-029",
+        "name": "Negate Bounded",
+        "category": "edge-case-handling",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeNegate that returns -n. Input must be greater than -2147483647 to avoid overflow.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5
+            ],
+            "expected": -5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -5
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              2147483647
+            ],
+            "expected": -2147483647,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeNegate",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjQQU3RsnjfxsHvWCz\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjQh5XKWegWDbFLqFt\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "safety-030",
+        "name": "Cube Bounded",
+        "category": "edge-case-handling",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeCube that returns n * n * n. Input must be between -1000 and 1000 to avoid overflow.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              3
+            ],
+            "expected": 27,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -3
+            ],
+            "expected": -27,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10
+            ],
+            "expected": 1000,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1001
+            ],
+            "expected": null,
+            "description": "Input too large",
+            "expectsContractViolation": true,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.5,
+          "contracts": 0.3,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeCube",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "precondition",
+          "safety",
+          "overflow"
+        ],
+        "bugPrevention": null
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjQxwnU75qUnFc8cUr\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjRGoT3LUJXePFucV4\u0022}"
+        ],
+        "testResults": [],
+        "generationMetadata": null,
+        "safetyScore": 0,
+        "violationDetectionRate": 0,
+        "averageErrorQuality": 0,
+        "normalCorrectness": 0
+      },
+      "safetyAdvantageRatio": 1
+    }
+  ],
+  "summary": {
+    "totalTasks": 30,
+    "calorWins": 0,
+    "cSharpWins": 0,
+    "ties": 30,
+    "averageCalorSafetyScore": 0,
+    "averageCSharpSafetyScore": 0,
+    "safetyAdvantageRatio": 1,
+    "calorViolationDetectionRate": 0,
+    "cSharpViolationDetectionRate": 0,
+    "calorAverageErrorQuality": 0,
+    "cSharpAverageErrorQuality": 0,
+    "calorNormalCorrectness": 0,
+    "cSharpNormalCorrectness": 0,
+    "byCategory": {
+      "precondition-enforcement": {
+        "category": "precondition-enforcement",
+        "taskCount": 10,
+        "averageCalorSafetyScore": 0,
+        "averageCSharpSafetyScore": 0,
+        "calorViolationDetectionRate": 0,
+        "cSharpViolationDetectionRate": 0,
+        "calorErrorQuality": 0,
+        "cSharpErrorQuality": 0,
+        "safetyAdvantageRatio": 1
+      },
+      "postcondition-verification": {
+        "category": "postcondition-verification",
+        "taskCount": 10,
+        "averageCalorSafetyScore": 0,
+        "averageCSharpSafetyScore": 0,
+        "calorViolationDetectionRate": 0,
+        "cSharpViolationDetectionRate": 0,
+        "calorErrorQuality": 0,
+        "cSharpErrorQuality": 0,
+        "safetyAdvantageRatio": 1
+      },
+      "edge-case-handling": {
+        "category": "edge-case-handling",
+        "taskCount": 10,
+        "averageCalorSafetyScore": 0,
+        "averageCSharpSafetyScore": 0,
+        "calorViolationDetectionRate": 0,
+        "cSharpViolationDetectionRate": 0,
+        "calorErrorQuality": 0,
+        "cSharpErrorQuality": 0,
+        "safetyAdvantageRatio": 1
+      }
+    }
+  },
+  "timestamp": "2026-02-21T20:11:55.9051892+00:00",
+  "provider": "claude",
+  "totalCost": 0
+}

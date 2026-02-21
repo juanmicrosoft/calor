@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calor Benchmark Dashboard</title>
+    <style>
+        :root {
+            --calor-green: #22c55e;
+            --csharp-blue: #3b82f6;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .subtitle { color: var(--text-secondary); margin-bottom: 2rem; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+        .card-label { color: var(--text-secondary); font-size: 0.875rem; }
+        .card-value { font-size: 2rem; font-weight: bold; margin-top: 0.5rem; }
+        .card-value.calor { color: var(--calor-green); }
+        .card-value.csharp { color: var(--csharp-blue); }
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .metrics-table th, .metrics-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .metrics-table th { color: var(--text-secondary); font-weight: 500; }
+        .winner-calor { color: var(--calor-green); }
+        .winner-csharp { color: var(--csharp-blue); }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .badge-calor { background: rgba(34, 197, 94, 0.2); color: var(--calor-green); }
+        .badge-csharp { background: rgba(59, 130, 246, 0.2); color: var(--csharp-blue); }
+        .ci { color: var(--text-secondary); font-size: 0.875rem; }
+        .timestamp { color: var(--text-secondary); font-size: 0.875rem; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Calor Benchmark Results</h1>
+        <p class="subtitle">Comparing Calor vs C# for AI coding agent effectiveness</p>
+
+        <div class="summary-grid">
+            <div class="card">
+                <div class="card-label">Overall Advantage</div>
+                <div class="card-value calor">1.15x</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Programs Tested</div>
+                <div class="card-value">40</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Calor Wins</div>
+                <div class="card-value calor">5</div>
+            </div>
+            <div class="card">
+                <div class="card-label">C# Wins</div>
+                <div class="card-value csharp">2</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Metric Results</h2>
+            <table class="metrics-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Ratio</th>
+                        <th>Winner</th>
+                        <th>95% CI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Comprehension</td>
+                        <td class="winner-calor">1.51x</td>
+                        <td><span class="badge badge-calor">Calor</span></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Edit Precision</td>
+                        <td class="winner-calor">1.37x</td>
+                        <td><span class="badge badge-calor">Calor</span></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Refactoring Stability</td>
+                        <td class="winner-calor">1.36x</td>
+                        <td><span class="badge badge-calor">Calor</span></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Error Detection</td>
+                        <td class="winner-calor">1.22x</td>
+                        <td><span class="badge badge-calor">Calor</span></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Correctness</td>
+                        <td class="winner-calor">1.09x</td>
+                        <td><span class="badge badge-calor">Calor</span></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Information Density</td>
+                        <td class="">1.00x</td>
+                        <td><span class="badge badge-csharp">Tie</span></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Generation Accuracy</td>
+                        <td class="winner-csharp">0.97x</td>
+                        <td><span class="badge badge-csharp">C#</span></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Token Economics</td>
+                        <td class="winner-csharp">0.83x</td>
+                        <td><span class="badge badge-csharp">C#</span></td>
+                        <td></td>
+                    </tr>
+
+                </tbody>
+            </table>
+        </div>
+
+        <p class="timestamp">Generated: 2026-02-21 20:12:12 UTC | Commit: 7f76e6e</p>
+    </div>
+</body>
+</html>

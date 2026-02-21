@@ -1,0 +1,4378 @@
+{
+  "results": [
+    {
+      "task": {
+        "id": "flaky-001",
+        "name": "Deterministic Report Generator",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named GenerateReport that takes a string \u0027title\u0027 and a long \u0027timestamp\u0027 (Unix epoch milliseconds), and returns a formatted report string. The timestamp MUST come from the parameter, not from DateTime.Now. The function must be deterministic - same inputs always produce same output. Return format: \u0022Report: {title} (Generated: {timestamp})\u0022",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "Sales Q1",
+              1705312800000
+            ],
+            "expected": "Report: Sales Q1 (Generated: 1705312800000)",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "Inventory",
+              1705399200000
+            ],
+            "expected": "Report: Inventory (Generated: 1705399200000)",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "",
+              0
+            ],
+            "expected": "Report:  (Generated: 0)",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "GenerateReport",
+          "parameterTypes": [
+            "string",
+            "long"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "time",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Report timestamps differ between test runs, breaking snapshot tests",
+          "calorApproach": "Pure effect signature prevents time effects",
+          "csharpApproach": "Passing timestamp as parameter (DI pattern)"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjazCShp3FNiQWgsKs\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjbL3DpVPpY2Q2gxfT\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-002",
+        "name": "Seeded Random Selection",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named SelectItem that takes an integer array \u0027items\u0027 and an integer \u0027seed\u0027, and returns one item selected using the seed for randomization. The selection must be deterministic - same seed always selects same item. Use simple modulo: seed % length gives the index.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              42
+            ],
+            "expected": 3,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                10,
+                20,
+                30
+              ],
+              123
+            ],
+            "expected": 10,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                100
+              ],
+              0
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SelectItem",
+          "parameterTypes": [
+            "int[]",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "random",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Tests randomly fail because item selection varies between runs",
+          "calorApproach": "Pure effect signature prevents rand effects",
+          "csharpApproach": "Using seeded Random instance from parameter"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjbdtmkDEFbVqXPmwN\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjbvWUdUXA8z2FmkUN\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-003",
+        "name": "Deterministic ID Generator",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named GenerateId that takes a string \u0027prefix\u0027 and an integer \u0027sequence\u0027, and returns an ID string. The function must be deterministic - do NOT use Guid.NewGuid() or DateTime.Now. Return format: \u0022{prefix}-{sequence:D6}\u0022 (6-digit zero-padded sequence).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "USR",
+              1
+            ],
+            "expected": "USR-000001",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "ORD",
+              12345
+            ],
+            "expected": "ORD-012345",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "TXN",
+              999999
+            ],
+            "expected": "TXN-999999",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "GenerateId",
+          "parameterTypes": [
+            "string",
+            "int"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "guid",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Tests comparing IDs fail because each run generates different GUIDs",
+          "calorApproach": "Pure effect signature prevents guid effects",
+          "csharpApproach": "Deterministic ID from parameters, no Guid.NewGuid()"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjcDNUzW4B85ie9uTU\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjcVVLubL4QVBNeZnW\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-004",
+        "name": "Deterministic Hash Calculator",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named CalculateHash that takes a string \u0027input\u0027 and returns its hash code as an integer. The function must be deterministic and pure - same input always returns same hash. Use a simple deterministic hash algorithm (sum of char codes).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "abc"
+            ],
+            "expected": 294,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "hello"
+            ],
+            "expected": 532,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              ""
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CalculateHash",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Hash values differ across process restarts due to hash randomization",
+          "calorApproach": "Pure effect signature ensures determinism",
+          "csharpApproach": "Custom deterministic hash, not GetHashCode()"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjcoqq2zN2Qn1M9y76\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjd8w1HkFhVXJSDSTe\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-005",
+        "name": "Test Data Formatter",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named FormatTestData that takes an integer \u0027value\u0027 and a string \u0027dateStr\u0027 (ISO format date string like \u00222024-01-15\u0022), and returns formatted test data. Do NOT use DateTime.Now or any current time. Return format: \u0022Value: {value} on {dateStr}\u0022.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              100,
+              "2024-01-15"
+            ],
+            "expected": "Value: 100 on 2024-01-15",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              "2023-12-31"
+            ],
+            "expected": "Value: 0 on 2023-12-31",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -50,
+              "2025-06-30"
+            ],
+            "expected": "Value: -50 on 2025-06-30",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "FormatTestData",
+          "parameterTypes": [
+            "int",
+            "string"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "time",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Test assertions fail at midnight when date rolls over",
+          "calorApproach": "Pure effect signature prevents time access",
+          "csharpApproach": "Date passed as parameter, no DateTime.Now"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjdXFcPs8mc2K5EfbA\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjdrqjLKtMKgenYA4C\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-006",
+        "name": "Deterministic Shuffle",
+        "category": "flaky-test-prevention",
+        "difficulty": 3,
+        "prompt": "Write a public function named ShuffleArray that takes an integer array \u0027items\u0027 and an integer \u0027seed\u0027, and returns a new shuffled array. The shuffle must be deterministic - same seed always produces same order. Do not modify the original array. Use Fisher-Yates shuffle with LCG: rng = rng * 1103515245 \u002B 12345, index = abs(rng) % (j\u002B1).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              [
+                1,
+                2,
+                3,
+                4
+              ],
+              42
+            ],
+            "expected": [
+              3,
+              4,
+              1,
+              2
+            ],
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                10,
+                20,
+                30
+              ],
+              123
+            ],
+            "expected": [
+              10,
+              20,
+              30
+            ],
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                5
+              ],
+              0
+            ],
+            "expected": [
+              5
+            ],
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "ShuffleArray",
+          "parameterTypes": [
+            "int[]",
+            "int"
+          ],
+          "returnType": "int[]"
+        },
+        "tags": [
+          "effects",
+          "random",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Shuffle order changes between test runs, breaking order-dependent assertions",
+          "calorApproach": "Pure effect signature, seed-based randomization",
+          "csharpApproach": "Seeded Random instance for deterministic shuffle"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjeCBnHfvkLVHWW4zN\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjeVJ5X6EDFo7eqbJ2\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-007",
+        "name": "Stable Sort Key",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named GetSortKey that takes a string \u0027name\u0027 and an integer \u0027priority\u0027, and returns a sort key string. The function must be pure and deterministic. Return format: \u0022{priority:D3}-{name}\u0022 (3-digit zero-padded priority).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "Alice",
+              1
+            ],
+            "expected": "001-Alice",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "Bob",
+              100
+            ],
+            "expected": "100-Bob",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "Charlie",
+              5
+            ],
+            "expected": "005-Charlie",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "GetSortKey",
+          "parameterTypes": [
+            "string",
+            "int"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Sort order unstable when keys are generated with timestamps",
+          "calorApproach": "Pure effect signature guarantees determinism",
+          "csharpApproach": "Pure function with no external dependencies"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjeo9LcjmMSou3dbzh\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjf5WaqJsghYDaD5N2\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-008",
+        "name": "Deterministic Token Generator",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named GenerateToken that takes an integer \u0027userId\u0027 and an integer \u0027sequence\u0027, and returns a token string. Must be deterministic - no Random or Guid. Return format: \u0022TOKEN-{userId}-{sequence}\u0022.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              1001,
+              1
+            ],
+            "expected": "TOKEN-1001-1",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              2002,
+              999
+            ],
+            "expected": "TOKEN-2002-999",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              0
+            ],
+            "expected": "TOKEN-0-0",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "GenerateToken",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Token validation tests fail because tokens are random each run",
+          "calorApproach": "Pure effect signature prevents random effects",
+          "csharpApproach": "Deterministic token from parameters"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjfPcmKXPkbyaiw5G2\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjfkhABsVraxoWfN1b\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-009",
+        "name": "Consistent Cache Key",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named BuildCacheKey that takes a string \u0027type\u0027 and an integer \u0027id\u0027, and returns a cache key. Must be deterministic and pure. Return format: \u0022{type}:{id}\u0022.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "user",
+              123
+            ],
+            "expected": "user:123",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "product",
+              456
+            ],
+            "expected": "product:456",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "order",
+              0
+            ],
+            "expected": "order:0",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "BuildCacheKey",
+          "parameterTypes": [
+            "string",
+            "int"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Cache key includes timestamp, causing cache misses in tests",
+          "calorApproach": "Pure effect signature ensures consistency",
+          "csharpApproach": "Pure function, no time or random components"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjg4JSUKB8qobTDq2K\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjgQdkmuK1KiE99BZx\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "flaky-010",
+        "name": "Reproducible Test Fixture",
+        "category": "flaky-test-prevention",
+        "difficulty": 2,
+        "prompt": "Write a public function named CreateFixture that takes a string \u0027name\u0027 and an integer \u0027seed\u0027, and returns a fixture ID. Must be deterministic. Return the seed XOR\u0027d with the sum of char codes of name.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "test",
+              100
+            ],
+            "expected": 420,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "abc",
+              0
+            ],
+            "expected": 294,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "",
+              42
+            ],
+            "expected": 42,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CreateFixture",
+          "parameterTypes": [
+            "string",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "determinism",
+          "flaky-test"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Test fixtures created with random data cause intermittent failures",
+          "calorApproach": "Pure effect signature guarantees reproducibility",
+          "csharpApproach": "Seeded generation, no Random without seed"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjgvdrWjnPuJF8gBtQ\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjhEkAj5JgmCmWj3mm\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-001",
+        "name": "Offline Config Parser",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named ParseConfigValue that takes a string \u0027json\u0027 containing a simple JSON object and a string \u0027key\u0027, and returns the value for that key as a string. MUST NOT make network calls. Algorithm: 1) Find quoted key position, 2) Get substring starting AFTER the key, 3) Find colon in that substring, 4) Find value between quotes after colon. IMPORTANT: Search for colon in substring after key, not in full string.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "{\u0022debug\u0022: \u0022true\u0022}",
+              "debug"
+            ],
+            "expected": "true",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "{\u0022name\u0022: \u0022app\u0022, \u0022version\u0022: \u00221.0\u0022}",
+              "version"
+            ],
+            "expected": "1.0",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "{\u0022empty\u0022: \u0022\u0022}",
+              "empty"
+            ],
+            "expected": "",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "ParseConfigValue",
+          "parameterTypes": [
+            "string",
+            "string"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "network",
+          "security",
+          "offline"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Enterprise security audit failed because config parser made license validation calls",
+          "calorApproach": "Pure effect signature prevents network effects",
+          "csharpApproach": "No HttpClient, WebRequest, or Socket usage"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjhaq3SjF4ktTJBF79\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjhtBvv3iqnKnidR5S\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-002",
+        "name": "Local Data Validator",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named ValidateEmail that takes a string \u0027email\u0027 and returns true if it\u0027s a valid email format. MUST NOT make network calls to validate (no DNS lookups, no SMTP checks). Use simple pattern matching: must contain exactly one @ with text on both sides.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "user@example.com"
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "invalid"
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "@nodomain"
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "noat.com"
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "ValidateEmail",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "bool"
+        },
+        "tags": [
+          "effects",
+          "network",
+          "security",
+          "validation"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Email validation caused DNS queries that leaked user data",
+          "calorApproach": "Pure effect signature prevents network effects",
+          "csharpApproach": "Local validation only, no DNS or network calls"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjiCHiDredWmdq72DW\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjiTud8e9RxuPaFhFa\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-003",
+        "name": "Sandboxed Calculator",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named EvaluateExpression that takes integers \u0027a\u0027, \u0027op\u0027 (0=add, 1=sub, 2=mul, 3=div), and \u0027b\u0027, and returns the result. MUST NOT read files, make network calls, or access external resources. Division by zero returns 0.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              10,
+              0,
+              5
+            ],
+            "expected": 15,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              1,
+              3
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              4,
+              2,
+              5
+            ],
+            "expected": 20,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              3,
+              2
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              3,
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "EvaluateExpression",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "security",
+          "sandboxed"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Calculator plugin loaded external formulas from network, introducing vulnerabilities",
+          "calorApproach": "Pure effect signature prevents all I/O",
+          "csharpApproach": "Pure computation, no external dependencies"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjikXTEVdxVWKVhmsW\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjj48kJX9vQztRTMHY\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-004",
+        "name": "Memory-Only Cache Lookup",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named LookupInMap that takes a string array \u0027keys\u0027, a string array \u0027values\u0027 (same length), and a string \u0027searchKey\u0027, and returns the corresponding value or empty string if not found. MUST NOT access files or network for lookup.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              [
+                "a",
+                "b",
+                "c"
+              ],
+              [
+                "1",
+                "2",
+                "3"
+              ],
+              "b"
+            ],
+            "expected": "2",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                "x"
+              ],
+              [
+                "y"
+              ],
+              "x"
+            ],
+            "expected": "y",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                "a",
+                "b"
+              ],
+              [
+                "1",
+                "2"
+              ],
+              "z"
+            ],
+            "expected": "",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "LookupInMap",
+          "parameterTypes": [
+            "string[]",
+            "string[]",
+            "string"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "security",
+          "memory-only"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Cache lookup fell back to remote service, exposing internal data",
+          "calorApproach": "Pure effect signature prevents I/O fallback",
+          "csharpApproach": "In-memory lookup only, no external calls"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjjNjLp1fR2gKcMTQo\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjjp2MzuryvS2pXYUV\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-005",
+        "name": "Offline Text Encoder",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named EncodeBase64 that takes a string \u0027input\u0027 and returns its Base64 encoding. MUST be computed locally without network calls. Algorithm: group chars by 3, combine into 24-bit value, extract 4 6-bit indices. Padding: if 1 byte remains, output 2 chars \u002B \u0027==\u0027; if 2 bytes remain, output 3 chars \u002B \u0027=\u0027.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "abc"
+            ],
+            "expected": "YWJj",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "Hello"
+            ],
+            "expected": "SGVsbG8=",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              ""
+            ],
+            "expected": "",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "EncodeBase64",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "security",
+          "encoding"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Encoding library called home to check license, leaking processed data",
+          "calorApproach": "Pure effect signature prevents network effects",
+          "csharpApproach": "Local encoding, no external service calls"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjkbek9RXEW8nB1n8k\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjm2CHe1QsyFhmhQrz\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-006",
+        "name": "Local Password Strength",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named CheckPasswordStrength that takes a string \u0027password\u0027 and returns an integer strength score (0-4). MUST NOT send password to any external service. Score: \u002B1 for length\u003E=8, \u002B1 for uppercase, \u002B1 for lowercase, \u002B1 for digit.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "Abcd1234"
+            ],
+            "expected": 4,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "abc"
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "ABCD1234"
+            ],
+            "expected": 3,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "12345678"
+            ],
+            "expected": 2,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CheckPasswordStrength",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "security",
+          "password"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Password checker sent passwords to \u0027strength API\u0027, exposing credentials",
+          "calorApproach": "Pure effect signature prevents network effects",
+          "csharpApproach": "Local validation only, no external calls"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjmLJaun74ZV85uv1h\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjmbvQRZvzV1xsjq4u\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-007",
+        "name": "Offline Hash Verifier",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named VerifySimpleHash that takes a string \u0027data\u0027 and an integer \u0027expectedHash\u0027, and returns true if the simple hash (sum of char codes) matches. MUST NOT contact any verification service.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "abc",
+              294
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "hello",
+              532
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "abc",
+              100
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "VerifySimpleHash",
+          "parameterTypes": [
+            "string",
+            "int"
+          ],
+          "returnType": "bool"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "security",
+          "hash"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Hash verification called online API, creating availability dependency",
+          "calorApproach": "Pure effect signature prevents network effects",
+          "csharpApproach": "Local verification, no external dependencies"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjn6C2ykhyaJEnqfHS\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjnYjEZLK7UuZbs8ac\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-008",
+        "name": "Isolated String Sanitizer",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named SanitizeForHtml that takes a string \u0027input\u0027 and returns it with HTML special characters escaped (\u003C to \u0026lt;, \u003E to \u0026gt;, \u0026 to \u0026amp;). MUST NOT log, send telemetry, or make any external calls.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "\u003Cscript\u003E"
+            ],
+            "expected": "\u0026lt;script\u0026gt;",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "a \u0026 b"
+            ],
+            "expected": "a \u0026amp; b",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "normal"
+            ],
+            "expected": "normal",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SanitizeForHtml",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "security",
+          "sanitization"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Sanitizer sent suspicious inputs to threat analysis API, leaking user data",
+          "calorApproach": "Pure effect signature prevents all I/O",
+          "csharpApproach": "Pure transformation, no logging or telemetry"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjnzm3cG9cbafnw1ti\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjoGds3DRE6Adub5sK\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-009",
+        "name": "Local Rate Calculator",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named CalculateDiscount that takes an integer \u0027price\u0027 and an integer \u0027discountPercent\u0027, and returns the discounted price. MUST NOT fetch rates from external services. Simple calculation: price - (price * discountPercent / 100).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              100,
+              10
+            ],
+            "expected": 90,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              200,
+              25
+            ],
+            "expected": 150,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              50,
+              0
+            ],
+            "expected": 50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CalculateDiscount",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "security",
+          "calculation"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Discount calculator fetched live tax rates, breaking offline POS",
+          "calorApproach": "Pure effect signature prevents network effects",
+          "csharpApproach": "Pure calculation from parameters only"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjobUioyUxTZmwSbAH\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjovpezZXwVPnENTao\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "security-010",
+        "name": "Airgapped Data Transformer",
+        "category": "security-boundaries",
+        "difficulty": 2,
+        "prompt": "Write a public function named TransformData that takes an integer array \u0027data\u0027 and an integer \u0027multiplier\u0027, and returns a new array with each element multiplied. MUST NOT make any external calls - this runs in a secure enclave.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              [
+                1,
+                2,
+                3
+              ],
+              2
+            ],
+            "expected": [
+              2,
+              4,
+              6
+            ],
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                10,
+                20
+              ],
+              0
+            ],
+            "expected": [
+              0,
+              0
+            ],
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [],
+              5
+            ],
+            "expected": [],
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "TransformData",
+          "parameterTypes": [
+            "int[]",
+            "int"
+          ],
+          "returnType": "int[]"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "security",
+          "enclave"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Data transform library phoned home for analytics, violating data isolation",
+          "calorApproach": "Pure effect signature prevents all external effects",
+          "csharpApproach": "Pure transformation, no I/O operations"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjpUp12YzvBfWDSGfW\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjpqPiJ5vURNwL5cci\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-001",
+        "name": "Pure String Sanitizer",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named SanitizeInput that takes a string \u0027text\u0027 and returns it with angle brackets removed. This is a utility function called millions of times - it must not have any side effects (no logging, no I/O, no metrics).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "\u003Cscript\u003Ealert(\u0027xss\u0027)\u003C/script\u003E"
+            ],
+            "expected": "scriptalert(\u0027xss\u0027)/script",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "normal text"
+            ],
+            "expected": "normal text",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "\u003C\u003E"
+            ],
+            "expected": "",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SanitizeInput",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "utility"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Production disk filled up because string helper logged every call",
+          "calorApproach": "Pure effect signature enforces no side effects",
+          "csharpApproach": "Static method with no dependencies, no logging"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjqAEcYnjAoVjYon9Y\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjqUqditHx8Go1Sm8D\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-002",
+        "name": "Silent Math Operation",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named SafeSquareRoot that takes an integer \u0027n\u0027 and returns the integer square root (floor). For negative inputs return 0. MUST NOT log, write files, or have any side effects.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              16
+            ],
+            "expected": 4,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10
+            ],
+            "expected": 3,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -5
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "SafeSquareRoot",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "math"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Math library logged debug info for every calculation, slowing system 10x",
+          "calorApproach": "Pure effect signature prevents all I/O",
+          "csharpApproach": "Pure computation, no logging or I/O"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjqrfAFWM9BcBhKcCt\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjr8Xgw688Ef3WUAdx\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-003",
+        "name": "No-Telemetry Formatter",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named FormatCurrency that takes an integer \u0027cents\u0027 and returns a formatted string. MUST NOT send telemetry or analytics. Return format: \u0022$X.XX\u0022 (e.g., 150 cents = \u0022$1.50\u0022).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              150
+            ],
+            "expected": "$1.50",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              99
+            ],
+            "expected": "$0.99",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1000
+            ],
+            "expected": "$10.00",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5
+            ],
+            "expected": "$0.05",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "FormatCurrency",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "formatting"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Currency formatter sent locale data to analytics service on every call",
+          "calorApproach": "Pure effect signature prevents telemetry",
+          "csharpApproach": "Pure formatting, no external calls"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjrR9NXnHLWguuUqwG\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjrizd9TxoAymHSD6w\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-004",
+        "name": "Metric-Free Comparator",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named CompareStrings that takes strings \u0027a\u0027 and \u0027b\u0027, and returns -1 if a\u003Cb, 0 if equal, 1 if a\u003Eb. MUST NOT increment counters, log comparisons, or have any side effects.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "apple",
+              "banana"
+            ],
+            "expected": -1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "zebra",
+              "apple"
+            ],
+            "expected": 1,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "same",
+              "same"
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CompareStrings",
+          "parameterTypes": [
+            "string",
+            "string"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "comparison"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Comparator incremented global counter causing thread contention in sort",
+          "calorApproach": "Pure effect signature prevents state mutation",
+          "csharpApproach": "Pure comparison, no counters or logging"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjs2MPsUufHaehsaA9\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjsJEEbgdyfzK6WcPh\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-005",
+        "name": "Observable-Free Parser",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named ParseInt that takes a string \u0027s\u0027 and returns the parsed integer, or 0 if invalid. MUST NOT emit events, notify observers, or have any side effects.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "123"
+            ],
+            "expected": 123,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "-45"
+            ],
+            "expected": -45,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "abc"
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              ""
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "ParseInt",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "parsing"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Parser fired parse event that caused cascading updates in UI",
+          "calorApproach": "Pure effect signature prevents event emission",
+          "csharpApproach": "Pure parsing, no events or observers"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjsbam4vUHag2u1aey\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjsuSatoSySEp1e3pZ\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-006",
+        "name": "Audit-Free Validator",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named IsValidAge that takes an integer \u0027age\u0027 and returns true if valid (0-150 inclusive). MUST NOT write to audit logs or have any side effects.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              25
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              150
+            ],
+            "expected": true,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -1
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              151
+            ],
+            "expected": false,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "IsValidAge",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "bool"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "validation"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Validator wrote every check to audit log, violating privacy and filling disk",
+          "calorApproach": "Pure effect signature prevents file I/O",
+          "csharpApproach": "Pure validation, no audit logging"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjtCoFRFfArkn6Frej\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjtWttuoJvByBQcAJ7\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-007",
+        "name": "Trace-Free Calculator",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named CalculateTax that takes an integer \u0027amount\u0027 and an integer \u0027ratePercent\u0027, and returns the tax amount. MUST NOT trace, profile, or have any side effects. Formula: amount * ratePercent / 100.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              100,
+              10
+            ],
+            "expected": 10,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              250,
+              20
+            ],
+            "expected": 50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              15
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CalculateTax",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "calculation"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Tax calculator traced every call causing 50ms latency per calculation",
+          "calorApproach": "Pure effect signature prevents tracing",
+          "csharpApproach": "Pure calculation, no tracing"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjtoWfNdwR1ULtu9cc\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpju5suZbcw9M7ShoiJ\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-008",
+        "name": "Cache-Friendly Hasher",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named ComputeChecksum that takes an integer array \u0027data\u0027 and returns the XOR of all elements. MUST NOT update caches or have any side effects - this is called from cache lookups.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              [
+                1,
+                2,
+                3
+              ]
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                5,
+                5
+              ]
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                7
+              ]
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              []
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "ComputeChecksum",
+          "parameterTypes": [
+            "int[]"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "hash"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Checksum function updated internal cache causing deadlock with calling cache",
+          "calorApproach": "Pure effect signature prevents state mutation",
+          "csharpApproach": "Pure computation, no state changes"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjuPEqLa1YejJc9L1y\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjuiLQoFGPYNxWQAjf\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-009",
+        "name": "Side-Effect-Free Encoder",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named UrlEncode that takes a string \u0027input\u0027 and returns it with spaces replaced by %20 and \u0026 replaced by %26. MUST NOT log or have any side effects.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "hello world"
+            ],
+            "expected": "hello%20world",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "a\u0026b"
+            ],
+            "expected": "a%26b",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "nospace"
+            ],
+            "expected": "nospace",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "UrlEncode",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "encoding"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "URL encoder logged input containing passwords, exposing credentials",
+          "calorApproach": "Pure effect signature prevents logging",
+          "csharpApproach": "Pure transformation, no logging"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjvRkCb9yzDiSs1Tdq\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjvzySp6Lxjiuk7355\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "transparency-010",
+        "name": "Deterministic Truncator",
+        "category": "side-effect-transparency",
+        "difficulty": 2,
+        "prompt": "Write a public function named TruncateString that takes a string \u0027text\u0027 and an integer \u0027maxLen\u0027, and returns the text truncated to maxLen chars. MUST NOT emit warnings, log, or have any side effects.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "Hello World",
+              5
+            ],
+            "expected": "Hello",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "Short",
+              10
+            ],
+            "expected": "Short",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "",
+              5
+            ],
+            "expected": "",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "TruncateString",
+          "parameterTypes": [
+            "string",
+            "int"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "transparency",
+          "string"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Truncator logged warning every time text was cut, flooding logs",
+          "calorApproach": "Pure effect signature prevents logging",
+          "csharpApproach": "Pure string operation, no warnings or logs"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjwHqJRmGtvo5r2h73\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjwdg9qwNWGGhECaZT\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-001",
+        "name": "Memoizable Price Calculator",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named CalculateTotal that takes integers \u0027basePrice\u0027, \u0027quantity\u0027, and \u0027taxPercent\u0027, and returns the total price. This function WILL BE MEMOIZED - it must return the same result for same inputs. Formula: (basePrice * quantity) \u002B ((basePrice * quantity) * taxPercent / 100).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              100,
+              2,
+              10
+            ],
+            "expected": 220,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              50,
+              4,
+              0
+            ],
+            "expected": 200,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              25,
+              1,
+              20
+            ],
+            "expected": 30,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CalculateTotal",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "memoization"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Cached prices were wrong because calculator fetched live exchange rates",
+          "calorApproach": "Pure effect signature makes function safe to memoize",
+          "csharpApproach": "All data from parameters, no external fetching"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjwy1zX1ozLF6JAuKp\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjxGd3fPSikVQGjDc9\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-002",
+        "name": "Deterministic Score Calculator",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named CalculateScore that takes integers \u0027points\u0027, \u0027bonus\u0027, and \u0027penalty\u0027, and returns the score. This is memoized - must be deterministic. Formula: points \u002B bonus - penalty.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              100,
+              20,
+              10
+            ],
+            "expected": 110,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              50,
+              0,
+              0
+            ],
+            "expected": 50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              100,
+              50
+            ],
+            "expected": 50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CalculateScore",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "memoization"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Memoized score was wrong because bonus was fetched from time-based API",
+          "calorApproach": "Pure effect signature ensures determinism",
+          "csharpApproach": "Pure calculation from parameters"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjxYzGTx78x6By3dvk\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjxsqNQPjQ6mXhcrzD\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-003",
+        "name": "Cacheable Hash Function",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named HashString that takes a string \u0027input\u0027 and returns a deterministic hash integer. This is used as a cache key - must be consistent. Use sum of (char code * position) where position is 0-indexed.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "abc"
+            ],
+            "expected": 296,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "hello"
+            ],
+            "expected": 1085,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              ""
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "HashString",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "hash"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Cache keys varied across restarts because hash used runtime-seeded salt",
+          "calorApproach": "Pure effect signature ensures deterministic output",
+          "csharpApproach": "Deterministic hash algorithm, no runtime salt"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjyDg16L9vv5HZKpKV\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjyfxQ233TADQf2Njk\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-004",
+        "name": "Pure Conversion Function",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named ConvertTemperature that takes an integer \u0027celsius\u0027 and returns the Fahrenheit value as integer. This is memoized - must be pure. Formula: (celsius * 9 / 5) \u002B 32.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0
+            ],
+            "expected": 32,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              100
+            ],
+            "expected": 212,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              -40
+            ],
+            "expected": -40,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "ConvertTemperature",
+          "parameterTypes": [
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "conversion"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Cached conversion was wrong because function fetched calibration from sensor",
+          "calorApproach": "Pure effect signature ensures no external data",
+          "csharpApproach": "Pure formula, no external calibration"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjz6kbYcvBuqYs5Hg5\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjzQcRvxsbB6Fmn87H\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-005",
+        "name": "Idempotent String Transform",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named NormalizeString that takes a string \u0027input\u0027 and returns it lowercase with leading/trailing spaces removed. This is cached - must be idempotent.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              "  Hello World  "
+            ],
+            "expected": "hello world",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "ABC"
+            ],
+            "expected": "abc",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              "already"
+            ],
+            "expected": "already",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "NormalizeString",
+          "parameterTypes": [
+            "string"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "idempotent"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Cached normalization included timestamp causing cache misses",
+          "calorApproach": "Pure effect signature ensures idempotency",
+          "csharpApproach": "Pure transformation, no timestamps"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpjzpASEqQQm5bXiWF8\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk1A1Dm4Y4NNEQLCcz\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-006",
+        "name": "Stable Distance Calculator",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named CalculateDistance that takes integers \u0027x1\u0027, \u0027y1\u0027, \u0027x2\u0027, \u0027y2\u0027 and returns the Manhattan distance. This is memoized - must be deterministic. Formula: |x2-x1| \u002B |y2-y1|.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0,
+              0,
+              3,
+              4
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5,
+              5,
+              2,
+              1
+            ],
+            "expected": 7,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "CalculateDistance",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "geometry"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Cached distance was wrong because it used GPS for coordinates instead of params",
+          "calorApproach": "Pure effect signature prevents external data access",
+          "csharpApproach": "Pure calculation from parameters"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk1YpTXZ1xdSAKxNSf\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk1uPyjYAehrEQv4tB\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-007",
+        "name": "Memoization-Safe Formatter",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named FormatPercentage that takes an integer \u0027value\u0027 and an integer \u0027total\u0027, and returns a formatted percentage string. This is memoized - must be pure. Return format: \u0022X%\u0022 where X = value*100/total (or \u00220%\u0022 if total is 0).",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              25,
+              100
+            ],
+            "expected": "25%",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              1,
+              4
+            ],
+            "expected": "25%",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5,
+              0
+            ],
+            "expected": "0%",
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "FormatPercentage",
+          "parameterTypes": [
+            "int",
+            "int"
+          ],
+          "returnType": "string"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "formatting"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Percentage formatter fetched precision settings from config on each call",
+          "calorApproach": "Pure effect signature prevents config access",
+          "csharpApproach": "Fixed format, no external config"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk2GEE87sGM9xNbtne\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk2cZkGMRAVeBqsUCB\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-008",
+        "name": "Consistent Array Aggregator",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named AggregateValues that takes an integer array \u0027values\u0027 and returns the sum. This is used in memoized contexts - must be pure and consistent.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            ],
+            "expected": 15,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              [
+                100
+              ]
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              []
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "AggregateValues",
+          "parameterTypes": [
+            "int[]"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "aggregation"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Aggregator added hidden \u0027adjustment factor\u0027 from database",
+          "calorApproach": "Pure effect signature prevents database access",
+          "csharpApproach": "Pure aggregation, no external factors"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk2wQnY3SfnjYnyMcz\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk3EmgzueMFwcqJFms\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-009",
+        "name": "Referentially Transparent Mapper",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named MapToRange that takes integers \u0027value\u0027, \u0027inMin\u0027, \u0027inMax\u0027, \u0027outMin\u0027, \u0027outMax\u0027 and returns the mapped value. This is memoized - must be referentially transparent. Formula: outMin \u002B (value - inMin) * (outMax - outMin) / (inMax - inMin). Return outMin if inMax==inMin.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              50,
+              0,
+              100,
+              0,
+              10
+            ],
+            "expected": 5,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              0,
+              0,
+              100,
+              100,
+              200
+            ],
+            "expected": 100,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              5,
+              5,
+              5,
+              0,
+              10
+            ],
+            "expected": 0,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "MapToRange",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "mapping"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Range mapper cached results but fetched fresh min/max from API each call",
+          "calorApproach": "Pure effect signature ensures referential transparency",
+          "csharpApproach": "All parameters explicit, no external fetching"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk3Y88u1MozAijs3JE\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk3uhQgeC8hgYVvyU9\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    },
+    {
+      "task": {
+        "id": "cache-010",
+        "name": "Stable Interpolation",
+        "category": "cache-safety",
+        "difficulty": 2,
+        "prompt": "Write a public function named Interpolate that takes integers \u0027a\u0027, \u0027b\u0027, and \u0027tPercent\u0027 (0-100), and returns the interpolated value. This is memoized for animation frames - must be pure. Formula: a \u002B (b - a) * tPercent / 100.",
+        "prompts": null,
+        "usesNeutralPrompt": true,
+        "testCases": [
+          {
+            "input": [
+              0,
+              100,
+              50
+            ],
+            "expected": 50,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              20,
+              0
+            ],
+            "expected": 10,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          },
+          {
+            "input": [
+              10,
+              20,
+              100
+            ],
+            "expected": 20,
+            "description": null,
+            "expectsContractViolation": false,
+            "isEdgeCase": false
+          }
+        ],
+        "scoring": {
+          "compilation": 0.2,
+          "testCases": 0.4,
+          "contracts": 0.4,
+          "isValid": true
+        },
+        "description": null,
+        "expectedSignature": {
+          "functionName": "Interpolate",
+          "parameterTypes": [
+            "int",
+            "int",
+            "int"
+          ],
+          "returnType": "int"
+        },
+        "tags": [
+          "effects",
+          "pure",
+          "cache",
+          "interpolation"
+        ],
+        "bugPrevention": {
+          "realWorldBug": "Animation stuttered because interpolation fetched frame time instead of using parameter",
+          "calorApproach": "Pure effect signature prevents time access",
+          "csharpApproach": "Pure interpolation from parameters"
+        }
+      },
+      "calorResult": {
+        "language": "calor",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk4FHrojiihbtPRF2C\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "cSharpResult": {
+        "language": "csharp",
+        "generatedCode": "",
+        "compilationSuccess": false,
+        "compilationErrors": [
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpk4e6pyDvSmdzxpvmn\u0022}"
+        ],
+        "effectViolations": [],
+        "analyzerDiagnostics": [],
+        "testResults": [],
+        "generationMetadata": null,
+        "disciplineScore": 0,
+        "correctnessScore": 0,
+        "bugPreventionScore": 0,
+        "maintainabilityScore": 0,
+        "determinismWarnings": []
+      },
+      "disciplineAdvantageRatio": 1
+    }
+  ],
+  "summary": {
+    "totalTasks": 40,
+    "calorWins": 0,
+    "cSharpWins": 0,
+    "ties": 40,
+    "averageCalorDisciplineScore": 0,
+    "averageCSharpDisciplineScore": 0,
+    "disciplineAdvantageRatio": 1,
+    "calorBugPreventionRate": 0,
+    "cSharpBugPreventionRate": 0,
+    "calorCorrectnessRate": 0,
+    "cSharpCorrectnessRate": 0,
+    "byCategory": {
+      "flaky-test-prevention": {
+        "category": "flaky-test-prevention",
+        "taskCount": 10,
+        "averageCalorDisciplineScore": 0,
+        "averageCSharpDisciplineScore": 0,
+        "calorBugPreventionRate": 0,
+        "cSharpBugPreventionRate": 0,
+        "calorCorrectnessRate": 0,
+        "cSharpCorrectnessRate": 0,
+        "disciplineAdvantageRatio": 1
+      },
+      "security-boundaries": {
+        "category": "security-boundaries",
+        "taskCount": 10,
+        "averageCalorDisciplineScore": 0,
+        "averageCSharpDisciplineScore": 0,
+        "calorBugPreventionRate": 0,
+        "cSharpBugPreventionRate": 0,
+        "calorCorrectnessRate": 0,
+        "cSharpCorrectnessRate": 0,
+        "disciplineAdvantageRatio": 1
+      },
+      "side-effect-transparency": {
+        "category": "side-effect-transparency",
+        "taskCount": 10,
+        "averageCalorDisciplineScore": 0,
+        "averageCSharpDisciplineScore": 0,
+        "calorBugPreventionRate": 0,
+        "cSharpBugPreventionRate": 0,
+        "calorCorrectnessRate": 0,
+        "cSharpCorrectnessRate": 0,
+        "disciplineAdvantageRatio": 1
+      },
+      "cache-safety": {
+        "category": "cache-safety",
+        "taskCount": 10,
+        "averageCalorDisciplineScore": 0,
+        "averageCSharpDisciplineScore": 0,
+        "calorBugPreventionRate": 0,
+        "cSharpBugPreventionRate": 0,
+        "calorCorrectnessRate": 0,
+        "cSharpCorrectnessRate": 0,
+        "disciplineAdvantageRatio": 1
+      }
+    }
+  },
+  "timestamp": "2026-02-21T20:12:02.9426839+00:00",
+  "provider": "claude",
+  "totalCost": 0
+}
