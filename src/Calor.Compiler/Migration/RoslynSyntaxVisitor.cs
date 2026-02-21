@@ -1045,6 +1045,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 continue;
             }
 
+            // Handle tuple deconstruction assignments: (_a, _b) = (x, y) → §ASSIGN _a x, §ASSIGN _b y
+            if (statement is ExpressionStatementSyntax tupleStmt
+                && tupleStmt.Expression is AssignmentExpressionSyntax tupleAssign
+                && tupleAssign.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                && tupleAssign.Left is TupleExpressionSyntax leftTuple
+                && tupleAssign.Right is TupleExpressionSyntax rightTuple
+                && leftTuple.Arguments.Count == rightTuple.Arguments.Count)
+            {
+                _context.RecordFeatureUsage("tuple-deconstruction");
+                for (int i = 0; i < leftTuple.Arguments.Count; i++)
+                {
+                    var leftExpr = ConvertExpression(leftTuple.Arguments[i].Expression);
+                    var rightExpr = ConvertExpression(rightTuple.Arguments[i].Expression);
+                    statements.Add(new AssignmentStatementNode(
+                        GetTextSpan(tupleStmt),
+                        leftExpr,
+                        rightExpr));
+                }
+                FlushPendingStatements(statements);
+                continue;
+            }
+
             var converted = ConvertStatement(statement);
             if (converted != null)
             {
