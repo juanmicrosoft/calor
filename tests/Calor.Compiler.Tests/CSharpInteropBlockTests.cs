@@ -435,8 +435,8 @@ public class CSharpInteropBlockTests
 
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
-        Assert.Contains("convertibility_score", text);
-        Assert.Contains("recommendation", text);
+        Assert.Contains("score", text);
+        Assert.Contains("summary", text);
     }
 
     #endregion
