@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Init;
+using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -123,8 +124,8 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["async"] = ["async", "await", "§AF", "§AMT", "§AWAIT", "§ASYNC"],
         ["contracts"] = ["contract", "§Q", "§S", "precondition", "postcondition", "requires", "ensures"],
         ["effects"] = ["effect", "§E", "side effect", "cw", "cr", "fs:"],
-        ["loops"] = ["loop", "for", "while", "§L{", "§WH{", "§DO{", "§BK", "§CN"],
-        ["conditionals"] = ["if", "else", "conditional", "§IF{", "§EI", "§EL", "ternary"],
+        ["loops"] = ["loop", "for", "for loop", "foreach", "while", "§L{", "§WH{", "§DO{", "§BK", "§CN"],
+        ["conditionals"] = ["if", "if statement", "if-else", "else", "conditional", "§IF{", "§EI", "§EL", "ternary"],
         ["functions"] = ["function", "§F{", "§I{", "§O{", "§R", "return", "parameter"],
         ["classes"] = ["class", "§CL{", "§EXT{", "§IMPL{", "inheritance", "interface"],
         ["generics"] = ["generic", "<T>", "§WHERE", "type parameter", "constraint"],
@@ -137,7 +138,16 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["records"] = ["record", "§D{", "union", "§T{", "§V{"],
         ["enums"] = ["enum", "§EN{", "§ENUM{"],
         ["constructors"] = ["constructor", "§CTOR{", "§BASE", "§THIS"],
-        ["properties"] = ["property", "§PROP{", "§GET", "§SET", "field", "§FLD{"]
+        ["properties"] = ["property", "§PROP{", "§GET", "§SET", "field", "§FLD{"],
+        ["structs"] = ["struct", "§ST{", "value type"],
+        ["operators"] = ["operator", "§OP{", "overload", "arithmetic"],
+        ["nullable"] = ["nullable", "null", "§?", "§??", "null check", "null coalescing"],
+        ["linq"] = ["linq", "query", "select", "where", "orderby"],
+        ["events"] = ["event", "§EV{", "§EVT{"],
+        ["using"] = ["using", "§USE{", "dispose", "IDisposable"],
+        ["modifiers"] = ["static", "abstract", "sealed", "virtual", "override", "readonly", "partial"],
+        ["indexers"] = ["indexer", "§IDX{", "this[]"],
+        ["yield"] = ["yield", "iterator", "IEnumerable"],
     };
 
     public override string Name => "calor_syntax_help";
@@ -174,7 +184,18 @@ public sealed class SyntaxHelpTool : McpToolBase
                 return Task.FromResult(McpToolResult.Error("Syntax documentation not available"));
             }
 
+            var resolvedCategory = ResolveCategory(feature);
             var sections = ExtractRelevantSections(content, feature);
+
+            // Track telemetry
+            if (CalorTelemetry.IsInitialized)
+            {
+                var matchedSectionNames = sections.Count > 0
+                    ? string.Join(";", sections.Select(s => s.Title).Take(5))
+                    : null;
+                CalorTelemetry.Instance.TrackSyntaxHelpQuery(
+                    feature, resolvedCategory, sections.Count, matchedSectionNames);
+            }
 
             if (sections.Count == 0)
             {
@@ -239,7 +260,7 @@ public sealed class SyntaxHelpTool : McpToolBase
 
                 if (searchTerms.Any(term =>
                     title.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                    templateContent.Contains(term, StringComparison.OrdinalIgnoreCase)))
+                    IsContentMatch(templateContent, term)))
                 {
                     sections.Add(new SyntaxSection
                     {
@@ -273,7 +294,43 @@ public sealed class SyntaxHelpTool : McpToolBase
     {
         return searchTerms.Any(term =>
             title.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-            content.Contains(term, StringComparison.OrdinalIgnoreCase));
+            IsContentMatch(content, term));
+    }
+
+    /// <summary>
+    /// Matches a search term against section content. Short plain-text terms (≤ 3 chars)
+    /// use word-boundary matching to prevent false positives like "for" in "information"
+    /// or "if" in "specific". Calor tokens and longer terms use substring matching.
+    /// </summary>
+    private static bool IsContentMatch(string text, string term)
+    {
+        // Calor-specific tokens (§, {, <, [) are already very specific — use substring matching
+        if (term.Contains('§') || term.Contains('{') || term.Contains('<') || term.Contains('['))
+        {
+            return text.Contains(term, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Short terms (≤ 3 chars) use word-boundary matching to avoid false positives
+        if (term.Length <= 3)
+        {
+            return Regex.IsMatch(text, $@"\b{Regex.Escape(term)}\b", RegexOptions.IgnoreCase);
+        }
+
+        // Longer terms are specific enough for substring matching
+        return text.Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ResolveCategory(string feature)
+    {
+        foreach (var (key, aliases) in FeatureAliases)
+        {
+            if (key.Equals(feature, StringComparison.OrdinalIgnoreCase) ||
+                aliases.Any(a => a.Equals(feature, StringComparison.OrdinalIgnoreCase)))
+            {
+                return key;
+            }
+        }
+        return null;
     }
 
     private sealed class SyntaxHelpOutput
