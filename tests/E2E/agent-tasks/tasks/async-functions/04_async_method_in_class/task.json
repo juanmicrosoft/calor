@@ -3,7 +3,7 @@
   "name": "Async method in class",
   "category": "async-functions",
   "fixture": "oop-project",
-  "prompt": "Add a public class called DataService to Domain.calr with a public async method LoadAsync that awaits HttpClient.GetAsync, then returns 100 as Task<int>. Declare the network read effect on the method.",
+  "prompt": "Add a public class called DataService to Domain.calr with a public async method LoadAsync that awaits HttpClient.GetAsync, then returns 100 as Task<int>. Declare the network effect on the method.",
   "verification": {
     "compilation": { "mustSucceed": true },
     "z3": { "enabled": false }
