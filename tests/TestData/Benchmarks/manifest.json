@@ -479,6 +479,72 @@
       "csharpFixed": "TokenEconomics/ContractedDivide.cs",
       "expectedError": "Division by zero",
       "level": 2
+    },
+    {
+      "id": "bug003",
+      "description": "Unsafe Option unwrap without is_some check",
+      "category": "null_reference",
+      "calorBuggy": "ErrorDetection/NullDeref_buggy.calr",
+      "calorFixed": "TokenEconomics/Calculator.calr",
+      "csharpBuggy": "ErrorDetection/NullDeref_buggy.cs",
+      "csharpFixed": "TokenEconomics/Calculator.cs",
+      "expectedError": "Unwrap on Option without prior check",
+      "level": 2
+    },
+    {
+      "id": "bug004",
+      "description": "Integer addition that can overflow",
+      "category": "overflow",
+      "calorBuggy": "ErrorDetection/Overflow_buggy.calr",
+      "calorFixed": "TokenEconomics/Calculator.calr",
+      "csharpBuggy": "ErrorDetection/Overflow_buggy.cs",
+      "csharpFixed": "TokenEconomics/Calculator.cs",
+      "expectedError": "Potential integer overflow",
+      "level": 2
+    },
+    {
+      "id": "bug005",
+      "description": "Division by parameter without precondition",
+      "category": "contract_violation",
+      "calorBuggy": "ErrorDetection/MissingContract_buggy.calr",
+      "calorFixed": "TokenEconomics/ContractedDivide.calr",
+      "csharpBuggy": "ErrorDetection/MissingContract_buggy.cs",
+      "csharpFixed": "TokenEconomics/ContractedDivide.cs",
+      "expectedError": "Missing precondition for division",
+      "level": 2
+    },
+    {
+      "id": "bug006",
+      "description": "Unreachable statement after return",
+      "category": "dead_code",
+      "calorBuggy": "ErrorDetection/DeadCode_buggy.calr",
+      "calorFixed": "TokenEconomics/Calculator.calr",
+      "csharpBuggy": "ErrorDetection/DeadCode_buggy.cs",
+      "csharpFixed": "TokenEconomics/Calculator.cs",
+      "expectedError": "Dead code detected",
+      "level": 2
+    },
+    {
+      "id": "bug007",
+      "description": "Variable used before assignment",
+      "category": "uninitialized",
+      "calorBuggy": "ErrorDetection/Uninitialized_buggy.calr",
+      "calorFixed": "TokenEconomics/Calculator.calr",
+      "csharpBuggy": "ErrorDetection/Uninitialized_buggy.cs",
+      "csharpFixed": "TokenEconomics/Calculator.cs",
+      "expectedError": "Variable used before initialization",
+      "level": 2
+    },
+    {
+      "id": "bug008",
+      "description": "Assignment never read (dead store)",
+      "category": "dead_store",
+      "calorBuggy": "ErrorDetection/DeadStore_buggy.calr",
+      "calorFixed": "TokenEconomics/Calculator.calr",
+      "csharpBuggy": "ErrorDetection/DeadStore_buggy.cs",
+      "csharpFixed": "TokenEconomics/Calculator.cs",
+      "expectedError": "Dead store detected",
+      "level": 2
     }
   ]
 }

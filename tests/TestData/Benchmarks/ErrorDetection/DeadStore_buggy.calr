@@ -1,0 +1,9 @@
+§M{m001:DeadStoreExample}
+§F{f001:Compute:pub}
+  §I{i32:x}
+  §O{i32}
+  §B{~temp:i32} (+ x 1)
+  §B{~temp:i32} (* x 2)
+  §R temp
+§/F{f001}
+§/M{m001}

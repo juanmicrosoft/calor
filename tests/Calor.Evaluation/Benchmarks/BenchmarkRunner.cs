@@ -1,5 +1,6 @@
 using Calor.Evaluation.Core;
 using Calor.Evaluation.Metrics;
+using ErrorDetectionCalc = Calor.Evaluation.Metrics.ErrorDetectionCalculator;
 
 namespace Calor.Evaluation.Benchmarks;
 
@@ -70,6 +71,9 @@ public class BenchmarkRunner
             result.CaseResults.Add(caseResult);
             result.Metrics.AddRange(caseResult.Metrics);
         }
+
+        // Run bug scenarios
+        await RunBugScenariosAsync(manifest, result);
 
         // Calculate summary statistics
         result.Summary = CalculateSummary(result);
@@ -204,6 +208,56 @@ public class BenchmarkRunner
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Runs bug scenario evaluations from the manifest.
+    /// </summary>
+    private async Task RunBugScenariosAsync(BenchmarkManifest manifest, EvaluationResult result)
+    {
+        if (manifest.BugScenarios.Count == 0)
+            return;
+
+        var errorCalc = _calculators.OfType<ErrorDetectionCalc>().FirstOrDefault();
+        if (errorCalc == null)
+            return;
+
+        foreach (var bug in manifest.BugScenarios)
+        {
+            try
+            {
+                var buggyCalorPath = Path.Combine(_adapter.BenchmarkPath, bug.CalorBuggy);
+                var fixedCalorPath = Path.Combine(_adapter.BenchmarkPath, bug.CalorFixed);
+                var buggyCSharpPath = Path.Combine(_adapter.BenchmarkPath, bug.CSharpBuggy);
+                var fixedCSharpPath = Path.Combine(_adapter.BenchmarkPath, bug.CSharpFixed);
+
+                var buggyCalor = File.Exists(buggyCalorPath) ? await File.ReadAllTextAsync(buggyCalorPath) : "";
+                var fixedCalor = File.Exists(fixedCalorPath) ? await File.ReadAllTextAsync(fixedCalorPath) : "";
+                var buggyCSharp = File.Exists(buggyCSharpPath) ? await File.ReadAllTextAsync(buggyCSharpPath) : "";
+                var fixedCSharp = File.Exists(fixedCSharpPath) ? await File.ReadAllTextAsync(fixedCSharpPath) : "";
+
+                var bugDesc = new BugDescription
+                {
+                    Id = bug.Id,
+                    Category = bug.Category,
+                    Description = bug.Description,
+                    ExpectedError = bug.ExpectedError
+                };
+
+                var detectionResult = errorCalc.EvaluateBuggyCode(
+                    buggyCalor, fixedCalor, buggyCSharp, fixedCSharp, bugDesc);
+
+                result.BugDetectionResults.Add(detectionResult);
+
+                if (_options.Verbose)
+                    Console.WriteLine($"Bug scenario {bug.Id}: Calor={detectionResult.CalorDetectionScore:F2}, C#={detectionResult.CSharpDetectionScore:F2}");
+            }
+            catch (Exception ex)
+            {
+                if (_options.Verbose)
+                    Console.Error.WriteLine($"Warning: Bug scenario {bug.Id} failed: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>

@@ -80,6 +80,16 @@ public sealed class BugPatternOptions
     public bool CheckOverflow { get; init; } = true;
 
     /// <summary>
+    /// Enable missing precondition suggestion.
+    /// </summary>
+    public bool CheckMissingPreconditions { get; init; } = true;
+
+    /// <summary>
+    /// Enable off-by-one error detection.
+    /// </summary>
+    public bool CheckOffByOne { get; init; } = true;
+
+    /// <summary>
     /// Use Z3 SMT solver for verification (more precise but slower).
     /// </summary>
     public bool UseZ3Verification { get; init; } = true;
@@ -88,6 +98,11 @@ public sealed class BugPatternOptions
     /// Z3 solver timeout in milliseconds.
     /// </summary>
     public uint Z3TimeoutMs { get; init; } = 5000;
+
+    /// <summary>
+    /// Parameter names guarded by existing preconditions, keyed by function name.
+    /// </summary>
+    public Dictionary<string, HashSet<string>>? PreconditionGuardedParams { get; init; }
 
     public static BugPatternOptions Default => new();
 
@@ -128,6 +143,12 @@ public sealed class BugPatternRunner
 
         if (_options.CheckOverflow)
             checkers.Add(new Patterns.OverflowChecker(_options));
+
+        if (_options.CheckMissingPreconditions)
+            checkers.Add(new Patterns.PreconditionSuggester(_options));
+
+        if (_options.CheckOffByOne)
+            checkers.Add(new Patterns.OffByOneChecker(_options));
 
         return checkers;
     }

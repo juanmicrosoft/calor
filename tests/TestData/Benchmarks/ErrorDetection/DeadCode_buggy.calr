@@ -1,0 +1,8 @@
+§M{m001:DeadCodeExample}
+§F{f001:GetStatus:pub}
+  §I{i32:code}
+  §O{i32}
+  §R code
+  §B{unused:i32} INT:42
+§/F{f001}
+§/M{m001}
