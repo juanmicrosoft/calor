@@ -197,6 +197,115 @@ jobs:
               core.info('No regressions detected');
             }
 
+  roundtrip-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: conversion-scorecard
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 (for Calor build)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup .NET 10 (for target projects)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore and build Calor
+        run: |
+          dotnet restore
+          dotnet build -c Release --no-restore
+
+      - name: Cache target projects
+        uses: actions/cache@v4
+        with:
+          path: ~/target-projects
+          key: roundtrip-projects-v1
+          restore-keys: roundtrip-projects-
+
+      - name: Clone target projects (if not cached)
+        run: |
+          mkdir -p ~/target-projects
+          for repo in jbogard/MediatR serilog/serilog FluentValidation/FluentValidation; do
+            name=$(echo $repo | cut -d/ -f2)
+            if [ ! -d ~/target-projects/$name ]; then
+              git clone --depth 1 https://github.com/$repo.git ~/target-projects/$name
+            fi
+          done
+
+      - name: Run round-trip verification
+        continue-on-error: true
+        run: |
+          dotnet run --project tools/Calor.RoundTrip.Harness/ -c Release -- \
+            run --all \
+            --projects-dir ~/target-projects \
+            --dotnet dotnet \
+            --output ./conversion-reports/
+
+      - name: Post round-trip results to PR
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- calor-roundtrip-verification -->';
+
+            let body = `${marker}\n## Round-Trip Verification\n\n`;
+            body += '| Project | Verdict | Baseline | Round-Trip | Regressions | Files Converted |\n';
+            body += '|---------|---------|----------|------------|-------------|----------------|\n';
+
+            const files = fs.readdirSync('conversion-reports')
+              .filter(f => f.endsWith('-roundtrip.json'));
+
+            for (const file of files) {
+              const data = JSON.parse(fs.readFileSync(`conversion-reports/${file}`));
+              const emoji = data.verdict === 'pass' ? ':white_check_mark:' :
+                           data.verdict === 'minor_regressions' ? ':warning:' : ':x:';
+
+              body += `| ${data.project} | ${emoji} ${data.verdict} | `;
+              body += `${data.baseline?.passed ?? '—'}/${data.baseline?.total ?? '—'} | `;
+              body += `${data.round_trip?.passed ?? '—'}/${data.round_trip?.total ?? '—'} | `;
+              body += `**${data.regressions}** | `;
+              body += `${data.files?.replaced}/${data.files?.total} |\n`;
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body,
+              });
+            }
+
+      - name: Upload round-trip reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: roundtrip-reports
+          path: conversion-reports/*-roundtrip.*
+          retention-days: 90
+
   id-validation:
     runs-on: ubuntu-latest
 
