@@ -1,5 +1,10 @@
 using System.Text.Json;
 using Calor.Compiler.Mcp.Tools;
+using Calor.Compiler.Telemetry;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Channel;
+using Microsoft.ApplicationInsights.DataContracts;
+using Microsoft.ApplicationInsights.Extensibility;
 using Xunit;
 
 namespace Calor.Compiler.Tests.Mcp;
@@ -175,6 +180,151 @@ public class SyntaxHelpToolTests
         var text = result.Content[0].Text!;
         Assert.Contains("feature", text);
     }
+
+    #region New Alias Category Tests
+
+    [Theory]
+    [InlineData("structs")]
+    [InlineData("struct")]
+    [InlineData("operators")]
+    [InlineData("operator")]
+    [InlineData("nullable")]
+    [InlineData("linq")]
+    [InlineData("events")]
+    [InlineData("event")]
+    [InlineData("using")]
+    [InlineData("modifiers")]
+    [InlineData("static")]
+    [InlineData("indexers")]
+    [InlineData("indexer")]
+    [InlineData("yield")]
+    public async Task ExecuteAsync_NewAliasCategories_ReturnsContent(string feature)
+    {
+        var args = JsonDocument.Parse($"{{\"feature\": \"{feature}\"}}").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.Contains("feature", text);
+    }
+
+    [Theory]
+    [InlineData("for loop")]
+    [InlineData("foreach")]
+    [InlineData("if statement")]
+    [InlineData("if-else")]
+    public async Task ExecuteAsync_RefinedAliases_ReturnsContent(string feature)
+    {
+        var args = JsonDocument.Parse($"{{\"feature\": \"{feature}\"}}").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.Contains("feature", text);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AvailableFeatures_IncludesNewCategories()
+    {
+        var args = JsonDocument.Parse("""{"feature": "functions"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        // New categories should appear in the availableFeatures list
+        Assert.Contains("structs", text);
+        Assert.Contains("operators", text);
+        Assert.Contains("nullable", text);
+        Assert.Contains("linq", text);
+        Assert.Contains("events", text);
+        Assert.Contains("modifiers", text);
+        Assert.Contains("indexers", text);
+        Assert.Contains("yield", text);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EventsFeature_IncludesEventContent()
+    {
+        var args = JsonDocument.Parse("""{"feature": "events"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.True(
+            text.Contains("event", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("§EV") || text.Contains("§EVT"),
+            "Expected event-related content in response");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OperatorsFeature_IncludesOperatorContent()
+    {
+        var args = JsonDocument.Parse("""{"feature": "operators"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        // The documentation has a "## Modern Operators" section
+        Assert.True(
+            text.Contains("operator", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("§OP") || text.Contains("Operator"),
+            "Expected operator-related content in response");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ForAlias_ResolvesToLoops()
+    {
+        // "for" should map to the loops category, not produce overly broad results
+        var args = JsonDocument.Parse("""{"feature": "for"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.True(
+            text.Contains("loop", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("§L{") || text.Contains("§WH{"),
+            "Expected loop-related content when searching for 'for'");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_IfAlias_ResolvesToConditionals()
+    {
+        // "if" should map to the conditionals category
+        var args = JsonDocument.Parse("""{"feature": "if"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.True(
+            text.Contains("conditional", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("§IF{") || text.Contains("§EI") || text.Contains("§EL"),
+            "Expected conditional-related content when searching for 'if'");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DelegateAlias_ResolvesToLambdas()
+    {
+        // "delegate" should resolve to lambdas (not events), since it appears in lambdas first
+        var args = JsonDocument.Parse("""{"feature": "delegate"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.True(
+            text.Contains("lambda", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("§LAM") || text.Contains("§DEL") || text.Contains("delegate", StringComparison.OrdinalIgnoreCase),
+            "Expected lambda/delegate-related content in response");
+    }
+
+    #endregion
 
     #region File Resolution Tests
 
@@ -395,6 +545,179 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
             Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, originalValue);
             SyntaxHelpTool.ResetCacheForTesting();
         }
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// Telemetry integration tests for SyntaxHelpTool.
+/// Uses TelemetrySingleton collection to avoid parallel execution conflicts.
+/// </summary>
+[Collection("TelemetrySingleton")]
+public class SyntaxHelpTelemetryTests
+{
+    [Fact]
+    public async Task ExecuteAsync_Hit_TracksSyntaxHelpQueryEvent()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
+
+        var tool = new SyntaxHelpTool();
+        var args = JsonDocument.Parse("""{"feature": "contracts"}""").RootElement;
+
+        await tool.ExecuteAsync(args);
+
+        // Filter by feature name to isolate from concurrent non-collection tests
+        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["feature"] == "contracts"));
+        Assert.Equal("contracts", evt.Properties["resolvedCategory"]);
+        Assert.Equal("True", evt.Properties["isHit"]);
+        Assert.True(int.Parse(evt.Properties["resultCount"]) > 0);
+        Assert.True(evt.Properties.ContainsKey("matchedSections"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Miss_TracksSyntaxHelpQueryWithNoHit()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
+
+        var tool = new SyntaxHelpTool();
+        var args = JsonDocument.Parse("""{"feature": "unknown_feature_xyz"}""").RootElement;
+
+        await tool.ExecuteAsync(args);
+
+        // Filter by feature name to isolate from concurrent non-collection tests
+        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["feature"] == "unknown_feature_xyz"));
+        Assert.Equal("none", evt.Properties["resolvedCategory"]);
+        Assert.Equal("False", evt.Properties["isHit"]);
+        Assert.Equal("0", evt.Properties["resultCount"]);
+        Assert.False(evt.Properties.ContainsKey("matchedSections"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AliasMatch_TracksResolvedCategory()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
+
+        var tool = new SyntaxHelpTool();
+        // "await" is an alias for the "async" category
+        var args = JsonDocument.Parse("""{"feature": "await"}""").RootElement;
+
+        await tool.ExecuteAsync(args);
+
+        // Filter by feature name to isolate from concurrent non-collection tests
+        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["feature"] == "await"));
+        Assert.Equal("async", evt.Properties["resolvedCategory"]);
+    }
+
+    [Fact]
+    public void TrackSyntaxHelpQuery_NeverThrows()
+    {
+        var (telemetry, _) = CreateTestTelemetry();
+
+        var exception = Record.Exception(() =>
+            telemetry.TrackSyntaxHelpQuery("test", "category", 3, "section1;section2"));
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void TrackSyntaxHelpQuery_EmitsCorrectProperties()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+
+        telemetry.TrackSyntaxHelpQuery("struct", "structs", 2, "Struct Definition;Value Types");
+
+        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
+        Assert.Equal("SyntaxHelpQuery", evt.Name);
+        Assert.Equal("struct", evt.Properties["feature"]);
+        Assert.Equal("structs", evt.Properties["resolvedCategory"]);
+        Assert.Equal("2", evt.Properties["resultCount"]);
+        Assert.Equal("True", evt.Properties["isHit"]);
+        Assert.Equal("Struct Definition;Value Types", evt.Properties["matchedSections"]);
+    }
+
+    [Fact]
+    public void TrackSyntaxHelpQuery_Miss_OmitsMatchedSections()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+
+        telemetry.TrackSyntaxHelpQuery("unknown", null, 0, null);
+
+        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
+        Assert.Equal("SyntaxHelpQuery", evt.Name);
+        Assert.Equal("none", evt.Properties["resolvedCategory"]);
+        Assert.Equal("0", evt.Properties["resultCount"]);
+        Assert.Equal("False", evt.Properties["isHit"]);
+        Assert.False(evt.Properties.ContainsKey("matchedSections"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ManyResults_CapsMatchedSectionsAtFive()
+    {
+        var tempFile = Path.GetTempFileName();
+        var originalValue = Environment.GetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar);
+        var (telemetry, channel) = CreateTestTelemetry();
+        using var _t = CalorTelemetry.SetInstanceForTesting(telemetry);
+
+        try
+        {
+            // Create a skill file with 8 sections all containing "testtopic"
+            var content = string.Join("\n", Enumerable.Range(1, 8).Select(i =>
+                $"## Section {i}\nThis testtopic section has testtopic content number {i}.\n"));
+            File.WriteAllText(tempFile, content);
+            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, tempFile);
+            SyntaxHelpTool.ResetCacheForTesting();
+
+            var tool = new SyntaxHelpTool();
+            var args = JsonDocument.Parse("""{"feature": "testtopic"}""").RootElement;
+
+            await tool.ExecuteAsync(args);
+
+            var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
+                .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["feature"] == "testtopic"));
+            Assert.Equal("8", evt.Properties["resultCount"]);
+            var sectionCount = evt.Properties["matchedSections"].Split(';').Length;
+            Assert.Equal(5, sectionCount);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, originalValue);
+            SyntaxHelpTool.ResetCacheForTesting();
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
+
+    #region Test Helpers
+
+    private static (CalorTelemetry telemetry, StubTelemetryChannel channel) CreateTestTelemetry()
+    {
+        var channel = new StubTelemetryChannel();
+        var config = new TelemetryConfiguration
+        {
+            TelemetryChannel = channel,
+            ConnectionString = "InstrumentationKey=00000000-0000-0000-0000-000000000000"
+        };
+        var client = new TelemetryClient(config);
+        var telemetry = new CalorTelemetry(client);
+        return (telemetry, channel);
+    }
+
+    private sealed class StubTelemetryChannel : ITelemetryChannel
+    {
+        private readonly System.Collections.Concurrent.ConcurrentBag<ITelemetry> _items = new();
+        public List<ITelemetry> Items => _items.ToList();
+        public bool? DeveloperMode { get; set; } = true;
+        public string EndpointAddress { get; set; } = "https://localhost";
+
+        public void Send(ITelemetry item) => _items.Add(item);
+        public void Flush() { }
+        public void Dispose() { }
     }
 
     #endregion

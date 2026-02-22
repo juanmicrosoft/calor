@@ -1,19 +1,20 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Calor.Compiler.Migration;
+using Calor.Compiler.Analysis;
 
 namespace Calor.Compiler.Mcp.Tools;
 
 /// <summary>
-/// MCP tool for analyzing C# code convertibility to Calor without producing output.
-/// Runs conversion in Interop mode and returns only stats/gaps.
+/// MCP tool for analyzing C# code convertibility to Calor.
 /// </summary>
 public sealed class AnalyzeConvertibilityTool : McpToolBase
 {
     public override string Name => "calor_analyze_convertibility";
 
     public override string Description =>
-        "Analyze how convertible C# source code is to Calor. Returns convertibility score, member counts, and gaps without generating Calor output.";
+        "Analyze how likely C# code is to successfully convert to Calor. " +
+        "Combines static analysis of unsupported constructs with an actual conversion attempt " +
+        "to produce a practical score (0-100) with blocker details.";
 
     protected override string GetInputSchemaJson() => """
         {
@@ -22,6 +23,16 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
                 "source": {
                     "type": "string",
                     "description": "C# source code to analyze"
+                },
+                "options": {
+                    "type": "object",
+                    "properties": {
+                        "quick": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Stage 1 only: static analysis without conversion attempt (faster)"
+                        }
+                    }
                 }
             },
             "required": ["source"]
@@ -33,62 +44,35 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))
         {
-            return Task.FromResult(McpToolResult.Error("Missing required parameter: source"));
+            return Task.FromResult(McpToolResult.Error("Missing required parameter: 'source'"));
         }
+
+        var options = GetOptions(arguments);
+        var quick = GetBool(options, "quick", false);
 
         try
         {
-            // Run conversion in Interop mode to detect what can and can't convert
-            var options = new ConversionOptions
+            var analyzer = new ConvertibilityAnalyzer();
+            var result = quick
+                ? analyzer.AnalyzeQuick(source)
+                : analyzer.Analyze(source);
+
+            var output = new ToolOutput
             {
-                PreserveComments = false,
-                AutoGenerateIds = true,
-                GracefulFallback = true,
-                Mode = ConversionMode.Interop
-            };
-
-            var converter = new CSharpToCalorConverter(options);
-            var result = converter.Convert(source);
-
-            var explanation = result.Context.GetExplanation();
-            var stats = result.Context.Stats;
-
-            var totalMembers = stats.MethodsConverted + stats.PropertiesConverted +
-                               stats.FieldsConverted + stats.ClassesConverted +
-                               stats.InterfacesConverted + stats.InteropBlocksEmitted;
-            var convertibleMembers = totalMembers - stats.InteropBlocksEmitted;
-            var score = totalMembers > 0
-                ? Math.Round((double)convertibleMembers / totalMembers * 100, 1)
-                : 100.0;
-
-            var recommendation = score switch
-            {
-                100.0 => "Fully convertible. Use standard conversion mode.",
-                >= 80.0 => "Mostly convertible. Use interop mode to preserve unsupported members.",
-                >= 50.0 => "Partially convertible. Interop mode recommended; review preserved blocks.",
-                _ => "Low convertibility. Consider manual migration or keeping as C#."
-            };
-
-            var gaps = explanation.UnsupportedFeatures
-                .Select(kvp => new GapOutput
+                Score = result.Score,
+                Summary = result.Summary,
+                ConversionAttempted = result.ConversionAttempted,
+                ConversionSucceeded = result.ConversionSucceeded,
+                CompilationSucceeded = result.CompilationSucceeded,
+                ConversionRate = result.ConversionRate,
+                Blockers = result.Blockers.Select(b => new ToolBlocker
                 {
-                    Feature = kvp.Key,
-                    Count = kvp.Value.Count,
-                    Instances = kvp.Value.Select(i => new GapInstanceOutput
-                    {
-                        Line = i.Line,
-                        Suggestion = i.Suggestion
-                    }).ToList()
-                }).ToList();
-
-            var output = new AnalyzeOutput
-            {
-                ConvertibilityScore = score,
-                TotalMembers = totalMembers,
-                ConvertibleMembers = convertibleMembers,
-                BlockedMembers = stats.InteropBlocksEmitted,
-                Gaps = gaps,
-                Recommendation = recommendation
+                    Name = b.Name,
+                    Description = b.Description,
+                    Count = b.Count
+                }).ToList(),
+                TotalBlockerInstances = result.TotalBlockerInstances,
+                DurationMs = (int)result.Duration.TotalMilliseconds
             };
 
             return Task.FromResult(McpToolResult.Json(output));
@@ -99,46 +83,46 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
         }
     }
 
-    private sealed class AnalyzeOutput
+    // Output DTOs
+    private sealed class ToolOutput
     {
-        [JsonPropertyName("convertibility_score")]
-        public double ConvertibilityScore { get; init; }
+        [JsonPropertyName("score")]
+        public int Score { get; init; }
 
-        [JsonPropertyName("total_members")]
-        public int TotalMembers { get; init; }
+        [JsonPropertyName("summary")]
+        public required string Summary { get; init; }
 
-        [JsonPropertyName("convertible_members")]
-        public int ConvertibleMembers { get; init; }
+        [JsonPropertyName("conversionAttempted")]
+        public bool ConversionAttempted { get; init; }
 
-        [JsonPropertyName("blocked_members")]
-        public int BlockedMembers { get; init; }
+        [JsonPropertyName("conversionSucceeded")]
+        public bool ConversionSucceeded { get; init; }
 
-        [JsonPropertyName("gaps")]
-        public required List<GapOutput> Gaps { get; init; }
+        [JsonPropertyName("compilationSucceeded")]
+        public bool CompilationSucceeded { get; init; }
 
-        [JsonPropertyName("recommendation")]
-        public required string Recommendation { get; init; }
+        [JsonPropertyName("conversionRate")]
+        public double ConversionRate { get; init; }
+
+        [JsonPropertyName("blockers")]
+        public required List<ToolBlocker> Blockers { get; init; }
+
+        [JsonPropertyName("totalBlockerInstances")]
+        public int TotalBlockerInstances { get; init; }
+
+        [JsonPropertyName("durationMs")]
+        public int DurationMs { get; init; }
     }
 
-    private sealed class GapOutput
+    private sealed class ToolBlocker
     {
-        [JsonPropertyName("feature")]
-        public required string Feature { get; init; }
+        [JsonPropertyName("name")]
+        public required string Name { get; init; }
+
+        [JsonPropertyName("description")]
+        public required string Description { get; init; }
 
         [JsonPropertyName("count")]
         public int Count { get; init; }
-
-        [JsonPropertyName("instances")]
-        public required List<GapInstanceOutput> Instances { get; init; }
-    }
-
-    private sealed class GapInstanceOutput
-    {
-        [JsonPropertyName("line")]
-        public int Line { get; init; }
-
-        [JsonPropertyName("suggestion")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Suggestion { get; init; }
     }
 }
