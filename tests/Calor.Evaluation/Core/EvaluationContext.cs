@@ -93,9 +93,14 @@ public class EvaluationContext
             var parser = new Parser(tokens, diagnostics);
             var module = parser.Parse();
 
+            // Capture compilation success BEFORE analysis — analysis findings
+            // (bug patterns, dataflow warnings) should not affect compilation success
+            var compilationSuccess = !diagnostics.HasErrors;
+            var compilationErrors = diagnostics.Errors.Select(d => d.Message).ToList();
+
             // Run verification analysis (bug patterns + dataflow) if parse succeeded
             VerificationAnalysisResult? analysisResult = null;
-            if (!diagnostics.HasErrors && module != null)
+            if (compilationSuccess && module != null)
             {
                 try
                 {
@@ -109,10 +114,10 @@ public class EvaluationContext
             }
 
             return new CalorCompilationResult(
-                Success: !diagnostics.HasErrors,
+                Success: compilationSuccess,
                 Module: module,
                 Tokens: tokens,
-                Errors: diagnostics.Errors.Select(d => d.Message).ToList(),
+                Errors: compilationErrors,
                 AnalysisResult: analysisResult,
                 AllDiagnostics: diagnostics.ToList());
         }

@@ -858,6 +858,151 @@ public class BugDetectionImprovementTests
 
     #endregion
 
+    #region First Try Success Regression Fix
+
+    [Fact]
+    public void CompileCalor_AnalysisErrors_DoNotAffectSuccess()
+    {
+        // Programs with potential bugs (e.g., division by parameter) should still
+        // report Success=true because they parse and bind correctly. Analysis
+        // findings are informational, not compilation failures.
+        var source = @"
+§M{m001:Test}
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (/ a b)
+§/F{f001}
+§/M{m001}
+";
+        var ctx = new EvaluationContext
+        {
+            CalorSource = source,
+            CSharpSource = "class C { int Divide(int a, int b) => a / b; }",
+            FileName = "test"
+        };
+
+        var result = ctx.CalorCompilation;
+
+        // Compilation must succeed — parse and binding are correct
+        Assert.True(result.Success, "Compilation should succeed despite analysis findings");
+        // Analysis should still run and find issues
+        Assert.NotNull(result.AnalysisResult);
+        // Analysis diagnostics should be available in AllDiagnostics
+        Assert.NotNull(result.AllDiagnostics);
+        Assert.True(result.AllDiagnostics!.Count > 0, "Analysis should have produced diagnostics");
+        // But Errors list should be empty (no parse/lex errors)
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void CalorStructureScore_WellFormedProgram_Reaches1()
+    {
+        // A well-formed Calor program with module, function, name, output, body,
+        // and parameters should achieve a structure score of 1.0
+        var source = @"
+§M{m001:MathOps}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§/M{m001}
+";
+        var ctx = new EvaluationContext
+        {
+            CalorSource = source,
+            CSharpSource = "using System; namespace N { class C { int Add(int a, int b) => a + b; } }",
+            FileName = "test"
+        };
+
+        var calc = new GenerationAccuracyCalculator();
+        var metrics = calc.CalculateDetailedMetrics(ctx);
+
+        var structureMetric = metrics.First(m => m.MetricName == "StructureCompleteness");
+        Assert.Equal(1.0, structureMetric.CalorScore, 2);
+    }
+
+    [Fact]
+    public async Task GenerationAccuracy_WellFormedProgram_RatioAtLeast1()
+    {
+        // With both fixes applied, a well-formed Calor program should achieve
+        // a GenerationAccuracy ratio >= 1.0 compared to C#
+        var source = @"
+§M{m001:MathOps}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§/M{m001}
+";
+        var csharpSource = @"
+using System;
+namespace MathOps {
+    class Calculator {
+        int Add(int a, int b) => a + b;
+    }
+}
+";
+        var ctx = new EvaluationContext
+        {
+            CalorSource = source,
+            CSharpSource = csharpSource,
+            FileName = "test"
+        };
+
+        var calc = new GenerationAccuracyCalculator();
+        var result = await calc.CalculateAsync(ctx);
+
+        Assert.True(result.CalorScore >= result.CSharpScore,
+            $"Calor score {result.CalorScore} should be >= C# score {result.CSharpScore}");
+    }
+
+    [Fact]
+    public void CompileCalor_IsPrimeBenchmark_SucceedsWithAnalysis()
+    {
+        // IsPrime was one of the 3 failing programs in v0.3.0.
+        // It should succeed after the fix.
+        var source = @"
+§M{m001:PrimeCheck}
+§F{f001:IsPrime:pub}
+  §I{i32:n}
+  §O{bool}
+  §Q (> n 0)
+  §IF{if1} (<= n 1) → §R false
+  §/I{if1}
+  §IF{if2} (<= n 3) → §R true
+  §/I{if2}
+  §IF{if3} (== (% n 2) 0) → §R false
+  §/I{if3}
+  §L{while1:i:3:1000:2}
+    §IF{if4} (> (* i i) n) → §R true
+    §/I{if4}
+    §IF{if5} (== (% n i) 0) → §R false
+    §/I{if5}
+  §/L{while1}
+  §R true
+§/F{f001}
+§/M{m001}
+";
+        var ctx = new EvaluationContext
+        {
+            CalorSource = source,
+            CSharpSource = "class C {}",
+            FileName = "IsPrime"
+        };
+
+        var result = ctx.CalorCompilation;
+
+        Assert.True(result.Success, $"IsPrime should compile successfully. Errors: {string.Join(", ", result.Errors)}");
+    }
+
+    #endregion
+
     #region Integration: Bug Scenarios from Manifest
 
     [Fact]
