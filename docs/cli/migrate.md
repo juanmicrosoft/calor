@@ -18,15 +18,14 @@ calor migrate <path> [options]
 
 ## Overview
 
-The `migrate` command converts all applicable files in a project or directory. It:
+The `migrate` command converts all applicable files in a project or directory using a 4-phase workflow:
 
-- Scans for convertible files
-- Creates a migration plan
-- Converts files in parallel (optional)
-- Generates detailed reports
-- Handles errors gracefully without stopping
+1. **Discover** — Scans for convertible files and creates a migration plan
+2. **Analyze** — Scores each file's migration potential (0–100) and prioritizes conversion order
+3. **Convert** — Converts files in parallel (optional), handling errors gracefully
+4. **Verify** — Validates contracts in converted Calor files using Z3 SMT solver
 
-Use this for bulk conversion of entire codebases.
+Each phase can be individually skipped. Use this for bulk conversion of entire codebases.
 
 ---
 
@@ -66,6 +65,9 @@ calor migrate ./src --direction calor-to-cs
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--skip-analyze` | | `false` | Skip the migration analysis phase (Phase 2) |
+| `--skip-verify` | | `false` | Skip the Z3 contract verification phase (Phase 4) |
+| `--verification-timeout` | | `5000` | Z3 verification timeout per contract in milliseconds |
 
 ### Direction Values
 
@@ -104,6 +106,50 @@ Skipped Files:
 Estimated Issues: 12 warnings across 8 files
 
 Run without --dry-run to execute migration.
+```
+
+---
+
+## Migration Phases
+
+The migrate command runs a 4-phase workflow. Each phase builds on the results of the previous phase:
+
+```
+Phase 1/4: Discovering files...
+  Files to convert: 24
+  Files needing review: 8
+  Files to skip: 3
+  Estimated issues: 12
+
+Phase 2/4: Analyzing migration potential...
+  Average score: 82.5/100
+  Priority: 12 critical, 8 high, 4 medium
+
+Phase 3/4: Converting files...
+  Successful: 24
+  Partial: 5 (need review)
+  Failed: 3
+
+Phase 4/4: Verifying contracts...
+  Contracts: 15 total
+  Proven: 12, Unproven: 2, Disproven: 1
+  Proven rate: 80.0%
+```
+
+### Skipping Phases
+
+```bash
+# Skip analysis (faster migration, no scoring)
+calor migrate ./src --skip-analyze
+
+# Skip verification (no Z3 required)
+calor migrate ./src --skip-verify
+
+# Skip both (discover + convert only)
+calor migrate ./src --skip-analyze --skip-verify
+
+# Custom verification timeout (10 seconds per contract)
+calor migrate ./src --verification-timeout 10000
 ```
 
 ---
@@ -314,9 +360,82 @@ fi
 
 ---
 
+## MCP Tool
+
+The migration functionality is also available via the MCP server as `calor_migrate`.
+Unlike the CLI command, the MCP tool defaults to **dry-run mode** for safety — agents
+must explicitly set `dryRun: false` to write files.
+
+### Input Schema
+
+```json
+{
+  "path": "./src",
+  "options": {
+    "direction": "cs-to-calor",
+    "dryRun": true,
+    "parallel": true,
+    "includeBenchmark": false,
+    "skipAnalyze": false,
+    "skipVerify": false,
+    "verificationTimeoutMs": 5000
+  }
+}
+```
+
+### Output Schema
+
+```json
+{
+  "success": true,
+  "dryRun": true,
+  "plan": {
+    "totalFiles": 35,
+    "convertibleFiles": 24,
+    "partialFiles": 8,
+    "skippedFiles": 3,
+    "estimatedIssues": 12
+  },
+  "summary": {
+    "totalFiles": 32,
+    "successfulFiles": 24,
+    "partialFiles": 5,
+    "failedFiles": 3,
+    "totalErrors": 4,
+    "totalWarnings": 8
+  },
+  "analysis": {
+    "filesAnalyzed": 32,
+    "averageScore": 82.5,
+    "priorityBreakdown": { "critical": 12, "high": 8, "medium": 4, "low": 0 }
+  },
+  "verification": {
+    "totalContracts": 15,
+    "proven": 12,
+    "unproven": 2,
+    "disproven": 1,
+    "provenRate": 80.0
+  },
+  "fileResults": [
+    { "sourcePath": "src/UserService.cs", "outputPath": "src/UserService.calr", "status": "success", "issueCount": 0 }
+  ],
+  "durationMs": 2340
+}
+```
+
+### Usage Example
+
+```bash
+# Via MCP JSON-RPC
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_migrate","arguments":{"path":"./src"}}}' | calor mcp
+```
+
+---
+
 ## See Also
 
 - [calor convert](/calor/cli/convert/) - Convert single files
 - [calor assess](/calor/cli/assess/) - Find migration candidates
+- [calor analyze-convertibility](/calor/cli/analyze-convertibility/) - Analyze C# code convertibility
 - [calor benchmark](/calor/cli/benchmark/) - Detailed metrics comparison
 - [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existing-projects/) - Complete migration guide
