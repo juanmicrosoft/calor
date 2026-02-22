@@ -105,9 +105,10 @@ public class GenerationAccuracyCalculator : IMetricCalculator
         // Check function completeness
         foreach (var func in module.Functions)
         {
-            if (func.Name != null) score += 0.1;
-            if (func.Output != null) score += 0.1;
+            if (func.Name != null) score += 0.15;
+            if (func.Output != null) score += 0.15;
             if (func.Body != null && func.Body.Count > 0) score += 0.1;
+            if (func.Parameters.Count > 0) score += 0.1;
             break; // Just check first function for now
         }
 
