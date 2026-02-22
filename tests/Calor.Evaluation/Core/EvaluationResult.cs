@@ -58,6 +58,11 @@ public class EvaluationResult
     public string? CommitHash { get; init; }
 
     /// <summary>
+    /// Results from bug detection scenario evaluation.
+    /// </summary>
+    public List<Metrics.ErrorDetectionResult> BugDetectionResults { get; init; } = new();
+
+    /// <summary>
     /// Calculates and returns the overall Calor advantage ratio (geometric mean of all category ratios).
     /// </summary>
     public double CalculateOverallAdvantage()

@@ -272,6 +272,21 @@ public static class DiagnosticCode
     /// </summary>
     public const string UnsafeUnwrap = "Calor0925";
 
+    /// <summary>
+    /// Warning: Division by parameter without precondition.
+    /// </summary>
+    public const string MissingPrecondition = "Calor0926";
+
+    /// <summary>
+    /// Warning: Potential off-by-one error in loop bounds with array access.
+    /// </summary>
+    public const string OffByOne = "Calor0927";
+
+    /// <summary>
+    /// Info: Contract inferred from function body analysis.
+    /// </summary>
+    public const string InferredContract = "Calor0928";
+
     // K-induction / loop analysis (Calor0950-0979)
 
     /// <summary>

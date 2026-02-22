@@ -1,0 +1,8 @@
+§M{m001:UnsafeAdd}
+§F{f001:AddLarge:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§/M{m001}

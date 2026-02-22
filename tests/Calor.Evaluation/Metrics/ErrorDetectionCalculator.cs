@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Calor.Evaluation.Core;
 
 namespace Calor.Evaluation.Metrics;
@@ -83,6 +84,16 @@ public class ErrorDetectionCalculator : IMetricCalculator
     }
 
     /// <summary>
+    /// Matches §S followed by space, paren, or newline (ensures postcondition marker).
+    /// </summary>
+    private static readonly Regex EnsuresPattern = new(@"§S[\s(]", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Checks if source contains Calor ensures (postcondition) markers.
+    /// </summary>
+    private static bool ContainsEnsures(string source) => EnsuresPattern.IsMatch(source);
+
+    /// <summary>
     /// Calculates Calor's error detection capability based on contract presence.
     /// </summary>
     private static double CalculateCalorErrorDetectionCapability(EvaluationContext context)
@@ -91,8 +102,8 @@ public class ErrorDetectionCalculator : IMetricCalculator
         var source = context.CalorSource;
 
         // Contracts significantly improve error detection
-        if (source.Contains("§REQ")) score += 0.25; // Requires preconditions
-        if (source.Contains("§ENS")) score += 0.20; // Ensures postconditions
+        if (source.Contains("§Q")) score += 0.25; // Requires preconditions
+        if (ContainsEnsures(source)) score += 0.20; // Ensures postconditions
         if (source.Contains("§INV")) score += 0.15; // Invariants
 
         // Effect declarations help detect side-effect bugs
@@ -137,8 +148,8 @@ public class ErrorDetectionCalculator : IMetricCalculator
         var source = context.CalorSource;
         return new Dictionary<string, bool>
         {
-            ["hasRequires"] = source.Contains("§REQ"),
-            ["hasEnsures"] = source.Contains("§ENS"),
+            ["hasRequires"] = source.Contains("§Q"),
+            ["hasEnsures"] = ContainsEnsures(source),
             ["hasInvariants"] = source.Contains("§INV"),
             ["hasEffects"] = source.Contains("§E{"),
             ["hasTypedInputs"] = source.Contains("§I{") && source.Contains(":"),
@@ -161,18 +172,30 @@ public class ErrorDetectionCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Checks if Calor contracts would catch the described bug.
+    /// Checks if Calor contracts or analysis would catch the described bug.
+    /// Uses analysis diagnostics when available, falls back to source markers.
     /// </summary>
     private static bool DetectsBugViaContracts(EvaluationContext context, BugDescription bug)
     {
         var source = context.CalorSource;
+        var diagnostics = context.CalorCompilation.AllDiagnostics;
 
         return bug.Category switch
         {
-            "null_reference" => source.Contains("§REQ") && source.Contains("!= null"),
-            "bounds_check" => source.Contains("§REQ") && (source.Contains(">=") || source.Contains("<=")),
-            "contract_violation" => source.Contains("§REQ") || source.Contains("§ENS"),
+            "null_reference" =>
+                diagnostics?.Any(d => d.Code == "Calor0922" || d.Code == "Calor0925") == true ||
+                (source.Contains("§Q") && source.Contains("!= null")),
+            "bounds_check" =>
+                diagnostics?.Any(d => d.Code == "Calor0921") == true ||
+                (source.Contains("§Q") && (source.Contains(">=") || source.Contains("<="))),
+            "contract_violation" =>
+                diagnostics?.Any(d => d.Code == "Calor0920" || d.Code == "Calor0926") == true ||
+                source.Contains("§Q") || ContainsEnsures(source),
             "invariant_violation" => source.Contains("§INV"),
+            "overflow" => diagnostics?.Any(d => d.Code == "Calor0923") == true,
+            "dead_code" => diagnostics?.Any(d => d.Code == "Calor0901") == true,
+            "uninitialized" => diagnostics?.Any(d => d.Code == "Calor0900") == true,
+            "dead_store" => diagnostics?.Any(d => d.Code == "Calor0902") == true,
             _ => false
         };
     }

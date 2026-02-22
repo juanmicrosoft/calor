@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Calor.Evaluation.Core;
 
 namespace Calor.Evaluation.Benchmarks;
@@ -15,6 +16,11 @@ public class TestDataAdapter
         _testDataPath = testDataPath;
         _benchmarkPath = benchmarkPath;
     }
+
+    /// <summary>
+    /// Gets the benchmark data path.
+    /// </summary>
+    public string BenchmarkPath => _benchmarkPath;
 
     /// <summary>
     /// Gets the path to the TestData directory, searching relative to the assembly location.
@@ -214,8 +220,8 @@ public class TestDataAdapter
         if (content.Contains("§V{")) features.Add("variable");
         if (content.Contains("§I{")) features.Add("parameters");
         if (content.Contains("§O{")) features.Add("return_type");
-        if (content.Contains("§REQ")) features.Add("requires");
-        if (content.Contains("§ENS")) features.Add("ensures");
+        if (content.Contains("§Q")) features.Add("requires");
+        if (Regex.IsMatch(content, @"§S[\s(]")) features.Add("ensures");
         if (content.Contains("§INV")) features.Add("invariant");
         if (content.Contains("§E{")) features.Add("effects");
         if (content.Contains("§IF")) features.Add("conditional");

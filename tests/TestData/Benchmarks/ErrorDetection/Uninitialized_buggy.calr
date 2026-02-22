@@ -1,0 +1,9 @@
+§M{m001:UninitExample}
+§F{f001:Process:pub}
+  §I{i32:n}
+  §O{i32}
+  §IF{if1} (> n 0) → §R n
+  §/I{if1}
+  §R (- 0 n)
+§/F{f001}
+§/M{m001}

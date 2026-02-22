@@ -1,9 +1,11 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
+using CalorDiagnostic = Calor.Compiler.Diagnostics.Diagnostic;
 
 namespace Calor.Evaluation.Core;
 
@@ -91,11 +93,28 @@ public class EvaluationContext
             var parser = new Parser(tokens, diagnostics);
             var module = parser.Parse();
 
+            // Run verification analysis (bug patterns + dataflow) if parse succeeded
+            VerificationAnalysisResult? analysisResult = null;
+            if (!diagnostics.HasErrors && module != null)
+            {
+                try
+                {
+                    var analysisPass = new VerificationAnalysisPass(diagnostics, VerificationAnalysisOptions.Fast);
+                    analysisResult = analysisPass.Analyze(module);
+                }
+                catch
+                {
+                    // Analysis failures are non-fatal — continue with parse results
+                }
+            }
+
             return new CalorCompilationResult(
                 Success: !diagnostics.HasErrors,
                 Module: module,
                 Tokens: tokens,
-                Errors: diagnostics.Errors.Select(d => d.Message).ToList());
+                Errors: diagnostics.Errors.Select(d => d.Message).ToList(),
+                AnalysisResult: analysisResult,
+                AllDiagnostics: diagnostics.ToList());
         }
         catch (Exception ex)
         {
@@ -164,7 +183,9 @@ public record CalorCompilationResult(
     bool Success,
     ModuleNode? Module,
     List<Token> Tokens,
-    List<string> Errors);
+    List<string> Errors,
+    VerificationAnalysisResult? AnalysisResult = null,
+    IReadOnlyList<CalorDiagnostic>? AllDiagnostics = null);
 
 /// <summary>
 /// Result of compiling C# source code.

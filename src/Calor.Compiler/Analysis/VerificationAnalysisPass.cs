@@ -1,4 +1,5 @@
 using Calor.Compiler.Analysis.BugPatterns;
+using Calor.Compiler.Analysis.ContractInference;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Analysis.Dataflow.Analyses;
 using Calor.Compiler.Analysis.Security;
@@ -28,6 +29,11 @@ public sealed class VerificationAnalysisOptions
     /// Enable security taint analysis.
     /// </summary>
     public bool EnableTaintAnalysis { get; init; } = true;
+
+    /// <summary>
+    /// Enable contract inference for functions without contracts.
+    /// </summary>
+    public bool EnableContractInference { get; init; } = false; // Off by default - opt-in
 
     /// <summary>
     /// Enable loop invariant synthesis with k-induction.
@@ -109,6 +115,11 @@ public sealed class VerificationAnalysisResult
     public int LoopInvariantsSynthesized { get; init; }
 
     /// <summary>
+    /// Number of contracts inferred.
+    /// </summary>
+    public int ContractsInferred { get; init; }
+
+    /// <summary>
     /// Analysis duration.
     /// </summary>
     public TimeSpan Duration { get; init; }
@@ -136,13 +147,31 @@ public sealed class VerificationAnalysisPass
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
+        // Extract precondition-guarded parameters from AST before binding
+        var guardedParams = ExtractPreconditionGuardedParams(module);
+
         // Bind the module to get bound nodes
         var bindingDiagnostics = new DiagnosticBag();
         var binder = new Binder(bindingDiagnostics);
         var boundModule = binder.Bind(module);
 
-        // Run analyses on the bound module
-        var result = AnalyzeBound(boundModule);
+        // Run analyses on the bound module with contract info
+        var result = AnalyzeBound(boundModule, guardedParams);
+
+        // Run contract inference if enabled
+        var contractsInferred = 0;
+        if (_options.EnableContractInference)
+        {
+            try
+            {
+                var inferencePass = new ContractInferencePass(_diagnostics);
+                contractsInferred = inferencePass.Infer(module, boundModule);
+            }
+            catch
+            {
+                // Contract inference failures are non-fatal
+            }
+        }
 
         sw.Stop();
         return new VerificationAnalysisResult
@@ -152,14 +181,75 @@ public sealed class VerificationAnalysisPass
             BugPatternsFound = result.BugPatternsFound,
             TaintVulnerabilities = result.TaintVulnerabilities,
             LoopInvariantsSynthesized = result.LoopInvariantsSynthesized,
+            ContractsInferred = contractsInferred,
             Duration = sw.Elapsed
         };
     }
 
     /// <summary>
+    /// Extracts parameter names referenced in preconditions, keyed by function name.
+    /// </summary>
+    private static Dictionary<string, HashSet<string>> ExtractPreconditionGuardedParams(ModuleNode module)
+    {
+        var result = new Dictionary<string, HashSet<string>>();
+
+        foreach (var func in module.Functions)
+        {
+            if (func.Preconditions.Count == 0)
+                continue;
+
+            var paramNames = func.Parameters.Select(p => p.Name).ToHashSet();
+            var guardedNames = new HashSet<string>();
+
+            foreach (var pre in func.Preconditions)
+            {
+                CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+            }
+
+            if (guardedNames.Count > 0)
+                result[func.Name] = guardedNames;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Recursively collects variable names from an expression that match parameter names.
+    /// </summary>
+    private static void CollectReferencedNames(
+        Ast.ExpressionNode expr,
+        HashSet<string> paramNames,
+        HashSet<string> collected)
+    {
+        switch (expr)
+        {
+            case Ast.ReferenceNode refNode:
+                if (paramNames.Contains(refNode.Name))
+                    collected.Add(refNode.Name);
+                break;
+
+            case Ast.BinaryOperationNode binOp:
+                CollectReferencedNames(binOp.Left, paramNames, collected);
+                CollectReferencedNames(binOp.Right, paramNames, collected);
+                break;
+
+            case Ast.UnaryOperationNode unary:
+                CollectReferencedNames(unary.Operand, paramNames, collected);
+                break;
+
+            case Ast.ConditionalExpressionNode cond:
+                CollectReferencedNames(cond.Condition, paramNames, collected);
+                CollectReferencedNames(cond.WhenTrue, paramNames, collected);
+                CollectReferencedNames(cond.WhenFalse, paramNames, collected);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Runs verification analyses on an already-bound module.
     /// </summary>
-    public VerificationAnalysisResult AnalyzeBound(BoundModule module)
+    public VerificationAnalysisResult AnalyzeBound(BoundModule module,
+        Dictionary<string, HashSet<string>>? preconditionGuardedParams = null)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var dataflowIssues = 0;
@@ -181,7 +271,8 @@ public sealed class VerificationAnalysisPass
                 var bugOptions = _options.BugPatternOptions ?? new BugPatternOptions
                 {
                     UseZ3Verification = _options.UseZ3Verification,
-                    Z3TimeoutMs = _options.Z3TimeoutMs
+                    Z3TimeoutMs = _options.Z3TimeoutMs,
+                    PreconditionGuardedParams = preconditionGuardedParams
                 };
                 var bugRunner = new BugPatternRunner(_diagnostics, bugOptions);
                 var beforeCount = _diagnostics.Count;

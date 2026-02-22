@@ -1,0 +1,7 @@
+§M{m001:UnsafeOption}
+§F{f001:GetValue:pub}
+  §I{Option<i32>:maybeVal}
+  §O{i32}
+  §R §C{maybeVal.unwrap} §/C
+§/F{f001}
+§/M{m001}

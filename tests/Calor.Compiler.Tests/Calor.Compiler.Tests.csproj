@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Calor.Compiler\Calor.Compiler.csproj" />
+    <ProjectReference Include="..\Calor.Evaluation\Calor.Evaluation.csproj" />
     <ProjectReference Include="..\Calor.Enforcement.Tests\Calor.Enforcement.Tests.csproj" />
   </ItemGroup>
 
