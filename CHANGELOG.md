@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-22
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.20x (Calor leads)
+- **Metrics**: Calor wins 6, C# wins 2
+- **Highlights**:
+  - ErrorDetection: 1.65x (Calor wins, large effect)
+  - Comprehension: 1.55x (Calor wins, large effect)
+  - EditPrecision: 1.37x (Calor wins, large effect)
+  - RefactoringStability: 1.37x (Calor wins, large effect)
+- **Programs Tested**: 40
+
+### Added
+- **C# interop blocks** — `§CSHARP{...}§/CSHARP` syntax for embedding raw C# at module/class scope, enabling incremental migration of unsupported constructs
+- **Interop conversion mode** — Converter wraps unsupported members in `§CSHARP` blocks instead of TODO comments, producing `.calr` files that round-trip to valid C#
+- **Convertibility analysis tool** — `calor_analyze_convertibility` MCP tool and `calor analyze-convertibility` CLI command for assessing C# file migration readiness
+- **Round-trip test harness** — Automated C# → Calor → C# pipeline with test result comparison for validating conversion fidelity
+- **Bug detection improvements** — Off-by-one checker and precondition suggester for enhanced static analysis
+- **Contract inference pass** — Automatic inference of contracts from code patterns
+- **Migrate workflow enhancements** — Analyze and verify phases added to `calor migrate` command
+- **Syntax help telemetry** — Track which syntax features agents query most to prioritize documentation
+
+### Fixed
+- **Agent benchmark docs** — Improved CLAUDE.md syntax reference fixing 12 failing benchmark tasks across 8 categories (86.5% → 100% pass rate): while loops, switch/pattern matching, events, implication operator (`->` not `implies`), async return types, StringBuilder operators, block lambdas, multi-effect declarations
+- **async-004 task prompt** — Fixed misleading "network read effect" to "network effect" (HttpClient needs `net:rw`)
+
 ## [0.2.9] - 2026-02-21
 
 ### Benchmark Results (Statistical: 30 runs)
