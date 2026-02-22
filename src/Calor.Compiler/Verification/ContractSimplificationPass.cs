@@ -174,6 +174,7 @@ public sealed class ContractSimplificationPass
             cls.Constructors,
             simplifiedMethods,
             cls.Events,
+            cls.OperatorOverloads,
             cls.Attributes,
             cls.CSharpAttributes,
             cls.IsStruct,

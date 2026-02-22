@@ -79,6 +79,7 @@ public class ClassVisibilityTests
             constructors: Array.Empty<ConstructorNode>(),
             methods: Array.Empty<MethodNode>(),
             events: Array.Empty<EventDefinitionNode>(),
+            operatorOverloads: Array.Empty<OperatorOverloadNode>(),
             attributes: new AttributeCollection(),
             csharpAttributes: Array.Empty<CalorAttributeNode>(),
             visibility: Visibility.Internal);
@@ -135,6 +136,7 @@ public class ClassVisibilityTests
             constructors: Array.Empty<ConstructorNode>(),
             methods: new[] { method },
             events: Array.Empty<EventDefinitionNode>(),
+            operatorOverloads: Array.Empty<OperatorOverloadNode>(),
             attributes: new AttributeCollection(),
             csharpAttributes: Array.Empty<CalorAttributeNode>(),
             visibility: Visibility.Public);
@@ -253,6 +255,7 @@ public class ClassVisibilityTests
             constructors: Array.Empty<ConstructorNode>(),
             methods: Array.Empty<MethodNode>(),
             events: Array.Empty<EventDefinitionNode>(),
+            operatorOverloads: Array.Empty<OperatorOverloadNode>(),
             attributes: new AttributeCollection(),
             csharpAttributes: Array.Empty<CalorAttributeNode>(),
             visibility: Visibility.Internal);

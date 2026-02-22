@@ -176,6 +176,8 @@ public enum TokenKind
     Init,
     Constructor,
     EndConstructor,
+    OperatorOverload,       // §OP
+    EndOperatorOverload,    // §/OP
     BaseCall,
     EndBaseCall,
     Assign,
@@ -284,6 +286,7 @@ public enum TokenKind
 
     // Raw C# Passthrough
     RawCSharp,          // §RAW ... §/RAW - Raw C# content emitted verbatim
+    CSharpInterop,      // §CSHARP{...}§/CSHARP - C# interop block (member-level)
 
     // Typed Literals
     IntLiteral,         // INT:42

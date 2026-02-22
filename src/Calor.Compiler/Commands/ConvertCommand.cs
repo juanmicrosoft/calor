@@ -101,6 +101,30 @@ public static class ConvertCommand
             if (conversionResult != null && telemetry != null)
             {
                 var explanation = conversionResult.Context.GetExplanation();
+
+                // Track conversion attempt metrics (Phase 4)
+                try
+                {
+                    var inputSource = await File.ReadAllTextAsync(input.FullName);
+                    var inputLines = inputSource.Split('\n').Length;
+                    telemetry.TrackConversionAttempted(
+                        inputLines,
+                        conversionResult.Success,
+                        sw.ElapsedMilliseconds,
+                        conversionResult.Issues.Count,
+                        explanation.TotalUnsupportedCount);
+
+                    // Track individual conversion gaps
+                    foreach (var issue in conversionResult.Issues.Where(i => i.Feature != null))
+                    {
+                        telemetry.TrackConversionGap(issue.Feature!, issue.Line);
+                    }
+                }
+                catch
+                {
+                    // Never crash the CLI
+                }
+
                 if (explanation.TotalUnsupportedCount > 0)
                 {
                     telemetry.TrackUnsupportedFeatures(

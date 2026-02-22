@@ -37,6 +37,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Calor.LanguageServer.Tests"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Calor.Conversion.Tests", "tests\Calor.Conversion.Tests\Calor.Conversion.Tests.csproj", "{0E5D1BC4-C731-4B7F-A005-DA7F022327D2}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{17DBFA88-FE04-4097-BB7B-A44F76DDA35A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Calor.RoundTrip.Harness", "tools\Calor.RoundTrip.Harness\Calor.RoundTrip.Harness.csproj", "{9E4B4198-FE38-48C8-91AB-8910E4136BED}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Calor.RoundTrip.Harness.Tests", "tests\Calor.RoundTrip.Harness.Tests\Calor.RoundTrip.Harness.Tests.csproj", "{4EE3DE0D-D2FA-490E-A3F3-EA5D4F7D750E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -99,6 +105,14 @@ Global
 		{0E5D1BC4-C731-4B7F-A005-DA7F022327D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0E5D1BC4-C731-4B7F-A005-DA7F022327D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0E5D1BC4-C731-4B7F-A005-DA7F022327D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E4B4198-FE38-48C8-91AB-8910E4136BED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E4B4198-FE38-48C8-91AB-8910E4136BED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E4B4198-FE38-48C8-91AB-8910E4136BED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E4B4198-FE38-48C8-91AB-8910E4136BED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4EE3DE0D-D2FA-490E-A3F3-EA5D4F7D750E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4EE3DE0D-D2FA-490E-A3F3-EA5D4F7D750E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4EE3DE0D-D2FA-490E-A3F3-EA5D4F7D750E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4EE3DE0D-D2FA-490E-A3F3-EA5D4F7D750E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -118,5 +132,7 @@ Global
 		{A42F7C58-6FB4-43C6-9231-7BFAF2E5E93D} = {D4E5F6A7-B8C9-0123-DEF0-234567890123}
 		{B53F8C69-7FB5-54D7-A342-8CEBF3F6FA4E} = {E5F6A7B8-C9D0-1234-EF01-345678901234}
 		{0E5D1BC4-C731-4B7F-A005-DA7F022327D2} = {E5F6A7B8-C9D0-1234-EF01-345678901234}
+		{9E4B4198-FE38-48C8-91AB-8910E4136BED} = {17DBFA88-FE04-4097-BB7B-A44F76DDA35A}
+		{4EE3DE0D-D2FA-490E-A3F3-EA5D4F7D750E} = {E5F6A7B8-C9D0-1234-EF01-345678901234}
 	EndGlobalSection
 EndGlobal

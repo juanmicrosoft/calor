@@ -34,6 +34,11 @@ public sealed class ConvertTool : McpToolBase
                 "explain": {
                     "type": "boolean",
                     "description": "Include detailed explanation of unsupported features in output (default: false)"
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["standard", "interop"],
+                    "description": "Conversion mode: 'standard' (default) produces TODO comments for unsupported code, 'interop' wraps unsupported members in §CSHARP{...}§/CSHARP blocks"
                 }
             },
             "required": ["source"]
@@ -51,6 +56,9 @@ public sealed class ConvertTool : McpToolBase
         var moduleName = GetString(arguments, "moduleName");
         var fallback = GetBool(arguments, "fallback", defaultValue: true);
         var explain = GetBool(arguments, "explain", defaultValue: false);
+        var modeStr = GetString(arguments, "mode") ?? "standard";
+        var mode = modeStr.Equals("interop", StringComparison.OrdinalIgnoreCase)
+            ? ConversionMode.Interop : ConversionMode.Standard;
 
         try
         {
@@ -60,7 +68,8 @@ public sealed class ConvertTool : McpToolBase
                 PreserveComments = true,
                 AutoGenerateIds = true,
                 GracefulFallback = fallback,
-                Explain = explain
+                Explain = explain,
+                Mode = mode
             };
 
             var converter = new CSharpToCalorConverter(options);
@@ -147,6 +156,7 @@ public sealed class ConvertTool : McpToolBase
                     MethodsConverted = result.Context.Stats.MethodsConverted,
                     PropertiesConverted = result.Context.Stats.PropertiesConverted,
                     FieldsConverted = result.Context.Stats.FieldsConverted,
+                    InteropBlocksEmitted = result.Context.Stats.InteropBlocksEmitted,
                     DurationMs = (int)result.Duration.TotalMilliseconds
                 },
                 Explanation = explanationOutput
@@ -255,6 +265,9 @@ public sealed class ConvertTool : McpToolBase
 
         [JsonPropertyName("fieldsConverted")]
         public int FieldsConverted { get; init; }
+
+        [JsonPropertyName("interopBlocksEmitted")]
+        public int InteropBlocksEmitted { get; init; }
 
         [JsonPropertyName("durationMs")]
         public int DurationMs { get; init; }

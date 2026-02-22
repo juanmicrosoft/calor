@@ -114,6 +114,7 @@ public interface IAstVisitor
     void Visit(PropertyNode node);
     void Visit(PropertyAccessorNode node);
     void Visit(ConstructorNode node);
+    void Visit(OperatorOverloadNode node);
     void Visit(ConstructorInitializerNode node);
     void Visit(AssignmentStatementNode node);
     void Visit(CompoundAssignmentStatementNode node);
@@ -205,6 +206,8 @@ public interface IAstVisitor
     void Visit(YieldBreakStatementNode node);
     // Raw C# passthrough
     void Visit(RawCSharpNode node);
+    // C# interop blocks (member-level raw C#)
+    void Visit(CSharpInteropBlockNode node);
 }
 
 /// <summary>
@@ -303,6 +306,7 @@ public interface IAstVisitor<T>
     T Visit(PropertyNode node);
     T Visit(PropertyAccessorNode node);
     T Visit(ConstructorNode node);
+    T Visit(OperatorOverloadNode node);
     T Visit(ConstructorInitializerNode node);
     T Visit(AssignmentStatementNode node);
     T Visit(CompoundAssignmentStatementNode node);
@@ -394,6 +398,8 @@ public interface IAstVisitor<T>
     T Visit(YieldBreakStatementNode node);
     // Raw C# passthrough
     T Visit(RawCSharpNode node);
+    // C# interop blocks (member-level raw C#)
+    T Visit(CSharpInteropBlockNode node);
 }
 
 /// <summary>

@@ -1,0 +1,172 @@
+// ============================================================================
+// Calor CLI — Telemetry KQL Queries
+// Reference queries for Azure Application Insights dashboards and alerts.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// 1. Command Duration Percentiles (with coalesce NaN fix)
+// ---------------------------------------------------------------------------
+customEvents
+| where name in ('CommandSucceeded', 'CommandFailed')
+| extend command = tostring(customDimensions.command),
+    dur = coalesce(todouble(customMeasurements.durationMs), todouble(customDimensions.durationMs))
+| where isnotnull(dur)
+| summarize
+    ['P50 (ms)'] = round(percentile(dur, 50), 0),
+    ['P90 (ms)'] = round(percentile(dur, 90), 0),
+    ['P95 (ms)'] = round(percentile(dur, 95), 0),
+    ['P99 (ms)'] = round(percentile(dur, 99), 0),
+    Invocations = count()
+    by Command = command
+| order by ['P50 (ms)'] desc
+
+// ---------------------------------------------------------------------------
+// 2. Session Duration Distribution
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'SessionEnded'
+| extend sessionMs = todouble(customMeasurements.sessionDurationMs),
+    cmdCount = toint(customMeasurements.commandCount)
+| summarize
+    ['Avg Session (ms)'] = round(avg(sessionMs), 0),
+    ['P50 Session (ms)'] = round(percentile(sessionMs, 50), 0),
+    ['P95 Session (ms)'] = round(percentile(sessionMs, 95), 0),
+    ['Avg Commands'] = round(avg(cmdCount), 1),
+    Sessions = count()
+
+// ---------------------------------------------------------------------------
+// 3. Conversion Success Rate
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'ConversionAttempted'
+| extend success = tostring(customDimensions.success) == 'True'
+| summarize
+    Total = count(),
+    Succeeded = countif(success),
+    Failed = countif(not(success))
+| extend ['Success Rate %'] = iff(Total > 0, round(100.0 * Succeeded / Total, 1), 0.0)
+
+// ---------------------------------------------------------------------------
+// 4. Top Conversion Gaps
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'ConversionGap'
+| extend gapName = tostring(customDimensions.gapName)
+| summarize Count = count() by gapName
+| order by Count desc
+| take 20
+
+// ---------------------------------------------------------------------------
+// 5. Diagnostic Co-occurrence Matrix
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'DiagnosticCoOccurrence'
+| mv-apply pair = bag_keys(customDimensions) on (
+    where pair startswith "pair:"
+    | extend pairName = substring(pair, 5), pairCount = toint(customDimensions[pair])
+)
+| summarize TotalOccurrences = sum(pairCount) by pairName
+| order by TotalOccurrences desc
+| take 20
+
+// ---------------------------------------------------------------------------
+// 6. Input Profile Distribution
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'InputProfile'
+| extend sizeCategory = tostring(customDimensions.sizeCategory),
+    lineCount = todouble(customMeasurements.lineCount),
+    hasContracts = tostring(customDimensions.hasContracts) == 'True',
+    hasEffects = tostring(customDimensions.hasEffects) == 'True',
+    hasModules = tostring(customDimensions.hasModules) == 'True'
+| summarize
+    Count = count(),
+    ['Avg Lines'] = round(avg(lineCount), 0),
+    ['With Contracts %'] = round(100.0 * countif(hasContracts) / count(), 1),
+    ['With Effects %'] = round(100.0 * countif(hasEffects) / count(), 1),
+    ['With Modules %'] = round(100.0 * countif(hasModules) / count(), 1)
+    by sizeCategory
+
+// ---------------------------------------------------------------------------
+// 7. Version Regression Detection
+// Same inputHash producing different outcomes across versions.
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'CompilationOutcome'
+| extend inputHash = tostring(customDimensions.inputHash),
+    success = tostring(customDimensions.success),
+    version = tostring(customDimensions.version)
+| summarize Outcomes = make_set(success), Versions = make_set(version) by inputHash
+| where array_length(Outcomes) > 1
+| project inputHash, Outcomes, Versions
+| order by inputHash
+
+// ---------------------------------------------------------------------------
+// 8. Compilation Determinism Check
+// Same inputHash producing different outputHash values.
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'CompilationDeterminism'
+| extend inputHash = tostring(customDimensions.inputHash),
+    outputHash = tostring(customDimensions.outputHash),
+    version = tostring(customDimensions.version)
+| summarize OutputHashes = make_set(outputHash), Versions = make_set(version) by inputHash
+| where array_length(OutputHashes) > 1
+| project inputHash, OutputHashes, Versions
+
+// ---------------------------------------------------------------------------
+// 9. Hook Compliance Trend (enhanced)
+// ---------------------------------------------------------------------------
+customEvents
+| where name in ('HookAllow', 'HookBlock')
+| summarize
+    Allows = countif(name == 'HookAllow'),
+    Blocks = countif(name == 'HookBlock'),
+    Total = count()
+    by bin(timestamp, 1d)
+| extend ['Compliance %'] = iff(Total > 0, round(100.0 * Allows / Total, 1), 0.0)
+| render timechart
+
+// ---------------------------------------------------------------------------
+// 10. Exception Rate by Version
+// ---------------------------------------------------------------------------
+exceptions
+| extend version = tostring(customDimensions.calorVersion)
+| summarize ExceptionCount = count() by version, bin(timestamp, 1d)
+| render timechart
+
+// ---------------------------------------------------------------------------
+// 11. Session Journey Funnel
+// ---------------------------------------------------------------------------
+let started = customEvents | where name == 'SessionStarted' | summarize Started = count();
+let commands = customEvents | where name in ('CommandSucceeded', 'CommandFailed') | summarize dcount(tostring(customDimensions.operationId));
+let succeeded = customEvents | where name == 'CommandSucceeded' | summarize dcount(tostring(customDimensions.operationId));
+let ended = customEvents | where name == 'SessionEnded' | summarize Ended = count();
+print
+    ['Sessions Started'] = toscalar(started | project Started),
+    ['Sessions With Commands'] = toscalar(commands),
+    ['Sessions With Success'] = toscalar(succeeded),
+    ['Sessions Ended Cleanly'] = toscalar(ended | project Ended)
+
+// ---------------------------------------------------------------------------
+// 12. Unsupported Feature Trends
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'UnsupportedFeatures'
+| extend totalCount = coalesce(todouble(customMeasurements.totalUnsupportedCount), todouble(customDimensions.totalUnsupportedCount))
+| summarize
+    ['Avg Unsupported'] = round(avg(totalCount), 1),
+    ['Total Events'] = count()
+    by bin(timestamp, 1d)
+| render timechart
+
+// ---------------------------------------------------------------------------
+// 13. Diagnostic Code Frequency Over Time
+// ---------------------------------------------------------------------------
+customEvents
+| where name == 'DiagnosticOccurrence'
+| extend code = tostring(customDimensions.code),
+    severity = tostring(customDimensions.severity)
+| summarize Count = count() by code, severity, bin(timestamp, 1d)
+| order by Count desc
+| render timechart

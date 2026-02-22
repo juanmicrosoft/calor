@@ -131,6 +131,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit C# interop blocks
+        foreach (var interop in node.InteropBlocks)
+        {
+            Visit(interop);
+            AppendLine();
+        }
+
         Dedent();
         AppendLine($"§/M{{{node.Id}}}");
 
@@ -283,6 +290,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var method in node.Methods)
         {
             Visit(method);
+            AppendLine();
+        }
+
+        // Emit operator overloads
+        foreach (var op in node.OperatorOverloads)
+        {
+            Visit(op);
+            AppendLine();
+        }
+
+        // Emit C# interop blocks
+        foreach (var interop in node.InteropBlocks)
+        {
+            Visit(interop);
             AppendLine();
         }
 
@@ -444,6 +465,52 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         Dedent();
         AppendLine($"§/CTOR{{{node.Id}}}");
+
+        return "";
+    }
+
+    public string Visit(OperatorOverloadNode node)
+    {
+        var visibility = GetVisibilityShorthand(node.Visibility);
+        var attrs = EmitCSharpAttributes(node.CSharpAttributes);
+
+        AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}");
+        Indent();
+
+        // Emit parameters
+        foreach (var param in node.Parameters)
+        {
+            var paramType = TypeMapper.CSharpToCalor(param.TypeName);
+            AppendLine($"§I{{{paramType}:{param.Name}}}");
+        }
+
+        // Emit output type
+        if (node.Output != null)
+        {
+            var output = TypeMapper.CSharpToCalor(node.Output.TypeName);
+            AppendLine($"§O{{{output}}}");
+        }
+
+        // Emit preconditions
+        foreach (var pre in node.Preconditions)
+        {
+            Visit(pre);
+        }
+
+        // Emit postconditions
+        foreach (var post in node.Postconditions)
+        {
+            Visit(post);
+        }
+
+        // Emit body statements
+        foreach (var stmt in node.Body)
+        {
+            stmt.Accept(this);
+        }
+
+        Dedent();
+        AppendLine($"§/OP{{{node.Id}}}");
 
         return "";
     }
@@ -2377,5 +2444,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(RawCSharpNode node)
     {
         return $"§RAW\n{node.CSharpCode}\n§/RAW";
+    }
+
+    public string Visit(CSharpInteropBlockNode node)
+    {
+        AppendLine($"§CSHARP{{{node.CSharpCode}}}§/CSHARP");
+        return "";
     }
 }

@@ -1309,6 +1309,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(PropertyNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(PropertyAccessorNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ConstructorNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(OperatorOverloadNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ConstructorInitializerNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(AssignmentStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(CompoundAssignmentStatementNode node) => throw new InvalidOperationException();
@@ -1413,6 +1414,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(YieldReturnStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(YieldBreakStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RawCSharpNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(CSharpInteropBlockNode node) => throw new InvalidOperationException();
 
     #endregion
 }

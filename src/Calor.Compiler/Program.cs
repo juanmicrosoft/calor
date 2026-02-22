@@ -1,6 +1,8 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
@@ -208,11 +210,16 @@ public class Program
         {
             CalorTelemetry.Initialize(noTelemetryEarly);
         }
+        if (CalorTelemetry.IsInitialized)
+        {
+            CalorTelemetry.Instance.TrackSessionStarted();
+        }
 
         var result = await rootCommand.InvokeAsync(args);
 
         if (CalorTelemetry.IsInitialized)
         {
+            CalorTelemetry.Instance.TrackSessionEnded();
             CalorTelemetry.Instance.Flush();
         }
 
@@ -352,6 +359,17 @@ public class Program
         diagnostics.SetFilePath(filePath);
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         var phaseSw = new Stopwatch();
+
+        // Input profile telemetry (Phase 2)
+        try
+        {
+            var inputProfile = TelemetryEnricher.AnalyzeInput(source);
+            telemetry?.TrackInputProfile(inputProfile);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
 
         // Lexical analysis
         phaseSw.Restart();
@@ -568,8 +586,44 @@ public class Program
             Console.WriteLine("Code generation completed successfully");
         }
 
+        // Compilation outcome & determinism telemetry (Phase 5)
+        try
+        {
+            var inputHash = ComputeHash(source);
+            var outputHash = ComputeHash(generatedCode);
+            telemetry?.TrackCompilationOutcome(inputHash, !diagnostics.HasErrors,
+                diagnostics.Errors.Count(), diagnostics.Warnings.Count());
+            telemetry?.TrackCompilationDeterminism(inputHash, outputHash);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+
         TrackDiagnostics(telemetry, diagnostics);
+
+        // Diagnostic co-occurrence telemetry (Phase 2)
+        try
+        {
+            var codes = diagnostics.Select(d => d.Code).Where(c => !string.IsNullOrEmpty(c)).ToList();
+            if (codes.Count > 1)
+            {
+                var pairs = TelemetryEnricher.AnalyzeCoOccurrence(codes);
+                telemetry?.TrackDiagnosticCoOccurrence(pairs);
+            }
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+
         return new CompilationResult(diagnostics, ast, generatedCode);
+    }
+
+    private static string ComputeHash(string input)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        return Convert.ToHexString(bytes)[..16].ToLowerInvariant();
     }
 
     private static void TrackDiagnostics(CalorTelemetry? telemetry, DiagnosticBag diagnostics)
@@ -579,12 +633,37 @@ public class Program
         foreach (var diag in diagnostics.Errors)
         {
             telemetry.TrackDiagnostic(diag.Code, diag.Message, SeverityLevel.Error);
+            telemetry.TrackDiagnosticEvent(diag.Code, "Error", GetDiagnosticCategory(diag.Code));
         }
 
         foreach (var diag in diagnostics.Warnings)
         {
             telemetry.TrackDiagnostic(diag.Code, diag.Message, SeverityLevel.Warning);
+            telemetry.TrackDiagnosticEvent(diag.Code, "Warning", GetDiagnosticCategory(diag.Code));
         }
+    }
+
+    private static string GetDiagnosticCategory(string code)
+    {
+        // Extract numeric part from codes like "Calor0001"
+        if (code.Length > 5 && int.TryParse(code.AsSpan(5), out var num))
+        {
+            return num switch
+            {
+                < 100 => "Lexer",
+                < 200 => "Parser",
+                < 300 => "Semantic",
+                < 400 => "Contract",
+                < 500 => "Effect",
+                < 600 => "Pattern",
+                < 700 => "ApiStrictness",
+                < 800 => "Verification",
+                < 900 => "Import",
+                < 1000 => "Conversion",
+                _ => "Other"
+            };
+        }
+        return "Unknown";
     }
 }
 

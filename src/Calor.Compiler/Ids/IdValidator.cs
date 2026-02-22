@@ -148,6 +148,7 @@ public static partial class IdValidator
         IdKind.Method => "mt",
         IdKind.Constructor => "ctor",
         IdKind.Enum => "e",
+        IdKind.OperatorOverload => "op",
         _ => ""
     };
 
@@ -170,6 +171,6 @@ public static partial class IdValidator
     [GeneratedRegex("^[0-9A-HJKMNP-TV-Z]+$", RegexOptions.IgnoreCase)]
     private static partial Regex UlidPatternRegex();
 
-    [GeneratedRegex("^(m|f|c|i|p|mt|ctor|e)(\\d{3,})$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex("^(m|f|c|i|p|mt|ctor|op|e)(\\d{3,})$", RegexOptions.IgnoreCase)]
     private static partial Regex TestIdPatternRegex();
 }

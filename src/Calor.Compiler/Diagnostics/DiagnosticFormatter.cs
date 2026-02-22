@@ -404,6 +404,8 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         DiagnosticCode.MissingDocComment => "Missing documentation comment",
         DiagnosticCode.BreakingChangeWithoutMarker => "Breaking change without marker",
         DiagnosticCode.CodeGenSyntaxError => "Generated C# code contains syntax errors",
+        DiagnosticCode.UnterminatedCSharpInteropBlock => "Unterminated C# interop block",
+        DiagnosticCode.CSharpInteropBlockPreserved => "C# code preserved in interop block",
         _ => "Calor compiler diagnostic"
     };
 

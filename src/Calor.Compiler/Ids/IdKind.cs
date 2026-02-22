@@ -30,5 +30,8 @@ public enum IdKind
     Enum,
 
     /// <summary>Enum extension declaration (§EXT).</summary>
-    EnumExtension
+    EnumExtension,
+
+    /// <summary>Operator overload declaration (§OP).</summary>
+    OperatorOverload
 }

@@ -1026,7 +1026,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_OperatorOverload_DetectedAsUnsupported()
+    public void AnalyzeSource_OperatorOverload_NotDetectedAsUnsupported()
     {
         var source = """
             public class Vector
@@ -1041,12 +1041,12 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "operator-overload");
+        // Operator overloads are now fully supported via §OP tags
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "operator-overload");
     }
 
     [Fact]
-    public void AnalyzeSource_ImplicitConversion_DetectedAsUnsupported()
+    public void AnalyzeSource_ImplicitConversion_NotDetectedAsUnsupported()
     {
         var source = """
             public class Wrapper
@@ -1058,8 +1058,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "implicit-conversion");
+        // Implicit conversions are now fully supported via §OP tags
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "implicit-conversion");
     }
 
     [Fact]

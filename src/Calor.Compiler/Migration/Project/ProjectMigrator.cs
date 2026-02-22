@@ -1,3 +1,7 @@
+using System.Diagnostics;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Verification.Z3;
+
 namespace Calor.Compiler.Migration.Project;
 
 /// <summary>
@@ -175,6 +179,22 @@ public sealed class ProjectMigrator
             ? (result.Context.HasWarnings ? FileMigrationStatus.Partial : FileMigrationStatus.Success)
             : FileMigrationStatus.Failed;
 
+        // Attach per-file analysis if available from a prior AnalyzeAsync call
+        FileAnalysisResult? analysisResult = null;
+        if (entry.AnalysisScore is { WasSkipped: false } score)
+        {
+            analysisResult = new FileAnalysisResult
+            {
+                FilePath = score.RelativePath,
+                Score = score.TotalScore,
+                Priority = score.Priority,
+                DimensionScores = score.Dimensions.ToDictionary(
+                    kv => kv.Key,
+                    kv => kv.Value.RawScore),
+                UnsupportedConstructs = score.UnsupportedConstructs
+            };
+        }
+
         return new FileMigrationResult
         {
             SourcePath = entry.SourcePath,
@@ -182,7 +202,8 @@ public sealed class ProjectMigrator
             Status = status,
             Duration = DateTime.UtcNow - startTime,
             Issues = result.Issues.ToList(),
-            Metrics = metrics
+            Metrics = metrics,
+            Analysis = analysisResult
         };
     }
 
@@ -224,6 +245,188 @@ public sealed class ProjectMigrator
             Duration = DateTime.UtcNow - startTime,
             Issues = issues,
             Metrics = metrics
+        };
+    }
+
+    /// <summary>
+    /// Analyzes migration potential for each file in the plan using MigrationAnalyzer.
+    /// </summary>
+    public async Task<AnalysisSummaryReport> AnalyzeAsync(MigrationPlan plan, IProgress<string>? progress = null)
+    {
+        var sw = Stopwatch.StartNew();
+        var analyzer = new MigrationAnalyzer();
+        var fileResults = new List<FileAnalysisResult>();
+
+        var entriesToAnalyze = plan.Entries
+            .Where(e => e.Convertibility != FileConvertibility.Skip)
+            .ToList();
+
+        foreach (var entry in entriesToAnalyze)
+        {
+            progress?.Report($"Analyzing {Path.GetFileName(entry.SourcePath)}...");
+
+            var score = await analyzer.AnalyzeFileAsync(entry.SourcePath, plan.ProjectPath);
+            entry.AnalysisScore = score;
+
+            if (!score.WasSkipped)
+            {
+                fileResults.Add(new FileAnalysisResult
+                {
+                    FilePath = score.RelativePath,
+                    Score = score.TotalScore,
+                    Priority = score.Priority,
+                    DimensionScores = score.Dimensions.ToDictionary(
+                        kv => kv.Key,
+                        kv => kv.Value.RawScore),
+                    UnsupportedConstructs = score.UnsupportedConstructs
+                });
+            }
+        }
+
+        sw.Stop();
+
+        var analyzedScores = fileResults.ToList();
+        var priorityBreakdown = analyzedScores
+            .GroupBy(f => f.Priority)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var dimensionAverages = new Dictionary<ScoreDimension, double>();
+        if (analyzedScores.Count > 0)
+        {
+            foreach (var dim in Enum.GetValues<ScoreDimension>())
+            {
+                var scores = analyzedScores
+                    .Where(f => f.DimensionScores.ContainsKey(dim))
+                    .Select(f => f.DimensionScores[dim])
+                    .ToList();
+                if (scores.Count > 0)
+                    dimensionAverages[dim] = scores.Average();
+            }
+        }
+
+        return new AnalysisSummaryReport
+        {
+            FilesAnalyzed = analyzedScores.Count,
+            AverageScore = analyzedScores.Count > 0 ? analyzedScores.Average(f => f.Score) : 0,
+            PriorityBreakdown = priorityBreakdown,
+            DimensionAverages = dimensionAverages,
+            Duration = sw.Elapsed,
+            FileResults = fileResults
+        };
+    }
+
+    /// <summary>
+    /// Verifies contracts in converted Calor files using Z3.
+    /// </summary>
+    public async Task<VerificationSummaryReport> VerifyAsync(
+        MigrationReport report,
+        uint timeoutMs = VerificationOptions.DefaultTimeoutMs,
+        IProgress<string>? progress = null)
+    {
+        var sw = Stopwatch.StartNew();
+
+        if (!Z3ContextFactory.IsAvailable)
+        {
+            sw.Stop();
+            return new VerificationSummaryReport
+            {
+                Z3Available = false,
+                Duration = sw.Elapsed
+            };
+        }
+
+        var fileResults = new List<FileVerificationSummary>();
+        var totalProven = 0;
+        var totalUnproven = 0;
+        var totalDisproven = 0;
+        var totalUnsupported = 0;
+        var totalSkipped = 0;
+        var filesSkipped = 0;
+
+        var successfulFiles = report.FileResults
+            .Where(f => f.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial
+                        && f.OutputPath != null)
+            .ToList();
+
+        foreach (var fileResult in successfulFiles)
+        {
+            progress?.Report($"Verifying {Path.GetFileName(fileResult.OutputPath!)}...");
+
+            try
+            {
+                var source = await File.ReadAllTextAsync(fileResult.OutputPath!);
+                var compileOptions = new CompilationOptions
+                {
+                    VerifyContracts = true,
+                    VerificationTimeoutMs = timeoutMs
+                };
+
+                var compileResult = Program.Compile(source, fileResult.OutputPath, compileOptions);
+
+                if (compileOptions.VerificationResults != null)
+                {
+                    var summary = compileOptions.VerificationResults.GetSummary();
+                    var disprovenDetails = new List<string>();
+
+                    foreach (var func in compileOptions.VerificationResults.Functions)
+                    {
+                        var allResults = func.PreconditionResults
+                            .Concat(func.PostconditionResults);
+                        foreach (var r in allResults.Where(r => r.Status == ContractVerificationStatus.Disproven))
+                        {
+                            disprovenDetails.Add(
+                                $"{func.FunctionName}: {r.CounterexampleDescription ?? "counterexample found"}");
+                        }
+                    }
+
+                    var fileSummary = new FileVerificationSummary
+                    {
+                        CalorPath = fileResult.OutputPath!,
+                        TotalContracts = summary.Total,
+                        Proven = summary.Proven,
+                        Unproven = summary.Unproven,
+                        Disproven = summary.Disproven,
+                        DisprovenDetails = disprovenDetails
+                    };
+
+                    // Attach per-file verification to the FileMigrationResult
+                    fileResult.Verification = fileSummary;
+
+                    fileResults.Add(fileSummary);
+                    totalProven += summary.Proven;
+                    totalUnproven += summary.Unproven;
+                    totalDisproven += summary.Disproven;
+                    totalUnsupported += summary.Unsupported;
+                    totalSkipped += summary.Skipped;
+                }
+                else
+                {
+                    filesSkipped++;
+                }
+            }
+            catch
+            {
+                filesSkipped++;
+            }
+        }
+
+        sw.Stop();
+
+        var totalContracts = totalProven + totalUnproven + totalDisproven + totalUnsupported + totalSkipped;
+
+        return new VerificationSummaryReport
+        {
+            FilesVerified = fileResults.Count,
+            FilesSkipped = filesSkipped,
+            TotalContracts = totalContracts,
+            Proven = totalProven,
+            Unproven = totalUnproven,
+            Disproven = totalDisproven,
+            Unsupported = totalUnsupported,
+            ContractsSkipped = totalSkipped,
+            Z3Available = true,
+            Duration = sw.Elapsed,
+            FileResults = fileResults
         };
     }
 

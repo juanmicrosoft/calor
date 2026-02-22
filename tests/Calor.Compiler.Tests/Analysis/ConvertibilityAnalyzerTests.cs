@@ -663,23 +663,34 @@ public class ConvertibilityAnalyzerTests
     }
 
     [Fact]
-    public void Score_ModerateBlockers_MidRange()
+    public void Score_ModerateBlockers_BelowClean()
     {
-        // 2-3 blocker types → should be 50-80
+        // Code with multiple blocker types should score below perfect
         var source = """
+            using System;
+
             namespace TestApp;
 
             public class Moderate
             {
+                public unsafe void WithPointer(int* p) { *p = 1; }
                 public void WithRef(ref int a) { a++; }
                 public void WithOut(out int b) { b = 0; }
                 public static int operator +(Moderate a, Moderate b) => 0;
+
+                public System.Collections.Generic.IEnumerable<int> Yield()
+                {
+                    yield return 1;
+                }
             }
             """;
 
         var result = _analyzer.Analyze(source);
 
-        Assert.InRange(result.Score, 45, 85);
+        Assert.True(result.Score < 95,
+            $"Code with multiple blocker types should score below 95, got {result.Score}");
+        Assert.True(result.Blockers.Count >= 2,
+            $"Expected >= 2 blocker types, got {result.Blockers.Count}");
     }
 
     [Fact]

@@ -98,6 +98,9 @@ public sealed class IdScanner : IAstVisitor
 
         foreach (var method in node.Methods)
             method.Accept(this);
+
+        foreach (var op in node.OperatorOverloads)
+            op.Accept(this);
     }
 
     public void Visit(PropertyNode node)
@@ -109,6 +112,11 @@ public sealed class IdScanner : IAstVisitor
     {
         // Constructors don't have a Name property - use the ID as the name identifier
         AddEntry(node.Id, IdKind.Constructor, ".ctor", node.Span);
+    }
+
+    public void Visit(OperatorOverloadNode node)
+    {
+        AddEntry(node.Id, IdKind.OperatorOverload, $"operator {node.OperatorToken}", node.Span);
     }
 
     public void Visit(MethodNode node)
@@ -278,4 +286,5 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(YieldReturnStatementNode node) { }
     public void Visit(YieldBreakStatementNode node) { }
     public void Visit(RawCSharpNode node) { }
+    public void Visit(CSharpInteropBlockNode node) { }
 }

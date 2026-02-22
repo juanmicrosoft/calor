@@ -60,4 +60,4 @@ src/Calor.Compiler/.z3-temp/
 
 # VS Code extension build artifacts
 editors/vscode/server/
-editors/vscode/*.vsix
+editors/vscode/*.vsixconversion-reports/

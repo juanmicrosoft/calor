@@ -26,6 +26,9 @@ public sealed class CalorTelemetry : IDisposable
     private readonly Stopwatch _sessionTimer;
     private string? _currentCommand;
     private readonly Dictionary<string, string> _commandProperties = new();
+    private readonly DateTime _sessionStartTime = DateTime.UtcNow;
+    private readonly List<string> _commandSequence = new();
+    private bool _sessionStarted;
     private bool _disposed;
 
     /// <summary>
@@ -47,6 +50,21 @@ public sealed class CalorTelemetry : IDisposable
     /// Whether telemetry has been initialized.
     /// </summary>
     public static bool IsInitialized => _instance != null;
+
+    /// <summary>
+    /// Sets the singleton instance for testing. Restores previous instance via returned disposable.
+    /// </summary>
+    internal static IDisposable SetInstanceForTesting(CalorTelemetry instance)
+    {
+        var previous = _instance;
+        _instance = instance;
+        return new InstanceRestorer(previous);
+    }
+
+    private sealed class InstanceRestorer(CalorTelemetry? previous) : IDisposable
+    {
+        public void Dispose() => _instance = previous;
+    }
 
     /// <summary>
     /// Internal constructor for unit testing with a custom TelemetryClient.
@@ -114,6 +132,7 @@ public sealed class CalorTelemetry : IDisposable
     public void SetCommand(string command, Dictionary<string, string>? properties = null)
     {
         _currentCommand = command;
+        _commandSequence.Add(command);
         _commandProperties.Clear();
         _commandProperties["command"] = command;
         if (properties != null)
@@ -139,6 +158,7 @@ public sealed class CalorTelemetry : IDisposable
             telemetry.Properties["command"] = command;
             telemetry.Properties["exitCode"] = exitCode.ToString();
             telemetry.Properties["durationMs"] = _sessionTimer.ElapsedMilliseconds.ToString();
+            telemetry.Metrics["durationMs"] = _sessionTimer.ElapsedMilliseconds;
 
             if (properties != null)
             {
@@ -297,6 +317,8 @@ public sealed class CalorTelemetry : IDisposable
             var telemetry = new EventTelemetry("UnsupportedFeatures");
             telemetry.Properties["totalUnsupportedCount"] = totalCount.ToString();
             telemetry.Properties["distinctFeatureCount"] = featureCounts.Count.ToString();
+            telemetry.Metrics["totalUnsupportedCount"] = totalCount;
+            telemetry.Metrics["distinctFeatureCount"] = featureCounts.Count;
 
             var i = 0;
             foreach (var (feature, count) in featureCounts.OrderByDescending(kv => kv.Value))
@@ -316,6 +338,245 @@ public sealed class CalorTelemetry : IDisposable
             // Never crash the CLI
         }
     }
+
+    // ── Phase 2: Enriched Event Schema ──────────────────────────────────
+
+    /// <summary>
+    /// Tracks an input profile (metadata-only, no source code).
+    /// </summary>
+    public void TrackInputProfile(InputProfile profile)
+    {
+        if (_client == null) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("InputProfile");
+            telemetry.Metrics["lineCount"] = profile.LineCount;
+            telemetry.Metrics["estimatedTokenCount"] = profile.EstimatedTokenCount;
+            telemetry.Properties["hasContracts"] = profile.HasContracts.ToString();
+            telemetry.Properties["hasEffects"] = profile.HasEffects.ToString();
+            telemetry.Properties["hasModules"] = profile.HasModules.ToString();
+            telemetry.Properties["sizeCategory"] = profile.SizeCategory;
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    /// <summary>
+    /// Tracks a structured diagnostic occurrence event.
+    /// </summary>
+    public void TrackDiagnosticEvent(string code, string severity, string category)
+    {
+        if (_client == null) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("DiagnosticOccurrence");
+            telemetry.Properties["code"] = code;
+            telemetry.Properties["severity"] = severity;
+            telemetry.Properties["category"] = category;
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    /// <summary>
+    /// Tracks diagnostic co-occurrence pairs.
+    /// </summary>
+    public void TrackDiagnosticCoOccurrence(Dictionary<string, int> codePairs)
+    {
+        if (_client == null || codePairs.Count == 0) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("DiagnosticCoOccurrence");
+
+            foreach (var (pair, count) in codePairs)
+            {
+                telemetry.Properties[$"pair:{pair}"] = count.ToString();
+            }
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    // ── Phase 3: Session Journey Tracking ─────────────────────────────
+
+    /// <summary>
+    /// Tracks the start of a CLI session.
+    /// </summary>
+    public void TrackSessionStarted()
+    {
+        if (_client == null || _sessionStarted) return;
+        _sessionStarted = true;
+
+        try
+        {
+            var telemetry = new EventTelemetry("SessionStarted");
+            telemetry.Properties["version"] = GetCalorVersion();
+            telemetry.Properties["timestamp"] = _sessionStartTime.ToString("O");
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    /// <summary>
+    /// Tracks the end of a CLI session with duration and command sequence.
+    /// </summary>
+    public void TrackSessionEnded()
+    {
+        if (_client == null) return;
+
+        try
+        {
+            var sessionDuration = (DateTime.UtcNow - _sessionStartTime).TotalMilliseconds;
+            var telemetry = new EventTelemetry("SessionEnded");
+            telemetry.Metrics["sessionDurationMs"] = sessionDuration;
+            telemetry.Metrics["commandCount"] = _commandSequence.Count;
+            telemetry.Properties["commandSequence"] = string.Join(",", _commandSequence);
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    // ── Phase 4: Converter-Specific Telemetry ─────────────────────────
+
+    /// <summary>
+    /// Tracks a conversion attempt with metrics (no source code).
+    /// </summary>
+    public void TrackConversionAttempted(int inputLines, bool success, long durationMs, int issueCount, int unsupportedCount)
+    {
+        if (_client == null) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("ConversionAttempted");
+            telemetry.Properties["success"] = success.ToString();
+            telemetry.Metrics["inputLines"] = inputLines;
+            telemetry.Metrics["durationMs"] = durationMs;
+            telemetry.Metrics["issueCount"] = issueCount;
+            telemetry.Metrics["unsupportedCount"] = unsupportedCount;
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    /// <summary>
+    /// Tracks a specific conversion gap (unsupported feature).
+    /// </summary>
+    public void TrackConversionGap(string gapName, int? line)
+    {
+        if (_client == null) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("ConversionGap");
+            telemetry.Properties["gapName"] = gapName;
+            if (line.HasValue)
+                telemetry.Properties["line"] = line.Value.ToString();
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    // ── Phase 5: Version Regression Detection ─────────────────────────
+
+    /// <summary>
+    /// Tracks a compilation outcome with input hash for regression detection.
+    /// </summary>
+    public void TrackCompilationOutcome(string inputHash, bool success, int errorCount, int warningCount)
+    {
+        if (_client == null) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("CompilationOutcome");
+            telemetry.Properties["inputHash"] = inputHash;
+            telemetry.Properties["success"] = success.ToString();
+            telemetry.Properties["version"] = GetCalorVersion();
+            telemetry.Metrics["errorCount"] = errorCount;
+            telemetry.Metrics["warningCount"] = warningCount;
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    /// <summary>
+    /// Tracks compilation determinism (same input should produce same output).
+    /// </summary>
+    public void TrackCompilationDeterminism(string inputHash, string outputHash)
+    {
+        if (_client == null) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("CompilationDeterminism");
+            telemetry.Properties["inputHash"] = inputHash;
+            telemetry.Properties["outputHash"] = outputHash;
+            telemetry.Properties["version"] = GetCalorVersion();
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
+    // ── Flush & Dispose ───────────────────────────────────────────────
 
     /// <summary>
     /// Flushes all pending telemetry. Call before process exit.

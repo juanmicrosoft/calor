@@ -37,7 +37,7 @@ public static class SectionMarkerSuggestions
 
         // Classes and interfaces
         "CL", "/CL", "IFACE", "/IFACE", "IMPL", "EXT", "MT", "/MT", "VR", "OV", "AB", "SD",
-        "THIS", "/THIS", "BASE", "CTOR", "/CTOR", "DTOR", "/DTOR", "PROP", "/PROP", "GET", "SET", "INIT",
+        "THIS", "/THIS", "BASE", "CTOR", "/CTOR", "OP", "/OP", "DTOR", "/DTOR", "PROP", "/PROP", "GET", "SET", "INIT",
 
         // Patterns
         "MATCH", "/MATCH", "ARM", "/ARM", "GUARD", "DEFAULT",
@@ -129,6 +129,7 @@ public static class SectionMarkerSuggestions
         ["IFACE"] = "Interface",
         ["MT"] = "Method",
         ["CTOR"] = "Constructor",
+        ["OP"] = "Operator overload",
         ["PROP"] = "Property",
 
         // Try/Catch
@@ -186,6 +187,8 @@ public static class SectionMarkerSuggestions
         ["/MODULE"] = "/M",
         ["/CALL"] = "/C",
         ["/LOOP"] = "/L",
+        ["OPERATOR"] = "OP",
+        ["OVERLOAD"] = "OP",
     };
 
     /// <summary>

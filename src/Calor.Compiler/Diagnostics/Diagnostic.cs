@@ -337,6 +337,18 @@ public static class DiagnosticCode
     /// Warning: Generated C# code contains syntax errors.
     /// </summary>
     public const string CodeGenSyntaxError = "Calor1000";
+
+    // C# Interop diagnostics (Calor1010-1019)
+
+    /// <summary>
+    /// Error: Unterminated §CSHARP interop block (missing }§/CSHARP).
+    /// </summary>
+    public const string UnterminatedCSharpInteropBlock = "Calor1010";
+
+    /// <summary>
+    /// Info: Raw C# code preserved in interop block for unsupported feature.
+    /// </summary>
+    public const string CSharpInteropBlockPreserved = "Calor1011";
 }
 
 /// <summary>
