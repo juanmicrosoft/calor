@@ -522,6 +522,36 @@ public sealed class CalorTelemetry : IDisposable
         }
     }
 
+    // ── MCP Tool Telemetry ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Tracks a syntax help query, including whether it produced results.
+    /// </summary>
+    public void TrackSyntaxHelpQuery(string feature, string? resolvedCategory, int resultCount, string? matchedSections)
+    {
+        if (_client == null) return;
+
+        try
+        {
+            var telemetry = new EventTelemetry("SyntaxHelpQuery");
+            telemetry.Properties["feature"] = feature;
+            telemetry.Properties["resolvedCategory"] = resolvedCategory ?? "none";
+            telemetry.Properties["resultCount"] = resultCount.ToString();
+            telemetry.Properties["isHit"] = (resultCount > 0).ToString();
+            if (!string.IsNullOrEmpty(matchedSections))
+                telemetry.Properties["matchedSections"] = matchedSections;
+
+            foreach (var kvp in _commandProperties)
+                telemetry.Properties[kvp.Key] = kvp.Value;
+
+            _client.TrackEvent(telemetry);
+        }
+        catch
+        {
+            // Never crash the CLI
+        }
+    }
+
     // ── Phase 5: Version Regression Detection ─────────────────────────
 
     /// <summary>
