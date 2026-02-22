@@ -295,6 +295,49 @@ init_calor() {
 
 This is a Calor project. Write code in `.calr` files.
 
+**Tip:** If you encounter unfamiliar Calor syntax, use these MCP tools:
+- `calor_syntax_help` — get syntax reference for a feature (e.g., "events", "pattern-matching", "async")
+- `calor_syntax_lookup` — look up Calor equivalent for any C# construct (e.g., "switch expression", "event handler")
+
+### Quick Reference
+
+| Syntax | Purpose | C# Equivalent |
+|--------|---------|---------------|
+| `§M{id:Name}...§/M{id}` | Module | `namespace` |
+| `§F{id:Name:pub}...§/F{id}` | Function | `static method` |
+| `§I{type:name}` | Input parameter | method parameter |
+| `§O{type}` | Output/return type | return type |
+| `§R expr` | Return | `return expr;` |
+| `§Q (cond)` / `§S (cond)` | Pre/postcondition | assert/contract |
+| `§E{cw,fs:w}` | Effects (comma-separated, ONE line) | — |
+| `§B{type:name} value` | Bind variable | `type name = value;` |
+| `§ASSIGN name expr` | Assignment | `name = expr;` |
+| `§IF{id} cond → action` / `§EL` / `§/I{id}` | Conditional | `if/else` |
+| `§L{id:i:start:end:step}...§/L{id}` | For loop | `for` |
+| `§WH{id} cond...§/WH{id}` | While loop | `while` |
+| `§R §W{id} expr §K val → result §K _ → default §/W{id}` | Switch expression | `switch` |
+| `§CL{id:Name:pub}...§/CL{id}` | Class | `class` |
+| `§MT{id:Name:pub}...§/MT{id}` | Method | instance method |
+| `§AF{id:Name:pub} §O{Task<T>}...§/AF{id}` | Async function | `async Task<T>` |
+| `§AMT{id:Name:pub}...§/AMT{id}` | Async method (in class) | `async` method |
+| `§AWAIT §C{Method} §/C` | Await call | `await Method()` |
+| `§C{Method} §A arg §/C` | Method call | `Method(arg)` |
+| `§LIST{name:type}§/LIST{name}` | Create list | `new List<T>()` |
+| `§PUSH{name} val` | Add to list | `.Add(val)` |
+| `§DICT{name:K:V}§/DICT{name}` | Create dictionary | `new Dictionary<K,V>()` |
+| `§PUT{name} key val` | Add to dictionary | `[key] = val` |
+| `§EACH{id:var} coll...§/EACH{id}` | Foreach | `foreach` |
+| `§EACHKV{id:k:v} dict...§/EACHKV{id}` | Foreach key-value | `foreach (var (k,v))` |
+| `§CNT{name}` | Count | `.Count` |
+| `§SM value` / `§NN` | Some/None | `Some(v)` / `None` |
+| `§OK value` / `§ERR msg` | Ok/Error | `Ok(v)` / `Err(msg)` |
+| `§EVT{id:Name:pub:Type}` | Event | `event Type Name` |
+| `§SUB event handler` | Subscribe | `event += handler` |
+| `§LAM{id:param:type} expr §/LAM{id}` | Lambda (use inside §B) | `(param) => expr` |
+| `§DEL{id:Name}...§/DEL{id}` | Delegate | `delegate` |
+| `§P value` | Print | `Console.WriteLine` |
+| `(+ a b)`, `(== a b)`, `(? c t f)` | Expressions (prefix) | `a + b`, `a == b`, `c ? t : f` |
+
 ## Contract-First Methodology
 
 **Before writing implementation, extract and express constraints as contracts.** This is your primary tool for ensuring correctness.
@@ -385,15 +428,18 @@ Use contracts to verify your implementation:
 ### Contracts
 - Precondition: `§Q (>= x 0)` or with message: `§Q{"x must be non-negative"} (>= x 0)`
 - Postcondition: `§S (>= result 0)` - use `result` to refer to return value
+- Implication in postcondition: `§S (-> (>= x 0) (== result x))` — use `->` operator (NOT `implies`)
 - Multiple contracts: Add multiple §Q or §S lines
 
 ### Effects Declaration
 Effects declare what side-effects a function may have:
 - `cw` = console write (Console.WriteLine, etc.)
 - `cr` = console read
-- `fs` = file system access
-- `net` = network access
+- `fs` = file system access (append `:r` for read, `:w` for write, `:rw` for both)
+- `net` = network access (append `:r` for read, `:w` for write, `:rw` for both)
 - `db` = database access
+
+Effect modes: `§E{fs:r}` (read), `§E{fs:w}` (write), `§E{fs:rw}` (read-write), `§E{net:rw}` (network read-write)
 
 Example with effects:
 ```
@@ -489,6 +535,19 @@ Example:
 §/F{f001}
 ```
 
+**Option with char parsing (TryParseDigit pattern):**
+```
+§F{f001:TryParseDigit:pub}
+  §I{char:c}
+  §O{Option<i32>}
+  §IF{if1} (and (>= c '0') (<= c '9'))
+    §R §SM (- c '0')
+  §EL
+    §R §NN
+  §/I{if1}
+§/F{f001}
+```
+
 ### Result Type (for success/error returns)
 Return type: `§O{Result<i32,str>}` for Result<int, string>
 
@@ -575,6 +634,36 @@ Example:
 §/F{f001}
 ```
 
+### While Loops
+
+**While loop syntax:**
+```
+§WH{id} condition
+  ...body...
+§/WH{id}
+```
+
+**Example - Countdown:**
+```
+§F{f001:Countdown:pub}
+  §O{void}
+  §E{cw}
+  §B{i32:count} 5
+  §WH{wh1} (> count 0)
+    §C{Console.WriteLine}
+      §A count
+    §/C
+    §ASSIGN count (- count 1)
+  §/WH{wh1}
+§/F{f001}
+```
+
+Key while loop syntax:
+- `§WH{id} condition` — begin while loop with unique id and boolean condition
+- `§/WH{id}` — end while loop (id MUST match opening tag)
+- Use `§B` before the loop to declare the loop variable
+- Use `§ASSIGN` inside the loop body to update the variable
+
 ### Collections
 
 **List - create empty, add values, iterate:**
@@ -609,6 +698,21 @@ Example:
 §/F{f001}
 ```
 
+**Function returning collection count:**
+```
+§F{f001:GetListLength:pub}
+  §I{i32:n}
+  §O{i32}
+  §Q (>= n 0)
+  §LIST{nums:i32}
+  §/LIST{nums}
+  §L{for1:i:1:n:1}
+    §PUSH{nums} i
+  §/L{for1}
+  §R §CNT{nums}
+§/F{f001}
+```
+
 **Dictionary - create, add entries, iterate:**
 ```
 §DICT{scores:str:i32}   // Create Dictionary<string, int>
@@ -621,6 +725,19 @@ Example:
   §P k
   §P v
 §/EACHKV{e1}            // Close foreach
+```
+
+**Function taking a Dictionary parameter and iterating it:**
+```
+§F{f001:PrintDictionary:pub}
+  §I{Dictionary<str,i32>:scores}
+  §O{void}
+  §E{cw}
+  §EACHKV{e1:k:v} scores
+    §P k
+    §P v
+  §/EACHKV{e1}
+§/F{f001}
 ```
 
 **HashSet - create, add values:**
@@ -636,6 +753,14 @@ Example:
 
 ### Async Functions
 
+**Simple async function (no await needed):**
+```
+§AF{af1:GetDataAsync:pub}
+  §O{Task<i32>}
+  §R 42
+§/AF{af1}
+```
+
 **Async function with await:**
 ```
 §AF{af1:ProcessAsync:pub}
@@ -648,7 +773,7 @@ Example:
 
 Key points:
 - Use `§AF{id:Name:pub}` for async function (not `§F`)
-- Return type is `Task<T>` (or just the inner type, Task wrapper is automatic)
+- **ALWAYS use `§O{Task<T>}` for return type** (e.g., `§O{Task<i32>}`, `§O{Task<str>}`)
 - Use `§AWAIT` before async calls: `§AWAIT §C{MethodAsync} §A arg §/C`
 - `§E{net:r}` declares network read effect
 
@@ -668,15 +793,142 @@ Use `§AWAIT{false}` to add ConfigureAwait(false) for library code.
 ```
 §CL{cl1:DataService:pub}
   §AMT{amt1:LoadAsync:pub}
-    §O{Task<str>}
-    §E{net:r}
-    §B{str:data} §AWAIT §C{HttpClient.GetStringAsync} §A "https://example.com" §/C
-    §R data
+    §O{Task<i32>}
+    §E{net:rw}
+    §B{i32:data} §AWAIT §C{HttpClient.GetAsync} §/C
+    §R 100
   §/AMT{amt1}
 §/CL{cl1}
 ```
 
 Use `§AMT{` for async method in class (not `§AF{` or `§MT{`).
+Note: HttpClient methods typically need `§E{net:rw}` (read-write), not just `§E{net:r}`.
+
+### Switch / Pattern Matching
+
+**Switch expression (return + arrow syntax):**
+Use `§R §W{id} target` to switch and return the result. Cases use `→` (arrow) with just the value (no `§R` inside cases):
+```
+§F{f001:GetStatus:pub}
+  §I{i32:code}
+  §O{str}
+  §R §W{sw1} code
+    §K 200 → "OK"
+    §K 404 → "Not Found"
+    §K 500 → "Server Error"
+    §K _ → "Unknown"
+  §/W{sw1}
+§/F{f001}
+```
+
+**Complete function with switch (DayName example):**
+```
+§F{f001:DayName:pub}
+  §I{i32:day}
+  §O{i32}
+  §R §W{sw1} day
+    §K 1 → 100
+    §K 2 → 100
+    §K 3 → 100
+    §K 4 → 100
+    §K 5 → 100
+    §K 6 → 200
+    §K 7 → 200
+    §K _ → 0
+  §/W{sw1}
+§/F{f001}
+```
+
+**Switch statement (block syntax with explicit §R):**
+Use `§W{id} target` without `§R` prefix. Each case uses block form:
+```
+§W{sw1} n
+  §K 0
+    §R "zero"
+  §K 1
+    §R "one"
+  §K _
+    §R "other"
+§/W{sw1}
+```
+
+Key switch syntax:
+- `§R §W{id} target` - switch expression (return inline, cases use `→`)
+- `§W{id} target` - switch statement (cases use block with explicit `§R`)
+- `§K value → result` - case with arrow (NO `§R` — arrow implies return)
+- `§K value` (block) - case start, followed by statements on next lines
+- `§K _` - wildcard/default case (MUST have space before `_`)
+- `§/W{id}` - close switch
+
+**Relational patterns with §PREL:**
+```
+§F{f001:GetGrade:pub}
+  §I{i32:score}
+  §O{str}
+  §R §W{sw1} score
+    §K §PREL{gte} 90 → "A"
+    §K §PREL{gte} 80 → "B"
+    §K §PREL{gte} 70 → "C"
+    §K _ → "F"
+  §/W{sw1}
+§/F{f001}
+```
+
+Relational operators: `gte` (>=), `gt` (>), `lte` (<=), `lt` (<)
+
+**Variable pattern with guard (§VAR + §WHEN):**
+```
+§F{f001:Describe:pub}
+  §I{i32:x}
+  §O{str}
+  §R §W{sw1} x
+    §K §VAR{n} §WHEN (> n 100) → "large"
+    §K §VAR{n} §WHEN (< n 0) → "negative"
+    §K 0 → "zero"
+    §K _ → "normal"
+  §/W{sw1}
+§/F{f001}
+```
+
+**Boolean result switch (IsSingleDigit example):**
+```
+§F{f001:IsSingleDigit:pub}
+  §I{i32:n}
+  §O{bool}
+  §R §W{sw1} n
+    §K 0 → true
+    §K 1 → true
+    §K 2 → true
+    §K 3 → true
+    §K 4 → true
+    §K 5 → true
+    §K 6 → true
+    §K 7 → true
+    §K 8 → true
+    §K 9 → true
+    §K _ → false
+  §/W{sw1}
+§/F{f001}
+```
+
+### Events
+
+**Event declaration in a class:**
+```
+§CL{cl1:EventPublisher:pub}
+  §EVT{ev1:OnDataReceived:pub:EventHandler}
+  §MT{mt1:Subscribe:pub}
+    §I{EventHandler:handler}
+    §O{void}
+    §SUB OnDataReceived handler
+  §/MT{mt1}
+§/CL{cl1}
+```
+
+Event syntax:
+- `§EVT{id:Name:visibility:DelegateType}` - declare event
+- `§SUB eventName handler` - subscribe handler to event (`+=`)
+- `§UNSUB eventName handler` - unsubscribe handler from event (`-=`)
 
 ### Lambdas and Delegates
 
@@ -695,21 +947,22 @@ Key lambda syntax:
 - `(a, b) → (+ a b)` for multiple params
 - Use `§B{type:name} lambda` to bind lambda to variable
 
-**Block lambda (multi-statement):**
+**Block lambda (named, reusable):**
 ```
 §F{f001:ApplyComplex:pub}
   §I{i32:x}
   §O{i32}
-  §LAM{lam1:n:i32}
-    §IF{if1} (> n 0) → §R (* n 2)
-    §EL → §R 0
-    §/I{if1}
+  §B{Func<i32,i32>:process} §LAM{lam1:n:i32}
+    (? (> n 0) (* n 2) 0)
   §/LAM{lam1}
-  §R §C{lam1} §A x §/C
+  §R §C{process} §A x §/C
 §/F{f001}
 ```
 
-Block lambda syntax: `§LAM{id:param:paramType}...§/LAM{id}`
+Block lambda syntax:
+- `§B{type:name} §LAM{id:param:paramType} body §/LAM{id}` - bind lambda to variable
+- Lambda body is an expression (use ternary `(? cond then else)` for conditionals)
+- Call with `§C{name} §A arg §/C`
 
 **Delegate definition:**
 ```
@@ -869,8 +1122,8 @@ When fully specifying behavior, use multiple §S postconditions:
   §I{i32:x}
   §O{i32}
   §S (>= result 0)
-  §S (implies (>= x 0) (== result x))
-  §S (implies (< x 0) (== result (- 0 x)))
+  §S (-> (>= x 0) (== result x))
+  §S (-> (< x 0) (== result (- 0 x)))
   §R (? (< x 0) (- 0 x) x)
 §/F{f001}
 ```
@@ -887,13 +1140,34 @@ When fully specifying behavior, use multiple §S postconditions:
 §E{fs:w}                // File write effect
 ```
 
-**Multiple effects (comma-separated):**
+**Multiple effects (comma-separated in ONE §E declaration):**
 ```
 §E{cw,fs:w}             // Console write AND file write
 §E{net,cw}              // Network AND console write
 ```
 
+**IMPORTANT:** Always combine multiple effects in a SINGLE `§E{}` with commas. Do NOT use multiple `§E` lines.
+
+**Function with multiple effects:**
+```
+§F{f001:LogToFileAndConsole:pub}
+  §I{str:path}
+  §I{str:message}
+  §O{void}
+  §E{cw,fs:w}
+  §C{Console.WriteLine}
+    §A message
+  §/C
+  §C{File.AppendAllText}
+    §A path
+    §A message
+  §/C
+§/F{f001}
+```
+
 ### StringBuilder Operations
+
+StringBuilder uses **functional-style calls** (NOT method calls like `§C{sb.Append}`):
 
 **Create and use StringBuilder:**
 ```
@@ -904,14 +1178,16 @@ When fully specifying behavior, use multiple §S postconditions:
   (sb-append sb "Hello, ")
   (sb-append sb name)
   (sb-append sb "!")
-  §R (sb-to-string sb)
+  §R (sb-tostring sb)
 §/F{f001}
 ```
 
-StringBuilder functions:
+StringBuilder functions (Lisp-style, NOT method calls):
 - `(sb-new)` - create new StringBuilder
 - `(sb-append sb value)` - append value to StringBuilder
-- `(sb-to-string sb)` - convert to string
+- `(sb-tostring sb)` - convert to string
+
+WRONG: `§C{sb.Append} §A "text" §/C` — do NOT use method call syntax for StringBuilder
 
 ### Array Types
 
