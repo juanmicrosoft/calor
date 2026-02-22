@@ -190,6 +190,7 @@ public class Program
         rootCommand.AddCommand(LintCommand.Create());
         rootCommand.AddCommand(DiagnoseCommand.Create());
         rootCommand.AddCommand(AssessCommand.Create());
+        rootCommand.AddCommand(AnalyzeConvertibilityCommand.Create());
         rootCommand.AddCommand(HookCommand.Create());
         rootCommand.AddCommand(IdsCommand.Create());
         rootCommand.AddCommand(EffectsCommand.Create());
