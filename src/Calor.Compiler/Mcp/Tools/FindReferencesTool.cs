@@ -29,6 +29,14 @@ public sealed class FindReferencesTool : McpToolBase
                     "type": "string",
                     "description": "Path to a .calr file (use this OR source)"
                 },
+                "symbolId": {
+                    "type": "string",
+                    "description": "Calor unique ID of the symbol (e.g., 'f001'). Use this OR symbolName OR line+column"
+                },
+                "symbolName": {
+                    "type": "string",
+                    "description": "Name of the symbol to find. Use this OR symbolId OR line+column"
+                },
                 "line": {
                     "type": "integer",
                     "description": "Line number (1-based) where the symbol is located"
@@ -40,9 +48,12 @@ public sealed class FindReferencesTool : McpToolBase
                 "includeDefinition": {
                     "type": "boolean",
                     "description": "Include the definition location in results (default: true)"
+                },
+                "groupByKind": {
+                    "type": "boolean",
+                    "description": "Group results by kind (definition, call_site, type_usage, reference) (default: false)"
                 }
-            },
-            "required": ["line", "column"]
+            }
         }
         """;
 
@@ -50,18 +61,22 @@ public sealed class FindReferencesTool : McpToolBase
     {
         var source = GetString(arguments, "source");
         var filePath = GetString(arguments, "filePath");
+        var symbolId = GetString(arguments, "symbolId");
+        var symbolName = GetString(arguments, "symbolName");
         var line = GetInt(arguments, "line", 0);
         var column = GetInt(arguments, "column", 0);
         var includeDefinition = GetBool(arguments, "includeDefinition", true);
+        var groupByKind = GetBool(arguments, "groupByKind", false);
 
         if (string.IsNullOrEmpty(source) && string.IsNullOrEmpty(filePath))
         {
             return McpToolResult.Error("Either 'source' or 'filePath' is required");
         }
 
-        if (line <= 0 || column <= 0)
+        // Need at least one way to identify the symbol
+        if (string.IsNullOrEmpty(symbolId) && string.IsNullOrEmpty(symbolName) && (line <= 0 || column <= 0))
         {
-            return McpToolResult.Error("Both 'line' and 'column' must be positive integers");
+            return McpToolResult.Error("Provide 'symbolId', 'symbolName', or both 'line' and 'column'");
         }
 
         ParseResult parseResult;
@@ -83,27 +98,94 @@ public sealed class FindReferencesTool : McpToolBase
             }, isError: true);
         }
 
-        // First, find what symbol is at the given position
-        var identifier = ExtractIdentifierAtPosition(parseResult.Source!, line, column);
-        if (string.IsNullOrEmpty(identifier))
+        // Resolve symbol name from ID, name, or position
+        string? identifier = null;
+
+        if (!string.IsNullOrEmpty(symbolId))
         {
-            return McpToolResult.Json(new FindReferencesOutput
+            // Look up by Calor unique ID
+            identifier = ResolveNameFromId(parseResult.Ast!, symbolId);
+            if (string.IsNullOrEmpty(identifier))
             {
-                Success = false,
-                Message = $"No symbol found at line {line}, column {column}"
-            });
+                return McpToolResult.Json(new FindReferencesOutput
+                {
+                    Success = false,
+                    Message = $"No symbol found with ID '{symbolId}'"
+                });
+            }
+        }
+        else if (!string.IsNullOrEmpty(symbolName))
+        {
+            identifier = symbolName;
+        }
+        else if (line > 0 && column > 0)
+        {
+            identifier = ExtractIdentifierAtPosition(parseResult.Source!, line, column);
+            if (string.IsNullOrEmpty(identifier))
+            {
+                return McpToolResult.Json(new FindReferencesOutput
+                {
+                    Success = false,
+                    Message = $"No symbol found at line {line}, column {column}"
+                });
+            }
         }
 
         // Find all references to this identifier
-        var references = FindReferences(parseResult.Ast!, parseResult.Source!, identifier, filePath, includeDefinition);
+        var references = FindReferences(parseResult.Ast!, parseResult.Source!, identifier!, filePath, includeDefinition);
+
+        if (groupByKind)
+        {
+            var grouped = references.GroupBy(r => r.Kind ?? "reference")
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            return McpToolResult.Json(new FindReferencesGroupedOutput
+            {
+                Success = true,
+                SymbolName = identifier,
+                SymbolId = symbolId,
+                ReferenceCount = references.Count,
+                GroupedReferences = grouped
+            });
+        }
 
         return McpToolResult.Json(new FindReferencesOutput
         {
             Success = true,
             SymbolName = identifier,
+            SymbolId = symbolId,
             ReferenceCount = references.Count,
             References = references
         });
+    }
+
+    private static string? ResolveNameFromId(ModuleNode ast, string id)
+    {
+        foreach (var func in ast.Functions)
+        {
+            if (func.Id == id) return func.Name;
+        }
+        foreach (var cls in ast.Classes)
+        {
+            if (cls.Name == id) return cls.Name;
+            foreach (var method in cls.Methods)
+            {
+                if (method.Id == id || $"{cls.Name}.{method.Id}" == id) return method.Name;
+            }
+            foreach (var field in cls.Fields)
+            {
+                if (field.Name == id) return field.Name;
+            }
+        }
+        foreach (var iface in ast.Interfaces)
+        {
+            if (iface.Name == id) return iface.Name;
+        }
+        foreach (var enumDef in ast.Enums)
+        {
+            if (enumDef.Name == id) return enumDef.Name;
+        }
+        return null;
     }
 
     private static List<ReferenceLocation> FindReferences(ModuleNode ast, string source, string symbolName, string? filePath, bool includeDefinition)
@@ -329,6 +411,10 @@ public sealed class FindReferencesTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? SymbolName { get; init; }
 
+        [JsonPropertyName("symbolId")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? SymbolId { get; init; }
+
         [JsonPropertyName("referenceCount")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int ReferenceCount { get; init; }
@@ -344,6 +430,26 @@ public sealed class FindReferencesTool : McpToolBase
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? Errors { get; init; }
+    }
+
+    private sealed class FindReferencesGroupedOutput
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; init; }
+
+        [JsonPropertyName("symbolName")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? SymbolName { get; init; }
+
+        [JsonPropertyName("symbolId")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? SymbolId { get; init; }
+
+        [JsonPropertyName("referenceCount")]
+        public int ReferenceCount { get; init; }
+
+        [JsonPropertyName("groupedReferences")]
+        public Dictionary<string, List<ReferenceLocation>>? GroupedReferences { get; init; }
     }
 
     private sealed class ReferenceLocation
