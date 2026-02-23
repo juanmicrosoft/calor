@@ -47,6 +47,12 @@ public sealed class McpMessageHandler
         RegisterTool(new SymbolInfoTool());
         RegisterTool(new DocumentOutlineTool());
         RegisterTool(new FindSymbolTool());
+
+        // Advanced analysis tools
+        RegisterTool(new ImpactAnalysisTool());
+        RegisterTool(new CallGraphTool());
+        RegisterTool(new EditPreviewTool());
+        RegisterTool(new ScopeInfoTool());
     }
 
     private void RegisterTool(IMcpTool tool)
