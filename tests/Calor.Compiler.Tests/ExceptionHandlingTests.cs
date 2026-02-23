@@ -198,7 +198,7 @@ public class ExceptionHandlingTests
     }
 
     [Fact]
-    public void CodeGen_ThrowStatement_GeneratesValidCSharp()
+    public void CodeGen_ThrowStatement_StringWrapsInException()
     {
         var source = @"
 §M{m1:Test}
@@ -211,8 +211,147 @@ public class ExceptionHandlingTests
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("throw", result);
-        Assert.Contains("error message", result);
+        Assert.Contains("throw new System.Exception(\"error message\")", result);
+    }
+
+    [Fact]
+    public void CodeGen_ThrowStatement_IntLiteralWrapsInException()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Throw:pub}
+§O{void}
+§TH 42
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("throw new System.Exception(42.ToString())", result);
+    }
+
+    [Fact]
+    public void CodeGen_ThrowStatement_BoolLiteralWrapsInException()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Throw:pub}
+§O{void}
+§TH true
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("throw new System.Exception(true.ToString())", result);
+    }
+
+    [Fact]
+    public void CodeGen_ThrowStatement_NewExceptionPassesThrough()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Throw:pub}
+§O{void}
+§TH §NEW{ArgumentException} §A ""bad arg"" §/NEW
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("throw new ArgumentException(\"bad arg\")", result);
+        Assert.DoesNotContain("System.Exception", result);
+    }
+
+    [Fact]
+    public void CodeGen_ThrowStatement_VariablePassesThrough()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Throw:pub}
+§O{void}
+§B{~ex} §NEW{InvalidOperationException} §A ""oops"" §/NEW
+§TH ex
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("throw ex;", result);
+        Assert.DoesNotContain("System.Exception", result);
+    }
+
+    [Fact]
+    public void CodeGen_ThrowStatement_FloatLiteralWrapsInException()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Throw:pub}
+§O{void}
+§TH 3.14
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("throw new System.Exception(3.14.ToString())", result);
+    }
+
+    [Fact]
+    public void CodeGen_ThrowStatement_DecimalLiteralWrapsInException()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Throw:pub}
+§O{void}
+§TH 18.00M
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("throw new System.Exception(18.00m.ToString())", result);
+    }
+
+    [Fact]
+    public void CodeGen_ThrowStatement_CharLiteralWrapsInException()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Throw:pub}
+§O{void}
+§TH (char-lit ""x"")
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("throw new System.Exception('x'.ToString())", result);
+    }
+
+    [Fact]
+    public void CodeGen_ThrowStatement_InterpolatedStringWrapsInException()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f1:Throw:pub}
+§I{str:name}
+§O{void}
+§TH §INTERP ""Hello, "" §EXP name ""!"" §/INTERP
+§/F{f1}
+§/M{m1}
+";
+
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("throw new System.Exception($\"Hello, {name}!\")", result);
     }
 
     [Fact]

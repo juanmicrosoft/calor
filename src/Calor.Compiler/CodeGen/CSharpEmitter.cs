@@ -2779,6 +2779,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.Exception != null)
         {
             var exception = node.Exception.Accept(this);
+            if (node.Exception is StringLiteralNode or InterpolatedStringNode)
+            {
+                return $"throw new System.Exception({exception});";
+            }
+            if (node.Exception is IntLiteralNode or BoolLiteralNode or FloatLiteralNode or DecimalLiteralNode or CharOperationNode)
+            {
+                return $"throw new System.Exception({exception}.ToString());";
+            }
             return $"throw {exception};";
         }
         return "throw;";
