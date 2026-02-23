@@ -1,3 +1,4 @@
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects.Manifests;
@@ -18,23 +19,11 @@ public sealed class EffectEnforcementPass
     private readonly UnknownCallPolicy _policy;
     private readonly bool _strictEffects;
 
-    // Maps function ID to its node
-    private readonly Dictionary<string, FunctionNode> _functions = new(StringComparer.Ordinal);
+    // Delegated call graph analysis (populated by Enforce)
+    private CallGraphAnalysis _callGraphAnalysis = null!;
 
     // Maps function ID to computed effects
     private readonly Dictionary<string, EffectSet> _computedEffects = new(StringComparer.Ordinal);
-
-    // Call graph: callee → list of callers
-    private readonly Dictionary<string, List<string>> _callGraph = new(StringComparer.Ordinal);
-
-    // Reverse call graph: caller → list of callees
-    private readonly Dictionary<string, List<(string Callee, TextSpan Span)>> _reverseCallGraph = new(StringComparer.Ordinal);
-
-    // Maps function name to ID for resolving internal calls
-    private readonly Dictionary<string, string> _functionNameToId = new(StringComparer.Ordinal);
-
-    // Maps bare method name to ALL qualified function IDs (handles name collisions across classes)
-    private readonly Dictionary<string, List<string>> _methodNameToIds = new(StringComparer.Ordinal);
 
     public EffectEnforcementPass(
         DiagnosticBag diagnostics,
@@ -60,15 +49,12 @@ public sealed class EffectEnforcementPass
     /// </summary>
     public void Enforce(ModuleNode module)
     {
-        // Phase 1: Build function map and call graph (includes §F functions and §MT methods)
-        BuildCallGraph(module);
+        // Phase 1: Build function map and call graph (includes functions and methods)
+        _callGraphAnalysis = CallGraphAnalysis.Build(module);
 
-        // Phase 2: Compute SCCs using Tarjan's algorithm
-        var sccs = ComputeSccs();
-
-        // Phase 3: Process SCCs in reverse topological order
+        // Phase 2+3: Process SCCs in reverse topological order
         // (Tarjan produces them in reverse topological order already)
-        foreach (var scc in sccs)
+        foreach (var scc in _callGraphAnalysis.StronglyConnectedComponents)
         {
             ProcessScc(scc);
         }
@@ -85,265 +71,26 @@ public sealed class EffectEnforcementPass
             foreach (var method in cls.Methods)
             {
                 var wrappedId = $"{cls.Name}.{method.Id}";
-                if (_functions.TryGetValue(wrappedId, out var wrapped))
+                if (_callGraphAnalysis.Functions.TryGetValue(wrappedId, out var wrapped))
                 {
                     CheckEffects(wrapped);
                 }
             }
             // Note: Constructors participate in the call graph (for SCC analysis)
             // but are not checked for effects here because:
-            // 1. §CTOR has no §E{...} declaration syntax yet
+            // 1. CTOR has no E{...} declaration syntax yet
             // 2. Constructors inherently assign to fields (mut) which would always fail
-            // Constructor enforcement requires language-level §E support on §CTOR first.
+            // Constructor enforcement requires language-level E support on CTOR first.
         }
-    }
-
-    /// <summary>
-    /// Creates a lightweight FunctionNode wrapper from a MethodNode for effect analysis.
-    /// Uses a qualified ID (className.methodId) to avoid collisions with top-level functions.
-    /// </summary>
-    private static FunctionNode ToFunctionNode(MethodNode method, string className)
-    {
-        var qualifiedId = $"{className}.{method.Id}";
-        return new FunctionNode(
-            method.Span,
-            qualifiedId,
-            method.Name,
-            method.Visibility,
-            method.Parameters,
-            method.Output,
-            method.Effects,
-            method.Body,
-            method.Attributes);
-    }
-
-    /// <summary>
-    /// Creates a lightweight FunctionNode wrapper from a ConstructorNode for effect analysis.
-    /// Constructors don't have §E{...} declarations, so effects will be null (treated as pure).
-    /// </summary>
-    private static FunctionNode ToFunctionNode(ConstructorNode ctor, string className)
-    {
-        var qualifiedId = $"{className}.{ctor.Id}";
-        return new FunctionNode(
-            ctor.Span,
-            qualifiedId,
-            $"{className}..ctor",
-            ctor.Visibility,
-            ctor.Parameters,
-            output: null,
-            effects: null,  // Constructors can't declare effects yet
-            ctor.Body,
-            ctor.Attributes);
     }
 
     /// <summary>
     /// Resolves a call target string to an internal function ID.
-    /// Handles dotted targets like "variable.MethodName" or "ClassName.MethodName"
-    /// by extracting the bare method name and looking it up in the function name index.
-    /// When multiple classes define the same method name (ambiguous), returns null
-    /// to avoid false resolution. Use ResolveToAllInternalIds for call graph edges.
+    /// Thin wrapper that delegates to CallGraphAnalysis.
     /// </summary>
     private string? ResolveToInternalId(string callee)
     {
-        // Exact match by function name (handles top-level calls and pre-resolved IDs)
-        if (_functionNameToId.TryGetValue(callee, out var id) && _functions.ContainsKey(id))
-            return id;
-
-        // Direct function ID match (for pre-resolved call targets)
-        if (_functions.ContainsKey(callee))
-            return callee;
-
-        // For dotted targets, try bare method name
-        var lastDot = callee.LastIndexOf('.');
-        if (lastDot > 0)
-        {
-            var bareMethodName = callee[(lastDot + 1)..];
-
-            // Check the multi-map for ambiguity: if multiple classes define this method,
-            // we can't safely resolve without type information
-            if (_methodNameToIds.TryGetValue(bareMethodName, out var candidates) && candidates.Count > 1)
-                return null; // Ambiguous — fall through to external resolution
-
-            if (_functionNameToId.TryGetValue(bareMethodName, out var bareId) && _functions.ContainsKey(bareId))
-                return bareId;
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Resolves a call target to ALL possible internal function IDs.
-    /// Used for call graph edges where we want to be conservative
-    /// (track all possible callees for SCC computation).
-    /// </summary>
-    private List<string> ResolveToAllInternalIds(string callee)
-    {
-        // Exact match by function name
-        if (_functionNameToId.TryGetValue(callee, out var id) && _functions.ContainsKey(id))
-            return new List<string> { id };
-
-        // Direct function ID match
-        if (_functions.ContainsKey(callee))
-            return new List<string> { callee };
-
-        // For dotted targets, try bare method name — return ALL candidates
-        var lastDot = callee.LastIndexOf('.');
-        if (lastDot > 0)
-        {
-            var bareMethodName = callee[(lastDot + 1)..];
-            if (_methodNameToIds.TryGetValue(bareMethodName, out var candidates))
-                return candidates;
-        }
-
-        return new List<string>();
-    }
-
-    private void BuildCallGraph(ModuleNode module)
-    {
-        // Index all top-level functions by ID and name
-        foreach (var function in module.Functions)
-        {
-            _functions[function.Id] = function;
-            _functionNameToId[function.Name] = function.Id;
-            _callGraph[function.Id] = new List<string>();
-            _reverseCallGraph[function.Id] = new List<(string, TextSpan)>();
-        }
-
-        // Index class methods and constructors as wrapped FunctionNodes
-        foreach (var cls in module.Classes)
-        {
-            foreach (var method in cls.Methods)
-            {
-                var wrapped = ToFunctionNode(method, cls.Name);
-                _functions[wrapped.Id] = wrapped;
-                _functionNameToId[wrapped.Name] = wrapped.Id;
-                _callGraph[wrapped.Id] = new List<string>();
-                _reverseCallGraph[wrapped.Id] = new List<(string, TextSpan)>();
-
-                // Track all IDs for this method name (handles name collisions across classes)
-                if (!_methodNameToIds.TryGetValue(wrapped.Name, out var ids))
-                {
-                    ids = new List<string>();
-                    _methodNameToIds[wrapped.Name] = ids;
-                }
-                ids.Add(wrapped.Id);
-            }
-            foreach (var ctor in cls.Constructors)
-            {
-                var wrapped = ToFunctionNode(ctor, cls.Name);
-                _functions[wrapped.Id] = wrapped;
-                // Don't add to _functionNameToId — constructors aren't called by name
-                _callGraph[wrapped.Id] = new List<string>();
-                _reverseCallGraph[wrapped.Id] = new List<(string, TextSpan)>();
-            }
-        }
-
-        // Build call edges for all indexed functions (top-level and class methods)
-        foreach (var function in _functions.Values)
-        {
-            var calls = CollectCalls(function);
-            foreach (var (callee, span) in calls)
-            {
-                _reverseCallGraph[function.Id].Add((callee, span));
-
-                // Resolve callee name to ALL possible internal IDs (conservative for SCC)
-                var calleeIds = ResolveToAllInternalIds(callee);
-
-                // Track internal calls for SCC computation
-                foreach (var calleeId in calleeIds)
-                {
-                    if (!_callGraph.ContainsKey(calleeId))
-                    {
-                        _callGraph[calleeId] = new List<string>();
-                    }
-                    _callGraph[calleeId].Add(function.Id);
-                }
-            }
-        }
-    }
-
-    private List<(string Callee, TextSpan Span)> CollectCalls(FunctionNode function)
-    {
-        var calls = new List<(string, TextSpan)>();
-        var collector = new CallCollector(calls);
-        collector.CollectFromStatements(function.Body);
-        return calls;
-    }
-
-    /// <summary>
-    /// Computes SCCs using Tarjan's algorithm.
-    /// Returns SCCs in reverse topological order (leaves first).
-    /// </summary>
-    private List<List<string>> ComputeSccs()
-    {
-        var sccs = new List<List<string>>();
-        var index = 0;
-        var indices = new Dictionary<string, int>();
-        var lowlinks = new Dictionary<string, int>();
-        var onStack = new HashSet<string>();
-        var stack = new Stack<string>();
-
-        foreach (var functionId in _functions.Keys)
-        {
-            if (!indices.ContainsKey(functionId))
-            {
-                Strongconnect(functionId, ref index, indices, lowlinks, onStack, stack, sccs);
-            }
-        }
-
-        return sccs;
-    }
-
-    private void Strongconnect(
-        string v,
-        ref int index,
-        Dictionary<string, int> indices,
-        Dictionary<string, int> lowlinks,
-        HashSet<string> onStack,
-        Stack<string> stack,
-        List<List<string>> sccs)
-    {
-        indices[v] = index;
-        lowlinks[v] = index;
-        index++;
-        stack.Push(v);
-        onStack.Add(v);
-
-        // Process successors (functions that v calls)
-        foreach (var (calleeName, _) in _reverseCallGraph.GetValueOrDefault(v, new List<(string, TextSpan)>()))
-        {
-            // Resolve callee name to ID for internal calls (handles cross-class method calls)
-            var calleeId = ResolveToInternalId(calleeName);
-
-            // Only consider internal functions for SCC
-            if (calleeId == null)
-                continue;
-
-            if (!indices.ContainsKey(calleeId))
-            {
-                Strongconnect(calleeId, ref index, indices, lowlinks, onStack, stack, sccs);
-                lowlinks[v] = Math.Min(lowlinks[v], lowlinks[calleeId]);
-            }
-            else if (onStack.Contains(calleeId))
-            {
-                lowlinks[v] = Math.Min(lowlinks[v], indices[calleeId]);
-            }
-        }
-
-        // If v is a root node, pop the SCC
-        if (lowlinks[v] == indices[v])
-        {
-            var scc = new List<string>();
-            string w;
-            do
-            {
-                w = stack.Pop();
-                onStack.Remove(w);
-                scc.Add(w);
-            } while (w != v);
-
-            sccs.Add(scc);
-        }
+        return _callGraphAnalysis.ResolveToInternalId(callee);
     }
 
     private void ProcessScc(List<string> scc)
@@ -352,7 +99,7 @@ public sealed class EffectEnforcementPass
         if (scc.Count == 1)
         {
             var functionId = scc[0];
-            var function = _functions[functionId];
+            var function = _callGraphAnalysis.Functions[functionId];
             var effects = InferEffects(function, new HashSet<string>());
             _computedEffects[functionId] = effects;
             return;
@@ -376,7 +123,7 @@ public sealed class EffectEnforcementPass
 
             foreach (var functionId in scc)
             {
-                var function = _functions[functionId];
+                var function = _callGraphAnalysis.Functions[functionId];
                 var newEffects = InferEffects(function, new HashSet<string>(scc));
                 var oldEffects = _computedEffects[functionId];
 
@@ -391,7 +138,7 @@ public sealed class EffectEnforcementPass
         if (changed)
         {
             _diagnostics.ReportWarning(
-                _functions[scc[0]].Span,
+                _callGraphAnalysis.Functions[scc[0]].Span,
                 "Calor0600",
                 $"Effect fixpoint iteration did not converge after {maxIterations} iterations for mutually recursive functions. Effects may be incomplete.");
         }
@@ -399,7 +146,12 @@ public sealed class EffectEnforcementPass
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
-        var context = new InferenceContext(_catalog, _resolver, _computedEffects, _functions, _functionNameToId, _methodNameToIds, sccMembers, _policy, _strictEffects, _diagnostics, function.Id);
+        var context = new InferenceContext(
+            _catalog, _resolver, _computedEffects,
+            _callGraphAnalysis.Functions,
+            _callGraphAnalysis.FunctionNameToId,
+            _callGraphAnalysis.MethodNameToIds,
+            sccMembers, _policy, _strictEffects, _diagnostics, function.Id);
         var inferrer = new EffectInferrer(context);
         return inferrer.InferFromStatements(function.Body);
     }
@@ -480,7 +232,7 @@ public sealed class EffectEnforcementPass
         var queue = new Queue<(string FunctionId, List<string> Path)>();
         var visited = new HashSet<string>();
 
-        queue.Enqueue((startFunctionId, new List<string> { _functions[startFunctionId].Name }));
+        queue.Enqueue((startFunctionId, new List<string> { _callGraphAnalysis.Functions[startFunctionId].Name }));
         visited.Add(startFunctionId);
 
         while (queue.Count > 0)
@@ -488,7 +240,7 @@ public sealed class EffectEnforcementPass
             var (currentId, path) = queue.Dequeue();
 
             // Check direct effects from this function's body
-            if (_reverseCallGraph.TryGetValue(currentId, out var calls))
+            if (_callGraphAnalysis.ForwardGraph.TryGetValue(currentId, out var calls))
             {
                 foreach (var (calleeName, span) in calls)
                 {
@@ -509,7 +261,7 @@ public sealed class EffectEnforcementPass
                     else if (!visited.Contains(calleeId))
                     {
                         visited.Add(calleeId);
-                        var newPath = new List<string>(path) { _functions[calleeId].Name };
+                        var newPath = new List<string>(path) { _callGraphAnalysis.Functions[calleeId].Name };
                         queue.Enqueue((calleeId, newPath));
                     }
                 }
@@ -1029,150 +781,6 @@ public sealed class EffectEnforcementPass
                 return InferFromStatements(lambda.StatementBody);
             }
             return EffectSet.Empty;
-        }
-    }
-
-    /// <summary>
-    /// Collects all call targets from statements.
-    /// </summary>
-    private sealed class CallCollector
-    {
-        private readonly List<(string, TextSpan)> _calls;
-
-        public CallCollector(List<(string, TextSpan)> calls)
-        {
-            _calls = calls;
-        }
-
-        public void CollectFromStatements(IEnumerable<StatementNode> statements)
-        {
-            foreach (var statement in statements)
-            {
-                CollectFromStatement(statement);
-            }
-        }
-
-        private void CollectFromStatement(StatementNode statement)
-        {
-            switch (statement)
-            {
-                case CallStatementNode call:
-                    _calls.Add((call.Target, call.Span));
-                    CollectFromExpressions(call.Arguments);
-                    break;
-                case IfStatementNode ifStmt:
-                    CollectFromExpression(ifStmt.Condition);
-                    CollectFromStatements(ifStmt.ThenBody);
-                    foreach (var elseIf in ifStmt.ElseIfClauses)
-                    {
-                        CollectFromExpression(elseIf.Condition);
-                        CollectFromStatements(elseIf.Body);
-                    }
-                    if (ifStmt.ElseBody != null)
-                        CollectFromStatements(ifStmt.ElseBody);
-                    break;
-                case ForStatementNode forStmt:
-                    CollectFromStatements(forStmt.Body);
-                    break;
-                case WhileStatementNode whileStmt:
-                    CollectFromExpression(whileStmt.Condition);
-                    CollectFromStatements(whileStmt.Body);
-                    break;
-                case DoWhileStatementNode doWhile:
-                    CollectFromStatements(doWhile.Body);
-                    CollectFromExpression(doWhile.Condition);
-                    break;
-                case ForeachStatementNode foreach_:
-                    CollectFromExpression(foreach_.Collection);
-                    CollectFromStatements(foreach_.Body);
-                    break;
-                case MatchStatementNode matchStmt:
-                    CollectFromExpression(matchStmt.Target);
-                    foreach (var matchCase in matchStmt.Cases)
-                        CollectFromStatements(matchCase.Body);
-                    break;
-                case TryStatementNode tryStmt:
-                    CollectFromStatements(tryStmt.TryBody);
-                    foreach (var catchClause in tryStmt.CatchClauses)
-                        CollectFromStatements(catchClause.Body);
-                    if (tryStmt.FinallyBody != null)
-                        CollectFromStatements(tryStmt.FinallyBody);
-                    break;
-                case ReturnStatementNode ret:
-                    if (ret.Expression != null)
-                        CollectFromExpression(ret.Expression);
-                    break;
-                case BindStatementNode bind:
-                    if (bind.Initializer != null)
-                        CollectFromExpression(bind.Initializer);
-                    break;
-                case AssignmentStatementNode assign:
-                    CollectFromExpression(assign.Target);
-                    CollectFromExpression(assign.Value);
-                    break;
-            }
-        }
-
-        private void CollectFromExpressions(IEnumerable<ExpressionNode> expressions)
-        {
-            foreach (var expr in expressions)
-                CollectFromExpression(expr);
-        }
-
-        private void CollectFromExpression(ExpressionNode expr)
-        {
-            switch (expr)
-            {
-                case CallExpressionNode call:
-                    _calls.Add((call.Target, call.Span));
-                    CollectFromExpressions(call.Arguments);
-                    break;
-                case BinaryOperationNode binOp:
-                    CollectFromExpression(binOp.Left);
-                    CollectFromExpression(binOp.Right);
-                    break;
-                case UnaryOperationNode unOp:
-                    CollectFromExpression(unOp.Operand);
-                    break;
-                case ConditionalExpressionNode cond:
-                    CollectFromExpression(cond.Condition);
-                    CollectFromExpression(cond.WhenTrue);
-                    CollectFromExpression(cond.WhenFalse);
-                    break;
-                case MatchExpressionNode match:
-                    CollectFromExpression(match.Target);
-                    foreach (var matchCase in match.Cases)
-                        CollectFromStatements(matchCase.Body);
-                    break;
-                case NewExpressionNode newExpr:
-                    CollectFromExpressions(newExpr.Arguments);
-                    break;
-                case FieldAccessNode field:
-                    CollectFromExpression(field.Target);
-                    break;
-                case ArrayAccessNode array:
-                    CollectFromExpression(array.Array);
-                    CollectFromExpression(array.Index);
-                    break;
-                case LambdaExpressionNode lambda:
-                    if (lambda.ExpressionBody != null)
-                        CollectFromExpression(lambda.ExpressionBody);
-                    if (lambda.StatementBody != null)
-                        CollectFromStatements(lambda.StatementBody);
-                    break;
-                case AwaitExpressionNode await_:
-                    CollectFromExpression(await_.Awaited);
-                    break;
-                case SomeExpressionNode some:
-                    CollectFromExpression(some.Value);
-                    break;
-                case OkExpressionNode ok:
-                    CollectFromExpression(ok.Value);
-                    break;
-                case ErrExpressionNode err:
-                    CollectFromExpression(err.Error);
-                    break;
-            }
         }
     }
 }
