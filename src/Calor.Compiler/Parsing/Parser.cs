@@ -3442,22 +3442,78 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a value in a C# attribute argument, including bitwise OR expressions.
+    /// Parses a value in a C# attribute argument, including bitwise expressions with proper precedence.
+    /// Grammar: bitwiseOr → bitwiseXor ('|' bitwiseXor)*
     /// </summary>
     private object ParseCSharpAttributeValue()
     {
-        var left = ParseCSharpAttributePrimaryValue();
-
-        if (!Check(TokenKind.Pipe))
-            return left;
-
-        var operands = new List<object> { left };
+        var left = ParseCSharpAttributeXor();
         while (Check(TokenKind.Pipe))
         {
             Advance(); // consume |
-            operands.Add(ParseCSharpAttributePrimaryValue());
+            var right = ParseCSharpAttributeXor();
+            left = new BitwiseBinaryExpression(left, BitwiseOperator.Or, right);
         }
-        return new BitwiseOrExpression(operands);
+        return left;
+    }
+
+    /// <summary>
+    /// bitwiseXor → bitwiseAnd ('^' bitwiseAnd)*
+    /// </summary>
+    private object ParseCSharpAttributeXor()
+    {
+        var left = ParseCSharpAttributeAnd();
+        while (Check(TokenKind.Caret))
+        {
+            Advance(); // consume ^
+            var right = ParseCSharpAttributeAnd();
+            left = new BitwiseBinaryExpression(left, BitwiseOperator.Xor, right);
+        }
+        return left;
+    }
+
+    /// <summary>
+    /// bitwiseAnd → unary ('&amp;' unary)*
+    /// </summary>
+    private object ParseCSharpAttributeAnd()
+    {
+        var left = ParseCSharpAttributeUnary();
+        while (Check(TokenKind.Amp))
+        {
+            Advance(); // consume &
+            var right = ParseCSharpAttributeUnary();
+            left = new BitwiseBinaryExpression(left, BitwiseOperator.And, right);
+        }
+        return left;
+    }
+
+    /// <summary>
+    /// unary → '~' unary | atom
+    /// </summary>
+    private object ParseCSharpAttributeUnary()
+    {
+        if (Check(TokenKind.Tilde))
+        {
+            Advance(); // consume ~
+            var operand = ParseCSharpAttributeUnary();
+            return new BitwiseNotExpression(operand);
+        }
+        return ParseCSharpAttributeAtom();
+    }
+
+    /// <summary>
+    /// atom → '(' bitwiseOr ')' | primary
+    /// </summary>
+    private object ParseCSharpAttributeAtom()
+    {
+        if (Check(TokenKind.OpenParen))
+        {
+            Advance(); // consume (
+            var inner = ParseCSharpAttributeValue();
+            Expect(TokenKind.CloseParen);
+            return inner;
+        }
+        return ParseCSharpAttributePrimaryValue();
     }
 
     /// <summary>
