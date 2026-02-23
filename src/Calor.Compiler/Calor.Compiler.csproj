@@ -150,6 +150,9 @@
     <EmbeddedResource Include="Resources\calor-syntax-documentation.json">
       <LogicalName>Calor.Compiler.Resources.calor-syntax-documentation.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Resources\error-suggestions.json">
+      <LogicalName>Calor.Compiler.Resources.error-suggestions.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="..\..\tests\Calor.Evaluation\Skills\calor-language-skills.md">
       <LogicalName>Calor.Compiler.Resources.calor-language-skills.md</LogicalName>
     </EmbeddedResource>
