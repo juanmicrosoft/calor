@@ -65,9 +65,9 @@ public class CoverageCommandTests : IDisposable
         var source = """
             public class Service
             {
-                public string Process(string input)
+                public string Process(string input, bool flag)
                 {
-                    return input ?? throw new ArgumentNullException(nameof(input));
+                    return flag ? input : throw new ArgumentNullException(nameof(input));
                 }
             }
             """;

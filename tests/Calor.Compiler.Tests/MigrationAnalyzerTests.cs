@@ -730,7 +730,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_ThrowExpression_DetectedAsUnsupported()
+    public void AnalyzeSource_ThrowExpressionInCoalesce_NotDetectedAsUnsupported()
     {
         var source = """
             public class Service
@@ -739,6 +739,25 @@ public class MigrationAnalyzerTests
                 public Service(string name)
                 {
                     Name = name ?? throw new ArgumentNullException(nameof(name));
+                }
+            }
+            """;
+
+        var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
+
+        // ?? throw is now fully supported — should NOT be in unsupported constructs
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "throw-expression");
+    }
+
+    [Fact]
+    public void AnalyzeSource_ThrowExpressionInTernary_StillDetectedAsUnsupported()
+    {
+        var source = """
+            public class Service
+            {
+                public int Check(bool flag)
+                {
+                    return flag ? 42 : throw new InvalidOperationException("nope");
                 }
             }
             """;
@@ -881,8 +900,8 @@ public class MigrationAnalyzerTests
                     if (input == null)
                         throw new ArgumentNullException(nameof(input));
 
-                    // Unsupported: throw expression
-                    var result = input ?? throw new ArgumentNullException(nameof(input));
+                    // Unsupported: throw expression in ternary (not inside coalesce)
+                    var result = input != null ? input : throw new ArgumentNullException(nameof(input));
                 }
             }
             """;

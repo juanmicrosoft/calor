@@ -1209,9 +1209,14 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         ErrorHandlingPatterns++;
         AddExample(ErrorHandlingExamples, "throw expression");
 
-        // Track as unsupported (throw as expression, not statement)
-        ThrowExpressionCount++;
-        AddExample(ThrowExpressionExamples, "?? throw new ...");
+        // Only mark as unsupported if NOT inside a null-coalescing expression
+        // (those are now properly converted to if-null-throw guards)
+        if (node.Parent is not BinaryExpressionSyntax binary ||
+            !binary.IsKind(SyntaxKind.CoalesceExpression))
+        {
+            ThrowExpressionCount++;
+            AddExample(ThrowExpressionExamples, "?? throw new ...");
+        }
 
         base.VisitThrowExpression(node);
     }

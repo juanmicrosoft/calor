@@ -2845,6 +2845,42 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new TypeOperationNode(GetTextSpan(binary), TypeOp.Is, left, typeName);
         }
 
+        // Handle null-coalescing with throw: x ?? throw new E(args) → hoist null guard, return x
+        if (binary.IsKind(SyntaxKind.CoalesceExpression) && binary.Right is ThrowExpressionSyntax throwExpr)
+        {
+            _context.RecordFeatureUsage("null-coalescing-throw");
+            _context.IncrementConverted();
+            var left = ConvertExpression(binary.Left);
+            var exceptionExpr = ConvertExpression(throwExpr.Expression);
+
+            // If the left side is not a simple reference (e.g., a method call),
+            // hoist it to a temp variable to avoid double evaluation.
+            var valueRef = left;
+            if (left is not ReferenceNode)
+            {
+                var tempName = _context.GenerateId("_nct");
+                _pendingStatements.Add(new BindStatementNode(
+                    left.Span, tempName, null, false, left, new AttributeCollection()));
+                valueRef = new ReferenceNode(left.Span, tempName);
+            }
+
+            var nullCheck = new BinaryOperationNode(
+                GetTextSpan(binary), BinaryOperator.Equal,
+                valueRef, new ReferenceNode(GetTextSpan(binary), "null"));
+            var throwStmt = new ThrowStatementNode(GetTextSpan(throwExpr), exceptionExpr);
+            var guard = new IfStatementNode(
+                GetTextSpan(binary),
+                _context.GenerateId("if"),
+                nullCheck,
+                new List<StatementNode> { throwStmt },
+                Array.Empty<ElseIfClauseNode>(),
+                null,
+                new AttributeCollection());
+
+            _pendingStatements.Add(guard);
+            return valueRef;
+        }
+
         // Handle null-coalescing operator: x ?? y → (if (== x null) y x)
         if (binary.IsKind(SyntaxKind.CoalesceExpression))
         {
