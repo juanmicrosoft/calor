@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "description": "Maps error patterns to common mistakes and fix suggestions from calor-language-skills.md",
+  "patterns": [
+    {
+      "id": "null-check-ordering",
+      "title": "Null-Check Ordering (CRITICAL)",
+      "matchPatterns": ["NullReferenceException", "null reference", "(len arr)", "(len ", "len null"],
+      "matchCodes": ["Calor0922", "Calor0921"],
+      "description": "Checking array/string length without null check first causes NullReferenceException instead of ContractViolationException.",
+      "wrongExample": "§Q (> (len arr) 0)            // Crashes if arr is null!",
+      "correctExample": "§Q (!= arr null)              // First: reject null\n§Q (> (len arr) 0)            // Then: check length (safe now)",
+      "explanation": "Contracts are evaluated in order. If you call (len arr) when arr is null, you get a crash instead of a proper contract violation. Always guard reference types with (!= x null) before accessing their properties."
+    },
+    {
+      "id": "string-operations",
+      "title": "String Operation Syntax",
+      "matchPatterns": ["ToString", "§CONCAT", "§TOSTR", "§STR_LEN", "Unexpected token"],
+      "matchCodes": ["Calor0110", "Calor0106"],
+      "description": "Calor uses specific syntax for string operations. Don't invent C#-style methods.",
+      "wrongExample": "§R (+ type \":\" (ToString id))\n§R §CONCAT \"TOKEN-\" §TOSTR userId",
+      "correctExample": "§R (concat type \":\" (str id))\n§R (fmt \"TOKEN-{0}-{1}\" userId sequence)\n§B{length} (len s)",
+      "explanation": "Use (str x) to convert to string, (concat ...) to join strings, (fmt \"...\") for formatting, (len s) for string length."
+    },
+    {
+      "id": "indexof-args",
+      "title": "indexof Argument Count",
+      "matchPatterns": ["indexof", "too many arguments", "3 arg"],
+      "matchCodes": ["Calor0110"],
+      "description": "The indexof function only takes 2 arguments (string and search term). Use substr for offset searches.",
+      "wrongExample": "§B{next} (indexof s \"@\" (+ first 1))  // 3 args not supported",
+      "correctExample": "§B{first} (indexof s \"@\")\n§B{rest} (substr s (+ first 1))\n§B{next} (indexof rest \"@\")",
+      "explanation": "indexof only takes 2 arguments. To search from an offset, use substr to create a substring first, then search within it."
+    },
+    {
+      "id": "variable-redeclaration",
+      "title": "Variable Redeclaration",
+      "matchPatterns": ["already defined", "already declared", "redeclar", "already exists"],
+      "matchCodes": ["Calor0201"],
+      "description": "Use §B to declare a new variable and §ASSIGN to update an existing one.",
+      "wrongExample": "§B{k} (% rng n)    // First use: declares k\n§B{k} (+ k 1)      // ERROR - 'k' already defined",
+      "correctExample": "§B{k} (% rng n)    // Declare k\n§ASSIGN k (+ k 1)   // Update k",
+      "explanation": "§B declares a new binding. Once declared, use §ASSIGN to update the variable's value. This applies inside conditionals too."
+    },
+    {
+      "id": "char-literals",
+      "title": "Character Literal Syntax",
+      "matchPatterns": ["Unexpected character '''", "single quote", "char literal", "'0'", "'-'"],
+      "matchCodes": ["Calor0112"],
+      "description": "Calor does not support single-quoted character literals. Use character predicates or char-code instead.",
+      "wrongExample": "§IF{if1} (== c '0')   // ERROR: Single quotes not supported",
+      "correctExample": "§IF{if1} (is-digit c)                    // Check if digit\n§IF{if2} (== (char-code c) 45)           // Check if c == '-' (code 45)\n§B{equalChar} (char-from-code 61)        // '=' character (code 61)\n§B{equalChar} (char-at \"=\" 0)             // '=' from string",
+      "explanation": "Use (is-digit c) for digit checks, (char-code c) for numeric comparison, (char-from-code n) for constants, or (char-at \"x\" 0) to extract from a string."
+    },
+    {
+      "id": "array-type-syntax",
+      "title": "Array Type Syntax",
+      "matchPatterns": ["i32[]", "string[]", "wrong type syntax", "array type"],
+      "matchCodes": ["Calor0113"],
+      "description": "Array type brackets go BEFORE the type name in Calor, not after.",
+      "wrongExample": "§I{i32[]:items}     // ERROR - wrong type syntax",
+      "correctExample": "§I{[i32]:items}     // Array of i32",
+      "explanation": "In Calor, array types use [T] syntax with brackets before the type name: [i32], [str], [f64]."
+    },
+    {
+      "id": "array-indexing",
+      "title": "Array Element Access",
+      "matchPatterns": ["get arr", "at arr", "arr[", "element access", "§IDX inside", "tag inside Lisp"],
+      "matchCodes": ["Calor0106", "Calor0104"],
+      "description": "Use §IDX for array element access. Cannot nest §IDX inside Lisp expressions.",
+      "wrongExample": "§B{x} (get arr i)      // ERROR - 'get' doesn't exist\n§B{x} arr[i]           // ERROR - no C# indexer\n§ASSIGN sum (+ sum §IDX data i)  // ERROR - tag inside Lisp expr",
+      "correctExample": "§B{x} §IDX arr i       // arr[i]\n§SETIDX{arr} i value   // arr[i] = value\n\n// For use in expressions, extract to binding first:\n§B{val} §IDX data i\n§ASSIGN sum (+ sum val)",
+      "explanation": "Use §IDX for reading (no braces), §SETIDX{arr} for writing. §IDX cannot be nested inside Lisp expressions — extract to a binding first."
+    },
+    {
+      "id": "string-comparison",
+      "title": "String Comparison",
+      "matchPatterns": ["can't compare strings", "string comparison", "< string", "> string"],
+      "matchCodes": ["Calor0202", "Calor0111"],
+      "description": "Relational operators (< >) don't work on strings. Use (equals) for equality.",
+      "wrongExample": "§IF{if1} (< a b) → §R (- 0 1)   // ERROR - can't compare strings with <",
+      "correctExample": "§IF{if1} (equals a b) → §R 0\n// For lexicographic comparison, compare character by character using (char-at) and (char-code).",
+      "explanation": "String types cannot use < or > operators. Use (equals a b) for equality. For ordering, compare character codes."
+    },
+    {
+      "id": "missing-operators",
+      "title": "Missing Built-in Operators",
+      "matchPatterns": ["(abs ", "(max ", "(min ", "(sqrt ", "(pow ", "undefined function"],
+      "matchCodes": ["Calor0200"],
+      "description": "abs, max, min, sqrt, pow are not built-in. Use IF expressions instead.",
+      "wrongExample": "§R (abs x)     // ERROR - abs doesn't exist\n§R (max a b)   // ERROR - max doesn't exist",
+      "correctExample": "§B{absX} §IF{if1} (< x 0) → (- 0 x) §EL → x §/I{if1}\n§B{maxVal} §IF{if1} (> a b) → a §EL → b §/I{if1}",
+      "explanation": "Calor doesn't have abs, max, min, sqrt, pow as built-in functions. Use IF expressions (ternary) to implement them inline."
+    },
+    {
+      "id": "control-flow-arrow",
+      "title": "Arrow Syntax Limitations",
+      "matchPatterns": ["arrow syntax", "→ multiple", "single statement"],
+      "matchCodes": ["Calor0100", "Calor0104"],
+      "description": "Arrow syntax (→) is for single statements only. Use block syntax for multiple statements.",
+      "wrongExample": "§IF{if1} (condition) → §B{x} 1 → §R x   // ERROR",
+      "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x\n§/I{if1}",
+      "explanation": "The arrow (→) can only be followed by a single statement. For multiple statements, use the block form with §/I{id} closing tag."
+    }
+  ]
+}

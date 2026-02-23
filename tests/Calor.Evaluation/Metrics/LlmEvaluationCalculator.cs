@@ -1,11 +1,16 @@
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Calor.Evaluation.Core;
 
 namespace Calor.Evaluation.Metrics;
 
 /// <summary>
 /// LLM-based evaluation calculator that uses AI models to assess code comprehension.
-/// Supports multiple LLM providers (Anthropic Claude, OpenAI GPT-4) for cross-validation.
+/// Uses Claude API to answer questions about Calor and C# code, then uses LLM-as-judge
+/// to score answers against ground truth. This captures the genuine comprehension advantage
+/// of Calor's explicit contracts and effects.
 /// </summary>
 public class LlmEvaluationCalculator : IMetricCalculator
 {
@@ -14,10 +19,20 @@ public class LlmEvaluationCalculator : IMetricCalculator
     public string Description => "Measures code comprehension using LLM-based question answering";
 
     private readonly LlmEvaluationOptions _options;
+    private readonly HttpClient _httpClient;
+    private readonly bool _ownsHttpClient;
+    private List<LlmQuestionSet>? _loadedQuestions;
 
-    public LlmEvaluationCalculator(LlmEvaluationOptions? options = null)
+    private const string AnthropicApiEndpoint = "https://api.anthropic.com/v1/messages";
+    private const string AnthropicApiVersion = "2023-06-01";
+    private const string DefaultModel = "claude-sonnet-4-20250514";
+    private const string JudgeModel = "claude-haiku-4-5-20251001";
+
+    public LlmEvaluationCalculator(LlmEvaluationOptions? options = null, HttpClient? httpClient = null)
     {
         _options = options ?? new LlmEvaluationOptions();
+        _ownsHttpClient = httpClient == null;
+        _httpClient = httpClient ?? new HttpClient();
     }
 
     public async Task<MetricResult> CalculateAsync(EvaluationContext context)
@@ -31,13 +46,10 @@ public class LlmEvaluationCalculator : IMetricCalculator
                 new Dictionary<string, object> { ["status"] = "disabled" });
         }
 
-        // Check for API keys
-        var hasAnthropicKey = !string.IsNullOrEmpty(_options.AnthropicApiKey) ||
-                              !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"));
-        var hasOpenAiKey = !string.IsNullOrEmpty(_options.OpenAiApiKey) ||
-                           !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
+        var apiKey = _options.AnthropicApiKey ??
+                     Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
 
-        if (!hasAnthropicKey && !hasOpenAiKey)
+        if (string.IsNullOrEmpty(apiKey))
         {
             return new MetricResult(
                 Category,
@@ -46,30 +58,81 @@ public class LlmEvaluationCalculator : IMetricCalculator
                 new Dictionary<string, object> { ["status"] = "no_api_keys" });
         }
 
-        var results = new List<LlmEvaluationResult>();
+        // Load questions for this file from the question bank
+        var questions = GetQuestionsForFile(context.FileName);
 
-        // Run evaluation with available providers
-        if (hasAnthropicKey)
+        // If no curated questions, generate structural ones
+        if (questions.Count == 0)
+            questions = GenerateStructuralQuestions(context);
+
+        if (questions.Count == 0)
         {
-            var claudeResult = await EvaluateWithProvider(context, LlmProvider.Claude);
-            results.Add(claudeResult);
+            return new MetricResult(
+                Category,
+                "Comprehension",
+                0, 0, 1.0,
+                new Dictionary<string, object> { ["status"] = "no_questions" });
         }
 
-        if (hasOpenAiKey)
+        var calorTotalScore = 0.0;
+        var csharpTotalScore = 0.0;
+        var totalCalorTokens = 0;
+        var totalCsharpTokens = 0;
+        var questionDetails = new List<Dictionary<string, object>>();
+
+        foreach (var question in questions)
         {
-            var gptResult = await EvaluateWithProvider(context, LlmProvider.Gpt4);
-            results.Add(gptResult);
+            // Ask the answering LLM about Calor code
+            var calorResponse = await AskQuestionViaApi(
+                apiKey, context.CalorSource, question.Question, "Calor");
+
+            // Ask the answering LLM about C# code
+            var csharpResponse = await AskQuestionViaApi(
+                apiKey, context.CSharpSource, question.Question, "C#");
+
+            // Score both answers using LLM-as-judge (or fallback to heuristic)
+            double calorScore, csharpScore;
+            if (_options.UseLlmJudge && question.ExpectedAnswer != null)
+            {
+                calorScore = await JudgeAnswerViaApi(
+                    apiKey, question.Question, calorResponse.Answer, question.ExpectedAnswer);
+                csharpScore = await JudgeAnswerViaApi(
+                    apiKey, question.Question, csharpResponse.Answer, question.ExpectedAnswer);
+            }
+            else
+            {
+                calorScore = EvaluateAnswerHeuristic(calorResponse.Answer, question.ExpectedAnswer);
+                csharpScore = EvaluateAnswerHeuristic(csharpResponse.Answer, question.ExpectedAnswer);
+            }
+
+            calorTotalScore += calorScore;
+            csharpTotalScore += csharpScore;
+            totalCalorTokens += calorResponse.TokensUsed;
+            totalCsharpTokens += csharpResponse.TokensUsed;
+
+            questionDetails.Add(new Dictionary<string, object>
+            {
+                ["questionId"] = question.Id,
+                ["question"] = question.Question,
+                ["category"] = question.Category.ToString(),
+                ["calorScore"] = calorScore,
+                ["csharpScore"] = csharpScore,
+                ["calorAnswer"] = calorResponse.Answer,
+                ["csharpAnswer"] = csharpResponse.Answer
+            });
         }
 
-        // Aggregate results
-        var calorAvg = results.Average(r => r.CalorScore);
-        var csharpAvg = results.Average(r => r.CSharpScore);
+        var questionCount = questions.Count;
+        var calorAvg = questionCount > 0 ? calorTotalScore / questionCount : 0;
+        var csharpAvg = questionCount > 0 ? csharpTotalScore / questionCount : 0;
 
         var details = new Dictionary<string, object>
         {
-            ["providers"] = results.Select(r => r.Provider.ToString()).ToList(),
-            ["results"] = results,
-            ["crossModelAgreement"] = CalculateCrossModelAgreement(results)
+            ["questionsEvaluated"] = questionCount,
+            ["calorTokensUsed"] = totalCalorTokens,
+            ["csharpTokensUsed"] = totalCsharpTokens,
+            ["usedLlmJudge"] = _options.UseLlmJudge,
+            ["questionResults"] = questionDetails
         };
 
         return MetricResult.CreateHigherIsBetter(
@@ -81,59 +144,107 @@ public class LlmEvaluationCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Evaluates code comprehension using a specific LLM provider.
+    /// Loads questions for a specific file from the question bank.
     /// </summary>
-    private async Task<LlmEvaluationResult> EvaluateWithProvider(
-        EvaluationContext context,
-        LlmProvider provider)
+    private List<LlmComprehensionQuestion> GetQuestionsForFile(string fileName)
     {
-        var questions = GenerateLlmComprehensionQuestions(context);
-        var calorScore = 0.0;
-        var csharpScore = 0.0;
-        var totalCalorTokens = 0;
-        var totalCsharpTokens = 0;
+        _loadedQuestions ??= LoadQuestionsFromBank();
 
-        foreach (var question in questions)
+        var set = _loadedQuestions.FirstOrDefault(s =>
+            string.Equals(s.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+
+        if (set == null) return new List<LlmComprehensionQuestion>();
+
+        return set.Questions
+            .Take(_options.QuestionsPerBenchmark)
+            .Select(q => new LlmComprehensionQuestion
+            {
+                Id = q.Id,
+                Question = q.Question,
+                Category = ParseCategory(q.Category),
+                ExpectedAnswer = q.Answer
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// Loads the question bank from the Comprehension/questions.json file.
+    /// </summary>
+    private List<LlmQuestionSet> LoadQuestionsFromBank()
+    {
+        if (!string.IsNullOrEmpty(_options.QuestionsFilePath) && File.Exists(_options.QuestionsFilePath))
         {
-            // Evaluate Calor comprehension
-            var calorResponse = await AskQuestion(
-                provider,
-                context.CalorSource,
-                question.Question,
-                "Calor");
-
-            var calorCorrect = EvaluateAnswer(calorResponse.Answer, question.ExpectedAnswer);
-            calorScore += calorCorrect;
-            totalCalorTokens += calorResponse.TokensUsed;
-
-            // Evaluate C# comprehension
-            var csharpResponse = await AskQuestion(
-                provider,
-                context.CSharpSource,
-                question.Question,
-                "C#");
-
-            var csharpCorrect = EvaluateAnswer(csharpResponse.Answer, question.ExpectedAnswer);
-            csharpScore += csharpCorrect;
-            totalCsharpTokens += csharpResponse.TokensUsed;
+            try
+            {
+                var json = File.ReadAllText(_options.QuestionsFilePath);
+                return ParseQuestionSets(json);
+            }
+            catch
+            {
+                // Fall through to empty
+            }
         }
 
-        var questionCount = questions.Count;
-        return new LlmEvaluationResult
+        return new List<LlmQuestionSet>();
+    }
+
+    private static List<LlmQuestionSet> ParseQuestionSets(string json)
+    {
+        var doc = JsonDocument.Parse(json);
+        var sets = new List<LlmQuestionSet>();
+
+        if (!doc.RootElement.TryGetProperty("questionSets", out var setsArray))
+            return sets;
+
+        foreach (var setEl in setsArray.EnumerateArray())
         {
-            Provider = provider,
-            CalorScore = questionCount > 0 ? calorScore / questionCount : 0,
-            CSharpScore = questionCount > 0 ? csharpScore / questionCount : 0,
-            QuestionsAnswered = questionCount,
-            CalorTokensUsed = totalCalorTokens,
-            CSharpTokensUsed = totalCsharpTokens
+            var set = new LlmQuestionSet
+            {
+                FileId = setEl.GetProperty("fileId").GetString() ?? "",
+                FileName = setEl.GetProperty("fileName").GetString() ?? ""
+            };
+
+            if (setEl.TryGetProperty("questions", out var questionsArray))
+            {
+                foreach (var qEl in questionsArray.EnumerateArray())
+                {
+                    set.Questions.Add(new LlmQuestionEntry
+                    {
+                        Id = qEl.GetProperty("id").GetString() ?? "",
+                        Question = qEl.GetProperty("question").GetString() ?? "",
+                        Answer = qEl.GetProperty("answer").GetString() ?? "",
+                        Category = qEl.TryGetProperty("category", out var cat)
+                            ? cat.GetString() ?? "behavior" : "behavior",
+                        Difficulty = qEl.TryGetProperty("difficulty", out var diff)
+                            ? diff.GetInt32() : 1
+                    });
+                }
+            }
+
+            sets.Add(set);
+        }
+
+        return sets;
+    }
+
+    private static QuestionCategory ParseCategory(string category)
+    {
+        return category.ToLowerInvariant() switch
+        {
+            "semantics" => QuestionCategory.Semantics,
+            "behavior" => QuestionCategory.Behavior,
+            "structure" => QuestionCategory.Structure,
+            "contracts" => QuestionCategory.Contracts,
+            "effects" => QuestionCategory.Effects,
+            "algorithm" => QuestionCategory.Algorithm,
+            _ => QuestionCategory.Behavior
         };
     }
 
     /// <summary>
-    /// Generates comprehension questions based on code structure.
+    /// Generates structural comprehension questions when no curated questions exist.
     /// </summary>
-    private List<LlmComprehensionQuestion> GenerateLlmComprehensionQuestions(EvaluationContext context)
+    private static List<LlmComprehensionQuestion> GenerateStructuralQuestions(EvaluationContext context)
     {
         var questions = new List<LlmComprehensionQuestion>
         {
@@ -142,30 +253,33 @@ public class LlmEvaluationCalculator : IMetricCalculator
                 Id = "purpose",
                 Question = "What is the main purpose of this code? Answer in one sentence.",
                 Category = QuestionCategory.Semantics,
-                ExpectedAnswer = null // Will be evaluated semantically
+                ExpectedAnswer = null
             },
             new()
             {
                 Id = "inputs",
-                Question = "What are the input parameters and their types?",
-                Category = QuestionCategory.Structure
+                Question = "What are the input parameters and their types? List each parameter.",
+                Category = QuestionCategory.Structure,
+                ExpectedAnswer = null
             },
             new()
             {
                 Id = "outputs",
-                Question = "What does this code return?",
-                Category = QuestionCategory.Behavior
+                Question = "What does this code return? Describe the return type and meaning.",
+                Category = QuestionCategory.Behavior,
+                ExpectedAnswer = null
             }
         };
 
         // Add contract-specific questions if contracts are present
-        if (context.CalorSource.Contains("§REQ") || context.CalorSource.Contains("§ENS"))
+        if (context.CalorSource.Contains("§Q ") || context.CalorSource.Contains("§S "))
         {
             questions.Add(new LlmComprehensionQuestion
             {
                 Id = "contracts",
-                Question = "What preconditions must be satisfied before calling this function?",
-                Category = QuestionCategory.Contracts
+                Question = "What preconditions must be satisfied before calling this function? What postconditions does it guarantee?",
+                Category = QuestionCategory.Contracts,
+                ExpectedAnswer = null
             });
         }
 
@@ -175,8 +289,9 @@ public class LlmEvaluationCalculator : IMetricCalculator
             questions.Add(new LlmComprehensionQuestion
             {
                 Id = "effects",
-                Question = "What side effects does this code have?",
-                Category = QuestionCategory.Effects
+                Question = "What side effects does this code have? (e.g., console output, file I/O, network, database)",
+                Category = QuestionCategory.Effects,
+                ExpectedAnswer = null
             });
         }
 
@@ -184,70 +299,158 @@ public class LlmEvaluationCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Asks an LLM a question about code and returns the response.
+    /// Calls the Claude API to answer a question about code.
     /// </summary>
-    private async Task<LlmResponse> AskQuestion(
-        LlmProvider provider,
-        string code,
-        string question,
-        string languageName)
+    private async Task<LlmResponse> AskQuestionViaApi(
+        string apiKey, string code, string question, string languageName)
     {
-        // TODO: Implement actual LLM API calls
-        // For now, return a placeholder response
+        var systemPrompt = $"You are a code analysis expert. You will be given {languageName} code and a question about it. " +
+                           "Answer concisely and accurately. Focus only on what can be determined from the code shown.";
 
-        var prompt = $@"Given the following {languageName} code:
+        var userPrompt = $"Given the following {languageName} code:\n\n```\n{code}\n```\n\n{question}\n\nAnswer concisely:";
 
-```
-{code}
-```
-
-{question}";
-
-        // Simulate API call delay
-        await Task.Delay(10);
-
-        return provider switch
+        try
         {
-            LlmProvider.Claude => await CallClaudeApi(prompt),
-            LlmProvider.Gpt4 => await CallOpenAiApi(prompt),
-            _ => new LlmResponse { Answer = "", TokensUsed = 0 }
-        };
-    }
+            var result = await CallClaudeApi(apiKey, systemPrompt, userPrompt, DefaultModel,
+                _options.MaxTokensPerRequest);
 
-    private async Task<LlmResponse> CallClaudeApi(string prompt)
-    {
-        // TODO: Implement Anthropic API call
-        // var apiKey = _options.AnthropicApiKey ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
-
-        // Placeholder - actual implementation would use HttpClient to call the Anthropic API
-        await Task.Delay(1);
-        return new LlmResponse
+            return new LlmResponse
+            {
+                Answer = result.text,
+                TokensUsed = result.inputTokens + result.outputTokens
+            };
+        }
+        catch (Exception ex)
         {
-            Answer = "[Claude API not implemented]",
-            TokensUsed = 0
-        };
-    }
-
-    private async Task<LlmResponse> CallOpenAiApi(string prompt)
-    {
-        // TODO: Implement OpenAI API call
-        // var apiKey = _options.OpenAiApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-
-        // Placeholder - actual implementation would use HttpClient to call the OpenAI API
-        await Task.Delay(1);
-        return new LlmResponse
-        {
-            Answer = "[OpenAI API not implemented]",
-            TokensUsed = 0
-        };
+            return new LlmResponse
+            {
+                Answer = $"[API error: {ex.Message}]",
+                TokensUsed = 0
+            };
+        }
     }
 
     /// <summary>
-    /// Evaluates if an answer is correct compared to expected answer.
+    /// Uses an LLM as a judge to score an answer against the expected answer on a 0-1 scale.
+    /// This replaces naive string matching with semantic evaluation.
     /// </summary>
-    private static double EvaluateAnswer(string actual, string? expected)
+    private async Task<double> JudgeAnswerViaApi(
+        string apiKey, string question, string actualAnswer, string expectedAnswer)
     {
-        if (string.IsNullOrEmpty(actual))
+        if (string.IsNullOrWhiteSpace(actualAnswer) || actualAnswer.StartsWith("[API error"))
+            return 0.0;
+
+        var systemPrompt = "You are a grading assistant. Rate how well the actual answer matches the expected answer. " +
+                           "Output ONLY a number between 0.0 and 1.0. " +
+                           "1.0 = perfect match (same meaning), 0.8 = mostly correct, 0.5 = partially correct, 0.0 = wrong.";
+
+        var userPrompt = $"Question: {question}\n\nExpected answer: {expectedAnswer}\n\nActual answer: {actualAnswer}\n\nScore (0.0-1.0):";
+
+        try
+        {
+            var result = await CallClaudeApi(apiKey, systemPrompt, userPrompt, JudgeModel, 50);
+
+            // Parse the score from the response
+            var text = result.text.Trim();
+            if (double.TryParse(text, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var score))
+            {
+                return Math.Clamp(score, 0.0, 1.0);
+            }
+
+            // Try to extract a number from the response
+            var match = System.Text.RegularExpressions.Regex.Match(text, @"(\d+\.?\d*)");
+            if (match.Success && double.TryParse(match.Groups[1].Value,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var extractedScore))
+            {
+                return Math.Clamp(extractedScore, 0.0, 1.0);
+            }
+
+            // Fallback to heuristic
+            return EvaluateAnswerHeuristic(actualAnswer, expectedAnswer);
+        }
+        catch
+        {
+            return EvaluateAnswerHeuristic(actualAnswer, expectedAnswer);
+        }
+    }
+
+    /// <summary>
+    /// Calls the Claude API with the given prompts.
+    /// </summary>
+    private async Task<(string text, int inputTokens, int outputTokens)> CallClaudeApi(
+        string apiKey, string systemPrompt, string userPrompt, string model, int maxTokens)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, AnthropicApiEndpoint);
+        request.Headers.Add("x-api-key", apiKey);
+        request.Headers.Add("anthropic-version", AnthropicApiVersion);
+
+        var body = new
+        {
+            model = model,
+            max_tokens = maxTokens,
+            temperature = 0.0,
+            system = systemPrompt,
+            messages = new[]
+            {
+                new { role = "user", content = userPrompt }
+            }
+        };
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        var json = JsonSerializer.Serialize(body, jsonOptions);
+        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var response = await _httpClient.SendAsync(request, cts.Token);
+        var responseBody = await response.Content.ReadAsStringAsync(cts.Token);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException($"Claude API error: {response.StatusCode} - {responseBody}");
+        }
+
+        using var doc = JsonDocument.Parse(responseBody);
+        var root = doc.RootElement;
+
+        var text = "";
+        if (root.TryGetProperty("content", out var content))
+        {
+            foreach (var block in content.EnumerateArray())
+            {
+                if (block.TryGetProperty("type", out var type) && type.GetString() == "text" &&
+                    block.TryGetProperty("text", out var textEl))
+                {
+                    text += textEl.GetString();
+                }
+            }
+        }
+
+        var inputTokens = 0;
+        var outputTokens = 0;
+        if (root.TryGetProperty("usage", out var usage))
+        {
+            if (usage.TryGetProperty("input_tokens", out var inTok))
+                inputTokens = inTok.GetInt32();
+            if (usage.TryGetProperty("output_tokens", out var outTok))
+                outputTokens = outTok.GetInt32();
+        }
+
+        return (text, inputTokens, outputTokens);
+    }
+
+    /// <summary>
+    /// Evaluates if an answer is correct using heuristic matching (fallback when LLM judge is unavailable).
+    /// </summary>
+    private static double EvaluateAnswerHeuristic(string actual, string? expected)
+    {
+        if (string.IsNullOrEmpty(actual) || actual.StartsWith("[API error") || actual.StartsWith("[Claude API"))
             return 0;
 
         if (expected == null)
@@ -261,6 +464,10 @@ public class LlmEvaluationCalculator : IMetricCalculator
         if (actual.Contains(expected, StringComparison.OrdinalIgnoreCase))
             return 0.8;
 
+        // Expected contains actual
+        if (expected.Contains(actual, StringComparison.OrdinalIgnoreCase))
+            return 0.6;
+
         // Word overlap scoring
         var expectedWords = expected.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var actualWords = actual.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -271,7 +478,7 @@ public class LlmEvaluationCalculator : IMetricCalculator
     }
 
     /// <summary>
-    /// Calculates agreement between different LLM providers.
+    /// Calculates agreement between different evaluation runs.
     /// </summary>
     private static double CalculateCrossModelAgreement(List<LlmEvaluationResult> results)
     {
@@ -281,11 +488,9 @@ public class LlmEvaluationCalculator : IMetricCalculator
         var calorScores = results.Select(r => r.CalorScore).ToList();
         var csharpScores = results.Select(r => r.CSharpScore).ToList();
 
-        // Calculate coefficient of variation (lower = more agreement)
         var calorCv = CalculateCoefficientOfVariation(calorScores);
         var csharpCv = CalculateCoefficientOfVariation(csharpScores);
 
-        // Convert to agreement score (1 - CV, capped at 0)
         var avgCv = (calorCv + csharpCv) / 2;
         return Math.Max(0, 1 - avgCv);
     }
@@ -310,8 +515,19 @@ public class LlmEvaluationOptions
     public bool Enabled { get; set; }
     public string? AnthropicApiKey { get; set; }
     public string? OpenAiApiKey { get; set; }
-    public int MaxTokensPerRequest { get; set; } = 1000;
+    public int MaxTokensPerRequest { get; set; } = 500;
     public int QuestionsPerBenchmark { get; set; } = 5;
+
+    /// <summary>
+    /// Path to the questions.json file containing the question bank.
+    /// </summary>
+    public string? QuestionsFilePath { get; set; }
+
+    /// <summary>
+    /// Whether to use LLM-as-judge for answer evaluation (more accurate but costs tokens).
+    /// When false, falls back to heuristic string matching.
+    /// </summary>
+    public bool UseLlmJudge { get; set; } = true;
 }
 
 /// <summary>
@@ -368,6 +584,28 @@ public class LlmEvaluationResult
     public int QuestionsAnswered { get; init; }
     public int CalorTokensUsed { get; init; }
     public int CSharpTokensUsed { get; init; }
+}
+
+/// <summary>
+/// A question set loaded from the question bank file.
+/// </summary>
+internal class LlmQuestionSet
+{
+    public required string FileId { get; init; }
+    public required string FileName { get; init; }
+    public List<LlmQuestionEntry> Questions { get; init; } = new();
+}
+
+/// <summary>
+/// A single question entry from the question bank.
+/// </summary>
+internal class LlmQuestionEntry
+{
+    public required string Id { get; init; }
+    public required string Question { get; init; }
+    public required string Answer { get; init; }
+    public string Category { get; init; } = "behavior";
+    public int Difficulty { get; init; } = 1;
 }
 
 #endregion

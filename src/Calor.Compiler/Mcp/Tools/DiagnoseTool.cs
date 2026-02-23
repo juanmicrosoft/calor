@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Init;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -99,6 +100,12 @@ public sealed class DiagnoseTool : McpToolBase
                     };
                 }
 
+                // Enrich with common mistake suggestion if no compiler fix was found
+                if (output.Suggestion == null)
+                {
+                    output.CommonMistake = FindCommonMistake(d.Message, d.Code.ToString());
+                }
+
                 return output;
             }).ToList();
 
@@ -116,6 +123,66 @@ public sealed class DiagnoseTool : McpToolBase
         {
             return Task.FromResult(McpToolResult.Error($"Diagnose failed: {ex.Message}"));
         }
+    }
+
+    private static readonly Lazy<JsonDocument?> ErrorSuggestions = new(LoadErrorSuggestions);
+
+    private static JsonDocument? LoadErrorSuggestions()
+    {
+        try
+        {
+            var json = EmbeddedResourceHelper.ReadResource(
+                "Calor.Compiler.Resources.error-suggestions.json");
+            return JsonDocument.Parse(json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static CommonMistakeOutput? FindCommonMistake(string message, string code)
+    {
+        var doc = ErrorSuggestions.Value;
+        if (doc == null) return null;
+
+        var normalizedMessage = message.ToLowerInvariant();
+
+        foreach (var pattern in doc.RootElement.GetProperty("patterns").EnumerateArray())
+        {
+            // Check match codes
+            foreach (var mc in pattern.GetProperty("matchCodes").EnumerateArray())
+            {
+                var codeStr = mc.GetString();
+                if (codeStr != null && code.Contains(codeStr, StringComparison.OrdinalIgnoreCase))
+                {
+                    return BuildCommonMistake(pattern);
+                }
+            }
+
+            // Check match patterns against the error message
+            foreach (var mp in pattern.GetProperty("matchPatterns").EnumerateArray())
+            {
+                var patternStr = mp.GetString();
+                if (patternStr != null && normalizedMessage.Contains(patternStr.ToLowerInvariant()))
+                {
+                    return BuildCommonMistake(pattern);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static CommonMistakeOutput BuildCommonMistake(JsonElement pattern)
+    {
+        return new CommonMistakeOutput
+        {
+            Id = pattern.GetProperty("id").GetString() ?? "",
+            Title = pattern.GetProperty("title").GetString() ?? "",
+            Suggestion = pattern.GetProperty("description").GetString() ?? "",
+            CorrectExample = pattern.GetProperty("correctExample").GetString() ?? ""
+        };
     }
 
     private sealed class DiagnoseToolOutput
@@ -157,6 +224,25 @@ public sealed class DiagnoseTool : McpToolBase
         [JsonPropertyName("fix")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public FixOutput? Fix { get; set; }
+
+        [JsonPropertyName("commonMistake")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public CommonMistakeOutput? CommonMistake { get; set; }
+    }
+
+    private sealed class CommonMistakeOutput
+    {
+        [JsonPropertyName("id")]
+        public required string Id { get; init; }
+
+        [JsonPropertyName("title")]
+        public required string Title { get; init; }
+
+        [JsonPropertyName("suggestion")]
+        public required string Suggestion { get; init; }
+
+        [JsonPropertyName("correctExample")]
+        public required string CorrectExample { get; init; }
     }
 
     private sealed class FixOutput

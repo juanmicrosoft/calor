@@ -59,6 +59,10 @@ public static class Program
             description: "Number of runs for statistical analysis",
             getDefaultValue: () => 30);
 
+        var llmOption = new Option<bool>(
+            aliases: new[] { "--llm" },
+            description: "Enable LLM-based comprehension evaluation (requires ANTHROPIC_API_KEY)");
+
         runCommand.AddOption(outputOption);
         runCommand.AddOption(formatOption);
         runCommand.AddOption(categoryOption);
@@ -66,11 +70,21 @@ public static class Program
         runCommand.AddOption(manifestOption);
         runCommand.AddOption(statisticalOption);
         runCommand.AddOption(runsOption);
+        runCommand.AddOption(llmOption);
 
-        runCommand.SetHandler(async (output, format, categories, verbose, manifest, statistical, runs) =>
+        runCommand.SetHandler(async (context) =>
         {
-            await RunBenchmarksAsync(output, format, categories, verbose, manifest, statistical, runs);
-        }, outputOption, formatOption, categoryOption, verboseOption, manifestOption, statisticalOption, runsOption);
+            var output = context.ParseResult.GetValueForOption(outputOption)!;
+            var format = context.ParseResult.GetValueForOption(formatOption)!;
+            var categories = context.ParseResult.GetValueForOption(categoryOption) ?? Array.Empty<string>();
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var manifest = context.ParseResult.GetValueForOption(manifestOption);
+            var statistical = context.ParseResult.GetValueForOption(statisticalOption);
+            var runs = context.ParseResult.GetValueForOption(runsOption);
+            var llm = context.ParseResult.GetValueForOption(llmOption);
+
+            await RunBenchmarksAsync(output, format, categories, verbose, manifest, statistical, runs, llm);
+        });
 
         rootCommand.AddCommand(runCommand);
 
@@ -506,7 +520,8 @@ public static class Program
         bool verbose,
         string? manifestPath,
         bool statistical = false,
-        int runs = 30)
+        int runs = 30,
+        bool enableLlm = false)
     {
         Console.WriteLine("Calor vs C# Evaluation Framework");
         Console.WriteLine("================================");
@@ -517,8 +532,18 @@ public static class Program
             Verbose = verbose,
             Categories = categories.ToList(),
             StatisticalMode = statistical,
-            StatisticalRuns = runs
+            StatisticalRuns = runs,
+            EnableLlmEvaluation = enableLlm
         };
+
+        if (enableLlm)
+        {
+            var hasKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"));
+            Console.WriteLine(hasKey
+                ? "LLM evaluation enabled (ANTHROPIC_API_KEY found)"
+                : "WARNING: LLM evaluation enabled but ANTHROPIC_API_KEY not set — will return disabled status");
+            Console.WriteLine();
+        }
 
         if (statistical)
         {
