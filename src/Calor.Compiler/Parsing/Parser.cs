@@ -3442,9 +3442,28 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses a single value in a C# attribute argument.
+    /// Parses a value in a C# attribute argument, including bitwise OR expressions.
     /// </summary>
     private object ParseCSharpAttributeValue()
+    {
+        var left = ParseCSharpAttributePrimaryValue();
+
+        if (!Check(TokenKind.Pipe))
+            return left;
+
+        var operands = new List<object> { left };
+        while (Check(TokenKind.Pipe))
+        {
+            Advance(); // consume |
+            operands.Add(ParseCSharpAttributePrimaryValue());
+        }
+        return new BitwiseOrExpression(operands);
+    }
+
+    /// <summary>
+    /// Parses a single primary value in a C# attribute argument (literal, identifier, typeof, qualified name).
+    /// </summary>
+    private object ParseCSharpAttributePrimaryValue()
     {
         if (Check(TokenKind.StrLiteral))
         {

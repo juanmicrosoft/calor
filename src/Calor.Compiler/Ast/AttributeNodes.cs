@@ -85,9 +85,11 @@ public sealed class CalorAttributeArgument
     /// <summary>
     /// Gets the value formatted as a string for Calor/C# emission.
     /// </summary>
-    public string GetFormattedValue()
+    public string GetFormattedValue() => FormatSingleValue(Value);
+
+    internal static string FormatSingleValue(object value)
     {
-        return Value switch
+        return value switch
         {
             string s => $"\"{EscapeString(s)}\"",
             bool b => b ? "true" : "false",
@@ -101,8 +103,10 @@ public sealed class CalorAttributeArgument
             TypeOfReference tr => $"typeof({tr.TypeName})",
             // Member access expression (e.g., AttributeTargets.Method)
             MemberAccessReference ma => ma.Expression,
+            // Bitwise OR expression (e.g., AttributeTargets.Class | AttributeTargets.Struct)
+            BitwiseOrExpression bor => string.Join(" | ", bor.Operands.Select(o => FormatSingleValue(o))),
             // Default: treat as identifier/enum value
-            _ => Value?.ToString() ?? "null"
+            _ => value?.ToString() ?? "null"
         };
     }
 
@@ -145,4 +149,19 @@ public sealed class MemberAccessReference
     }
 
     public override string ToString() => Expression;
+}
+
+/// <summary>
+/// Represents a bitwise OR expression in an attribute argument (e.g., AttributeTargets.Class | AttributeTargets.Struct).
+/// </summary>
+public sealed class BitwiseOrExpression
+{
+    public IReadOnlyList<object> Operands { get; }
+
+    public BitwiseOrExpression(IReadOnlyList<object> operands)
+    {
+        Operands = operands;
+    }
+
+    public override string ToString() => string.Join(" | ", Operands);
 }
