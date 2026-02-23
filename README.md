@@ -187,26 +187,6 @@ See [calor mcp](https://juanmicrosoft.github.io/calor/docs/cli/mcp/) for the com
 - **[CLI Reference](https://juanmicrosoft.github.io/calor/docs/cli/)** — All `calor` commands including `mcp`, `analyze`, `convert`, and `migrate`
 - **[Benchmarking](https://juanmicrosoft.github.io/calor/docs/benchmarking/)** — How we measure Calor vs C#
 
-## Project Status
-
-- [x] Core compiler (lexer, parser, C# code generation)
-- [x] Control flow (for, if/else, while)
-- [x] Type system (Option, Result)
-- [x] Contracts (requires, ensures)
-- [x] Effects declarations
-- [x] MSBuild SDK integration
-- [x] AI agent initialization (`calor init`)
-- [x] Multi-AI support (Claude, OpenAI Codex, Google Gemini, GitHub Copilot)
-- [x] MCP server with 19 tools (`calor mcp`)
-- [x] Z3 static contract verification
-- [x] VS Code extension (syntax highlighting)
-- [x] C# to Calor converter (`calor convert`)
-- [x] Code analysis (`calor analyze`)
-- [x] C# interop blocks (`§CSHARP{...}§/CSHARP`)
-- [x] Evaluation framework (8 metrics, 40 programs)
-- [ ] Direct IL emission
-- [ ] IDE language server
-
 ## Contributing
 
 Calor is an experiment in language design for AI agents. We welcome contributions, especially:
