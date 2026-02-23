@@ -108,6 +108,7 @@ public class CorrectnessCalculator : IMetricCalculator
         var calorScore = EstimateCalorCorrectnessScore(context);
         var csharpScore = EstimateCSharpCorrectnessScore(context);
 
+        var source = context.CalorSource;
         var details = new Dictionary<string, object>
         {
             ["estimated"] = true,
@@ -115,12 +116,15 @@ public class CorrectnessCalculator : IMetricCalculator
             ["calorFactors"] = new Dictionary<string, object>
             {
                 ["compiles"] = context.CalorCompilation.Success,
-                ["hasPreconditions"] = context.CalorSource.Contains("§Q") ||
-                                       context.CalorSource.Contains("§REQ"),
-                ["hasNullChecks"] = context.CalorSource.Contains("null") ||
-                                    context.CalorSource.Contains("!= null"),
-                ["hasBoundsChecks"] = context.CalorSource.Contains(">=") &&
-                                      context.CalorSource.Contains("<")
+                ["hasPreconditions"] = source.Contains("§Q") || source.Contains("§REQ"),
+                ["hasPostconditions"] = source.Contains("§S ") || source.Contains("§S(") ||
+                                       source.Contains("§ENS"),
+                ["hasOptionHandling"] = source.Contains("Option<") || source.Contains("§SM") ||
+                                        source.Contains("§NN") || source.Contains("is_some") ||
+                                        source.Contains("is_none") || source.Contains("unwrap_or"),
+                ["hasBoundsChecks"] = HasCalorBoundsChecks(source),
+                ["hasConditionalReturns"] = source.Contains("→ §R") || source.Contains("§EL"),
+                ["hasAnalysisSignal"] = context.CalorCompilation.EdgeCaseCoverage?.CoverageScore > 0
             },
             ["csharpFactors"] = new Dictionary<string, object>
             {
@@ -157,21 +161,44 @@ public class CorrectnessCalculator : IMetricCalculator
             score += 0.15;
 
         // Postconditions indicate output validation
-        if (source.Contains("§S") || source.Contains("§ENS"))
+        // Use "§S " (with trailing space) to avoid matching §SM, §SB, §SET, etc.
+        if (source.Contains("§S ") || source.Contains("§S(") || source.Contains("§ENS"))
             score += 0.10;
 
-        // Null/bounds handling patterns
-        if (source.Contains("null"))
+        // Option type handling (Calor uses Option<T>/Some/None, not null)
+        if (source.Contains("Option<") || source.Contains("§SM") || source.Contains("§NN") ||
+            source.Contains("is_some") || source.Contains("is_none") || source.Contains("unwrap_or"))
             score += 0.10;
 
-        if (source.Contains(">=") && source.Contains("<"))
+        // Bounds checking — support both infix (>=, <) and lisp-style ((<=, (>=, (==)
+        if (HasCalorBoundsChecks(source))
             score += 0.10;
 
-        // Effect declarations indicate careful design
-        if (source.Contains("§E{"))
+        // Edge case returns — conditional returns (→ §R) and else branches (§EL)
+        if (source.Contains("→ §R") || source.Contains("§EL"))
+            score += 0.05;
+
+        // Analysis signal — AST analyzer detected defensive programming patterns
+        var coverage = context.CalorCompilation.EdgeCaseCoverage;
+        if (coverage != null && coverage.CoverageScore > 0)
             score += 0.05;
 
         return Math.Min(score, 1.0);
+    }
+
+    private static bool HasCalorBoundsChecks(string source)
+    {
+        // Infix operators
+        if (source.Contains(">=") && source.Contains("<"))
+            return true;
+
+        // Lisp-style comparisons against boundary values 0 or 1
+        // Patterns like (<= n 1), (== n 0), (< n 0), (>= n 0)
+        if ((source.Contains("(<= ") || source.Contains("(>= ") || source.Contains("(== ")) &&
+            (source.Contains(" 0)") || source.Contains(" 1)")))
+            return true;
+
+        return false;
     }
 
     private static double EstimateCSharpCorrectnessScore(EvaluationContext context)

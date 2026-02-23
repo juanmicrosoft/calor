@@ -1070,6 +1070,331 @@ namespace MathOps {
         Assert.True(result3.CalorDetectedViaContract, "Should detect §S followed by newline");
     }
 
+    #endregion
+
+    #region EdgeCaseCoverageAnalyzer
+
+    [Fact]
+    public void EdgeCaseCoverage_ProgramWithEarlyReturnGuards_DetectsGuards()
+    {
+        var source = @"
+§M{m001:Test}
+§F{f001:IsPrime:pub}
+  §I{i32:n}
+  §O{bool}
+  §IF{if1} (<= n 1) → §R false
+  §/I{if1}
+  §IF{if2} (<= n 3) → §R true
+  §/I{if2}
+  §IF{if3} (== (% n 2) 0) → §R false
+  §/I{if3}
+  §R true
+§/F{f001}
+§/M{m001}
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.Equal(3, result.EarlyReturnGuards);
+        Assert.Equal(1, result.TotalFunctions);
+        Assert.True(result.CoverageScore > 0, "Should have positive coverage score");
+    }
+
+    [Fact]
+    public void EdgeCaseCoverage_ProgramWithBoundaryChecks_DetectsBoundaries()
+    {
+        var source = @"
+§M{m001:Test}
+§F{f001:Clamp:pub}
+  §I{i32:n}
+  §O{i32}
+  §IF{if1} (< n 0) → §R INT:0
+  §/I{if1}
+  §IF{if2} (== n 1) → §R INT:1
+  §/I{if2}
+  §R n
+§/F{f001}
+§/M{m001}
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.True(result.BoundaryConditionChecks >= 2,
+            $"Should detect at least 2 boundary checks, got {result.BoundaryConditionChecks}");
+    }
+
+    [Fact]
+    public void EdgeCaseCoverage_ProgramWithElseBranches_DetectsCompleteness()
+    {
+        var source = @"
+§M{m001:Test}
+§F{f001:Abs:pub}
+  §I{i32:n}
+  §O{i32}
+  §IF{if1} (< n 0)
+    §R (- 0 n)
+  §EL
+    §R n
+  §/I{if1}
+§/F{f001}
+§/M{m001}
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.True(result.ElseBranches >= 1,
+            $"Should detect at least 1 else branch, got {result.ElseBranches}");
+    }
+
+    [Fact]
+    public void EdgeCaseCoverage_ProgramWithContracts_DetectsContractCoverage()
+    {
+        var source = @"
+§M{m001:Test}
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §S (>= result 0)
+  §R (/ a b)
+§/F{f001}
+§F{f002:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f002}
+§/M{m001}
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.Equal(2, result.TotalFunctions);
+        Assert.Equal(1, result.FunctionsWithContracts);
+    }
+
+    [Fact]
+    public void EdgeCaseCoverage_MinimalProgram_ScoresLow()
+    {
+        var source = @"
+§M{m001:Test}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§/M{m001}
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.Equal(0, result.EarlyReturnGuards);
+        Assert.Equal(0, result.BoundaryConditionChecks);
+        Assert.Equal(0, result.ElseBranches);
+        Assert.Equal(0, result.FunctionsWithContracts);
+        Assert.Equal(0.0, result.CoverageScore);
+    }
+
+    [Fact]
+    public void EdgeCaseCoverage_MatchExpressionWithWildcard_DetectsExhaustiveness()
+    {
+        // Match expression (inside return) with wildcard pattern
+        var source = @"
+§M{m001:Test}
+§F{f001:Describe:pub}
+  §I{i32:x}
+  §O{str}
+  §R §W{sw1} x
+    §K 1 → ""one""
+    §K 2 → ""two""
+    §K _ → ""other""
+  §/W{sw1}
+§/F{f001}
+§/M{m001}
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.True(result.ExhaustiveMatches >= 1,
+            $"Should detect exhaustive match with wildcard, got {result.ExhaustiveMatches}");
+    }
+
+    [Fact]
+    public void EdgeCaseCoverage_MatchStatementWithWildcard_DetectsExhaustiveness()
+    {
+        // Match statement (not inside return) with wildcard pattern
+        var source = @"
+§M{m001:Test}
+§F{f001:Test:pub}
+  §I{i32:x}
+  §O{i32}
+    §W{m1} x
+      §K 1
+        §R INT:10
+      §K _
+        §R INT:0
+    §/W{m1}
+§/F{f001}
+§/M{m001}
+";
+        var module = Parse(source, out var diag);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+
+        var result = EdgeCaseCoverageAnalyzer.Analyze(module);
+
+        Assert.True(result.ExhaustiveMatches >= 1,
+            $"Should detect exhaustive match statement with wildcard, got {result.ExhaustiveMatches}");
+    }
+
+    [Fact]
+    public async Task CorrectnessEstimation_CalorWithConditionalReturns_ScoresHigher()
+    {
+        // A Calor program with → §R conditional returns should score higher than base
+        var source = @"
+§M{m001:Test}
+§F{f001:Factorial:pub}
+  §I{i32:n}
+  §O{i32}
+  §Q (>= n 0)
+  §IF{if1} (<= n 1) → §R INT:1
+  §/I{if1}
+  §R (* n §C{Factorial} §A (- n 1) §/C)
+§/F{f001}
+§/M{m001}
+";
+        var ctx = new EvaluationContext
+        {
+            CalorSource = source,
+            CSharpSource = "class C { int Factorial(int n) => n <= 1 ? 1 : n * Factorial(n - 1); }",
+            FileName = "test"
+        };
+
+        var calc = new CorrectnessCalculator();
+        var result = await calc.CalculateAsync(ctx);
+
+        // Should get credit for preconditions, conditional returns, boundary checks, and analysis signal
+        Assert.True(result.CalorScore > 0.5,
+            $"Calor score {result.CalorScore} should be > 0.5 (base) with conditional returns");
+    }
+
+    [Fact]
+    public async Task CorrectnessEstimation_CalorWithDefensivePatterns_GetsAnalysisBonus()
+    {
+        // A program with actual defensive patterns should get the analysis signal bonus
+        // but a minimal program without them should not
+        var defensiveSource = @"
+§M{m001:Test}
+§F{f001:SafeDiv:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §IF{if1} (<= b 1) → §R INT:0
+  §/I{if1}
+  §R (/ a b)
+§/F{f001}
+§/M{m001}
+";
+        var minimalSource = @"
+§M{m001:Test}
+§F{f001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§/M{m001}
+";
+        var defensiveCtx = new EvaluationContext
+        {
+            CalorSource = defensiveSource,
+            CSharpSource = "class C { int SafeDiv(int a, int b) => b == 0 ? 0 : a / b; }",
+            FileName = "test"
+        };
+        var minimalCtx = new EvaluationContext
+        {
+            CalorSource = minimalSource,
+            CSharpSource = "class C { int Add(int a, int b) => a + b; }",
+            FileName = "test"
+        };
+
+        var calc = new CorrectnessCalculator();
+        var defensiveResult = await calc.CalculateAsync(defensiveCtx);
+        var minimalResult = await calc.CalculateAsync(minimalCtx);
+
+        // Defensive program should score higher than minimal — the analysis signal
+        // requires actual edge case coverage, not just absence of bugs
+        Assert.True(defensiveResult.CalorScore > minimalResult.CalorScore,
+            $"Defensive score {defensiveResult.CalorScore} should be > minimal score {minimalResult.CalorScore}");
+    }
+
+    [Fact]
+    public async Task CorrectnessEstimation_BothLanguagesCanReachMax()
+    {
+        // Verify that both languages can theoretically reach 1.0
+        // C# with all patterns
+        var csharpSource = @"
+class C {
+    int Divide(int a, int b) {
+        if (b == null) throw new ArgumentNullException(""b"");
+        if (b == 0) throw new ArgumentException(""b"");
+        if (a.Length > 0 && b.Count > 0) { }
+        try { return a / b; } catch { return 0; }
+        return -1;
+    }
+}";
+        // Calor with all patterns
+        var calorSource = @"
+§M{m001:Test}
+§F{f001:Divide:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §Q (!= b 0)
+  §S (>= result 0)
+  §IF{if1} (<= b 1) → §R INT:0
+  §/I{if1}
+  §IF{if2} (> a 0)
+    §R (/ a b)
+  §EL
+    §R INT:0
+  §/I{if2}
+§/F{f001}
+§/M{m001}
+";
+        var ctx = new EvaluationContext
+        {
+            CalorSource = calorSource,
+            CSharpSource = csharpSource,
+            FileName = "test"
+        };
+
+        var calc = new CorrectnessCalculator();
+        var result = await calc.CalculateAsync(ctx);
+
+        // Both should be able to reach high scores
+        Assert.True(result.CalorScore >= 0.9,
+            $"Calor score {result.CalorScore} should be >= 0.9 with all patterns");
+        Assert.True(result.CSharpScore >= 0.9,
+            $"C# score {result.CSharpScore} should be >= 0.9 with all patterns");
+    }
+
+    #endregion
+
     private static string? FindTestDataDir()
     {
         var dir = Path.GetDirectoryName(typeof(BugDetectionImprovementTests).Assembly.Location);
@@ -1085,6 +1410,4 @@ namespace MathOps {
         }
         return null;
     }
-
-    #endregion
 }

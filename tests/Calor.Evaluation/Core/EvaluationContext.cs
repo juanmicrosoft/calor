@@ -113,13 +113,28 @@ public class EvaluationContext
                 }
             }
 
+            // Run edge case coverage analysis if parse succeeded
+            EdgeCaseCoverageResult? edgeCaseCoverage = null;
+            if (compilationSuccess && module != null)
+            {
+                try
+                {
+                    edgeCaseCoverage = EdgeCaseCoverageAnalyzer.Analyze(module);
+                }
+                catch
+                {
+                    // Edge case analysis failures are non-fatal
+                }
+            }
+
             return new CalorCompilationResult(
                 Success: compilationSuccess,
                 Module: module,
                 Tokens: tokens,
                 Errors: compilationErrors,
                 AnalysisResult: analysisResult,
-                AllDiagnostics: diagnostics.ToList());
+                AllDiagnostics: diagnostics.ToList(),
+                EdgeCaseCoverage: edgeCaseCoverage);
         }
         catch (Exception ex)
         {
@@ -190,7 +205,8 @@ public record CalorCompilationResult(
     List<Token> Tokens,
     List<string> Errors,
     VerificationAnalysisResult? AnalysisResult = null,
-    IReadOnlyList<CalorDiagnostic>? AllDiagnostics = null);
+    IReadOnlyList<CalorDiagnostic>? AllDiagnostics = null,
+    EdgeCaseCoverageResult? EdgeCaseCoverage = null);
 
 /// <summary>
 /// Result of compiling C# source code.
