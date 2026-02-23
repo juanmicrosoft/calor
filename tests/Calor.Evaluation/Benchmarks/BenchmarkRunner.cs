@@ -38,7 +38,21 @@ public class BenchmarkRunner
             new CorrectnessCalculator()
         };
 
-        // Note: LLM-based metrics are NOT included here:
+        // Optionally add LLM-based comprehension evaluation
+        if (_options.EnableLlmEvaluation)
+        {
+            var questionsPath = Path.Combine(benchmarkPath, "Comprehension", "questions.json");
+            _calculators.Add(new LlmEvaluationCalculator(new LlmEvaluationOptions
+            {
+                Enabled = true,
+                AnthropicApiKey = _options.AnthropicApiKey,
+                QuestionsFilePath = questionsPath,
+                QuestionsPerBenchmark = _options.LlmQuestionsPerBenchmark,
+                UseLlmJudge = _options.UseLlmJudge
+            }));
+        }
+
+        // Note: Other LLM-based metrics are NOT included here:
         // - TaskCompletionCalculator: run via 'llm-tasks' command
         // - SafetyCalculator: run via 'safety-benchmark' command
         // - EffectDisciplineCalculator: run via 'effect-discipline' command
@@ -501,4 +515,24 @@ public class BenchmarkRunnerOptions
     /// Confidence level for intervals (default: 0.95 = 95%).
     /// </summary>
     public double ConfidenceLevel { get; set; } = 0.95;
+
+    /// <summary>
+    /// Enable LLM-based comprehension evaluation (requires ANTHROPIC_API_KEY).
+    /// </summary>
+    public bool EnableLlmEvaluation { get; set; }
+
+    /// <summary>
+    /// Anthropic API key for LLM evaluation (uses ANTHROPIC_API_KEY env var if null).
+    /// </summary>
+    public string? AnthropicApiKey { get; set; }
+
+    /// <summary>
+    /// Number of questions per benchmark for LLM evaluation (default: 5).
+    /// </summary>
+    public int LlmQuestionsPerBenchmark { get; set; } = 5;
+
+    /// <summary>
+    /// Whether to use LLM-as-judge for answer scoring (more accurate but more expensive).
+    /// </summary>
+    public bool UseLlmJudge { get; set; } = true;
 }

@@ -1,7 +1,61 @@
 {
-  "version": "1.0",
-  "description": "Comprehension questions for Calor vs C# evaluation",
+  "version": "2.0",
+  "description": "Comprehension questions for Calor vs C# evaluation — 100+ questions across all 40 programs",
   "questionSets": [
+    {
+      "fileId": "001",
+      "fileName": "HelloWorld",
+      "questions": [
+        {
+          "id": "hello_q1",
+          "question": "What side effect does this program have?",
+          "answer": "It writes to the console (prints 'Hello from Calor!')",
+          "category": "effects",
+          "difficulty": 1
+        },
+        {
+          "id": "hello_q2",
+          "question": "What does the effect annotation §E{cw} indicate?",
+          "answer": "Console write — the function performs console output",
+          "category": "effects",
+          "difficulty": 1
+        },
+        {
+          "id": "hello_q3",
+          "question": "What is the return type of the Main function?",
+          "answer": "void — it returns nothing",
+          "category": "structure",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "002",
+      "fileName": "Calculator",
+      "questions": [
+        {
+          "id": "calc_q1",
+          "question": "How many functions does this module contain?",
+          "answer": "4 functions: Add, Subtract, Multiply, Divide",
+          "category": "structure",
+          "difficulty": 1
+        },
+        {
+          "id": "calc_q2",
+          "question": "Does the Divide function have any safety contracts?",
+          "answer": "No, it has no preconditions — division by zero is unguarded",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "calc_q3",
+          "question": "What side effects do any of these functions have?",
+          "answer": "None — all functions are pure (no §E{} declarations)",
+          "category": "effects",
+          "difficulty": 1
+        }
+      ]
+    },
     {
       "fileId": "003",
       "fileName": "FizzBuzz",
@@ -37,6 +91,60 @@
       ]
     },
     {
+      "fileId": "004",
+      "fileName": "Factorial",
+      "questions": [
+        {
+          "id": "fact_q1",
+          "question": "What algorithm does this use — recursion or iteration?",
+          "answer": "Iteration — it uses a while loop (§WH) with a counter",
+          "category": "algorithm",
+          "difficulty": 1
+        },
+        {
+          "id": "fact_q2",
+          "question": "What is the initial value of the result variable?",
+          "answer": "1",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "fact_q3",
+          "question": "Does this function have any preconditions?",
+          "answer": "No — there are no §Q contracts, so negative inputs are unguarded",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "005",
+      "fileName": "Fibonacci",
+      "questions": [
+        {
+          "id": "fib_q1",
+          "question": "What does the function return for input 0 or 1?",
+          "answer": "Returns n itself (0 or 1)",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "fib_q2",
+          "question": "What control flow structures are used?",
+          "answer": "An if-else (§IF/§EL) for the base case and a while loop (§WH) for iteration",
+          "category": "structure",
+          "difficulty": 1
+        },
+        {
+          "id": "fib_q3",
+          "question": "How does the iterative approach track state?",
+          "answer": "Using three mutable variables: a (previous), b (current), and i (counter), swapping at each step",
+          "category": "algorithm",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
       "fileId": "006",
       "fileName": "ContractedDivide",
       "questions": [
@@ -57,9 +165,103 @@
         {
           "id": "divide_q3",
           "question": "What effect annotation does this function have?",
-          "answer": "Pure - it has no side effects",
+          "answer": "Pure — it has no side effects (no §E{} declaration)",
           "category": "effects",
           "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "007",
+      "fileName": "StringUtils",
+      "questions": [
+        {
+          "id": "strutil_q1",
+          "question": "How many string utility functions are provided?",
+          "answer": "4: GetLength, ToUpper, ToLower, Concat",
+          "category": "structure",
+          "difficulty": 1
+        },
+        {
+          "id": "strutil_q2",
+          "question": "What does the GetLength function use to determine string length?",
+          "answer": "The (len s) built-in function",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "strutil_q3",
+          "question": "Do any of these functions have side effects?",
+          "answer": "No — all are pure functions with no effect declarations",
+          "category": "effects",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "008",
+      "fileName": "MathOperations",
+      "questions": [
+        {
+          "id": "mathops_q1",
+          "question": "What postcondition does the Abs function guarantee?",
+          "answer": "The result is >= 0",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "mathops_q2",
+          "question": "How does Abs handle negative numbers without a built-in abs?",
+          "answer": "Uses an if expression: if x < 0 return (0 - x), else return x",
+          "category": "algorithm",
+          "difficulty": 2
+        },
+        {
+          "id": "mathops_q3",
+          "question": "How many functions have postconditions (§S)?",
+          "answer": "One — only Abs has a postcondition (result >= 0)",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "009",
+      "fileName": "ArraySum",
+      "questions": [
+        {
+          "id": "arrsum_q1",
+          "question": "How does the Sum function add three numbers?",
+          "answer": "Nested addition: (+ (+ a b) c)",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "arrsum_q2",
+          "question": "What is the difference between Sum and SumTwo?",
+          "answer": "Sum takes 3 parameters, SumTwo takes 2",
+          "category": "structure",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "010",
+      "fileName": "MaxValue",
+      "questions": [
+        {
+          "id": "maxval_q1",
+          "question": "How does Max3 determine the maximum of three numbers?",
+          "answer": "Nested if-else: compares a vs b first, then the winner against c",
+          "category": "algorithm",
+          "difficulty": 2
+        },
+        {
+          "id": "maxval_q2",
+          "question": "Where does the Max function end?",
+          "answer": "At §/F{f001} — the closing tag explicitly marks the boundary",
+          "category": "structure",
+          "difficulty": 1
         }
       ]
     },
@@ -91,6 +293,208 @@
       ]
     },
     {
+      "fileId": "012",
+      "fileName": "BinarySearch",
+      "questions": [
+        {
+          "id": "binsearch_q1",
+          "question": "What does Find return when the target matches val2?",
+          "answer": "1 (the index of the second value)",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "binsearch_q2",
+          "question": "What does Find return when the target is not found?",
+          "answer": "-1",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "binsearch_q3",
+          "question": "How many comparisons does this function make in the worst case?",
+          "answer": "3 — it checks val1, then val2, then val3 sequentially using §EI",
+          "category": "algorithm",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "013",
+      "fileName": "TemperatureConverter",
+      "questions": [
+        {
+          "id": "temp_q1",
+          "question": "What is the formula used for CelsiusToFahrenheit?",
+          "answer": "(c * 1.8) + 32",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "temp_q2",
+          "question": "How many conversion functions are provided?",
+          "answer": "3: CelsiusToFahrenheit, FahrenheitToCelsius, CelsiusToKelvin",
+          "category": "structure",
+          "difficulty": 1
+        },
+        {
+          "id": "temp_q3",
+          "question": "Do any functions have preconditions on temperature values?",
+          "answer": "No — there are no §Q contracts, so any f64 value is accepted",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "014",
+      "fileName": "LeapYear",
+      "questions": [
+        {
+          "id": "leap_q1",
+          "question": "What does IsLeapYear return for year 2000?",
+          "answer": "true — 2000 is divisible by 400",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "leap_q2",
+          "question": "In what order are the divisibility checks performed?",
+          "answer": "First 400, then 100, then 4 — using §IF/§EI/§EI/§EL chain",
+          "category": "algorithm",
+          "difficulty": 2
+        },
+        {
+          "id": "leap_q3",
+          "question": "What happens for year 1900?",
+          "answer": "Returns false — 1900 is divisible by 100 but not 400",
+          "category": "behavior",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "015",
+      "fileName": "GCD",
+      "questions": [
+        {
+          "id": "gcd_q1",
+          "question": "What algorithm is used?",
+          "answer": "Euclidean algorithm using modulo — iterates while y != 0",
+          "category": "algorithm",
+          "difficulty": 1
+        },
+        {
+          "id": "gcd_q2",
+          "question": "What is the loop termination condition?",
+          "answer": "The loop continues while y is not equal to 0 (!= y 0)",
+          "category": "structure",
+          "difficulty": 1
+        },
+        {
+          "id": "gcd_q3",
+          "question": "How are the values swapped each iteration?",
+          "answer": "temp = y, y = x % y, x = temp",
+          "category": "algorithm",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "016",
+      "fileName": "ReverseString",
+      "questions": [
+        {
+          "id": "revstr_q1",
+          "question": "What does the Swap function do?",
+          "answer": "Concatenates b and a in reversed order",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "revstr_q2",
+          "question": "What does the Identity function do?",
+          "answer": "Returns the input string unchanged",
+          "category": "behavior",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "017",
+      "fileName": "CountVowels",
+      "questions": [
+        {
+          "id": "vowel_q1",
+          "question": "Which characters are considered vowels?",
+          "answer": "a, e, i, o, u (lowercase only)",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "vowel_q2",
+          "question": "Does IsVowel handle uppercase vowels?",
+          "answer": "No — it only checks lowercase letters",
+          "category": "behavior",
+          "difficulty": 2
+        },
+        {
+          "id": "vowel_q3",
+          "question": "What control flow pattern is used for the multiple comparisons?",
+          "answer": "An if/else-if chain using §IF/§EI/§EI/§EI/§EI/§EL",
+          "category": "structure",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "018",
+      "fileName": "Palindrome",
+      "questions": [
+        {
+          "id": "palindrome_q1",
+          "question": "What does IsPalindrome3 check?",
+          "answer": "Whether the first and third characters (a and c) are equal",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "palindrome_q2",
+          "question": "How many functions are in this module?",
+          "answer": "2: IsPalindrome3 and AreEqual",
+          "category": "structure",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "019",
+      "fileName": "Power",
+      "questions": [
+        {
+          "id": "power_q1",
+          "question": "What precondition does the Power function require?",
+          "answer": "The exponent (exp) must be >= 0",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "power_q2",
+          "question": "What inputs will cause this function to throw a contract violation?",
+          "answer": "Any negative exponent value (exp < 0)",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "power_q3",
+          "question": "What is the algorithm used?",
+          "answer": "Iterative multiplication — multiplies result by base, exp times",
+          "category": "algorithm",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
       "fileId": "020",
       "fileName": "Clamp",
       "questions": [
@@ -113,6 +517,532 @@
           "question": "What is the precondition for the min and max parameters?",
           "answer": "min must be less than or equal to max",
           "category": "contracts",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "021",
+      "fileName": "Stack",
+      "questions": [
+        {
+          "id": "stack_q1",
+          "question": "How does NewCount determine the updated count?",
+          "answer": "If isPush is true, adds 1 to oldCount; otherwise subtracts 1",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "stack_q2",
+          "question": "What does IsEmpty return?",
+          "answer": "true if count equals 0, false otherwise",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "stack_q3",
+          "question": "Does this module have contracts to prevent popping from an empty stack?",
+          "answer": "No — there are no preconditions (§Q) on NewCount to guard against negative counts",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "022",
+      "fileName": "Queue",
+      "questions": [
+        {
+          "id": "queue_q1",
+          "question": "What is the structural difference between Queue and Stack modules?",
+          "answer": "They are structurally identical — both use isPush/isEnqueue boolean to determine increment/decrement",
+          "category": "structure",
+          "difficulty": 2
+        },
+        {
+          "id": "queue_q2",
+          "question": "Does this queue have any side effects?",
+          "answer": "No — all functions are pure with no effect declarations",
+          "category": "effects",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "023",
+      "fileName": "LinkedList",
+      "questions": [
+        {
+          "id": "llist_q1",
+          "question": "What functions does the LinkedList module provide?",
+          "answer": "3 functions: IsEmpty, Size, and NewSize",
+          "category": "structure",
+          "difficulty": 1
+        },
+        {
+          "id": "llist_q2",
+          "question": "How does NewSize calculate the updated size?",
+          "answer": "Adds 1 if isAdd is true, subtracts 1 otherwise",
+          "category": "behavior",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "024",
+      "fileName": "BinaryTree",
+      "questions": [
+        {
+          "id": "btree_q1",
+          "question": "What does CompareValues return for equal inputs?",
+          "answer": "0",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "btree_q2",
+          "question": "How does the module determine tree traversal direction?",
+          "answer": "ShouldGoLeft returns true if value < nodeValue, ShouldGoRight if value > nodeValue",
+          "category": "algorithm",
+          "difficulty": 2
+        },
+        {
+          "id": "btree_q3",
+          "question": "What does CompareValues return when a < b?",
+          "answer": "-1",
+          "category": "behavior",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "025",
+      "fileName": "Singleton",
+      "questions": [
+        {
+          "id": "singleton_q1",
+          "question": "What does SetValue return?",
+          "answer": "The newValue parameter — it replaces the old value",
+          "category": "behavior",
+          "difficulty": 1
+        },
+        {
+          "id": "singleton_q2",
+          "question": "Does this implementation have any thread-safety contracts?",
+          "answer": "No — there are no contracts or synchronization mechanisms",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "026",
+      "fileName": "Factory",
+      "questions": [
+        {
+          "id": "factory_q1",
+          "question": "What preconditions does RectangleArea require?",
+          "answer": "Both width > 0 and height > 0",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "factory_q2",
+          "question": "What postcondition is shared across all area functions?",
+          "answer": "result >= 0 — all areas must be non-negative",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "factory_q3",
+          "question": "What inputs will cause CircleArea to throw a contract violation?",
+          "answer": "Any radius <= 0 (the precondition requires radius > 0.0)",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "factory_q4",
+          "question": "How many shape calculation functions are defined?",
+          "answer": "5: CircleArea, RectangleArea, SquareArea, CirclePerimeter, RectanglePerimeter",
+          "category": "structure",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "027",
+      "fileName": "ShoppingCart",
+      "questions": [
+        {
+          "id": "cart_q1",
+          "question": "What preconditions does ItemTotal enforce?",
+          "answer": "price > 0 and quantity > 0",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "cart_q2",
+          "question": "What constraints does the TotalWithTax function place on taxRate?",
+          "answer": "taxRate must be >= 0 and <= 1.0 (0% to 100%)",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "cart_q3",
+          "question": "What guarantee does TotalWithTax make about its result?",
+          "answer": "The result is >= subtotal (tax can only increase the total)",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "cart_q4",
+          "question": "What happens in NewQuantity when the result would be negative?",
+          "answer": "It returns 0 instead — quantity cannot go below zero",
+          "category": "behavior",
+          "difficulty": 2
+        },
+        {
+          "id": "cart_q5",
+          "question": "How many preconditions (§Q) are in the entire module?",
+          "answer": "7 preconditions across 4 functions",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "028",
+      "fileName": "QuickSort",
+      "questions": [
+        {
+          "id": "qsort_q1",
+          "question": "What does ChoosePivot return?",
+          "answer": "The high index — it uses the last element as pivot",
+          "category": "algorithm",
+          "difficulty": 1
+        },
+        {
+          "id": "qsort_q2",
+          "question": "What preconditions does ChoosePivot require?",
+          "answer": "low >= 0 and low <= high",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "qsort_q3",
+          "question": "What does ShouldSwap determine?",
+          "answer": "Whether a value should be placed before the pivot (value <= pivot)",
+          "category": "algorithm",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "cv001",
+      "fileName": "ProvableContracts",
+      "questions": [
+        {
+          "id": "prov_q1",
+          "question": "What postconditions does the Max function guarantee?",
+          "answer": "result >= a AND result >= b",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "prov_q2",
+          "question": "What are all contracts on the Clamp function?",
+          "answer": "Precondition: min <= max. Postconditions: result >= min AND result <= max",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "prov_q3",
+          "question": "Can you verify that Abs always satisfies result >= 0?",
+          "answer": "Yes — when x >= 0, result = x >= 0; when x < 0, result = -x > 0",
+          "category": "contracts",
+          "difficulty": 3
+        }
+      ]
+    },
+    {
+      "fileId": "cv002",
+      "fileName": "BuggyContracts",
+      "questions": [
+        {
+          "id": "buggy_q1",
+          "question": "Why does BadAbs violate its postcondition?",
+          "answer": "It returns x directly without negating negative values, so result can be < 0",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "buggy_q2",
+          "question": "For what inputs does BadMax violate result >= b?",
+          "answer": "When b > a — BadMax always returns a regardless of comparison",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "buggy_q3",
+          "question": "Why does BadDivide always violate its postcondition?",
+          "answer": "It always returns 0 instead of a/b — the ensures clause (result == a/b) fails for most inputs",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "cv003",
+      "fileName": "MixedContracts",
+      "questions": [
+        {
+          "id": "mixed_q1",
+          "question": "Which functions have provably correct contracts?",
+          "answer": "GoodSquare (x*x >= 0), SafeDivide (with != 0 guard), and ComplexCondition (x+y > 0 when both > 0)",
+          "category": "contracts",
+          "difficulty": 3
+        },
+        {
+          "id": "mixed_q2",
+          "question": "Why is BadNegate's postcondition (result < 0) not always true?",
+          "answer": "When x = 0, (- 0 x) = 0 which is not < 0",
+          "category": "contracts",
+          "difficulty": 3
+        },
+        {
+          "id": "mixed_q3",
+          "question": "What message is shown if SafeDivide's precondition is violated?",
+          "answer": "divisor must not be zero",
+          "category": "contracts",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "cv004",
+      "fileName": "OverflowUnsafe",
+      "questions": [
+        {
+          "id": "ovunsafe_q1",
+          "question": "Why can IncrementUnsafe violate result > x?",
+          "answer": "Integer overflow: when x = 2147483647 (max i32), x+1 wraps to -2147483648",
+          "category": "contracts",
+          "difficulty": 3
+        },
+        {
+          "id": "ovunsafe_q2",
+          "question": "What input causes SquareUnsafe to violate result >= 0?",
+          "answer": "Large values like x = 46341 cause x*x to overflow, producing a negative result",
+          "category": "contracts",
+          "difficulty": 3
+        },
+        {
+          "id": "ovunsafe_q3",
+          "question": "How many functions in this module have unsafe contracts?",
+          "answer": "6 — all functions have contracts that can be violated due to integer overflow",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "cv005",
+      "fileName": "OverflowSafe",
+      "questions": [
+        {
+          "id": "ovsafe_q1",
+          "question": "How does IncrementSafe prevent overflow?",
+          "answer": "Precondition: x < 2147483647 — prevents x+1 from wrapping",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "ovsafe_q2",
+          "question": "What bound does SquareSafe use to prevent overflow?",
+          "answer": "x <= 46340 — because 46340^2 = 2147395600 fits in i32, but 46341^2 overflows",
+          "category": "contracts",
+          "difficulty": 3
+        },
+        {
+          "id": "ovsafe_q3",
+          "question": "How many preconditions does AddPositivesSafe have?",
+          "answer": "4: x > 0, x < 1073741824, y > 0, y < 1073741824",
+          "category": "contracts",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "cv006",
+      "fileName": "StringContracts",
+      "questions": [
+        {
+          "id": "strcon_q1",
+          "question": "What does ConcatLonger's postcondition guarantee?",
+          "answer": "The result length is greater than the length of b (since non-empty a is prepended)",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "strcon_q2",
+          "question": "What does ContainsImpliesLength verify?",
+          "answer": "If haystack contains needle, then haystack length >= needle length",
+          "category": "contracts",
+          "difficulty": 3
+        },
+        {
+          "id": "strcon_q3",
+          "question": "What precondition does NonEmptyLength require?",
+          "answer": "The string must not be empty: (! (isempty s))",
+          "category": "contracts",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "cv007",
+      "fileName": "ArrayContracts",
+      "questions": [
+        {
+          "id": "arrcon_q1",
+          "question": "What does ValidIndex check?",
+          "answer": "Whether index is in range [0, length) — both >= 0 and < length",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "arrcon_q2",
+          "question": "What does MidpointIndex guarantee about its result?",
+          "answer": "result >= low AND result < high — the midpoint is always within bounds",
+          "category": "contracts",
+          "difficulty": 2
+        },
+        {
+          "id": "arrcon_q3",
+          "question": "How does MidpointIndex avoid integer overflow?",
+          "answer": "Uses low + (high - low) / 2 instead of (low + high) / 2",
+          "category": "algorithm",
+          "difficulty": 3
+        }
+      ]
+    },
+    {
+      "fileId": "es001",
+      "fileName": "CorrectEffects",
+      "questions": [
+        {
+          "id": "correff_q1",
+          "question": "Which functions have console write effects?",
+          "answer": "LogMessage and LogAndCompute — both declare §E{cw}",
+          "category": "effects",
+          "difficulty": 1
+        },
+        {
+          "id": "correff_q2",
+          "question": "Is ComputeSum a pure function?",
+          "answer": "Yes — it has no effect declaration and only performs arithmetic",
+          "category": "effects",
+          "difficulty": 1
+        },
+        {
+          "id": "correff_q3",
+          "question": "Does LogAndCompute correctly declare all its effects?",
+          "answer": "Yes — it prints to console and declares §E{cw}",
+          "category": "effects",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "es002",
+      "fileName": "MissingEffects",
+      "questions": [
+        {
+          "id": "misseff_q1",
+          "question": "Does HiddenNetwork have any undeclared effects?",
+          "answer": "The function is named HiddenNetwork but only returns the url — it has no actual side effects",
+          "category": "effects",
+          "difficulty": 2
+        },
+        {
+          "id": "misseff_q2",
+          "question": "What effect does UndeclaredWrite declare?",
+          "answer": "§E{cw} — console write, though it seems to represent a file write conceptually",
+          "category": "effects",
+          "difficulty": 2
+        }
+      ]
+    },
+    {
+      "fileId": "es003",
+      "fileName": "HiddenNetworkEffect",
+      "questions": [
+        {
+          "id": "hidnet_q1",
+          "question": "What functions does ProcessOrder call?",
+          "answer": "SaveOrder and NotifyCustomer — through §C{} call syntax",
+          "category": "structure",
+          "difficulty": 1
+        },
+        {
+          "id": "hidnet_q2",
+          "question": "Does ProcessOrder correctly declare its effects?",
+          "answer": "It declares §E{cw} — matching its transitive calls which all use console write",
+          "category": "effects",
+          "difficulty": 2
+        },
+        {
+          "id": "hidnet_q3",
+          "question": "What arguments are passed to NotifyCustomer?",
+          "answer": "email and the string literal 'Order shipped'",
+          "category": "behavior",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "ie001",
+      "fileName": "BclCoverage",
+      "questions": [
+        {
+          "id": "bcl_q1",
+          "question": "Which function has a side effect?",
+          "answer": "LogMessage — it declares §E{cw} and prints the message",
+          "category": "effects",
+          "difficulty": 1
+        },
+        {
+          "id": "bcl_q2",
+          "question": "Are ConcatStrings, GetLength, and ToUpperCase pure?",
+          "answer": "Yes — they have no effect declarations and only transform data",
+          "category": "effects",
+          "difficulty": 1
+        }
+      ]
+    },
+    {
+      "fileId": "ie002",
+      "fileName": "PureFunctions",
+      "questions": [
+        {
+          "id": "pure_q1",
+          "question": "Do any functions in this module have side effects?",
+          "answer": "No — all 6 functions are pure with no effect declarations",
+          "category": "effects",
+          "difficulty": 1
+        },
+        {
+          "id": "pure_q2",
+          "question": "What is the only function with a precondition?",
+          "answer": "Power — requires exp >= 0",
+          "category": "contracts",
+          "difficulty": 1
+        },
+        {
+          "id": "pure_q3",
+          "question": "How many functions are defined in this module?",
+          "answer": "6: Add, Multiply, Abs, Max, Power, StringConcat",
+          "category": "structure",
           "difficulty": 1
         }
       ]
