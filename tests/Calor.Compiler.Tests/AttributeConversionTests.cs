@@ -512,6 +512,217 @@ public class AttributeConversionTests
 
     #endregion
 
+    #region Bitwise OR in Attribute Arguments
+
+    [Fact]
+    public void Parser_ParsesBitwiseOrInAttribute()
+    {
+        var calorSource = """
+            §M{m001:TestModule}
+              §CL{c001:MyAttribute}[@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        Assert.Single(module.Classes);
+
+        var cls = module.Classes[0];
+        Assert.Single(cls.CSharpAttributes);
+
+        var attr = cls.CSharpAttributes[0];
+        Assert.Equal("AttributeUsage", attr.Name);
+        Assert.Single(attr.Arguments);
+
+        var value = attr.Arguments[0].Value;
+        var bor = Assert.IsType<BitwiseOrExpression>(value);
+        Assert.Equal(2, bor.Operands.Count);
+    }
+
+    [Fact]
+    public void Parser_ParsesThreeOperandBitwiseOr()
+    {
+        var calorSource = """
+            §M{m001:TestModule}
+              §CL{c001:MyAttribute}[@Flags][@AttributeUsage(A.X | A.Y | A.Z)]
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var cls = module.Classes[0];
+        var attrUsage = cls.CSharpAttributes.First(a => a.Name == "AttributeUsage");
+        var bor = Assert.IsType<BitwiseOrExpression>(attrUsage.Arguments[0].Value);
+        Assert.Equal(3, bor.Operands.Count);
+    }
+
+    [Fact]
+    public void RoundTrip_BitwiseOrAttribute_Preserved()
+    {
+        var calorSource = """
+            §M{m001:TestModule}
+              §CL{c001:MyAttribute}[@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        // Parse Calor
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        // Emit C#
+        var csharpEmitter = new CSharpEmitter();
+        var outputCode = csharpEmitter.Emit(module);
+
+        Assert.Contains("AttributeTargets.Class | AttributeTargets.Struct", outputCode);
+    }
+
+    [Fact]
+    public void Parser_ParsesNamedArgWithBitwiseOr()
+    {
+        var calorSource = """
+            §M{m001:TestModule}
+              §CL{c001:MyAttribute}[@AttributeUsage(ValidOn = AttributeTargets.Class | AttributeTargets.Struct)]
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var attr = module.Classes[0].CSharpAttributes[0];
+        Assert.Equal("AttributeUsage", attr.Name);
+        Assert.Single(attr.Arguments);
+        Assert.Equal("ValidOn", attr.Arguments[0].Name);
+
+        var bor = Assert.IsType<BitwiseOrExpression>(attr.Arguments[0].Value);
+        Assert.Equal(2, bor.Operands.Count);
+    }
+
+    [Fact]
+    public void Parser_ParsesMixedArgsWithBitwiseOr()
+    {
+        var calorSource = """
+            §M{m001:TestModule}
+              §CL{c001:TestClass}[@SomeAttr("text", Flags = A.X | A.Y)]
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var attr = module.Classes[0].CSharpAttributes[0];
+        Assert.Equal("SomeAttr", attr.Name);
+        Assert.Equal(2, attr.Arguments.Count);
+
+        // First arg: positional string
+        Assert.Null(attr.Arguments[0].Name);
+        Assert.Equal("text", attr.Arguments[0].Value);
+
+        // Second arg: named bitwise OR
+        Assert.Equal("Flags", attr.Arguments[1].Name);
+        var bor = Assert.IsType<BitwiseOrExpression>(attr.Arguments[1].Value);
+        Assert.Equal(2, bor.Operands.Count);
+    }
+
+    [Fact]
+    public void RoundTrip_CSharpToCalorToCSharp_BitwiseOrPreserved()
+    {
+        var csharpSource = """
+            using System;
+
+            [Flags]
+            [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+            public class MyAttribute : Attribute
+            {
+            }
+            """;
+
+        // C# → Calor AST
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        // Verify the converter produced a BitwiseOrExpression (not a plain string)
+        var cls = result.Ast!.Classes[0];
+        var attrUsage = cls.CSharpAttributes.First(a => a.Name == "AttributeUsage");
+        Assert.Single(attrUsage.Arguments);
+        Assert.IsType<BitwiseOrExpression>(attrUsage.Arguments[0].Value);
+
+        // Calor AST → Calor text
+        var calorEmitter = new CalorEmitter();
+        var calorCode = calorEmitter.Emit(result.Ast!);
+
+        Assert.Contains("AttributeTargets.Class | AttributeTargets.Struct", calorCode);
+
+        // Parse Calor text back
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorCode, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var parsedModule = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        // Calor AST → C#
+        var csharpEmitter = new CSharpEmitter();
+        var outputCode = csharpEmitter.Emit(parsedModule);
+
+        Assert.Contains("AttributeTargets.Class | AttributeTargets.Struct", outputCode);
+    }
+
+    [Fact]
+    public void Parser_TrailingPipeInAttribute_ReportsError()
+    {
+        var calorSource = """
+            §M{m001:TestModule}
+              §CL{c001:MyClass}[@SomeAttr(A.X | )]
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        parser.Parse();
+
+        Assert.True(diagnostics.HasErrors);
+        var error = diagnostics.First(d => d.Code == DiagnosticCode.UnexpectedToken);
+        Assert.Contains("attribute value", error.Message);
+        Assert.Contains("CloseParen", error.Message);
+    }
+
+    #endregion
+
     private static string GetErrorMessage(ConversionResult result)
     {
         if (result.Success) return "";

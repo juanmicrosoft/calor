@@ -4905,7 +4905,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             TypeOfExpressionSyntax typeOf => new TypeOfReference(typeOf.Type.ToString()),
             MemberAccessExpressionSyntax memberAccess => new MemberAccessReference(memberAccess.ToString()),
             IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.BitwiseOrExpression)
+                => ConvertBitwiseOrExpression(binary),
             _ => expression.ToString()
         };
+    }
+
+    private BitwiseOrExpression ConvertBitwiseOrExpression(BinaryExpressionSyntax binary)
+    {
+        var operands = new List<object>();
+        CollectBitwiseOrOperands(binary, operands);
+        return new BitwiseOrExpression(operands);
+    }
+
+    private void CollectBitwiseOrOperands(ExpressionSyntax expression, List<object> operands)
+    {
+        if (expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.BitwiseOrExpression))
+        {
+            CollectBitwiseOrOperands(binary.Left, operands);
+            CollectBitwiseOrOperands(binary.Right, operands);
+        }
+        else
+        {
+            operands.Add(ConvertAttributeValue(expression));
+        }
     }
 }
