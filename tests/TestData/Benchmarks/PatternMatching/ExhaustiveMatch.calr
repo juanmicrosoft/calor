@@ -1,0 +1,17 @@
+§M{m001:ExhaustiveMatch}
+§F{f001:CardSuit:pub}
+  §I{i32:suit}
+  §O{i32}
+  §IF{if1} (== suit 0) → §R 0
+  §EI (== suit 1) → §R 1
+  §EI (== suit 2) → §R 2
+  §EI (== suit 3) → §R 3
+  §EL → §R (- 0 1)
+  §/I{if1}
+§/F{f001}
+§F{f002:IsRed:pub}
+  §I{i32:suit}
+  §O{bool}
+  §R (|| (== suit 1) (== suit 2))
+§/F{f002}
+§/M{m001}

@@ -1,0 +1,11 @@
+§M{m001:SealedClass}
+§F{f001:GetValue:pub}
+  §I{i32:value}
+  §O{i32}
+  §R value
+§/F{f001}
+§F{f002:IsImmutable:pub}
+  §O{bool}
+  §R true
+§/F{f002}
+§/M{m001}

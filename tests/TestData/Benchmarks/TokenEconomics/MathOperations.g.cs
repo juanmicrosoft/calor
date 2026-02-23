@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace MathOps
 {
@@ -24,7 +28,7 @@ namespace MathOps
             }
 
 
-            if (!((__result__ >= 0))) throw new InvalidOperationException("Postcondition failed: (__result__ >= 0)");
+            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 58, length: 16, sourceFile: null, line: 5, column: 3, condition: "(__result__ >= 0)");
             return __result__;
         }
 

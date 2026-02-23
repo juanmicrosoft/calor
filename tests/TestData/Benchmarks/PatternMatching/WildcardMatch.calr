@@ -1,0 +1,15 @@
+§M{m001:WildcardMatch}
+§F{f001:DefaultValue:pub}
+  §I{i32:typeCode}
+  §O{i32}
+  §IF{if1} (== typeCode 0) → §R 0
+  §EI (== typeCode 1) → §R 1
+  §EL → §R (- 0 1)
+  §/I{if1}
+§/F{f001}
+§F{f002:IsKnown:pub}
+  §I{i32:typeCode}
+  §O{bool}
+  §R (&& (>= typeCode 0) (<= typeCode 1))
+§/F{f002}
+§/M{m001}

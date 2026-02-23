@@ -1,0 +1,37 @@
+§M{m001:SumDigits}
+§F{f001:LastDigit:pub}
+  §I{i32:n}
+  §O{i32}
+  §S (>= result 0)
+  §B{r} (% n 10)
+  §IF{if1} (< r 0) → §R (- 0 r)
+  §EL → §R r
+  §/I{if1}
+§/F{f001}
+§F{f002:RemoveLastDigit:pub}
+  §I{i32:n}
+  §O{i32}
+  §R (/ n 10)
+§/F{f002}
+§F{f003:SumDigitsPositive:pub}
+  §I{i32:n}
+  §O{i32}
+  §Q (>= n 0)
+  §S (>= result 0)
+  §IF{if1} (== n 0) → §R 0
+  §/I{if1}
+  §B{digit} §C{LastDigit} §A n §/C
+  §B{remaining} §C{SumDigitsPositive} §A (/ n 10) §/C
+  §R (+ digit remaining)
+§/F{f003}
+§F{f004:SumDigits:pub}
+  §I{i32:n}
+  §O{i32}
+  §S (>= result 0)
+  §IF{if1} (< n 0)
+    §B{posN} (- 0 n)
+    §R §C{SumDigitsPositive} §A posN §/C
+  §/I{if1}
+  §R §C{SumDigitsPositive} §A n §/C
+§/F{f004}
+§/M{m001}

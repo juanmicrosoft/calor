@@ -1,0 +1,30 @@
+§M{m001:MaxHeap}
+§F{f001:Parent:pub}
+  §I{i32:index}
+  §O{i32}
+  §Q (> index 0)
+  §R (/ (- index 1) 2)
+§/F{f001}
+§F{f002:LeftChild:pub}
+  §I{i32:index}
+  §O{i32}
+  §R (+ (* 2 index) 1)
+§/F{f002}
+§F{f003:RightChild:pub}
+  §I{i32:index}
+  §O{i32}
+  §R (+ (* 2 index) 2)
+§/F{f003}
+§F{f004:ShouldSwapUp:pub}
+  §I{i32:child}
+  §I{i32:parent}
+  §O{bool}
+  §R (> child parent)
+§/F{f004}
+§F{f005:HasChild:pub}
+  §I{i32:childIndex}
+  §I{i32:size}
+  §O{bool}
+  §R (< childIndex size)
+§/F{f005}
+§/M{m001}

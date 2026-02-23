@@ -1,0 +1,15 @@
+§M{m001:SimpleMatch}
+§F{f001:DayName:pub}
+  §I{i32:day}
+  §O{i32}
+  §IF{if1} (== day 1) → §R 1
+  §EI (== day 2) → §R 2
+  §EI (== day 3) → §R 3
+  §EI (== day 4) → §R 4
+  §EI (== day 5) → §R 5
+  §EI (== day 6) → §R 6
+  §EI (== day 7) → §R 7
+  §EL → §R 0
+  §/I{if1}
+§/F{f001}
+§/M{m001}

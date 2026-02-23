@@ -1,0 +1,25 @@
+§M{m001:Deque}
+§F{f001:CanRemove:pub}
+  §I{i32:size}
+  §O{bool}
+  §R (> size 0)
+§/F{f001}
+§F{f002:NewSizeAfterAdd:pub}
+  §I{i32:size}
+  §O{i32}
+  §S (> result size)
+  §R (+ size 1)
+§/F{f002}
+§F{f003:NewSizeAfterRemove:pub}
+  §I{i32:size}
+  §O{i32}
+  §Q (> size 0)
+  §S (< result size)
+  §R (- size 1)
+§/F{f003}
+§F{f004:IsEmpty:pub}
+  §I{i32:size}
+  §O{bool}
+  §R (== size 0)
+§/F{f004}
+§/M{m001}

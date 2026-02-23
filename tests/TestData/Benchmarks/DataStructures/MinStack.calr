@@ -1,0 +1,21 @@
+§M{m001:MinStack}
+§F{f001:NewMin:pub}
+  §I{i32:value}
+  §I{i32:currentMin}
+  §O{i32}
+  §IF{if1} (< value currentMin) → §R value
+  §EL → §R currentMin
+  §/I{if1}
+§/F{f001}
+§F{f002:IsNewMin:pub}
+  §I{i32:value}
+  §I{i32:currentMin}
+  §O{bool}
+  §R (<= value currentMin)
+§/F{f002}
+§F{f003:CanPop:pub}
+  §I{i32:size}
+  §O{bool}
+  §R (> size 0)
+§/F{f003}
+§/M{m001}

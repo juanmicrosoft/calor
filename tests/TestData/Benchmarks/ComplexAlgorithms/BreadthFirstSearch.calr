@@ -1,0 +1,18 @@
+§M{m001:BreadthFirstSearch}
+§F{f001:IsGoal:pub}
+  §I{i32:current}
+  §I{i32:target}
+  §O{bool}
+  §R (== current target)
+§/F{f001}
+§F{f002:QueueEmpty:pub}
+  §I{i32:queueSize}
+  §O{bool}
+  §R (== queueSize 0)
+§/F{f002}
+§F{f003:Distance:pub}
+  §I{i32:parentDist}
+  §O{i32}
+  §R (+ parentDist 1)
+§/F{f003}
+§/M{m001}

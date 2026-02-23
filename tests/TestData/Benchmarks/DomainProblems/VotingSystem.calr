@@ -1,0 +1,27 @@
+§M{m001:VotingSystem}
+§F{f001:AddVote:pub}
+  §I{i32:currentVotes}
+  §O{i32}
+  §R (+ currentVotes 1)
+§/F{f001}
+§F{f002:HasMajority:pub}
+  §I{i32:votes}
+  §I{i32:totalVotes}
+  §O{bool}
+  §Q (> totalVotes 0)
+  §R (> (* votes 2) totalVotes)
+§/F{f002}
+§F{f003:Percentage:pub}
+  §I{i32:votes}
+  §I{i32:totalVotes}
+  §O{f64}
+  §Q (> totalVotes 0)
+  §R (* (/ (cast f64 votes) (cast f64 totalVotes)) 100.0)
+§/F{f003}
+§F{f004:IsValid:pub}
+  §I{i32:totalVotes}
+  §I{i32:eligibleVoters}
+  §O{bool}
+  §R (<= totalVotes eligibleVoters)
+§/F{f004}
+§/M{m001}

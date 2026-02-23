@@ -1,0 +1,18 @@
+§M{m001:ArraySlice}
+§F{f001:SliceLength:pub}
+  §I{i32:start}
+  §I{i32:end}
+  §O{i32}
+  §Q (>= start 0)
+  §Q (> end start)
+  §S (> result 0)
+  §R (- end start)
+§/F{f001}
+§F{f002:IsValidSlice:pub}
+  §I{i32:start}
+  §I{i32:end}
+  §I{i32:length}
+  §O{bool}
+  §R (&& (&& (>= start 0) (<= end length)) (>= end start))
+§/F{f002}
+§/M{m001}

@@ -1,0 +1,32 @@
+§M{m001:LinqPipeline}
+§F{f001:SumPositive:pub}
+  §I{i32:value}
+  §I{i32:acc}
+  §O{i32}
+  §IF{if1} (> value 0) → §R (+ acc value)
+  §EL → §R acc
+  §/I{if1}
+§/F{f001}
+§F{f002:CountEven:pub}
+  §I{i32:value}
+  §I{i32:acc}
+  §O{i32}
+  §IF{if1} (== (% value 2) 0) → §R (+ acc 1)
+  §EL → §R acc
+  §/I{if1}
+§/F{f002}
+§F{f003:MaxOfTwo:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §IF{if1} (> a b) → §R a
+  §EL → §R b
+  §/I{if1}
+§/F{f003}
+§F{f004:AnyAboveThreshold:pub}
+  §I{i32:value}
+  §I{i32:threshold}
+  §O{bool}
+  §R (> value threshold)
+§/F{f004}
+§/M{m001}

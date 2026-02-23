@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Factorial
 {
@@ -12,17 +16,15 @@ namespace Factorial
     {
         public static int Calculate(int n)
         {
-            if ((n <= 1))
+            var result = 1;
+            var i = 2;
+            while ((i <= n))
             {
-                return 1;
-            }
-            else
-            {
-                int prev = default;
-                Calculate((n - 1));
-                return (n * prev);
+                result = (result * i);
+                i = (i + 1);
             }
 
+            return result;
         }
 
     }

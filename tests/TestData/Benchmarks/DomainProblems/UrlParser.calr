@@ -1,0 +1,24 @@
+§M{m001:UrlParser}
+§F{f001:HasProtocol:pub}
+  §I{bool:startsWithHttp}
+  §O{bool}
+  §R startsWithHttp
+§/F{f001}
+§F{f002:IsSecure:pub}
+  §I{bool:isHttps}
+  §O{bool}
+  §R isHttps
+§/F{f002}
+§F{f003:DefaultPort:pub}
+  §I{bool:isHttps}
+  §O{i32}
+  §IF{if1} isHttps → §R 443
+  §EL → §R 80
+  §/I{if1}
+§/F{f003}
+§F{f004:IsValidPort:pub}
+  §I{i32:port}
+  §O{bool}
+  §R (&& (> port 0) (<= port 65535))
+§/F{f004}
+§/M{m001}

@@ -1,0 +1,21 @@
+§M{m001:SimpleClass}
+§F{f001:CreateAge:pub}
+  §I{i32:birthYear}
+  §I{i32:currentYear}
+  §O{i32}
+  §Q (> currentYear birthYear)
+  §S (> result 0)
+  §R (- currentYear birthYear)
+§/F{f001}
+§F{f002:IsAdult:pub}
+  §I{i32:age}
+  §O{bool}
+  §R (>= age 18)
+§/F{f002}
+§F{f003:FullName:pub}
+  §I{str:first}
+  §I{str:last}
+  §O{str}
+  §R first
+§/F{f003}
+§/M{m001}

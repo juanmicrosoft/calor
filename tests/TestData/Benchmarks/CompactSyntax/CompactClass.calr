@@ -1,0 +1,25 @@
+§M{m001:CompactClass}
+§F{f001:Greet:pub}
+  §I{str:name}
+  §O{str}
+  §E{cw}
+  §P name
+  §R name
+§/F{f001}
+§F{f002:Square:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (>= result 0)
+  §R (* x x)
+§/F{f002}
+§F{f003:Max:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §S (>= result a)
+  §S (>= result b)
+  §IF{if1} (> a b) → §R a
+  §EL → §R b
+  §/I{if1}
+§/F{f003}
+§/M{m001}

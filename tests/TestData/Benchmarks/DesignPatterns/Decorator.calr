@@ -1,0 +1,26 @@
+§M{m001:Decorator}
+§F{f001:BasePrice:pub}
+  §I{f64:price}
+  §O{f64}
+  §Q (> price 0.0)
+  §R price
+§/F{f001}
+§F{f002:WithTax:pub}
+  §I{f64:price}
+  §I{f64:taxRate}
+  §O{f64}
+  §Q (> price 0.0)
+  §Q (>= taxRate 0.0)
+  §S (>= result price)
+  §R (* price (+ 1.0 taxRate))
+§/F{f002}
+§F{f003:WithDiscount:pub}
+  §I{f64:price}
+  §I{f64:discount}
+  §O{f64}
+  §Q (> price 0.0)
+  §Q (>= discount 0.0)
+  §Q (<= discount 1.0)
+  §R (* price (- 1.0 discount))
+§/F{f003}
+§/M{m001}

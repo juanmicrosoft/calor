@@ -1,0 +1,14 @@
+§M{m001:Contains}
+§F{f001:Matches:pub}
+  §I{i32:value}
+  §I{i32:target}
+  §O{bool}
+  §R (== value target)
+§/F{f001}
+§F{f002:IsInRange:pub}
+  §I{i32:index}
+  §I{i32:length}
+  §O{bool}
+  §R (&& (>= index 0) (< index length))
+§/F{f002}
+§/M{m001}

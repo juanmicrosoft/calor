@@ -1,0 +1,36 @@
+§M{m001:RangeContracts}
+§F{f001:ClampByte:pub}
+  §I{i32:value}
+  §O{i32}
+  §S (>= result 0)
+  §S (<= result 255)
+  §IF{if1} (< value 0) → §R 0
+  §EI (> value 255) → §R 255
+  §EL → §R value
+  §/I{if1}
+§/F{f001}
+§F{f002:Percentage:pub}
+  §I{i32:part}
+  §I{i32:whole}
+  §O{i32}
+  §Q (> whole 0)
+  §Q (>= part 0)
+  §Q (<= part whole)
+  §S (>= result 0)
+  §S (<= result 100)
+  §R (/ (* part 100) whole)
+§/F{f002}
+§F{f003:MapRange:pub}
+  §I{i32:value}
+  §I{i32:inMin}
+  §I{i32:inMax}
+  §I{i32:outMin}
+  §I{i32:outMax}
+  §O{i32}
+  §Q (< inMin inMax)
+  §Q (< outMin outMax)
+  §Q (>= value inMin)
+  §Q (<= value inMax)
+  §R (+ outMin (/ (* (- value inMin) (- outMax outMin)) (- inMax inMin)))
+§/F{f003}
+§/M{m001}

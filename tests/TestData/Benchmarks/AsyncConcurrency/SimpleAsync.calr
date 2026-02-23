@@ -1,0 +1,11 @@
+§M{m001:SimpleAsync}
+§AF{f001:GetValue:pub}
+  §O{i32}
+  §E{net}
+  §R 42
+§/AF{f001}
+§F{f002:Fallback:pub}
+  §O{i32}
+  §R 0
+§/F{f002}
+§/M{m001}

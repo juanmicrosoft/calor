@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace MathUtils
 {
@@ -12,16 +16,16 @@ namespace MathUtils
     {
         public static int GCD(int a, int b)
         {
-            if ((b == 0))
+            var x = a;
+            var y = b;
+            while ((y != 0))
             {
-                return a;
-            }
-            else
-            {
-                return;
-                GCD(b, (a % b));
+                var temp = y;
+                y = (x % y);
+                x = temp;
             }
 
+            return x;
         }
 
     }

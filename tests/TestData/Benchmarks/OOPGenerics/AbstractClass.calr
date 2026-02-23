@@ -1,0 +1,15 @@
+§M{m001:AbstractClass}
+§F{f001:BaseProcess:pub}
+  §I{i32:input}
+  §I{i32:factor}
+  §O{i32}
+  §R (* input factor)
+§/F{f001}
+§F{f002:Validate:pub}
+  §I{i32:value}
+  §I{i32:min}
+  §I{i32:max}
+  §O{bool}
+  §R (&& (>= value min) (<= value max))
+§/F{f002}
+§/M{m001}

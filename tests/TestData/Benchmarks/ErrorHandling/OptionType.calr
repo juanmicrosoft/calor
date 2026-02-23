@@ -1,0 +1,23 @@
+§M{m001:OptionType}
+§F{f001:HasValue:pub}
+  §I{bool:isSome}
+  §O{bool}
+  §R isSome
+§/F{f001}
+§F{f002:Unwrap:pub}
+  §I{i32:value}
+  §I{bool:isSome}
+  §O{i32}
+  §Q (== isSome true)
+  §R value
+§/F{f002}
+§F{f003:GetOrElse:pub}
+  §I{i32:value}
+  §I{i32:fallback}
+  §I{bool:isSome}
+  §O{i32}
+  §IF{if1} isSome → §R value
+  §EL → §R fallback
+  §/I{if1}
+§/F{f003}
+§/M{m001}

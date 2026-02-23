@@ -1,0 +1,19 @@
+§M{m001:Adapter}
+§F{f001:MilesToKm:pub}
+  §I{f64:miles}
+  §O{f64}
+  §Q (>= miles 0.0)
+  §R (* miles 1.60934)
+§/F{f001}
+§F{f002:KmToMiles:pub}
+  §I{f64:km}
+  §O{f64}
+  §Q (>= km 0.0)
+  §R (* km 0.621371)
+§/F{f002}
+§F{f003:FahrenheitToCelsius:pub}
+  §I{f64:f}
+  §O{f64}
+  §R (/ (* (- f 32.0) 5.0) 9.0)
+§/F{f003}
+§/M{m001}

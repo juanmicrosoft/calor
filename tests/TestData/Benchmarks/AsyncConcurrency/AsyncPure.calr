@@ -1,0 +1,14 @@
+§M{m001:AsyncPure}
+§AF{f001:PureAdd:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/AF{f001}
+§AF{f002:PureMultiply:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (* a b)
+§/AF{f002}
+§/M{m001}

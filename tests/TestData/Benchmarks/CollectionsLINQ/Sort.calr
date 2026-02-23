@@ -1,0 +1,20 @@
+§M{m001:Sort}
+§F{f001:CompareAsc:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{bool}
+  §R (< a b)
+§/F{f001}
+§F{f002:CompareDesc:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{bool}
+  §R (> a b)
+§/F{f002}
+§F{f003:IsSorted:pub}
+  §I{i32:prev}
+  §I{i32:current}
+  §O{bool}
+  §R (<= prev current)
+§/F{f003}
+§/M{m001}

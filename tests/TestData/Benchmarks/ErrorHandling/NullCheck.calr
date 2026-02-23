@@ -1,0 +1,16 @@
+§M{m001:NullCheck}
+§F{f001:IsNull:pub}
+  §I{bool:isNull}
+  §O{bool}
+  §R isNull
+§/F{f001}
+§F{f002:CoalesceInt:pub}
+  §I{i32:value}
+  §I{i32:fallback}
+  §I{bool:hasValue}
+  §O{i32}
+  §IF{if1} hasValue → §R value
+  §EL → §R fallback
+  §/I{if1}
+§/F{f002}
+§/M{m001}

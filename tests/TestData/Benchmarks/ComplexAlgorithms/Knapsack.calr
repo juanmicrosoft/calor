@@ -1,0 +1,26 @@
+§M{m001:Knapsack}
+§F{f001:BetterValue:pub}
+  §I{i32:withItem}
+  §I{i32:withoutItem}
+  §O{i32}
+  §IF{if1} (> withItem withoutItem) → §R withItem
+  §EL → §R withoutItem
+  §/I{if1}
+§/F{f001}
+§F{f002:Fits:pub}
+  §I{i32:weight}
+  §I{i32:capacity}
+  §O{bool}
+  §Q (> weight 0)
+  §Q (>= capacity 0)
+  §R (<= weight capacity)
+§/F{f002}
+§F{f003:RemainingCapacity:pub}
+  §I{i32:capacity}
+  §I{i32:weight}
+  §O{i32}
+  §Q (>= capacity weight)
+  §S (>= result 0)
+  §R (- capacity weight)
+§/F{f003}
+§/M{m001}

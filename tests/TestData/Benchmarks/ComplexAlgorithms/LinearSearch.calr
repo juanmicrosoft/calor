@@ -1,0 +1,18 @@
+§M{m001:LinearSearch}
+§F{f001:IsMatch:pub}
+  §I{i32:value}
+  §I{i32:target}
+  §O{bool}
+  §R (== value target)
+§/F{f001}
+§F{f002:NotFound:pub}
+  §O{i32}
+  §R (- 0 1)
+§/F{f002}
+§F{f003:HasMore:pub}
+  §I{i32:index}
+  §I{i32:length}
+  §O{bool}
+  §R (< index length)
+§/F{f003}
+§/M{m001}

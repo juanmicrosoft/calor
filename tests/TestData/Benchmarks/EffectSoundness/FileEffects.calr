@@ -1,0 +1,23 @@
+§M{m001:FileService}
+§F{f001:ReadFile:pub}
+  §I{str:path}
+  §O{str}
+  §E{fr}
+  §R path
+§/F{f001}
+§F{f002:WriteFile:pub}
+  §I{str:path}
+  §I{str:content}
+  §O{void}
+  §E{fw}
+  §P content
+§/F{f002}
+§F{f003:ProcessFile:pub}
+  §I{str:input}
+  §I{str:output}
+  §O{void}
+  §E{fr}
+  §E{fw}
+  §P input
+§/F{f003}
+§/M{m001}

@@ -1,0 +1,24 @@
+§M{m001:DisjointSet}
+§F{f001:IsRoot:pub}
+  §I{i32:node}
+  §I{i32:parent}
+  §O{bool}
+  §R (== node parent)
+§/F{f001}
+§F{f002:ShouldMerge:pub}
+  §I{i32:rootA}
+  §I{i32:rootB}
+  §O{bool}
+  §R (!= rootA rootB)
+§/F{f002}
+§F{f003:PickRoot:pub}
+  §I{i32:rankA}
+  §I{i32:rankB}
+  §I{i32:rootA}
+  §I{i32:rootB}
+  §O{i32}
+  §IF{if1} (>= rankA rankB) → §R rootA
+  §EL → §R rootB
+  §/I{if1}
+§/F{f003}
+§/M{m001}

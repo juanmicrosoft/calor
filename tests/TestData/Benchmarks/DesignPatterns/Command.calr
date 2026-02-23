@@ -1,0 +1,24 @@
+§M{m001:Command}
+§F{f001:Execute:pub}
+  §I{i32:value}
+  §I{i32:delta}
+  §O{i32}
+  §R (+ value delta)
+§/F{f001}
+§F{f002:Undo:pub}
+  §I{i32:value}
+  §I{i32:delta}
+  §O{i32}
+  §R (- value delta)
+§/F{f002}
+§F{f003:CanUndo:pub}
+  §I{i32:historySize}
+  §O{bool}
+  §R (> historySize 0)
+§/F{f003}
+§F{f004:HistoryPush:pub}
+  §I{i32:historySize}
+  §O{i32}
+  §R (+ historySize 1)
+§/F{f004}
+§/M{m001}

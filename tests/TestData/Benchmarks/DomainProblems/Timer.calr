@@ -1,0 +1,26 @@
+§M{m001:Timer}
+§F{f001:SecondsToMinutes:pub}
+  §I{i32:seconds}
+  §O{i32}
+  §Q (>= seconds 0)
+  §R (/ seconds 60)
+§/F{f001}
+§F{f002:RemainingSeconds:pub}
+  §I{i32:seconds}
+  §O{i32}
+  §Q (>= seconds 0)
+  §R (% seconds 60)
+§/F{f002}
+§F{f003:IsExpired:pub}
+  §I{i32:remaining}
+  §O{bool}
+  §R (<= remaining 0)
+§/F{f003}
+§F{f004:Tick:pub}
+  §I{i32:remaining}
+  §O{i32}
+  §Q (> remaining 0)
+  §S (< result remaining)
+  §R (- remaining 1)
+§/F{f004}
+§/M{m001}

@@ -1,0 +1,25 @@
+§M{m001:Trie}
+§F{f001:CharIndex:pub}
+  §I{i32:charCode}
+  §O{i32}
+  §Q (>= charCode 97)
+  §Q (<= charCode 122)
+  §S (>= result 0)
+  §S (< result 26)
+  §R (- charCode 97)
+§/F{f001}
+§F{f002:IsValidChar:pub}
+  §I{i32:charCode}
+  §O{bool}
+  §R (&& (>= charCode 97) (<= charCode 122))
+§/F{f002}
+§F{f003:IsEndOfWord:pub}
+  §I{bool:flag}
+  §O{bool}
+  §R flag
+§/F{f003}
+§F{f004:AlphabetSize:pub}
+  §O{i32}
+  §R 26
+§/F{f004}
+§/M{m001}

@@ -1,0 +1,16 @@
+§M{m001:GroupBy}
+§F{f001:GroupKey:pub}
+  §I{i32:value}
+  §I{i32:divisor}
+  §O{i32}
+  §Q (!= divisor 0)
+  §R (/ value divisor)
+§/F{f001}
+§F{f002:BucketIndex:pub}
+  §I{i32:value}
+  §I{i32:bucketSize}
+  §O{i32}
+  §Q (> bucketSize 0)
+  §R (/ value bucketSize)
+§/F{f002}
+§/M{m001}

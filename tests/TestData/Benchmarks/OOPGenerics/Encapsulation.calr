@@ -1,0 +1,12 @@
+§M{m001:Encapsulation}
+§F{f001:GetBalance:pub}
+  §I{f64:balance}
+  §O{f64}
+  §R balance
+§/F{f001}
+§F{f002:IsValidDeposit:pub}
+  §I{f64:amount}
+  §O{bool}
+  §R (> amount 0.0)
+§/F{f002}
+§/M{m001}

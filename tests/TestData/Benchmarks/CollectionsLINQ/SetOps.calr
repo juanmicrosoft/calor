@@ -1,0 +1,21 @@
+§M{m001:SetOps}
+§F{f001:Contains:pub}
+  §I{bool:found}
+  §O{bool}
+  §R found
+§/F{f001}
+§F{f002:SetSize:pub}
+  §I{i32:size}
+  §O{i32}
+  §S (>= result 0)
+  §R size
+§/F{f002}
+§F{f003:UnionSize:pub}
+  §I{i32:sizeA}
+  §I{i32:sizeB}
+  §I{i32:overlapCount}
+  §O{i32}
+  §S (>= result 0)
+  §R (- (+ sizeA sizeB) overlapCount)
+§/F{f003}
+§/M{m001}

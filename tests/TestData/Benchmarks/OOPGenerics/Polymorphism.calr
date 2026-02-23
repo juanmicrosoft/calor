@@ -1,0 +1,12 @@
+§M{m001:Polymorphism}
+§F{f001:ProcessShape:pub}
+  §I{i32:shapeType}
+  §I{f64:param1}
+  §I{f64:param2}
+  §O{f64}
+  §IF{if1} (== shapeType 0) → §R (* 3.14159 (* param1 param1))
+  §EI (== shapeType 1) → §R (* param1 param2)
+  §EL → §R (/ (* param1 param2) 2.0)
+  §/I{if1}
+§/F{f001}
+§/M{m001}

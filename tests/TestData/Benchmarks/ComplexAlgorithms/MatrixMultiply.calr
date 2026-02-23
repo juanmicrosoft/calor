@@ -1,0 +1,24 @@
+§M{m001:MatrixMultiply}
+§F{f001:DotProduct:pub}
+  §I{i32:a1}
+  §I{i32:b1}
+  §I{i32:a2}
+  §I{i32:b2}
+  §O{i32}
+  §R (+ (* a1 b1) (* a2 b2))
+§/F{f001}
+§F{f002:ValidDimensions:pub}
+  §I{i32:aCols}
+  §I{i32:bRows}
+  §O{bool}
+  §R (== aCols bRows)
+§/F{f002}
+§F{f003:ResultSize:pub}
+  §I{i32:aRows}
+  §I{i32:bCols}
+  §O{i32}
+  §Q (> aRows 0)
+  §Q (> bCols 0)
+  §R (* aRows bCols)
+§/F{f003}
+§/M{m001}

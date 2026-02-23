@@ -1,0 +1,20 @@
+§M{m001:Properties}
+§F{f001:GetName:pub}
+  §I{str:name}
+  §O{str}
+  §R name
+§/F{f001}
+§F{f002:ValidateAge:pub}
+  §I{i32:age}
+  §O{i32}
+  §Q (>= age 0)
+  §Q (<= age 150)
+  §R age
+§/F{f002}
+§F{f003:ValidateEmail:pub}
+  §I{str:email}
+  §I{i32:length}
+  §O{bool}
+  §R (> length 0)
+§/F{f003}
+§/M{m001}

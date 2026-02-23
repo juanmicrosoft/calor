@@ -1,0 +1,21 @@
+§M{m001:NetService}
+§F{f001:FetchUrl:pub}
+  §I{str:url}
+  §O{str}
+  §E{net}
+  §R url
+§/F{f001}
+§F{f002:PostData:pub}
+  §I{str:url}
+  §I{str:body}
+  §O{i32}
+  §E{net}
+  §R 200
+§/F{f002}
+§F{f003:BuildUrl:pub}
+  §I{str:base}
+  §I{str:path}
+  §O{str}
+  §R base
+§/F{f003}
+§/M{m001}

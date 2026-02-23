@@ -1,0 +1,32 @@
+§M{m001:UnitConverter}
+§F{f001:InchesToCm:pub}
+  §I{f64:inches}
+  §O{f64}
+  §Q (>= inches 0.0)
+  §R (* inches 2.54)
+§/F{f001}
+§F{f002:CmToInches:pub}
+  §I{f64:cm}
+  §O{f64}
+  §Q (>= cm 0.0)
+  §R (/ cm 2.54)
+§/F{f002}
+§F{f003:PoundsToKg:pub}
+  §I{f64:pounds}
+  §O{f64}
+  §Q (>= pounds 0.0)
+  §R (* pounds 0.453592)
+§/F{f003}
+§F{f004:KgToPounds:pub}
+  §I{f64:kg}
+  §O{f64}
+  §Q (>= kg 0.0)
+  §R (/ kg 0.453592)
+§/F{f004}
+§F{f005:GallonsToLiters:pub}
+  §I{f64:gallons}
+  §O{f64}
+  §Q (>= gallons 0.0)
+  §R (* gallons 3.78541)
+§/F{f005}
+§/M{m001}

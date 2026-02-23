@@ -1,0 +1,16 @@
+§M{m001:EnumType}
+§F{f001:DaysInSeason:pub}
+  §I{i32:season}
+  §O{i32}
+  §IF{if1} (== season 0) → §R 92
+  §EI (== season 1) → §R 92
+  §EI (== season 2) → §R 91
+  §EL → §R 90
+  §/I{if1}
+§/F{f001}
+§F{f002:IsWarm:pub}
+  §I{i32:season}
+  §O{bool}
+  §R (|| (== season 1) (== season 0))
+§/F{f002}
+§/M{m001}

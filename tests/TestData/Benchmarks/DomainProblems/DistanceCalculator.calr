@@ -1,0 +1,30 @@
+§M{m001:DistanceCalculator}
+§F{f001:DistanceSquared:pub}
+  §I{f64:x1}
+  §I{f64:y1}
+  §I{f64:x2}
+  §I{f64:y2}
+  §O{f64}
+  §S (>= result 0.0)
+  §B{dx} (- x2 x1)
+  §B{dy} (- y2 y1)
+  §R (+ (* dx dx) (* dy dy))
+§/F{f001}
+§F{f002:ManhattanDist:pub}
+  §I{f64:x1}
+  §I{f64:y1}
+  §I{f64:x2}
+  §I{f64:y2}
+  §O{f64}
+  §S (>= result 0.0)
+  §B{dx} (- x2 x1)
+  §B{dy} (- y2 y1)
+  §B{absDx} dx
+  §IF{if1} (< absDx 0.0) → §ASSIGN absDx (- 0.0 absDx)
+  §/I{if1}
+  §B{absDy} dy
+  §IF{if2} (< absDy 0.0) → §ASSIGN absDy (- 0.0 absDy)
+  §/I{if2}
+  §R (+ absDx absDy)
+§/F{f002}
+§/M{m001}

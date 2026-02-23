@@ -1,0 +1,9 @@
+§M{m001:AreaOfCircle}
+§F{f001:Area:pub}
+  §I{f64:radius}
+  §O{f64}
+  §Q (> radius 0.0)
+  §S (> result 0.0)
+  §R (* 3.14159265 (* radius radius))
+§/F{f001}
+§/M{m001}

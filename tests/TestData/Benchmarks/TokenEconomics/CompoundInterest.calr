@@ -1,0 +1,21 @@
+§M{m001:CompoundInterest}
+§F{f001:SimpleInterest:pub}
+  §I{f64:principal}
+  §I{f64:rate}
+  §I{i32:years}
+  §O{f64}
+  §Q (> principal 0.0)
+  §Q (>= rate 0.0)
+  §Q (> years 0)
+  §S (>= result principal)
+  §R (* principal (+ 1.0 (* rate (cast f64 years))))
+§/F{f001}
+§F{f002:YearlyGrowth:pub}
+  §I{f64:amount}
+  §I{f64:rate}
+  §O{f64}
+  §Q (> amount 0.0)
+  §Q (>= rate 0.0)
+  §R (* amount (+ 1.0 rate))
+§/F{f002}
+§/M{m001}

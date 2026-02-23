@@ -1,0 +1,17 @@
+§M{m001:GenericFunction}
+§F{f001:Identity:pub}
+  §I{i32:value}
+  §O{i32}
+  §R value
+§/F{f001}
+§F{f002:AreEqual:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{bool}
+  §R (== a b)
+§/F{f002}
+§F{f003:DefaultValue:pub}
+  §O{i32}
+  §R 0
+§/F{f003}
+§/M{m001}

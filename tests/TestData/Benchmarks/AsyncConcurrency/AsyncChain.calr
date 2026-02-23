@@ -1,0 +1,17 @@
+§M{m001:AsyncChain}
+§AF{f001:Step1:pub}
+  §I{i32:input}
+  §O{i32}
+  §R (+ input 1)
+§/AF{f001}
+§AF{f002:Step2:pub}
+  §I{i32:input}
+  §O{i32}
+  §R (* input 2)
+§/AF{f002}
+§F{f003:SyncPipeline:pub}
+  §I{i32:input}
+  §O{i32}
+  §R (* (+ input 1) 2)
+§/F{f003}
+§/M{m001}

@@ -1,0 +1,17 @@
+§M{m001:Map}
+§F{f001:Double:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (* x 2)
+§/F{f001}
+§F{f002:Square:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (* x x)
+§/F{f002}
+§F{f003:Negate:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (- 0 x)
+§/F{f003}
+§/M{m001}

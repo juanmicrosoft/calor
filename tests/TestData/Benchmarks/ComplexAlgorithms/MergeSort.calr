@@ -1,0 +1,21 @@
+§M{m001:MergeSort}
+§F{f001:MidPoint:pub}
+  §I{i32:low}
+  §I{i32:high}
+  §O{i32}
+  §Q (<= low high)
+  §R (+ low (/ (- high low) 2))
+§/F{f001}
+§F{f002:ShouldTakeLeft:pub}
+  §I{i32:leftVal}
+  §I{i32:rightVal}
+  §O{bool}
+  §R (<= leftVal rightVal)
+§/F{f002}
+§F{f003:IsBaseCase:pub}
+  §I{i32:low}
+  §I{i32:high}
+  §O{bool}
+  §R (>= low high)
+§/F{f003}
+§/M{m001}

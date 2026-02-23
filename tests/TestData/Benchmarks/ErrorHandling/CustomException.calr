@@ -1,0 +1,18 @@
+§M{m001:CustomException}
+§F{f001:Validate:pub}
+  §I{i32:value}
+  §I{i32:min}
+  §I{i32:max}
+  §O{bool}
+  §R (&& (>= value min) (<= value max))
+§/F{f001}
+§F{f002:ThrowIfInvalid:pub}
+  §I{i32:value}
+  §I{i32:min}
+  §I{i32:max}
+  §O{i32}
+  §Q (>= value min)
+  §Q (<= value max)
+  §R value
+§/F{f002}
+§/M{m001}

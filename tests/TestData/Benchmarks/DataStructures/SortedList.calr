@@ -1,0 +1,20 @@
+§M{m001:SortedList}
+§F{f001:FindInsertPos:pub}
+  §I{i32:value}
+  §I{i32:existingValue}
+  §O{bool}
+  §R (<= value existingValue)
+§/F{f001}
+§F{f002:IsInOrder:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{bool}
+  §R (<= a b)
+§/F{f002}
+§F{f003:SizeAfterInsert:pub}
+  §I{i32:currentSize}
+  §O{i32}
+  §S (> result currentSize)
+  §R (+ currentSize 1)
+§/F{f003}
+§/M{m001}

@@ -1,0 +1,26 @@
+§M{m001:TodoList}
+§F{f001:AddTask:pub}
+  §I{i32:count}
+  §O{i32}
+  §R (+ count 1)
+§/F{f001}
+§F{f002:CompleteTask:pub}
+  §I{i32:completedCount}
+  §O{i32}
+  §R (+ completedCount 1)
+§/F{f002}
+§F{f003:PendingCount:pub}
+  §I{i32:total}
+  §I{i32:completed}
+  §O{i32}
+  §Q (>= total completed)
+  §S (>= result 0)
+  §R (- total completed)
+§/F{f003}
+§F{f004:AllDone:pub}
+  §I{i32:total}
+  §I{i32:completed}
+  §O{bool}
+  §R (== total completed)
+§/F{f004}
+§/M{m001}

@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SafeMath
 {
@@ -12,12 +16,12 @@ namespace SafeMath
     {
         public static int Divide(int a, int b)
         {
-            if (!((b != 0))) throw new ArgumentException("divisor must not be zero");
+            if (!((b != 0))) throw new Calor.Runtime.ContractViolationException("divisor must not be zero", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 74, length: 39, sourceFile: null, line: 6, column: 3, condition: "(b != 0)");
             int __result__ = default;
 
             __result__ = (a / b);
 
-            if (!((__result__ == (a / b)))) throw new InvalidOperationException("Postcondition failed: (__result__ == (a / b))");
+            if (!((__result__ == (a / b)))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ == (a / b))", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 116, length: 22, sourceFile: null, line: 7, column: 3, condition: "(__result__ == (a / b))");
             return __result__;
         }
 

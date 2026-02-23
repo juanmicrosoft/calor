@@ -1,0 +1,12 @@
+§M{m001:EnumMatch}
+§F{f001:HttpStatus:pub}
+  §I{i32:code}
+  §O{i32}
+  §IF{if1} (== code 200) → §R 0
+  §EI (== code 404) → §R 1
+  §EI (== code 500) → §R 2
+  §EI (== code 301) → §R 3
+  §EL → §R 4
+  §/I{if1}
+§/F{f001}
+§/M{m001}

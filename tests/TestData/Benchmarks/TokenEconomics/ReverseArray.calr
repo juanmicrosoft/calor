@@ -1,0 +1,22 @@
+§M{m001:ReverseArray}
+§F{f001:SwapIndex:pub}
+  §I{i32:length}
+  §I{i32:i}
+  §O{i32}
+  §Q (>= i 0)
+  §Q (< i length)
+  §R (- (- length 1) i)
+§/F{f001}
+§F{f002:ShouldSwap:pub}
+  §I{i32:left}
+  §I{i32:right}
+  §O{bool}
+  §R (< left right)
+§/F{f002}
+§F{f003:MidPoint:pub}
+  §I{i32:length}
+  §O{i32}
+  §Q (> length 0)
+  §R (/ length 2)
+§/F{f003}
+§/M{m001}

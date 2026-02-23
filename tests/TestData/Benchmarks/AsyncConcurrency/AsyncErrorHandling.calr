@@ -1,0 +1,13 @@
+§M{m001:AsyncErrorHandling}
+§AF{f001:SafeFetch:pub}
+  §I{str:url}
+  §O{str}
+  §E{net}
+  §R url
+§/AF{f001}
+§F{f002:IsError:pub}
+  §I{bool:succeeded}
+  §O{bool}
+  §R (! succeeded)
+§/F{f002}
+§/M{m001}

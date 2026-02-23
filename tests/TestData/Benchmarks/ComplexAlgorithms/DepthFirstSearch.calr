@@ -1,0 +1,19 @@
+§M{m001:DepthFirstSearch}
+§F{f001:IsVisited:pub}
+  §I{i32:node}
+  §I{i32:visitedBitmask}
+  §O{bool}
+  §R (!= visitedBitmask 0)
+§/F{f001}
+§F{f002:MarkVisited:pub}
+  §I{i32:visitedCount}
+  §O{i32}
+  §R (+ visitedCount 1)
+§/F{f002}
+§F{f003:AllVisited:pub}
+  §I{i32:visitedCount}
+  §I{i32:totalNodes}
+  §O{bool}
+  §R (== visitedCount totalNodes)
+§/F{f003}
+§/M{m001}

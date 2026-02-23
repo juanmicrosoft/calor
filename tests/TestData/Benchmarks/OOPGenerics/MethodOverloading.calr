@@ -1,0 +1,21 @@
+§M{m001:MethodOverloading}
+§F{f001:AddInts:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§F{f002:AddDoubles:pub}
+  §I{f64:a}
+  §I{f64:b}
+  §O{f64}
+  §R (+ a b)
+§/F{f002}
+§F{f003:AddThree:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §I{i32:c}
+  §O{i32}
+  §R (+ (+ a b) c)
+§/F{f003}
+§/M{m001}

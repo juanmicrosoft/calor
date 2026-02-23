@@ -1,0 +1,16 @@
+§M{m001:Composition}
+§F{f001:EngineHorsepower:pub}
+  §I{i32:hp}
+  §O{i32}
+  §Q (> hp 0)
+  §R hp
+§/F{f001}
+§F{f002:CarSpeed:pub}
+  §I{i32:hp}
+  §I{f64:weight}
+  §O{f64}
+  §Q (> hp 0)
+  §Q (> weight 0.0)
+  §R (/ (cast f64 hp) weight)
+§/F{f002}
+§/M{m001}

@@ -1,0 +1,14 @@
+§M{m001:CancellableTask}
+§F{f001:IsCancelled:pub}
+  §I{bool:token}
+  §O{bool}
+  §R token
+§/F{f001}
+§F{f002:ShouldContinue:pub}
+  §I{bool:cancelled}
+  §I{i32:iteration}
+  §I{i32:maxIterations}
+  §O{bool}
+  §R (&& (! cancelled) (< iteration maxIterations))
+§/F{f002}
+§/M{m001}

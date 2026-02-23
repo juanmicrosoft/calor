@@ -1,0 +1,24 @@
+§M{m001:EmailValidator}
+§F{f001:HasAtSign:pub}
+  §I{bool:containsAt}
+  §O{bool}
+  §R containsAt
+§/F{f001}
+§F{f002:HasDot:pub}
+  §I{bool:containsDot}
+  §O{bool}
+  §R containsDot
+§/F{f002}
+§F{f003:IsValidLength:pub}
+  §I{i32:length}
+  §O{bool}
+  §R (&& (>= length 5) (<= length 254))
+§/F{f003}
+§F{f004:IsValid:pub}
+  §I{bool:hasAt}
+  §I{bool:hasDot}
+  §I{i32:length}
+  §O{bool}
+  §R (&& (&& hasAt hasDot) (&& (>= length 5) (<= length 254)))
+§/F{f004}
+§/M{m001}

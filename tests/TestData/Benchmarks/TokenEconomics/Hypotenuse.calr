@@ -1,0 +1,18 @@
+§M{m001:Hypotenuse}
+§F{f001:HypotenuseSquared:pub}
+  §I{f64:a}
+  §I{f64:b}
+  §O{f64}
+  §Q (> a 0.0)
+  §Q (> b 0.0)
+  §S (> result 0.0)
+  §R (+ (* a a) (* b b))
+§/F{f001}
+§F{f002:SumOfSquares:pub}
+  §I{f64:x}
+  §I{f64:y}
+  §O{f64}
+  §S (>= result 0.0)
+  §R (+ (* x x) (* y y))
+§/F{f002}
+§/M{m001}
