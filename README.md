@@ -103,9 +103,27 @@ dotnet tool install -g calor
 # Initialize for Claude Code (run in a folder with a C# project or solution)
 calor init --ai claude
 
+# Initialize for OpenAI Codex CLI
+calor init --ai codex
+
+# Initialize for Google Gemini CLI
+calor init --ai gemini
+
+# Initialize for GitHub Copilot (with MCP tools)
+calor init --ai github
+
 # Compile Calor to C#
 calor --input program.calr --output program.g.cs
 ```
+
+### AI Integration Comparison
+
+| Feature | Claude Code | Gemini CLI | Codex CLI | GitHub Copilot |
+|:--------|:------------|:-----------|:----------|:---------------|
+| Project instructions | `CLAUDE.md` | `GEMINI.md` | `AGENTS.md` | `copilot-instructions.md` |
+| Skill invocation | `/calor` | `@calor` | `$calor` | Reference skill name |
+| MCP tools | ✓ (`~/.claude.json`) | ✓ (`.gemini/settings.json`) | ✓ (`.codex/config.toml`) | ✓ (`.vscode/mcp.json`) |
+| Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance + MCP tools | Guidance + MCP tools |
 
 ### Your First Calor Program
 
@@ -138,10 +156,35 @@ dotnet run --project src/Calor.Compiler -- \
 dotnet run --project samples/HelloWorld
 ```
 
+## MCP Tooling
+
+Calor ships an **MCP (Model Context Protocol) server** that gives AI agents direct access to the compiler. Run `calor init --ai <agent>` to auto-configure it, or start it manually:
+
+```bash
+calor mcp
+```
+
+The server exposes 19 tools across five categories:
+
+| Category | Tools |
+|:---------|:------|
+| Compilation & Verification | `calor_compile`, `calor_typecheck`, `calor_verify`, `calor_verify_contracts`, `calor_diagnose` |
+| Code Navigation (LSP-style) | `calor_goto_definition`, `calor_find_references`, `calor_symbol_info`, `calor_document_outline`, `calor_find_symbol` |
+| Analysis & Migration | `calor_analyze`, `calor_assess`, `calor_convert`, `calor_compile_check_compat` |
+| Code Quality | `calor_lint`, `calor_format`, `calor_validate_snippet` |
+| Syntax Help | `calor_syntax_help`, `calor_syntax_lookup`, `calor_ids` |
+
+See [calor mcp](https://juanmicrosoft.github.io/calor/docs/cli/mcp/) for the complete reference.
+
 ## Documentation
 
+- **[Getting Started](https://juanmicrosoft.github.io/calor/docs/getting-started/)** — Installation, hello world, and AI agent integration
+  - [Claude Integration](https://juanmicrosoft.github.io/calor/docs/getting-started/claude-integration/) — Enforced Calor-first with hooks
+  - [Codex Integration](https://juanmicrosoft.github.io/calor/docs/getting-started/codex-integration/) — OpenAI Codex CLI with MCP
+  - [Gemini Integration](https://juanmicrosoft.github.io/calor/docs/getting-started/gemini-integration/) — Google Gemini CLI with hooks and MCP
+  - [GitHub Copilot Integration](https://juanmicrosoft.github.io/calor/docs/getting-started/github-integration/) — GitHub Copilot with MCP tools
 - **[Syntax Reference](https://juanmicrosoft.github.io/calor/docs/syntax-reference/)** — Complete language reference
-- **[Getting Started](https://juanmicrosoft.github.io/calor/docs/getting-started/)** — Installation, hello world, Claude integration
+- **[CLI Reference](https://juanmicrosoft.github.io/calor/docs/cli/)** — All `calor` commands including `mcp`, `analyze`, `convert`, and `migrate`
 - **[Benchmarking](https://juanmicrosoft.github.io/calor/docs/benchmarking/)** — How we measure Calor vs C#
 
 ## Project Status
@@ -153,7 +196,14 @@ dotnet run --project samples/HelloWorld
 - [x] Effects declarations
 - [x] MSBuild SDK integration
 - [x] AI agent initialization (`calor init`)
-- [x] Evaluation framework (8 metrics, 28 programs)
+- [x] Multi-AI support (Claude, OpenAI Codex, Google Gemini, GitHub Copilot)
+- [x] MCP server with 19 tools (`calor mcp`)
+- [x] Z3 static contract verification
+- [x] VS Code extension (syntax highlighting)
+- [x] C# to Calor converter (`calor convert`)
+- [x] Code analysis (`calor analyze`)
+- [x] C# interop blocks (`§CSHARP{...}§/CSHARP`)
+- [x] Evaluation framework (8 metrics, 40 programs)
 - [ ] Direct IL emission
 - [ ] IDE language server
 
