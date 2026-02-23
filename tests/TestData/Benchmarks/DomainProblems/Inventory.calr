@@ -1,0 +1,30 @@
+§M{m001:Inventory}
+§F{f001:Restock:pub}
+  §I{i32:current}
+  §I{i32:quantity}
+  §O{i32}
+  §Q (> quantity 0)
+  §S (> result current)
+  §R (+ current quantity)
+§/F{f001}
+§F{f002:Sell:pub}
+  §I{i32:current}
+  §I{i32:quantity}
+  §O{i32}
+  §Q (> quantity 0)
+  §Q (>= current quantity)
+  §S (>= result 0)
+  §R (- current quantity)
+§/F{f002}
+§F{f003:InStock:pub}
+  §I{i32:quantity}
+  §O{bool}
+  §R (> quantity 0)
+§/F{f003}
+§F{f004:NeedsReorder:pub}
+  §I{i32:quantity}
+  §I{i32:threshold}
+  §O{bool}
+  §R (<= quantity threshold)
+§/F{f004}
+§/M{m001}

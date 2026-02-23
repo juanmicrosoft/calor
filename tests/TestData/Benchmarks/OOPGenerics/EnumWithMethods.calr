@@ -1,0 +1,16 @@
+§M{m001:EnumWithMethods}
+§F{f001:Priority:pub}
+  §I{i32:level}
+  §O{i32}
+  §IF{if1} (== level 0) → §R 1
+  §EI (== level 1) → §R 2
+  §EI (== level 2) → §R 3
+  §EL → §R 4
+  §/I{if1}
+§/F{f001}
+§F{f002:IsUrgent:pub}
+  §I{i32:level}
+  §O{bool}
+  §R (>= level 2)
+§/F{f002}
+§/M{m001}

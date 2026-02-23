@@ -1,0 +1,27 @@
+§M{m001:GradeCalculator}
+§F{f001:WeightedScore:pub}
+  §I{f64:score}
+  §I{f64:weight}
+  §O{f64}
+  §Q (>= score 0.0)
+  §Q (<= score 100.0)
+  §Q (> weight 0.0)
+  §Q (<= weight 1.0)
+  §R (* score weight)
+§/F{f001}
+§F{f002:LetterGrade:pub}
+  §I{f64:score}
+  §O{i32}
+  §IF{if1} (>= score 90.0) → §R 4
+  §EI (>= score 80.0) → §R 3
+  §EI (>= score 70.0) → §R 2
+  §EI (>= score 60.0) → §R 1
+  §EL → §R 0
+  §/I{if1}
+§/F{f002}
+§F{f003:IsPassing:pub}
+  §I{f64:score}
+  §O{bool}
+  §R (>= score 60.0)
+§/F{f003}
+§/M{m001}

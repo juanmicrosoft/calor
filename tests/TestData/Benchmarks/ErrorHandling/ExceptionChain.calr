@@ -1,0 +1,13 @@
+§M{m001:ExceptionChain}
+§F{f001:WrapError:pub}
+  §I{i32:code}
+  §O{i32}
+  §R code
+§/F{f001}
+§F{f002:ErrorLevel:pub}
+  §I{i32:depth}
+  §O{i32}
+  §S (>= result 0)
+  §R depth
+§/F{f002}
+§/M{m001}

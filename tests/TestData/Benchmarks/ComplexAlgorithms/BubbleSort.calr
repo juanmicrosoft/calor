@@ -1,0 +1,20 @@
+§M{m001:BubbleSort}
+§F{f001:NeedsSwap:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{bool}
+  §R (> a b)
+§/F{f001}
+§F{f002:PassEnd:pub}
+  §I{i32:length}
+  §I{i32:pass}
+  §O{i32}
+  §Q (> length 0)
+  §R (- length (+ pass 1))
+§/F{f002}
+§F{f003:TotalPasses:pub}
+  §I{i32:length}
+  §O{i32}
+  §R (- length 1)
+§/F{f003}
+§/M{m001}

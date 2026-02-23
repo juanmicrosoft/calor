@@ -1,0 +1,28 @@
+§M{m001:PropertyAccess}
+§F{f001:GetX:pub}
+  §I{i32:x}
+  §O{i32}
+  §R x
+§/F{f001}
+§F{f002:GetY:pub}
+  §I{i32:y}
+  §O{i32}
+  §R y
+§/F{f002}
+§F{f003:GetName:pub}
+  §I{str:name}
+  §O{str}
+  §R name
+§/F{f003}
+§F{f004:GetAge:pub}
+  §I{i32:age}
+  §O{i32}
+  §Q (>= age 0)
+  §R age
+§/F{f004}
+§F{f005:GetEmail:pub}
+  §I{str:email}
+  §O{str}
+  §R email
+§/F{f005}
+§/M{m001}

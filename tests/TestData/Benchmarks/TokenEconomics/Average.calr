@@ -1,0 +1,15 @@
+§M{m001:Average}
+§F{f001:Average:pub}
+  §I{i32:count}
+  §I{i32:total}
+  §O{f64}
+  §Q (> count 0)
+  §R (/ (cast f64 total) (cast f64 count))
+§/F{f001}
+§F{f002:Sum:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f002}
+§/M{m001}

@@ -1,0 +1,26 @@
+§M{m001:MathLib}
+§F{f001:Square:pub}
+  §I{f64:x}
+  §O{f64}
+  §S (>= result 0.0)
+  §R (* x x)
+§/F{f001}
+§F{f002:Cube:pub}
+  §I{f64:x}
+  §O{f64}
+  §R (* x (* x x))
+§/F{f002}
+§F{f003:MaxOf:pub}
+  §I{f64:a}
+  §I{f64:b}
+  §O{f64}
+  §IF{if1} (> a b) → §R a
+  §EL → §R b
+  §/I{if1}
+§/F{f003}
+§F{f004:Floor:pub}
+  §I{f64:x}
+  §O{i32}
+  §R (cast i32 x)
+§/F{f004}
+§/M{m001}

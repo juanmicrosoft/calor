@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ValueOps
 {
@@ -12,7 +16,7 @@ namespace ValueOps
     {
         public static int Clamp(int value, int min, int max)
         {
-            if (!((min <= max))) throw new ArgumentException("Precondition failed: (min <= max)");
+            if (!((min <= max))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (min <= max)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 93, length: 15, sourceFile: null, line: 7, column: 3, condition: "(min <= max)");
             int __result__ = default;
 
             if ((value < min))
@@ -29,8 +33,8 @@ namespace ValueOps
             }
 
 
-            if (!((__result__ >= min))) throw new InvalidOperationException("Postcondition failed: (__result__ >= min)");
-            if (!((__result__ <= max))) throw new InvalidOperationException("Postcondition failed: (__result__ <= max)");
+            if (!((__result__ >= min))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= min)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 111, length: 18, sourceFile: null, line: 8, column: 3, condition: "(__result__ >= min)");
+            if (!((__result__ <= max))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ <= max)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 132, length: 18, sourceFile: null, line: 9, column: 3, condition: "(__result__ <= max)");
             return __result__;
         }
 

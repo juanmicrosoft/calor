@@ -1,0 +1,9 @@
+§M{m001:CelsiusToKelvin}
+§F{f001:ToKelvin:pub}
+  §I{f64:celsius}
+  §O{f64}
+  §Q (>= celsius -273.15)
+  §S (>= result 0.0)
+  §R (+ celsius 273.15)
+§/F{f001}
+§/M{m001}

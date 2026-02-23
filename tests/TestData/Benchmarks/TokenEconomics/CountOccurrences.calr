@@ -1,0 +1,18 @@
+§M{m001:CountOccurrences}
+§F{f001:CountOccurrences:pub}
+  §I{i32:length}
+  §I{i32:matchCount}
+  §O{i32}
+  §S (>= result 0)
+  §S (<= result length)
+  §R matchCount
+§/F{f001}
+§F{f002:IncrementIf:pub}
+  §I{i32:count}
+  §I{bool:matches}
+  §O{i32}
+  §IF{if1} matches → §R (+ count 1)
+  §EL → §R count
+  §/I{if1}
+§/F{f002}
+§/M{m001}

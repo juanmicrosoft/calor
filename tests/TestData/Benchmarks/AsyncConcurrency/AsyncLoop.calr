@@ -1,0 +1,13 @@
+§M{m001:AsyncLoop}
+§AF{f001:ProcessItem:pub}
+  §I{i32:item}
+  §O{i32}
+  §R (* item 2)
+§/AF{f001}
+§F{f002:HasMore:pub}
+  §I{i32:index}
+  §I{i32:count}
+  §O{bool}
+  §R (< index count)
+§/F{f002}
+§/M{m001}

@@ -1,0 +1,22 @@
+§M{m001:ChainOfResponsibility}
+§F{f001:CanApprove:pub}
+  §I{f64:amount}
+  §I{f64:limit}
+  §O{bool}
+  §Q (> amount 0.0)
+  §Q (> limit 0.0)
+  §R (<= amount limit)
+§/F{f001}
+§F{f002:ManagerLimit:pub}
+  §O{f64}
+  §R 1000.0
+§/F{f002}
+§F{f003:DirectorLimit:pub}
+  §O{f64}
+  §R 10000.0
+§/F{f003}
+§F{f004:VPLimit:pub}
+  §O{f64}
+  §R 100000.0
+§/F{f004}
+§/M{m001}

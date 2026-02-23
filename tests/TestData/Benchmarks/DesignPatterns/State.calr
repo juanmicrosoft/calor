@@ -1,0 +1,25 @@
+§M{m001:StateMachine}
+§F{f001:NextState:pub}
+  §I{i32:current}
+  §O{i32}
+  §IF{if1} (== current 0) → §R 1
+  §EI (== current 1) → §R 2
+  §EL → §R 0
+  §/I{if1}
+§/F{f001}
+§F{f002:IsGreen:pub}
+  §I{i32:state}
+  §O{bool}
+  §R (== state 0)
+§/F{f002}
+§F{f003:IsYellow:pub}
+  §I{i32:state}
+  §O{bool}
+  §R (== state 1)
+§/F{f003}
+§F{f004:IsRed:pub}
+  §I{i32:state}
+  §O{bool}
+  §R (== state 2)
+§/F{f004}
+§/M{m001}

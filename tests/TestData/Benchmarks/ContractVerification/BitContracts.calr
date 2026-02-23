@@ -1,0 +1,21 @@
+§M{m001:BitContracts}
+§F{f001:PowerOfTwo:pub}
+  §I{i32:n}
+  §O{bool}
+  §Q (> n 0)
+  §R (== (& n (- n 1)) 0)
+§/F{f001}
+§F{f002:IsAligned:pub}
+  §I{i32:value}
+  §I{i32:alignment}
+  §O{bool}
+  §Q (> alignment 0)
+  §R (== (% value alignment) 0)
+§/F{f002}
+§F{f003:ClearLowest:pub}
+  §I{i32:n}
+  §O{i32}
+  §Q (> n 0)
+  §R (& n (- n 1))
+§/F{f003}
+§/M{m001}

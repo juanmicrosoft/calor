@@ -1,0 +1,15 @@
+§M{m001:DelayedResult}
+§AF{f001:DelayedValue:pub}
+  §I{i32:value}
+  §I{i32:delayMs}
+  §O{i32}
+  §E{net}
+  §Q (> delayMs 0)
+  §R value
+§/AF{f001}
+§F{f002:ImmediateValue:pub}
+  §I{i32:value}
+  §O{i32}
+  §R value
+§/F{f002}
+§/M{m001}

@@ -1,0 +1,27 @@
+§M{m001:ScoreBoard}
+§F{f001:UpdateScore:pub}
+  §I{i32:current}
+  §I{i32:points}
+  §O{i32}
+  §R (+ current points)
+§/F{f001}
+§F{f002:IsHighScore:pub}
+  §I{i32:score}
+  §I{i32:highScore}
+  §O{bool}
+  §R (> score highScore)
+§/F{f002}
+§F{f003:Rank:pub}
+  §I{i32:winsAbove}
+  §O{i32}
+  §S (>= result 1)
+  §R (+ winsAbove 1)
+§/F{f003}
+§F{f004:AverageScore:pub}
+  §I{i32:totalScore}
+  §I{i32:games}
+  §O{f64}
+  §Q (> games 0)
+  §R (/ (cast f64 totalScore) (cast f64 games))
+§/F{f004}
+§/M{m001}

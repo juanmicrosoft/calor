@@ -1,0 +1,12 @@
+§M{m001:PropertyMatch}
+§F{f001:ClassifyTemp:pub}
+  §I{f64:temp}
+  §I{str:unit}
+  §O{i32}
+  §IF{if1} (< temp 0.0) → §R 0
+  §EI (< temp 15.0) → §R 1
+  §EI (< temp 30.0) → §R 2
+  §EL → §R 3
+  §/I{if1}
+§/F{f001}
+§/M{m001}

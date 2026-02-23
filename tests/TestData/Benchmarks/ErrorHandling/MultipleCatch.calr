@@ -1,0 +1,13 @@
+§M{m001:MultipleCatch}
+§F{f001:ParseInt:pub}
+  §I{str:input}
+  §I{i32:defaultVal}
+  §O{i32}
+  §R defaultVal
+§/F{f001}
+§F{f002:IsNumeric:pub}
+  §I{i32:charCode}
+  §O{bool}
+  §R (&& (>= charCode 48) (<= charCode 57))
+§/F{f002}
+§/M{m001}

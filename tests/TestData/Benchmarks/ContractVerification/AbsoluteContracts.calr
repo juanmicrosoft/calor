@@ -1,0 +1,28 @@
+§M{m001:AbsoluteContracts}
+§F{f001:AbsNonNeg:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (> x (- 0 2147483647))
+  §S (>= result 0)
+  §IF{if1} (>= x 0) → §R x
+  §EL → §R (- 0 x)
+  §/I{if1}
+§/F{f001}
+§F{f002:AbsIdempotent:pub}
+  §I{i32:x}
+  §O{i32}
+  §Q (>= x 0)
+  §S (== result x)
+  §R x
+§/F{f002}
+§F{f003:TriangleInequality:pub}
+  §I{i32:absA}
+  §I{i32:absB}
+  §I{i32:absSum}
+  §O{bool}
+  §Q (>= absA 0)
+  §Q (>= absB 0)
+  §Q (>= absSum 0)
+  §R (<= absSum (+ absA absB))
+§/F{f003}
+§/M{m001}

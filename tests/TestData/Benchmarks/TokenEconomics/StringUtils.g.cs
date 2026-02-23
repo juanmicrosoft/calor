@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace StringUtils
 {
@@ -12,26 +16,22 @@ namespace StringUtils
     {
         public static int GetLength(string s)
         {
-            return;
-            String.Length(s);
+            return s.Length;
         }
 
         public static string ToUpper(string s)
         {
-            return;
-            String.ToUpper(s);
+            return s.ToUpper();
         }
 
         public static string ToLower(string s)
         {
-            return;
-            String.ToLower(s);
+            return s.ToLower();
         }
 
         public static string Concat(string a, string b)
         {
-            return;
-            String.Concat(a, b);
+            return string.Concat(a, b);
         }
 
     }

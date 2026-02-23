@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Fibonacci
 {
@@ -18,11 +22,18 @@ namespace Fibonacci
             }
             else
             {
-                int a = default;
-                Calculate((n - 1));
-                int b = default;
-                Calculate((n - 2));
-                return (a + b);
+                var a = 0;
+                var b = 1;
+                var i = 2;
+                while ((i <= n))
+                {
+                    var temp = (a + b);
+                    a = b;
+                    b = temp;
+                    i = (i + 1);
+                }
+
+                return b;
             }
 
         }

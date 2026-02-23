@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ArrayOps
 {

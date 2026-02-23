@@ -1,0 +1,33 @@
+§M{m001:SwitchExpression}
+§F{f001:Season:pub}
+  §I{i32:month}
+  §O{i32}
+  §Q (>= month 1)
+  §Q (<= month 12)
+  §IF{if1} (== month 12) → §R 0
+  §EI (<= month 2) → §R 0
+  §EI (<= month 5) → §R 1
+  §EI (<= month 8) → §R 2
+  §EI (<= month 11) → §R 3
+  §EL → §R 0
+  §/I{if1}
+§/F{f001}
+§F{f002:DayType:pub}
+  §I{i32:day}
+  §O{i32}
+  §IF{if1} (== day 0) → §R 0
+  §EI (== day 6) → §R 0
+  §EL → §R 1
+  §/I{if1}
+§/F{f002}
+§F{f003:HttpCategory:pub}
+  §I{i32:status}
+  §O{i32}
+  §IF{if1} (< status 200) → §R 1
+  §EI (< status 300) → §R 2
+  §EI (< status 400) → §R 3
+  §EI (< status 500) → §R 4
+  §EL → §R 5
+  §/I{if1}
+§/F{f003}
+§/M{m001}

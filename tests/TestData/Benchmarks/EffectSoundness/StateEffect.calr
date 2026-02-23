@@ -1,0 +1,18 @@
+§M{m001:StateService}
+§F{f001:IncrementCounter:pub}
+  §I{i32:counter}
+  §O{i32}
+  §E{st}
+  §R (+ counter 1)
+§/F{f001}
+§F{f002:ResetCounter:pub}
+  §O{i32}
+  §E{st}
+  §R 0
+§/F{f002}
+§F{f003:ReadCounter:pub}
+  §I{i32:counter}
+  §O{i32}
+  §R counter
+§/F{f003}
+§/M{m001}

@@ -1,0 +1,34 @@
+§M{m001:DigitCount}
+§F{f001:IsZero:pub}
+  §I{i32:n}
+  §O{bool}
+  §R (== n 0)
+§/F{f001}
+§F{f002:Abs:pub}
+  §I{i32:n}
+  §O{i32}
+  §S (>= result 0)
+  §IF{if1} (< n 0) → §R (- 0 n)
+  §EL → §R n
+  §/I{if1}
+§/F{f002}
+§F{f003:DigitCountPositive:pub}
+  §I{i32:n}
+  §O{i32}
+  §Q (>= n 0)
+  §S (> result 0)
+  §IF{if1} (< n 10) → §R 1
+  §/I{if1}
+  §B{rest} §C{DigitCountPositive} §A (/ n 10) §/C
+  §R (+ 1 rest)
+§/F{f003}
+§F{f004:DigitCount:pub}
+  §I{i32:n}
+  §O{i32}
+  §S (> result 0)
+  §IF{if1} (== n 0) → §R 1
+  §/I{if1}
+  §B{absN} §C{Abs} §A n §/C
+  §R §C{DigitCountPositive} §A absN §/C
+§/F{f004}
+§/M{m001}

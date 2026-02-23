@@ -1,0 +1,25 @@
+§M{m001:BankAccount}
+§F{f001:Deposit:pub}
+  §I{f64:balance}
+  §I{f64:amount}
+  §O{f64}
+  §Q (> amount 0.0)
+  §S (> result balance)
+  §R (+ balance amount)
+§/F{f001}
+§F{f002:Withdraw:pub}
+  §I{f64:balance}
+  §I{f64:amount}
+  §O{f64}
+  §Q (> amount 0.0)
+  §Q (>= balance amount)
+  §S (< result balance)
+  §R (- balance amount)
+§/F{f002}
+§F{f003:CanWithdraw:pub}
+  §I{f64:balance}
+  §I{f64:amount}
+  §O{bool}
+  §R (&& (> amount 0.0) (>= balance amount))
+§/F{f003}
+§/M{m001}

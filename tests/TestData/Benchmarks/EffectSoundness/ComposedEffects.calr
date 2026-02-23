@@ -1,0 +1,22 @@
+§M{m001:ComposedService}
+§F{f001:FetchAndLog:pub}
+  §I{str:url}
+  §O{str}
+  §E{net}
+  §E{cw}
+  §P url
+  §R url
+§/F{f001}
+§F{f002:ReadAndStore:pub}
+  §I{str:path}
+  §O{void}
+  §E{fr}
+  §E{db}
+  §P path
+§/F{f002}
+§F{f003:PureHelper:pub}
+  §I{str:data}
+  §O{i32}
+  §R 0
+§/F{f003}
+§/M{m001}

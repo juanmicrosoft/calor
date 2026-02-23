@@ -1,0 +1,25 @@
+§M{m001:Iterator}
+§F{f001:HasNext:pub}
+  §I{i32:current}
+  §I{i32:end}
+  §O{bool}
+  §R (< current end)
+§/F{f001}
+§F{f002:Next:pub}
+  §I{i32:current}
+  §I{i32:step}
+  §O{i32}
+  §Q (> step 0)
+  §R (+ current step)
+§/F{f002}
+§F{f003:Current:pub}
+  §I{i32:value}
+  §O{i32}
+  §R value
+§/F{f003}
+§F{f004:Reset:pub}
+  §I{i32:start}
+  §O{i32}
+  §R start
+§/F{f004}
+§/M{m001}

@@ -3,31 +3,29 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace MathPower
 {
     public static class MathPowerModule
     {
-        public static int Power(int @base, int exp)
+        public static int Power(int base, int exp)
         {
-            if (!((exp >= 0))) throw new ArgumentException("Precondition failed: (exp >= 0)");
-            if ((exp == 0))
+            if (!((exp >= 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (exp >= 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 79, length: 13, sourceFile: null, line: 6, column: 3, condition: "(exp >= 0)");
+            var result = 1;
+            var i = 0;
+            while ((i < exp))
             {
-                return 1;
-            }
-            else if ((exp == 1))
-            {
-                return @base;
-            }
-            else
-            {
-                int prev = default;
-                Power(@base, (exp - 1));
-                return (@base * prev);
+                result = (result * base);
+                i = (i + 1);
             }
 
+            return result;
         }
 
     }

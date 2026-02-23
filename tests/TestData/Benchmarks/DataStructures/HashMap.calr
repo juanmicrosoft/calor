@@ -1,0 +1,28 @@
+§M{m001:HashMap}
+§F{f001:BucketIndex:pub}
+  §I{i32:hashCode}
+  §I{i32:bucketCount}
+  §O{i32}
+  §Q (> bucketCount 0)
+  §S (>= result 0)
+  §S (< result bucketCount)
+  §B{absHash} hashCode
+  §IF{if1} (< absHash 0) → §ASSIGN absHash (- 0 absHash)
+  §/I{if1}
+  §R (% absHash bucketCount)
+§/F{f001}
+§F{f002:LoadFactor:pub}
+  §I{i32:itemCount}
+  §I{i32:bucketCount}
+  §O{f64}
+  §Q (> bucketCount 0)
+  §R (/ (cast f64 itemCount) (cast f64 bucketCount))
+§/F{f002}
+§F{f003:NeedsResize:pub}
+  §I{i32:itemCount}
+  §I{i32:bucketCount}
+  §O{bool}
+  §Q (> bucketCount 0)
+  §R (> (* itemCount 100) (* bucketCount 75))
+§/F{f003}
+§/M{m001}

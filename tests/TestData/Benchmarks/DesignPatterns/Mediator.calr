@@ -1,0 +1,18 @@
+§M{m001:Mediator}
+§F{f001:ShouldDeliver:pub}
+  §I{i32:senderId}
+  §I{i32:recipientId}
+  §O{bool}
+  §R (!= senderId recipientId)
+§/F{f001}
+§F{f002:MessageCount:pub}
+  §I{i32:current}
+  §O{i32}
+  §R (+ current 1)
+§/F{f002}
+§F{f003:UserCount:pub}
+  §I{i32:count}
+  §O{i32}
+  §R count
+§/F{f003}
+§/M{m001}

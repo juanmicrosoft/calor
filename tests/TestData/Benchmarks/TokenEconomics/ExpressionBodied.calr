@@ -1,0 +1,42 @@
+§M{m001:ExpressionBodied}
+§F{f001:Double:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (* x 2)
+§/F{f001}
+§F{f002:Triple:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (* x 3)
+§/F{f002}
+§F{f003:Square:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (* x x)
+§/F{f003}
+§F{f004:Increment:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (+ x 1)
+§/F{f004}
+§F{f005:Decrement:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (- x 1)
+§/F{f005}
+§F{f006:IsPositive:pub}
+  §I{i32:x}
+  §O{bool}
+  §R (> x 0)
+§/F{f006}
+§F{f007:IsNegative:pub}
+  §I{i32:x}
+  §O{bool}
+  §R (< x 0)
+§/F{f007}
+§F{f008:Negate:pub}
+  §I{i32:x}
+  §O{i32}
+  §R (- 0 x)
+§/F{f008}
+§/M{m001}

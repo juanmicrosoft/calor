@@ -1,0 +1,23 @@
+§M{m001:Inheritance}
+§F{f001:AnimalSound:pub}
+  §I{i32:animalType}
+  §O{i32}
+  §IF{if1} (== animalType 0) → §R 0
+  §EI (== animalType 1) → §R 1
+  §EL → §R 2
+  §/I{if1}
+§/F{f001}
+§F{f002:CanFly:pub}
+  §I{i32:animalType}
+  §O{bool}
+  §R (== animalType 2)
+§/F{f002}
+§F{f003:Legs:pub}
+  §I{i32:animalType}
+  §O{i32}
+  §IF{if1} (== animalType 0) → §R 4
+  §EI (== animalType 1) → §R 4
+  §EL → §R 2
+  §/I{if1}
+§/F{f003}
+§/M{m001}

@@ -1,0 +1,14 @@
+§M{m001:ParallelTasks}
+§F{f001:CombineResults:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§F{f002:AllSucceeded:pub}
+  §I{bool:a}
+  §I{bool:b}
+  §O{bool}
+  §R (&& a b)
+§/F{f002}
+§/M{m001}

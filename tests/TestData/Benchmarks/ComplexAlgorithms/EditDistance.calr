@@ -1,0 +1,22 @@
+§M{m001:EditDistance}
+§F{f001:MinOfThree:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §I{i32:c}
+  §O{i32}
+  §B{minAB} a
+  §IF{if1} (< b minAB) → §ASSIGN minAB b
+  §/I{if1}
+  §IF{if2} (< c minAB) → §R c
+  §EL → §R minAB
+  §/I{if2}
+§/F{f001}
+§F{f002:SubstitutionCost:pub}
+  §I{i32:charA}
+  §I{i32:charB}
+  §O{i32}
+  §IF{if1} (== charA charB) → §R 0
+  §EL → §R 1
+  §/I{if1}
+§/F{f002}
+§/M{m001}

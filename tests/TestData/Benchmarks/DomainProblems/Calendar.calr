@@ -1,0 +1,41 @@
+§M{m001:Calendar}
+§F{f001:IsLeapYear:pub}
+  §I{i32:year}
+  §O{bool}
+  §Q (> year 0)
+  §IF{if1} (== (% year 400) 0) → §R true
+  §EI (&& (== (% year 4) 0) (!= (% year 100) 0)) → §R true
+  §EL → §R false
+  §/I{if1}
+§/F{f001}
+§F{f002:DaysInMonth:pub}
+  §I{i32:month}
+  §I{bool:isLeap}
+  §O{i32}
+  §Q (>= month 1)
+  §Q (<= month 12)
+  §S (> result 0)
+  §IF{if1} (== month 2)
+    §IF{if2} isLeap → §R 29
+    §EL → §R 28
+    §/I{if2}
+  §EI (== month 4)
+    §R 30
+  §EI (== month 6)
+    §R 30
+  §EI (== month 9)
+    §R 30
+  §EI (== month 11)
+    §R 30
+  §EL
+    §R 31
+  §/I{if1}
+§/F{f002}
+§F{f003:DaysInYear:pub}
+  §I{bool:isLeap}
+  §O{i32}
+  §IF{if1} isLeap → §R 366
+  §EL → §R 365
+  §/I{if1}
+§/F{f003}
+§/M{m001}

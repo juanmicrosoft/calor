@@ -1,0 +1,22 @@
+§M{m001:InterfaceImpl}
+§F{f001:AreaCircle:pub}
+  §I{f64:radius}
+  §O{f64}
+  §Q (> radius 0.0)
+  §R (* 3.14159265 (* radius radius))
+§/F{f001}
+§F{f002:AreaSquare:pub}
+  §I{f64:side}
+  §O{f64}
+  §Q (> side 0.0)
+  §R (* side side)
+§/F{f002}
+§F{f003:AreaTriangle:pub}
+  §I{f64:base}
+  §I{f64:height}
+  §O{f64}
+  §Q (> base 0.0)
+  §Q (> height 0.0)
+  §R (/ (* base height) 2.0)
+§/F{f003}
+§/M{m001}

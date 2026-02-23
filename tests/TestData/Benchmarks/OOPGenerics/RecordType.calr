@@ -1,0 +1,27 @@
+§M{m001:RecordType}
+§F{f001:CreatePoint:pub}
+  §I{f64:x}
+  §I{f64:y}
+  §O{f64}
+  §R x
+§/F{f001}
+§F{f002:DistanceSquared:pub}
+  §I{f64:x1}
+  §I{f64:y1}
+  §I{f64:x2}
+  §I{f64:y2}
+  §O{f64}
+  §S (>= result 0.0)
+  §B{dx} (- x2 x1)
+  §B{dy} (- y2 y1)
+  §R (+ (* dx dx) (* dy dy))
+§/F{f002}
+§F{f003:AreEqual:pub}
+  §I{f64:x1}
+  §I{f64:y1}
+  §I{f64:x2}
+  §I{f64:y2}
+  §O{bool}
+  §R (&& (== x1 x2) (== y1 y2))
+§/F{f003}
+§/M{m001}

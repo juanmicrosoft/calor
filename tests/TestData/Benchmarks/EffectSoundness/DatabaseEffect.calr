@@ -1,0 +1,20 @@
+§M{m001:DbService}
+§F{f001:QueryCount:pub}
+  §I{str:table}
+  §O{i32}
+  §E{db}
+  §R 0
+§/F{f001}
+§F{f002:Insert:pub}
+  §I{str:table}
+  §I{str:data}
+  §O{void}
+  §E{db}
+  §P data
+§/F{f002}
+§F{f003:PureTransform:pub}
+  §I{str:data}
+  §O{str}
+  §R data
+§/F{f003}
+§/M{m001}

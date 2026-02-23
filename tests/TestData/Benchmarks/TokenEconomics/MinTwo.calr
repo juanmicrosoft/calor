@@ -1,0 +1,12 @@
+§M{m001:MinTwo}
+§F{f001:Min:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §S (<= result a)
+  §S (<= result b)
+  §IF{if1} (< a b) → §R a
+  §EL → §R b
+  §/I{if1}
+§/F{f001}
+§/M{m001}

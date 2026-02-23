@@ -1,0 +1,16 @@
+§M{m001:ResultType}
+§F{f001:IsSuccess:pub}
+  §I{bool:succeeded}
+  §O{bool}
+  §R succeeded
+§/F{f001}
+§F{f002:ValueOrDefault:pub}
+  §I{i32:value}
+  §I{i32:defaultVal}
+  §I{bool:hasValue}
+  §O{i32}
+  §IF{if1} hasValue → §R value
+  §EL → §R defaultVal
+  §/I{if1}
+§/F{f002}
+§/M{m001}

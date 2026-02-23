@@ -1,0 +1,13 @@
+§M{m001:GenericClass}
+§F{f001:HasValue:pub}
+  §I{bool:isPresent}
+  §O{bool}
+  §R isPresent
+§/F{f001}
+§F{f002:Count:pub}
+  §I{i32:count}
+  §O{i32}
+  §S (>= result 0)
+  §R count
+§/F{f002}
+§/M{m001}

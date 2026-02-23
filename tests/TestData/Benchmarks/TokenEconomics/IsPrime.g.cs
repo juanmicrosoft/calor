@@ -3,8 +3,12 @@
 // Do not modify this file directly.
 // </auto-generated>
 
+#nullable enable
+
 using System;
 using Calor.Runtime;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace PrimeCheck
 {
@@ -12,7 +16,7 @@ namespace PrimeCheck
     {
         public static bool IsPrime(int n)
         {
-            if (!((n > 0))) throw new ArgumentException("Precondition failed: (n > 0)");
+            if (!((n > 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (n > 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 66, length: 10, sourceFile: null, line: 5, column: 3, condition: "(n > 0)");
             if ((n <= 1))
             {
                 return false;

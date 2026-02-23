@@ -1,0 +1,12 @@
+using System;
+
+namespace TokenEconomics
+{
+    public static class IsEvenModule
+    {
+        public static bool IsEven(int n)
+        {
+            return n % 2 == 0;
+        }
+    }
+}

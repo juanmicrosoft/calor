@@ -1,0 +1,19 @@
+§M{m001:SelectionSort}
+§F{f001:IsNewMin:pub}
+  §I{i32:current}
+  §I{i32:currentMin}
+  §O{bool}
+  §R (< current currentMin)
+§/F{f001}
+§F{f002:LastUnsorted:pub}
+  §I{i32:length}
+  §O{i32}
+  §Q (> length 0)
+  §R (- length 1)
+§/F{f002}
+§F{f003:SearchStart:pub}
+  §I{i32:sortedCount}
+  §O{i32}
+  §R (+ sortedCount 1)
+§/F{f003}
+§/M{m001}

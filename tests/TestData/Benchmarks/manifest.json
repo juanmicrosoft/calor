@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "description": "Calor vs C# evaluation benchmarks for AI coding agent effectiveness",
+  "version": "2.0",
+  "description": "Calor vs C# evaluation benchmarks for AI coding agent effectiveness. 207 programs across 14 categories. Calor programs use functional pure-function style (not §CL/§IFACE class syntax) for cross-language comparability. Programs with expectedAdvantage < 1.0 are adversarial — C# is naturally more compact there.",
   "benchmarks": [
     {
       "id": "001",
@@ -9,7 +9,12 @@
       "calorFile": "TokenEconomics/HelloWorld.calr",
       "csharpFile": "TokenEconomics/HelloWorld.cs",
       "level": 1,
-      "features": ["module", "function", "console_write", "effects"],
+      "features": [
+        "module",
+        "function",
+        "console_write",
+        "effects"
+      ],
       "notes": "Simple hello world program - baseline comparison",
       "expectedAdvantage": 1.8
     },
@@ -20,7 +25,13 @@
       "calorFile": "TokenEconomics/Calculator.calr",
       "csharpFile": "TokenEconomics/Calculator.cs",
       "level": 2,
-      "features": ["module", "function", "parameters", "return_type", "arithmetic"],
+      "features": [
+        "module",
+        "function",
+        "parameters",
+        "return_type",
+        "arithmetic"
+      ],
       "notes": "Basic arithmetic operations with multiple functions"
     },
     {
@@ -30,7 +41,13 @@
       "calorFile": "TokenEconomics/FizzBuzz.calr",
       "csharpFile": "TokenEconomics/FizzBuzz.cs",
       "level": 2,
-      "features": ["module", "function", "conditional", "loop", "modulo"],
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "loop",
+        "modulo"
+      ],
       "notes": "Classic FizzBuzz implementation"
     },
     {
@@ -40,7 +57,12 @@
       "calorFile": "TokenEconomics/Factorial.calr",
       "csharpFile": "TokenEconomics/Factorial.cs",
       "level": 2,
-      "features": ["module", "function", "recursion", "conditional"],
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "conditional"
+      ],
       "notes": "Recursive factorial calculation"
     },
     {
@@ -50,7 +72,12 @@
       "calorFile": "TokenEconomics/Fibonacci.calr",
       "csharpFile": "TokenEconomics/Fibonacci.cs",
       "level": 2,
-      "features": ["module", "function", "recursion", "conditional"],
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "conditional"
+      ],
       "notes": "Fibonacci sequence generator"
     },
     {
@@ -60,7 +87,13 @@
       "calorFile": "TokenEconomics/ContractedDivide.calr",
       "csharpFile": "TokenEconomics/ContractedDivide.cs",
       "level": 3,
-      "features": ["module", "function", "contracts", "requires", "ensures"],
+      "features": [
+        "module",
+        "function",
+        "contracts",
+        "requires",
+        "ensures"
+      ],
       "notes": "Division with contract-based validation"
     },
     {
@@ -70,7 +103,12 @@
       "calorFile": "TokenEconomics/StringUtils.calr",
       "csharpFile": "TokenEconomics/StringUtils.cs",
       "level": 2,
-      "features": ["module", "function", "string_operations", "multiple_methods"],
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "multiple_methods"
+      ],
       "notes": "String utility functions"
     },
     {
@@ -80,7 +118,13 @@
       "calorFile": "TokenEconomics/MathOperations.calr",
       "csharpFile": "TokenEconomics/MathOperations.cs",
       "level": 3,
-      "features": ["module", "function", "contracts", "effects", "pure"],
+      "features": [
+        "module",
+        "function",
+        "contracts",
+        "effects",
+        "pure"
+      ],
       "notes": "Math operations with purity effects"
     },
     {
@@ -90,7 +134,12 @@
       "calorFile": "TokenEconomics/ArraySum.calr",
       "csharpFile": "TokenEconomics/ArraySum.cs",
       "level": 2,
-      "features": ["module", "function", "array", "loop"],
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop"
+      ],
       "notes": "Array summation"
     },
     {
@@ -100,7 +149,13 @@
       "calorFile": "TokenEconomics/MaxValue.calr",
       "csharpFile": "TokenEconomics/MaxValue.cs",
       "level": 2,
-      "features": ["module", "function", "array", "loop", "conditional"],
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "conditional"
+      ],
       "notes": "Find maximum value in array"
     },
     {
@@ -110,7 +165,13 @@
       "calorFile": "TokenEconomics/IsPrime.calr",
       "csharpFile": "TokenEconomics/IsPrime.cs",
       "level": 3,
-      "features": ["module", "function", "loop", "conditional", "contracts"],
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "conditional",
+        "contracts"
+      ],
       "notes": "Prime number checker"
     },
     {
@@ -120,7 +181,13 @@
       "calorFile": "TokenEconomics/BinarySearch.calr",
       "csharpFile": "TokenEconomics/BinarySearch.cs",
       "level": 3,
-      "features": ["module", "function", "array", "loop", "algorithm"],
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "algorithm"
+      ],
       "notes": "Binary search implementation"
     },
     {
@@ -130,7 +197,12 @@
       "calorFile": "TokenEconomics/TemperatureConverter.calr",
       "csharpFile": "TokenEconomics/TemperatureConverter.cs",
       "level": 1,
-      "features": ["module", "function", "arithmetic", "multiple_methods"],
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "multiple_methods"
+      ],
       "notes": "Temperature unit conversions"
     },
     {
@@ -140,7 +212,12 @@
       "calorFile": "TokenEconomics/LeapYear.calr",
       "csharpFile": "TokenEconomics/LeapYear.cs",
       "level": 2,
-      "features": ["module", "function", "conditional", "boolean"],
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "boolean"
+      ],
       "notes": "Leap year checker"
     },
     {
@@ -150,7 +227,12 @@
       "calorFile": "TokenEconomics/GCD.calr",
       "csharpFile": "TokenEconomics/GCD.cs",
       "level": 2,
-      "features": ["module", "function", "recursion", "algorithm"],
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "algorithm"
+      ],
       "notes": "Greatest common divisor (Euclidean algorithm)"
     },
     {
@@ -160,7 +242,12 @@
       "calorFile": "TokenEconomics/ReverseString.calr",
       "csharpFile": "TokenEconomics/ReverseString.cs",
       "level": 2,
-      "features": ["module", "function", "string_operations", "loop"],
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "loop"
+      ],
       "notes": "String reversal"
     },
     {
@@ -170,7 +257,13 @@
       "calorFile": "TokenEconomics/CountVowels.calr",
       "csharpFile": "TokenEconomics/CountVowels.cs",
       "level": 2,
-      "features": ["module", "function", "string_operations", "loop", "conditional"],
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "loop",
+        "conditional"
+      ],
       "notes": "Count vowels in string"
     },
     {
@@ -180,7 +273,13 @@
       "calorFile": "TokenEconomics/Palindrome.calr",
       "csharpFile": "TokenEconomics/Palindrome.cs",
       "level": 2,
-      "features": ["module", "function", "string_operations", "loop", "boolean"],
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "loop",
+        "boolean"
+      ],
       "notes": "Palindrome checker"
     },
     {
@@ -190,7 +289,12 @@
       "calorFile": "TokenEconomics/Power.calr",
       "csharpFile": "TokenEconomics/Power.cs",
       "level": 2,
-      "features": ["module", "function", "recursion", "contracts"],
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "contracts"
+      ],
       "notes": "Power function with contracts"
     },
     {
@@ -200,7 +304,13 @@
       "calorFile": "TokenEconomics/Clamp.calr",
       "csharpFile": "TokenEconomics/Clamp.cs",
       "level": 2,
-      "features": ["module", "function", "conditional", "contracts", "ensures"],
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "contracts",
+        "ensures"
+      ],
       "notes": "Value clamping with postconditions"
     },
     {
@@ -210,7 +320,13 @@
       "calorFile": "DataStructures/Stack.calr",
       "csharpFile": "DataStructures/Stack.cs",
       "level": 3,
-      "features": ["module", "function", "state", "contracts", "effects"],
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "effects"
+      ],
       "notes": "Stack data structure with push, pop, peek operations"
     },
     {
@@ -220,7 +336,13 @@
       "calorFile": "DataStructures/Queue.calr",
       "csharpFile": "DataStructures/Queue.cs",
       "level": 3,
-      "features": ["module", "function", "state", "contracts", "effects"],
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "effects"
+      ],
       "notes": "Queue data structure with enqueue, dequeue operations"
     },
     {
@@ -230,7 +352,14 @@
       "calorFile": "DataStructures/LinkedList.calr",
       "csharpFile": "DataStructures/LinkedList.cs",
       "level": 4,
-      "features": ["module", "function", "state", "contracts", "nested_types", "optional"],
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "nested_types",
+        "optional"
+      ],
       "notes": "Singly linked list with add/remove operations"
     },
     {
@@ -240,7 +369,14 @@
       "calorFile": "DataStructures/BinaryTree.calr",
       "csharpFile": "DataStructures/BinaryTree.cs",
       "level": 4,
-      "features": ["module", "function", "recursion", "state", "contracts", "tree"],
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "state",
+        "contracts",
+        "tree"
+      ],
       "notes": "Binary search tree with insert and search"
     },
     {
@@ -250,7 +386,13 @@
       "calorFile": "DesignPatterns/Singleton.calr",
       "csharpFile": "DesignPatterns/Singleton.cs",
       "level": 2,
-      "features": ["module", "function", "state", "contracts", "design_pattern"],
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "design_pattern"
+      ],
       "notes": "Singleton pattern implementation"
     },
     {
@@ -260,7 +402,13 @@
       "calorFile": "DesignPatterns/Factory.calr",
       "csharpFile": "DesignPatterns/Factory.cs",
       "level": 3,
-      "features": ["module", "function", "contracts", "polymorphism", "design_pattern"],
+      "features": [
+        "module",
+        "function",
+        "contracts",
+        "polymorphism",
+        "design_pattern"
+      ],
       "notes": "Factory pattern for shape creation"
     },
     {
@@ -270,7 +418,14 @@
       "calorFile": "DomainProblems/ShoppingCart.calr",
       "csharpFile": "DomainProblems/ShoppingCart.cs",
       "level": 4,
-      "features": ["module", "function", "state", "contracts", "domain_logic", "business_rules"],
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "domain_logic",
+        "business_rules"
+      ],
       "notes": "Shopping cart with add/remove items and tax calculation"
     },
     {
@@ -280,8 +435,1590 @@
       "calorFile": "ComplexAlgorithms/QuickSort.calr",
       "csharpFile": "ComplexAlgorithms/QuickSort.cs",
       "level": 4,
-      "features": ["module", "function", "recursion", "contracts", "algorithm", "in_place"],
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "contracts",
+        "algorithm",
+        "in_place"
+      ],
       "notes": "QuickSort algorithm with partition"
+    },
+    {
+      "id": "029",
+      "name": "SumRange",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/SumRange.calr",
+      "csharpFile": "TokenEconomics/SumRange.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "arithmetic"
+      ],
+      "notes": "Sum integers from 1 to n"
+    },
+    {
+      "id": "030",
+      "name": "Average",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/Average.calr",
+      "csharpFile": "TokenEconomics/Average.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "arithmetic"
+      ],
+      "notes": "Compute average of array elements"
+    },
+    {
+      "id": "031",
+      "name": "Abs",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/Abs.calr",
+      "csharpFile": "TokenEconomics/Abs.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional"
+      ],
+      "notes": "Absolute value function"
+    },
+    {
+      "id": "032",
+      "name": "Sign",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/Sign.calr",
+      "csharpFile": "TokenEconomics/Sign.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional"
+      ],
+      "notes": "Sign of a number (-1, 0, 1)"
+    },
+    {
+      "id": "033",
+      "name": "MinTwo",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/MinTwo.calr",
+      "csharpFile": "TokenEconomics/MinTwo.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional"
+      ],
+      "notes": "Minimum of two values"
+    },
+    {
+      "id": "034",
+      "name": "MaxTwo",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/MaxTwo.calr",
+      "csharpFile": "TokenEconomics/MaxTwo.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional"
+      ],
+      "notes": "Maximum of two values"
+    },
+    {
+      "id": "035",
+      "name": "IsEven",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/IsEven.calr",
+      "csharpFile": "TokenEconomics/IsEven.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "modulo",
+        "boolean"
+      ],
+      "notes": "Check if number is even"
+    },
+    {
+      "id": "036",
+      "name": "IsOdd",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/IsOdd.calr",
+      "csharpFile": "TokenEconomics/IsOdd.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "modulo",
+        "boolean"
+      ],
+      "notes": "Check if number is odd"
+    },
+    {
+      "id": "037",
+      "name": "CelsiusToKelvin",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/CelsiusToKelvin.calr",
+      "csharpFile": "TokenEconomics/CelsiusToKelvin.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "arithmetic"
+      ],
+      "notes": "Convert Celsius to Kelvin"
+    },
+    {
+      "id": "038",
+      "name": "AreaOfCircle",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/AreaOfCircle.calr",
+      "csharpFile": "TokenEconomics/AreaOfCircle.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts"
+      ],
+      "notes": "Compute area of circle"
+    },
+    {
+      "id": "039",
+      "name": "Hypotenuse",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/Hypotenuse.calr",
+      "csharpFile": "TokenEconomics/Hypotenuse.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts"
+      ],
+      "notes": "Pythagorean theorem \u2014 compute hypotenuse"
+    },
+    {
+      "id": "040",
+      "name": "DigitCount",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/DigitCount.calr",
+      "csharpFile": "TokenEconomics/DigitCount.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "conditional"
+      ],
+      "notes": "Count digits in a number"
+    },
+    {
+      "id": "041",
+      "name": "SumDigits",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/SumDigits.calr",
+      "csharpFile": "TokenEconomics/SumDigits.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "modulo"
+      ],
+      "notes": "Sum all digits of a number"
+    },
+    {
+      "id": "042",
+      "name": "ReverseArray",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/ReverseArray.calr",
+      "csharpFile": "TokenEconomics/ReverseArray.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop"
+      ],
+      "notes": "Check if array would be reversed (helper functions)"
+    },
+    {
+      "id": "043",
+      "name": "Contains",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/Contains.calr",
+      "csharpFile": "TokenEconomics/Contains.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "boolean"
+      ],
+      "notes": "Check if value equals target"
+    },
+    {
+      "id": "044",
+      "name": "CountOccurrences",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/CountOccurrences.calr",
+      "csharpFile": "TokenEconomics/CountOccurrences.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "conditional"
+      ],
+      "notes": "Count element occurrences in array"
+    },
+    {
+      "id": "045",
+      "name": "TruncateString",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/TruncateString.calr",
+      "csharpFile": "TokenEconomics/TruncateString.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "conditional"
+      ],
+      "notes": "Truncate string to maximum length"
+    },
+    {
+      "id": "046",
+      "name": "IsAlpha",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/IsAlpha.calr",
+      "csharpFile": "TokenEconomics/IsAlpha.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "boolean"
+      ],
+      "notes": "Check if character code is alphabetic"
+    },
+    {
+      "id": "047",
+      "name": "Capitalize",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/Capitalize.calr",
+      "csharpFile": "TokenEconomics/Capitalize.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "conditional"
+      ],
+      "notes": "Capitalize first letter logic"
+    },
+    {
+      "id": "048",
+      "name": "CompoundInterest",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/CompoundInterest.calr",
+      "csharpFile": "TokenEconomics/CompoundInterest.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts"
+      ],
+      "notes": "Compound interest financial calculation"
+    },
+    {
+      "id": "049",
+      "name": "PriorityQueue",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/PriorityQueue.calr",
+      "csharpFile": "DataStructures/PriorityQueue.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "conditional",
+        "contracts"
+      ],
+      "notes": "Priority queue helpers \u2014 compare priorities"
+    },
+    {
+      "id": "050",
+      "name": "Deque",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/Deque.calr",
+      "csharpFile": "DataStructures/Deque.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts"
+      ],
+      "notes": "Double-ended queue helpers"
+    },
+    {
+      "id": "051",
+      "name": "CircularBuffer",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/CircularBuffer.calr",
+      "csharpFile": "DataStructures/CircularBuffer.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "modulo",
+        "contracts"
+      ],
+      "notes": "Circular buffer index calculations"
+    },
+    {
+      "id": "052",
+      "name": "HashMap",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/HashMap.calr",
+      "csharpFile": "DataStructures/HashMap.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "modulo",
+        "contracts"
+      ],
+      "notes": "Hash map bucket index calculations"
+    },
+    {
+      "id": "053",
+      "name": "MinStack",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/MinStack.calr",
+      "csharpFile": "DataStructures/MinStack.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "conditional",
+        "contracts"
+      ],
+      "notes": "Stack with O(1) minimum \u2014 tracking min helpers"
+    },
+    {
+      "id": "054",
+      "name": "Trie",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/Trie.calr",
+      "csharpFile": "DataStructures/Trie.cs",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "string_operations"
+      ],
+      "notes": "Trie character index calculations"
+    },
+    {
+      "id": "055",
+      "name": "Graph",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/Graph.calr",
+      "csharpFile": "DataStructures/Graph.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "contracts"
+      ],
+      "notes": "Graph adjacency helpers"
+    },
+    {
+      "id": "056",
+      "name": "DisjointSet",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/DisjointSet.calr",
+      "csharpFile": "DataStructures/DisjointSet.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "algorithm"
+      ],
+      "notes": "Union-find helper functions"
+    },
+    {
+      "id": "057",
+      "name": "MaxHeap",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/MaxHeap.calr",
+      "csharpFile": "DataStructures/MaxHeap.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "contracts"
+      ],
+      "notes": "Max heap helpers"
+    },
+    {
+      "id": "058",
+      "name": "SortedList",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/SortedList.calr",
+      "csharpFile": "DataStructures/SortedList.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "conditional"
+      ],
+      "notes": "Sorted list insertion position finder"
+    },
+    {
+      "id": "059",
+      "name": "BitSet",
+      "category": "DataStructures",
+      "calorFile": "DataStructures/BitSet.calr",
+      "csharpFile": "DataStructures/BitSet.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "boolean"
+      ],
+      "notes": "Bit set operations"
+    },
+    {
+      "id": "060",
+      "name": "Observer",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Observer.calr",
+      "csharpFile": "DesignPatterns/Observer.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "notes": "Observer pattern \u2014 notification logic"
+    },
+    {
+      "id": "061",
+      "name": "Strategy",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Strategy.calr",
+      "csharpFile": "DesignPatterns/Strategy.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "notes": "Strategy pattern \u2014 swappable sort strategies"
+    },
+    {
+      "id": "062",
+      "name": "Builder",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Builder.calr",
+      "csharpFile": "DesignPatterns/Builder.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "notes": "Builder pattern \u2014 step-by-step construction"
+    },
+    {
+      "id": "063",
+      "name": "Decorator",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Decorator.calr",
+      "csharpFile": "DesignPatterns/Decorator.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "design_pattern"
+      ],
+      "notes": "Decorator pattern \u2014 price decoration"
+    },
+    {
+      "id": "064",
+      "name": "Command",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Command.calr",
+      "csharpFile": "DesignPatterns/Command.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "notes": "Command pattern \u2014 undo/redo value tracking"
+    },
+    {
+      "id": "065",
+      "name": "State",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/State.calr",
+      "csharpFile": "DesignPatterns/State.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "notes": "State machine \u2014 traffic light states"
+    },
+    {
+      "id": "066",
+      "name": "Adapter",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Adapter.calr",
+      "csharpFile": "DesignPatterns/Adapter.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "design_pattern"
+      ],
+      "notes": "Adapter pattern \u2014 unit conversion adapter"
+    },
+    {
+      "id": "067",
+      "name": "Proxy",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Proxy.calr",
+      "csharpFile": "DesignPatterns/Proxy.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "notes": "Proxy pattern \u2014 access control"
+    },
+    {
+      "id": "068",
+      "name": "Iterator",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Iterator.calr",
+      "csharpFile": "DesignPatterns/Iterator.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "notes": "Iterator pattern \u2014 range iterator"
+    },
+    {
+      "id": "069",
+      "name": "Mediator",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Mediator.calr",
+      "csharpFile": "DesignPatterns/Mediator.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "notes": "Mediator pattern \u2014 chat room message routing"
+    },
+    {
+      "id": "070",
+      "name": "ChainOfResponsibility",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/ChainOfResponsibility.calr",
+      "csharpFile": "DesignPatterns/ChainOfResponsibility.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "notes": "Chain of responsibility \u2014 approval chain"
+    },
+    {
+      "id": "071",
+      "name": "Composite",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Composite.calr",
+      "csharpFile": "DesignPatterns/Composite.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "design_pattern"
+      ],
+      "notes": "Composite pattern \u2014 file system size calculation"
+    },
+    {
+      "id": "072",
+      "name": "Flyweight",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Flyweight.calr",
+      "csharpFile": "DesignPatterns/Flyweight.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "notes": "Flyweight pattern \u2014 shared state pooling"
+    },
+    {
+      "id": "073",
+      "name": "BankAccount",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/BankAccount.calr",
+      "csharpFile": "DomainProblems/BankAccount.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "domain_logic"
+      ],
+      "notes": "Bank account deposit/withdraw/balance"
+    },
+    {
+      "id": "074",
+      "name": "TodoList",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/TodoList.calr",
+      "csharpFile": "DomainProblems/TodoList.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "domain_logic"
+      ],
+      "notes": "Todo list \u2014 task completion tracking"
+    },
+    {
+      "id": "075",
+      "name": "Inventory",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/Inventory.calr",
+      "csharpFile": "DomainProblems/Inventory.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "domain_logic"
+      ],
+      "notes": "Inventory stock management"
+    },
+    {
+      "id": "076",
+      "name": "VotingSystem",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/VotingSystem.calr",
+      "csharpFile": "DomainProblems/VotingSystem.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "domain_logic"
+      ],
+      "notes": "Vote counting and majority detection"
+    },
+    {
+      "id": "077",
+      "name": "GradeCalculator",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/GradeCalculator.calr",
+      "csharpFile": "DomainProblems/GradeCalculator.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "arithmetic",
+        "domain_logic"
+      ],
+      "notes": "Weighted grade calculation"
+    },
+    {
+      "id": "078",
+      "name": "PasswordValidator",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/PasswordValidator.calr",
+      "csharpFile": "DomainProblems/PasswordValidator.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "boolean",
+        "domain_logic"
+      ],
+      "notes": "Password strength validation"
+    },
+    {
+      "id": "079",
+      "name": "PhoneBook",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/PhoneBook.calr",
+      "csharpFile": "DomainProblems/PhoneBook.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "domain_logic"
+      ],
+      "notes": "Phone book contact operations"
+    },
+    {
+      "id": "080",
+      "name": "UnitConverter",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/UnitConverter.calr",
+      "csharpFile": "DomainProblems/UnitConverter.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "domain_logic"
+      ],
+      "notes": "Metric/imperial unit conversions"
+    },
+    {
+      "id": "081",
+      "name": "Calendar",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/Calendar.calr",
+      "csharpFile": "DomainProblems/Calendar.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "algorithm",
+        "domain_logic"
+      ],
+      "notes": "Calendar helpers \u2014 days in month, leap year"
+    },
+    {
+      "id": "082",
+      "name": "Timer",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/Timer.calr",
+      "csharpFile": "DomainProblems/Timer.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "domain_logic"
+      ],
+      "notes": "Timer \u2014 countdown and time formatting"
+    },
+    {
+      "id": "083",
+      "name": "ScoreBoard",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/ScoreBoard.calr",
+      "csharpFile": "DomainProblems/ScoreBoard.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "domain_logic"
+      ],
+      "notes": "Scoreboard leaderboard logic"
+    },
+    {
+      "id": "084",
+      "name": "TaxCalculator",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/TaxCalculator.calr",
+      "csharpFile": "DomainProblems/TaxCalculator.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "arithmetic",
+        "domain_logic",
+        "business_rules"
+      ],
+      "notes": "Tax bracket calculation"
+    },
+    {
+      "id": "085",
+      "name": "BMICalculator",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/BMICalculator.calr",
+      "csharpFile": "DomainProblems/BMICalculator.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "conditional",
+        "domain_logic"
+      ],
+      "notes": "Body mass index calculator"
+    },
+    {
+      "id": "086",
+      "name": "DistanceCalculator",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/DistanceCalculator.calr",
+      "csharpFile": "DomainProblems/DistanceCalculator.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts",
+        "domain_logic"
+      ],
+      "notes": "Euclidean distance calculation"
+    },
+    {
+      "id": "087",
+      "name": "CurrencyConverter",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/CurrencyConverter.calr",
+      "csharpFile": "DomainProblems/CurrencyConverter.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts",
+        "domain_logic"
+      ],
+      "notes": "Currency exchange rate conversions"
+    },
+    {
+      "id": "088",
+      "name": "DateDiff",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/DateDiff.calr",
+      "csharpFile": "DomainProblems/DateDiff.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "domain_logic"
+      ],
+      "notes": "Day difference calculation between dates"
+    },
+    {
+      "id": "089",
+      "name": "EmailValidator",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/EmailValidator.calr",
+      "csharpFile": "DomainProblems/EmailValidator.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "string_operations",
+        "domain_logic"
+      ],
+      "notes": "Basic email format validation"
+    },
+    {
+      "id": "090",
+      "name": "UrlParser",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/UrlParser.calr",
+      "csharpFile": "DomainProblems/UrlParser.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "domain_logic"
+      ],
+      "notes": "URL component extraction helpers"
+    },
+    {
+      "id": "091",
+      "name": "CsvParser",
+      "category": "DomainProblems",
+      "calorFile": "DomainProblems/CsvParser.calr",
+      "csharpFile": "DomainProblems/CsvParser.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "domain_logic"
+      ],
+      "notes": "Simple CSV field counting"
+    },
+    {
+      "id": "092",
+      "name": "MergeSort",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/MergeSort.calr",
+      "csharpFile": "ComplexAlgorithms/MergeSort.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "algorithm"
+      ],
+      "notes": "Merge sort helper functions"
+    },
+    {
+      "id": "093",
+      "name": "InsertionSort",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/InsertionSort.calr",
+      "csharpFile": "ComplexAlgorithms/InsertionSort.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "algorithm"
+      ],
+      "notes": "Insertion sort helper functions"
+    },
+    {
+      "id": "094",
+      "name": "SelectionSort",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/SelectionSort.calr",
+      "csharpFile": "ComplexAlgorithms/SelectionSort.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "algorithm"
+      ],
+      "notes": "Selection sort helper functions"
+    },
+    {
+      "id": "095",
+      "name": "BubbleSort",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/BubbleSort.calr",
+      "csharpFile": "ComplexAlgorithms/BubbleSort.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "algorithm"
+      ],
+      "notes": "Bubble sort helper functions"
+    },
+    {
+      "id": "096",
+      "name": "LinearSearch",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/LinearSearch.calr",
+      "csharpFile": "ComplexAlgorithms/LinearSearch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "algorithm"
+      ],
+      "notes": "Linear search"
+    },
+    {
+      "id": "097",
+      "name": "InterpolationSearch",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/InterpolationSearch.calr",
+      "csharpFile": "ComplexAlgorithms/InterpolationSearch.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "arithmetic"
+      ],
+      "notes": "Interpolation search position estimation"
+    },
+    {
+      "id": "098",
+      "name": "DepthFirstSearch",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/DepthFirstSearch.calr",
+      "csharpFile": "ComplexAlgorithms/DepthFirstSearch.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "algorithm",
+        "graph"
+      ],
+      "notes": "DFS helper functions"
+    },
+    {
+      "id": "099",
+      "name": "BreadthFirstSearch",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/BreadthFirstSearch.calr",
+      "csharpFile": "ComplexAlgorithms/BreadthFirstSearch.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "graph"
+      ],
+      "notes": "BFS helper functions"
+    },
+    {
+      "id": "100",
+      "name": "Dijkstra",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/Dijkstra.calr",
+      "csharpFile": "ComplexAlgorithms/Dijkstra.cs",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "graph"
+      ],
+      "notes": "Dijkstra shortest path helpers"
+    },
+    {
+      "id": "101",
+      "name": "Knapsack",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/Knapsack.calr",
+      "csharpFile": "ComplexAlgorithms/Knapsack.cs",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "dynamic_programming"
+      ],
+      "notes": "0/1 Knapsack helpers"
+    },
+    {
+      "id": "102",
+      "name": "LCS",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/LCS.calr",
+      "csharpFile": "ComplexAlgorithms/LCS.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "dynamic_programming"
+      ],
+      "notes": "Longest common subsequence helpers"
+    },
+    {
+      "id": "103",
+      "name": "EditDistance",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/EditDistance.calr",
+      "csharpFile": "ComplexAlgorithms/EditDistance.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "dynamic_programming"
+      ],
+      "notes": "Levenshtein edit distance helpers"
+    },
+    {
+      "id": "104",
+      "name": "MatrixMultiply",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/MatrixMultiply.calr",
+      "csharpFile": "ComplexAlgorithms/MatrixMultiply.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "loop",
+        "arithmetic"
+      ],
+      "notes": "Matrix multiplication helpers"
+    },
+    {
+      "id": "105",
+      "name": "TowerOfHanoi",
+      "category": "ComplexAlgorithms",
+      "calorFile": "ComplexAlgorithms/TowerOfHanoi.calr",
+      "csharpFile": "ComplexAlgorithms/TowerOfHanoi.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "algorithm"
+      ],
+      "notes": "Tower of Hanoi move counter"
+    },
+    {
+      "id": "049a",
+      "name": "ExpressionBodied",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/ExpressionBodied.calr",
+      "csharpFile": "TokenEconomics/ExpressionBodied.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "adversarial"
+      ],
+      "notes": "ADVERSARIAL: C# expression-bodied members (1 line) vs Calor (5 lines per function). C# wins.",
+      "expectedAdvantage": 0.6
+    },
+    {
+      "id": "049b",
+      "name": "TernaryChain",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/TernaryChain.calr",
+      "csharpFile": "TokenEconomics/TernaryChain.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "adversarial"
+      ],
+      "notes": "ADVERSARIAL: C# ternary chains vs Calor \u00a7IF/\u00a7EI/\u00a7EL blocks. C# wins.",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "async001",
+      "name": "SimpleAsync",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/SimpleAsync.calr",
+      "csharpFile": "AsyncConcurrency/SimpleAsync.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Basic async/await pattern"
+    },
+    {
+      "id": "async002",
+      "name": "AsyncReturn",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/AsyncReturn.calr",
+      "csharpFile": "AsyncConcurrency/AsyncReturn.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Async with return value"
+    },
+    {
+      "id": "async003",
+      "name": "AsyncChain",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/AsyncChain.calr",
+      "csharpFile": "AsyncConcurrency/AsyncChain.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Sequential await chain"
+    },
+    {
+      "id": "async004",
+      "name": "DelayedResult",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/DelayedResult.calr",
+      "csharpFile": "AsyncConcurrency/DelayedResult.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Task.Delay pattern"
+    },
+    {
+      "id": "async005",
+      "name": "AsyncPure",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/AsyncPure.calr",
+      "csharpFile": "AsyncConcurrency/AsyncPure.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Async pure computation"
+    },
+    {
+      "id": "async006",
+      "name": "AsyncEffect",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/AsyncEffect.calr",
+      "csharpFile": "AsyncConcurrency/AsyncEffect.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Async with effects"
+    },
+    {
+      "id": "async007",
+      "name": "ParallelTasks",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/ParallelTasks.calr",
+      "csharpFile": "AsyncConcurrency/ParallelTasks.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Task.WhenAll pattern"
+    },
+    {
+      "id": "async008",
+      "name": "CancellableTask",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/CancellableTask.calr",
+      "csharpFile": "AsyncConcurrency/CancellableTask.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Cancellation token pattern"
+    },
+    {
+      "id": "async009",
+      "name": "AsyncLoop",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/AsyncLoop.calr",
+      "csharpFile": "AsyncConcurrency/AsyncLoop.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Async iteration pattern"
+    },
+    {
+      "id": "async010",
+      "name": "AsyncErrorHandling",
+      "category": "AsyncConcurrency",
+      "calorFile": "AsyncConcurrency/AsyncErrorHandling.calr",
+      "csharpFile": "AsyncConcurrency/AsyncErrorHandling.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "notes": "Try/catch in async"
+    },
+    {
+      "id": "col001",
+      "name": "ListOps",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/ListOps.calr",
+      "csharpFile": "CollectionsLINQ/ListOps.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "List operations",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "col002",
+      "name": "DictOps",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/DictOps.calr",
+      "csharpFile": "CollectionsLINQ/DictOps.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Dictionary operations",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "col003",
+      "name": "SetOps",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/SetOps.calr",
+      "csharpFile": "CollectionsLINQ/SetOps.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Set operations",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "col004",
+      "name": "ArraySlice",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/ArraySlice.calr",
+      "csharpFile": "CollectionsLINQ/ArraySlice.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Array slicing helpers"
+    },
+    {
+      "id": "col005",
+      "name": "Filter",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/Filter.calr",
+      "csharpFile": "CollectionsLINQ/Filter.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Collection filtering",
+      "expectedAdvantage": 0.6
+    },
+    {
+      "id": "col006",
+      "name": "Map",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/Map.calr",
+      "csharpFile": "CollectionsLINQ/Map.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Collection transformation",
+      "expectedAdvantage": 0.6
+    },
+    {
+      "id": "col007",
+      "name": "Reduce",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/Reduce.calr",
+      "csharpFile": "CollectionsLINQ/Reduce.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Collection aggregation",
+      "expectedAdvantage": 0.6
+    },
+    {
+      "id": "col008",
+      "name": "Sort",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/Sort.calr",
+      "csharpFile": "CollectionsLINQ/Sort.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Collection sorting",
+      "expectedAdvantage": 0.6
+    },
+    {
+      "id": "col009",
+      "name": "GroupBy",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/GroupBy.calr",
+      "csharpFile": "CollectionsLINQ/GroupBy.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Grouping elements",
+      "expectedAdvantage": 0.6
+    },
+    {
+      "id": "col010",
+      "name": "Zip",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/Zip.calr",
+      "csharpFile": "CollectionsLINQ/Zip.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "notes": "Combining collections",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "col011",
+      "name": "LinqPipeline",
+      "category": "CollectionsLINQ",
+      "calorFile": "CollectionsLINQ/LinqPipeline.calr",
+      "csharpFile": "CollectionsLINQ/LinqPipeline.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections",
+        "adversarial"
+      ],
+      "notes": "ADVERSARIAL: C# LINQ one-liner pipelines vs Calor fold functions. C# decisively wins.",
+      "expectedAdvantage": 0.4
+    },
+    {
+      "id": "compact001",
+      "name": "InlineSigs",
+      "category": "CompactSyntax",
+      "calorFile": "CompactSyntax/InlineSigs.calr",
+      "csharpFile": "CompactSyntax/InlineSigs.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "notes": "Inline signature demonstration"
+    },
+    {
+      "id": "compact002",
+      "name": "AutoProps",
+      "category": "CompactSyntax",
+      "calorFile": "CompactSyntax/AutoProps.calr",
+      "csharpFile": "CompactSyntax/AutoProps.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "notes": "Auto-property shorthand"
+    },
+    {
+      "id": "compact003",
+      "name": "OptionalIds",
+      "category": "CompactSyntax",
+      "calorFile": "CompactSyntax/OptionalIds.calr",
+      "csharpFile": "CompactSyntax/OptionalIds.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "notes": "Optional ID demonstration"
+    },
+    {
+      "id": "compact004",
+      "name": "CompactClass",
+      "category": "CompactSyntax",
+      "calorFile": "CompactSyntax/CompactClass.calr",
+      "csharpFile": "CompactSyntax/CompactClass.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "notes": "All compact forms combined"
+    },
+    {
+      "id": "compact005",
+      "name": "MixedSyntax",
+      "category": "CompactSyntax",
+      "calorFile": "CompactSyntax/MixedSyntax.calr",
+      "csharpFile": "CompactSyntax/MixedSyntax.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "notes": "Compact and verbose forms mixed"
     },
     {
       "id": "cv001",
@@ -290,7 +2027,12 @@
       "calorFile": "ContractVerification/ProvableContracts.calr",
       "csharpFile": "ContractVerification/ProvableContracts.cs",
       "level": 2,
-      "features": ["contracts", "z3", "verification", "ensures"],
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "ensures"
+      ],
       "notes": "Functions with provable postconditions"
     },
     {
@@ -300,7 +2042,12 @@
       "calorFile": "ContractVerification/BuggyContracts.calr",
       "csharpFile": "ContractVerification/BuggyContracts.cs",
       "level": 2,
-      "features": ["contracts", "z3", "verification", "disproven"],
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "disproven"
+      ],
       "notes": "Functions with provably violated postconditions"
     },
     {
@@ -310,7 +2057,12 @@
       "calorFile": "ContractVerification/MixedContracts.calr",
       "csharpFile": "ContractVerification/MixedContracts.cs",
       "level": 3,
-      "features": ["contracts", "z3", "verification", "mixed"],
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "mixed"
+      ],
       "notes": "Mix of provable and unprovable contracts"
     },
     {
@@ -320,7 +2072,14 @@
       "calorFile": "ContractVerification/OverflowUnsafe.calr",
       "csharpFile": "ContractVerification/OverflowUnsafe.cs",
       "level": 3,
-      "features": ["contracts", "z3", "verification", "overflow", "bit-vectors", "disproven"],
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "overflow",
+        "bit-vectors",
+        "disproven"
+      ],
       "notes": "Contracts that must be DISPROVEN due to integer overflow (validates bit-vector soundness)"
     },
     {
@@ -330,7 +2089,14 @@
       "calorFile": "ContractVerification/OverflowSafe.calr",
       "csharpFile": "ContractVerification/OverflowSafe.cs",
       "level": 3,
-      "features": ["contracts", "z3", "verification", "overflow", "bit-vectors", "proven"],
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "overflow",
+        "bit-vectors",
+        "proven"
+      ],
       "notes": "Contracts with proper bounds that CAN be proven (no overflow possible)"
     },
     {
@@ -340,7 +2106,13 @@
       "calorFile": "ContractVerification/StringContracts.calr",
       "csharpFile": "ContractVerification/StringContracts.cs",
       "level": 3,
-      "features": ["contracts", "z3", "verification", "strings", "string-theory"],
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "strings",
+        "string-theory"
+      ],
       "notes": "String operation contracts using Z3 string theory (length, contains, startswith, etc.)"
     },
     {
@@ -350,8 +2122,307 @@
       "calorFile": "ContractVerification/ArrayContracts.calr",
       "csharpFile": "ContractVerification/ArrayContracts.cs",
       "level": 3,
-      "features": ["contracts", "z3", "verification", "arrays", "bounds-checking"],
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "arrays",
+        "bounds-checking"
+      ],
       "notes": "Array index and bounds contracts (valid index, safe ranges, binary search invariants)"
+    },
+    {
+      "id": "cv008",
+      "name": "DivisionContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/DivisionContracts.calr",
+      "csharpFile": "ContractVerification/DivisionContracts.cs",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "division"
+      ],
+      "notes": "Safe division variants with contracts"
+    },
+    {
+      "id": "cv009",
+      "name": "RangeContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/RangeContracts.calr",
+      "csharpFile": "ContractVerification/RangeContracts.cs",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "ranges"
+      ],
+      "notes": "Bounded range contracts"
+    },
+    {
+      "id": "cv010",
+      "name": "ListInvariant",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/ListInvariant.calr",
+      "csharpFile": "ContractVerification/ListInvariant.cs",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "invariants"
+      ],
+      "notes": "List length invariant contracts"
+    },
+    {
+      "id": "cv011",
+      "name": "SortingContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/SortingContracts.calr",
+      "csharpFile": "ContractVerification/SortingContracts.cs",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "sorting"
+      ],
+      "notes": "Sorting postcondition contracts"
+    },
+    {
+      "id": "cv012",
+      "name": "SearchContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/SearchContracts.calr",
+      "csharpFile": "ContractVerification/SearchContracts.cs",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "search"
+      ],
+      "notes": "Binary search pre/postcondition contracts"
+    },
+    {
+      "id": "cv013",
+      "name": "AbsoluteContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/AbsoluteContracts.calr",
+      "csharpFile": "ContractVerification/AbsoluteContracts.cs",
+      "level": 2,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "absolute"
+      ],
+      "notes": "Absolute value properties"
+    },
+    {
+      "id": "cv014",
+      "name": "ModuloContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/ModuloContracts.calr",
+      "csharpFile": "ContractVerification/ModuloContracts.cs",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "modulo"
+      ],
+      "notes": "Modulo operation bound contracts"
+    },
+    {
+      "id": "cv015",
+      "name": "BitContracts",
+      "category": "ContractVerification",
+      "calorFile": "ContractVerification/BitContracts.calr",
+      "csharpFile": "ContractVerification/BitContracts.cs",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "bitwise"
+      ],
+      "notes": "Bitwise operation property contracts"
+    },
+    {
+      "id": "dp003",
+      "name": "Visitor",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/Visitor.calr",
+      "csharpFile": "DesignPatterns/Visitor.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "polymorphism",
+        "design_pattern"
+      ],
+      "notes": "Visitor pattern implementation"
+    },
+    {
+      "id": "dp004",
+      "name": "TemplateMethod",
+      "category": "DesignPatterns",
+      "calorFile": "DesignPatterns/TemplateMethod.calr",
+      "csharpFile": "DesignPatterns/TemplateMethod.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "polymorphism",
+        "design_pattern"
+      ],
+      "notes": "Template method pattern implementation"
+    },
+    {
+      "id": "err001",
+      "name": "BasicTryCatch",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/BasicTryCatch.calr",
+      "csharpFile": "ErrorHandling/BasicTryCatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Simple try/catch"
+    },
+    {
+      "id": "err002",
+      "name": "MultipleCatch",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/MultipleCatch.calr",
+      "csharpFile": "ErrorHandling/MultipleCatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Multiple catch blocks"
+    },
+    {
+      "id": "err003",
+      "name": "TryFinally",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/TryFinally.calr",
+      "csharpFile": "ErrorHandling/TryFinally.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Cleanup with finally"
+    },
+    {
+      "id": "err004",
+      "name": "CustomException",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/CustomException.calr",
+      "csharpFile": "ErrorHandling/CustomException.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "User-defined exception"
+    },
+    {
+      "id": "err005",
+      "name": "ExceptionChain",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/ExceptionChain.calr",
+      "csharpFile": "ErrorHandling/ExceptionChain.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Inner exception pattern"
+    },
+    {
+      "id": "err006",
+      "name": "ResultType",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/ResultType.calr",
+      "csharpFile": "ErrorHandling/ResultType.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Result<T> pattern",
+      "expectedAdvantage": 0.8
+    },
+    {
+      "id": "err007",
+      "name": "OptionType",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/OptionType.calr",
+      "csharpFile": "ErrorHandling/OptionType.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Option/Maybe pattern",
+      "expectedAdvantage": 0.8
+    },
+    {
+      "id": "err008",
+      "name": "NullCheck",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/NullCheck.calr",
+      "csharpFile": "ErrorHandling/NullCheck.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Null safety patterns",
+      "expectedAdvantage": 0.8
+    },
+    {
+      "id": "err009",
+      "name": "GuardClause",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/GuardClause.calr",
+      "csharpFile": "ErrorHandling/GuardClause.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Early return validation"
+    },
+    {
+      "id": "err010",
+      "name": "ErrorPropagation",
+      "category": "ErrorHandling",
+      "calorFile": "ErrorHandling/ErrorPropagation.calr",
+      "csharpFile": "ErrorHandling/ErrorPropagation.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "notes": "Error bubbling pattern"
     },
     {
       "id": "es001",
@@ -360,7 +2431,11 @@
       "calorFile": "EffectSoundness/CorrectEffects.calr",
       "csharpFile": "EffectSoundness/CorrectEffects.cs",
       "level": 2,
-      "features": ["effects", "enforcement", "sound"],
+      "features": [
+        "effects",
+        "enforcement",
+        "sound"
+      ],
       "notes": "Functions with correctly declared effects"
     },
     {
@@ -370,7 +2445,11 @@
       "calorFile": "EffectSoundness/MissingEffects.calr",
       "csharpFile": "EffectSoundness/MissingEffects.cs",
       "level": 2,
-      "features": ["effects", "enforcement", "missing"],
+      "features": [
+        "effects",
+        "enforcement",
+        "missing"
+      ],
       "notes": "Functions with undeclared effects"
     },
     {
@@ -380,8 +2459,110 @@
       "calorFile": "EffectSoundness/HiddenNetworkEffect.calr",
       "csharpFile": "EffectSoundness/HiddenNetworkEffect.cs",
       "level": 3,
-      "features": ["effects", "enforcement", "transitive"],
+      "features": [
+        "effects",
+        "enforcement",
+        "transitive"
+      ],
       "notes": "Effect leakage through transitive calls"
+    },
+    {
+      "id": "es004",
+      "name": "FileEffects",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/FileEffects.calr",
+      "csharpFile": "EffectSoundness/FileEffects.cs",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "file_io"
+      ],
+      "notes": "File I/O effect declarations"
+    },
+    {
+      "id": "es005",
+      "name": "DatabaseEffect",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/DatabaseEffect.calr",
+      "csharpFile": "EffectSoundness/DatabaseEffect.cs",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "database"
+      ],
+      "notes": "Database query effect tracking"
+    },
+    {
+      "id": "es006",
+      "name": "NetworkEffect",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/NetworkEffect.calr",
+      "csharpFile": "EffectSoundness/NetworkEffect.cs",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "network"
+      ],
+      "notes": "Network call effect tracking"
+    },
+    {
+      "id": "es007",
+      "name": "ComposedEffects",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/ComposedEffects.calr",
+      "csharpFile": "EffectSoundness/ComposedEffects.cs",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "composed"
+      ],
+      "notes": "Multiple composed effects"
+    },
+    {
+      "id": "es008",
+      "name": "PureComputation",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/PureComputation.calr",
+      "csharpFile": "EffectSoundness/PureComputation.cs",
+      "level": 2,
+      "features": [
+        "effects",
+        "enforcement",
+        "pure"
+      ],
+      "notes": "Verified pure computations \u2014 no effects"
+    },
+    {
+      "id": "es009",
+      "name": "StateEffect",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/StateEffect.calr",
+      "csharpFile": "EffectSoundness/StateEffect.cs",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "state"
+      ],
+      "notes": "Mutable state effect tracking"
+    },
+    {
+      "id": "es010",
+      "name": "TimerEffect",
+      "category": "EffectSoundness",
+      "calorFile": "EffectSoundness/TimerEffect.calr",
+      "csharpFile": "EffectSoundness/TimerEffect.cs",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "timing"
+      ],
+      "notes": "Timing/delay effect tracking"
     },
     {
       "id": "ie001",
@@ -390,7 +2571,12 @@
       "calorFile": "InteropEffectCoverage/BclCoverage.calr",
       "csharpFile": "InteropEffectCoverage/BclCoverage.cs",
       "level": 2,
-      "features": ["effects", "manifest", "bcl", "interop"],
+      "features": [
+        "effects",
+        "manifest",
+        "bcl",
+        "interop"
+      ],
       "notes": "Common BCL methods with effect annotations"
     },
     {
@@ -400,8 +2586,532 @@
       "calorFile": "InteropEffectCoverage/PureFunctions.calr",
       "csharpFile": "InteropEffectCoverage/PureFunctions.cs",
       "level": 1,
-      "features": ["effects", "manifest", "pure"],
+      "features": [
+        "effects",
+        "manifest",
+        "pure"
+      ],
       "notes": "Pure BCL methods that should resolve cleanly"
+    },
+    {
+      "id": "ie003",
+      "name": "MathLib",
+      "category": "InteropEffectCoverage",
+      "calorFile": "InteropEffectCoverage/MathLib.calr",
+      "csharpFile": "InteropEffectCoverage/MathLib.cs",
+      "level": 2,
+      "features": [
+        "effects",
+        "manifest",
+        "bcl",
+        "math"
+      ],
+      "notes": "System.Math BCL methods \u2014 pure"
+    },
+    {
+      "id": "ie004",
+      "name": "StringLib",
+      "category": "InteropEffectCoverage",
+      "calorFile": "InteropEffectCoverage/StringLib.calr",
+      "csharpFile": "InteropEffectCoverage/StringLib.cs",
+      "level": 2,
+      "features": [
+        "effects",
+        "manifest",
+        "bcl",
+        "string"
+      ],
+      "notes": "String manipulation BCL methods \u2014 pure"
+    },
+    {
+      "id": "ie005",
+      "name": "CollectionLib",
+      "category": "InteropEffectCoverage",
+      "calorFile": "InteropEffectCoverage/CollectionLib.calr",
+      "csharpFile": "InteropEffectCoverage/CollectionLib.cs",
+      "level": 2,
+      "features": [
+        "effects",
+        "manifest",
+        "bcl",
+        "collections"
+      ],
+      "notes": "Collection BCL operations"
+    },
+    {
+      "id": "oop001",
+      "name": "SimpleClass",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/SimpleClass.calr",
+      "csharpFile": "OOPGenerics/SimpleClass.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "fields"
+      ],
+      "notes": "Simple class with fields and methods"
+    },
+    {
+      "id": "oop002",
+      "name": "ConstructorInit",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/ConstructorInit.calr",
+      "csharpFile": "OOPGenerics/ConstructorInit.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "constructor"
+      ],
+      "notes": "Constructor patterns with validation"
+    },
+    {
+      "id": "oop003",
+      "name": "Properties",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/Properties.calr",
+      "csharpFile": "OOPGenerics/Properties.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "properties"
+      ],
+      "notes": "Get/set property patterns"
+    },
+    {
+      "id": "oop004",
+      "name": "Inheritance",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/Inheritance.calr",
+      "csharpFile": "OOPGenerics/Inheritance.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "inheritance"
+      ],
+      "notes": "Base and derived class patterns"
+    },
+    {
+      "id": "oop005",
+      "name": "InterfaceImpl",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/InterfaceImpl.calr",
+      "csharpFile": "OOPGenerics/InterfaceImpl.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "interface",
+        "polymorphism"
+      ],
+      "notes": "Interface implementation patterns"
+    },
+    {
+      "id": "oop012",
+      "name": "AbstractClass",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/AbstractClass.calr",
+      "csharpFile": "OOPGenerics/AbstractClass.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Abstract class with template method"
+    },
+    {
+      "id": "oop013",
+      "name": "SealedClass",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/SealedClass.calr",
+      "csharpFile": "OOPGenerics/SealedClass.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Sealed class pattern"
+    },
+    {
+      "id": "oop014",
+      "name": "GenericFunction",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/GenericFunction.calr",
+      "csharpFile": "OOPGenerics/GenericFunction.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Generic function pattern"
+    },
+    {
+      "id": "oop015",
+      "name": "GenericClass",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/GenericClass.calr",
+      "csharpFile": "OOPGenerics/GenericClass.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Generic container class"
+    },
+    {
+      "id": "oop016",
+      "name": "GenericConstraints",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/GenericConstraints.calr",
+      "csharpFile": "OOPGenerics/GenericConstraints.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Generic type constraints"
+    },
+    {
+      "id": "oop017",
+      "name": "StaticMembers",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/StaticMembers.calr",
+      "csharpFile": "OOPGenerics/StaticMembers.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Static method patterns"
+    },
+    {
+      "id": "oop018",
+      "name": "MethodOverloading",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/MethodOverloading.calr",
+      "csharpFile": "OOPGenerics/MethodOverloading.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Overloaded method patterns"
+    },
+    {
+      "id": "oop019",
+      "name": "MethodOverriding",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/MethodOverriding.calr",
+      "csharpFile": "OOPGenerics/MethodOverriding.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Virtual/override patterns",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "oop020",
+      "name": "Encapsulation",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/Encapsulation.calr",
+      "csharpFile": "OOPGenerics/Encapsulation.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Private/public access control"
+    },
+    {
+      "id": "oop021",
+      "name": "Composition",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/Composition.calr",
+      "csharpFile": "OOPGenerics/Composition.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Object composition pattern"
+    },
+    {
+      "id": "oop022",
+      "name": "Polymorphism",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/Polymorphism.calr",
+      "csharpFile": "OOPGenerics/Polymorphism.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Runtime dispatch pattern"
+    },
+    {
+      "id": "oop023",
+      "name": "EnumType",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/EnumType.calr",
+      "csharpFile": "OOPGenerics/EnumType.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Enum type patterns"
+    },
+    {
+      "id": "oop024",
+      "name": "EnumWithMethods",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/EnumWithMethods.calr",
+      "csharpFile": "OOPGenerics/EnumWithMethods.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Enum with extension methods"
+    },
+    {
+      "id": "oop025",
+      "name": "RecordType",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/RecordType.calr",
+      "csharpFile": "OOPGenerics/RecordType.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Immutable record pattern",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "oop026",
+      "name": "TypeAlias",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/TypeAlias.calr",
+      "csharpFile": "OOPGenerics/TypeAlias.cs",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "notes": "Type alias patterns (using type mapping)"
+    },
+    {
+      "id": "oop027",
+      "name": "PropertyAccess",
+      "category": "OOPGenerics",
+      "calorFile": "OOPGenerics/PropertyAccess.calr",
+      "csharpFile": "OOPGenerics/PropertyAccess.cs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "properties",
+        "adversarial"
+      ],
+      "notes": "ADVERSARIAL: C# auto-properties (1 line) vs Calor getter functions (5 lines). C# wins.",
+      "expectedAdvantage": 0.5
+    },
+    {
+      "id": "pat001",
+      "name": "SimpleMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/SimpleMatch.calr",
+      "csharpFile": "PatternMatching/SimpleMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Basic value matching",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "pat002",
+      "name": "TypeMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/TypeMatch.calr",
+      "csharpFile": "PatternMatching/TypeMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Match by type (simulated with int codes)"
+    },
+    {
+      "id": "pat003",
+      "name": "RangeMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/RangeMatch.calr",
+      "csharpFile": "PatternMatching/RangeMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Match ranges"
+    },
+    {
+      "id": "pat004",
+      "name": "GuardMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/GuardMatch.calr",
+      "csharpFile": "PatternMatching/GuardMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Match with guards"
+    },
+    {
+      "id": "pat005",
+      "name": "NestedMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/NestedMatch.calr",
+      "csharpFile": "PatternMatching/NestedMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Nested pattern matching"
+    },
+    {
+      "id": "pat006",
+      "name": "TupleMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/TupleMatch.calr",
+      "csharpFile": "PatternMatching/TupleMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Match on tuples",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "pat007",
+      "name": "EnumMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/EnumMatch.calr",
+      "csharpFile": "PatternMatching/EnumMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Match enum values",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "pat008",
+      "name": "WildcardMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/WildcardMatch.calr",
+      "csharpFile": "PatternMatching/WildcardMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Default/wildcard patterns"
+    },
+    {
+      "id": "pat009",
+      "name": "PropertyMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/PropertyMatch.calr",
+      "csharpFile": "PatternMatching/PropertyMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Match on properties (simulated)"
+    },
+    {
+      "id": "pat010",
+      "name": "ExhaustiveMatch",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/ExhaustiveMatch.calr",
+      "csharpFile": "PatternMatching/ExhaustiveMatch.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "notes": "Exhaustive matching",
+      "expectedAdvantage": 0.7
+    },
+    {
+      "id": "pat011",
+      "name": "SwitchExpression",
+      "category": "PatternMatching",
+      "calorFile": "PatternMatching/SwitchExpression.calr",
+      "csharpFile": "PatternMatching/SwitchExpression.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching",
+        "adversarial"
+      ],
+      "notes": "ADVERSARIAL: C# switch expressions vs Calor \u00a7IF/\u00a7EI chains. C# wins.",
+      "expectedAdvantage": 0.65
     }
   ],
   "comprehensionQuestions": {

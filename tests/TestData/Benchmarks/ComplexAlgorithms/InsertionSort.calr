@@ -1,0 +1,18 @@
+§M{m001:InsertionSort}
+§F{f001:ShouldShift:pub}
+  §I{i32:current}
+  §I{i32:key}
+  §O{bool}
+  §R (> current key)
+§/F{f001}
+§F{f002:InsertPosition:pub}
+  §I{i32:j}
+  §O{i32}
+  §R (+ j 1)
+§/F{f002}
+§F{f003:NeedsSorting:pub}
+  §I{i32:length}
+  §O{bool}
+  §R (> length 1)
+§/F{f003}
+§/M{m001}

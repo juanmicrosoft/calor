@@ -1,0 +1,20 @@
+§M{m001:Composite}
+§F{f001:FileSize:pub}
+  §I{i32:size}
+  §O{i32}
+  §Q (>= size 0)
+  §R size
+§/F{f001}
+§F{f002:TotalSize:pub}
+  §I{i32:ownSize}
+  §I{i32:childrenSize}
+  §O{i32}
+  §S (>= result ownSize)
+  §R (+ ownSize childrenSize)
+§/F{f002}
+§F{f003:IsLeaf:pub}
+  §I{i32:childCount}
+  §O{bool}
+  §R (== childCount 0)
+§/F{f003}
+§/M{m001}

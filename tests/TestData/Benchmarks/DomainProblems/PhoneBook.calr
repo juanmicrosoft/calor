@@ -1,0 +1,25 @@
+§M{m001:PhoneBook}
+§F{f001:EntryCount:pub}
+  §I{i32:count}
+  §O{i32}
+  §S (>= result 0)
+  §R count
+§/F{f001}
+§F{f002:AddEntry:pub}
+  §I{i32:count}
+  §O{i32}
+  §R (+ count 1)
+§/F{f002}
+§F{f003:RemoveEntry:pub}
+  §I{i32:count}
+  §O{i32}
+  §Q (> count 0)
+  §S (>= result 0)
+  §R (- count 1)
+§/F{f003}
+§F{f004:IsEmpty:pub}
+  §I{i32:count}
+  §O{bool}
+  §R (== count 0)
+§/F{f004}
+§/M{m001}

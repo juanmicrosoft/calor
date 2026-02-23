@@ -1,0 +1,23 @@
+§M{m001:ListOps}
+§F{f001:Sum:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{f001}
+§F{f002:Count:pub}
+  §I{i32:n}
+  §O{i32}
+  §S (>= result 0)
+  §R n
+§/F{f002}
+§F{f003:FirstOrDefault:pub}
+  §I{i32:value}
+  §I{i32:defaultVal}
+  §I{bool:hasElements}
+  §O{i32}
+  §IF{if1} hasElements → §R value
+  §EL → §R defaultVal
+  §/I{if1}
+§/F{f003}
+§/M{m001}

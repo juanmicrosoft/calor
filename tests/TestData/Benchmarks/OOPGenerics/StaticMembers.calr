@@ -1,0 +1,12 @@
+§M{m001:StaticMembers}
+§F{f001:NextId:pub}
+  §I{i32:current}
+  §O{i32}
+  §R (+ current 1)
+§/F{f001}
+§F{f002:InstanceCount:pub}
+  §I{i32:count}
+  §O{i32}
+  §R count
+§/F{f002}
+§/M{m001}

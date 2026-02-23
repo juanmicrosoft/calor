@@ -1,0 +1,22 @@
+§M{m001:Reduce}
+§F{f001:Sum:pub}
+  §I{i32:acc}
+  §I{i32:value}
+  §O{i32}
+  §R (+ acc value)
+§/F{f001}
+§F{f002:Product:pub}
+  §I{i32:acc}
+  §I{i32:value}
+  §O{i32}
+  §R (* acc value)
+§/F{f002}
+§F{f003:Max:pub}
+  §I{i32:acc}
+  §I{i32:value}
+  §O{i32}
+  §IF{if1} (> value acc) → §R value
+  §EL → §R acc
+  §/I{if1}
+§/F{f003}
+§/M{m001}

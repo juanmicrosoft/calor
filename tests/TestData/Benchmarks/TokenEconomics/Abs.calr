@@ -1,0 +1,10 @@
+§M{m001:AbsModule}
+§F{f001:Abs:pub}
+  §I{i32:x}
+  §O{i32}
+  §S (>= result 0)
+  §IF{if1} (>= x 0) → §R x
+  §EL → §R (- 0 x)
+  §/I{if1}
+§/F{f001}
+§/M{m001}

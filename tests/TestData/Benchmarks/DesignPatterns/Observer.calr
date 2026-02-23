@@ -1,0 +1,18 @@
+§M{m001:Observer}
+§F{f001:ShouldNotify:pub}
+  §I{i32:subscriberCount}
+  §O{bool}
+  §R (> subscriberCount 0)
+§/F{f001}
+§F{f002:NextId:pub}
+  §I{i32:currentId}
+  §O{i32}
+  §R (+ currentId 1)
+§/F{f002}
+§F{f003:IsSubscribed:pub}
+  §I{i32:subscriberId}
+  §I{i32:targetId}
+  §O{bool}
+  §R (== subscriberId targetId)
+§/F{f003}
+§/M{m001}
