@@ -90,7 +90,7 @@ export function Footer() {
 
         <div className="mt-12 border-t pt-8 flex flex-col sm:flex-row justify-between items-center gap-2">
           <p className="text-sm text-muted-foreground">
-            Calor is open source. Licensed under MIT.
+            Calor is open source. Licensed under Apache 2.0.
           </p>
           <p className="text-sm text-muted-foreground">
             v{packageJson.version}
