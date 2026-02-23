@@ -4942,28 +4942,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             MemberAccessExpressionSyntax memberAccess => new MemberAccessReference(memberAccess.ToString()),
             IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
             BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.BitwiseOrExpression)
-                => ConvertBitwiseOrExpression(binary),
+                => ConvertBitwiseBinaryExpression(binary, BitwiseOperator.Or),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.BitwiseAndExpression)
+                => ConvertBitwiseBinaryExpression(binary, BitwiseOperator.And),
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.ExclusiveOrExpression)
+                => ConvertBitwiseBinaryExpression(binary, BitwiseOperator.Xor),
+            PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.BitwiseNotExpression)
+                => new BitwiseNotExpression(ConvertAttributeValue(prefix.Operand)),
+            ParenthesizedExpressionSyntax paren => ConvertAttributeValue(paren.Expression),
             _ => expression.ToString()
         };
     }
 
-    private BitwiseOrExpression ConvertBitwiseOrExpression(BinaryExpressionSyntax binary)
+    private BitwiseBinaryExpression ConvertBitwiseBinaryExpression(BinaryExpressionSyntax binary, BitwiseOperator op)
     {
-        var operands = new List<object>();
-        CollectBitwiseOrOperands(binary, operands);
-        return new BitwiseOrExpression(operands);
-    }
-
-    private void CollectBitwiseOrOperands(ExpressionSyntax expression, List<object> operands)
-    {
-        if (expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.BitwiseOrExpression))
-        {
-            CollectBitwiseOrOperands(binary.Left, operands);
-            CollectBitwiseOrOperands(binary.Right, operands);
-        }
-        else
-        {
-            operands.Add(ConvertAttributeValue(expression));
-        }
+        var left = ConvertAttributeValue(binary.Left);
+        var right = ConvertAttributeValue(binary.Right);
+        return new BitwiseBinaryExpression(left, op, right);
     }
 }

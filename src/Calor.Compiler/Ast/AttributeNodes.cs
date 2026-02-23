@@ -103,11 +103,34 @@ public sealed class CalorAttributeArgument
             TypeOfReference tr => $"typeof({tr.TypeName})",
             // Member access expression (e.g., AttributeTargets.Method)
             MemberAccessReference ma => ma.Expression,
-            // Bitwise OR expression (e.g., AttributeTargets.Class | AttributeTargets.Struct)
-            BitwiseOrExpression bor => string.Join(" | ", bor.Operands.Select(o => FormatSingleValue(o))),
+            // Bitwise binary expression (e.g., A | B, A & B, A ^ B)
+            BitwiseBinaryExpression bbe => FormatBitwiseBinary(bbe),
+            // Bitwise NOT expression (e.g., ~A)
+            BitwiseNotExpression bne => $"~{FormatSingleValue(bne.Operand)}",
             // Default: treat as identifier/enum value
             _ => value?.ToString() ?? "null"
         };
+    }
+
+    private static string FormatBitwiseBinary(BitwiseBinaryExpression expr)
+    {
+        var left = FormatBitwiseChild(expr.Left, expr.Operator);
+        var right = FormatBitwiseChild(expr.Right, expr.Operator);
+        var op = expr.Operator switch
+        {
+            BitwiseOperator.Or => "|",
+            BitwiseOperator.Xor => "^",
+            BitwiseOperator.And => "&",
+            _ => "|"
+        };
+        return $"{left} {op} {right}";
+    }
+
+    private static string FormatBitwiseChild(object child, BitwiseOperator parentOp)
+    {
+        if (child is BitwiseBinaryExpression childExpr && childExpr.Operator < parentOp)
+            return $"({FormatSingleValue(child)})";
+        return FormatSingleValue(child);
     }
 
     private static string EscapeString(string s)
@@ -152,16 +175,46 @@ public sealed class MemberAccessReference
 }
 
 /// <summary>
-/// Represents a bitwise OR expression in an attribute argument (e.g., AttributeTargets.Class | AttributeTargets.Struct).
+/// Operator for bitwise binary expressions in attribute arguments.
+/// Values are ordered by precedence (lowest to highest).
 /// </summary>
-public sealed class BitwiseOrExpression
+public enum BitwiseOperator
 {
-    public IReadOnlyList<object> Operands { get; }
+    Or = 0,
+    Xor = 1,
+    And = 2,
+}
 
-    public BitwiseOrExpression(IReadOnlyList<object> operands)
+/// <summary>
+/// Represents a bitwise binary expression in an attribute argument (e.g., A | B, A &amp; B, A ^ B).
+/// </summary>
+public sealed class BitwiseBinaryExpression
+{
+    public object Left { get; }
+    public BitwiseOperator Operator { get; }
+    public object Right { get; }
+
+    public BitwiseBinaryExpression(object left, BitwiseOperator op, object right)
     {
-        Operands = operands;
+        Left = left;
+        Operator = op;
+        Right = right;
     }
 
-    public override string ToString() => string.Join(" | ", Operands);
+    public override string ToString() => CalorAttributeArgument.FormatSingleValue(this);
+}
+
+/// <summary>
+/// Represents a bitwise NOT expression in an attribute argument (e.g., ~AttributeTargets.Class).
+/// </summary>
+public sealed class BitwiseNotExpression
+{
+    public object Operand { get; }
+
+    public BitwiseNotExpression(object operand)
+    {
+        Operand = operand;
+    }
+
+    public override string ToString() => $"~{CalorAttributeArgument.FormatSingleValue(Operand)}";
 }
