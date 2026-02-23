@@ -31,6 +31,7 @@ public sealed class McpMessageHandler
         RegisterTool(new LintTool());
         RegisterTool(new FormatTool());
         RegisterTool(new DiagnoseTool());
+        RegisterTool(new ExplainErrorTool());
         RegisterTool(new IdsTool());
         RegisterTool(new AssessTool());
         RegisterTool(new SyntaxLookupTool());

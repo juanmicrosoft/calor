@@ -80,6 +80,22 @@ jobs:
           restore-keys: |
             llm-cache-
 
+      - name: Run LLM Comprehension evaluation
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set, skipping LLM comprehension evaluation"
+            exit 0
+          fi
+          dotnet run --project tests/Calor.Evaluation -c Release -- run \
+            --llm \
+            --format json \
+            --output website/public/data/llm-comprehension-results.json \
+            --verbose
+
       - name: Run TaskCompletion benchmark (LLM)
         if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
         continue-on-error: true
@@ -152,6 +168,7 @@ jobs:
           path: |
             website/public/data/benchmark-results.json
             website/public/data/benchmark-results-statistical.json
+            website/public/data/llm-comprehension-results.json
             website/public/data/llm-results.json
             website/public/data/safety-results.json
             website/public/data/effect-discipline-results.json
