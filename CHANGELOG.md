@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-02-23
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.27x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.70x (Calor wins, large effect d=1.39)
+  - ErrorDetection: 1.65x (Calor wins, large effect d=1.62)
+  - EditPrecision: 1.37x (Calor wins, large effect d=11.80)
+  - RefactoringStability: 1.37x (Calor wins, large effect d=4.36)
+  - Correctness: 1.26x (Calor wins, large effect d=1.06)
+- **Programs Tested**: 40
+
+### Added
+- **Proportional comprehension scoring** — Replace boolean presence checks with log2 diminishing returns formula; files with more contracts/effects now score proportionally higher
+- **Contract-depth and effect-specificity scoring** — Bonus for pre+post contract completeness, effect specificity (comma-separated effects), and matched open/close ID pairs
+- **LLM-based comprehension evaluation** — Claude API integration with LLM-as-judge scoring via `--llm` flag; loads curated questions, falls back to structural generation
+- **`calor_explain_error` MCP tool** — Matches compiler errors to 10 common mistake patterns with fix examples and correct syntax
+- **DiagnoseTool error guidance** — Enriches diagnostics with `commonMistake` field when compiler has no specific fix suggestion
+- **Expanded question bank** — 105 comprehension questions across all 36 benchmark programs (up from 13 across 4)
+- **Pre-compiled regexes** — All comprehension scoring regexes compiled at class load time for 250+ program scalability
+- **CI LLM comprehension workflow** — GitHub Actions step runs LLM evaluation with `ANTHROPIC_API_KEY` secret
+
 ## [0.3.0] - 2026-02-22
 
 ### Benchmark Results (Statistical: 30 runs)
