@@ -192,6 +192,41 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    /// <summary>
+    /// Format inline parameter list for compact signatures: (type:name, type:name, ...)
+    /// Returns null if any parameter has C# attributes or default values (which can't be inlined).
+    /// </summary>
+    private string? TryFormatInlineParams(IReadOnlyList<ParameterNode> parameters)
+    {
+        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null))
+            return null;
+
+        return string.Join(", ", parameters.Select(p =>
+        {
+            var typeName = TypeMapper.CSharpToCalor(p.TypeName);
+            var modifiers = new List<string>();
+            if (p.Modifier.HasFlag(ParameterModifier.This)) modifiers.Add("this");
+            if (p.Modifier.HasFlag(ParameterModifier.Ref)) modifiers.Add("ref");
+            if (p.Modifier.HasFlag(ParameterModifier.Out)) modifiers.Add("out");
+            if (p.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
+            if (p.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
+            var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+            return $"{typeName}:{p.Name}{modStr}";
+        }));
+    }
+
+    private void EmitParameterLines(IReadOnlyList<ParameterNode> parameters)
+    {
+        foreach (var param in parameters)
+            AppendLine(Visit(param));
+    }
+
+    private void EmitOutputLine(OutputNode? output)
+    {
+        if (output != null)
+            AppendLine($"§O{{{TypeMapper.CSharpToCalor(output.TypeName)}}}");
+    }
+
     public string Visit(MethodSignatureNode node)
     {
         var typeParams = node.TypeParameters.Count > 0
@@ -199,19 +234,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§MT{{{node.Id}:{node.Name}{typeParams}}}{attrs}");
-        Indent();
-
-        foreach (var param in node.Parameters)
+        var inlineFmt = TryFormatInlineParams(node.Parameters);
+        if (inlineFmt != null)
         {
-            AppendLine(Visit(param));
+            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
+            var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}" : "";
+            AppendLine($"§MT{{{node.Id}:{node.Name}{typeParams}}}{attrs}{inlineParams}{inlineReturn}");
         }
-        if (node.Output != null)
+        else
         {
-            AppendLine($"§O{{{TypeMapper.CSharpToCalor(node.Output.TypeName)}}}");
+            AppendLine($"§MT{{{node.Id}:{node.Name}{typeParams}}}{attrs}");
+            Indent();
+            EmitParameterLines(node.Parameters);
+            EmitOutputLine(node.Output);
+            Dedent();
         }
-
-        Dedent();
         AppendLine($"§/MT{{{node.Id}}}");
 
         return "";
@@ -345,7 +382,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var visibility = GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
-        var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
 
         var modifiers = new List<string>();
         if (node.IsRequired) modifiers.Add("req");
@@ -356,30 +392,36 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsStatic) modifiers.Add("stat");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
-        // Always emit full property syntax with body and closing tag
-        // Parser expects: §PROP[id:name:type:vis:modifiers?] §GET §SET §/PROP[id]
+        // Compact auto-property shorthand
+        if (node.IsAutoProperty && (node.Getter != null || node.Setter != null || node.Initer != null))
+        {
+            var accessors = new List<string>();
+            if (node.Getter != null)
+                accessors.Add(node.Getter.Visibility == Visibility.Private ? "priget" :
+                              node.Getter.Visibility == Visibility.Internal ? "intget" :
+                              node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
+            if (node.Setter != null)
+                accessors.Add(node.Setter.Visibility == Visibility.Private ? "priset" :
+                              node.Setter.Visibility == Visibility.Internal ? "intset" :
+                              node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
+            if (node.Initer != null)
+                accessors.Add("init");
+            var accessorStr = string.Join(",", accessors);
+            var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
+            AppendLine($"§PROP{{{node.Id}:{node.Name}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{defaultVal}");
+            return "";
+        }
+
+        // Full property syntax with body and closing tag
         AppendLine($"§PROP{{{node.Id}:{node.Name}:{typeName}:{visibility}{modStr}}}{attrs}");
         Indent();
 
-        if (node.Getter != null)
-        {
-            Visit(node.Getter);
-        }
-        if (node.Setter != null)
-        {
-            Visit(node.Setter);
-        }
-        if (node.Initer != null)
-        {
-            Visit(node.Initer);
-        }
+        if (node.Getter != null) Visit(node.Getter);
+        if (node.Setter != null) Visit(node.Setter);
+        if (node.Initer != null) Visit(node.Initer);
 
-        // Emit default value if present (as direct expression, parser handles it)
         if (node.DefaultValue != null)
-        {
-            var defaultExpr = node.DefaultValue.Accept(this);
-            AppendLine($"= {defaultExpr}");
-        }
+            AppendLine($"= {node.DefaultValue.Accept(this)}");
 
         Dedent();
         AppendLine($"§/PROP{{{node.Id}}}");
@@ -426,15 +468,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var visibility = GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        // Parser expects: §CTOR[id:visibility] with §I[type:name] for params
-        AppendLine($"§CTOR{{{node.Id}:{visibility}}}{attrs}");
+        // Inline params: §CTOR{id:vis} (type:name, type:name)
+        var inlineFmt = TryFormatInlineParams(node.Parameters);
+        if (inlineFmt != null && node.Parameters.Count > 0)
+            AppendLine($"§CTOR{{{node.Id}:{visibility}}}{attrs} ({inlineFmt})");
+        else
+            AppendLine($"§CTOR{{{node.Id}:{visibility}}}{attrs}");
         Indent();
 
-        // Emit parameters as separate §I[type:name] lines
-        foreach (var param in node.Parameters)
-        {
-            AppendLine(Visit(param));
-        }
+        if (inlineFmt == null)
+            EmitParameterLines(node.Parameters);
 
         // Emit preconditions
         foreach (var pre in node.Preconditions)
@@ -473,21 +516,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var visibility = GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}");
+        var inlineFmt = TryFormatInlineParams(node.Parameters);
+        if (inlineFmt != null)
+        {
+            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
+            var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}" : "";
+            AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}{inlineParams}{inlineReturn}");
+        }
+        else
+        {
+            AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}");
+            Indent();
+            EmitParameterLines(node.Parameters);
+            EmitOutputLine(node.Output);
+            Dedent();
+        }
         Indent();
-
-        // Emit parameters
-        foreach (var param in node.Parameters)
-        {
-            AppendLine(Visit(param));
-        }
-
-        // Emit output type
-        if (node.Output != null)
-        {
-            var output = TypeMapper.CSharpToCalor(node.Output.TypeName);
-            AppendLine($"§O{{{output}}}");
-        }
 
         // Emit preconditions
         foreach (var pre in node.Preconditions)
@@ -543,22 +587,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         // Use §AMT for async methods, §MT for regular methods
         var methodTag = node.IsAsync ? "AMT" : "MT";
-        AppendLine($"§{methodTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}{modStr}}}{attrs}");
+        var inlineFmt = TryFormatInlineParams(node.Parameters);
+        if (inlineFmt != null)
+        {
+            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
+            var inlineReturn = node.Output != null ? $" -> {output}" : "";
+            AppendLine($"§{methodTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}{modStr}}}{attrs}{inlineParams}{inlineReturn}");
+        }
+        else
+        {
+            AppendLine($"§{methodTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}{modStr}}}{attrs}");
+        }
         Indent();
 
         // Emit type parameter constraints
         EmitTypeParameterConstraints(node.TypeParameters);
 
-        // Parameters
-        foreach (var param in node.Parameters)
+        if (inlineFmt == null)
         {
-            AppendLine(Visit(param));
-        }
-
-        // Output
-        if (node.Output != null)
-        {
-            AppendLine($"§O{{{output}}}");
+            EmitParameterLines(node.Parameters);
+            EmitOutputLine(node.Output);
         }
 
         // Effects
@@ -602,22 +650,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         // Use §AF for async functions, §F for regular functions
         var funcTag = node.IsAsync ? "AF" : "F";
-        AppendLine($"§{funcTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}}}");
+        var inlineFmt = TryFormatInlineParams(node.Parameters);
+        if (inlineFmt != null)
+        {
+            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
+            var inlineReturn = node.Output != null ? $" -> {output}" : "";
+            AppendLine($"§{funcTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}}}{inlineParams}{inlineReturn}");
+        }
+        else
+        {
+            AppendLine($"§{funcTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}}}");
+        }
         Indent();
 
         // Emit type parameter constraints
         EmitTypeParameterConstraints(node.TypeParameters);
 
-        // Parameters
-        foreach (var param in node.Parameters)
+        if (inlineFmt == null)
         {
-            AppendLine(Visit(param));
-        }
-
-        // Output
-        if (node.Output != null)
-        {
-            AppendLine($"§O{{{output}}}");
+            EmitParameterLines(node.Parameters);
+            EmitOutputLine(node.Output);
         }
 
         // Effects

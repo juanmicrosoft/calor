@@ -397,8 +397,8 @@ public interface ICalculator
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Contains("§MT{", result.CalorSource);
-        Assert.Contains("§I{", result.CalorSource);
-        Assert.Contains("§O{", result.CalorSource);
+        Assert.Contains("i32:a", result.CalorSource);
+        Assert.Contains("-> i32", result.CalorSource);
         Assert.DoesNotContain("§SIG", result.CalorSource);
     }
 
@@ -509,8 +509,8 @@ public class Example
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         var source = result.CalorSource ?? "";
-        Assert.Contains("§I{str:class}", source);
-        Assert.Contains("§I{i32:event}", source);
+        Assert.Contains("str:class", source);
+        Assert.Contains("i32:event", source);
         Assert.DoesNotContain("@class", source);
         Assert.DoesNotContain("@event", source);
     }

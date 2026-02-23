@@ -186,7 +186,7 @@ public sealed class Parser
         var endId = AttributeHelper.InterpretEndModuleAttributes(endAttrs);
 
         // Validate ID matching
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MODULE", id, "END_MODULE", endId);
         }
@@ -255,6 +255,17 @@ public sealed class Parser
         var attrs = ParseAttributes();
 
         var (id, funcName, visibilityStr) = AttributeHelper.InterpretFuncAttributes(attrs);
+
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount < 3 && !IsIdPattern(id))
+        {
+            // Shift: id was actually name, name was visibility
+            visibilityStr = funcName;
+            funcName = id;
+            id = GenerateParserAutoId("f");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FUNC", "id");
@@ -269,8 +280,11 @@ public sealed class Parser
 
         // NEW: Parse optional type parameters §F{...}<T, U>
         var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+
+        // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
+        TryParseInlineSignature(startToken.Span, parameters, ref output);
         EffectsNode? effects = null;
         var preconditions = new List<RequiresNode>();
         var postconditions = new List<EnsuresNode>();
@@ -407,7 +421,7 @@ public sealed class Parser
         var endId = AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
         // Validate ID matching
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "FUNC", id, "END_FUNC", endId);
         }
@@ -433,6 +447,16 @@ public sealed class Parser
         var attrs = ParseAttributes();
 
         var (id, funcName, visibilityStr) = AttributeHelper.InterpretFuncAttributes(attrs);
+
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount < 3 && !IsIdPattern(id))
+        {
+            visibilityStr = funcName;
+            funcName = id;
+            id = GenerateParserAutoId("f");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "AF", "id");
@@ -447,8 +471,11 @@ public sealed class Parser
 
         // Parse optional type parameters §AF{...}<T, U>
         var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+
+        // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
+        TryParseInlineSignature(startToken.Span, parameters, ref output);
         EffectsNode? effects = null;
         var preconditions = new List<RequiresNode>();
         var postconditions = new List<EnsuresNode>();
@@ -580,7 +607,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "AF", id, "END_AF", endId);
         }
@@ -2249,7 +2276,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MATCH", id, "END_MATCH", endId);
         }
@@ -2280,7 +2307,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MATCH", id, "END_MATCH", endId);
         }
@@ -2536,7 +2563,7 @@ public sealed class Parser
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "FOR", id, "END_FOR", endId);
         }
@@ -2587,7 +2614,7 @@ public sealed class Parser
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "WHILE", id, "END_WHILE", endId);
         }
@@ -2616,7 +2643,7 @@ public sealed class Parser
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DO", id, "END_DO", endId);
         }
@@ -2778,7 +2805,7 @@ public sealed class Parser
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
-            if (endId != id)
+            if (ShouldReportMismatchedId(endId, id, endToken))
             {
                 _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IF", id, "END_IF", endId);
             }
@@ -3717,7 +3744,7 @@ public sealed class Parser
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? "";
 
-            if (endId != id)
+            if (ShouldReportMismatchedId(endId, id, endToken))
             {
                 _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "ARR", id, "END_ARR", endId);
             }
@@ -3836,7 +3863,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EACH", id, "END_EACH", endId);
         }
@@ -3880,7 +3907,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "LIST", id, "END_LIST", endId);
         }
@@ -3955,7 +3982,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DICT", id, "END_DICT", endId);
         }
@@ -4025,7 +4052,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "HSET", id, "END_HSET", endId);
         }
@@ -4271,7 +4298,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EACHKV", id, "END_EACHKV", endId);
         }
@@ -4583,6 +4610,14 @@ public sealed class Parser
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
 
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount < 2 && !IsIdPattern(id))
+        {
+            name = id;
+            id = GenerateParserAutoId("i");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IFACE", "id");
@@ -4673,7 +4708,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IFACE", id, "END_IFACE", endId);
         }
@@ -4696,6 +4731,14 @@ public sealed class Parser
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
 
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount < 2 && !IsIdPattern(id))
+        {
+            name = id;
+            id = GenerateParserAutoId("m");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "METHOD", "id");
@@ -4703,8 +4746,11 @@ public sealed class Parser
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
         var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+
+        // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
+        TryParseInlineSignature(startToken.Span, parameters, ref output);
         EffectsNode? effects = null;
         var preconditions = new List<RequiresNode>();
         var postconditions = new List<EnsuresNode>();
@@ -4750,7 +4796,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
         }
@@ -4778,6 +4824,17 @@ public sealed class Parser
         var name = attrs["_pos1"] ?? "";
         var pos2 = attrs["_pos2"] ?? "";
         var pos3 = attrs["_pos3"];
+
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount >= 1 && !IsIdPattern(id) && !IsClassModifierOrVisibility(id))
+        {
+            // Shift all positionals right: id becomes name, name becomes pos2, etc.
+            pos3 = pos2;
+            pos2 = name;
+            name = id;
+            id = GenerateParserAutoId("c");
+        }
 
         if (string.IsNullOrEmpty(id))
         {
@@ -4964,7 +5021,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "CLASS", id, "END_CLASS", endId);
         }
@@ -5045,6 +5102,17 @@ public sealed class Parser
         var visStr = attrs["_pos2"] ?? "private";
         var modStr = attrs["_pos3"] ?? "";
 
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount <= 3 && !IsIdPattern(id) && IsVisibilityKeyword(attrs["_pos1"] ?? ""))
+        {
+            // Shift: §MT{name:vis:mod}
+            modStr = visStr;
+            visStr = name;
+            name = id;
+            id = GenerateParserAutoId("m");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "METHOD", "id");
@@ -5080,8 +5148,10 @@ public sealed class Parser
             }
         }
 
+        // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
+        TryParseInlineSignature(startToken.Span, parameters, ref output);
         EffectsNode? effects = null;
         var preconditions = new List<RequiresNode>();
         var postconditions = new List<EnsuresNode>();
@@ -5133,7 +5203,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
         }
@@ -5162,6 +5232,16 @@ public sealed class Parser
         var name = attrs["_pos1"] ?? "";
         var visStr = attrs["_pos2"] ?? "private";
         var modStr = attrs["_pos3"] ?? "";
+
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount <= 3 && !IsIdPattern(id) && IsVisibilityKeyword(attrs["_pos1"] ?? ""))
+        {
+            modStr = visStr;
+            visStr = name;
+            name = id;
+            id = GenerateParserAutoId("m");
+        }
 
         if (string.IsNullOrEmpty(id))
         {
@@ -5198,8 +5278,10 @@ public sealed class Parser
             }
         }
 
+        // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
         OutputNode? output = null;
+        TryParseInlineSignature(startToken.Span, parameters, ref output);
         EffectsNode? effects = null;
         var preconditions = new List<RequiresNode>();
         var postconditions = new List<EnsuresNode>();
@@ -5251,7 +5333,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "AMT", id, "END_AMT", endId);
         }
@@ -5570,12 +5652,34 @@ public sealed class Parser
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
-        // Positional: [id:name:type:visibility?:modifiers?]
+        // Positional: [id:name:type:visibility?:modifiers?:accessors?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
         var typeName = attrs["_pos2"] ?? "object";
         var visStr = attrs["_pos3"] ?? "public";
         var modStr = attrs["_pos4"] ?? "";
+        var accessorStr = attrs["_pos5"] ?? "";  // 6th positional for accessor shorthand
+
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount < 5 && !IsIdPattern(id))
+        {
+            // Shift: id was actually name, name was type, etc.
+            accessorStr = modStr;
+            modStr = visStr;
+            visStr = typeName;
+            typeName = name;
+            name = id;
+            id = GenerateParserAutoId("p");
+        }
+
+        // If modStr is an accessor shorthand and there's no explicit accessorStr,
+        // the accessor is in modStr (e.g., §PROP{id:name:type:vis:get,set})
+        if (string.IsNullOrEmpty(accessorStr) && IsAccessorShorthand(modStr))
+        {
+            accessorStr = modStr;
+            modStr = "";
+        }
 
         if (string.IsNullOrEmpty(id))
         {
@@ -5585,35 +5689,58 @@ public sealed class Parser
         var visibility = ParseVisibility(visStr);
         var modifiers = ParseMethodModifiers(modStr);
 
-        PropertyAccessorNode? getter = null;
-        PropertyAccessorNode? setter = null;
-        PropertyAccessorNode? initer = null;
-        ExpressionNode? defaultValue = null;
+        // --- Compact accessor shorthand ---
+        // Detect accessor shorthand in accessorStr position
+        if (IsAccessorShorthand(accessorStr))
+        {
+            var (getter, setter, initer) = ParseAccessorShorthand(accessorStr, startToken.Span, visibility);
+
+            // Parse optional default value
+            ExpressionNode? defaultValue = null;
+            if (Check(TokenKind.Equals))
+            {
+                Advance();
+                defaultValue = ParseExpression();
+            }
+            else if (IsExpressionStart())
+            {
+                defaultValue = ParseExpression();
+            }
+
+            // Compact form: no §/PROP closing tag needed
+            var compactSpan = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
+            return new PropertyNode(compactSpan, id, name, typeName, visibility, modifiers, getter, setter, initer, defaultValue, attrs, csharpAttrs);
+        }
+
+        PropertyAccessorNode? getter2 = null;
+        PropertyAccessorNode? setter2 = null;
+        PropertyAccessorNode? initer2 = null;
+        ExpressionNode? defaultValue2 = null;
 
         while (!IsAtEnd && !Check(TokenKind.EndProperty))
         {
             if (Check(TokenKind.Get))
             {
-                getter = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Get);
+                getter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Get);
             }
             else if (Check(TokenKind.Set))
             {
-                setter = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Set);
+                setter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Set);
             }
             else if (Check(TokenKind.Init))
             {
-                initer = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Init);
+                initer2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Init);
             }
             else if (Check(TokenKind.Equals))
             {
                 // Default value prefixed with =
                 Advance(); // consume =
-                defaultValue = ParseExpression();
+                defaultValue2 = ParseExpression();
             }
             else if (IsExpressionStart())
             {
                 // Default value without = prefix
-                defaultValue = ParseExpression();
+                defaultValue2 = ParseExpression();
             }
             else
             {
@@ -5625,13 +5752,13 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "PROP", id, "END_PROP", endId);
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new PropertyNode(span, id, name, typeName, visibility, modifiers, getter, setter, initer, defaultValue, attrs, csharpAttrs);
+        return new PropertyNode(span, id, name, typeName, visibility, modifiers, getter2, setter2, initer2, defaultValue2, attrs, csharpAttrs);
     }
 
     /// <summary>
@@ -5718,6 +5845,14 @@ public sealed class Parser
         var id = attrs["_pos0"] ?? "";
         var visStr = attrs["_pos1"] ?? "public";
 
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount < 2 && !IsIdPattern(id) && IsVisibilityKeyword(id))
+        {
+            visStr = id;
+            id = GenerateParserAutoId("ctor");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CTOR", "id");
@@ -5725,7 +5860,17 @@ public sealed class Parser
 
         var visibility = ParseVisibility(visStr);
 
+        // --- Compact syntax: inline signature (consume but parameters already parsed via §I) ---
+        var _inlineParams = new List<ParameterNode>();
+        OutputNode? _inlineOutput = null;
+        TryParseInlineSignature(startToken.Span, _inlineParams, ref _inlineOutput);
+
         var parameters = new List<ParameterNode>();
+        // If inline signature produced parameters, use them
+        if (_inlineParams.Count > 0)
+        {
+            parameters.AddRange(_inlineParams);
+        }
         var preconditions = new List<RequiresNode>();
         ConstructorInitializerNode? initializer = null;
         var body = new List<StatementNode>();
@@ -5762,7 +5907,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "CTOR", id, "END_CTOR", endId);
         }
@@ -5804,10 +5949,12 @@ public sealed class Parser
         var csharpAttrs = ParseCSharpAttributes();
         var visibility = ParseVisibility(visStr);
 
+        // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
         var preconditions = new List<RequiresNode>();
         var postconditions = new List<EnsuresNode>();
         OutputNode? output = null;
+        TryParseInlineSignature(startToken.Span, parameters, ref output);
         var body = new List<StatementNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndOperatorOverload))
@@ -5842,7 +5989,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "OP", id, "END_OP", endId);
         }
@@ -6018,7 +6165,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "USE", id, "END_USE", endId);
         }
@@ -6078,7 +6225,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "TRY", id, "END_TRY", endId);
         }
@@ -6306,7 +6453,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "LAM", id, "END_LAM", endId);
         }
@@ -6397,7 +6544,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DEL", id, "END_DEL", endId);
         }
@@ -7117,7 +7264,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "DECISION", id, "END_DECISION", endId);
         }
@@ -7427,6 +7574,14 @@ public sealed class Parser
         var name = attrs["_pos1"] ?? "";
         var underlyingType = attrs["_pos2"]; // optional
 
+        // --- Compact syntax: optional ID ---
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount < 2 && !IsIdPattern(id))
+        {
+            name = id;
+            id = GenerateParserAutoId("e");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "EN", "id");
@@ -7487,7 +7642,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EN", id, "END_EN", endId);
         }
@@ -7548,7 +7703,7 @@ public sealed class Parser
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
-        if (endId != id)
+        if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EXT", id, "END_EXT", endId);
         }
@@ -7649,6 +7804,374 @@ public sealed class Parser
                 return false;
         }
         return true;
+    }
+
+    #endregion
+
+    #region Compact Syntax Helpers
+
+    private int _autoIdCounter;
+
+    /// <summary>
+    /// Generates a unique auto-assigned ID for compact syntax forms that omit the ID.
+    /// Format: prefix + "_auto" + counter (e.g., "f_auto1", "m_auto2", "p_auto3").
+    /// </summary>
+    private string GenerateParserAutoId(string prefix)
+    {
+        _autoIdCounter++;
+        return $"{prefix}_auto{_autoIdCounter}";
+    }
+
+    /// <summary>
+    /// Determines whether a mismatched closing-tag ID should be reported as an error.
+    /// When the open tag used an auto-generated ID (compact syntax), the closing tag
+    /// is allowed to have an empty ID without triggering an error.
+    /// </summary>
+    private static bool ShouldReportMismatchedId(string endId, string openId, Token endToken)
+    {
+        // If both are the same, no mismatch
+        if (endId == openId)
+            return false;
+
+        // If the open ID was auto-generated and the end ID is empty, that's fine
+        // (compact syntax: §/F or §/MT with no braces)
+        if (openId.Contains("_auto") && string.IsNullOrEmpty(endId))
+            return false;
+
+        // Otherwise it's a real mismatch
+        return true;
+    }
+
+    /// <summary>
+    /// Determines if a value looks like an ID pattern (e.g., "f001", "m002", "c001", "ctor1").
+    /// Used for disambiguation when the first positional might be an ID or a name.
+    ///
+    /// ID patterns:
+    /// - A letter prefix followed by digits: f001, m002, c001, p001, e001, i001
+    /// - "ctor" followed by digits: ctor1, ctor2
+    /// - Contains underscore followed by digits: my_001
+    /// - Explicitly empty string (treated as needing an ID)
+    ///
+    /// NOT ID patterns (these are names):
+    /// - PascalCase identifiers: Main, GetValue, IShape, MyClass
+    /// - camelCase identifiers: getValue, myMethod
+    /// - Visibility keywords: pub, pri, pro
+    /// - Modifier keywords: abs, seal, static
+    /// </summary>
+    private static bool IsIdPattern(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        // Check for common ID patterns: letter(s) + digits
+        // e.g., f001, m002, c001, p001, e001, i001, ctor1, op1
+        var i = 0;
+
+        // Consume leading lowercase letters
+        while (i < value.Length && char.IsLower(value[i]))
+            i++;
+
+        // Must have consumed at least one letter and remaining must be all digits
+        if (i > 0 && i < value.Length)
+        {
+            var allDigits = true;
+            for (var j = i; j < value.Length; j++)
+            {
+                if (!char.IsDigit(value[j]))
+                {
+                    allDigits = false;
+                    break;
+                }
+            }
+            if (allDigits)
+                return true;
+        }
+
+        // Also match patterns with underscore like "f_001" or "my_id_001"
+        if (value.Contains('_'))
+        {
+            var lastUnderscore = value.LastIndexOf('_');
+            if (lastUnderscore < value.Length - 1)
+            {
+                var suffix = value.Substring(lastUnderscore + 1);
+                if (suffix.All(char.IsDigit))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Known accessor keywords used in compact property shorthand.
+    /// Includes short form (g, s, i) and long form (get, set, init) with optional
+    /// visibility prefixes (priget, proset, intinit).
+    /// </summary>
+    private static readonly HashSet<string> AccessorKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "g", "s", "i", "gs", "gi", "si", "gsi", "gis",
+        "get", "set", "init",
+        "priget", "proget", "intget",
+        "priset", "proset", "intset",
+        "priinit", "proinit", "intinit"
+    };
+
+    /// <summary>
+    /// Determines if a string is a compact accessor shorthand.
+    /// Recognized patterns:
+    /// - Short form: "g", "gs", "gi", "gsi", "gis", "s", "si", "i"
+    /// - Long form: "get", "set", "init", "priget", "proset", etc.
+    /// - Comma-separated: "get,priset", "get,init", "get,set"
+    /// </summary>
+    private static bool IsAccessorShorthand(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        // Check comma-separated list: "get,priset" etc.
+        var parts = value.Split(',');
+        foreach (var part in parts)
+        {
+            var trimmed = part.Trim();
+            if (!AccessorKeywords.Contains(trimmed))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Parses a compact accessor shorthand into getter, setter, and initer accessor nodes.
+    /// Handles both short form (gs, g, gi) and long form (get, priset, init) patterns.
+    /// Comma-separated accessors: "get,priset", "get,init"
+    /// </summary>
+    private (PropertyAccessorNode? getter, PropertyAccessorNode? setter, PropertyAccessorNode? initer)
+        ParseAccessorShorthand(string spec, TextSpan span, Visibility ownerVisibility)
+    {
+        PropertyAccessorNode? getter = null;
+        PropertyAccessorNode? setter = null;
+        PropertyAccessorNode? initer = null;
+
+        // Split on comma for multi-accessor specs: "get,priset" etc.
+        var parts = spec.Split(',');
+        foreach (var part in parts)
+        {
+            var trimmed = part.Trim().ToLowerInvariant();
+
+            // Long form with optional visibility prefix
+            if (trimmed.EndsWith("get"))
+            {
+                var vis = ExtractAccessorVisibility(trimmed, "get");
+                getter = CreateAutoAccessor(PropertyAccessorNode.AccessorKind.Get, span, vis);
+            }
+            else if (trimmed.EndsWith("set"))
+            {
+                var vis = ExtractAccessorVisibility(trimmed, "set");
+                setter = CreateAutoAccessor(PropertyAccessorNode.AccessorKind.Set, span, vis);
+            }
+            else if (trimmed.EndsWith("init"))
+            {
+                var vis = ExtractAccessorVisibility(trimmed, "init");
+                initer = CreateAutoAccessor(PropertyAccessorNode.AccessorKind.Init, span, vis);
+            }
+            else
+            {
+                // Short form: each character is an accessor
+                foreach (var ch in trimmed)
+                {
+                    switch (ch)
+                    {
+                        case 'g':
+                            getter = CreateAutoAccessor(PropertyAccessorNode.AccessorKind.Get, span, null);
+                            break;
+                        case 's':
+                            setter = CreateAutoAccessor(PropertyAccessorNode.AccessorKind.Set, span, null);
+                            break;
+                        case 'i':
+                            initer = CreateAutoAccessor(PropertyAccessorNode.AccessorKind.Init, span, null);
+                            break;
+                    }
+                }
+            }
+        }
+
+        return (getter, setter, initer);
+    }
+
+    /// <summary>
+    /// Extracts optional visibility prefix from accessor keyword (e.g., "priset" -> Private, "proget" -> Protected).
+    /// </summary>
+    private static Visibility? ExtractAccessorVisibility(string keyword, string accessorSuffix)
+    {
+        var prefix = keyword.Substring(0, keyword.Length - accessorSuffix.Length);
+        if (string.IsNullOrEmpty(prefix))
+            return null;
+
+        return prefix switch
+        {
+            "pri" or "priv" or "private" => Visibility.Private,
+            "pro" or "prot" or "protected" => Visibility.Protected,
+            "int" or "internal" => Visibility.Internal,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Creates an auto-implemented property accessor node with empty body.
+    /// </summary>
+    private static PropertyAccessorNode CreateAutoAccessor(
+        PropertyAccessorNode.AccessorKind kind, TextSpan span, Visibility? visibility)
+    {
+        return new PropertyAccessorNode(
+            span, kind, visibility,
+            Array.Empty<RequiresNode>(),
+            Array.Empty<StatementNode>(),
+            new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Attempts to parse an inline signature after a tag's attributes.
+    /// Inline signatures use parentheses for parameters and an arrow for return type:
+    ///   §F{name:pub}(type:name, type:name) -> returnType
+    /// Both colon-separated (type:name) and space-separated (type name) formats are supported.
+    /// If no opening paren is found, this method does nothing.
+    /// </summary>
+    private void TryParseInlineSignature(TextSpan span, List<ParameterNode> parameters, ref OutputNode? output)
+    {
+        if (!Check(TokenKind.OpenParen))
+            return;
+
+        Advance(); // consume (
+
+        // Parse comma-separated parameters: type:name, type:name, ...
+        if (!Check(TokenKind.CloseParen))
+        {
+            do
+            {
+                // Parse optional parameter modifier (this, ref, out, in, params)
+                var modifier = ParameterModifier.None;
+
+                var paramType = ReadInlineTypeToken();
+                var paramName = "";
+
+                // Check for colon separator (type:name format) or space separator (type name)
+                if (Check(TokenKind.Colon))
+                {
+                    Advance(); // consume :
+                    if (Check(TokenKind.Identifier))
+                    {
+                        paramName = Advance().Text;
+                    }
+
+                    // Check for optional modifier suffix :mod1,mod2
+                    if (Check(TokenKind.Colon))
+                    {
+                        Advance(); // consume :
+                        if (Check(TokenKind.Identifier))
+                        {
+                            var modStr = Advance().Text;
+                            foreach (var mod in modStr.Split(','))
+                            {
+                                if (mod.Equals("this", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.This;
+                                else if (mod.Equals("ref", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Ref;
+                                else if (mod.Equals("out", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Out;
+                                else if (mod.Equals("in", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.In;
+                                else if (mod.Equals("params", StringComparison.OrdinalIgnoreCase)) modifier |= ParameterModifier.Params;
+                            }
+                        }
+                    }
+                }
+                else if (Check(TokenKind.Identifier))
+                {
+                    // Space-separated: type name
+                    paramName = Advance().Text;
+                }
+
+                var paramAttrs = new AttributeCollection();
+                paramAttrs.Add("_pos0", paramType);
+                paramAttrs.Add("_pos1", paramName);
+                parameters.Add(new ParameterNode(span, paramName, paramType, modifier, paramAttrs, Array.Empty<CalorAttributeNode>()));
+            }
+            while (Match(TokenKind.Comma));
+        }
+
+        Expect(TokenKind.CloseParen);
+
+        // Parse optional return type: -> type or → type
+        if (Check(TokenKind.Arrow))
+        {
+            Advance(); // consume ->
+            var returnType = ReadInlineTypeToken();
+            output = new OutputNode(span, returnType);
+        }
+    }
+
+    /// <summary>
+    /// Reads a type token for inline signatures. Handles simple types (i32, str, bool),
+    /// nullable types (i32?), array types ([i32]), and generic types (List&lt;i32&gt;).
+    /// </summary>
+    private string ReadInlineTypeToken()
+    {
+        var sb = new System.Text.StringBuilder();
+
+        // Handle nullable prefix
+        if (Check(TokenKind.Question))
+        {
+            sb.Append('?');
+            Advance();
+        }
+
+        // Handle array type [T]
+        if (Check(TokenKind.OpenBracket))
+        {
+            sb.Append('[');
+            Advance();
+            sb.Append(ReadInlineTypeToken());
+            if (Check(TokenKind.CloseBracket))
+            {
+                sb.Append(']');
+                Advance();
+            }
+            return sb.ToString();
+        }
+
+        // Read the base type name
+        if (Check(TokenKind.Identifier) || Current.IsKeyword)
+        {
+            sb.Append(Advance().Text);
+        }
+        else if (Check(TokenKind.IntLiteral))
+        {
+            // For types like "i32", "f64" that might lex as identifier
+            sb.Append(Advance().Text);
+        }
+
+        // Handle nullable suffix
+        if (Check(TokenKind.Question))
+        {
+            sb.Append('?');
+            Advance();
+        }
+
+        // Handle generic parameters: Type<T, U>
+        if (Check(TokenKind.Less))
+        {
+            sb.Append('<');
+            Advance();
+            sb.Append(ReadInlineTypeToken());
+            while (Check(TokenKind.Comma))
+            {
+                sb.Append(',');
+                Advance();
+                sb.Append(ReadInlineTypeToken());
+            }
+            if (Check(TokenKind.Greater))
+            {
+                sb.Append('>');
+                Advance();
+            }
+        }
+
+        return sb.ToString();
     }
 
     #endregion
