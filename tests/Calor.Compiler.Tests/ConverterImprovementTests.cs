@@ -19,7 +19,7 @@ public class ConverterImprovementTests
     #region A1: Throw Expressions
 
     [Fact]
-    public void Migration_ThrowExpression_ConvertsToErr()
+    public void Migration_ThrowExpressionInCoalesce_HoistsNullGuard()
     {
         var csharp = """
             public class Service
@@ -36,13 +36,187 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
 
-        // The null-coalescing (??) is converted as ConditionalExpressionNode:
-        // (if (== input null) <throw-expr> input)
-        var conditional = Assert.IsType<ConditionalExpressionNode>(ret.Expression);
-        // WhenTrue is the throw expression (ERR), WhenFalse is the input variable
-        Assert.IsType<ErrExpressionNode>(conditional.WhenTrue);
+        // Should hoist an if-null-throw guard before the return
+        Assert.Equal(2, method.Body.Count);
+        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[1]);
+
+        // Guard condition: (== input null)
+        var nullCheck = Assert.IsType<BinaryOperationNode>(guard.Condition);
+        Assert.Equal(BinaryOperator.Equal, nullCheck.Operator);
+
+        // Guard body: throw with preserved exception type
+        Assert.Single(guard.ThenBody);
+        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
+        Assert.IsType<NewExpressionNode>(throwStmt.Exception);
+
+        // Return is just the variable reference (no conditional wrapper)
+        Assert.IsType<ReferenceNode>(ret.Expression);
+    }
+
+    [Fact]
+    public void Migration_CoalesceThrow_Assignment_HoistsNullGuard()
+    {
+        var csharp = """
+            public class Config
+            {
+                private readonly string _name;
+                public Config(string name)
+                {
+                    _name = name ?? throw new ArgumentNullException(nameof(name));
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var ctor = Assert.Single(cls.Constructors);
+
+        // Should hoist an if-null-throw guard before the assignment
+        Assert.Equal(2, ctor.Body.Count);
+        var guard = Assert.IsType<IfStatementNode>(ctor.Body[0]);
+        Assert.IsType<AssignmentStatementNode>(ctor.Body[1]);
+
+        // Guard body preserves ArgumentNullException type
+        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
+        var newExpr = Assert.IsType<NewExpressionNode>(throwStmt.Exception);
+        Assert.Contains("ArgumentNullException", newExpr.TypeName);
+    }
+
+    [Fact]
+    public void Migration_CoalesceThrow_LocalDeclaration_HoistsNullGuard()
+    {
+        var csharp = """
+            public class Service
+            {
+                public void Run(string? value)
+                {
+                    var name = value ?? throw new Exception("msg");
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+
+        // Should hoist an if-null-throw guard before the binding
+        Assert.Equal(2, method.Body.Count);
+        Assert.IsType<IfStatementNode>(method.Body[0]);
+        Assert.IsType<BindStatementNode>(method.Body[1]);
+    }
+
+    [Fact]
+    public void Migration_RegularCoalesce_StillConvertsToConditional()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Fallback(string? input)
+                {
+                    return input ?? "default";
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+
+        // Regular ?? should still produce a ConditionalExpressionNode (no hoisting)
+        Assert.Single(method.Body);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
+        Assert.IsType<ConditionalExpressionNode>(ret.Expression);
+    }
+
+    [Fact]
+    public void Migration_CoalesceThrow_CalorOutput_PreservesExceptionType()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Name { get; }
+                public Service(string name)
+                {
+                    Name = name ?? throw new ArgumentNullException(nameof(name));
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should contain the exception type in a §NEW, not §ERR
+        Assert.Contains("ArgumentNullException", result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    [Fact]
+    public void Migration_CoalesceThrow_MethodCall_HoistsToTempVariable()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string GetName() => "test";
+                public string Process()
+                {
+                    return GetName() ?? throw new InvalidOperationException("no name");
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        // GetName is first method, Process is second
+        var method = cls.Methods[1];
+
+        // Should hoist: temp bind, then if-null-throw guard, then return temp ref
+        Assert.Equal(3, method.Body.Count);
+        Assert.IsType<BindStatementNode>(method.Body[0]);
+        Assert.IsType<IfStatementNode>(method.Body[1]);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[2]);
+
+        // Return should reference the temp variable, not the original call
+        var returnRef = Assert.IsType<ReferenceNode>(ret.Expression);
+        Assert.StartsWith("_nct", returnRef.Name);
+    }
+
+    [Fact]
+    public void Migration_NestedCoalesceThrow_ProducesCorrectOutput()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Resolve(string? a, string? b)
+                {
+                    return a ?? b ?? throw new InvalidOperationException("both null");
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+
+        // The inner (b ?? throw) is handled first, hoisting a guard for b.
+        // The outer (a ?? <inner>) becomes a regular conditional since <inner> returns b.
+        // Expect: if-null-throw guard for b, then return with conditional for a.
+        Assert.True(method.Body.Count >= 2,
+            $"Expected at least 2 statements, got {method.Body.Count}");
+        Assert.IsType<IfStatementNode>(method.Body[0]);
     }
 
     [Fact]
@@ -328,7 +502,7 @@ public class ConverterImprovementTests
     #region Edge Cases: Throw Expression with Existing Variable
 
     [Fact]
-    public void Migration_ThrowExpressionWithVariable_ConvertsToErr()
+    public void Migration_ThrowExpressionWithVariable_HoistsNullGuard()
     {
         var csharp = """
             public class Service
@@ -345,14 +519,18 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
 
-        // The null-coalescing (??) is now a ConditionalExpressionNode:
-        // (if (== input null) <throw-expr> input)
-        var conditional = Assert.IsType<ConditionalExpressionNode>(ret.Expression);
-        // throw ex → ErrExpressionNode wrapping a ReferenceNode
-        var err = Assert.IsType<ErrExpressionNode>(conditional.WhenTrue);
-        Assert.IsType<ReferenceNode>(err.Error);
+        // ?? throw ex now hoists a null guard before the return
+        Assert.Equal(2, method.Body.Count);
+        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[1]);
+
+        // Guard body: throw with the variable reference
+        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
+        Assert.IsType<ReferenceNode>(throwStmt.Exception);
+
+        // Return is just the variable reference
+        Assert.IsType<ReferenceNode>(ret.Expression);
     }
 
     #endregion
