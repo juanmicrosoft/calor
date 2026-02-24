@@ -1,112 +1,48 @@
 {
   "version": "1.0",
-  "timestamp": "2026-02-23T20:13:55.21742Z",
-  "commit": "5f7019e",
+  "timestamp": "2026-02-24T14:37:21.3829682Z",
+  "commit": "c7665e6",
   "frameworkVersion": "1.0.0",
   "summary": {
     "overallAdvantage": 1.27,
-    "programCount": 40,
+    "programCount": 207,
     "metricCount": 8,
     "calorWins": 7,
     "cSharpWins": 1,
-    "statisticalRunCount": 30
+    "statisticalRunCount": 0
   },
   "metrics": {
     "TokenEconomics": {
-      "ratio": 0.92,
-      "winner": "csharp",
-      "ci95": [
-        0.916,
-        0.916
-      ],
-      "significant": true,
-      "pValue": 0.0006,
-      "effectSize": 0.072,
-      "effectInterpretation": "negligible"
+      "ratio": 0.73,
+      "winner": "csharp"
     },
     "GenerationAccuracy": {
-      "ratio": 1.03,
-      "winner": "calor",
-      "ci95": [
-        1.029,
-        1.029
-      ],
-      "significant": true,
-      "pValue": 0.0001,
-      "effectSize": 0.754,
-      "effectInterpretation": "medium"
+      "ratio": 1.02,
+      "winner": "calor"
     },
     "Comprehension": {
-      "ratio": 1.7,
-      "winner": "calor",
-      "ci95": [
-        1.696,
-        1.696
-      ],
-      "significant": true,
-      "pValue": 0.0001,
-      "effectSize": 1.386,
-      "effectInterpretation": "large"
+      "ratio": 2.12,
+      "winner": "calor"
     },
     "EditPrecision": {
-      "ratio": 1.37,
-      "winner": "calor",
-      "ci95": [
-        1.368,
-        1.368
-      ],
-      "significant": true,
-      "pValue": 0.0001,
-      "effectSize": 11.798,
-      "effectInterpretation": "large"
+      "ratio": 1.38,
+      "winner": "calor"
     },
     "ErrorDetection": {
-      "ratio": 1.65,
-      "winner": "calor",
-      "ci95": [
-        1.646,
-        1.646
-      ],
-      "significant": true,
-      "pValue": 0.0001,
-      "effectSize": 1.616,
-      "effectInterpretation": "large"
+      "ratio": 1.75,
+      "winner": "calor"
     },
     "InformationDensity": {
-      "ratio": 1.05,
-      "winner": "calor",
-      "ci95": [
-        1.053,
-        1.053
-      ],
-      "significant": true,
-      "pValue": 0.0028,
-      "effectSize": -0.12,
-      "effectInterpretation": "negligible"
+      "ratio": 1.08,
+      "winner": "calor"
     },
     "RefactoringStability": {
-      "ratio": 1.37,
-      "winner": "calor",
-      "ci95": [
-        1.365,
-        1.365
-      ],
-      "significant": true,
-      "pValue": 0.0001,
-      "effectSize": 4.359,
-      "effectInterpretation": "large"
+      "ratio": 1.3,
+      "winner": "calor"
     },
     "Correctness": {
-      "ratio": 1.26,
-      "winner": "calor",
-      "ci95": [
-        1.26,
-        1.26
-      ],
-      "significant": true,
-      "pValue": 0.0001,
-      "effectSize": 1.065,
-      "effectInterpretation": "large"
+      "ratio": 1.27,
+      "winner": "calor"
     }
   },
   "programs": [
@@ -122,10 +58,10 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.34,
+      "advantage": 1.344,
       "metrics": {
         "TokenEconomics": 0.717,
-        "GenerationAccuracy": 0.97,
+        "GenerationAccuracy": 1,
         "Comprehension": 2.612,
         "EditPrecision": 1.334,
         "ErrorDetection": 1.5,
@@ -172,10 +108,10 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.125,
+      "advantage": 1.129,
       "metrics": {
         "TokenEconomics": 0.96,
-        "GenerationAccuracy": 0.97,
+        "GenerationAccuracy": 1,
         "Comprehension": 1.056,
         "EditPrecision": 1.283,
         "ErrorDetection": 1.5,
@@ -805,6 +741,2514 @@
       }
     },
     {
+      "id": "029",
+      "name": "SumRange",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "arithmetic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.251,
+      "metrics": {
+        "TokenEconomics": 0.88,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.512,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.099,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "030",
+      "name": "Average",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "arithmetic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.391,
+      "metrics": {
+        "TokenEconomics": 0.664,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.324,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.725,
+        "RefactoringStability": 1.213,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "031",
+      "name": "Abs",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.284,
+      "metrics": {
+        "TokenEconomics": 0.43,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.716,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.971,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "032",
+      "name": "Sign",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.063,
+      "metrics": {
+        "TokenEconomics": 0.556,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.381,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.678,
+        "RefactoringStability": 1.213,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "033",
+      "name": "MinTwo",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.244,
+      "metrics": {
+        "TokenEconomics": 0.393,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.789,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.812,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "034",
+      "name": "MaxTwo",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.244,
+      "metrics": {
+        "TokenEconomics": 0.393,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.789,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.812,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "035",
+      "name": "IsEven",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "modulo",
+        "boolean"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.102,
+      "metrics": {
+        "TokenEconomics": 0.596,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.446,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.684,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "036",
+      "name": "IsOdd",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "modulo",
+        "boolean"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.077,
+      "metrics": {
+        "TokenEconomics": 0.596,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.446,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.684,
+        "RefactoringStability": 1.213,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "037",
+      "name": "CelsiusToKelvin",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "arithmetic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.439,
+      "metrics": {
+        "TokenEconomics": 0.714,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.382,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.095,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "038",
+      "name": "AreaOfCircle",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.435,
+      "metrics": {
+        "TokenEconomics": 0.718,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.382,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.062,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "039",
+      "name": "Hypotenuse",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.464,
+      "metrics": {
+        "TokenEconomics": 0.439,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.039,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 0.915,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "040",
+      "name": "DigitCount",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.604,
+      "metrics": {
+        "TokenEconomics": 0.238,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.096,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.978,
+        "RefactoringStability": 1.443,
+        "Correctness": 1.9
+      }
+    },
+    {
+      "id": "041",
+      "name": "SumDigits",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "modulo"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.638,
+      "metrics": {
+        "TokenEconomics": 0.193,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.37,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.02,
+        "RefactoringStability": 1.443,
+        "Correctness": 1.9
+      }
+    },
+    {
+      "id": "042",
+      "name": "ReverseArray",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.613,
+      "metrics": {
+        "TokenEconomics": 0.51,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.503,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.811,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "043",
+      "name": "Contains",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "boolean"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.166,
+      "metrics": {
+        "TokenEconomics": 0.472,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.882,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.866,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "044",
+      "name": "CountOccurrences",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "array",
+        "loop",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.378,
+      "metrics": {
+        "TokenEconomics": 0.444,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.251,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2,
+        "InformationDensity": 1.153,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "045",
+      "name": "TruncateString",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.279,
+      "metrics": {
+        "TokenEconomics": 0.531,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.174,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.046,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.071
+      }
+    },
+    {
+      "id": "046",
+      "name": "IsAlpha",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "boolean"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.185,
+      "metrics": {
+        "TokenEconomics": 0.5,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.385,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.526,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "047",
+      "name": "Capitalize",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.348,
+      "metrics": {
+        "TokenEconomics": 0.469,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.181,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 0.813,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "048",
+      "name": "CompoundInterest",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.454,
+      "metrics": {
+        "TokenEconomics": 0.674,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.511,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 0.937,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "049",
+      "name": "PriorityQueue",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "conditional",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.503,
+      "metrics": {
+        "TokenEconomics": 1.728,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.121,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.194,
+        "RefactoringStability": 1.394,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "050",
+      "name": "Deque",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.585,
+      "metrics": {
+        "TokenEconomics": 1.064,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.763,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.333,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "051",
+      "name": "CircularBuffer",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "modulo",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.541,
+      "metrics": {
+        "TokenEconomics": 0.903,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.716,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.379,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.286
+      }
+    },
+    {
+      "id": "052",
+      "name": "HashMap",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "modulo",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.65,
+      "metrics": {
+        "TokenEconomics": 1.342,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.284,
+        "EditPrecision": 1.301,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.507,
+        "RefactoringStability": 1.43,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "053",
+      "name": "MinStack",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "conditional",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.315,
+      "metrics": {
+        "TokenEconomics": 1.248,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.763,
+        "EditPrecision": 1.641,
+        "ErrorDetection": 1.143,
+        "InformationDensity": 1.209,
+        "RefactoringStability": 1.349,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "054",
+      "name": "Trie",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "string_operations"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.592,
+      "metrics": {
+        "TokenEconomics": 1.364,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.09,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.305,
+        "RefactoringStability": 1.365,
+        "Correctness": 1.385
+      }
+    },
+    {
+      "id": "055",
+      "name": "Graph",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.681,
+      "metrics": {
+        "TokenEconomics": 0.896,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.155,
+        "EditPrecision": 1.641,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.183,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "056",
+      "name": "DisjointSet",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.291,
+      "metrics": {
+        "TokenEconomics": 1.297,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.616,
+        "EditPrecision": 1.552,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.043,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "057",
+      "name": "MaxHeap",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "contracts"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.497,
+      "metrics": {
+        "TokenEconomics": 1.588,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.136,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.496,
+        "RefactoringStability": 1.337,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "058",
+      "name": "SortedList",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "conditional"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.4,
+      "metrics": {
+        "TokenEconomics": 0.862,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.069,
+        "EditPrecision": 1.627,
+        "ErrorDetection": 2,
+        "InformationDensity": 1.176,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.25
+      }
+    },
+    {
+      "id": "059",
+      "name": "BitSet",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "boolean"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.602,
+      "metrics": {
+        "TokenEconomics": 0.365,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.192,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.738,
+        "RefactoringStability": 1.443,
+        "Correctness": 1.9
+      }
+    },
+    {
+      "id": "060",
+      "name": "Observer",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.275,
+      "metrics": {
+        "TokenEconomics": 1.098,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.795,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.066,
+        "RefactoringStability": 1.31,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "061",
+      "name": "Strategy",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.245,
+      "metrics": {
+        "TokenEconomics": 1.139,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.744,
+        "EditPrecision": 1.53,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.906,
+        "RefactoringStability": 1.31,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "062",
+      "name": "Builder",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.231,
+      "metrics": {
+        "TokenEconomics": 1.122,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.379,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.143,
+        "InformationDensity": 1.218,
+        "RefactoringStability": 1.394,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "063",
+      "name": "Decorator",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.609,
+      "metrics": {
+        "TokenEconomics": 0.817,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.399,
+        "EditPrecision": 1.745,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.939,
+        "RefactoringStability": 1.337,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "064",
+      "name": "Command",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.312,
+      "metrics": {
+        "TokenEconomics": 1.123,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.056,
+        "EditPrecision": 1.713,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.13,
+        "RefactoringStability": 1.31,
+        "Correctness": 0.833
+      }
+    },
+    {
+      "id": "065",
+      "name": "State",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.533,
+      "metrics": {
+        "TokenEconomics": 0.587,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.604,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 2.54,
+        "RefactoringStability": 1.402,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "066",
+      "name": "Adapter",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.447,
+      "metrics": {
+        "TokenEconomics": 0.908,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.868,
+        "EditPrecision": 1.698,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.111,
+        "RefactoringStability": 1.424,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "067",
+      "name": "Proxy",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.315,
+      "metrics": {
+        "TokenEconomics": 0.826,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.744,
+        "EditPrecision": 1.713,
+        "ErrorDetection": 1.429,
+        "InformationDensity": 1.05,
+        "RefactoringStability": 1.561,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "068",
+      "name": "Iterator",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.444,
+      "metrics": {
+        "TokenEconomics": 0.698,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.254,
+        "EditPrecision": 1.367,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.434,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "069",
+      "name": "Mediator",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.282,
+      "metrics": {
+        "TokenEconomics": 1.454,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.784,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.143,
+        "InformationDensity": 1.361,
+        "RefactoringStability": 1.284,
+        "Correctness": 0.833
+      }
+    },
+    {
+      "id": "070",
+      "name": "ChainOfResponsibility",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.246,
+      "metrics": {
+        "TokenEconomics": 0.946,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.574,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 0.783,
+        "RefactoringStability": 1.337,
+        "Correctness": 1.077
+      }
+    },
+    {
+      "id": "071",
+      "name": "Composite",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.656,
+      "metrics": {
+        "TokenEconomics": 1.23,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.06,
+        "EditPrecision": 1.713,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.221,
+        "RefactoringStability": 1.394,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "072",
+      "name": "Flyweight",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.592,
+      "metrics": {
+        "TokenEconomics": 0.875,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.245,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.523,
+        "RefactoringStability": 1.365,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "073",
+      "name": "BankAccount",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.662,
+      "metrics": {
+        "TokenEconomics": 0.718,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.31,
+        "EditPrecision": 1.682,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.373,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "074",
+      "name": "TodoList",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.582,
+      "metrics": {
+        "TokenEconomics": 0.917,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.51,
+        "EditPrecision": 1.627,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.438,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "075",
+      "name": "Inventory",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "contracts",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.584,
+      "metrics": {
+        "TokenEconomics": 0.87,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.205,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.078,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "076",
+      "name": "VotingSystem",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.445,
+      "metrics": {
+        "TokenEconomics": 0.64,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.502,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.086,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "077",
+      "name": "GradeCalculator",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "arithmetic",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.326,
+      "metrics": {
+        "TokenEconomics": 0.474,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.98,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 0.62,
+        "RefactoringStability": 1.324,
+        "Correctness": 1.7
+      }
+    },
+    {
+      "id": "078",
+      "name": "PasswordValidator",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "boolean",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.171,
+      "metrics": {
+        "TokenEconomics": 0.668,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.998,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.814,
+        "RefactoringStability": 1.213,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "079",
+      "name": "PhoneBook",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "state",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.563,
+      "metrics": {
+        "TokenEconomics": 0.751,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.826,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.045,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "080",
+      "name": "UnitConverter",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.397,
+      "metrics": {
+        "TokenEconomics": 0.383,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.941,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 0.753,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "081",
+      "name": "Calendar",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "algorithm",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.523,
+      "metrics": {
+        "TokenEconomics": 0.358,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.646,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.731,
+        "RefactoringStability": 1.375,
+        "Correctness": 1.9
+      }
+    },
+    {
+      "id": "082",
+      "name": "Timer",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.586,
+      "metrics": {
+        "TokenEconomics": 0.661,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.026,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.369,
+        "RefactoringStability": 1.31,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "083",
+      "name": "ScoreBoard",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.626,
+      "metrics": {
+        "TokenEconomics": 0.808,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.919,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.097,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "084",
+      "name": "TaxCalculator",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "arithmetic",
+        "domain_logic",
+        "business_rules"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.47,
+      "metrics": {
+        "TokenEconomics": 0.381,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.628,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.664,
+        "RefactoringStability": 1.324,
+        "Correctness": 1.583
+      }
+    },
+    {
+      "id": "085",
+      "name": "BMICalculator",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "conditional",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.497,
+      "metrics": {
+        "TokenEconomics": 0.502,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.408,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.663,
+        "RefactoringStability": 1.324,
+        "Correctness": 1.9
+      }
+    },
+    {
+      "id": "086",
+      "name": "DistanceCalculator",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.223,
+      "metrics": {
+        "TokenEconomics": 0.372,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.784,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.55,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "087",
+      "name": "CurrencyConverter",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "contracts",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.525,
+      "metrics": {
+        "TokenEconomics": 0.342,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.126,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.767,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "088",
+      "name": "DateDiff",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "arithmetic",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.647,
+      "metrics": {
+        "TokenEconomics": 0.464,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.625,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.711,
+        "RefactoringStability": 1.3,
+        "Correctness": 1.9
+      }
+    },
+    {
+      "id": "089",
+      "name": "EmailValidator",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "string_operations",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.148,
+      "metrics": {
+        "TokenEconomics": 0.54,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.048,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.71,
+        "RefactoringStability": 1.213,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "090",
+      "name": "UrlParser",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.236,
+      "metrics": {
+        "TokenEconomics": 0.639,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.973,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.905,
+        "RefactoringStability": 1.3,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "091",
+      "name": "CsvParser",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_operations",
+        "domain_logic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": false,
+      "advantage": 1.576,
+      "metrics": {
+        "TokenEconomics": 0.692,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.478,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2,
+        "InformationDensity": 2.856,
+        "RefactoringStability": 1.236,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "092",
+      "name": "MergeSort",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.504,
+      "metrics": {
+        "TokenEconomics": 1.896,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.823,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.151,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "093",
+      "name": "InsertionSort",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.3,
+      "metrics": {
+        "TokenEconomics": 0.828,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.612,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.277,
+        "RefactoringStability": 1.26,
+        "Correctness": 0.833
+      }
+    },
+    {
+      "id": "094",
+      "name": "SelectionSort",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.493,
+      "metrics": {
+        "TokenEconomics": 0.876,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.729,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.494,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "095",
+      "name": "BubbleSort",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.496,
+      "metrics": {
+        "TokenEconomics": 0.814,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.945,
+        "EditPrecision": 1.29,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.303,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "096",
+      "name": "LinearSearch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "loop",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.148,
+      "metrics": {
+        "TokenEconomics": 0.52,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.01,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.974,
+        "RefactoringStability": 1.236,
+        "Correctness": 0.857
+      }
+    },
+    {
+      "id": "097",
+      "name": "InterpolationSearch",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "arithmetic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.338,
+      "metrics": {
+        "TokenEconomics": 0.893,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.917,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 0.984,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.143
+      }
+    },
+    {
+      "id": "098",
+      "name": "DepthFirstSearch",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "algorithm",
+        "graph"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.34,
+      "metrics": {
+        "TokenEconomics": 1.298,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.023,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.263,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "099",
+      "name": "BreadthFirstSearch",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "graph"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.328,
+      "metrics": {
+        "TokenEconomics": 1.468,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.852,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.425,
+        "RefactoringStability": 1.31,
+        "Correctness": 0.857
+      }
+    },
+    {
+      "id": "100",
+      "name": "Dijkstra",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "graph"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.774,
+      "metrics": {
+        "TokenEconomics": 1.392,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.958,
+        "EditPrecision": 1.367,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.606,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "101",
+      "name": "Knapsack",
+      "level": 4,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "dynamic_programming"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.667,
+      "metrics": {
+        "TokenEconomics": 0.904,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.145,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.239,
+        "RefactoringStability": 1.375,
+        "Correctness": 1.583
+      }
+    },
+    {
+      "id": "102",
+      "name": "LCS",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "dynamic_programming"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.278,
+      "metrics": {
+        "TokenEconomics": 1.02,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.029,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.209,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "103",
+      "name": "EditDistance",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "dynamic_programming"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.276,
+      "metrics": {
+        "TokenEconomics": 1.31,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.805,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.161,
+        "RefactoringStability": 1.349,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "104",
+      "name": "MatrixMultiply",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "algorithm",
+        "loop",
+        "arithmetic"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.463,
+      "metrics": {
+        "TokenEconomics": 0.988,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.454,
+        "EditPrecision": 1.367,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.492,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "105",
+      "name": "TowerOfHanoi",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "recursion",
+        "algorithm"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.542,
+      "metrics": {
+        "TokenEconomics": 0.807,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.645,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 0.972,
+        "RefactoringStability": 1.521,
+        "Correctness": 1.583
+      }
+    },
+    {
+      "id": "049a",
+      "name": "ExpressionBodied",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "adversarial"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.229,
+      "metrics": {
+        "TokenEconomics": 0.635,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.313,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.02,
+        "RefactoringStability": 1.191,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "049b",
+      "name": "TernaryChain",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "adversarial"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.26,
+      "metrics": {
+        "TokenEconomics": 0.617,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.942,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.146,
+        "RefactoringStability": 1.3,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "async001",
+      "name": "SimpleAsync",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.308,
+      "metrics": {
+        "TokenEconomics": 0.781,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.958,
+        "EditPrecision": 1.334,
+        "ErrorDetection": 1.5,
+        "InformationDensity": 1.587,
+        "RefactoringStability": 1.306,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "async002",
+      "name": "AsyncReturn",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.145,
+      "metrics": {
+        "TokenEconomics": 0.704,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.578,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.987,
+        "RefactoringStability": 1.213,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "async003",
+      "name": "AsyncChain",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.164,
+      "metrics": {
+        "TokenEconomics": 0.832,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.441,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.985,
+        "RefactoringStability": 1.26,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "async004",
+      "name": "DelayedResult",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.413,
+      "metrics": {
+        "TokenEconomics": 0.62,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.092,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.5,
+        "InformationDensity": 1.048,
+        "RefactoringStability": 1.306,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "async005",
+      "name": "AsyncPure",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1,
+      "metrics": {
+        "TokenEconomics": 0.789,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.011,
+        "EditPrecision": 1,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.924,
+        "RefactoringStability": 0.943,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "async006",
+      "name": "AsyncEffect",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.22,
+      "metrics": {
+        "TokenEconomics": 0.945,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.552,
+        "EditPrecision": 1.036,
+        "ErrorDetection": 1.667,
+        "InformationDensity": 1.485,
+        "RefactoringStability": 1.078,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "async007",
+      "name": "ParallelTasks",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.349,
+      "metrics": {
+        "TokenEconomics": 0.667,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.833,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.286,
+        "RefactoringStability": 1.213,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "async008",
+      "name": "CancellableTask",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.264,
+      "metrics": {
+        "TokenEconomics": 0.788,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.069,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.224,
+        "RefactoringStability": 1.236,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "async009",
+      "name": "AsyncLoop",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.405,
+      "metrics": {
+        "TokenEconomics": 0.932,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.486,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.791,
+        "RefactoringStability": 1.236,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "async010",
+      "name": "AsyncErrorHandling",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "async"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.405,
+      "metrics": {
+        "TokenEconomics": 0.815,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.102,
+        "EditPrecision": 1.508,
+        "ErrorDetection": 1.667,
+        "InformationDensity": 1.856,
+        "RefactoringStability": 1.382,
+        "Correctness": 0.909
+      }
+    },
+    {
+      "id": "col001",
+      "name": "ListOps",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.41,
+      "metrics": {
+        "TokenEconomics": 0.581,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.612,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2,
+        "InformationDensity": 1.222,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "col002",
+      "name": "DictOps",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.523,
+      "metrics": {
+        "TokenEconomics": 0.882,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.937,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 2,
+        "InformationDensity": 1.376,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "col003",
+      "name": "SetOps",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.568,
+      "metrics": {
+        "TokenEconomics": 1.177,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.768,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 2,
+        "InformationDensity": 1.378,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "col004",
+      "name": "ArraySlice",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.547,
+      "metrics": {
+        "TokenEconomics": 0.628,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.199,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 0.945,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "col005",
+      "name": "Filter",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.319,
+      "metrics": {
+        "TokenEconomics": 0.945,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.685,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.734,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "col006",
+      "name": "Map",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.466,
+      "metrics": {
+        "TokenEconomics": 1.043,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.688,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.014,
+        "RefactoringStability": 1.191,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "col007",
+      "name": "Reduce",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.294,
+      "metrics": {
+        "TokenEconomics": 0.8,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.584,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.903,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "col008",
+      "name": "Sort",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.213,
+      "metrics": {
+        "TokenEconomics": 0.985,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.095,
+        "EditPrecision": 1.254,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.993,
+        "RefactoringStability": 1.213,
+        "Correctness": 0.833
+      }
+    },
+    {
+      "id": "col009",
+      "name": "GroupBy",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.533,
+      "metrics": {
+        "TokenEconomics": 1.227,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.859,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 0.958,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "col010",
+      "name": "Zip",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.363,
+      "metrics": {
+        "TokenEconomics": 0.935,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.139,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.963,
+        "RefactoringStability": 1.191,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "col011",
+      "name": "LinqPipeline",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "collections",
+        "adversarial"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.262,
+      "metrics": {
+        "TokenEconomics": 0.826,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.135,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.991,
+        "RefactoringStability": 1.3,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "compact001",
+      "name": "InlineSigs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.191,
+      "metrics": {
+        "TokenEconomics": 0.457,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.296,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.709,
+        "RefactoringStability": 1.191,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "compact002",
+      "name": "AutoProps",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.237,
+      "metrics": {
+        "TokenEconomics": 0.526,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.167,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.255,
+        "RefactoringStability": 1.26,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "compact003",
+      "name": "OptionalIds",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.147,
+      "metrics": {
+        "TokenEconomics": 0.471,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.148,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.69,
+        "RefactoringStability": 1.191,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "compact004",
+      "name": "CompactClass",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.466,
+      "metrics": {
+        "TokenEconomics": 0.432,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.82,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.333,
+        "InformationDensity": 0.891,
+        "RefactoringStability": 1.306,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "compact005",
+      "name": "MixedSyntax",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "compact_syntax"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.413,
+      "metrics": {
+        "TokenEconomics": 0.632,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.45,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 0.883,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.333
+      }
+    },
+    {
       "id": "cv001",
       "name": "ProvableContracts",
       "level": 2,
@@ -979,6 +3423,476 @@
       }
     },
     {
+      "id": "cv008",
+      "name": "DivisionContracts",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "division"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.551,
+      "metrics": {
+        "TokenEconomics": 0.653,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 2.781,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 0.823,
+        "RefactoringStability": 1.365,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "cv009",
+      "name": "RangeContracts",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "ranges"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.571,
+      "metrics": {
+        "TokenEconomics": 0.471,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 2.848,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.785,
+        "RefactoringStability": 1.49,
+        "Correctness": 1.583
+      }
+    },
+    {
+      "id": "cv010",
+      "name": "ListInvariant",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "invariants"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.677,
+      "metrics": {
+        "TokenEconomics": 0.35,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 4.083,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 0.912,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "cv011",
+      "name": "SortingContracts",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "sorting"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.656,
+      "metrics": {
+        "TokenEconomics": 0.426,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 3.688,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.658,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "cv012",
+      "name": "SearchContracts",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "search"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.639,
+      "metrics": {
+        "TokenEconomics": 0.386,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 3.394,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.835,
+        "RefactoringStability": 1.31,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "cv013",
+      "name": "AbsoluteContracts",
+      "level": 2,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "absolute"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.661,
+      "metrics": {
+        "TokenEconomics": 0.385,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 4.04,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 0.895,
+        "RefactoringStability": 1.402,
+        "Correctness": 1.583
+      }
+    },
+    {
+      "id": "cv014",
+      "name": "ModuloContracts",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "modulo"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.738,
+      "metrics": {
+        "TokenEconomics": 0.29,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 4.186,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.737,
+        "RefactoringStability": 1.402,
+        "Correctness": 1.9
+      }
+    },
+    {
+      "id": "cv015",
+      "name": "BitContracts",
+      "level": 3,
+      "features": [
+        "contracts",
+        "z3",
+        "verification",
+        "bitwise"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.476,
+      "metrics": {
+        "TokenEconomics": 0.509,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 2.972,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 0.722,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "dp003",
+      "name": "Visitor",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "polymorphism",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.985,
+      "metrics": {
+        "TokenEconomics": 0.937,
+        "GenerationAccuracy": 0.76,
+        "Comprehension": 0.611,
+        "EditPrecision": 0.944,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.808,
+        "RefactoringStability": 1.486,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "dp004",
+      "name": "TemplateMethod",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "polymorphism",
+        "design_pattern"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 0.965,
+      "metrics": {
+        "TokenEconomics": 0.829,
+        "GenerationAccuracy": 0.76,
+        "Comprehension": 0.541,
+        "EditPrecision": 0.909,
+        "ErrorDetection": 1.143,
+        "InformationDensity": 1.021,
+        "RefactoringStability": 1.419,
+        "Correctness": 1.1
+      }
+    },
+    {
+      "id": "err001",
+      "name": "BasicTryCatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.106,
+      "metrics": {
+        "TokenEconomics": 0.551,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.406,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.882,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.077
+      }
+    },
+    {
+      "id": "err002",
+      "name": "MultipleCatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.156,
+      "metrics": {
+        "TokenEconomics": 0.579,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.624,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.957,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.091
+      }
+    },
+    {
+      "id": "err003",
+      "name": "TryFinally",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.189,
+      "metrics": {
+        "TokenEconomics": 0.558,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.816,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.202,
+        "RefactoringStability": 1.26,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "err004",
+      "name": "CustomException",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.347,
+      "metrics": {
+        "TokenEconomics": 0.758,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.793,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.053,
+        "RefactoringStability": 1.337,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "err005",
+      "name": "ExceptionChain",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.41,
+      "metrics": {
+        "TokenEconomics": 0.765,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.114,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.714,
+        "InformationDensity": 1.722,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.364
+      }
+    },
+    {
+      "id": "err006",
+      "name": "ResultType",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.255,
+      "metrics": {
+        "TokenEconomics": 1.104,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.852,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.152,
+        "RefactoringStability": 1.284,
+        "Correctness": 0.923
+      }
+    },
+    {
+      "id": "err007",
+      "name": "OptionType",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.548,
+      "metrics": {
+        "TokenEconomics": 0.689,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 3.054,
+        "EditPrecision": 1.436,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.409,
+        "RefactoringStability": 1.337,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "err008",
+      "name": "NullCheck",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.118,
+      "metrics": {
+        "TokenEconomics": 0.66,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.014,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.143,
+        "InformationDensity": 0.792,
+        "RefactoringStability": 1.191,
+        "Correctness": 0.8
+      }
+    },
+    {
+      "id": "err009",
+      "name": "GuardClause",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.353,
+      "metrics": {
+        "TokenEconomics": 0.709,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.495,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 0.823,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "err010",
+      "name": "ErrorPropagation",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "error_handling"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.284,
+      "metrics": {
+        "TokenEconomics": 0.564,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.209,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 0.918,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.167
+      }
+    },
+    {
       "id": "es001",
       "name": "CorrectEffects",
       "level": 2,
@@ -1048,6 +3962,167 @@
       }
     },
     {
+      "id": "es004",
+      "name": "FileEffects",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "file_io"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.442,
+      "metrics": {
+        "TokenEconomics": 0.92,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 2.716,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 1.667,
+        "InformationDensity": 1.305,
+        "RefactoringStability": 1.41,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "es005",
+      "name": "DatabaseEffect",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "database"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.41,
+      "metrics": {
+        "TokenEconomics": 0.7,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 2.673,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 1.667,
+        "InformationDensity": 1.271,
+        "RefactoringStability": 1.41,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "es006",
+      "name": "NetworkEffect",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "network"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.422,
+      "metrics": {
+        "TokenEconomics": 0.701,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 2.644,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 1.667,
+        "InformationDensity": 1.369,
+        "RefactoringStability": 1.439,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "es007",
+      "name": "ComposedEffects",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "composed"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.41,
+      "metrics": {
+        "TokenEconomics": 0.905,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 2.329,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 1.667,
+        "InformationDensity": 1.64,
+        "RefactoringStability": 1.469,
+        "Correctness": 0.714
+      }
+    },
+    {
+      "id": "es008",
+      "name": "PureComputation",
+      "level": 2,
+      "features": [
+        "effects",
+        "enforcement",
+        "pure"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.431,
+      "metrics": {
+        "TokenEconomics": 0.503,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 2.727,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.875,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "es009",
+      "name": "StateEffect",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "state"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.435,
+      "metrics": {
+        "TokenEconomics": 0.645,
+        "GenerationAccuracy": 1.136,
+        "Comprehension": 2.3,
+        "EditPrecision": 1.436,
+        "ErrorDetection": 1.667,
+        "InformationDensity": 1.882,
+        "RefactoringStability": 1.41,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "es010",
+      "name": "TimerEffect",
+      "level": 3,
+      "features": [
+        "effects",
+        "enforcement",
+        "timing"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.681,
+      "metrics": {
+        "TokenEconomics": 0.416,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 3.711,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 0.781,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.9
+      }
+    },
+    {
       "id": "ie001",
       "name": "BclCoverage",
       "level": 2,
@@ -1093,94 +4168,833 @@
         "RefactoringStability": 1.589,
         "Correctness": 1.7
       }
-    }
-  ],
-  "statisticalAnalysis": {
-    "runCount": 30,
-    "confidenceLevel": 0.95,
-    "significantCategories": [
-      "TokenEconomics",
-      "GenerationAccuracy",
-      "Comprehension",
-      "EditPrecision",
-      "ErrorDetection",
-      "InformationDensity",
-      "RefactoringStability",
-      "Correctness"
-    ],
-    "categoryDetails": {
-      "TokenEconomics": {
-        "mean": 0.916,
-        "stdDev": 24.551,
-        "ci95Lower": 0.892,
-        "ci95Upper": 0.941,
-        "cohensD": 0.072,
-        "pValue": 0.0006,
-        "significant": true
-      },
-      "GenerationAccuracy": {
-        "mean": 1.029,
-        "stdDev": 0.029,
-        "ci95Lower": 1.026,
-        "ci95Upper": 1.032,
-        "cohensD": 0.754,
-        "pValue": 0.0001,
-        "significant": true
-      },
-      "Comprehension": {
-        "mean": 1.696,
-        "stdDev": 0.069,
-        "ci95Lower": 1.673,
-        "ci95Upper": 1.72,
-        "cohensD": 1.386,
-        "pValue": 0.0001,
-        "significant": true
-      },
-      "EditPrecision": {
-        "mean": 1.368,
-        "stdDev": 0.006,
-        "ci95Lower": 1.365,
-        "ci95Upper": 1.37,
-        "cohensD": 11.798,
-        "pValue": 0.0001,
-        "significant": true
-      },
-      "ErrorDetection": {
-        "mean": 1.646,
-        "stdDev": 0.095,
-        "ci95Lower": 1.619,
-        "ci95Upper": 1.674,
-        "cohensD": 1.616,
-        "pValue": 0.0001,
-        "significant": true
-      },
-      "InformationDensity": {
-        "mean": 1.053,
-        "stdDev": 0.019,
-        "ci95Lower": 1.033,
-        "ci95Upper": 1.072,
-        "cohensD": -0.12,
-        "pValue": 0.0028,
-        "significant": true
-      },
-      "RefactoringStability": {
-        "mean": 1.365,
-        "stdDev": 0.014,
-        "ci95Lower": 1.356,
-        "ci95Upper": 1.375,
-        "cohensD": 4.359,
-        "pValue": 0.0001,
-        "significant": true
-      },
-      "Correctness": {
-        "mean": 1.26,
-        "stdDev": 0.061,
-        "ci95Lower": 1.241,
-        "ci95Upper": 1.279,
-        "cohensD": 1.065,
-        "pValue": 0.0001,
-        "significant": true
+    },
+    {
+      "id": "ie003",
+      "name": "MathLib",
+      "level": 2,
+      "features": [
+        "effects",
+        "manifest",
+        "bcl",
+        "math"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.471,
+      "metrics": {
+        "TokenEconomics": 0.476,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 3.143,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.829,
+        "RefactoringStability": 1.402,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "ie004",
+      "name": "StringLib",
+      "level": 2,
+      "features": [
+        "effects",
+        "manifest",
+        "bcl",
+        "string"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.396,
+      "metrics": {
+        "TokenEconomics": 0.463,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 2.872,
+        "EditPrecision": 1.42,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.782,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.25
+      }
+    },
+    {
+      "id": "ie005",
+      "name": "CollectionLib",
+      "level": 2,
+      "features": [
+        "effects",
+        "manifest",
+        "bcl",
+        "collections"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.46,
+      "metrics": {
+        "TokenEconomics": 0.685,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 2.81,
+        "EditPrecision": 1.556,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.972,
+        "RefactoringStability": 1.31,
+        "Correctness": 1.25
+      }
+    },
+    {
+      "id": "oop001",
+      "name": "SimpleClass",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "fields"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.652,
+      "metrics": {
+        "TokenEconomics": 0.743,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.798,
+        "EditPrecision": 1.682,
+        "ErrorDetection": 2.833,
+        "InformationDensity": 1.026,
+        "RefactoringStability": 1.337,
+        "Correctness": 1.8
+      }
+    },
+    {
+      "id": "oop002",
+      "name": "ConstructorInit",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "constructor"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.563,
+      "metrics": {
+        "TokenEconomics": 0.686,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.175,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 2.429,
+        "InformationDensity": 1.267,
+        "RefactoringStability": 1.26,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "oop003",
+      "name": "Properties",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "properties"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.409,
+      "metrics": {
+        "TokenEconomics": 0.723,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 2.221,
+        "EditPrecision": 1.508,
+        "ErrorDetection": 1.857,
+        "InformationDensity": 1.224,
+        "RefactoringStability": 1.31,
+        "Correctness": 1.333
+      }
+    },
+    {
+      "id": "oop004",
+      "name": "Inheritance",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "inheritance"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.321,
+      "metrics": {
+        "TokenEconomics": 0.694,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.742,
+        "EditPrecision": 1.508,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.486,
+        "RefactoringStability": 1.402,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "oop005",
+      "name": "InterfaceImpl",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "interface",
+        "polymorphism"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.525,
+      "metrics": {
+        "TokenEconomics": 1.065,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.163,
+        "EditPrecision": 1.713,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.205,
+        "RefactoringStability": 1.489,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "oop012",
+      "name": "AbstractClass",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.105,
+      "metrics": {
+        "TokenEconomics": 0.832,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.537,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 1.143,
+        "InformationDensity": 0.715,
+        "RefactoringStability": 1.26,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "oop013",
+      "name": "SealedClass",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.248,
+      "metrics": {
+        "TokenEconomics": 1.303,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.7,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.029,
+        "RefactoringStability": 1.26,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "oop014",
+      "name": "GenericFunction",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.332,
+      "metrics": {
+        "TokenEconomics": 0.667,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.896,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.105,
+        "RefactoringStability": 1.191,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "oop015",
+      "name": "GenericClass",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.414,
+      "metrics": {
+        "TokenEconomics": 1.148,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.978,
+        "EditPrecision": 1.356,
+        "ErrorDetection": 1.714,
+        "InformationDensity": 1.378,
+        "RefactoringStability": 1.236,
+        "Correctness": 1.5
+      }
+    },
+    {
+      "id": "oop016",
+      "name": "GenericConstraints",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.383,
+      "metrics": {
+        "TokenEconomics": 0.785,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.824,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.962,
+        "RefactoringStability": 1.3,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "oop017",
+      "name": "StaticMembers",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.269,
+      "metrics": {
+        "TokenEconomics": 0.74,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 1.686,
+        "EditPrecision": 1.463,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.594,
+        "RefactoringStability": 1.236,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "oop018",
+      "name": "MethodOverloading",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.147,
+      "metrics": {
+        "TokenEconomics": 0.469,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.177,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.662,
+        "RefactoringStability": 1.191,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "oop019",
+      "name": "MethodOverriding",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.288,
+      "metrics": {
+        "TokenEconomics": 0.805,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.666,
+        "EditPrecision": 1.454,
+        "ErrorDetection": 1.167,
+        "InformationDensity": 1.979,
+        "RefactoringStability": 1.236,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "oop020",
+      "name": "Encapsulation",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.17,
+      "metrics": {
+        "TokenEconomics": 1.215,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.315,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.821,
+        "RefactoringStability": 1.284,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "oop021",
+      "name": "Composition",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.446,
+      "metrics": {
+        "TokenEconomics": 1.063,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.855,
+        "EditPrecision": 1.395,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.234,
+        "RefactoringStability": 1.456,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "oop022",
+      "name": "Polymorphism",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.282,
+      "metrics": {
+        "TokenEconomics": 1.282,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.312,
+        "EditPrecision": 1.713,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.879,
+        "RefactoringStability": 1.337,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "oop023",
+      "name": "EnumType",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.329,
+      "metrics": {
+        "TokenEconomics": 0.662,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.368,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.179,
+        "RefactoringStability": 1.349,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "oop024",
+      "name": "EnumWithMethods",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.274,
+      "metrics": {
+        "TokenEconomics": 0.484,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.368,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 0.938,
+        "RefactoringStability": 1.324,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "oop025",
+      "name": "RecordType",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.526,
+      "metrics": {
+        "TokenEconomics": 0.282,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 3.611,
+        "EditPrecision": 1.742,
+        "ErrorDetection": 2,
+        "InformationDensity": 0.866,
+        "RefactoringStability": 1.31,
+        "Correctness": 1.3
+      }
+    },
+    {
+      "id": "oop026",
+      "name": "TypeAlias",
+      "level": 3,
+      "features": [
+        "module",
+        "function",
+        "class"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.5,
+      "metrics": {
+        "TokenEconomics": 0.754,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 3.075,
+        "EditPrecision": 1.436,
+        "ErrorDetection": 1.625,
+        "InformationDensity": 1.634,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "oop027",
+      "name": "PropertyAccess",
+      "level": 1,
+      "features": [
+        "module",
+        "function",
+        "class",
+        "properties",
+        "adversarial"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.959,
+      "metrics": {
+        "TokenEconomics": 0.784,
+        "GenerationAccuracy": 1.099,
+        "Comprehension": 2.088,
+        "EditPrecision": 1.508,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 5.094,
+        "RefactoringStability": 1.337,
+        "Correctness": 1.6
+      }
+    },
+    {
+      "id": "pat001",
+      "name": "SimpleMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.391,
+      "metrics": {
+        "TokenEconomics": 0.597,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.153,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 2.089,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "pat002",
+      "name": "TypeMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.415,
+      "metrics": {
+        "TokenEconomics": 0.779,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.749,
+        "EditPrecision": 1.38,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 2.392,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "pat003",
+      "name": "RangeMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.538,
+      "metrics": {
+        "TokenEconomics": 0.604,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.321,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 1.952,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.7
+      }
+    },
+    {
+      "id": "pat004",
+      "name": "GuardMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.323,
+      "metrics": {
+        "TokenEconomics": 0.795,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.966,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.534,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "pat005",
+      "name": "NestedMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.327,
+      "metrics": {
+        "TokenEconomics": 0.909,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.966,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.65,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "pat006",
+      "name": "TupleMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.278,
+      "metrics": {
+        "TokenEconomics": 0.607,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.016,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.31,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "pat007",
+      "name": "EnumMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.332,
+      "metrics": {
+        "TokenEconomics": 0.621,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.068,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.879,
+        "RefactoringStability": 1.213,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "pat008",
+      "name": "WildcardMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.257,
+      "metrics": {
+        "TokenEconomics": 0.461,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.089,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.109,
+        "RefactoringStability": 1.324,
+        "Correctness": 1.4
+      }
+    },
+    {
+      "id": "pat009",
+      "name": "PropertyMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.342,
+      "metrics": {
+        "TokenEconomics": 0.802,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.892,
+        "EditPrecision": 1.682,
+        "ErrorDetection": 1.333,
+        "InformationDensity": 1.543,
+        "RefactoringStability": 1.284,
+        "Correctness": 1.2
+      }
+    },
+    {
+      "id": "pat010",
+      "name": "ExhaustiveMatch",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.356,
+      "metrics": {
+        "TokenEconomics": 0.684,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.411,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 1.143,
+        "InformationDensity": 1.755,
+        "RefactoringStability": 1.349,
+        "Correctness": 1.167
+      }
+    },
+    {
+      "id": "pat011",
+      "name": "SwitchExpression",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "conditional",
+        "pattern_matching",
+        "adversarial"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.626,
+      "metrics": {
+        "TokenEconomics": 0.721,
+        "GenerationAccuracy": 1,
+        "Comprehension": 2.26,
+        "EditPrecision": 1.342,
+        "ErrorDetection": 2.167,
+        "InformationDensity": 2.446,
+        "RefactoringStability": 1.375,
+        "Correctness": 1.7
       }
     }
-  }
+  ]
 }
