@@ -1,16 +1,10 @@
 §M{m004:Test_01_01}
   §CL{c001:Calculator:pub}
-    §MT{m002:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
+    §MT{m002:Add:pub} (i32:a, i32:b) -> i32
       §R (+ a b)
     §/MT{m002}
 
-    §MT{m003:Subtract:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
+    §MT{m003:Subtract:pub} (i32:a, i32:b) -> i32
       §R (- a b)
     §/MT{m003}
 

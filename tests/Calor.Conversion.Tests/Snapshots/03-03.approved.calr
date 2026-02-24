@@ -1,8 +1,6 @@
 §M{m004:Test_03_03}
   §CL{c001:Loops:pub}
-    §MT{m002:CountDown:pub}
-      §I{i32:start}
-      §O{i32}
+    §MT{m002:CountDown:pub} (i32:start) -> i32
       §B{~count:i32} 0
       §WH{while003} (> start 0)
         §ASSIGN start (- start 1)

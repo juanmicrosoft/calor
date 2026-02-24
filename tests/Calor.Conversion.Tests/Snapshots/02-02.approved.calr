@@ -3,15 +3,11 @@
 
   §IFACE{i001:IRepository<T>}
     §WHERE T : class
-    §MT{m002:GetById}
-      §I{i32:id}
-      §O{T}
+    §MT{m002:GetById} (i32:id) -> T
     §/MT{m002}
-    §MT{m003:Save}
-      §I{T:entity}
+    §MT{m003:Save} (T:entity)
     §/MT{m003}
-    §MT{m004:GetAll}
-      §O{Seq<T>}
+    §MT{m004:GetAll} () -> Seq<T>
     §/MT{m004}
   §/IFACE{i001}
 

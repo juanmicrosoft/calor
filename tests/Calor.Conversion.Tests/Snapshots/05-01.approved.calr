@@ -2,8 +2,7 @@
   §U{System.Threading.Tasks}
 
   §CL{c001:DataService:pub}
-    §AMT{m002:FetchDataAsync:pub}
-      §O{str}
+    §AMT{m002:FetchDataAsync:pub} () -> str
       §B{_} §AWAIT §C{Task.Delay} §A 100 §/C
       §R "data"
     §/AMT{m002}

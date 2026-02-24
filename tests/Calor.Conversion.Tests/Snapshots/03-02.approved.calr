@@ -1,8 +1,6 @@
 §M{m004:Test_03_02}
   §CL{c001:Loops:pub}
-    §MT{m002:Sum:pub}
-      §I{i32:n}
-      §O{i32}
+    §MT{m002:Sum:pub} (i32:n) -> i32
       §B{~total:i32} 0
       §L{for003:i:0:(- n 1):1}
         §ASSIGN total (+ total i)

@@ -5661,8 +5661,10 @@ public sealed class Parser
         var accessorStr = attrs["_pos5"] ?? "";  // 6th positional for accessor shorthand
 
         // --- Compact syntax: optional ID ---
+        // Only shift for 4-part format (§PROP{Name:type:vis:accessors}) where ID was omitted.
+        // 3-part format (§PROP{id:name:type}) is the old format — don't shift.
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 5 && !IsIdPattern(id))
+        if (posCount >= 4 && !IsIdPattern(id))
         {
             // Shift: id was actually name, name was type, etc.
             accessorStr = modStr;
@@ -8111,6 +8113,17 @@ public sealed class Parser
     /// </summary>
     private string ReadInlineTypeToken()
     {
+        int pendingGreaters = 0;
+        return ReadInlineTypeToken(ref pendingGreaters);
+    }
+
+    /// <summary>
+    /// Internal overload that tracks pending '>' tokens from consumed '>>' (GreaterGreater) tokens.
+    /// This handles nested generics like IEnumerable&lt;IGrouping&lt;i32, i32&gt;&gt; where the lexer
+    /// tokenizes '>>' as a single GreaterGreater token.
+    /// </summary>
+    private string ReadInlineTypeToken(ref int pendingGreaters)
+    {
         var sb = new System.Text.StringBuilder();
 
         // Handle nullable prefix
@@ -8125,7 +8138,7 @@ public sealed class Parser
         {
             sb.Append('[');
             Advance();
-            sb.Append(ReadInlineTypeToken());
+            sb.Append(ReadInlineTypeToken(ref pendingGreaters));
             if (Check(TokenKind.CloseBracket))
             {
                 sb.Append(']');
@@ -8157,17 +8170,30 @@ public sealed class Parser
         {
             sb.Append('<');
             Advance();
-            sb.Append(ReadInlineTypeToken());
+            sb.Append(ReadInlineTypeToken(ref pendingGreaters));
             while (Check(TokenKind.Comma))
             {
                 sb.Append(',');
                 Advance();
-                sb.Append(ReadInlineTypeToken());
+                sb.Append(ReadInlineTypeToken(ref pendingGreaters));
             }
-            if (Check(TokenKind.Greater))
+            if (pendingGreaters > 0)
+            {
+                // A child already consumed a GreaterGreater token; use the pending '>'
+                sb.Append('>');
+                pendingGreaters--;
+            }
+            else if (Check(TokenKind.Greater))
             {
                 sb.Append('>');
                 Advance();
+            }
+            else if (Check(TokenKind.GreaterGreater))
+            {
+                // '>>' token: consume it, close this generic level, and leave one '>' for the parent
+                sb.Append('>');
+                Advance();
+                pendingGreaters++;
             }
         }
 

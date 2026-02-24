@@ -1,8 +1,6 @@
 §M{m004:Test_03_04}
   §CL{c001:Router:pub}
-    §MT{m002:Route:pub}
-      §I{i32:code}
-      §O{str}
+    §MT{m002:Route:pub} (i32:code) -> str
       §W{match003} code
         §K 200 → "OK"
         §K 404 → "Not Found"
