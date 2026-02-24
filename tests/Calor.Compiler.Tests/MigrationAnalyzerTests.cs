@@ -750,7 +750,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_ThrowExpressionInTernary_StillDetectedAsUnsupported()
+    public void AnalyzeSource_ThrowExpressionInTernary_NowSupported()
     {
         var source = """
             public class Service
@@ -764,8 +764,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "throw-expression");
+        // Ternary throws are now properly hoisted to guard statements
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "throw-expression");
     }
 
     [Fact]
@@ -900,8 +900,11 @@ public class MigrationAnalyzerTests
                     if (input == null)
                         throw new ArgumentNullException(nameof(input));
 
-                    // Unsupported: throw expression in ternary (not inside coalesce)
-                    var result = input != null ? input : throw new ArgumentNullException(nameof(input));
+                    // Unsupported: out parameter (not inside coalesce/ternary)
+                    if (int.TryParse(input, out var result))
+                    {
+                        Name = result.ToString();
+                    }
                 }
             }
             """;
@@ -917,8 +920,8 @@ public class MigrationAnalyzerTests
                     if (input == null)
                         throw new ArgumentNullException(nameof(input));
 
-                    // Supported: null coalescing without throw
-                    var result = input ?? "default";
+                    // Supported: simple assignment
+                    Name = input;
                 }
             }
             """;
@@ -926,7 +929,7 @@ public class MigrationAnalyzerTests
         var resultWithUnsupported = _analyzer.AnalyzeSource(sourceWithUnsupported, "test.cs", "test.cs");
         var resultWithoutUnsupported = _analyzer.AnalyzeSource(sourceWithoutUnsupported, "test.cs", "test.cs");
 
-        // Score should be significantly lower when unsupported constructs are present
+        // Score should be lower when unsupported constructs are present
         Assert.True(resultWithUnsupported.TotalScore < resultWithoutUnsupported.TotalScore,
             $"Expected unsupported score ({resultWithUnsupported.TotalScore}) < supported score ({resultWithoutUnsupported.TotalScore})");
     }
