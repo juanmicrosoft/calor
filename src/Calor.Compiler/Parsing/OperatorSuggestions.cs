@@ -83,7 +83,6 @@ public static class OperatorSuggestions
     public static readonly IReadOnlyDictionary<string, string> CSharpToCalorHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         // C# keywords with Calor equivalents
-        ["nameof"] = "Use a string literal instead: \"VariableName\"",
         ["typeof"] = "Use (typeof Type) in Lisp expressions",
         ["sizeof"] = "Size operations are not supported in Calor. Use constants for known sizes.",
         ["default"] = "Use explicit default values (0 for numbers, \"\" for strings, §NN for None).",

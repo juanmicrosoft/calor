@@ -195,6 +195,24 @@ public sealed class TypeOfExpressionNode : ExpressionNode
 }
 
 /// <summary>
+/// Represents a nameof expression.
+/// (nameof value) generates: nameof(value)
+/// </summary>
+public sealed class NameOfExpressionNode : ExpressionNode
+{
+    public string Name { get; }
+
+    public NameOfExpressionNode(TextSpan span, string name)
+        : base(span)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a call expression where the target is an expression rather than a string name.
 /// §C §NEW{object}§/NEW.GetType §/C generates: new object().GetType()
 /// </summary>

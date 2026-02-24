@@ -228,6 +228,8 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
 
     // Feature 12: typeof expression
     public virtual T Visit(TypeOfExpressionNode node) => DefaultVisit(node)!;
+    // Feature 13: nameof expression
+    public virtual T Visit(NameOfExpressionNode node) => DefaultVisit(node)!;
     // Feature 9: Expression call targets
     public virtual T Visit(ExpressionCallNode node) => DefaultVisit(node)!;
     // Yield support

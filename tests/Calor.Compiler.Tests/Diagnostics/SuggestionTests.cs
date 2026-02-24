@@ -46,7 +46,6 @@ public class SuggestionTests
     }
 
     [Theory]
-    [InlineData("nameof", "Use a string literal")]
     [InlineData("typeof", "Use (typeof Type)")]
     [InlineData("new", "§NEW")]
     [InlineData("await", "await")]
@@ -147,15 +146,13 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void Parser_UnknownOperator_WithCSharpConstruct_ShowsHint()
+    public void Parser_NameofOperator_CompilesSuccessfully()
     {
         var source = "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x) §/F{f001} §/M{m001}";
         var result = Program.Compile(source, "test.calr");
 
-        Assert.True(result.HasErrors);
-        var error = result.Diagnostics.First(d => d.IsError);
-        Assert.Contains("nameof", error.Message);
-        Assert.Contains("string literal", error.Message);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("nameof(x)", result.GeneratedCode);
     }
 
     [Fact]
@@ -513,8 +510,9 @@ public class SuggestionTests
     public void GetCSharpHint_CaseInsensitive_ReturnsHint()
     {
         // C# construct detection should be case-insensitive
-        Assert.NotNull(OperatorSuggestions.GetCSharpHint("NAMEOF"));
-        Assert.NotNull(OperatorSuggestions.GetCSharpHint("NameOf"));
+        // nameof is now a valid operator, so it's no longer in the hints
+        Assert.Null(OperatorSuggestions.GetCSharpHint("NAMEOF"));
+        Assert.Null(OperatorSuggestions.GetCSharpHint("NameOf"));
         Assert.NotNull(OperatorSuggestions.GetCSharpHint("typeof"));
         Assert.NotNull(OperatorSuggestions.GetCSharpHint("TYPEOF"));
     }
