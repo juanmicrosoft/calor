@@ -285,37 +285,33 @@ public static class FeatureSupport
         ["unsafe"] = new FeatureInfo
         {
             Name = "unsafe",
-            Support = SupportLevel.NotSupported,
-            Description = "Unsafe code blocks are not supported",
-            Workaround = "Use safe alternatives or keep as C# interop"
+            Support = SupportLevel.Full,
+            Description = "Unsafe code blocks are converted to §UNSAFE blocks"
         },
         ["pointer"] = new FeatureInfo
         {
             Name = "pointer",
-            Support = SupportLevel.NotSupported,
-            Description = "Pointer types are not supported",
-            Workaround = "Use safe alternatives"
+            Support = SupportLevel.Full,
+            Description = "Pointer types (int*) are supported with §ADDR and §DEREF"
         },
         ["stackalloc"] = new FeatureInfo
         {
             Name = "stackalloc",
-            Support = SupportLevel.NotSupported,
-            Description = "Stackalloc is not supported",
-            Workaround = "Use regular array allocation"
+            Support = SupportLevel.Full,
+            Description = "Stackalloc expressions are converted to §SALLOC nodes"
         },
         ["fixed"] = new FeatureInfo
         {
             Name = "fixed",
-            Support = SupportLevel.NotSupported,
-            Description = "Fixed buffers are not supported",
-            Workaround = "Use regular arrays"
+            Support = SupportLevel.Full,
+            Description = "Fixed statements are converted to §FIXED blocks"
         },
         ["volatile"] = new FeatureInfo
         {
             Name = "volatile",
             Support = SupportLevel.NotSupported,
-            Description = "Volatile keyword is not supported",
-            Workaround = "Use proper synchronization primitives"
+            Description = "Volatile keyword is not yet supported",
+            Workaround = "Remove volatile modifier; use explicit memory barriers or Interlocked operations instead"
         },
 
         // Manual required
@@ -656,6 +652,74 @@ public static class FeatureSupport
             Name = "default-parameter",
             Support = SupportLevel.Full,
             Description = "Default parameter values are converted to §I{type:name} = value syntax"
+        },
+
+        // Issue #325: Language gap features
+        ["parallel"] = new FeatureInfo
+        {
+            Name = "parallel",
+            Support = SupportLevel.Full,
+            Description = "Parallel.For/ForEach/Invoke are converted as method calls"
+        },
+        ["plinq"] = new FeatureInfo
+        {
+            Name = "plinq",
+            Support = SupportLevel.Full,
+            Description = "PLINQ .AsParallel() chains are converted as method calls"
+        },
+        ["com-interop"] = new FeatureInfo
+        {
+            Name = "com-interop",
+            Support = SupportLevel.Full,
+            Description = "COM attributes ([ComImport], [Guid]) are preserved"
+        },
+        ["extern-method"] = new FeatureInfo
+        {
+            Name = "extern-method",
+            Support = SupportLevel.Full,
+            Description = "Extern methods with [DllImport] are fully supported"
+        },
+        ["dllimport"] = new FeatureInfo
+        {
+            Name = "dllimport",
+            Support = SupportLevel.Full,
+            Description = "[DllImport] attribute for P/Invoke is fully supported"
+        },
+        ["tuple-type"] = new FeatureInfo
+        {
+            Name = "tuple-type",
+            Support = SupportLevel.Full,
+            Description = "Tuple types in signatures like (int, string) are mapped"
+        },
+        ["tuple-literal"] = new FeatureInfo
+        {
+            Name = "tuple-literal",
+            Support = SupportLevel.Full,
+            Description = "Tuple literals (a, b) are fully supported"
+        },
+        ["tuple-deconstruction"] = new FeatureInfo
+        {
+            Name = "tuple-deconstruction",
+            Support = SupportLevel.Full,
+            Description = "Tuple deconstruction var (a, b) = ... is fully supported"
+        },
+        ["span"] = new FeatureInfo
+        {
+            Name = "span",
+            Support = SupportLevel.Full,
+            Description = "Span<T> and ReadOnlySpan<T> types are supported"
+        },
+        ["memory"] = new FeatureInfo
+        {
+            Name = "memory",
+            Support = SupportLevel.Full,
+            Description = "Memory<T> and ReadOnlyMemory<T> types are supported"
+        },
+        ["multidim-array"] = new FeatureInfo
+        {
+            Name = "multidim-array",
+            Support = SupportLevel.Full,
+            Description = "Multidimensional arrays (int[,], int[,,]) are fully supported"
         },
     };
 

@@ -48,7 +48,6 @@ public class FeatureCheckCommandTests
 
     [Theory]
     [InlineData("goto", SupportLevel.NotSupported)]
-    [InlineData("unsafe", SupportLevel.NotSupported)]
     [InlineData("lock-statement", SupportLevel.NotSupported)]
     [InlineData("await-foreach", SupportLevel.NotSupported)]
     [InlineData("collection-expression", SupportLevel.NotSupported)]

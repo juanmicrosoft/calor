@@ -288,6 +288,23 @@ public enum TokenKind
     RawCSharp,          // §RAW ... §/RAW - Raw C# content emitted verbatim
     CSharpInterop,      // §CSHARP{...}§/CSHARP - C# interop block (member-level)
 
+    // Unsafe/Low-Level
+    StackAlloc,         // §SALLOC - stackalloc expression
+    EndStackAlloc,      // §/SALLOC - end stackalloc initializer
+    Unsafe,             // §UNSAFE - unsafe block
+    EndUnsafe,          // §/UNSAFE - end unsafe block
+    Fixed,              // §FIXED - fixed statement
+    EndFixed,           // §/FIXED - end fixed block
+    AddressOf,          // §ADDR - address-of (&)
+    Deref,              // §DEREF - pointer dereference (*)
+    SizeOf,             // §SIZEOF - sizeof expression
+
+    // Multidimensional Arrays
+    Array2D,            // §ARR2D - multidimensional array creation
+    EndArray2D,         // §/ARR2D - end multidimensional array
+    Index2D,            // §IDX2D - multidimensional array access
+    Row,                // §ROW - row separator in array initializer
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
@@ -323,7 +340,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndAnonymousObject;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Row;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;

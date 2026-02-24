@@ -2052,6 +2052,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var modifiers = new List<string> { visibility };
         if (node.IsStatic) modifiers.Add("static");
+        if (node.IsUnsafe) modifiers.Add("unsafe");
+        if (node.IsExtern) modifiers.Add("extern");
         if (node.IsPartial) modifiers.Add("partial");
         if (node.IsAsync) modifiers.Add("async");
         if (node.IsAbstract) modifiers.Add("abstract");
@@ -2104,8 +2106,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return EmitOperatorMethod(node, modifiers, mappedReturnType, parameters);
         }
 
-        // Abstract methods and partial method stubs have no body
-        if (node.IsAbstract || (node.IsPartial && node.Body.Count == 0))
+        // Abstract methods, extern methods, and partial method stubs have no body
+        if (node.IsAbstract || node.IsExtern || (node.IsPartial && node.Body.Count == 0))
         {
             AppendLine($"{string.Join(" ", modifiers)} {mappedReturnType} {methodName}{typeParams}({parameters}){whereClause};");
             return "";
@@ -3855,6 +3857,102 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _builder.AppendLine(line.TrimEnd('\r'));
         }
         return "";
+    }
+
+    public string Visit(StackAllocNode node)
+    {
+        var elementType = MapTypeName(node.ElementType);
+        if (node.Size != null)
+        {
+            var size = node.Size.Accept(this);
+            return $"stackalloc {elementType}[{size}]";
+        }
+        else if (node.Initializer.Count > 0)
+        {
+            var elements = string.Join(", ", node.Initializer.Select(e => e.Accept(this)));
+            return $"stackalloc {elementType}[] {{ {elements} }}";
+        }
+        return $"stackalloc {elementType}[0]";
+    }
+
+    public string Visit(UnsafeBlockNode node)
+    {
+        AppendLine("unsafe");
+        AppendLine("{");
+        Indent();
+        foreach (var stmt in node.Body)
+        {
+            var stmtCode = stmt.Accept(this);
+            AppendLine(stmtCode);
+        }
+        Dedent();
+        AppendLine("}");
+        return "";
+    }
+
+    public string Visit(FixedStatementNode node)
+    {
+        var pointerType = MapTypeName(node.PointerType);
+        var init = node.Initializer.Accept(this);
+        AppendLine($"fixed ({pointerType} {node.PointerName} = {init})");
+        AppendLine("{");
+        Indent();
+        foreach (var stmt in node.Body)
+        {
+            var stmtCode = stmt.Accept(this);
+            AppendLine(stmtCode);
+        }
+        Dedent();
+        AppendLine("}");
+        return "";
+    }
+
+    public string Visit(AddressOfNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        return $"&{operand}";
+    }
+
+    public string Visit(PointerDereferenceNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        return $"*{operand}";
+    }
+
+    public string Visit(SizeOfNode node)
+    {
+        var typeName = MapTypeName(node.TypeName);
+        return $"sizeof({typeName})";
+    }
+
+    public string Visit(MultiDimArrayCreationNode node)
+    {
+        var elementType = MapTypeName(node.ElementType);
+
+        if (node.DimensionSizes.Count > 0)
+        {
+            var dims = string.Join(", ", node.DimensionSizes.Select(d => d.Accept(this)));
+            return $"new {elementType}[{dims}]";
+        }
+        else if (node.Initializer.Count > 0)
+        {
+            var commas = new string(',', node.Rank - 1);
+            var rows = node.Initializer.Select(row =>
+                "{ " + string.Join(", ", row.Select(e => e.Accept(this))) + " }");
+            return $"new {elementType}[{commas}] {{ {string.Join(", ", rows)} }}";
+        }
+        else
+        {
+            var zeros = string.Join(", ", Enumerable.Repeat("0", node.Rank));
+            return $"new {elementType}[{zeros}]";
+        }
+    }
+
+    public string Visit(MultiDimArrayAccessNode node)
+    {
+        var array = node.Array.Accept(this);
+        var indices = string.Join(", ", node.Indices.Select(i => i.Accept(this)));
+        return $"{array}[{indices}]";
     }
 
     /// <summary>

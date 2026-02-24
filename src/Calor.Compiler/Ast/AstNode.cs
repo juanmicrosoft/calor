@@ -208,6 +208,16 @@ public interface IAstVisitor
     void Visit(RawCSharpNode node);
     // C# interop blocks (member-level raw C#)
     void Visit(CSharpInteropBlockNode node);
+    // Unsafe/low-level nodes
+    void Visit(StackAllocNode node);
+    void Visit(UnsafeBlockNode node);
+    void Visit(FixedStatementNode node);
+    void Visit(AddressOfNode node);
+    void Visit(PointerDereferenceNode node);
+    void Visit(SizeOfNode node);
+    // Multidimensional arrays
+    void Visit(MultiDimArrayCreationNode node);
+    void Visit(MultiDimArrayAccessNode node);
 }
 
 /// <summary>
@@ -400,6 +410,16 @@ public interface IAstVisitor<T>
     T Visit(RawCSharpNode node);
     // C# interop blocks (member-level raw C#)
     T Visit(CSharpInteropBlockNode node);
+    // Unsafe/low-level nodes
+    T Visit(StackAllocNode node);
+    T Visit(UnsafeBlockNode node);
+    T Visit(FixedStatementNode node);
+    T Visit(AddressOfNode node);
+    T Visit(PointerDereferenceNode node);
+    T Visit(SizeOfNode node);
+    // Multidimensional arrays
+    T Visit(MultiDimArrayCreationNode node);
+    T Visit(MultiDimArrayAccessNode node);
 }
 
 /// <summary>

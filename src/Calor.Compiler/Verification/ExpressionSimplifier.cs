@@ -1415,6 +1415,14 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(YieldBreakStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RawCSharpNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(CSharpInteropBlockNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(StackAllocNode node) => node;
+    public ExpressionNode Visit(UnsafeBlockNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(FixedStatementNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(AddressOfNode node) => node;
+    public ExpressionNode Visit(PointerDereferenceNode node) => node;
+    public ExpressionNode Visit(SizeOfNode node) => node;
+    public ExpressionNode Visit(MultiDimArrayCreationNode node) => node;
+    public ExpressionNode Visit(MultiDimArrayAccessNode node) => node;
 
     #endregion
 }

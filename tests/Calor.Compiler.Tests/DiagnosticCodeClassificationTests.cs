@@ -91,12 +91,14 @@ public class DiagnosticCodeClassificationTests
     [Fact]
     public void TypeOp_WrongArgCount_ProducesCalor0110()
     {
-        // cast requires exactly 2 args
-        var source = WrapInFunction("§R (cast x)", inputType: "object");
+        // cast now has dedicated parsing with ParseLispTypeName + ParseLispArgument,
+        // so missing operand produces InvalidLispExpression (Calor0114) not OperatorArgumentCount.
+        // Test a StringBuilder op instead (still goes through generic arg count check).
+        var source = WrapInFunction("""§R (sb-append)""");
         Parse(source, out var diagnostics);
 
         var error = Assert.Single(diagnostics.Errors, d => d.Code == DiagnosticCode.OperatorArgumentCount);
-        Assert.Contains("Type operation", error.Message);
+        Assert.Contains("StringBuilder operation", error.Message);
     }
 
     [Fact]
@@ -188,12 +190,12 @@ public class DiagnosticCodeClassificationTests
     [Fact]
     public void TypeOp_NonIdentifierTypeArg_ProducesCalor0113()
     {
-        // (cast 42 x) — 42 is not a type name
+        // (cast 42 x) — 42 is not a type name (ParseLispTypeName reports error)
         var source = WrapInFunction("§R (cast 42 x)", inputType: "object");
         Parse(source, out var diagnostics);
 
         var error = Assert.Single(diagnostics.Errors, d => d.Code == DiagnosticCode.ExpectedTypeName);
-        Assert.Contains("Expected a type name", error.Message);
+        Assert.Contains("Expected type name", error.Message);
     }
 
     [Fact]

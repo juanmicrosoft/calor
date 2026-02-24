@@ -1,0 +1,10 @@
+§M{m003:Test_10_03}
+  §CL{c001:TupleMapper:pub}
+    §MT{m002:GetTriple:pub}
+      §O{(i32, str, bool)}
+      §R (1, "hello", true)
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m003}

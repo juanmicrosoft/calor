@@ -169,3 +169,72 @@ public sealed class ForeachStatementNode : StatementNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents multidimensional array creation.
+/// §ARR2D{id:name:type:dim1:dim2}               // int[,] grid = new int[3,4]
+/// §ARR2D{id:name:type} §ROW ... §/ARR2D         // initializer form
+/// </summary>
+public sealed class MultiDimArrayCreationNode : ExpressionNode
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+
+    /// <summary>
+    /// The rank (number of dimensions), e.g., 2 for [,], 3 for [,,].
+    /// </summary>
+    public int Rank { get; }
+
+    /// <summary>
+    /// Size expressions for each dimension. Empty if using initializer.
+    /// </summary>
+    public IReadOnlyList<ExpressionNode> DimensionSizes { get; }
+
+    /// <summary>
+    /// For initializer form: list of rows, each row is a list of expressions.
+    /// Empty if using dimension sizes.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<ExpressionNode>> Initializer { get; }
+
+    public MultiDimArrayCreationNode(
+        TextSpan span,
+        string id,
+        string name,
+        string elementType,
+        int rank,
+        IReadOnlyList<ExpressionNode> dimensionSizes,
+        IReadOnlyList<IReadOnlyList<ExpressionNode>> initializer)
+        : base(span)
+    {
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+        Rank = rank;
+        DimensionSizes = dimensionSizes ?? Array.Empty<ExpressionNode>();
+        Initializer = initializer ?? Array.Empty<IReadOnlyList<ExpressionNode>>();
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents multidimensional array element access.
+/// §IDX2D array index1 index2                    // grid[1, 2]
+/// </summary>
+public sealed class MultiDimArrayAccessNode : ExpressionNode
+{
+    public ExpressionNode Array { get; }
+    public IReadOnlyList<ExpressionNode> Indices { get; }
+
+    public MultiDimArrayAccessNode(TextSpan span, ExpressionNode array, IReadOnlyList<ExpressionNode> indices)
+        : base(span)
+    {
+        Array = array ?? throw new ArgumentNullException(nameof(array));
+        Indices = indices ?? throw new ArgumentNullException(nameof(indices));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

@@ -164,6 +164,18 @@ public static class AttributeHelper
         if (value.StartsWith('['))
             return true;
 
+        // Pointer types: i32*, void**, etc.
+        if (value.EndsWith('*'))
+            return IsLikelyType(value.TrimEnd('*'));
+
+        // Multi-dim array types: int[,], i32[,,], etc.
+        if (value.EndsWith(']') && value.Contains("[,"))
+        {
+            var bracketStart = value.IndexOf('[');
+            if (bracketStart > 0)
+                return IsLikelyType(value[..bracketStart]);
+        }
+
         var lower = value.ToLowerInvariant();
         return lower switch
         {
@@ -404,12 +416,20 @@ public static class AttributeHelper
             return $"{baseName}<{expandedArgs}>";
         }
 
-        // Handle array types: T[] or T[,]
-        if (compactType.EndsWith("[]") || compactType.EndsWith("[,]"))
+        // Handle array types: T[], T[,], T[,,], etc.
+        if (compactType.EndsWith(']'))
         {
             var arrayStart = compactType.LastIndexOf('[');
-            var elementType = ExpandType(compactType[..arrayStart]);
-            return elementType + compactType[arrayStart..];
+            if (arrayStart > 0)
+            {
+                var suffix = compactType[arrayStart..];
+                // Match [] or [,] or [,,] or [,,,] etc.
+                if (suffix == "[]" || (suffix.Length >= 3 && suffix.Skip(1).SkipLast(1).All(c => c == ',')))
+                {
+                    var elementType = ExpandType(compactType[..arrayStart]);
+                    return elementType + suffix;
+                }
+            }
         }
 
         // Primitive type mappings

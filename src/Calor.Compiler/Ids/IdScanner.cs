@@ -287,4 +287,12 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(YieldBreakStatementNode node) { }
     public void Visit(RawCSharpNode node) { }
     public void Visit(CSharpInteropBlockNode node) { }
+    public void Visit(StackAllocNode node) { }
+    public void Visit(UnsafeBlockNode node) { }
+    public void Visit(FixedStatementNode node) { }
+    public void Visit(AddressOfNode node) { }
+    public void Visit(PointerDereferenceNode node) { }
+    public void Visit(SizeOfNode node) { }
+    public void Visit(MultiDimArrayCreationNode node) { }
+    public void Visit(MultiDimArrayAccessNode node) { }
 }

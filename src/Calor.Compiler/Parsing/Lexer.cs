@@ -252,6 +252,23 @@ public sealed class Lexer
         ["ANON"] = TokenKind.AnonymousObject,   // §ANON = Anonymous object
         ["/ANON"] = TokenKind.EndAnonymousObject, // §/ANON
 
+        // Unsafe/Low-Level
+        ["SALLOC"] = TokenKind.StackAlloc,          // §SALLOC
+        ["/SALLOC"] = TokenKind.EndStackAlloc,      // §/SALLOC
+        ["UNSAFE"] = TokenKind.Unsafe,              // §UNSAFE
+        ["/UNSAFE"] = TokenKind.EndUnsafe,          // §/UNSAFE
+        ["FIXED"] = TokenKind.Fixed,                // §FIXED
+        ["/FIXED"] = TokenKind.EndFixed,            // §/FIXED
+        ["ADDR"] = TokenKind.AddressOf,             // §ADDR
+        ["DEREF"] = TokenKind.Deref,                // §DEREF
+        ["SIZEOF"] = TokenKind.SizeOf,              // §SIZEOF
+
+        // Multidimensional Arrays
+        ["ARR2D"] = TokenKind.Array2D,              // §ARR2D
+        ["/ARR2D"] = TokenKind.EndArray2D,          // §/ARR2D
+        ["IDX2D"] = TokenKind.Index2D,              // §IDX2D
+        ["ROW"] = TokenKind.Row,                    // §ROW
+
         // Built-in aliases for common operations
         ["P"] = TokenKind.Print,            // §P = Console.WriteLine
         ["Pf"] = TokenKind.PrintF,          // §Pf = Console.Write
