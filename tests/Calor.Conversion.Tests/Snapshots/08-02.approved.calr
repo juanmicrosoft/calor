@@ -1,7 +1,6 @@
 §M{m003:Test_08_02}
   §CL{c001:TupleDemo:pub}
-    §MT{m002:GetPair:pub}
-      §O{(i32, str)}
+    §MT{m002:GetPair:pub} () -> (i32, str)
       §R (42, "hello")
     §/MT{m002}
 
