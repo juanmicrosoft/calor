@@ -124,37 +124,85 @@ public class RefactoringStabilityCalculator : IMetricCalculator
 
     /// <summary>
     /// Calculates score based on unique ID presence and diversity.
+    /// Groups markers by role with relative weights. Score is normalized by
+    /// the total weight of groups that have markers present, so programs are
+    /// not penalized for groups they don't use (e.g., a purely functional
+    /// program won't lose points for lacking §CL{ markers).
     /// </summary>
     private static double CalculateIdPreservationScore(string source)
     {
-        var score = 0.0;
+        var earnedWeight = 0.0;
+        var applicableWeight = 0.0;
 
-        // Module IDs
+        // Module-level IDs (base weight: 0.20)
         var moduleIds = ExtractIds(source, @"§M\{([^:]+):");
-        if (moduleIds.Count > 0 && moduleIds.All(IsUniqueId))
-            score += 0.25;
+        if (moduleIds.Count > 0)
+        {
+            applicableWeight += 0.20;
+            if (moduleIds.All(IsUniqueId))
+                earnedWeight += 0.20;
+        }
 
-        // Function IDs
+        // Type-level IDs (base weight: 0.15)
+        var classIds = ExtractIds(source, @"§CL\{([^:]+):");
+        var ifaceIds = ExtractIds(source, @"§IFACE\{([^:]+):");
+        var structIds = ExtractIds(source, @"§STRUCT\{([^:]+):");
+        if (classIds.Count > 0 || ifaceIds.Count > 0 || structIds.Count > 0)
+        {
+            applicableWeight += 0.15;
+            earnedWeight += 0.15;
+        }
+
+        // Member-level IDs (base weight: 0.30)
         var functionIds = ExtractIds(source, @"§F\{([^:]+):");
-        if (functionIds.Count > 0 && functionIds.All(IsUniqueId))
-            score += 0.35;
+        var asyncFuncIds = ExtractIds(source, @"§AF\{([^:]+):");
+        var methodIds = ExtractIds(source, @"§MT\{([^:]+):");
+        var ctorIds = ExtractIds(source, @"§CTOR\{([^:]+):");
+        var opIds = ExtractIds(source, @"§OP\{([^:]+):");
+        if (functionIds.Count > 0 || asyncFuncIds.Count > 0 || methodIds.Count > 0 ||
+            ctorIds.Count > 0 || opIds.Count > 0)
+        {
+            applicableWeight += 0.30;
+            earnedWeight += 0.30;
+        }
 
-        // Variable IDs
-        var variableIds = ExtractIds(source, @"§V\{([^:]+):");
-        if (variableIds.Count > 0)
-            score += 0.20;
+        // Property/Field IDs (base weight: 0.15)
+        var propIds = ExtractIds(source, @"§PROP\{([^:]+):");
+        var fieldIds = ExtractIds(source, @"§FLD\{([^:]+):");
+        if (propIds.Count > 0 || fieldIds.Count > 0)
+        {
+            applicableWeight += 0.15;
+            earnedWeight += 0.15;
+        }
 
-        // Loop/Control IDs
+        // Control flow IDs (base weight: 0.10)
         var loopIds = ExtractIds(source, @"§LOOP\{([^:]+):");
         var ifIds = ExtractIds(source, @"§IF\{([^:]+):");
-        if (loopIds.Count > 0 || ifIds.Count > 0)
-            score += 0.20;
+        var whileIds = ExtractIds(source, @"§WH\{([^:]+):");
+        var forIds = ExtractIds(source, @"§FOR\{([^:]+):");
+        if (loopIds.Count > 0 || ifIds.Count > 0 || whileIds.Count > 0 || forIds.Count > 0)
+        {
+            applicableWeight += 0.10;
+            earnedWeight += 0.10;
+        }
 
-        return Math.Min(score, 1.0);
+        // Variable/Binding IDs (base weight: 0.10)
+        var variableIds = ExtractIds(source, @"§V\{([^:]+):");
+        var bindingIds = ExtractIds(source, @"§B\{([^:]+):");
+        if (variableIds.Count > 0 || bindingIds.Count > 0)
+        {
+            applicableWeight += 0.10;
+            earnedWeight += 0.10;
+        }
+
+        // Normalize: score relative to applicable groups only
+        if (applicableWeight == 0) return 0.0;
+        return Math.Min(earnedWeight / applicableWeight, 1.0);
     }
 
     /// <summary>
     /// Calculates score based on reference structure.
+    /// Original weights preserved for backward compatibility; new markers are additive.
     /// </summary>
     private static double CalculateReferenceValidityScore(string source)
     {
@@ -172,24 +220,67 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var typeAnnotations = CountPattern(source, @"§[IO]\{");
         if (typeAnnotations > 0) score += 0.15;
 
+        // Property/field references (reference-bearing constructs)
+        var propRefs = CountPattern(source, @"§PROP\{[^\}]+\}");
+        var fieldRefs = CountPattern(source, @"§FLD\{[^\}]+\}");
+        if (propRefs > 0 || fieldRefs > 0) score += 0.1;
+
+        // Binding references
+        var bindingRefs = CountPattern(source, @"§B\{[^\}]+\}");
+        if (bindingRefs > 0) score += 0.05;
+
         return Math.Min(score, 1.0);
     }
 
     /// <summary>
     /// Calculates score based on structural clarity for diff minimization.
+    /// Checks module, type, function, and member boundary pairs. The 0.50 bonus
+    /// budget is normalized by applicable boundary types so programs are not
+    /// penalized for boundary types they don't use.
     /// </summary>
     private static double CalculateStructuralClarityScore(string source)
     {
-        var score = 0.5;
+        var earnedBonus = 0.0;
+        var applicableBonus = 0.0;
 
-        // Clear boundaries help minimize diffs
-        var hasModuleBoundaries = source.Contains("§M{") && source.Contains("§/M{");
-        var hasFunctionBoundaries = source.Contains("§F{") && source.Contains("§/F{");
+        // Module boundaries
+        if (source.Contains("§M{"))
+        {
+            applicableBonus += 0.125;
+            if (source.Contains("§/M{")) earnedBonus += 0.125;
+        }
 
-        if (hasModuleBoundaries) score += 0.25;
-        if (hasFunctionBoundaries) score += 0.25;
+        // Type boundaries (class, interface)
+        if (source.Contains("§CL{") || source.Contains("§IFACE{"))
+        {
+            applicableBonus += 0.125;
+            if ((source.Contains("§CL{") && source.Contains("§/CL{")) ||
+                (source.Contains("§IFACE{") && source.Contains("§/IFACE{")))
+                earnedBonus += 0.125;
+        }
 
-        return Math.Min(score, 1.0);
+        // Function boundaries
+        if (source.Contains("§F{"))
+        {
+            applicableBonus += 0.125;
+            if (source.Contains("§/F{")) earnedBonus += 0.125;
+        }
+
+        // Member boundaries (method, async function, constructor, operator)
+        if (source.Contains("§MT{") || source.Contains("§AF{") ||
+            source.Contains("§CTOR{") || source.Contains("§OP{"))
+        {
+            applicableBonus += 0.125;
+            if ((source.Contains("§MT{") && source.Contains("§/MT{")) ||
+                (source.Contains("§AF{") && source.Contains("§/AF{")) ||
+                (source.Contains("§CTOR{") && source.Contains("§/CTOR{")) ||
+                (source.Contains("§OP{") && source.Contains("§/OP{")))
+                earnedBonus += 0.125;
+        }
+
+        // Normalize bonus to the 0.50 budget, scaled by applicable groups
+        var bonusScore = applicableBonus > 0 ? (earnedBonus / applicableBonus) * 0.50 : 0.0;
+        return Math.Min(0.50 + bonusScore, 1.0);
     }
 
     /// <summary>
