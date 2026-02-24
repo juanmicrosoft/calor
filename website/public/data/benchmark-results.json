@@ -1,48 +1,112 @@
 {
   "version": "1.0",
-  "timestamp": "2026-02-24T14:37:21.3829682Z",
-  "commit": "c7665e6",
+  "timestamp": "2026-02-24T15:43:11.971871Z",
+  "commit": "0114330",
   "frameworkVersion": "1.0.0",
   "summary": {
-    "overallAdvantage": 1.27,
+    "overallAdvantage": 1.31,
     "programCount": 207,
     "metricCount": 8,
     "calorWins": 7,
     "cSharpWins": 1,
-    "statisticalRunCount": 0
+    "statisticalRunCount": 30
   },
   "metrics": {
     "TokenEconomics": {
-      "ratio": 0.73,
-      "winner": "csharp"
+      "ratio": 0.79,
+      "winner": "csharp",
+      "ci95": [
+        0.791,
+        0.791
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 0.353,
+      "effectInterpretation": "small"
     },
     "GenerationAccuracy": {
       "ratio": 1.02,
-      "winner": "calor"
+      "winner": "calor",
+      "ci95": [
+        1.017,
+        1.017
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 0.344,
+      "effectInterpretation": "small"
     },
     "Comprehension": {
-      "ratio": 2.12,
-      "winner": "calor"
+      "ratio": 2.22,
+      "winner": "calor",
+      "ci95": [
+        2.22,
+        2.22
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 2.355,
+      "effectInterpretation": "large"
     },
     "EditPrecision": {
-      "ratio": 1.38,
-      "winner": "calor"
+      "ratio": 1.39,
+      "winner": "calor",
+      "ci95": [
+        1.388,
+        1.388
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 4.909,
+      "effectInterpretation": "large"
     },
     "ErrorDetection": {
-      "ratio": 1.75,
-      "winner": "calor"
+      "ratio": 1.83,
+      "winner": "calor",
+      "ci95": [
+        1.83,
+        1.83
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 2.017,
+      "effectInterpretation": "large"
     },
     "InformationDensity": {
-      "ratio": 1.08,
-      "winner": "calor"
+      "ratio": 1.15,
+      "winner": "calor",
+      "ci95": [
+        1.152,
+        1.152
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 0.157,
+      "effectInterpretation": "negligible"
     },
     "RefactoringStability": {
       "ratio": 1.3,
-      "winner": "calor"
+      "winner": "calor",
+      "ci95": [
+        1.3,
+        1.3
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 4.611,
+      "effectInterpretation": "large"
     },
     "Correctness": {
-      "ratio": 1.27,
-      "winner": "calor"
+      "ratio": 1.3,
+      "winner": "calor",
+      "ci95": [
+        1.301,
+        1.301
+      ],
+      "significant": true,
+      "pValue": 0.0001,
+      "effectSize": 1.377,
+      "effectInterpretation": "large"
     }
   },
   "programs": [
@@ -4996,5 +5060,93 @@
         "Correctness": 1.7
       }
     }
-  ]
+  ],
+  "statisticalAnalysis": {
+    "runCount": 30,
+    "confidenceLevel": 0.95,
+    "significantCategories": [
+      "TokenEconomics",
+      "GenerationAccuracy",
+      "Comprehension",
+      "EditPrecision",
+      "ErrorDetection",
+      "InformationDensity",
+      "RefactoringStability",
+      "Correctness"
+    ],
+    "categoryDetails": {
+      "TokenEconomics": {
+        "mean": 0.791,
+        "stdDev": 4.38,
+        "ci95Lower": 0.783,
+        "ci95Upper": 0.799,
+        "cohensD": 0.353,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "GenerationAccuracy": {
+        "mean": 1.017,
+        "stdDev": 0.039,
+        "ci95Lower": 1.016,
+        "ci95Upper": 1.019,
+        "cohensD": 0.344,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "Comprehension": {
+        "mean": 2.22,
+        "stdDev": 0.049,
+        "ci95Lower": 2.204,
+        "ci95Upper": 2.236,
+        "cohensD": 2.355,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "EditPrecision": {
+        "mean": 1.388,
+        "stdDev": 0.012,
+        "ci95Lower": 1.386,
+        "ci95Upper": 1.391,
+        "cohensD": 4.909,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "ErrorDetection": {
+        "mean": 1.83,
+        "stdDev": 0.106,
+        "ci95Lower": 1.816,
+        "ci95Upper": 1.843,
+        "cohensD": 2.017,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "InformationDensity": {
+        "mean": 1.152,
+        "stdDev": 0.024,
+        "ci95Lower": 1.14,
+        "ci95Upper": 1.163,
+        "cohensD": 0.157,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "RefactoringStability": {
+        "mean": 1.3,
+        "stdDev": 0,
+        "ci95Lower": 1.297,
+        "ci95Upper": 1.303,
+        "cohensD": 4.611,
+        "pValue": 0.0001,
+        "significant": true
+      },
+      "Correctness": {
+        "mean": 1.301,
+        "stdDev": 0.053,
+        "ci95Lower": 1.293,
+        "ci95Upper": 1.308,
+        "cohensD": 1.377,
+        "pValue": 0.0001,
+        "significant": true
+      }
+    }
+  }
 }
