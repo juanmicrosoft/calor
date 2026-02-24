@@ -3205,16 +3205,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     case ParenthesizedLambdaExpressionSyntax:
                     case SimpleLambdaExpressionSyntax:
                     case AnonymousMethodExpressionSyntax:
-                    case LocalFunctionStatementSyntax:
-                        return null; // can't infer across scope boundary without semantic model
+                        return null; // can't infer across lambda/delegate boundary without semantic model
+                    case LocalFunctionStatementSyntax localFunc:
+                    {
+                        var rt = localFunc.ReturnType.ToString();
+                        if (localFunc.Modifiers.Any(SyntaxKind.AsyncKeyword))
+                            rt = UnwrapTaskType(rt);
+                        return rt is "void" or "var" ? null : TypeMapper.CSharpToCalor(rt);
+                    }
                     case MethodDeclarationSyntax method:
-                        return TypeMapper.CSharpToCalor(method.ReturnType.ToString());
+                    {
+                        var rt = method.ReturnType.ToString();
+                        if (method.Modifiers.Any(SyntaxKind.AsyncKeyword))
+                            rt = UnwrapTaskType(rt);
+                        return rt is "void" or "var" ? null : TypeMapper.CSharpToCalor(rt);
+                    }
                     case PropertyDeclarationSyntax property:
                         return TypeMapper.CSharpToCalor(property.Type.ToString());
                     case OperatorDeclarationSyntax op:
                         return TypeMapper.CSharpToCalor(op.ReturnType.ToString());
-                    case ConversionOperatorDeclarationSyntax convOp:
-                        return TypeMapper.CSharpToCalor(convOp.Type.ToString());
+                    case ConversionOperatorDeclarationSyntax:
+                        return null; // conversion operators don't have a named return type to infer from
                 }
                 ancestor = ancestor.Parent;
             }
