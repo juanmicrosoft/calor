@@ -146,7 +146,8 @@ public sealed class CalorFormatter
         foreach (var param in func.Parameters)
         {
             var typeName = CompactTypeName(param.TypeName);
-            AppendLine($"§I{{{typeName}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
         }
 
         // Output type - lowercase compact form
@@ -214,7 +215,8 @@ public sealed class CalorFormatter
 
         foreach (var param in method.Parameters)
         {
-            AppendLine($"§I{{{CompactTypeName(param.TypeName)}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{CompactTypeName(param.TypeName)}:{param.Name}}}{defaultVal}");
         }
         if (method.Output != null)
         {
@@ -332,7 +334,8 @@ public sealed class CalorFormatter
         foreach (var param in ctor.Parameters)
         {
             var typeName = CompactTypeName(param.TypeName);
-            AppendLine($"§I{{{typeName}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
         }
 
         foreach (var stmt in ctor.Body)
@@ -352,7 +355,8 @@ public sealed class CalorFormatter
         foreach (var param in op.Parameters)
         {
             var typeName = CompactTypeName(param.TypeName);
-            AppendLine($"§I{{{typeName}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
         }
 
         if (op.Output != null)
@@ -388,7 +392,8 @@ public sealed class CalorFormatter
         foreach (var param in method.Parameters)
         {
             var typeName = CompactTypeName(param.TypeName);
-            AppendLine($"§I{{{typeName}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
         }
 
         if (method.Output != null)

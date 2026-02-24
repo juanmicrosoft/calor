@@ -627,7 +627,16 @@ public sealed class Parser
         }
 
         var csharpAttrs = ParseCSharpAttributes();
-        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, csharpAttrs);
+
+        // Parse optional default value: §I{type:name} = expression
+        ExpressionNode? defaultValue = null;
+        if (Check(TokenKind.Equals))
+        {
+            Advance(); // consume '='
+            defaultValue = ParseExpression();
+        }
+
+        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, csharpAttrs, defaultValue);
     }
 
     private OutputNode ParseOutput()
