@@ -782,6 +782,12 @@ public sealed class Lexer
         }
     }
 
+    // Design note: Dots are intentionally included in identifiers so that qualified
+    // names like Math.PI, StringComparison.Ordinal, and System.Console are lexed as
+    // single tokens. This produces ReferenceNode("Math.PI") rather than a
+    // FieldAccessNode chain. The CSharpEmitter (Visit(ReferenceNode)) handles dots
+    // by splitting on '.' and sanitizing each part, so the round-trip is lossless.
+    // See DottedNameRoundTripTests for verification.
     private Token ScanIdentifierOrTypedLiteral()
     {
         while (char.IsLetterOrDigit(Current) || Current == '_' || Current == '.')
