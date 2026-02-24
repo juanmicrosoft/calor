@@ -1326,6 +1326,22 @@ public sealed class Parser
             return new TypeOfExpressionNode(startToken.Span.Union(typeofEnd.Span), typeName);
         }
 
+        // Handle nameof: (nameof identifier) or (nameof obj.Property)
+        if (opText == "nameof")
+        {
+            var nameToken = Expect(TokenKind.Identifier);
+            var name = nameToken.Text;
+            // Allow dotted names: nameof(obj.Property)
+            while (Check(TokenKind.Dot))
+            {
+                Advance();
+                var partToken = Expect(TokenKind.Identifier);
+                name += "." + partToken.Text;
+            }
+            var nameofEnd = Expect(TokenKind.CloseParen);
+            return new NameOfExpressionNode(startToken.Span.Union(nameofEnd.Span), name);
+        }
+
         // Handle is/as/cast with special type parsing to support generics and pointer types
         if (opText == "is")
         {
@@ -3507,6 +3523,24 @@ public sealed class Parser
             var nameToken = Advance();
             var name = nameToken.Text;
 
+            // Detect attribute target prefix: [@return:AttrName] or [@param:AttrName]
+            string? target = null;
+            if (Check(TokenKind.Colon))
+            {
+                // The identifier before ':' is the target (return, param, field, assembly, etc.)
+                target = name;
+                Advance(); // consume :
+                if (Check(TokenKind.Identifier))
+                {
+                    name = Advance().Text;
+                }
+                else
+                {
+                    _diagnostics.ReportUnexpectedToken(Current.Span, "attribute name after target", Current.Kind);
+                    name = "";
+                }
+            }
+
             // Handle qualified names like System.ComponentModel.Description
             while (Current.Text == ".")
             {
@@ -3530,7 +3564,7 @@ public sealed class Parser
             Expect(TokenKind.CloseBracket);
 
             var span = startToken.Span.Union(Current.Span);
-            attributes.Add(new CalorAttributeNode(span, name, arguments));
+            attributes.Add(new CalorAttributeNode(span, name, arguments, target));
         }
 
         return attributes;

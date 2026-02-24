@@ -599,7 +599,7 @@ public class McpServerTests
     }
 
     [Fact]
-    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithCSharpConstruct_IncludesHelpfulMessage()
+    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithNameof_CompilesSuccessfully()
     {
         var handler = new McpMessageHandler();
         var request = new JsonRpcRequest
@@ -624,9 +624,9 @@ public class McpServerTests
 
         var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
 
-        // Verify helpful C# migration hint is included
-        Assert.Contains("nameof", json);
-        Assert.Contains("string literal", json);
+        // nameof is now a supported Calor expression — should compile without errors
+        Assert.Contains("errorCount", json);
+        Assert.Contains(":0", json); // errorCount should be 0
     }
 
     [Fact]

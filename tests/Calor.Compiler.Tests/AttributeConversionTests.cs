@@ -974,6 +974,141 @@ public class AttributeConversionTests
 
     #endregion
 
+    #region Attribute Target Prefixes
+
+    [Fact]
+    public void Convert_ReturnAttribute_PreservesTarget()
+    {
+        var csharp = """
+            using System.Diagnostics.CodeAnalysis;
+            public class Service
+            {
+                [return: NotNullIfNotNull("input")]
+                public string? Process(string? input)
+                {
+                    return input;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains("[@return:NotNullIfNotNull", result.CalorSource);
+    }
+
+    [Fact]
+    public void Parser_ReturnAttributeTarget_RoundtripsToCS()
+    {
+        var calorSource = """
+            §M{m1:Test}
+            §CL{c1:Service}
+            §MT{m1:Process:pub}
+              [@return:MaybeNull]
+              §I{str:input}
+              §O{str}
+              §R input
+            §/MT{m1}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var compilationResult = Program.Compile(calorSource);
+
+        Assert.False(compilationResult.HasErrors,
+            string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("[return: MaybeNull]", compilationResult.GeneratedCode);
+    }
+
+    [Fact]
+    public void Parser_ParamAttributeTarget_RoundtripsToCS()
+    {
+        var calorSource = """
+            §M{m1:Test}
+            §CL{c1:Service}
+            §MT{m1:Process:pub}
+              [@param:NotNull]
+              §I{str:input}
+              §O{str}
+              §R input
+            §/MT{m1}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var compilationResult = Program.Compile(calorSource);
+
+        Assert.False(compilationResult.HasErrors,
+            string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("[param: NotNull]", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
+    #region nameof Roundtrip
+
+    [Fact]
+    public void Convert_Nameof_PreservesInCalor()
+    {
+        var csharp = """
+            using System;
+            public class Guard
+            {
+                public void Check(string name)
+                {
+                    if (name == null) throw new ArgumentNullException(nameof(name));
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains("(nameof name)", result.CalorSource);
+    }
+
+    [Fact]
+    public void Parser_Nameof_RoundtripsToCS()
+    {
+        var calorSource = """
+            §M{m1:Test}
+            §F{f1:GetName}
+              §I{str:value}
+              §O{str}
+              §R (nameof value)
+            §/F{f1}
+            §/M{m1}
+            """;
+
+        var compilationResult = Program.Compile(calorSource);
+
+        Assert.False(compilationResult.HasErrors,
+            string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("nameof(value)", compilationResult.GeneratedCode);
+    }
+
+    [Fact]
+    public void Parser_Nameof_DottedName_RoundtripsToCS()
+    {
+        var calorSource = """
+            §M{m1:Test}
+            §F{f1:GetName}
+              §I{str:value}
+              §O{str}
+              §R (nameof obj.Property)
+            §/F{f1}
+            §/M{m1}
+            """;
+
+        var compilationResult = Program.Compile(calorSource);
+
+        Assert.False(compilationResult.HasErrors,
+            string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("nameof(obj.Property)", compilationResult.GeneratedCode);
+    }
+
+    #endregion
+
     private static string GetErrorMessage(ConversionResult result)
     {
         if (result.Success) return "";

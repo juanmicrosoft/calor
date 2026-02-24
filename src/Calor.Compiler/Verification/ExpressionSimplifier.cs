@@ -1394,6 +1394,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(FallbackExpressionNode node) => node;
     public ExpressionNode Visit(FallbackCommentNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(TypeOfExpressionNode node) => node;
+    public ExpressionNode Visit(NameOfExpressionNode node) => node;
     public ExpressionNode Visit(ExpressionCallNode node)
     {
         var newTarget = node.TargetExpression.Accept(this);

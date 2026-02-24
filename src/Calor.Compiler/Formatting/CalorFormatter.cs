@@ -642,6 +642,7 @@ public sealed class CalorFormatter
             ThisExpressionNode => "§THIS",
             BaseExpressionNode => "§BASE",
             TypeOfExpressionNode typeOfExpr => $"(typeof {typeOfExpr.TypeName})",
+            NameOfExpressionNode nameOfExpr => $"(nameof {nameOfExpr.Name})",
             ExpressionCallNode exprCall => $"§C {FormatExpression(exprCall.TargetExpression)} {string.Join(" ", exprCall.Arguments.Select(a => $"§A {FormatExpression(a)}"))} §/C".TrimEnd(),
             IsPatternNode isPat => isPat.VariableName != null
                 ? $"(is {FormatExpression(isPat.Operand)} {isPat.TargetType} {isPat.VariableName})"

@@ -13,14 +13,21 @@ public sealed class CalorAttributeNode : AstNode
     public string Name { get; }
 
     /// <summary>
+    /// The attribute target (e.g., "return", "param", "field", "assembly").
+    /// Null if no target is specified.
+    /// </summary>
+    public string? Target { get; }
+
+    /// <summary>
     /// The attribute arguments (positional and named).
     /// </summary>
     public IReadOnlyList<CalorAttributeArgument> Arguments { get; }
 
-    public CalorAttributeNode(TextSpan span, string name, IReadOnlyList<CalorAttributeArgument>? arguments = null)
+    public CalorAttributeNode(TextSpan span, string name, IReadOnlyList<CalorAttributeArgument>? arguments = null, string? target = null)
         : base(span)
     {
         Name = name;
+        Target = target;
         Arguments = arguments ?? Array.Empty<CalorAttributeArgument>();
     }
 

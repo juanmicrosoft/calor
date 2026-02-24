@@ -2370,13 +2370,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CalorAttributeNode node)
     {
+        var prefix = node.Target != null ? $"{node.Target}:" : "";
         if (node.Arguments.Count == 0)
         {
-            return $"[@{node.Name}]";
+            return $"[@{prefix}{node.Name}]";
         }
 
         var args = string.Join(", ", node.Arguments.Select(FormatAttributeArgument));
-        return $"[@{node.Name}({args})]";
+        return $"[@{prefix}{node.Name}({args})]";
     }
 
     private static string FormatAttributeArgument(CalorAttributeArgument arg)
@@ -2523,6 +2524,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(TypeOfExpressionNode node)
     {
         return $"(typeof {node.TypeName})";
+    }
+
+    public string Visit(NameOfExpressionNode node)
+    {
+        return $"(nameof {node.Name})";
     }
 
     public string Visit(ExpressionCallNode node)

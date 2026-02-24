@@ -339,7 +339,7 @@ public class Test
     #region Issue 301: Convert nameof() to string literal and string.Empty to ""
 
     [Fact]
-    public void Convert_Nameof_ProducesStringLiteral()
+    public void Convert_Nameof_PreservesNameof()
     {
         var result = _converter.Convert(@"
 public class Test
@@ -350,8 +350,7 @@ public class Test
     }
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Contains(@"""name""", result.CalorSource);
-        Assert.DoesNotContain("nameof", result.CalorSource);
+        Assert.Contains("(nameof name)", result.CalorSource);
     }
 
     [Fact]

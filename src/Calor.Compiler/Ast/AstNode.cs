@@ -199,6 +199,8 @@ public interface IAstVisitor
     void Visit(FallbackCommentNode node);
     // Feature 12: typeof expression
     void Visit(TypeOfExpressionNode node);
+    // nameof expression
+    void Visit(NameOfExpressionNode node);
     // Feature 9: Expression call targets
     void Visit(ExpressionCallNode node);
     // Yield support
@@ -401,6 +403,8 @@ public interface IAstVisitor<T>
     T Visit(FallbackCommentNode node);
     // Feature 12: typeof expression
     T Visit(TypeOfExpressionNode node);
+    // nameof expression
+    T Visit(NameOfExpressionNode node);
     // Feature 9: Expression call targets
     T Visit(ExpressionCallNode node);
     // Yield support
