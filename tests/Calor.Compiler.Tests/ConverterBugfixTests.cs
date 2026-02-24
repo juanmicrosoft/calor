@@ -790,4 +790,125 @@ public class Test
     }
 
     #endregion
+
+    #region Ternary Expression Round-Trip Tests
+
+    [Fact]
+    public void RoundTrip_SimpleTernary_Preserved()
+    {
+        var csharp = """
+            public class Test
+            {
+                public int Max(int a, int b) { return a > b ? a : b; }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+        Assert.Contains("?", output);
+        Assert.Contains(":", output);
+        Assert.Contains("a", output);
+        Assert.Contains("b", output);
+    }
+
+    [Fact]
+    public void RoundTrip_TernaryChain_Preserved()
+    {
+        var csharp = """
+            public class Test
+            {
+                public int Classify(int score)
+                {
+                    return score >= 90 ? 4 : score >= 80 ? 3 : score >= 70 ? 2 : 1;
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+        Assert.Contains("score >= 90", output);
+        Assert.Contains("? 4 :", output);
+        Assert.Contains("? 3 :", output);
+    }
+
+    [Fact]
+    public void RoundTrip_TernaryInAssignment_Preserved()
+    {
+        var csharp = """
+            public class Test
+            {
+                public void M(bool flag)
+                {
+                    var x = flag ? "yes" : "no";
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+        Assert.Contains("flag ? \"yes\" : \"no\"", output);
+    }
+
+    [Fact]
+    public void RoundTrip_TernaryInBaseCall_Preserved()
+    {
+        var csharp = """
+            using System;
+            public class MyException : Exception
+            {
+                public MyException(bool critical, string msg)
+                    : base(critical ? "CRITICAL: " + msg : msg) { }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+        Assert.Contains("base(", output);
+        Assert.Contains("critical ?", output);
+    }
+
+    [Fact]
+    public void RoundTrip_TernaryInMethodArgument_Preserved()
+    {
+        var csharp = """
+            using System;
+            public class Test
+            {
+                public void M(int x)
+                {
+                    Console.WriteLine(x > 0 ? "positive" : "non-positive");
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+        Assert.Contains("? \"positive\" : \"non-positive\"", output);
+    }
+
+    [Fact]
+    public void CalorParser_TernaryLispSyntax_ParsesCorrectly()
+    {
+        var calor = """
+            §M{m001:TestModule}
+              §CL{c001:Test}
+                §MT{m001:Max:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (? (> a b) a b)
+                §/MT{m001}
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calor, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var csharpEmitter = new CSharpEmitter();
+        var output = csharpEmitter.Emit(module);
+        Assert.Contains("? a : b", output);
+    }
+
+    #endregion
 }
