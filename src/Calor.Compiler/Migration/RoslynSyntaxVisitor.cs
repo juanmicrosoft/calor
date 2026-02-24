@@ -637,31 +637,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var operatorOverloads = new List<OperatorOverloadNode>();
         var events = new List<EventDefinitionNode>();
 
+        var interopBlocks = new List<CSharpInteropBlockNode>();
+
         foreach (var member in node.Members)
         {
-            switch (member)
+            try
             {
-                case FieldDeclarationSyntax fieldSyntax:
-                    fields.AddRange(ConvertFields(fieldSyntax));
-                    break;
-                case PropertyDeclarationSyntax propertySyntax:
-                    properties.Add(ConvertProperty(propertySyntax));
-                    break;
-                case ConstructorDeclarationSyntax ctorSyntax:
-                    constructors.Add(ConvertConstructor(ctorSyntax));
-                    break;
-                case MethodDeclarationSyntax methodSyntax:
-                    methods.Add(ConvertMethod(methodSyntax));
-                    break;
-                case OperatorDeclarationSyntax opSyntax:
-                    operatorOverloads.Add(ConvertOperatorOverload(opSyntax));
-                    break;
-                case ConversionOperatorDeclarationSyntax convSyntax:
-                    operatorOverloads.Add(ConvertConversionOperatorOverload(convSyntax));
-                    break;
-                case EventFieldDeclarationSyntax eventSyntax:
-                    events.AddRange(ConvertEventFields(eventSyntax));
-                    break;
+                ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
+            }
+            catch (Exception) when (_context.Mode == ConversionMode.Interop)
+            {
+                var kind = member switch
+                {
+                    MethodDeclarationSyntax => InteropMemberKind.Method,
+                    PropertyDeclarationSyntax => InteropMemberKind.Property,
+                    FieldDeclarationSyntax => InteropMemberKind.Field,
+                    ConstructorDeclarationSyntax => InteropMemberKind.Constructor,
+                    EventFieldDeclarationSyntax => InteropMemberKind.Event,
+                    _ => InteropMemberKind.Other
+                };
+                interopBlocks.Add(CreateInteropBlock(member, null, kind));
             }
         }
 
@@ -690,7 +685,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             csharpAttrs,
             isStruct: true,
             isReadOnly: isReadOnly,
-            visibility: visibility);
+            visibility: visibility,
+            interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -3198,7 +3194,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Case 3: Return statement in method — use method return type
         if (parent is ReturnStatementSyntax || parent is ArrowExpressionClauseSyntax)
         {
-            // Would need method context; skip for now
+            // Walk up the syntax tree to find the enclosing member declaration.
+            // Bail out if we cross a lambda/local function boundary to avoid
+            // inferring the outer method's return type instead of the inner scope's.
+            var ancestor = parent;
+            while (ancestor != null)
+            {
+                switch (ancestor)
+                {
+                    case ParenthesizedLambdaExpressionSyntax:
+                    case SimpleLambdaExpressionSyntax:
+                    case AnonymousMethodExpressionSyntax:
+                    case LocalFunctionStatementSyntax:
+                        return null; // can't infer across scope boundary without semantic model
+                    case MethodDeclarationSyntax method:
+                        return TypeMapper.CSharpToCalor(method.ReturnType.ToString());
+                    case PropertyDeclarationSyntax property:
+                        return TypeMapper.CSharpToCalor(property.Type.ToString());
+                    case OperatorDeclarationSyntax op:
+                        return TypeMapper.CSharpToCalor(op.ReturnType.ToString());
+                    case ConversionOperatorDeclarationSyntax convOp:
+                        return TypeMapper.CSharpToCalor(convOp.Type.ToString());
+                }
+                ancestor = ancestor.Parent;
+            }
             return null;
         }
 
