@@ -651,6 +651,12 @@ public static class FeatureSupport
             Description = "Postfix increment/decrement as expression: i++, i--",
             Workaround = "Use as statement or rewrite as x = x + 1"
         },
+        ["default-parameter"] = new FeatureInfo
+        {
+            Name = "default-parameter",
+            Support = SupportLevel.Full,
+            Description = "Default parameter values are converted to §I{type:name} = value syntax"
+        },
     };
 
     /// <summary>

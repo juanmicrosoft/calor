@@ -4612,9 +4612,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 if (p.Modifiers.Any(SyntaxKind.OutKeyword)) modifier |= ParameterModifier.Out;
                 if (p.Modifiers.Any(SyntaxKind.InKeyword)) modifier |= ParameterModifier.In;
                 if (p.Modifiers.Any(SyntaxKind.ParamsKeyword)) modifier |= ParameterModifier.Params;
-                ExpressionNode? defaultValue = p.Default != null
-                    ? ConvertExpression(p.Default.Value)
-                    : null;
+                ExpressionNode? defaultValue = null;
+                if (p.Default != null)
+                {
+                    defaultValue = ConvertExpression(p.Default.Value);
+                    _context.RecordFeatureUsage("default-parameter");
+                }
                 var paramAttrs = ConvertAttributes(p.AttributeLists);
                 return new ParameterNode(
                     GetTextSpan(p),

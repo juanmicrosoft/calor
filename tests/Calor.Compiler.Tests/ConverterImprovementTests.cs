@@ -1427,4 +1427,444 @@ public class ConverterImprovementTests
     }
 
     #endregion
+
+    #region Default Parameter Values
+
+    [Fact]
+    public void Migration_DefaultStringParameter_EmitsDefaultValue()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Greet(string name, string greeting = "Hello")
+                {
+                    return greeting + " " + name;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        Assert.Contains("= \"Hello\"", output);
+    }
+
+    [Fact]
+    public void Migration_DefaultNumericParameter_EmitsDefaultValue()
+    {
+        var csharp = """
+            public class Service
+            {
+                public int Add(int a, int b = 0)
+                {
+                    return a + b;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        Assert.Contains("= 0", output);
+    }
+
+    [Fact]
+    public void Migration_DefaultBoolParameter_EmitsDefaultValue()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Process(string input, bool trim = true)
+                {
+                    return trim ? input.Trim() : input;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        Assert.Contains("= true", output);
+    }
+
+    [Fact]
+    public void Migration_DefaultNullParameter_EmitsDefaultValue()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Process(string? sourceFile = null)
+                {
+                    return sourceFile ?? "default";
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        Assert.Contains("= null", output);
+    }
+
+    [Fact]
+    public void Migration_NoDefaultParameter_EmitsWithoutDefault()
+    {
+        var csharp = """
+            public class Service
+            {
+                public int Add(int a, int b)
+                {
+                    return a + b;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        // Should not contain any = sign after parameter declarations
+        var lines = output.Split('\n');
+        foreach (var line in lines)
+        {
+            if (line.TrimStart().StartsWith("§I{"))
+            {
+                Assert.DoesNotContain("=", line);
+            }
+        }
+    }
+
+    [Fact]
+    public void Migration_MixedDefaultParameters_EmitsCorrectly()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Format(string value, string prefix = "[", string suffix = "]")
+                {
+                    return prefix + value + suffix;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        // First param (value) should have no default
+        // Second param (prefix) should have default "["
+        // Third param (suffix) should have default "]"
+        var lines = output.Split('\n').Where(l => l.TrimStart().StartsWith("§I{")).ToList();
+        Assert.Equal(3, lines.Count);
+        Assert.DoesNotContain("=", lines[0]);
+        Assert.Contains("= \"[\"", lines[1]);
+        Assert.Contains("= \"]\"", lines[2]);
+    }
+
+    [Fact]
+    public void RoundTrip_DefaultParameterValue_PreservesDefault()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Greet(string name, string greeting = "Hello")
+                {
+                    return greeting;
+                }
+            }
+            """;
+
+        // C# → Calor AST
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        // Calor AST → Calor source (emitter)
+        var emitter = new CalorEmitter();
+        var calorSource = emitter.Emit(result.Ast!);
+        Assert.Contains("= \"Hello\"", calorSource);
+
+        // Calor source → Calor AST (parser)
+        var ast2 = Parse(calorSource);
+        var cls = Assert.Single(ast2.Classes);
+        var method = Assert.Single(cls.Methods);
+
+        // Verify the greeting parameter has a default value
+        Assert.Equal(2, method.Parameters.Count);
+        Assert.Null(method.Parameters[0].DefaultValue); // name - no default
+        Assert.NotNull(method.Parameters[1].DefaultValue); // greeting - has default
+        Assert.IsType<StringLiteralNode>(method.Parameters[1].DefaultValue);
+        Assert.Equal("Hello", ((StringLiteralNode)method.Parameters[1].DefaultValue!).Value);
+    }
+
+    [Fact]
+    public void CalorFormatter_DefaultParameter_EmitsDefaultValue()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Greet(string name, string greeting = "Hello")
+                {
+                    return greeting;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var formatter = new CalorFormatter();
+        var formatted = formatter.Format(result.Ast!);
+
+        Assert.Contains("= \"Hello\"", formatted);
+    }
+
+    [Fact]
+    public void Parser_DefaultParameterValue_ParsesDirectly()
+    {
+        var calorSource = """
+            §M{m1:Test}
+            §CL{c1:Service:pub}
+            §MT{m1:Greet:pub}
+              §I{str:name}
+              §I{str:greeting} = "Hello"
+              §O{str}
+              §R greeting
+            §/MT{m1}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var ast = Parse(calorSource);
+        var cls = Assert.Single(ast.Classes);
+        var method = Assert.Single(cls.Methods);
+
+        Assert.Equal(2, method.Parameters.Count);
+        Assert.Null(method.Parameters[0].DefaultValue);
+        Assert.NotNull(method.Parameters[1].DefaultValue);
+        var defaultStr = Assert.IsType<StringLiteralNode>(method.Parameters[1].DefaultValue);
+        Assert.Equal("Hello", defaultStr.Value);
+    }
+
+    [Fact]
+    public void Parser_DefaultNumericParameterValue_ParsesCorrectly()
+    {
+        var calorSource = """
+            §M{m1:Test}
+            §CL{c1:Service:pub}
+            §MT{m1:Add:pub}
+              §I{i32:a}
+              §I{i32:b} = 0
+              §O{i32}
+              §R (+ a b)
+            §/MT{m1}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var ast = Parse(calorSource);
+        var cls = Assert.Single(ast.Classes);
+        var method = Assert.Single(cls.Methods);
+
+        Assert.Equal(2, method.Parameters.Count);
+        Assert.Null(method.Parameters[0].DefaultValue);
+        Assert.NotNull(method.Parameters[1].DefaultValue);
+        var defaultInt = Assert.IsType<IntLiteralNode>(method.Parameters[1].DefaultValue);
+        Assert.Equal(0, defaultInt.Value);
+    }
+
+    [Fact]
+    public void Migration_DefaultParameter_RecordsFeatureUsage()
+    {
+        var csharp = """
+            public class Service
+            {
+                public string Greet(string name, string greeting = "Hello")
+                {
+                    return greeting + " " + name;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        Assert.Contains("default-parameter", result.Context.UsedFeatures);
+    }
+
+    [Fact]
+    public void Migration_NoDefaultParameter_DoesNotRecordFeature()
+    {
+        var csharp = """
+            public class Service
+            {
+                public int Add(int a, int b)
+                {
+                    return a + b;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        Assert.DoesNotContain("default-parameter", result.Context.UsedFeatures);
+    }
+
+    [Fact]
+    public void Migration_DefaultEnumMemberParameter_EmitsFieldAccess()
+    {
+        var csharp = """
+            using System;
+            public class Service
+            {
+                public bool Compare(string a, string b, StringComparison comparison = StringComparison.Ordinal)
+                {
+                    return string.Equals(a, b, comparison);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        // Should emit the enum member access as a default value
+        Assert.Contains("= StringComparison.Ordinal", output);
+    }
+
+    [Fact]
+    public void Migration_DefaultNegativeParameter_EmitsNegativeValue()
+    {
+        var csharp = """
+            public class Service
+            {
+                public int Process(int value, int sentinel = -1)
+                {
+                    return value + sentinel;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        // Negative literal emits as unary negate: (- 1)
+        Assert.Contains("= (- 1)", output);
+    }
+
+    [Fact]
+    public void Parser_BackwardCompat_ParameterWithoutDefault_StillParses()
+    {
+        // Existing Calor files without default values should continue to parse correctly
+        var calorSource = """
+            §M{m1:Test}
+            §CL{c1:Service:pub}
+            §MT{m1:Greet:pub}
+              §I{str:name}
+              §I{str:greeting}
+              §O{str}
+              §R greeting
+            §/MT{m1}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var ast = Parse(calorSource);
+        var cls = Assert.Single(ast.Classes);
+        var method = Assert.Single(cls.Methods);
+
+        Assert.Equal(2, method.Parameters.Count);
+        Assert.Equal("name", method.Parameters[0].Name);
+        Assert.Null(method.Parameters[0].DefaultValue);
+        Assert.Equal("greeting", method.Parameters[1].Name);
+        Assert.Null(method.Parameters[1].DefaultValue);
+    }
+
+    [Fact]
+    public void RoundTrip_DefaultEnumParameter_PreservesFieldAccess()
+    {
+        var calorSource = """
+            §M{m1:Test}
+            §CL{c1:Service:pub}
+            §MT{m1:Compare:pub}
+              §I{str:a}
+              §I{str:b}
+              §I{StringComparison:comparison} = StringComparison.Ordinal
+              §O{bool}
+              §R true
+            §/MT{m1}
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        // Parse → emit → reparse
+        var ast = Parse(calorSource);
+        var cls = Assert.Single(ast.Classes);
+        var method = Assert.Single(cls.Methods);
+
+        // Verify third parameter has default value
+        Assert.Equal(3, method.Parameters.Count);
+        Assert.NotNull(method.Parameters[2].DefaultValue);
+
+        // Emit back and verify default is preserved
+        var emitter = new CalorEmitter();
+        var emitted = emitter.Emit(ast);
+        Assert.Contains("= StringComparison.Ordinal", emitted);
+
+        // Reparse and verify — parser reads dotted names as ReferenceNode
+        var ast2 = Parse(emitted);
+        var method2 = Assert.Single(ast2.Classes).Methods[0];
+        Assert.NotNull(method2.Parameters[2].DefaultValue);
+        var refNode = Assert.IsType<ReferenceNode>(method2.Parameters[2].DefaultValue);
+        Assert.Equal("StringComparison.Ordinal", refNode.Name);
+    }
+
+    [Fact]
+    public void Migration_ConstructorDefaultParameter_EmitsDefaultValue()
+    {
+        var csharp = """
+            public class Config
+            {
+                private readonly int _timeout;
+                public Config(int timeout = 30)
+                {
+                    _timeout = timeout;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var output = emitter.Emit(result.Ast!);
+
+        // Constructor parameter should have default value
+        var lines = output.Split('\n').Where(l => l.TrimStart().StartsWith("§I{")).ToList();
+        Assert.Single(lines);
+        Assert.Contains("= 30", lines[0]);
+    }
+
+    #endregion
 }
