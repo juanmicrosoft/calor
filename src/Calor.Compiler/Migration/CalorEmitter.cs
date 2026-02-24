@@ -2536,6 +2536,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"(typeof {node.TypeName})";
     }
 
+    public string Visit(NameOfExpressionNode node)
+    {
+        return $"(nameof {node.Name})";
+    }
+
     public string Visit(ExpressionCallNode node)
     {
         var target = node.TargetExpression.Accept(this);

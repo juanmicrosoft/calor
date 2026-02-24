@@ -62,7 +62,7 @@ public class DiagnoseToolFixTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithCSharpConstruct_IncludesHelpfulMessage()
+    public async Task ExecuteAsync_WithNameof_CompilesSuccessfully()
     {
         var args = JsonDocument.Parse("""
             {
@@ -75,10 +75,7 @@ public class DiagnoseToolFixTests
         var text = result.Content[0].Text!;
         var json = JsonDocument.Parse(text).RootElement;
 
-        var diagnostic = json.GetProperty("diagnostics")[0];
-        var message = diagnostic.GetProperty("message").GetString()!;
-        Assert.Contains("nameof", message);
-        Assert.Contains("string literal", message);
+        Assert.Equal(0, json.GetProperty("errorCount").GetInt32());
     }
 
     [Fact]

@@ -385,7 +385,7 @@ public class CodeActionHandlerTests
     }
 
     [Fact]
-    public void CSharpConstruct_NoFix_ButHelpfulMessage()
+    public void NameofOperator_CompilesWithNoErrors()
     {
         var source = """
             §M{m001:TestModule}
@@ -398,15 +398,7 @@ public class CodeActionHandlerTests
 
         var diagnostics = LspTestHarness.GetDiagnostics(source);
 
-        Assert.True(diagnostics.HasErrors);
-        var error = diagnostics.First(d => d.Code == "Calor0106");
-        Assert.Contains("nameof", error.Message);
-        Assert.Contains("string literal", error.Message);
-
-        // No fix expected for C# constructs - they need manual conversion
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-        var operatorFix = fixes.FirstOrDefault(f => f.Code == "Calor0106");
-        Assert.Null(operatorFix);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
     }
 
     [Fact]

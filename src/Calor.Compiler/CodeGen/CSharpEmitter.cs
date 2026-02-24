@@ -3937,6 +3937,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return $"typeof({MapTypeName(node.TypeName)})";
     }
 
+    public string Visit(NameOfExpressionNode node)
+    {
+        return $"nameof({node.Name})";
+    }
+
     public string Visit(ExpressionCallNode node)
     {
         var target = node.TargetExpression.Accept(this);

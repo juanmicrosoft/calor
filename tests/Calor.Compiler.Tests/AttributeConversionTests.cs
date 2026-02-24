@@ -974,6 +974,84 @@ public class AttributeConversionTests
 
     #endregion
 
+    #region nameof Expression Tests
+
+    [Fact]
+    public void Converter_PreservesNameof_InCalorOutput()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                public void Check(string name)
+                {
+                    var x = nameof(name);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var calorEmitter = new CalorEmitter();
+        var calorCode = calorEmitter.Emit(result.Ast!);
+
+        Assert.Contains("(nameof name)", calorCode);
+    }
+
+    [Fact]
+    public void Parser_Roundtrip_NameofValue_ToCSharp()
+    {
+        var calorSource = """
+            §M{m001:TestModule}
+            §F{f001:Fn:pub}
+            §O{str}
+            §R (nameof value)
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var csharpEmitter = new CSharpEmitter();
+        var outputCode = csharpEmitter.Emit(module);
+
+        Assert.Contains("nameof(value)", outputCode);
+    }
+
+    [Fact]
+    public void Parser_Roundtrip_NameofDottedName_ToCSharp()
+    {
+        var calorSource = """
+            §M{m001:TestModule}
+            §F{f001:Fn:pub}
+            §O{str}
+            §R (nameof obj.Property)
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var csharpEmitter = new CSharpEmitter();
+        var outputCode = csharpEmitter.Emit(module);
+
+        Assert.Contains("nameof(obj.Property)", outputCode);
+    }
+
+    #endregion
+
     private static string GetErrorMessage(ConversionResult result)
     {
         if (result.Success) return "";

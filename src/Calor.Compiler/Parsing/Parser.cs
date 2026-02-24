@@ -1338,6 +1338,21 @@ public sealed class Parser
             return new TypeOfExpressionNode(startToken.Span.Union(typeofEnd.Span), typeName);
         }
 
+        // Handle nameof: (nameof name) or (nameof obj.Property)
+        if (opText == "nameof")
+        {
+            var nameToken = Expect(TokenKind.Identifier);
+            var name = nameToken.Text;
+            while (Check(TokenKind.Dot))
+            {
+                Advance();
+                var partToken = Expect(TokenKind.Identifier);
+                name += "." + partToken.Text;
+            }
+            var nameofEnd = Expect(TokenKind.CloseParen);
+            return new NameOfExpressionNode(startToken.Span.Union(nameofEnd.Span), name);
+        }
+
         // Handle is/as/cast with special type parsing to support generics and pointer types
         if (opText == "is")
         {

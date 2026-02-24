@@ -3616,14 +3616,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.RecordFeatureUsage("plinq");
         }
 
-        // Convert nameof(x) to string literal "x"
+        // Convert nameof(x) to NameOfExpressionNode
         if (target == "nameof" && invocation.ArgumentList.Arguments.Count == 1)
         {
             var argText = invocation.ArgumentList.Arguments[0].Expression.ToString();
-            // nameof returns the last identifier part (e.g., nameof(obj.Prop) => "Prop")
-            var lastDot = argText.LastIndexOf('.');
-            var nameText = lastDot >= 0 ? argText.Substring(lastDot + 1) : argText;
-            return new StringLiteralNode(GetTextSpan(invocation), nameText);
+            return new NameOfExpressionNode(GetTextSpan(invocation), argText);
         }
 
         return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames);

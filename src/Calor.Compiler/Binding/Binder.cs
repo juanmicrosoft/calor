@@ -248,6 +248,7 @@ public sealed class Binder
             UnaryOperationNode unaryOp => BindUnaryOperation(unaryOp),
             CallExpressionNode callExpr => BindCallExpression(callExpr),
             ConditionalExpressionNode condExpr => BindConditionalExpression(condExpr),
+            NameOfExpressionNode nameOf => new BoundStringLiteral(nameOf.Span, nameOf.Name),
             _ => BindFallbackExpression(expr)
         };
     }
