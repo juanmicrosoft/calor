@@ -306,6 +306,140 @@ namespace Calculator
 
     #endregion
 
+    #region Refactoring Stability Tests
+
+    [Fact]
+    public async Task RefactoringStability_AsyncFunction_ScoresOnIdPreservation()
+    {
+        // Arrange - AsyncConcurrency program using §AF{ markers
+        var calculator = new RefactoringStabilityCalculator();
+        var context = CreateContext(
+            calor: @"§M{m001:AsyncApp}
+§AF{af001:FetchData:pub}
+  §I{str:url}
+  §O{Task_str}
+  §R (await (httpGet url))
+§/AF{af001}
+§/M{m001}",
+            csharp: @"namespace AsyncApp { public class AsyncModule { public async Task<string> FetchData(string url) { return await HttpGet(url); } } }");
+
+        // Act
+        var result = await calculator.CalculateAsync(context);
+
+        // Assert - §AF{ should now be recognized, contributing to ID Preservation score
+        // Expected CalorScore ≈ 0.775 (ID=1.0, Ref=0.80, Structure=1.0, Semantic=0.30)
+        Assert.True(result.CalorScore > result.CSharpScore,
+            "Calor with §AF{ markers should score higher than C# on refactoring stability");
+        Assert.True(result.CalorScore >= 0.70,
+            $"Async function programs should score ≥0.70 (got {result.CalorScore:F3})");
+        Assert.True(result.AdvantageRatio >= 1.3,
+            $"Async function programs should have ≥1.3x advantage (got {result.AdvantageRatio:F3})");
+    }
+
+    [Fact]
+    public async Task RefactoringStability_OopProgram_ScoresOnIdAndStructure()
+    {
+        // Arrange - OOP program using §CL{, §MT{, §CTOR{, §PROP{ markers
+        var calculator = new RefactoringStabilityCalculator();
+        var context = CreateContext(
+            calor: @"§M{m001:Shapes}
+§CL{cl001:Circle}
+  §PROP{p001:Radius:pub} §O{f64}
+  §CTOR{ct001:New:pub}
+    §I{f64:radius}
+    §R (set this.Radius radius)
+  §/CTOR{ct001}
+  §MT{mt001:Area:pub}
+    §O{f64}
+    §R (* 3.14159 (* this.Radius this.Radius))
+  §/MT{mt001}
+§/CL{cl001}
+§/M{m001}",
+            csharp: @"namespace Shapes { public class Circle { public double Radius { get; set; } public Circle(double radius) { Radius = radius; } public double Area() { return 3.14159 * Radius * Radius; } } }");
+
+        // Act
+        var result = await calculator.CalculateAsync(context);
+
+        // Assert - §CL{, §MT{, §CTOR{, §PROP{ should all be recognized
+        // Expected CalorScore ≈ 0.80 (ID=1.0, Ref=0.90, Structure=1.0, Semantic=0.30)
+        Assert.True(result.CalorScore > result.CSharpScore,
+            "Calor with OOP markers (§CL{, §MT{, §CTOR{, §PROP{) should score higher than C#");
+        Assert.True(result.CalorScore >= 0.70,
+            $"OOP programs should score ≥0.70 (got {result.CalorScore:F3})");
+        Assert.True(result.AdvantageRatio >= 1.3,
+            $"OOP programs should have ≥1.3x advantage (got {result.AdvantageRatio:F3})");
+    }
+
+    [Fact]
+    public async Task RefactoringStability_OriginalMarkers_MaintainScores()
+    {
+        // Arrange - program using only original markers (§M{, §F{, §V{, §LOOP{, §IF{)
+        var calculator = new RefactoringStabilityCalculator();
+        var context = CreateContext(
+            calor: @"§M{m001:Math}
+§F{f001:SumPositive:pub}
+  §I{arr_i32:nums}
+  §O{i32}
+  §V{v001:total} 0
+  §LOOP{l001:each} nums
+    §IF{if001:positive}
+      (> item 0)
+      (set total (+ total item))
+    §/IF{if001}
+  §/LOOP{l001}
+  §R total
+§/F{f001}
+§/M{m001}",
+            csharp: @"namespace Math { public class MathOps { public int SumPositive(int[] nums) { int total = 0; foreach (var item in nums) { if (item > 0) total += item; } return total; } } }");
+
+        // Act
+        var result = await calculator.CalculateAsync(context);
+
+        // Assert - proportional scoring preserves original-marker scores
+        // Expected CalorScore ≈ 0.775 (ID=1.0, Ref=0.80, Structure=1.0, Semantic=0.30)
+        // This should be identical to the pre-change score thanks to proportional normalization
+        Assert.True(result.CalorScore > result.CSharpScore,
+            "Original marker programs should maintain Calor advantage");
+        Assert.True(result.CalorScore >= 0.70,
+            $"Original markers should score ≥0.70 to maintain backward compatibility (got {result.CalorScore:F3})");
+        Assert.True(result.AdvantageRatio >= 1.3,
+            $"Original markers should maintain ≥1.3x advantage (got {result.AdvantageRatio:F3})");
+    }
+
+    [Fact]
+    public async Task RefactoringStability_FieldAndOperator_ScoresOnIdPreservation()
+    {
+        // Arrange - program using §FLD{ and §OP{ markers
+        var calculator = new RefactoringStabilityCalculator();
+        var context = CreateContext(
+            calor: @"§M{m001:Vector}
+§CL{cl001:Vec2}
+  §FLD{fld001:X:pub} §O{f64}
+  §FLD{fld002:Y:pub} §O{f64}
+  §OP{op001:Add:pub}
+    §I{Vec2:a} §I{Vec2:b}
+    §O{Vec2}
+    §R (new Vec2 (+ a.X b.X) (+ a.Y b.Y))
+  §/OP{op001}
+§/CL{cl001}
+§/M{m001}",
+            csharp: @"namespace Vector { public struct Vec2 { public double X; public double Y; public static Vec2 operator +(Vec2 a, Vec2 b) => new Vec2 { X = a.X + b.X, Y = a.Y + b.Y }; } }");
+
+        // Act
+        var result = await calculator.CalculateAsync(context);
+
+        // Assert - §FLD{ and §OP{ should be recognized
+        // Expected CalorScore ≈ 0.80 (ID=1.0, Ref=0.90, Structure=1.0, Semantic=0.30)
+        Assert.True(result.CalorScore > result.CSharpScore,
+            "Calor with §FLD{ and §OP{ markers should score higher than C#");
+        Assert.True(result.CalorScore >= 0.70,
+            $"Field/operator programs should score ≥0.70 (got {result.CalorScore:F3})");
+        Assert.True(result.AdvantageRatio >= 1.3,
+            $"Field/operator programs should have ≥1.3x advantage (got {result.AdvantageRatio:F3})");
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static EvaluationContext CreateContext(string calor, string csharp)
