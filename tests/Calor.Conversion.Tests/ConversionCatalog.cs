@@ -504,6 +504,47 @@ public static class ConversionCatalog
         """,
         IsKnownGap: true);
 
+    // ── 10: Unsafe/Low-Level Features ──
+
+    public static readonly ConversionSnippet SizeOfExpression = new(
+        "10-01", "UnsafeLowLevel", "sizeof expression",
+        """
+        public static class SizeTest
+        {
+            public static int GetSizeOfInt()
+            {
+                return sizeof(int);
+            }
+        }
+        """);
+
+    public static readonly ConversionSnippet MultiDimArrayCreation = new(
+        "10-02", "UnsafeLowLevel", "Multidimensional array creation and access",
+        """
+        public static class GridHelper
+        {
+            public static int[,] CreateGrid(int rows, int cols)
+            {
+                int[,] grid = new int[rows, cols];
+                return grid;
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet TupleReturnTypeMapped = new(
+        "10-03", "UnsafeLowLevel", "Tuple return type with type mapping",
+        """
+        public class TupleMapper
+        {
+            public (int, string, bool) GetTriple()
+            {
+                return (1, "hello", true);
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
     /// <summary>
     /// All snippets that should successfully convert.
     /// </summary>
@@ -538,6 +579,9 @@ public static class ConversionCatalog
         TupleLiteral,
         EmptyCollection,
         NullCoalescing,
+        SizeOfExpression,
+        MultiDimArrayCreation,
+        TupleReturnTypeMapped,
     };
 
     /// <summary>

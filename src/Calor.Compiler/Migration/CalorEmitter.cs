@@ -575,6 +575,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsAbstract) modifiers.Add("abs");
         if (node.IsSealed) modifiers.Add("seal");
         if (node.IsStatic) modifiers.Add("stat");
+        if (node.IsUnsafe) modifiers.Add("unsafe");
+        if (node.IsExtern) modifiers.Add("ext");
 
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
@@ -624,8 +626,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Visit(post);
         }
 
-        // Body (only for non-abstract methods)
-        if (!node.IsAbstract)
+        // Body (only for non-abstract/non-extern methods)
+        if (!node.IsAbstract && !node.IsExtern)
         {
             foreach (var stmt in node.Body)
             {
@@ -862,6 +864,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitArrayCreationWithName(arrNode, node.Name);
             return "";
         }
+        if (node.Initializer is MultiDimArrayCreationNode mdArrNode)
+        {
+            EmitMultiDimArrayCreationWithName(mdArrNode, node.Name, node.TypeName);
+            return "";
+        }
 
         // Parser expects: §B[type:name] expression (no = sign)
         var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
@@ -955,6 +962,35 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else
         {
             AppendLine($"§ARR{{{elementType}:{variableName}}}");
+        }
+    }
+
+    private void EmitMultiDimArrayCreationWithName(MultiDimArrayCreationNode node, string variableName, string? typeName)
+    {
+        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+        var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : $"{elementType}[{new string(',', node.Rank - 1)}]";
+
+        if (node.DimensionSizes.Count > 0)
+        {
+            var dims = string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)));
+            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
+        }
+        else if (node.Initializer.Count > 0)
+        {
+            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}}}");
+            Indent();
+            foreach (var row in node.Initializer)
+            {
+                var elements = string.Join(" ", row.Select(e => e.Accept(this)));
+                AppendLine($"§ROW {elements}");
+            }
+            Dedent();
+            AppendLine($"§/ARR2D{{{node.Id}}}");
+        }
+        else
+        {
+            var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
+            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{zeros}}}");
         }
     }
 
@@ -2505,5 +2541,100 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         AppendLine($"§CSHARP{{{node.CSharpCode}}}§/CSHARP");
         return "";
+    }
+
+    public string Visit(StackAllocNode node)
+    {
+        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+        if (node.Size != null)
+        {
+            var size = node.Size.Accept(this);
+            return $"§SALLOC{{{elementType}:{size}}}";
+        }
+        else if (node.Initializer.Count > 0)
+        {
+            var elements = string.Join(" ", node.Initializer.Select(e => e.Accept(this)));
+            return $"§SALLOC{{{elementType}}} {elements} §/SALLOC";
+        }
+        return $"§SALLOC{{{elementType}:0}}";
+    }
+
+    public string Visit(UnsafeBlockNode node)
+    {
+        AppendLine($"§UNSAFE{{{node.Id}}}");
+        Indent();
+        foreach (var stmt in node.Body)
+            stmt.Accept(this);
+        Dedent();
+        AppendLine($"§/UNSAFE{{{node.Id}}}");
+        return "";
+    }
+
+    public string Visit(FixedStatementNode node)
+    {
+        var pointerType = TypeMapper.CSharpToCalor(node.PointerType);
+        var init = node.Initializer.Accept(this);
+        AppendLine($"§FIXED{{{node.Id}:{node.PointerName}:{pointerType}:{init}}}");
+        Indent();
+        foreach (var stmt in node.Body)
+            stmt.Accept(this);
+        Dedent();
+        AppendLine($"§/FIXED{{{node.Id}}}");
+        return "";
+    }
+
+    public string Visit(AddressOfNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        return $"§ADDR {operand}";
+    }
+
+    public string Visit(PointerDereferenceNode node)
+    {
+        var operand = node.Operand.Accept(this);
+        return $"§DEREF {operand}";
+    }
+
+    public string Visit(SizeOfNode node)
+    {
+        var typeName = TypeMapper.CSharpToCalor(node.TypeName);
+        return $"§SIZEOF{{{typeName}}}";
+    }
+
+    public string Visit(MultiDimArrayCreationNode node)
+    {
+        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+
+        if (node.DimensionSizes.Count > 0)
+        {
+            var dims = string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)));
+            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{dims}}}";
+        }
+        else if (node.Initializer.Count > 0)
+        {
+            var id = string.IsNullOrEmpty(node.Name) ? "_arr2d" : node.Name;
+            AppendLine($"§ARR2D{{{node.Id}:{id}:{elementType}}}");
+            Indent();
+            foreach (var row in node.Initializer)
+            {
+                var elements = string.Join(" ", row.Select(e => e.Accept(this)));
+                AppendLine($"§ROW {elements}");
+            }
+            Dedent();
+            AppendLine($"§/ARR2D{{{node.Id}}}");
+            return "";
+        }
+        else
+        {
+            var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
+            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{zeros}}}";
+        }
+    }
+
+    public string Visit(MultiDimArrayAccessNode node)
+    {
+        var array = node.Array.Accept(this);
+        var indices = string.Join(" ", node.Indices.Select(i => i.Accept(this)));
+        return $"§IDX2D {array} {indices}";
     }
 }

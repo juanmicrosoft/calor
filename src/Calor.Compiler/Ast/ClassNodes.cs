@@ -17,7 +17,9 @@ public enum MethodModifiers
     Const = 32,
     Readonly = 64,
     Required = 128,
-    Partial = 256
+    Partial = 256,
+    Extern = 512,
+    Unsafe = 1024
 }
 
 /// <summary>
@@ -612,6 +614,8 @@ public sealed class MethodNode : AstNode
     public bool IsSealed => (Modifiers & MethodModifiers.Sealed) != 0;
     public bool IsStatic => (Modifiers & MethodModifiers.Static) != 0;
     public bool IsPartial => (Modifiers & MethodModifiers.Partial) != 0;
+    public bool IsExtern => (Modifiers & MethodModifiers.Extern) != 0;
+    public bool IsUnsafe => (Modifiers & MethodModifiers.Unsafe) != 0;
     public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

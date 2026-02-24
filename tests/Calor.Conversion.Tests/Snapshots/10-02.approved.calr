@@ -1,0 +1,10 @@
+§M{m005:Test_10_02}
+  §CL{c001:GridHelper:pub:stat}
+    §MT{m002:CreateGrid:pub:stat} (i32:rows, i32:cols) -> i32[,]
+      §B{i32[,]:grid} §ARR2D{arr2d003:grid:i32:rows:cols}
+      §R grid
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m005}

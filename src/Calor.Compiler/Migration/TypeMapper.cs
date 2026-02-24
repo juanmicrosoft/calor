@@ -104,6 +104,12 @@ public static class TypeMapper
         // Other common types
         ["Guid"] = "guid",
         ["System.Guid"] = "guid",
+
+        // Span/Memory types (identity mapping — preserve as-is)
+        ["Span"] = "Span",
+        ["ReadOnlySpan"] = "ReadOnlySpan",
+        ["Memory"] = "Memory",
+        ["ReadOnlyMemory"] = "ReadOnlyMemory",
     };
 
     /// <summary>
@@ -193,6 +199,12 @@ public static class TypeMapper
 
         // Other common types
         ["guid"] = "Guid",
+
+        // Span/Memory types (identity mapping)
+        ["Span"] = "Span",
+        ["ReadOnlySpan"] = "ReadOnlySpan",
+        ["Memory"] = "Memory",
+        ["ReadOnlyMemory"] = "ReadOnlyMemory",
     };
 
     /// <summary>
@@ -279,6 +291,35 @@ public static class TypeMapper
             return $"[{mappedElement}]";
         }
 
+        // Handle multi-dim arrays T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
+        {
+            var bracketStart = csharpType.IndexOf('[');
+            if (bracketStart > 0 && csharpType.EndsWith("]"))
+            {
+                var suffix = csharpType[bracketStart..];
+                if (suffix.Length >= 3 && suffix.All(c => c == '[' || c == ']' || c == ','))
+                {
+                    var elementType = csharpType[..bracketStart];
+                    var mappedElement = CSharpToCalor(elementType);
+                    return $"{mappedElement}{suffix}";
+                }
+            }
+        }
+
+        // Handle tuple types (int, string) -> (i32, str)
+        if (csharpType.StartsWith("(") && csharpType.EndsWith(")"))
+        {
+            return MapTupleType(csharpType, CSharpToCalor);
+        }
+
+        // Handle pointer types int* -> i32*
+        if (csharpType.EndsWith("*"))
+        {
+            var pointeeType = csharpType[..^1];
+            var mappedPointee = CSharpToCalor(pointeeType);
+            return $"{mappedPointee}*";
+        }
+
         // Handle generic types
         var genericIndex = csharpType.IndexOf('<');
         if (genericIndex > 0)
@@ -326,19 +367,24 @@ public static class TypeMapper
         }
 
         // Handle expanded INT format: INT[bits=N][signed=B] -> sbyte/short/int/long/byte/ushort/uint/ulong
-        if (calorType.StartsWith("INT[", StringComparison.Ordinal))
+        // Must check for "bits=" to avoid matching multi-dim array types like INT[,]
+        if (calorType.StartsWith("INT[bits=", StringComparison.Ordinal))
         {
             return MapExpandedIntType(calorType);
         }
 
         // Handle expanded FLOAT format: FLOAT[bits=N] -> float/double
-        if (calorType.StartsWith("FLOAT[", StringComparison.Ordinal))
+        if (calorType.StartsWith("FLOAT[bits=", StringComparison.Ordinal))
         {
             return MapExpandedFloatType(calorType);
         }
 
-        // Handle bare expanded FLOAT (from ExpandType for f64/float) -> double
-        // Must be before dictionary lookup since case-insensitive "FLOAT" matches "float" -> "float"
+        // Handle bare expanded types from ExpandType (INT -> int, FLOAT -> double)
+        // Must be before dictionary lookup since case-insensitive "INT"/"FLOAT" could match other entries
+        if (calorType == "INT")
+        {
+            return "int";
+        }
         if (calorType == "FLOAT")
         {
             return "double";
@@ -369,6 +415,35 @@ public static class TypeMapper
             var elementType = calorType[1..^1];
             var mappedElement = CalorToCSharp(elementType);
             return $"{mappedElement}[]";
+        }
+
+        // Handle multi-dim array types T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
+        {
+            var bracketStart = calorType.IndexOf('[');
+            if (bracketStart > 0 && calorType.EndsWith("]"))
+            {
+                var suffix = calorType[bracketStart..];
+                if (suffix.Length >= 3 && suffix.All(c => c == '[' || c == ']' || c == ','))
+                {
+                    var elementType = calorType[..bracketStart];
+                    var mappedElement = CalorToCSharp(elementType);
+                    return $"{mappedElement}{suffix}";
+                }
+            }
+        }
+
+        // Handle tuple types (i32, str) -> (int, string)
+        if (calorType.StartsWith("(") && calorType.EndsWith(")"))
+        {
+            return MapTupleType(calorType, CalorToCSharp);
+        }
+
+        // Handle pointer types i32* -> int*
+        if (calorType.EndsWith("*"))
+        {
+            var pointeeType = calorType[..^1];
+            var mappedPointee = CalorToCSharp(pointeeType);
+            return $"{mappedPointee}*";
         }
 
         // Handle generic types
@@ -582,5 +657,76 @@ public static class TypeMapper
             };
         }
         return "double";
+    }
+
+    /// <summary>
+    /// Maps a tuple type string like "(int, string)" or "(int x, string y)" using the provided mapper.
+    /// Respects nesting depth for types like "(int, (string, bool))".
+    /// </summary>
+    private static string MapTupleType(string tupleType, Func<string, string> mapper)
+    {
+        // Strip outer parens
+        var inner = tupleType[1..^1];
+
+        // Split on commas at depth 0, respecting nested parens and angle brackets
+        var elements = new List<string>();
+        var depth = 0;
+        var current = "";
+
+        foreach (var c in inner)
+        {
+            if (c is '(' or '<')
+            {
+                depth++;
+                current += c;
+            }
+            else if (c is ')' or '>')
+            {
+                depth--;
+                current += c;
+            }
+            else if (c == ',' && depth == 0)
+            {
+                elements.Add(current.Trim());
+                current = "";
+            }
+            else
+            {
+                current += c;
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(current))
+            elements.Add(current.Trim());
+
+        // Map each element: "int x" -> "i32 x", "int" -> "i32"
+        var mapped = new List<string>();
+        foreach (var elem in elements)
+        {
+            // Check for named element: "type name"
+            var lastSpace = -1;
+            var scanDepth = 0;
+            for (int i = 0; i < elem.Length; i++)
+            {
+                if (elem[i] is '(' or '<') scanDepth++;
+                else if (elem[i] is ')' or '>') scanDepth--;
+                else if (elem[i] == ' ' && scanDepth == 0) lastSpace = i;
+            }
+
+            if (lastSpace > 0)
+            {
+                var typePart = elem[..lastSpace].Trim();
+                var namePart = elem[(lastSpace + 1)..].Trim();
+                // Only treat as named if the name part is an identifier (not a type keyword)
+                if (namePart.Length > 0 && char.IsLetter(namePart[0]) && !namePart.Contains('<') && !namePart.Contains('('))
+                {
+                    mapped.Add($"{mapper(typePart)} {namePart}");
+                    continue;
+                }
+            }
+
+            mapped.Add(mapper(elem));
+        }
+
+        return $"({string.Join(", ", mapped)})";
     }
 }

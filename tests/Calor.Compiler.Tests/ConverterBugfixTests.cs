@@ -360,7 +360,7 @@ public class Test
 {
     void M()
     {
-        var x = stackalloc int[10];
+        var x = checked(1 + 2);
     }
 }";
         var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });

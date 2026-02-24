@@ -235,4 +235,14 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Raw C# passthrough
     public virtual T Visit(RawCSharpNode node) => DefaultVisit(node)!;
     public virtual T Visit(CSharpInteropBlockNode node) => DefaultVisit(node)!;
+    // Unsafe/low-level nodes
+    public virtual T Visit(StackAllocNode node) => DefaultVisit(node)!;
+    public virtual T Visit(UnsafeBlockNode node) => DefaultVisit(node)!;
+    public virtual T Visit(FixedStatementNode node) => DefaultVisit(node)!;
+    public virtual T Visit(AddressOfNode node) => DefaultVisit(node)!;
+    public virtual T Visit(PointerDereferenceNode node) => DefaultVisit(node)!;
+    public virtual T Visit(SizeOfNode node) => DefaultVisit(node)!;
+    // Multidimensional arrays
+    public virtual T Visit(MultiDimArrayCreationNode node) => DefaultVisit(node)!;
+    public virtual T Visit(MultiDimArrayAccessNode node) => DefaultVisit(node)!;
 }

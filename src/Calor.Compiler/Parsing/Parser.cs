@@ -899,6 +899,15 @@ public sealed class Parser
         {
             return ParseRawCSharpStatement();
         }
+        // Unsafe/Low-Level statements
+        else if (Check(TokenKind.Unsafe))
+        {
+            return ParseUnsafeBlock();
+        }
+        else if (Check(TokenKind.Fixed))
+        {
+            return ParseFixedStatement();
+        }
         // Expression statement: bare lisp expression like (inc x), (post-dec y)
         else if (Check(TokenKind.OpenParen))
         {
@@ -1050,7 +1059,14 @@ public sealed class Parser
             or TokenKind.RangeOp
             or TokenKind.IndexEnd
             // Phase 10: Advanced Patterns
-            or TokenKind.With;
+            or TokenKind.With
+            // Unsafe/Low-Level
+            or TokenKind.StackAlloc
+            or TokenKind.AddressOf
+            or TokenKind.Deref
+            or TokenKind.SizeOf
+            or TokenKind.Array2D
+            or TokenKind.Index2D;
     }
 
     private ExpressionNode ParseExpression()
@@ -1106,6 +1122,14 @@ public sealed class Parser
             TokenKind.IndexEnd => ParseIndexFromEnd(),
             // Phase 10: Advanced Patterns
             TokenKind.With => ParseWithExpression(),
+            // Unsafe/Low-Level
+            TokenKind.StackAlloc => ParseStackAlloc(),
+            TokenKind.AddressOf => ParseAddressOf(),
+            TokenKind.Deref => ParsePointerDereference(),
+            TokenKind.SizeOf => ParseSizeOf(),
+            // Multidimensional Arrays
+            TokenKind.Array2D => ParseMultiDimArrayCreation(),
+            TokenKind.Index2D => ParseMultiDimArrayAccess(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
         };
     }
@@ -1302,7 +1326,7 @@ public sealed class Parser
             return new TypeOfExpressionNode(startToken.Span.Union(typeofEnd.Span), typeName);
         }
 
-        // Handle is/as with special type parsing to support generics
+        // Handle is/as/cast with special type parsing to support generics and pointer types
         if (opText == "is")
         {
             return ParseLispIsExpression(startToken);
@@ -1310,6 +1334,10 @@ public sealed class Parser
         if (opText == "as")
         {
             return ParseLispAsExpression(startToken);
+        }
+        if (opText == "cast")
+        {
+            return ParseLispCastExpression(startToken);
         }
 
         // Parse arguments until we hit CloseParen
@@ -2023,12 +2051,37 @@ public sealed class Parser
             Advance();
         }
 
-        // Handle array types: Type[]
-        if (Check(TokenKind.OpenBracket) && Peek(1).Kind == TokenKind.CloseBracket)
+        // Handle pointer types: Type*, Type**
+        while (Check(TokenKind.Star))
         {
-            typeBuilder.Append("[]");
-            Advance(); // consume '['
-            Advance(); // consume ']'
+            typeBuilder.Append('*');
+            Advance();
+        }
+
+        // Handle array types: Type[] or multi-dim Type[,], Type[,,], etc.
+        if (Check(TokenKind.OpenBracket))
+        {
+            if (Peek(1).Kind == TokenKind.CloseBracket)
+            {
+                typeBuilder.Append("[]");
+                Advance(); // consume '['
+                Advance(); // consume ']'
+            }
+            else if (Peek(1).Kind == TokenKind.Comma)
+            {
+                typeBuilder.Append('[');
+                Advance(); // consume '['
+                while (Check(TokenKind.Comma))
+                {
+                    typeBuilder.Append(',');
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBracket))
+                {
+                    typeBuilder.Append(']');
+                    Advance();
+                }
+            }
         }
 
         return typeBuilder.ToString();
@@ -2076,6 +2129,22 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
 
         return new TypeOperationNode(span, TypeOp.As, operand, typeName);
+    }
+
+    /// <summary>
+    /// Parses a 'cast' expression in Lisp form: (cast Type expr)
+    /// Handles pointer types like i32* that would fail in general arg parsing.
+    /// </summary>
+    private ExpressionNode ParseLispCastExpression(Token startToken)
+    {
+        // cast: type comes first, then expression
+        var typeName = ParseLispTypeName();
+        var operand = ParseLispArgument();
+
+        var endToken = Expect(TokenKind.CloseParen);
+        var span = startToken.Span.Union(endToken.Span);
+
+        return new TypeOperationNode(span, TypeOp.Cast, operand, typeName);
     }
 
     /// <summary>
@@ -3150,6 +3219,30 @@ public sealed class Parser
                 if (Check(TokenKind.Identifier))
                 {
                     sb.Append(Advance().Text);
+                }
+            }
+
+            // Handle pointer type suffix: i32* or i32**
+            while (Check(TokenKind.Star))
+            {
+                sb.Append('*');
+                Advance();
+            }
+
+            // Handle multi-dim array suffix: int[,] or int[,,]
+            if (Check(TokenKind.OpenBracket) && Peek(1).Kind == TokenKind.Comma)
+            {
+                sb.Append('[');
+                Advance(); // consume [
+                while (Check(TokenKind.Comma))
+                {
+                    sb.Append(',');
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBracket))
+                {
+                    sb.Append(']');
+                    Advance();
                 }
             }
 
@@ -5378,6 +5471,11 @@ public sealed class Parser
             else if (token.Equals("part", StringComparison.OrdinalIgnoreCase)
                 || token.Equals("partial", StringComparison.OrdinalIgnoreCase))
                 mods |= MethodModifiers.Partial;
+            else if (token.Equals("ext", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("extern", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Extern;
+            else if (token.Equals("unsafe", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Unsafe;
         }
         return mods;
     }
@@ -8198,6 +8296,218 @@ public sealed class Parser
         }
 
         return sb.ToString();
+    }
+
+    #endregion
+
+    #region Unsafe/Low-Level Parsing
+
+    /// <summary>
+    /// Parses §SALLOC{type:size} or §SALLOC{type} elements §/SALLOC
+    /// </summary>
+    private StackAllocNode ParseStackAlloc()
+    {
+        var startToken = Expect(TokenKind.StackAlloc);
+        var attrs = ParseAttributes();
+        // Attributes are already split by ParsePositionalAttributes: _pos0=type, _pos1=size
+        var elementType = attrs["_pos0"] ?? "i32";
+        var sizeStr = attrs["_pos1"];
+
+        ExpressionNode? size = null;
+        var initializer = new List<ExpressionNode>();
+
+        if (!string.IsNullOrEmpty(sizeStr))
+        {
+            // Sized form: §SALLOC{type:size}
+            if (int.TryParse(sizeStr, out var s))
+                size = new IntLiteralNode(startToken.Span, s);
+            else
+                size = new ReferenceNode(startToken.Span, sizeStr);
+        }
+        else
+        {
+            // Initializer form: parse expressions until §/SALLOC
+            while (!IsAtEnd && !Check(TokenKind.EndStackAlloc))
+            {
+                initializer.Add(ParseExpression());
+            }
+            if (Check(TokenKind.EndStackAlloc))
+                Advance();
+        }
+
+        return new StackAllocNode(startToken.Span, elementType, size, initializer);
+    }
+
+    /// <summary>
+    /// Parses §ADDR expr
+    /// </summary>
+    private AddressOfNode ParseAddressOf()
+    {
+        var startToken = Expect(TokenKind.AddressOf);
+        var operand = ParseExpression();
+        return new AddressOfNode(startToken.Span, operand);
+    }
+
+    /// <summary>
+    /// Parses §DEREF expr
+    /// </summary>
+    private PointerDereferenceNode ParsePointerDereference()
+    {
+        var startToken = Expect(TokenKind.Deref);
+        var operand = ParseExpression();
+        return new PointerDereferenceNode(startToken.Span, operand);
+    }
+
+    /// <summary>
+    /// Parses §SIZEOF{type}
+    /// </summary>
+    private SizeOfNode ParseSizeOf()
+    {
+        var startToken = Expect(TokenKind.SizeOf);
+        var attrs = ParseAttributes();
+        var typeName = attrs["_pos0"] ?? "i32";
+        return new SizeOfNode(startToken.Span, typeName);
+    }
+
+    /// <summary>
+    /// Parses §ARR2D{id:name:type:dim1:dim2} or §ARR2D{id:name:type} §ROW ... §/ARR2D
+    /// </summary>
+    private MultiDimArrayCreationNode ParseMultiDimArrayCreation()
+    {
+        var startToken = Expect(TokenKind.Array2D);
+        var attrs = ParseAttributes();
+
+        var id = attrs["_pos0"] ?? "_arr2d";
+        var name = attrs["_pos1"] ?? "_arr2d";
+        var elementType = attrs["_pos2"] ?? "i32";
+
+        var dimensionSizes = new List<ExpressionNode>();
+        var initializer = new List<IReadOnlyList<ExpressionNode>>();
+        var rank = 2;
+
+        // Check for dimension sizes in positions 3+
+        var pos3 = attrs["_pos3"];
+        if (pos3 != null)
+        {
+            // Sized form: §ARR2D{id:name:type:dim1:dim2[:dim3...]}
+            for (int i = 3; ; i++)
+            {
+                var posN = attrs[$"_pos{i}"];
+                if (posN == null) break;
+                if (int.TryParse(posN, out var d))
+                    dimensionSizes.Add(new IntLiteralNode(startToken.Span, d));
+                else
+                    dimensionSizes.Add(new ReferenceNode(startToken.Span, posN));
+            }
+            rank = dimensionSizes.Count;
+        }
+        else
+        {
+            // Initializer form: parse §ROW elements until §/ARR2D
+            while (!IsAtEnd && !Check(TokenKind.EndArray2D))
+            {
+                if (Check(TokenKind.Row))
+                {
+                    Advance();
+                    var row = new List<ExpressionNode>();
+                    while (!IsAtEnd && !Check(TokenKind.Row) && !Check(TokenKind.EndArray2D))
+                    {
+                        row.Add(ParseExpression());
+                    }
+                    initializer.Add(row);
+                }
+                else
+                {
+                    Advance(); // skip unexpected tokens
+                }
+            }
+            if (Check(TokenKind.EndArray2D))
+            {
+                Advance();
+                ParseAttributes(); // consume optional {id} on closing tag
+            }
+            rank = initializer.Count > 0 ? 2 : rank;
+        }
+
+        return new MultiDimArrayCreationNode(startToken.Span, id, name, elementType, rank, dimensionSizes, initializer);
+    }
+
+    /// <summary>
+    /// Parses §IDX2D array index1 index2
+    /// </summary>
+    private MultiDimArrayAccessNode ParseMultiDimArrayAccess()
+    {
+        var startToken = Expect(TokenKind.Index2D);
+        var array = ParseExpression();
+        var indices = new List<ExpressionNode>();
+        // Parse remaining index expressions (at least one more)
+        while (!IsAtEnd && IsExpressionStart())
+        {
+            indices.Add(ParseExpression());
+        }
+        return new MultiDimArrayAccessNode(startToken.Span, array, indices);
+    }
+
+    /// <summary>
+    /// Parses §UNSAFE{id} ... §/UNSAFE{id}
+    /// </summary>
+    private UnsafeBlockNode ParseUnsafeBlock()
+    {
+        var startToken = Expect(TokenKind.Unsafe);
+        var attrs = ParseAttributes();
+        var id = attrs["_pos0"] ?? "_unsafe";
+
+        var body = new List<StatementNode>();
+        while (!IsAtEnd && !Check(TokenKind.EndUnsafe))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null) body.Add(stmt);
+        }
+        if (Check(TokenKind.EndUnsafe))
+        {
+            Advance();
+            ParseAttributes(); // consume optional {id} on closing tag
+        }
+
+        return new UnsafeBlockNode(startToken.Span, id, body);
+    }
+
+    /// <summary>
+    /// Parses §FIXED{id:ptr:type:init} ... §/FIXED{id}
+    /// </summary>
+    private FixedStatementNode ParseFixedStatement()
+    {
+        var startToken = Expect(TokenKind.Fixed);
+        var attrs = ParseAttributes();
+        var id = attrs["_pos0"] ?? "_fixed";
+        var pointerName = attrs["_pos1"] ?? "ptr";
+        var pointerType = attrs["_pos2"] ?? "i32*";
+        // The init expression is in _pos3 or we parse after
+        var initStr = attrs["_pos3"];
+
+        ExpressionNode initializer;
+        if (initStr != null)
+        {
+            initializer = new ReferenceNode(startToken.Span, initStr);
+        }
+        else
+        {
+            initializer = ParseExpression();
+        }
+
+        var body = new List<StatementNode>();
+        while (!IsAtEnd && !Check(TokenKind.EndFixed))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null) body.Add(stmt);
+        }
+        if (Check(TokenKind.EndFixed))
+        {
+            Advance();
+            ParseAttributes(); // consume optional {id} on closing tag
+        }
+
+        return new FixedStatementNode(startToken.Span, id, pointerName, pointerType, initializer, body);
     }
 
     #endregion

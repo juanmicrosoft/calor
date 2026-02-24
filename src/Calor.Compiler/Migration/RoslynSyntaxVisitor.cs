@@ -738,9 +738,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.RecordFeatureUsage("async-method");
         }
 
+        // Track extern methods (P/Invoke)
+        if (modifiers.HasFlag(MethodModifiers.Extern))
+        {
+            _context.RecordFeatureUsage("extern-method");
+        }
+
         var returnType = TypeMapper.CSharpToCalor(returnTypeStr);
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
-        var body = ConvertMethodBody(node.Body, node.ExpressionBody);
+        var body = modifiers.HasFlag(MethodModifiers.Extern)
+            ? Array.Empty<StatementNode>()  // extern methods have no body
+            : ConvertMethodBody(node.Body, node.ExpressionBody);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         _context.Stats.MethodsConverted++;
@@ -1401,6 +1409,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
             LockStatementSyntax lockStmt => ConvertLockStatement(lockStmt),
             CheckedStatementSyntax checkedStmt => ConvertCheckedStatement(checkedStmt),
+            UnsafeStatementSyntax unsafeStmt => ConvertUnsafeStatement(unsafeStmt),
+            FixedStatementSyntax fixedStmt => ConvertFixedStatement(fixedStmt),
             _ => HandleUnsupportedStatement(statement)
         };
     }
@@ -2757,6 +2767,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             LiteralExpressionSyntax literal => ConvertLiteral(literal),
             IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText),
             BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
+            PrefixUnaryExpressionSyntax addrOf when addrOf.IsKind(SyntaxKind.AddressOfExpression) => ConvertAddressOfExpression(addrOf),
+            PrefixUnaryExpressionSyntax deref when deref.IsKind(SyntaxKind.PointerIndirectionExpression) => ConvertPointerDereferenceExpression(deref),
             PrefixUnaryExpressionSyntax prefix => ConvertPrefixUnaryExpression(prefix),
             PostfixUnaryExpressionSyntax postfix => ConvertPostfixUnaryExpression(postfix),
             ParenthesizedExpressionSyntax paren => ConvertExpression(paren.Expression),
@@ -2790,6 +2802,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
             AssignmentExpressionSyntax assignExpr => ConvertAssignmentExpression(assignExpr),
             TupleExpressionSyntax tupleExpr => ConvertTupleExpression(tupleExpr),
+            StackAllocArrayCreationExpressionSyntax stackAlloc => ConvertStackAllocExpression(stackAlloc),
+            ImplicitStackAllocArrayCreationExpressionSyntax implicitStackAlloc => ConvertImplicitStackAllocExpression(implicitStackAlloc),
+            SizeOfExpressionSyntax sizeOf => ConvertSizeOfExpression(sizeOf),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -3482,6 +3497,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 _context.RecordFeatureUsage("native-char-op");
                 return charOp;
             }
+        }
+
+        // Track Parallel.For/ForEach/Invoke usage
+        if (target.StartsWith("Parallel.") || target.StartsWith("System.Threading.Tasks.Parallel."))
+        {
+            _context.RecordFeatureUsage("parallel");
+        }
+
+        // Track PLINQ .AsParallel() usage
+        if (target.EndsWith(".AsParallel") || target.EndsWith(".AsOrdered") || target.EndsWith(".AsUnordered")
+            || target.EndsWith(".WithDegreeOfParallelism") || target.EndsWith(".WithCancellation"))
+        {
+            _context.RecordFeatureUsage("plinq");
         }
 
         // Convert nameof(x) to string literal "x"
@@ -4253,8 +4281,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return false;
     }
 
-    private ArrayCreationNode ConvertArrayCreation(ArrayCreationExpressionSyntax arrayCreation)
+    private ExpressionNode ConvertArrayCreation(ArrayCreationExpressionSyntax arrayCreation)
     {
+        // Detect multidimensional arrays (int[,], int[,,])
+        if (arrayCreation.Type.RankSpecifiers.Count > 0)
+        {
+            var rankSpec = arrayCreation.Type.RankSpecifiers[0];
+            if (rankSpec.Rank > 1)
+            {
+                return ConvertMultiDimArrayCreation(arrayCreation, rankSpec.Rank);
+            }
+        }
+
         var id = _context.GenerateId("arr");
         var name = _context.GenerateId("arr");
         var elementType = TypeMapper.CSharpToCalor(arrayCreation.Type.ElementType.ToString());
@@ -4265,7 +4303,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (arrayCreation.Type.RankSpecifiers.Count > 0)
         {
             var rank = arrayCreation.Type.RankSpecifiers[0];
-            if (rank.Sizes.Count > 0 && rank.Sizes[0] is ExpressionSyntax sizeExpr)
+            if (rank.Sizes.Count > 0 && rank.Sizes[0] is ExpressionSyntax sizeExpr
+                && sizeExpr is not OmittedArraySizeExpressionSyntax)
             {
                 size = ConvertExpression(sizeExpr);
             }
@@ -4377,9 +4416,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertElementAccess(ElementAccessExpressionSyntax elementAccess)
     {
-        var array = ConvertExpression(elementAccess.Expression);
-        var index = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
         var span = GetTextSpan(elementAccess);
+        var array = ConvertExpression(elementAccess.Expression);
+
+        // Multidimensional array access: grid[1, 2] has multiple arguments
+        if (elementAccess.ArgumentList.Arguments.Count > 1)
+        {
+            _context.RecordFeatureUsage("multidim-array");
+            var indices = elementAccess.ArgumentList.Arguments
+                .Select(a => ConvertExpression(a.Expression))
+                .ToList();
+            return new MultiDimArrayAccessNode(span, array, indices);
+        }
+
+        var index = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
 
         // Only use char-at when the target is a string literal (e.g. "hello"[0])
         // Default to §IDX (ArrayAccess) — array/list indexing is far more common
@@ -4819,6 +4869,138 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
     }
 
+    // --- Unsafe/Low-Level conversions ---
+
+    private ExpressionNode ConvertStackAllocExpression(StackAllocArrayCreationExpressionSyntax stackAlloc)
+    {
+        _context.RecordFeatureUsage("stackalloc");
+        var elementType = TypeMapper.CSharpToCalor(stackAlloc.Type is ArrayTypeSyntax arrayType
+            ? arrayType.ElementType.ToString()
+            : stackAlloc.Type.ToString());
+        ExpressionNode? size = null;
+        var initializer = new List<ExpressionNode>();
+
+        if (stackAlloc.Type is ArrayTypeSyntax at && at.RankSpecifiers.Count > 0)
+        {
+            var rank = at.RankSpecifiers[0];
+            if (rank.Sizes.Count > 0 && rank.Sizes[0] is ExpressionSyntax sizeExpr
+                && sizeExpr is not OmittedArraySizeExpressionSyntax)
+            {
+                size = ConvertExpression(sizeExpr);
+            }
+        }
+
+        if (stackAlloc.Initializer != null)
+        {
+            initializer = stackAlloc.Initializer.Expressions
+                .Select(ConvertExpression)
+                .ToList();
+        }
+
+        return new StackAllocNode(GetTextSpan(stackAlloc), elementType, size, initializer);
+    }
+
+    private ExpressionNode ConvertImplicitStackAllocExpression(ImplicitStackAllocArrayCreationExpressionSyntax implicitStackAlloc)
+    {
+        _context.RecordFeatureUsage("stackalloc");
+        var initializer = implicitStackAlloc.Initializer.Expressions
+            .Select(ConvertExpression)
+            .ToList();
+        // Infer type from first element or use "i32" as default
+        return new StackAllocNode(GetTextSpan(implicitStackAlloc), "i32", null, initializer);
+    }
+
+    private ExpressionNode ConvertSizeOfExpression(SizeOfExpressionSyntax sizeOf)
+    {
+        _context.RecordFeatureUsage("unsafe");
+        var typeName = TypeMapper.CSharpToCalor(sizeOf.Type.ToString());
+        return new SizeOfNode(GetTextSpan(sizeOf), typeName);
+    }
+
+    private ExpressionNode ConvertAddressOfExpression(PrefixUnaryExpressionSyntax addrOf)
+    {
+        _context.RecordFeatureUsage("pointer");
+        var operand = ConvertExpression(addrOf.Operand);
+        return new AddressOfNode(GetTextSpan(addrOf), operand);
+    }
+
+    private ExpressionNode ConvertPointerDereferenceExpression(PrefixUnaryExpressionSyntax deref)
+    {
+        _context.RecordFeatureUsage("pointer");
+        var operand = ConvertExpression(deref.Operand);
+        return new PointerDereferenceNode(GetTextSpan(deref), operand);
+    }
+
+    private StatementNode ConvertUnsafeStatement(UnsafeStatementSyntax unsafeStmt)
+    {
+        _context.RecordFeatureUsage("unsafe");
+        var id = _context.GenerateId("unsafe");
+        var body = ConvertBlock(unsafeStmt.Block);
+        return new UnsafeBlockNode(GetTextSpan(unsafeStmt), id, body);
+    }
+
+    private StatementNode ConvertFixedStatement(FixedStatementSyntax fixedStmt)
+    {
+        _context.RecordFeatureUsage("fixed");
+        var id = _context.GenerateId("fixed");
+
+        // Parse the declaration from fixed (type* name = expr)
+        var decl = fixedStmt.Declaration;
+        var pointerType = TypeMapper.CSharpToCalor(decl.Type.ToString());
+        var variable = decl.Variables[0];
+        var pointerName = variable.Identifier.Text;
+        var initializer = variable.Initializer != null
+            ? ConvertExpression(variable.Initializer.Value)
+            : new ReferenceNode(GetTextSpan(fixedStmt), "null");
+
+        var body = fixedStmt.Statement is BlockSyntax block
+            ? ConvertBlock(block)
+            : new List<StatementNode> { ConvertStatement(fixedStmt.Statement)! };
+
+        return new FixedStatementNode(GetTextSpan(fixedStmt), id, pointerName, pointerType, initializer, body);
+    }
+
+    // --- Multidimensional array conversions ---
+
+    private ExpressionNode ConvertMultiDimArrayCreation(ArrayCreationExpressionSyntax arrayCreation, int rank)
+    {
+        _context.RecordFeatureUsage("multidim-array");
+        var id = _context.GenerateId("arr2d");
+        var name = _context.GenerateId("arr2d");
+        var elementType = TypeMapper.CSharpToCalor(arrayCreation.Type.ElementType.ToString());
+
+        var dimensionSizes = new List<ExpressionNode>();
+        var initializer = new List<IReadOnlyList<ExpressionNode>>();
+
+        if (arrayCreation.Type.RankSpecifiers.Count > 0)
+        {
+            var rankSpec = arrayCreation.Type.RankSpecifiers[0];
+            foreach (var sizeExpr in rankSpec.Sizes)
+            {
+                if (sizeExpr is not OmittedArraySizeExpressionSyntax)
+                    dimensionSizes.Add(ConvertExpression(sizeExpr));
+            }
+        }
+
+        if (arrayCreation.Initializer != null)
+        {
+            foreach (var rowExpr in arrayCreation.Initializer.Expressions)
+            {
+                if (rowExpr is InitializerExpressionSyntax rowInit)
+                {
+                    var row = rowInit.Expressions.Select(ConvertExpression).ToList();
+                    initializer.Add(row);
+                }
+                else
+                {
+                    initializer.Add(new List<ExpressionNode> { ConvertExpression(rowExpr) });
+                }
+            }
+        }
+
+        return new MultiDimArrayCreationNode(GetTextSpan(arrayCreation), id, name, elementType, rank, dimensionSizes, initializer);
+    }
+
     private static MethodModifiers GetMethodModifiers(SyntaxTokenList modifiers)
     {
         var result = MethodModifiers.None;
@@ -4837,6 +5019,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             result |= MethodModifiers.Required;
         if (modifiers.Any(SyntaxKind.PartialKeyword))
             result |= MethodModifiers.Partial;
+        if (modifiers.Any(SyntaxKind.ExternKeyword))
+            result |= MethodModifiers.Extern;
+        if (modifiers.Any(SyntaxKind.UnsafeKeyword))
+            result |= MethodModifiers.Unsafe;
 
         return result;
     }
@@ -5002,6 +5188,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
 
                 result.Add(new CalorAttributeNode(GetTextSpan(attr), name, args));
+
+                // Track COM interop and P/Invoke attribute usage
+                if (name is "ComImport" or "Guid" or "InterfaceType" or "CoClass"
+                    or "ComVisible" or "ProgId" or "ClassInterface")
+                {
+                    _context.RecordFeatureUsage("com-interop");
+                }
+                else if (name is "DllImport" or "MarshalAs" or "StructLayout" or "FieldOffset")
+                {
+                    _context.RecordFeatureUsage("dllimport");
+                }
             }
         }
 

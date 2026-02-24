@@ -1145,7 +1145,7 @@ public class CSharpToCalorConversionTests
             {
                 void M()
                 {
-                    var x = stackalloc int[10];
+                    var x = checked(1 + 2);
                 }
             }
             """;
@@ -1166,7 +1166,7 @@ public class CSharpToCalorConversionTests
             {
                 void M()
                 {
-                    var x = stackalloc int[10];
+                    var x = checked(1 + 2);
                 }
             }
             """;
@@ -1189,8 +1189,8 @@ public class CSharpToCalorConversionTests
             {
                 void M()
                 {
-                    var x = stackalloc int[10];
-                    var y = stackalloc byte[20];
+                    var x = checked(1 + 2);
+                    var y = checked(3 + 4);
                 }
             }
             """;
@@ -1214,7 +1214,7 @@ public class CSharpToCalorConversionTests
             {
                 void M()
                 {
-                    var x = stackalloc int[10];
+                    var x = checked(1 + 2);
                 }
             }
             """;
@@ -1235,7 +1235,7 @@ public class CSharpToCalorConversionTests
             {
                 void M()
                 {
-                    var x = stackalloc int[10];
+                    var x = checked(1 + 2);
                 }
             }
             """;
