@@ -1867,4 +1867,164 @@ public class ConverterImprovementTests
     }
 
     #endregion
+
+    #region Target-Typed New in Return/Arrow Contexts (InferTargetType Case 3)
+
+    [Fact]
+    public void Migration_TargetTypedNew_InLocalFunctionArrow_InfersReturnType()
+    {
+        var csharp = """
+            public class Example
+            {
+                public string Get()
+                {
+                    string Local() => new("hello");
+                    return Local();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        // The local function is hoisted to a module-level §F function.
+        // The return expression should be a NewExpressionNode with type "str" (not "object").
+        var hoistedFunc = result.Ast!.Functions.FirstOrDefault(f => f.Name == "Local");
+        Assert.NotNull(hoistedFunc);
+        var ret = Assert.IsType<ReturnStatementNode>(hoistedFunc.Body[0]);
+        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
+        Assert.Equal("str", newExpr.TypeName);
+    }
+
+    [Fact]
+    public void Migration_TargetTypedNew_InLocalFunctionReturnStatement_InfersReturnType()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            public class Example
+            {
+                public List<int> Get()
+                {
+                    List<int> Local()
+                    {
+                        return new(16);
+                    }
+                    return Local();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var hoistedFunc = result.Ast!.Functions.FirstOrDefault(f => f.Name == "Local");
+        Assert.NotNull(hoistedFunc);
+        var ret = Assert.IsType<ReturnStatementNode>(hoistedFunc.Body[0]);
+        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
+        Assert.Equal("List<i32>", newExpr.TypeName);
+    }
+
+    [Fact]
+    public void Migration_TargetTypedNew_InMethodReturnWithArgs_InfersReturnType()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            public class Factory
+            {
+                public List<string> Create(int capacity)
+                {
+                    return new(capacity);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
+        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
+        Assert.Equal("List<str>", newExpr.TypeName);
+    }
+
+    [Fact]
+    public void Migration_TargetTypedNew_AsyncMethod_UnwrapsTaskType()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            public class Service
+            {
+                public async Task<List<int>> GetAsync()
+                {
+                    return new();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var method = Assert.Single(cls.Methods);
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
+        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
+        Assert.Equal("List<i32>", newExpr.TypeName);
+    }
+
+    [Fact]
+    public void Migration_TargetTypedNew_AsyncLocalFunction_UnwrapsTaskType()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            public class Service
+            {
+                public async Task<List<int>> Get()
+                {
+                    async Task<List<int>> LocalAsync()
+                    {
+                        return new();
+                    }
+                    return await LocalAsync();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var hoistedFunc = result.Ast!.Functions.FirstOrDefault(f => f.Name == "LocalAsync");
+        Assert.NotNull(hoistedFunc);
+        var ret = Assert.IsType<ReturnStatementNode>(hoistedFunc.Body[0]);
+        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
+        Assert.Equal("List<i32>", newExpr.TypeName);
+    }
+
+    [Fact]
+    public void Migration_TargetTypedNew_InExpressionBodiedProperty_InfersType()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            public class Factory
+            {
+                public List<string> Items => new();
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var cls = Assert.Single(result.Ast!.Classes);
+        var prop = cls.Properties.FirstOrDefault(p => p.Name == "Items");
+        Assert.NotNull(prop);
+        Assert.NotNull(prop.Getter);
+        Assert.NotEmpty(prop.Getter.Body);
+        var ret = Assert.IsType<ReturnStatementNode>(prop.Getter.Body[0]);
+        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
+        Assert.Equal("List<str>", newExpr.TypeName);
+    }
+
+    #endregion
 }
