@@ -156,7 +156,9 @@ The `(len arr)` operation will throw `NullReferenceException` if `arr` is null. 
 ### Structure Tags
 
 ```
-§M{id:Name}           Module (namespace)
+§M{id:Name}           Module (namespace) — dotted names supported for nested namespaces
+                      e.g. §M{m001:Calor.Runtime} → namespace Calor.Runtime { ... }
+                      e.g. §M{m001:MyApp.Services} → namespace MyApp.Services { ... }
 §F{id:Name:vis}       Function (pub|pri)
 §I{type:name}         Input parameter
 §O{type}              Output/return type
