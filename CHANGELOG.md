@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-02-24
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.31x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins)
+  - ErrorDetection: 1.83x (Calor wins)
+  - EditPrecision: 1.39x (Calor wins)
+  - RefactoringStability: 1.30x (Calor wins)
+  - Correctness: 1.30x (Calor wins)
+- **Programs Tested**: 207
+
+### Added
+- **Compact syntax Phase 1** — Auto-props, optional IDs, and inline signatures reduce Calor boilerplate (#445)
+- **Default parameter values** — Emit and parse default parameter values in Calor syntax (#460)
+- **6 language gap features** — Address 6 C# constructs from tracking issue #325: unsafe/fixed/stackalloc blocks, tuple types, multi-dimensional arrays, Parallel LINQ, COM interop fallback, Span<T> (#457)
+- **Bitwise attribute expressions** — Full support for bitwise OR (`|`), AND (`&`), complement (`~`), and parenthesized expressions in attribute arguments (#449, #453)
+- **Expanded benchmark suite** — Grow from 40 to 207 programs across 14 categories (#452)
+- **Return type inference for `new()`** — Infer target type for `new()` in local functions and async methods (#466)
+- **EdgeCaseCoverageAnalyzer** — New analyzer for edge case coverage and correctness estimation (#442)
+- **MCP tools for edit precision** — Add call graph analysis tools for refactoring impact (#446)
+- **2.0x comprehension ratio** — Proportional metrics and LLM evaluation reach 2.0x AI comprehension ratio (#447)
+
+### Fixed
+- **Ternary throw hoisting** — Hoist ternary throw expressions to guard statements (#459)
+- **Option<T>/Result<T,E> converter** — Per-member fallback for `ConvertStruct` and `InferTargetType` for return context (#458)
+- **Null-coalescing throw** — Convert `?? throw` to if-null-throw guard instead of `§ERR` (#451)
+- **Non-throwable literal wrapping** — Wrap non-throwable literals in `System.Exception` for `§TH` codegen (#450)
+- **CalorFormatter coverage** — Handle all 23 missing expression types in `FormatExpression` (#464)
+- **Self-referential runtime reference** — Prevent `Calor.Runtime` from referencing itself; document dotted module names (#463)
+- **Dotted-name round-trip** — Document and test dotted-name round-trip behavior (#462)
+- **Constructor overloading** — Close Challenge 8; constructor overloading was already supported (#456)
+- **Benchmark structure scoring** — Remove artificial parameters dependency in `CalculateCalorStructureScore` (#454)
+- **License attribution** — Fix website footer to show Apache 2.0 instead of MIT (#443)
+
 ## [0.3.1] - 2026-02-23
 
 ### Benchmark Results (Statistical: 30 runs)
