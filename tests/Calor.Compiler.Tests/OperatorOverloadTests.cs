@@ -1034,4 +1034,166 @@ public class Wrapper
     }
 
     #endregion
+
+    #region Generic Operator Overload Tests
+
+    [Fact]
+    public void RoundTrip_GenericClassBinaryOperator_Preserved()
+    {
+        var csharp = """
+            public class Vector<T>
+            {
+                public T X { get; set; }
+
+                public static Vector<T> operator +(Vector<T> a, Vector<T> b)
+                {
+                    return new Vector<T>();
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("class Vector<T>", output);
+        Assert.Contains("operator +(Vector<T> a, Vector<T> b)", output);
+    }
+
+    [Fact]
+    public void RoundTrip_GenericClassWithConstraintAndOperator_Preserved()
+    {
+        var csharp = """
+            public class Wrapper<T> where T : struct
+            {
+                public T Value { get; set; }
+
+                public static Wrapper<T> operator +(Wrapper<T> a, Wrapper<T> b)
+                {
+                    return new Wrapper<T>();
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("where T : struct", output);
+        Assert.Contains("operator +(Wrapper<T> a, Wrapper<T> b)", output);
+    }
+
+    [Fact]
+    public void RoundTrip_GenericEqualityOperators_Preserved()
+    {
+        var csharp = """
+            public class Pair<TKey, TValue>
+            {
+                public TKey Key { get; set; }
+                public TValue Value { get; set; }
+
+                public static bool operator ==(Pair<TKey, TValue> a, Pair<TKey, TValue> b) { return true; }
+                public static bool operator !=(Pair<TKey, TValue> a, Pair<TKey, TValue> b) { return false; }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("class Pair<TKey, TValue>", output);
+        Assert.Contains("operator ==(Pair<TKey, TValue> a, Pair<TKey, TValue> b)", output);
+        Assert.Contains("operator !=(Pair<TKey, TValue> a, Pair<TKey, TValue> b)", output);
+    }
+
+    [Fact]
+    public void RoundTrip_GenericImplicitExplicitConversion_Preserved()
+    {
+        var csharp = """
+            public class Box<T>
+            {
+                public T Value { get; set; }
+
+                public static implicit operator T(Box<T> box) { return box.Value; }
+                public static explicit operator Box<T>(T value) { return new Box<T>(); }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("implicit operator T(Box<T> box)", output);
+        Assert.Contains("explicit operator Box<T>(T value)", output);
+    }
+
+    [Fact]
+    public void RoundTrip_GenericOperatorWithTernaryInBody_Preserved()
+    {
+        var csharp = """
+            public class SafeValue<T>
+            {
+                public int Count { get; set; }
+
+                public static SafeValue<T> operator +(SafeValue<T> a, SafeValue<T> b)
+                {
+                    var total = a.Count + b.Count;
+                    return new SafeValue<T> { Count = total > 100 ? 100 : total };
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("operator +(SafeValue<T> a, SafeValue<T> b)", output);
+        Assert.Contains("? 100 :", output);
+    }
+
+    [Fact]
+    public void CalorParser_GenericClassOperator_ParsesCorrectly()
+    {
+        var calor = """
+            §M{m001:TestModule}
+              §CL{c001:Vector<T>:pub}
+                §WHERE T : struct
+                §OP{op001:+:pub}
+                  §I{Vector<T>:a}
+                  §I{Vector<T>:b}
+                  §O{Vector<T>}
+                  §R §NEW{Vector<T>} §/NEW
+                §/OP{op001}
+              §/CL{c001}
+            §/M{m001}
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calor, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        Assert.Single(module.Classes);
+
+        var cls = module.Classes[0];
+        Assert.Contains("Vector", cls.Name);
+        Assert.Single(cls.OperatorOverloads);
+        Assert.Equal("+", cls.OperatorOverloads[0].OperatorToken);
+    }
+
+    private static string ConvertAndRoundTrip(string csharp)
+    {
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.ToString())));
+
+        var calorEmitter = new CalorEmitter();
+        var calorCode = calorEmitter.Emit(result.Ast!);
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorCode, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Re-parse failed:\n{string.Join("\n", diagnostics.Select(d => d.Message))}\nCalor:\n{calorCode}");
+
+        var emitter = new CSharpEmitter();
+        return emitter.Emit(module);
+    }
+
+    #endregion
 }

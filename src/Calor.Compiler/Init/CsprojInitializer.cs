@@ -183,10 +183,13 @@ public sealed class CsprojInitializer
 
         root.Add(runtimePropertyGroup);
 
-        // Add ItemGroup for Calor.Runtime reference
+        // Add ItemGroup for Calor.Runtime reference (skipped when CalorSkipRuntimeReference is set
+        // or when a ProjectReference to Calor.Runtime already exists)
         var runtimeItemGroup = new XElement("ItemGroup",
+            new XAttribute("Condition", "'$(CalorSkipRuntimeReference)' != 'true'"),
             new XElement("Reference",
                 new XAttribute("Include", "Calor.Runtime"),
+                new XAttribute("Condition", "!@(ProjectReference->AnyHaveMetadataValue('Filename', 'Calor.Runtime'))"),
                 new XElement("HintPath", "$(CalorRuntimePath)")));
 
         root.Add(runtimeItemGroup);
@@ -297,8 +300,9 @@ public sealed class CsprojInitializer
               <CalorRuntimePath>$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net8.0/any/Calor.Runtime.dll</CalorRuntimePath>
             </PropertyGroup>
 
-            <ItemGroup>
-              <Reference Include="Calor.Runtime">
+            <ItemGroup Condition="'$(CalorSkipRuntimeReference)' != 'true'">
+              <Reference Include="Calor.Runtime"
+                         Condition="!@(ProjectReference->AnyHaveMetadataValue('Filename', 'Calor.Runtime'))">
                 <HintPath>$(CalorRuntimePath)</HintPath>
               </Reference>
             </ItemGroup>

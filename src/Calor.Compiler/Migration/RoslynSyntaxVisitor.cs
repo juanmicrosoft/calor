@@ -637,31 +637,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var operatorOverloads = new List<OperatorOverloadNode>();
         var events = new List<EventDefinitionNode>();
 
+        var interopBlocks = new List<CSharpInteropBlockNode>();
+
         foreach (var member in node.Members)
         {
-            switch (member)
+            try
             {
-                case FieldDeclarationSyntax fieldSyntax:
-                    fields.AddRange(ConvertFields(fieldSyntax));
-                    break;
-                case PropertyDeclarationSyntax propertySyntax:
-                    properties.Add(ConvertProperty(propertySyntax));
-                    break;
-                case ConstructorDeclarationSyntax ctorSyntax:
-                    constructors.Add(ConvertConstructor(ctorSyntax));
-                    break;
-                case MethodDeclarationSyntax methodSyntax:
-                    methods.Add(ConvertMethod(methodSyntax));
-                    break;
-                case OperatorDeclarationSyntax opSyntax:
-                    operatorOverloads.Add(ConvertOperatorOverload(opSyntax));
-                    break;
-                case ConversionOperatorDeclarationSyntax convSyntax:
-                    operatorOverloads.Add(ConvertConversionOperatorOverload(convSyntax));
-                    break;
-                case EventFieldDeclarationSyntax eventSyntax:
-                    events.AddRange(ConvertEventFields(eventSyntax));
-                    break;
+                ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
+            }
+            catch (Exception) when (_context.Mode == ConversionMode.Interop)
+            {
+                var kind = member switch
+                {
+                    MethodDeclarationSyntax => InteropMemberKind.Method,
+                    PropertyDeclarationSyntax => InteropMemberKind.Property,
+                    FieldDeclarationSyntax => InteropMemberKind.Field,
+                    ConstructorDeclarationSyntax => InteropMemberKind.Constructor,
+                    EventFieldDeclarationSyntax => InteropMemberKind.Event,
+                    _ => InteropMemberKind.Other
+                };
+                interopBlocks.Add(CreateInteropBlock(member, null, kind));
             }
         }
 
@@ -690,7 +685,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             csharpAttrs,
             isStruct: true,
             isReadOnly: isReadOnly,
-            visibility: visibility);
+            visibility: visibility,
+            interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -3198,7 +3194,41 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Case 3: Return statement in method — use method return type
         if (parent is ReturnStatementSyntax || parent is ArrowExpressionClauseSyntax)
         {
-            // Would need method context; skip for now
+            // Walk up the syntax tree to find the enclosing member declaration.
+            // Bail out if we cross a lambda/local function boundary to avoid
+            // inferring the outer method's return type instead of the inner scope's.
+            var ancestor = parent;
+            while (ancestor != null)
+            {
+                switch (ancestor)
+                {
+                    case ParenthesizedLambdaExpressionSyntax:
+                    case SimpleLambdaExpressionSyntax:
+                    case AnonymousMethodExpressionSyntax:
+                        return null; // can't infer across lambda/delegate boundary without semantic model
+                    case LocalFunctionStatementSyntax localFunc:
+                    {
+                        var rt = localFunc.ReturnType.ToString();
+                        if (localFunc.Modifiers.Any(SyntaxKind.AsyncKeyword))
+                            rt = UnwrapTaskType(rt);
+                        return rt is "void" or "var" ? null : TypeMapper.CSharpToCalor(rt);
+                    }
+                    case MethodDeclarationSyntax method:
+                    {
+                        var rt = method.ReturnType.ToString();
+                        if (method.Modifiers.Any(SyntaxKind.AsyncKeyword))
+                            rt = UnwrapTaskType(rt);
+                        return rt is "void" or "var" ? null : TypeMapper.CSharpToCalor(rt);
+                    }
+                    case PropertyDeclarationSyntax property:
+                        return TypeMapper.CSharpToCalor(property.Type.ToString());
+                    case OperatorDeclarationSyntax op:
+                        return TypeMapper.CSharpToCalor(op.ReturnType.ToString());
+                    case ConversionOperatorDeclarationSyntax:
+                        return null; // conversion operators don't have a named return type to infer from
+                }
+                ancestor = ancestor.Parent;
+            }
             return null;
         }
 
@@ -4082,16 +4112,61 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertConditionalExpression(ConditionalExpressionSyntax conditional)
     {
-        // Ternary is converted to a conditional expression: (? cond then else)
-        var condition = ConvertExpression(conditional.Condition);
+        var span = GetTextSpan(conditional);
+
+        // Handle ternary with throw in false branch: flag ? value : throw new E(...)
+        // Hoist to: if (!flag) throw new E(...); return value;
+        if (conditional.WhenFalse is ThrowExpressionSyntax throwFalse)
+        {
+            _context.RecordFeatureUsage("ternary-throw");
+            _context.IncrementConverted();
+            var condition = ConvertExpression(conditional.Condition);
+            var exceptionExpr = ConvertExpression(throwFalse.Expression);
+
+            var negatedCondition = new UnaryOperationNode(span, UnaryOperator.Not, condition);
+            var throwStmt = new ThrowStatementNode(GetTextSpan(throwFalse), exceptionExpr);
+            var guard = new IfStatementNode(
+                span,
+                _context.GenerateId("if"),
+                negatedCondition,
+                new List<StatementNode> { throwStmt },
+                Array.Empty<ElseIfClauseNode>(),
+                null,
+                new AttributeCollection());
+
+            _pendingStatements.Add(guard);
+            return ConvertExpression(conditional.WhenTrue);
+        }
+
+        // Handle ternary with throw in true branch: flag ? throw new E(...) : value
+        // Hoist to: if (flag) throw new E(...); return value;
+        if (conditional.WhenTrue is ThrowExpressionSyntax throwTrue)
+        {
+            _context.RecordFeatureUsage("ternary-throw");
+            _context.IncrementConverted();
+            var condition = ConvertExpression(conditional.Condition);
+            var exceptionExpr = ConvertExpression(throwTrue.Expression);
+
+            var throwStmt = new ThrowStatementNode(GetTextSpan(throwTrue), exceptionExpr);
+            var guard = new IfStatementNode(
+                span,
+                _context.GenerateId("if"),
+                condition,
+                new List<StatementNode> { throwStmt },
+                Array.Empty<ElseIfClauseNode>(),
+                null,
+                new AttributeCollection());
+
+            _pendingStatements.Add(guard);
+            return ConvertExpression(conditional.WhenFalse);
+        }
+
+        // Standard ternary: (? cond then else)
+        var cond = ConvertExpression(conditional.Condition);
         var whenTrue = ConvertExpression(conditional.WhenTrue);
         var whenFalse = ConvertExpression(conditional.WhenFalse);
 
-        return new ConditionalExpressionNode(
-            GetTextSpan(conditional),
-            condition,
-            whenTrue,
-            whenFalse);
+        return new ConditionalExpressionNode(span, cond, whenTrue, whenFalse);
     }
 
     private ExpressionNode ConvertCastExpression(CastExpressionSyntax cast)
@@ -4548,9 +4623,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 if (p.Modifiers.Any(SyntaxKind.OutKeyword)) modifier |= ParameterModifier.Out;
                 if (p.Modifiers.Any(SyntaxKind.InKeyword)) modifier |= ParameterModifier.In;
                 if (p.Modifiers.Any(SyntaxKind.ParamsKeyword)) modifier |= ParameterModifier.Params;
-                ExpressionNode? defaultValue = p.Default != null
-                    ? ConvertExpression(p.Default.Value)
-                    : null;
+                ExpressionNode? defaultValue = null;
+                if (p.Default != null)
+                {
+                    defaultValue = ConvertExpression(p.Default.Value);
+                    _context.RecordFeatureUsage("default-parameter");
+                }
                 var paramAttrs = ConvertAttributes(p.AttributeLists);
                 return new ParameterNode(
                     GetTextSpan(p),

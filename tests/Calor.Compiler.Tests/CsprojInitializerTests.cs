@@ -458,4 +458,65 @@ public class CsprojInitializerTests : IDisposable
           </PropertyGroup>
         </Project>
         """;
+
+    #region Challenge 4+5: CalorSkipRuntimeReference and duplicate reference detection
+
+    [Fact]
+    public void GenerateCalorTargetsXml_ContainsCalorSkipRuntimeReferenceCondition()
+    {
+        var xml = CsprojInitializer.GenerateCalorTargetsXml();
+
+        Assert.Contains("CalorSkipRuntimeReference", xml);
+        Assert.Contains("'$(CalorSkipRuntimeReference)' != 'true'", xml);
+    }
+
+    [Fact]
+    public void GenerateCalorTargetsXml_ContainsProjectReferenceAutoDetection()
+    {
+        var xml = CsprojInitializer.GenerateCalorTargetsXml();
+
+        // The template should detect existing ProjectReference to Calor.Runtime
+        Assert.Contains("ProjectReference", xml);
+        Assert.Contains("Calor.Runtime", xml);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_InjectsSkipRuntimeCondition()
+    {
+        var projectPath = Path.Combine(_testDir, "TestProject.csproj");
+        File.WriteAllText(projectPath, SdkStyleCsproj);
+
+        var result = await _initializer.InitializeAsync(projectPath);
+        Assert.True(result.IsSuccess);
+
+        var content = File.ReadAllText(projectPath);
+        Assert.Contains("CalorSkipRuntimeReference", content);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_CalorRuntimeProject_CanSetSkipFlag()
+    {
+        // Simulates Calor.Runtime.csproj with CalorSkipRuntimeReference already set
+        var runtimeCsproj = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <CalorSkipRuntimeReference>true</CalorSkipRuntimeReference>
+              </PropertyGroup>
+            </Project>
+            """;
+
+        var projectPath = Path.Combine(_testDir, "Calor.Runtime.csproj");
+        File.WriteAllText(projectPath, runtimeCsproj);
+
+        var result = await _initializer.InitializeAsync(projectPath);
+        Assert.True(result.IsSuccess);
+
+        var content = File.ReadAllText(projectPath);
+        // The skip flag should still be present
+        Assert.Contains("<CalorSkipRuntimeReference>true</CalorSkipRuntimeReference>", content);
+        // The condition on the ItemGroup should respect it
+        Assert.Contains("CalorSkipRuntimeReference", content);
+    }
+
+    #endregion
 }

@@ -62,12 +62,14 @@ public class CoverageCommandTests : IDisposable
     [Fact]
     public async Task Coverage_WithBlockers_ReturnsLowerScore()
     {
+        // Use out parameter (genuinely unsupported) instead of ternary throw (now supported)
         var source = """
             public class Service
             {
-                public string Process(string input, bool flag)
+                public bool TryParse(string input, out int result)
                 {
-                    return flag ? input : throw new ArgumentNullException(nameof(input));
+                    result = 0;
+                    return int.TryParse(input, out result);
                 }
             }
             """;
@@ -77,7 +79,7 @@ public class CoverageCommandTests : IDisposable
 
         Assert.False(result.WasSkipped);
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "throw-expression");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "ref-parameter");
     }
 
     [Fact]

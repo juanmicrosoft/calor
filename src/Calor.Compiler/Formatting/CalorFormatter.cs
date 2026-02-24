@@ -146,7 +146,8 @@ public sealed class CalorFormatter
         foreach (var param in func.Parameters)
         {
             var typeName = CompactTypeName(param.TypeName);
-            AppendLine($"§I{{{typeName}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
         }
 
         // Output type - lowercase compact form
@@ -214,7 +215,8 @@ public sealed class CalorFormatter
 
         foreach (var param in method.Parameters)
         {
-            AppendLine($"§I{{{CompactTypeName(param.TypeName)}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{CompactTypeName(param.TypeName)}:{param.Name}}}{defaultVal}");
         }
         if (method.Output != null)
         {
@@ -332,7 +334,8 @@ public sealed class CalorFormatter
         foreach (var param in ctor.Parameters)
         {
             var typeName = CompactTypeName(param.TypeName);
-            AppendLine($"§I{{{typeName}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
         }
 
         foreach (var stmt in ctor.Body)
@@ -352,7 +355,8 @@ public sealed class CalorFormatter
         foreach (var param in op.Parameters)
         {
             var typeName = CompactTypeName(param.TypeName);
-            AppendLine($"§I{{{typeName}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
         }
 
         if (op.Output != null)
@@ -388,7 +392,8 @@ public sealed class CalorFormatter
         foreach (var param in method.Parameters)
         {
             var typeName = CompactTypeName(param.TypeName);
-            AppendLine($"§I{{{typeName}:{param.Name}}}");
+            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
+            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
         }
 
         if (method.Output != null)
@@ -627,6 +632,44 @@ public sealed class CalorFormatter
                 TypeOp.As => $"(as {FormatExpression(typeOp.Operand)} {typeOp.TargetType})",
                 _ => $"/* TypeOp {typeOp.Operation} */"
             },
+            // Ternary conditional: (? cond then else)
+            ConditionalExpressionNode cond => $"(? {FormatExpression(cond.Condition)} {FormatExpression(cond.WhenTrue)} {FormatExpression(cond.WhenFalse)})",
+            // Decimal literals
+            DecimalLiteralNode dec => "DEC:" + dec.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            // Fallback for unsupported C# constructs
+            FallbackExpressionNode fb => $"§ERR{{\"TODO: {fb.FeatureName}\"}}",
+            // String interpolation
+            InterpolatedStringNode interp => FormatInterpolatedString(interp),
+            // Range and index-from-end
+            RangeExpressionNode range => $"{(range.Start != null ? FormatExpression(range.Start) : "")}..{(range.End != null ? FormatExpression(range.End) : "")}",
+            IndexFromEndNode idx => $"^{FormatExpression(idx.Offset)}",
+            // With expression (non-destructive mutation)
+            WithExpressionNode with => FormatWithExpression(with),
+            // Native string/char/StringBuilder operations
+            StringOperationNode strOp => FormatStringOperation(strOp),
+            CharOperationNode charOp => $"({charOp.Operation.ToCalorName()} {string.Join(" ", charOp.Arguments.Select(FormatExpression))})",
+            StringBuilderOperationNode sbOp => FormatStringBuilderOperation(sbOp),
+            // Collections
+            ListCreationNode list => $"§LIST{{{list.Id}:{CompactTypeName(list.ElementType)}}} {string.Join(" ", list.Elements.Select(FormatExpression))} §/LIST{{{list.Id}}}".TrimEnd(),
+            DictionaryCreationNode dict => FormatDictionaryCreation(dict),
+            SetCreationNode set => $"§HSET{{{set.Id}:{CompactTypeName(set.ElementType)}}} {string.Join(" ", set.Elements.Select(FormatExpression))} §/HSET{{{set.Id}}}".TrimEnd(),
+            CollectionContainsNode has => FormatCollectionContains(has),
+            CollectionCountNode cnt => $"§CNT {FormatExpression(cnt.Collection)}",
+            // Array length
+            ArrayLengthNode len => $"{FormatExpression(len.Array)}.len",
+            // Anonymous objects and tuples
+            AnonymousObjectCreationNode anon => FormatAnonymousObject(anon),
+            TupleLiteralNode tuple => $"({string.Join(", ", tuple.Elements.Select(FormatExpression))})",
+            // Quantifiers
+            ForallExpressionNode forall => $"(forall ({string.Join(" ", forall.BoundVariables.Select(v => $"({v.Name} {v.TypeName})"))}) {FormatExpression(forall.Body)})",
+            ExistsExpressionNode exists => $"(exists ({string.Join(" ", exists.BoundVariables.Select(v => $"({v.Name} {v.TypeName})"))}) {FormatExpression(exists.Body)})",
+            ImplicationExpressionNode impl => $"(-> {FormatExpression(impl.Antecedent)} {FormatExpression(impl.Consequent)})",
+            // Generic type instantiation
+            GenericTypeNode gen => gen.TypeArguments.Count > 0
+                ? $"{CompactTypeName(gen.TypeName)}<{string.Join(", ", gen.TypeArguments.Select(CompactTypeName))}>"
+                : CompactTypeName(gen.TypeName),
+            // Internal keyword argument (should not appear in final AST, but handle gracefully)
+            KeywordArgNode kw => $":{kw.Name}",
             _ => $"/* {expr.GetType().Name} */"
         };
     }
@@ -669,6 +712,71 @@ public sealed class CalorFormatter
         }
         var size = arr.Size != null ? $":{FormatExpression(arr.Size)}" : "";
         return $"§ARR{{{arr.Name}:{CompactTypeName(arr.ElementType)}{size}}}";
+    }
+
+    private string FormatInterpolatedString(InterpolatedStringNode interp)
+    {
+        var sb = new StringBuilder("\"");
+        foreach (var part in interp.Parts)
+        {
+            if (part is InterpolatedStringTextNode textPart)
+                sb.Append(textPart.Text);
+            else if (part is InterpolatedStringExpressionNode exprPart)
+            {
+                sb.Append("${");
+                sb.Append(FormatExpression(exprPart.Expression));
+                sb.Append('}');
+            }
+        }
+        sb.Append('"');
+        return sb.ToString();
+    }
+
+    private string FormatWithExpression(WithExpressionNode with)
+    {
+        var target = FormatExpression(with.Target);
+        var assignments = string.Join(", ", with.Assignments.Select(a => $"{a.PropertyName} = {FormatExpression(a.Value)}"));
+        return $"{target} with {{ {assignments} }}";
+    }
+
+    private string FormatStringOperation(StringOperationNode strOp)
+    {
+        var opName = strOp.Operation.ToCalorName();
+        var args = string.Join(" ", strOp.Arguments.Select(FormatExpression));
+        if (strOp.ComparisonMode.HasValue)
+            return $"({opName} {args} :{strOp.ComparisonMode.Value.ToKeyword()})";
+        return $"({opName} {args})";
+    }
+
+    private string FormatStringBuilderOperation(StringBuilderOperationNode sbOp)
+    {
+        var opName = sbOp.Operation.ToCalorName();
+        var args = sbOp.Arguments.Select(FormatExpression).ToList();
+        return args.Count > 0 ? $"({opName} {string.Join(" ", args)})" : $"({opName})";
+    }
+
+    private string FormatDictionaryCreation(DictionaryCreationNode dict)
+    {
+        var entries = string.Join(" ", dict.Entries.Select(e => $"§KV {FormatExpression(e.Key)} {FormatExpression(e.Value)}"));
+        return $"§DICT{{{dict.Id}:{CompactTypeName(dict.KeyType)}:{CompactTypeName(dict.ValueType)}}} {entries} §/DICT{{{dict.Id}}}".TrimEnd();
+    }
+
+    private string FormatCollectionContains(CollectionContainsNode has)
+    {
+        var keyOrValue = FormatExpression(has.KeyOrValue);
+        var modePrefix = has.Mode switch
+        {
+            ContainsMode.Key => "§KEY ",
+            ContainsMode.DictValue => "§VAL ",
+            _ => ""
+        };
+        return $"§HAS{{{has.CollectionName}}} {modePrefix}{keyOrValue}";
+    }
+
+    private string FormatAnonymousObject(AnonymousObjectCreationNode anon)
+    {
+        var inits = string.Join(" ", anon.Initializers.Select(i => $"{i.PropertyName} = {FormatExpression(i.Value)}"));
+        return $"§ANON {inits} §/ANON".TrimEnd();
     }
 
     private static string FormatCatchAttributes(CatchClauseNode catchClause)

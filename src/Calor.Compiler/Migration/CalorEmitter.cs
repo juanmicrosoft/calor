@@ -204,7 +204,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         foreach (var param in node.Parameters)
         {
-            AppendLine($"§I{{{TypeMapper.CSharpToCalor(param.TypeName)}:{param.Name}}}");
+            AppendLine(Visit(param));
         }
         if (node.Output != null)
         {
@@ -433,8 +433,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Emit parameters as separate §I[type:name] lines
         foreach (var param in node.Parameters)
         {
-            var paramType = TypeMapper.CSharpToCalor(param.TypeName);
-            AppendLine($"§I{{{paramType}:{param.Name}}}");
+            AppendLine(Visit(param));
         }
 
         // Emit preconditions
@@ -480,8 +479,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Emit parameters
         foreach (var param in node.Parameters)
         {
-            var paramType = TypeMapper.CSharpToCalor(param.TypeName);
-            AppendLine($"§I{{{paramType}:{param.Name}}}");
+            AppendLine(Visit(param));
         }
 
         // Emit output type
@@ -660,7 +658,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
-        return $"§I{{{typeName}:{node.Name}{modStr}}}{attrs}";
+        var result = $"§I{{{typeName}:{node.Name}{modStr}}}{attrs}";
+        if (node.DefaultValue != null)
+        {
+            result += $" = {node.DefaultValue.Accept(this)}";
+        }
+        return result;
     }
 
     public string Visit(RequiresNode node)
@@ -1957,7 +1960,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         foreach (var param in node.Parameters)
         {
-            AppendLine($"§I{{{TypeMapper.CSharpToCalor(param.TypeName)}:{param.Name}}}");
+            AppendLine(Visit(param));
         }
         if (node.Output != null)
         {

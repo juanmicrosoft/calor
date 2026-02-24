@@ -1209,13 +1209,17 @@ internal sealed class MigrationAnalysisVisitor : CSharpSyntaxWalker
         ErrorHandlingPatterns++;
         AddExample(ErrorHandlingExamples, "throw expression");
 
-        // Only mark as unsupported if NOT inside a null-coalescing expression
-        // (those are now properly converted to if-null-throw guards)
-        if (node.Parent is not BinaryExpressionSyntax binary ||
-            !binary.IsKind(SyntaxKind.CoalesceExpression))
+        // Don't penalize throw expressions that are properly converted:
+        // 1. Null-coalescing: x ?? throw new E() → hoisted null guard
+        // 2. Ternary: flag ? x : throw new E() → hoisted condition guard
+        var isCoalesceThrow = node.Parent is BinaryExpressionSyntax binary &&
+            binary.IsKind(SyntaxKind.CoalesceExpression);
+        var isTernaryThrow = node.Parent is ConditionalExpressionSyntax;
+
+        if (!isCoalesceThrow && !isTernaryThrow)
         {
             ThrowExpressionCount++;
-            AddExample(ThrowExpressionExamples, "?? throw new ...");
+            AddExample(ThrowExpressionExamples, "throw expression in unsupported context");
         }
 
         base.VisitThrowExpression(node);
