@@ -1,14 +1,10 @@
 §M{m004:Test_01_04}
   §CL{c001:MathUtils:pub:stat}
-    §MT{m002:Square:pub:stat}
-      §I{f64:x}
-      §O{f64}
+    §MT{m002:Square:pub:stat} (f64:x) -> f64
       §R (* x x)
     §/MT{m002}
 
-    §MT{m003:Cube:pub:stat}
-      §I{f64:x}
-      §O{f64}
+    §MT{m003:Cube:pub:stat} (f64:x) -> f64
       §R (* (* x x) x)
     §/MT{m003}
 

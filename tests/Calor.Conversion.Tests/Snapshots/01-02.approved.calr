@@ -1,17 +1,8 @@
 §M{m005:Test_01_02}
   §CL{c001:Person:pub}
-    §PROP{p002:Name:str:pub}
-      §GET{pub}
-      §SET{pub}
-    §/PROP{p002}
-    §PROP{p003:Age:i32:pub}
-      §GET{pub}
-    §/PROP{p003}
-    §PROP{p004:Email:str:pub}
-      §GET{pub}
-      §SET{pub}
-      = ""
-    §/PROP{p004}
+    §PROP{p002:Name:str:pub:get,set}
+    §PROP{p003:Age:i32:pub:get}
+    §PROP{p004:Email:str:pub:get,set} = ""
 
   §/CL{c001}
 

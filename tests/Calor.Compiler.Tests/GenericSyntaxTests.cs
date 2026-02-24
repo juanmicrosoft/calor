@@ -524,8 +524,8 @@ public class GenericSyntaxTests
         var calorOutput = emitter.Emit(module);
 
         Assert.Contains("§F{f001:Identity<T>:pub}", calorOutput);
-        Assert.Contains("§I{T:value}", calorOutput);
-        Assert.Contains("§O{T}", calorOutput);
+        Assert.Contains("T:value", calorOutput);
+        Assert.Contains("-> T", calorOutput);
     }
 
     [Fact]
@@ -659,7 +659,10 @@ public class GenericSyntaxTests
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("<T>", result.CalorSource);
-        Assert.Contains("§I{T:value}", result.CalorSource);
+        // Inline params format: (T:value) or full format: §I{T:value}
+        Assert.True(
+            result.CalorSource!.Contains("§I{T:value}") || result.CalorSource.Contains("(T:value)"),
+            $"Expected parameter 'T:value' in either inline or full format. Actual:\n{result.CalorSource}");
     }
 
     [Fact]

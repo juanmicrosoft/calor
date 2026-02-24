@@ -3,15 +3,12 @@
     §FLD{str:_id:priv:readonly}
     §FLD{dec:_balance:priv}
 
-    §CTOR{ctor002:pub}
-      §I{str:id}
-      §I{dec:initialBalance}
+    §CTOR{ctor002:pub} (str:id, dec:initialBalance)
       §ASSIGN _id id
       §ASSIGN _balance initialBalance
     §/CTOR{ctor002}
 
-    §MT{m003:GetBalance:pub}
-      §O{dec}
+    §MT{m003:GetBalance:pub} () -> dec
       §R _balance
     §/MT{m003}
 

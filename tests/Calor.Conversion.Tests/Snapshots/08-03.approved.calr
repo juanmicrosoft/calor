@@ -4,13 +4,7 @@
   §CL{c001:Container:pub}
     §LIST{list002:any}
     §/LIST{list002}
-    §PROP{p004:Items:List<str>:pub}
-      §GET{pub}
-      §SET{pub}
-      §LIST{list002:any}
-      §/LIST{list002}
-      = 
-    §/PROP{p004}
+    §PROP{p004:Items:List<str>:pub:get,set} = 
 
   §/CL{c001}
 

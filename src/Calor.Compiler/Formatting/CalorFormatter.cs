@@ -138,24 +138,15 @@ public sealed class CalorFormatter
     {
         var funcId = AbbreviateId(func.Id);
 
-        // Function declaration - visibility INSIDE braces as third positional parameter
+        // Function declaration with inline params: §F{id:Name:vis} (type:name, type:name) -> returnType
         var visibility = func.Visibility == Visibility.Public ? "pub" : "pri";
-        AppendLine($"§F{{{funcId}:{func.Name}:{visibility}}}");
-
-        // Parameters - type name should be lowercase compact form
-        foreach (var param in func.Parameters)
+        var paramList = string.Join(", ", func.Parameters.Select(p =>
         {
-            var typeName = CompactTypeName(param.TypeName);
-            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
-            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
-        }
-
-        // Output type - lowercase compact form
-        if (func.Output != null)
-        {
-            var typeName = CompactTypeName(func.Output.TypeName);
-            AppendLine($"§O{{{typeName}}}");
-        }
+            var defaultVal = p.DefaultValue != null ? $" = {FormatExpression(p.DefaultValue)}" : "";
+            return $"{CompactTypeName(p.TypeName)}:{p.Name}{defaultVal}";
+        }));
+        var returnType = func.Output != null ? $" -> {CompactTypeName(func.Output.TypeName)}" : "";
+        AppendLine($"§F{{{funcId}:{func.Name}:{visibility}}} ({paramList}){returnType}");
 
         // Effects - use compact effect codes
         if (func.Effects != null)
@@ -211,18 +202,13 @@ public sealed class CalorFormatter
     private void FormatMethodSignature(MethodSignatureNode method)
     {
         var methodId = AbbreviateId(method.Id);
-        AppendLine($"§MT{{{methodId}:{method.Name}}}");
-
-        foreach (var param in method.Parameters)
+        var paramList = string.Join(", ", method.Parameters.Select(p =>
         {
-            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
-            AppendLine($"§I{{{CompactTypeName(param.TypeName)}:{param.Name}}}{defaultVal}");
-        }
-        if (method.Output != null)
-        {
-            AppendLine($"§O{{{CompactTypeName(method.Output.TypeName)}}}");
-        }
-
+            var defaultVal = p.DefaultValue != null ? $" = {FormatExpression(p.DefaultValue)}" : "";
+            return $"{CompactTypeName(p.TypeName)}:{p.Name}{defaultVal}";
+        }));
+        var returnType = method.Output != null ? $" -> {CompactTypeName(method.Output.TypeName)}" : "";
+        AppendLine($"§MT{{{methodId}:{method.Name}}} ({paramList}){returnType}");
         AppendLine($"§/MT{{{methodId}}}");
     }
 
@@ -298,6 +284,27 @@ public sealed class CalorFormatter
         var propId = AbbreviateId(prop.Id);
         var visibility = prop.Visibility == Visibility.Public ? "pub" : "priv";
         var typeName = CompactTypeName(prop.TypeName);
+
+        // Compact auto-property shorthand: single line
+        if (prop.IsAutoProperty && (prop.Getter != null || prop.Setter != null || prop.Initer != null))
+        {
+            var accessors = new List<string>();
+            if (prop.Getter != null)
+                accessors.Add(CompactAccessorName(PropertyAccessorNode.AccessorKind.Get, prop.Getter.Visibility));
+            if (prop.Setter != null)
+                accessors.Add(CompactAccessorName(PropertyAccessorNode.AccessorKind.Set, prop.Setter.Visibility));
+            if (prop.Initer != null)
+                accessors.Add(CompactAccessorName(PropertyAccessorNode.AccessorKind.Init, prop.Initer.Visibility));
+
+            var accessorStr = string.Join(",", accessors);
+            var line = $"§PROP{{{propId}:{prop.Name}:{typeName}:{visibility}:{accessorStr}}}";
+            if (prop.DefaultValue != null)
+                line += $" = {FormatExpression(prop.DefaultValue)}";
+            AppendLine(line);
+            return;
+        }
+
+        // Multi-line form for properties with custom accessor bodies
         AppendLine($"§PROP{{{propId}:{prop.Name}:{typeName}:{visibility}}}");
 
         if (prop.Getter != null)
@@ -322,21 +329,49 @@ public sealed class CalorFormatter
             AppendLine("§/SET");
         }
 
+        if (prop.DefaultValue != null)
+        {
+            AppendLine($"= {FormatExpression(prop.DefaultValue)}");
+        }
+
         AppendLine($"§/PROP{{{propId}}}");
+    }
+
+    /// <summary>
+    /// Maps an accessor kind and its visibility to a compact name.
+    /// get, set, init for public; priget, priset, etc. for private;
+    /// intget, intset for internal; proget, proset for protected.
+    /// </summary>
+    private static string CompactAccessorName(PropertyAccessorNode.AccessorKind kind, Visibility? vis)
+    {
+        var prefix = vis switch
+        {
+            Visibility.Private => "pri",
+            Visibility.Internal => "int",
+            Visibility.Protected => "pro",
+            Visibility.ProtectedInternal => "pro",
+            _ => "" // Public or null = no prefix
+        };
+        var suffix = kind switch
+        {
+            PropertyAccessorNode.AccessorKind.Get => "get",
+            PropertyAccessorNode.AccessorKind.Set => "set",
+            PropertyAccessorNode.AccessorKind.Init => "init",
+            _ => "get"
+        };
+        return prefix + suffix;
     }
 
     private void FormatConstructor(ConstructorNode ctor)
     {
         var ctorId = AbbreviateId(ctor.Id);
         var visibility = ctor.Visibility == Visibility.Public ? "pub" : "priv";
-        AppendLine($"§CTOR{{{ctorId}:{visibility}}}");
-
-        foreach (var param in ctor.Parameters)
+        var paramList = string.Join(", ", ctor.Parameters.Select(p =>
         {
-            var typeName = CompactTypeName(param.TypeName);
-            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
-            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
-        }
+            var defaultVal = p.DefaultValue != null ? $" = {FormatExpression(p.DefaultValue)}" : "";
+            return $"{CompactTypeName(p.TypeName)}:{p.Name}{defaultVal}";
+        }));
+        AppendLine($"§CTOR{{{ctorId}:{visibility}}} ({paramList})");
 
         foreach (var stmt in ctor.Body)
         {
@@ -350,20 +385,13 @@ public sealed class CalorFormatter
     {
         var opId = AbbreviateId(op.Id);
         var visibility = op.Visibility == Visibility.Public ? "pub" : "priv";
-        AppendLine($"§OP{{{opId}:{op.OperatorToken}:{visibility}}}");
-
-        foreach (var param in op.Parameters)
+        var paramList = string.Join(", ", op.Parameters.Select(p =>
         {
-            var typeName = CompactTypeName(param.TypeName);
-            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
-            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
-        }
-
-        if (op.Output != null)
-        {
-            var typeName = CompactTypeName(op.Output.TypeName);
-            AppendLine($"§O{{{typeName}}}");
-        }
+            var defaultVal = p.DefaultValue != null ? $" = {FormatExpression(p.DefaultValue)}" : "";
+            return $"{CompactTypeName(p.TypeName)}:{p.Name}{defaultVal}";
+        }));
+        var returnType = op.Output != null ? $" -> {CompactTypeName(op.Output.TypeName)}" : "";
+        AppendLine($"§OP{{{opId}:{op.OperatorToken}:{visibility}}} ({paramList}){returnType}");
 
         foreach (var pre in op.Preconditions)
         {
@@ -387,20 +415,13 @@ public sealed class CalorFormatter
     {
         var methodId = AbbreviateId(method.Id);
         var visibility = method.Visibility == Visibility.Public ? "pub" : "priv";
-        AppendLine($"§MT{{{methodId}:{method.Name}:{visibility}}}");
-
-        foreach (var param in method.Parameters)
+        var paramList = string.Join(", ", method.Parameters.Select(p =>
         {
-            var typeName = CompactTypeName(param.TypeName);
-            var defaultVal = param.DefaultValue != null ? $" = {FormatExpression(param.DefaultValue)}" : "";
-            AppendLine($"§I{{{typeName}:{param.Name}}}{defaultVal}");
-        }
-
-        if (method.Output != null)
-        {
-            var typeName = CompactTypeName(method.Output.TypeName);
-            AppendLine($"§O{{{typeName}}}");
-        }
+            var defaultVal = p.DefaultValue != null ? $" = {FormatExpression(p.DefaultValue)}" : "";
+            return $"{CompactTypeName(p.TypeName)}:{p.Name}{defaultVal}";
+        }));
+        var returnType = method.Output != null ? $" -> {CompactTypeName(method.Output.TypeName)}" : "";
+        AppendLine($"§MT{{{methodId}:{method.Name}:{visibility}}} ({paramList}){returnType}");
 
         foreach (var stmt in method.Body)
         {

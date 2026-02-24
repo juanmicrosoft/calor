@@ -1383,9 +1383,9 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        // Property tag should include stat modifier
-        Assert.Contains(":stat}", output);
-        Assert.DoesNotContain(":static}", output);
+        // Property tag should include stat modifier (compact form may have accessor suffix)
+        Assert.Contains(":stat:", output);
+        Assert.DoesNotContain(":static:", output);
     }
 
     [Fact]
