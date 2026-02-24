@@ -110,6 +110,33 @@ if (expression is UnaryExpression unary)
 
 **Implementation Notes:** Need to generate proper Calor pattern matching with variable binding.
 
+#### ~~Constructor Overloading~~ ✅ DONE
+```csharp
+// NOW SUPPORTED:
+public class MyException : Exception
+{
+    public MyException(string message, int code) : base(message) { }
+    public MyException(string message) : base(message) { }
+}
+```
+**Status:** Multiple `§CTOR` blocks per class have always been supported. Parser, AST (`IReadOnlyList<ConstructorNode>`), code gen, converter, and emitter all handle arbitrary constructor count. Constructor chaining (`§THIS`/`§BASE` initializers) works. Tests added in `ConstructorOverloadingTests.cs`.
+```calor
+§CTOR{ctor001:pub}
+  §I{str:message}
+  §I{i32:code}
+  §BASE
+    §A message
+  §/BASE
+§/CTOR{ctor001}
+
+§CTOR{ctor002:pub}
+  §I{str:message}
+  §BASE
+    §A message
+  §/BASE
+§/CTOR{ctor002}
+```
+
 #### ~~Nested Generic Types~~ ✅ DONE
 ```csharp
 // NOW SUPPORTED:
