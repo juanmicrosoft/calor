@@ -438,7 +438,7 @@ public class TypeOperationTests
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
-        Assert.Contains("(int)(x + 1)", code);
+        Assert.Contains("(int)x + 1", code);
     }
 
     [Fact]

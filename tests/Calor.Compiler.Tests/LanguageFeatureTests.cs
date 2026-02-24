@@ -670,7 +670,7 @@ public class LanguageFeatureTests
             §/M{m001}
             """;
         var code = CompileToCode(source);
-        Assert.Contains("return a ?? (b + 1);", code);
+        Assert.Contains("return a ?? b + 1;", code);
     }
 
     [Fact]

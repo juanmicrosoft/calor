@@ -6,9 +6,7 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 namespace Transliterator
@@ -38,7 +36,7 @@ namespace Transliterator
             for (var i = 0; i <= input.Length; i++)
             {
                 char ch = input[i];
-                if ((ch == 'Y'))
+                if (ch == 'Y')
                 {
                     sb.Append("Y");
                 }

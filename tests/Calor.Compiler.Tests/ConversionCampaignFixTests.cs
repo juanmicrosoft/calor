@@ -753,11 +753,11 @@ class Test
         var result = _converter.Convert(csharp, "test");
         var calor = result.CalorSource;
 
-        // Should contain a null check and assignment, not arithmetic
+        // Should contain a null-coalescing assignment, not arithmetic
         Assert.DoesNotContain("(+ items", calor);
-        // Should have an if-null-assign pattern
-        Assert.Contains("== items null", calor);
+        // Should have the ??= pattern as compound assignment
         Assert.Contains("§ASSIGN", calor);
+        Assert.Contains("?? items", calor);
     }
 
     #endregion

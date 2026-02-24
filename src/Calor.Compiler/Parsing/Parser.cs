@@ -899,6 +899,11 @@ public sealed class Parser
         {
             return ParseRawCSharpStatement();
         }
+        // Preprocessor conditional block
+        else if (Check(TokenKind.Preprocessor))
+        {
+            return ParsePreprocessorDirective();
+        }
         // Unsafe/Low-Level statements
         else if (Check(TokenKind.Unsafe))
         {
@@ -1066,7 +1071,10 @@ public sealed class Parser
             or TokenKind.Deref
             or TokenKind.SizeOf
             or TokenKind.Array2D
-            or TokenKind.Index2D;
+            or TokenKind.Index2D
+            or TokenKind.Throw
+            // Inline raw C# expression
+            or TokenKind.RawCSharpExpression;
     }
 
     private ExpressionNode ParseExpression()
@@ -1130,6 +1138,10 @@ public sealed class Parser
             // Multidimensional Arrays
             TokenKind.Array2D => ParseMultiDimArrayCreation(),
             TokenKind.Index2D => ParseMultiDimArrayAccess(),
+            // Throw expression
+            TokenKind.Throw => ParseThrowExpression(),
+            // Inline raw C# expression
+            TokenKind.RawCSharpExpression => ParseRawCSharpExpression(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
         };
     }
@@ -3488,6 +3500,18 @@ public sealed class Parser
             var startToken = Advance(); // consume [
             Advance(); // consume @
 
+            // Parse optional target prefix: [@target:Name(args)]
+            // Accept any identifier before ':' as a target, matching C# grammar.
+            // The identifier after ':' must also be present (the attribute name).
+            string? target = null;
+            if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Colon
+                && Peek(2).Kind == TokenKind.Identifier)
+            {
+                target = Current.Text;
+                Advance(); // consume target
+                Advance(); // consume :
+            }
+
             // Parse attribute name
             if (!Check(TokenKind.Identifier))
             {
@@ -3530,7 +3554,7 @@ public sealed class Parser
             Expect(TokenKind.CloseBracket);
 
             var span = startToken.Span.Union(Current.Span);
-            attributes.Add(new CalorAttributeNode(span, name, arguments));
+            attributes.Add(new CalorAttributeNode(span, name, arguments, target));
         }
 
         return attributes;
@@ -6371,6 +6395,13 @@ public sealed class Parser
         return new CatchClauseNode(span, exceptionType, variableName, filter, body, attrs);
     }
 
+    private ThrowExpressionNode ParseThrowExpression()
+    {
+        var startToken = Expect(TokenKind.Throw);
+        var exception = ParseExpression();
+        return new ThrowExpressionNode(startToken.Span.Union(exception.Span), exception);
+    }
+
     /// <summary>
     /// Parses a throw statement.
     /// §THROW §NEW[ArgumentException] §A "Invalid" §/NEW
@@ -6428,6 +6459,49 @@ public sealed class Parser
         var token = Expect(TokenKind.RawCSharp);
         var content = token.Value as string ?? "";
         return new RawCSharpNode(token.Span, content);
+    }
+
+    /// <summary>
+    /// Parses an inline raw C# expression.
+    /// §CS{expr} (content already captured by lexer as single token)
+    /// </summary>
+    private RawCSharpExpressionNode ParseRawCSharpExpression()
+    {
+        var token = Expect(TokenKind.RawCSharpExpression);
+        var code = token.Value as string ?? "";
+        return new RawCSharpExpressionNode(token.Span, code);
+    }
+
+    /// <summary>
+    /// Parses a preprocessor conditional block.
+    /// §PP{CONDITION} ... §PPE ... §/PP{CONDITION}
+    /// </summary>
+    private PreprocessorDirectiveNode ParsePreprocessorDirective()
+    {
+        var startToken = Expect(TokenKind.Preprocessor);
+        var condition = startToken.Value as string ?? "";
+
+        var body = new List<StatementNode>();
+        List<StatementNode>? elseBody = null;
+
+        while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null) body.Add(stmt);
+        }
+
+        if (Match(TokenKind.PreprocessorElse))
+        {
+            elseBody = new List<StatementNode>();
+            while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null) elseBody.Add(stmt);
+            }
+        }
+
+        Expect(TokenKind.EndPreprocessor);
+        return new PreprocessorDirectiveNode(startToken.Span, condition, body, elseBody);
     }
 
     /// <summary>
@@ -8186,10 +8260,17 @@ public sealed class Parser
                     paramName = Advance().Text;
                 }
 
+                // Parse optional default value: = expression
+                ExpressionNode? defaultValue = null;
+                if (Match(TokenKind.Equals))
+                {
+                    defaultValue = ParseExpression();
+                }
+
                 var paramAttrs = new AttributeCollection();
                 paramAttrs.Add("_pos0", paramType);
                 paramAttrs.Add("_pos1", paramName);
-                parameters.Add(new ParameterNode(span, paramName, paramType, modifier, paramAttrs, Array.Empty<CalorAttributeNode>()));
+                parameters.Add(new ParameterNode(span, paramName, paramType, modifier, paramAttrs, Array.Empty<CalorAttributeNode>(), defaultValue));
             }
             while (Match(TokenKind.Comma));
         }

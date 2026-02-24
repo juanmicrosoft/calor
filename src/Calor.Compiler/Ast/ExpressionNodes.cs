@@ -251,3 +251,21 @@ public sealed class FallbackExpressionNode : ExpressionNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents an inline raw C# expression that passes through verbatim.
+/// §CS{expr}
+/// </summary>
+public sealed class RawCSharpExpressionNode : ExpressionNode
+{
+    public string CSharpCode { get; }
+
+    public RawCSharpExpressionNode(TextSpan span, string csharpCode)
+        : base(span)
+    {
+        CSharpCode = csharpCode ?? throw new ArgumentNullException(nameof(csharpCode));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

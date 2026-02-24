@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Init;
 using Calor.Compiler.Telemetry;
 using Microsoft.CodeAnalysis.CSharp;
@@ -43,6 +44,10 @@ public static class DiagnoseCommand
             aliases: ["--validate-codegen"],
             description: "Validate generated C# code for syntax errors");
 
+        var permissiveEffectsOption = new Option<bool>(
+            aliases: ["--permissive-effects"],
+            description: "Use permissive effect enforcement: unknown calls assumed pure, forbidden-effect checks demoted to warnings");
+
         var command = new Command("diagnose", "Output machine-readable diagnostics for Calor files")
         {
             inputArgument,
@@ -50,10 +55,11 @@ public static class DiagnoseCommand
             outputOption,
             strictApiOption,
             requireDocsOption,
-            validateCodegenOption
+            validateCodegenOption,
+            permissiveEffectsOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, formatOption, outputOption, strictApiOption, requireDocsOption, validateCodegenOption);
+        command.SetHandler(ExecuteAsync, inputArgument, formatOption, outputOption, strictApiOption, requireDocsOption, validateCodegenOption, permissiveEffectsOption);
 
         return command;
     }
@@ -64,7 +70,8 @@ public static class DiagnoseCommand
         FileInfo? output,
         bool strictApi,
         bool requireDocs,
-        bool validateCodegen)
+        bool validateCodegen,
+        bool permissiveEffects)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("diagnose");
@@ -98,7 +105,10 @@ public static class DiagnoseCommand
                 var options = new CompilationOptions
                 {
                     StrictApi = strictApi,
-                    RequireDocs = requireDocs
+                    RequireDocs = requireDocs,
+                    UnknownCallPolicy = permissiveEffects
+                        ? UnknownCallPolicy.Permissive
+                        : UnknownCallPolicy.Strict
                 };
                 var result = Program.Compile(source, file.FullName, options);
                 allDiagnostics.AddRange(result.Diagnostics);

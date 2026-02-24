@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace FizzBuzz
 {
@@ -18,15 +15,15 @@ namespace FizzBuzz
         {
             for (var i = 1; i <= 100; i++)
             {
-                if (((i % 15) == 0))
+                if (i % 15 == 0)
                 {
                     Console.WriteLine("FizzBuzz");
                 }
-                else if (((i % 3) == 0))
+                else if (i % 3 == 0)
                 {
                     Console.WriteLine("Fizz");
                 }
-                else if (((i % 5) == 0))
+                else if (i % 5 == 0)
                 {
                     Console.WriteLine("Buzz");
                 }

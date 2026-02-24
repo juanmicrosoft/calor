@@ -7,7 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace QuantifierDemo
@@ -16,13 +15,13 @@ namespace QuantifierDemo
     {
         public static bool AllNonNegative(int n)
         {
-            if (!(Enumerable.Range(0, n - 0).All(i => ((i >= 0))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Enumerable.Range(0, n - 0).All(i => ((i >= 0)))", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 78, length: 65, sourceFile: null, line: 6, column: 3, condition: "Enumerable.Range(0, n - 0).All(i => ((i >= 0)))");
+            if (!(Enumerable.Range(0, n - 0).All(i => (i >= 0)))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Enumerable.Range(0, n - 0).All(i => (i >= 0))", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 78, length: 65, sourceFile: null, line: 6, column: 3, condition: "Enumerable.Range(0, n - 0).All(i => (i >= 0))");
             return true;
         }
 
         public static bool ExistsTarget(int target)
         {
-            if (!(Enumerable.Range(0, 10 - 0).Any(i => ((i == target))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Enumerable.Range(0, 10 - 0).Any(i => ((i == target)))", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 221, length: 66, sourceFile: null, line: 13, column: 3, condition: "Enumerable.Range(0, 10 - 0).Any(i => ((i == target)))");
+            if (!(Enumerable.Range(0, 10 - 0).Any(i => (i == target)))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Enumerable.Range(0, 10 - 0).Any(i => (i == target))", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 221, length: 66, sourceFile: null, line: 13, column: 3, condition: "Enumerable.Range(0, 10 - 0).Any(i => (i == target))");
             bool __result__ = default;
 
             __result__ = true;
@@ -33,13 +32,13 @@ namespace QuantifierDemo
 
         public static bool ImplicationTest(int x)
         {
-            if (!((!((x > 0)) || ((x >= 0))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (!((x > 0)) || ((x >= 0)))", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 385, length: 32, sourceFile: null, line: 21, column: 3, condition: "(!((x > 0)) || ((x >= 0)))");
+            if (!((!(x > 0) || (x >= 0)))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (!(x > 0) || (x >= 0))", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 385, length: 32, sourceFile: null, line: 21, column: 3, condition: "(!(x > 0) || (x >= 0))");
             return true;
         }
 
         public static bool MatrixSymmetry(int n, int m)
         {
-            if (!(Enumerable.Range(0, n - 0).All(i => (Enumerable.Range(0, m - 0).All(j => ((i >= 0))))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Enumerable.Range(0, n - 0).All(i => (Enumerable.Range(0, m - 0).All(j => ((i >= 0)))))", "f004", Calor.Runtime.ContractKind.Requires, startOffset: 504, length: 94, sourceFile: null, line: 29, column: 3, condition: "Enumerable.Range(0, n - 0).All(i => (Enumerable.Range(0, m - 0).All(j => ((i >= 0)))))");
+            if (!(Enumerable.Range(0, n - 0).All(i => (Enumerable.Range(0, m - 0).All(j => (i >= 0)))))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Enumerable.Range(0, n - 0).All(i => (Enumerable.Range(0, m - 0).All(j => (i >= 0))))", "f004", Calor.Runtime.ContractKind.Requires, startOffset: 504, length: 94, sourceFile: null, line: 29, column: 3, condition: "Enumerable.Range(0, n - 0).All(i => (Enumerable.Range(0, m - 0).All(j => (i >= 0))))");
             return true;
         }
 

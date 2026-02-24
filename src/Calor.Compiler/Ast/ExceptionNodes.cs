@@ -113,6 +113,27 @@ public sealed class ThrowStatementNode : StatementNode
 }
 
 /// <summary>
+/// Represents a throw expression (throw in expression position).
+/// Used in switch arms, ternary, and ?? contexts.
+/// </summary>
+public sealed class ThrowExpressionNode : ExpressionNode
+{
+    /// <summary>
+    /// The exception to throw.
+    /// </summary>
+    public ExpressionNode Exception { get; }
+
+    public ThrowExpressionNode(TextSpan span, ExpressionNode exception)
+        : base(span)
+    {
+        Exception = exception ?? throw new ArgumentNullException(nameof(exception));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a rethrow statement.
 /// §RETHROW
 /// </summary>

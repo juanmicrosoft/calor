@@ -1515,6 +1515,61 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             "Checked/unchecked semantics stripped; handle overflow manually if needed");
     }
 
+    /// <summary>
+    /// Converts a bare ExpressionSyntax to a StatementNode.
+    /// Used for for-loop initializers and incrementors which are expressions, not expression statements.
+    /// </summary>
+    private StatementNode? ConvertExpressionToStatement(ExpressionSyntax expr, TextSpan span)
+    {
+        if (expr is AssignmentExpressionSyntax assignment)
+        {
+            if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+            {
+                return new AssignmentStatementNode(span,
+                    ConvertExpression(assignment.Left),
+                    ConvertExpression(assignment.Right));
+            }
+            // Compound assignments (+=, -=, etc.)
+            var compOp = assignment.Kind() switch
+            {
+                SyntaxKind.AddAssignmentExpression => CompoundAssignmentOperator.Add,
+                SyntaxKind.SubtractAssignmentExpression => CompoundAssignmentOperator.Subtract,
+                SyntaxKind.MultiplyAssignmentExpression => CompoundAssignmentOperator.Multiply,
+                SyntaxKind.DivideAssignmentExpression => CompoundAssignmentOperator.Divide,
+                SyntaxKind.ModuloAssignmentExpression => CompoundAssignmentOperator.Modulo,
+                _ => (CompoundAssignmentOperator?)null
+            };
+            if (compOp != null)
+            {
+                return new CompoundAssignmentStatementNode(span,
+                    ConvertExpression(assignment.Left),
+                    compOp.Value,
+                    ConvertExpression(assignment.Right));
+            }
+        }
+        // Handle i++, i--, ++i, --i as compound assignments
+        if (expr is PostfixUnaryExpressionSyntax postfix)
+        {
+            var target = ConvertExpression(postfix.Operand);
+            var op = postfix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken)
+                ? CompoundAssignmentOperator.Add
+                : CompoundAssignmentOperator.Subtract;
+            return new CompoundAssignmentStatementNode(span, target, op, new IntLiteralNode(span, 1));
+        }
+        if (expr is PrefixUnaryExpressionSyntax prefix
+            && (prefix.IsKind(SyntaxKind.PreIncrementExpression) || prefix.IsKind(SyntaxKind.PreDecrementExpression)))
+        {
+            var target = ConvertExpression(prefix.Operand);
+            var op = prefix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken)
+                ? CompoundAssignmentOperator.Add
+                : CompoundAssignmentOperator.Subtract;
+            return new CompoundAssignmentStatementNode(span, target, op, new IntLiteralNode(span, 1));
+        }
+        // Fallback: convert expression and wrap as a discarded bind
+        var exprNode = ConvertExpression(expr);
+        return new BindStatementNode(span, "_", null, false, exprNode, new AttributeCollection());
+    }
+
     private StatementNode ConvertExpressionStatement(ExpressionStatementSyntax node)
     {
         var expr = node.Expression;
@@ -1693,29 +1748,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     ConvertExpression(assignment.Right));
             }
 
-            // Handle null-coalescing assignment: x ??= y → if (== x null) { x = y }
+            // Handle null-coalescing assignment: x ??= y → CompoundAssignment(NullCoalesce)
             if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
             {
                 _context.RecordFeatureUsage("null-coalescing-assignment");
-                var target = ConvertExpression(assignment.Left);
-                var value = ConvertExpression(assignment.Right);
-                var nullCheck = new BinaryOperationNode(
-                    GetTextSpan(node),
-                    BinaryOperator.Equal,
-                    target,
-                    new ReferenceNode(GetTextSpan(node), "null"));
-                var assignStmt = new AssignmentStatementNode(
+                return new CompoundAssignmentStatementNode(
                     GetTextSpan(node),
                     ConvertExpression(assignment.Left),
-                    value);
-                return new IfStatementNode(
-                    GetTextSpan(node),
-                    _context.GenerateId("if"),
-                    nullCheck,
-                    new List<StatementNode> { assignStmt },
-                    Array.Empty<ElseIfClauseNode>(),
-                    null,
-                    new AttributeCollection());
+                    CompoundAssignmentOperator.NullCoalesce,
+                    ConvertExpression(assignment.Right));
             }
 
             return new AssignmentStatementNode(
@@ -1931,7 +1972,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         return expression is InvocationExpressionSyntax invocation
             && invocation.Expression is MemberAccessExpressionSyntax memberAccess
-            && memberAccess.Expression is InvocationExpressionSyntax;
+            && (memberAccess.Expression is InvocationExpressionSyntax
+                || memberAccess.Expression is ElementAccessExpressionSyntax);
     }
 
     /// <summary>
@@ -2293,18 +2335,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection());
     }
 
-    private ForStatementNode ConvertForStatement(ForStatementSyntax node)
+    private StatementNode ConvertForStatement(ForStatementSyntax node)
     {
         _context.RecordFeatureUsage("for");
         _context.IncrementConverted();
 
         var id = _context.GenerateId("for");
+        var span = GetTextSpan(node);
 
         // Try to extract standard for loop pattern: for (var i = from; i <= to; i += step)
-        var varName = "i";
-        ExpressionNode from = new IntLiteralNode(TextSpan.Empty, 0);
-        ExpressionNode to = new IntLiteralNode(TextSpan.Empty, 10);
+        var varName = (string?)null;
+        ExpressionNode? from = null;
+        ExpressionNode? to = null;
         ExpressionNode? step = null;
+        bool isStandard = true;
 
         // Extract variable name and initial value from declaration
         if (node.Declaration?.Variables.Count > 0)
@@ -2315,6 +2359,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 from = ConvertExpression(decl.Initializer.Value);
             }
+        }
+        else
+        {
+            isStandard = false; // No variable declaration — non-standard
         }
 
         // Extract upper bound from condition
@@ -2331,6 +2379,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 to = new BinaryOperationNode(TextSpan.Empty, Ast.BinaryOperator.Add, to, new IntLiteralNode(TextSpan.Empty, 1));
             }
+        }
+        else
+        {
+            isStandard = false; // No binary condition — non-standard
         }
 
         // Extract step from incrementors
@@ -2359,12 +2411,55 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ? ConvertBlock(block)
             : new List<StatementNode> { ConvertStatement(node.Statement)! };
 
+        // Fall back to while loop for non-standard for patterns
+        if (!isStandard)
+        {
+            var whileBody = new List<StatementNode>();
+
+            // Prepend initializer(s) as statements before the while
+            if (node.Declaration != null)
+            {
+                foreach (var variable in node.Declaration.Variables)
+                {
+                    var initExpr = variable.Initializer != null
+                        ? ConvertExpression(variable.Initializer.Value)
+                        : new ReferenceNode(span, "default");
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, variable.Identifier.Text,
+                        TypeMapper.CSharpToCalor(node.Declaration.Type.ToString()),
+                        true, initExpr, new AttributeCollection()));
+                }
+            }
+            else if (node.Initializers.Count > 0)
+            {
+                foreach (var init in node.Initializers)
+                {
+                    var initStmt = ConvertExpressionToStatement(init, span);
+                    if (initStmt != null) _pendingStatements.Add(initStmt);
+                }
+            }
+
+            // Body + incrementors
+            whileBody.AddRange(body);
+            foreach (var inc in node.Incrementors)
+            {
+                var incStmt = ConvertExpressionToStatement(inc, span);
+                if (incStmt != null) whileBody.Add(incStmt);
+            }
+
+            var condition = node.Condition != null
+                ? ConvertExpression(node.Condition)
+                : new BoolLiteralNode(span, true);
+
+            return new WhileStatementNode(span, id, condition, whileBody, new AttributeCollection());
+        }
+
         return new ForStatementNode(
-            GetTextSpan(node),
+            span,
             id,
-            varName,
-            from,
-            to,
+            varName ?? "i",
+            from ?? new IntLiteralNode(TextSpan.Empty, 0),
+            to ?? new IntLiteralNode(TextSpan.Empty, 10),
             step,
             body,
             new AttributeCollection());
@@ -3255,9 +3350,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("throw-expression");
         _context.IncrementConverted();
         var inner = ConvertExpression(throwExpr.Expression);
-        if (inner is NewExpressionNode newExpr && newExpr.Arguments.Count > 0)
-            return new ErrExpressionNode(GetTextSpan(throwExpr), newExpr.Arguments[0]);
-        return new ErrExpressionNode(GetTextSpan(throwExpr), inner);
+        return new ThrowExpressionNode(GetTextSpan(throwExpr), inner);
     }
 
     private ExpressionNode ConvertDefaultExpression(DefaultExpressionSyntax defaultExpr)
@@ -3444,6 +3537,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_chain");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, innerConverted, new AttributeCollection()));
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+            }
+
+            // Handle indexer-then-call pattern: words[0].Method(...)
+            // Hoist the element access to a temp bind so the method call has a clean target.
+            if (memberAccess.Expression is ElementAccessExpressionSyntax elementAccess)
+            {
+                var elementConverted = ConvertExpression(elementAccess);
+                var tempName = _context.GenerateId("_elem");
+                _pendingStatements.Add(new BindStatementNode(
+                    span, tempName, null, false, elementConverted, new AttributeCollection()));
                 return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
             }
 
@@ -4492,7 +4596,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             else
             {
+                // Save/restore _pendingStatements so chains inside the lambda body
+                // don't hoist temp binds outside the lambda scope.
+                var savedPending = new List<StatementNode>(_pendingStatements);
+                _pendingStatements.Clear();
+
                 exprBody = ConvertExpression(lambda.ExpressionBody);
+
+                // If the expression body produced pending statements (e.g., chain hoisting),
+                // convert the expression body to a statement body with those binds prepended.
+                if (_pendingStatements.Count > 0)
+                {
+                    stmtBody = new List<StatementNode>(_pendingStatements);
+                    stmtBody.Add(new ReturnStatementNode(exprBody.Span, exprBody));
+                    exprBody = null;
+                }
+
+                _pendingStatements.Clear();
+                _pendingStatements.AddRange(savedPending);
             }
         }
         else if (lambda.Body is BlockSyntax block)
@@ -5164,6 +5285,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         foreach (var attrList in attributeLists)
         {
+            // Extract the attribute target (e.g., "return", "assembly", "field")
+            var target = attrList.Target?.Identifier.Text;
+
             foreach (var attr in attrList.Attributes)
             {
                 var name = attr.Name.ToString();
@@ -5187,7 +5311,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     }
                 }
 
-                result.Add(new CalorAttributeNode(GetTextSpan(attr), name, args));
+                result.Add(new CalorAttributeNode(GetTextSpan(attr), name, args, target));
 
                 // Track COM interop and P/Invoke attribute usage
                 if (name is "ComImport" or "Guid" or "InterfaceType" or "CoClass"

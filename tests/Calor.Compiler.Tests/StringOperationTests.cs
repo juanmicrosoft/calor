@@ -664,7 +664,7 @@ public class StringOperationTests
         var code = emitter.Emit(module);
 
         Assert.Contains("email.IndexOf(\"@\")", code);
-        Assert.Contains("email.Substring((atIdx + 1))", code);
+        Assert.Contains("email.Substring(atIdx + 1)", code);
     }
 
     [Fact]

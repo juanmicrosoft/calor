@@ -198,7 +198,7 @@ public class EndToEndTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
-        Assert.Contains("((i % 15) == 0)", result.GeneratedCode);
+        Assert.Contains("i % 15 == 0", result.GeneratedCode);
     }
 
     [Fact]
@@ -261,7 +261,7 @@ public class EndToEndTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
-        Assert.Contains("(!flag)", result.GeneratedCode);
+        Assert.Contains("!flag", result.GeneratedCode);
     }
 
     [Fact]
@@ -283,7 +283,7 @@ public class EndToEndTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
-        Assert.Contains("Console.WriteLine((x + 10))", result.GeneratedCode);
+        Assert.Contains("Console.WriteLine(x + 10)", result.GeneratedCode);
     }
 
     [Fact]

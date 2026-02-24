@@ -168,6 +168,31 @@ public sealed class RawCSharpNode : StatementNode
 }
 
 /// <summary>
+/// Represents a preprocessor conditional block.
+/// §PP{CONDITION}
+///   ... body ...
+/// §/PP{CONDITION}
+/// </summary>
+public sealed class PreprocessorDirectiveNode : StatementNode
+{
+    public string Condition { get; }
+    public IReadOnlyList<StatementNode> Body { get; }
+    public IReadOnlyList<StatementNode>? ElseBody { get; }
+
+    public PreprocessorDirectiveNode(TextSpan span, string condition,
+        IReadOnlyList<StatementNode> body, IReadOnlyList<StatementNode>? elseBody = null)
+        : base(span)
+    {
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        Body = body ?? throw new ArgumentNullException(nameof(body));
+        ElseBody = elseBody;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Kind of C# member preserved in an interop block.
 /// </summary>
 public enum InteropMemberKind

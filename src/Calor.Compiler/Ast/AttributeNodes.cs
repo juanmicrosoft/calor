@@ -17,11 +17,17 @@ public sealed class CalorAttributeNode : AstNode
     /// </summary>
     public IReadOnlyList<CalorAttributeArgument> Arguments { get; }
 
-    public CalorAttributeNode(TextSpan span, string name, IReadOnlyList<CalorAttributeArgument>? arguments = null)
+    /// <summary>
+    /// Optional attribute target (e.g., "return", "assembly", "field", "property", "param", "type", "method", "event").
+    /// </summary>
+    public string? Target { get; }
+
+    public CalorAttributeNode(TextSpan span, string name, IReadOnlyList<CalorAttributeArgument>? arguments = null, string? target = null)
         : base(span)
     {
         Name = name;
         Arguments = arguments ?? Array.Empty<CalorAttributeArgument>();
+        Target = target;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

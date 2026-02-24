@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Contracts
 {
@@ -21,19 +19,19 @@ namespace Contracts
 
         public static int Square(int x)
         {
-            if (!((x >= 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (x >= 0)", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 173, length: 11, sourceFile: null, line: 14, column: 3, condition: "(x >= 0)");
+            if (!(x >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: x >= 0", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 173, length: 11, sourceFile: null, line: 14, column: 3, condition: "x >= 0");
             int __result__ = default;
 
-            __result__ = (x * x);
+            __result__ = x * x;
 
-            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 187, length: 16, sourceFile: null, line: 15, column: 3, condition: "(__result__ >= 0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 187, length: 16, sourceFile: null, line: 15, column: 3, condition: "__result__ >= 0");
             return __result__;
         }
 
         public static int Divide(int a, int b)
         {
-            if (!((b != 0))) throw new Calor.Runtime.ContractViolationException("divisor must not be zero", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 284, length: 39, sourceFile: null, line: 23, column: 3, condition: "(b != 0)");
-            return (a / b);
+            if (!(b != 0)) throw new Calor.Runtime.ContractViolationException("divisor must not be zero", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 284, length: 39, sourceFile: null, line: 23, column: 3, condition: "b != 0");
+            return a / b;
         }
 
     }

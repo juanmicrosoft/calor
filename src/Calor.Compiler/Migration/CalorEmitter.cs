@@ -1019,10 +1019,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
             CompoundAssignmentOperator.BitwiseXor => "^",
             CompoundAssignmentOperator.LeftShift => "<<",
             CompoundAssignmentOperator.RightShift => ">>",
+            CompoundAssignmentOperator.NullCoalesce => "??",
             _ => "+"
         };
         // Parser expects: §ASSIGN <target> <value>
-        AppendLine($"§ASSIGN {target} ({opSymbol} {target} {value})");
+        if (node.Operator == CompoundAssignmentOperator.NullCoalesce)
+            AppendLine($"§ASSIGN {target} (?? {target} {value})");
+        else
+            AppendLine($"§ASSIGN {target} ({opSymbol} {target} {value})");
         return "";
     }
 
@@ -1372,6 +1376,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine("§RT");
         }
         return "";
+    }
+
+    public string Visit(ThrowExpressionNode node)
+    {
+        var expr = node.Exception.Accept(this);
+        return $"§TH {expr}";
     }
 
     public string Visit(RethrowStatementNode node)
@@ -2370,13 +2380,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CalorAttributeNode node)
     {
+        var targetPrefix = node.Target != null ? $"{node.Target}:" : "";
         if (node.Arguments.Count == 0)
         {
-            return $"[@{node.Name}]";
+            return $"[@{targetPrefix}{node.Name}]";
         }
 
         var args = string.Join(", ", node.Arguments.Select(FormatAttributeArgument));
-        return $"[@{node.Name}({args})]";
+        return $"[@{targetPrefix}{node.Name}({args})]";
     }
 
     private static string FormatAttributeArgument(CalorAttributeArgument arg)
@@ -2535,6 +2546,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(RawCSharpNode node)
     {
         return $"§RAW\n{node.CSharpCode}\n§/RAW";
+    }
+
+    public string Visit(RawCSharpExpressionNode node)
+    {
+        return $"§CS{{{node.CSharpCode}}}";
+    }
+
+    public string Visit(PreprocessorDirectiveNode node)
+    {
+        AppendLine($"§PP{{{node.Condition}}}");
+        foreach (var stmt in node.Body)
+            stmt.Accept(this);
+        if (node.ElseBody != null && node.ElseBody.Count > 0)
+        {
+            AppendLine("§PPE");
+            foreach (var stmt in node.ElseBody)
+                stmt.Accept(this);
+        }
+        AppendLine($"§/PP{{{node.Condition}}}");
+        return "";
     }
 
     public string Visit(CSharpInteropBlockNode node)

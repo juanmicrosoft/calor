@@ -84,7 +84,7 @@ public class BuildIntegrationTests
         Assert.False(result.HasErrors);
         Assert.Contains("namespace Calculator", result.GeneratedCode);
         Assert.Contains("public static int Add(int a, int b)", result.GeneratedCode);
-        Assert.Contains("return (a + b)", result.GeneratedCode);
+        Assert.Contains("return a + b", result.GeneratedCode);
     }
 
     [Fact]

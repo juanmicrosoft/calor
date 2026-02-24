@@ -281,7 +281,8 @@ public enum CompoundAssignmentOperator
     BitwiseOr,  // |=
     BitwiseXor, // ^=
     LeftShift,  // <<=
-    RightShift  // >>=
+    RightShift, // >>=
+    NullCoalesce // ??=
 }
 
 /// <summary>
