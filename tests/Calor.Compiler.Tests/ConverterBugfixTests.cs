@@ -615,4 +615,179 @@ public class Test
     }
 
     #endregion
+
+    #region Challenge 10: String interpolation in base() constructor calls
+
+    [Fact]
+    public void Converter_BaseCallWithInterpolation_NativeCalorNotInterop()
+    {
+        var csharp = """
+            using System;
+            public class ContractException : Exception
+            {
+                public ContractException(string kind, string functionId)
+                    : base($"{kind} contract violation in {functionId}")
+                {
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CalorEmitter();
+        var calor = emitter.Emit(result.Ast!);
+
+        // Must NOT fall back to interop
+        Assert.DoesNotContain("§CSHARP", calor);
+        // Must contain native Calor base call with interpolation
+        Assert.Contains("§BASE", calor);
+        Assert.Contains("${kind}", calor);
+        Assert.Contains("${functionId}", calor);
+    }
+
+    [Fact]
+    public void RoundTrip_BaseCallWithInterpolation_Preserved()
+    {
+        var csharp = """
+            using System;
+            public class ContractException : Exception
+            {
+                public ContractException(string kind, string functionId)
+                    : base($"{kind} contract violation in {functionId}")
+                {
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains(": base($\"{kind} contract violation in {functionId}\")", output);
+    }
+
+    [Fact]
+    public void RoundTrip_BaseCallWithFormatSpecifier_Preserved()
+    {
+        var csharp = """
+            using System;
+            public class PriceException : Exception
+            {
+                public PriceException(decimal price)
+                    : base($"Invalid price: {price:C2}")
+                {
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("$\"Invalid price: {price:C2}\"", output);
+    }
+
+    [Fact]
+    public void RoundTrip_BaseCallWithMethodCallInInterpolation_Preserved()
+    {
+        var csharp = """
+            using System;
+            public class DetailException : Exception
+            {
+                public DetailException(object obj)
+                    : base($"Object: {obj.ToString()}")
+                {
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        // Converter simplifies obj.ToString() to (str obj) cast
+        Assert.Contains("base($\"Object: {", output);
+        Assert.Contains("obj", output);
+    }
+
+    [Fact]
+    public void RoundTrip_BaseCallWithMultipleInterpolationParts_Preserved()
+    {
+        var csharp = """
+            using System;
+            public class ValidationException : Exception
+            {
+                public ValidationException(string field, object value, string rule)
+                    : base($"Field '{field}' with value '{value}' failed rule '{rule}'")
+                {
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("$\"Field '{field}' with value '{value}' failed rule '{rule}'\"", output);
+    }
+
+    [Fact]
+    public void RoundTrip_ThisCallWithInterpolation_Preserved()
+    {
+        var csharp = """
+            using System;
+            public class AppException : Exception
+            {
+                public AppException(string msg) : base(msg) { }
+                public AppException(string code, string detail)
+                    : this($"{code}: {detail}")
+                {
+                }
+            }
+            """;
+
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("$\"{code}: {detail}\"", output);
+    }
+
+    [Fact]
+    public void InteropMode_BaseCallWithInterpolation_NativeNotInterop()
+    {
+        var csharp = """
+            using System;
+            public class ContractException : Exception
+            {
+                public ContractException(string kind, string functionId)
+                    : base($"{kind} contract violation in {functionId}")
+                {
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Mode = ConversionMode.Interop });
+        var result = converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        // Must not produce any interop blocks
+        Assert.All(result.Ast!.Classes, c => Assert.Empty(c.InteropBlocks));
+    }
+
+    private string ConvertAndRoundTrip(string csharp)
+    {
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var calorEmitter = new CalorEmitter();
+        var calorCode = calorEmitter.Emit(result.Ast!);
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorCode, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors,
+            $"Re-parse failed:\n{string.Join("\n", diagnostics.Select(d => d.Message))}\nCalor:\n{calorCode}");
+
+        var emitter = new CSharpEmitter();
+        return emitter.Emit(module);
+    }
+
+    #endregion
 }
