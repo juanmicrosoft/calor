@@ -3159,11 +3159,62 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return null;
         }
 
-        // Case 3: Return statement in method — use method return type
+        // Case 3: Return statement or arrow expression body — walk up to enclosing declaration
         if (parent is ReturnStatementSyntax || parent is ArrowExpressionClauseSyntax)
         {
-            // Would need method context; skip for now
+            var enclosingType = FindEnclosingReturnType(parent);
+            if (enclosingType != null)
+                return TypeMapper.CSharpToCalor(enclosingType);
             return null;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Walks up the Roslyn syntax tree from a return/arrow context to find the
+    /// enclosing declaration's return type string. Returns null if no typed
+    /// declaration is found.
+    /// </summary>
+    private static string? FindEnclosingReturnType(SyntaxNode node)
+    {
+        for (var current = node.Parent; current != null; current = current.Parent)
+        {
+            switch (current)
+            {
+                case LocalFunctionStatementSyntax localFunc:
+                {
+                    var rt = localFunc.ReturnType.ToString();
+                    if (localFunc.Modifiers.Any(SyntaxKind.AsyncKeyword))
+                        rt = UnwrapTaskType(rt);
+                    return rt is "void" or "var" ? null : rt;
+                }
+
+                case MethodDeclarationSyntax method:
+                {
+                    var rt = method.ReturnType.ToString();
+                    if (method.Modifiers.Any(SyntaxKind.AsyncKeyword))
+                        rt = UnwrapTaskType(rt);
+                    return rt is "void" or "var" ? null : rt;
+                }
+
+                case PropertyDeclarationSyntax property:
+                    return property.Type.ToString();
+
+                case OperatorDeclarationSyntax op:
+                    return op.ReturnType.ToString();
+
+                case ConversionOperatorDeclarationSyntax:
+                    return null; // Conversion operators don't have a named return type to infer from
+
+                // Stop walking at type/namespace boundaries without matching
+                case ClassDeclarationSyntax:
+                case StructDeclarationSyntax:
+                case InterfaceDeclarationSyntax:
+                case NamespaceDeclarationSyntax:
+                case CompilationUnitSyntax:
+                    return null;
+            }
         }
 
         return null;
