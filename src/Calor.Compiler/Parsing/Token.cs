@@ -286,7 +286,13 @@ public enum TokenKind
 
     // Raw C# Passthrough
     RawCSharp,          // §RAW ... §/RAW - Raw C# content emitted verbatim
+    RawCSharpExpression,  // §CS{...} - Inline C# expression
     CSharpInterop,      // §CSHARP{...}§/CSHARP - C# interop block (member-level)
+
+    // Preprocessor Directives
+    Preprocessor,       // §PP{CONDITION} - preprocessor conditional start
+    EndPreprocessor,    // §/PP{CONDITION} - preprocessor conditional end
+    PreprocessorElse,   // §PPE - preprocessor else
 
     // Unsafe/Low-Level
     StackAlloc,         // §SALLOC - stackalloc expression

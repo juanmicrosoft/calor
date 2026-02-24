@@ -97,7 +97,7 @@ public class SafetyBenchmarkTests
         Assert.True(execResult.SafetyAnalysis.ExceptionDetected);
         Assert.True(execResult.SafetyAnalysis.HasLocation);
         Assert.True(execResult.SafetyAnalysis.HasCondition);
-        Assert.Equal("(b != 0)", execResult.SafetyAnalysis.Condition);
+        Assert.Equal("b != 0", execResult.SafetyAnalysis.Condition);
         Assert.Equal("f001", execResult.SafetyAnalysis.FunctionId);
         Assert.True(execResult.SafetyAnalysis.Line > 0);
     }

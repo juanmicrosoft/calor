@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace SkillSyntax
 {
@@ -30,17 +27,17 @@ namespace SkillSyntax
 
         public static int Add(int a, int b)
         {
-            return (a + b);
+            return a + b;
         }
 
         public static int Subtract(int a, int b)
         {
-            return (a - b);
+            return a - b;
         }
 
         public static int Multiply(int a, int b)
         {
-            return (a * b);
+            return a * b;
         }
 
         private static void TestComparison()
@@ -50,12 +47,12 @@ namespace SkillSyntax
 
         public static bool IsPositive(int x)
         {
-            return (x > 0);
+            return x > 0;
         }
 
         public static bool IsZero(int x)
         {
-            return (x == 0);
+            return x == 0;
         }
 
         private static void TestControlFlow()

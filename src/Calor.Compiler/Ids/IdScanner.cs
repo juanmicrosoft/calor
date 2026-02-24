@@ -223,6 +223,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(TryStatementNode node) { }
     public void Visit(CatchClauseNode node) { }
     public void Visit(ThrowStatementNode node) { }
+    public void Visit(ThrowExpressionNode node) { }
     public void Visit(RethrowStatementNode node) { }
     public void Visit(LambdaParameterNode node) { }
     public void Visit(LambdaExpressionNode node) { }
@@ -286,6 +287,8 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(YieldReturnStatementNode node) { }
     public void Visit(YieldBreakStatementNode node) { }
     public void Visit(RawCSharpNode node) { }
+    public void Visit(RawCSharpExpressionNode node) { }
+    public void Visit(PreprocessorDirectiveNode node) { }
     public void Visit(CSharpInteropBlockNode node) { }
     public void Visit(StackAllocNode node) { }
     public void Visit(UnsafeBlockNode node) { }

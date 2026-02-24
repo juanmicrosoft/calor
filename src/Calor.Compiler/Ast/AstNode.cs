@@ -123,6 +123,7 @@ public interface IAstVisitor
     void Visit(TryStatementNode node);
     void Visit(CatchClauseNode node);
     void Visit(ThrowStatementNode node);
+    void Visit(ThrowExpressionNode node);
     void Visit(RethrowStatementNode node);
     // Phase 11: Lambdas, Delegates, Events
     void Visit(LambdaParameterNode node);
@@ -218,6 +219,10 @@ public interface IAstVisitor
     // Multidimensional arrays
     void Visit(MultiDimArrayCreationNode node);
     void Visit(MultiDimArrayAccessNode node);
+    // Inline raw C# expression
+    void Visit(RawCSharpExpressionNode node);
+    // Preprocessor directives
+    void Visit(PreprocessorDirectiveNode node);
 }
 
 /// <summary>
@@ -325,6 +330,7 @@ public interface IAstVisitor<T>
     T Visit(TryStatementNode node);
     T Visit(CatchClauseNode node);
     T Visit(ThrowStatementNode node);
+    T Visit(ThrowExpressionNode node);
     T Visit(RethrowStatementNode node);
     // Phase 11: Lambdas, Delegates, Events
     T Visit(LambdaParameterNode node);
@@ -420,6 +426,10 @@ public interface IAstVisitor<T>
     // Multidimensional arrays
     T Visit(MultiDimArrayCreationNode node);
     T Visit(MultiDimArrayAccessNode node);
+    // Inline raw C# expression
+    T Visit(RawCSharpExpressionNode node);
+    // Preprocessor directives
+    T Visit(PreprocessorDirectiveNode node);
 }
 
 /// <summary>

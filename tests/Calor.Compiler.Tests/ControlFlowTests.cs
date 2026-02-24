@@ -322,7 +322,7 @@ public class ControlFlowTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors);
-        Assert.Contains("return (a + b);", result.GeneratedCode);
+        Assert.Contains("return a + b;", result.GeneratedCode);
     }
 
     [Fact]
@@ -341,7 +341,7 @@ public class ControlFlowTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors);
-        Assert.Contains("return ((n % 2) == 0);", result.GeneratedCode);
+        Assert.Contains("return n % 2 == 0;", result.GeneratedCode);
     }
 
     [Fact]
@@ -413,7 +413,7 @@ public class ControlFlowTests
 
         Assert.False(result.HasErrors);
         Assert.Contains("do", result.GeneratedCode);
-        Assert.Contains("while ((i < 10));", result.GeneratedCode);
+        Assert.Contains("while (i < 10);", result.GeneratedCode);
     }
 
     [Fact]
@@ -445,7 +445,7 @@ public class ControlFlowTests
         var intSumCount = result.GeneratedCode.Split("int sum").Length - 1;
         Assert.Equal(1, intSumCount);
         // Verify the reassignment exists
-        Assert.Contains("sum = (sum + i);", result.GeneratedCode);
+        Assert.Contains("sum = sum + i;", result.GeneratedCode);
     }
 
     [Fact]
@@ -473,7 +473,7 @@ public class ControlFlowTests
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message)));
         // Should generate for loop with (n - 1) as the upper bound
-        Assert.Contains("for (var i = 0; i <= (n - 1); i++)", result.GeneratedCode);
+        Assert.Contains("for (var i = 0; i <= n - 1; i++)", result.GeneratedCode);
     }
 
     [Fact]
@@ -503,9 +503,9 @@ public class ControlFlowTests
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message)));
         // Verify expressions are parsed for from, to, and step
-        Assert.Contains("(start + 1)", result.GeneratedCode);
-        Assert.Contains("(end - 1)", result.GeneratedCode);
-        Assert.Contains("(stepSize * 2)", result.GeneratedCode);
+        Assert.Contains("start + 1", result.GeneratedCode);
+        Assert.Contains("end - 1", result.GeneratedCode);
+        Assert.Contains("stepSize * 2", result.GeneratedCode);
     }
 
     [Fact]
@@ -532,7 +532,7 @@ public class ControlFlowTests
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message)));
         // Verify nested expressions are parsed correctly
-        Assert.Contains("((a - 1) + (b - 2))", result.GeneratedCode);
+        Assert.Contains("a - 1 + (b - 2)", result.GeneratedCode);
     }
 
     [Fact]
@@ -557,7 +557,7 @@ public class ControlFlowTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message)));
-        Assert.Contains("while ((i <= limit))", result.GeneratedCode);
+        Assert.Contains("while (i <= limit)", result.GeneratedCode);
     }
 
     [Fact]
@@ -578,7 +578,7 @@ public class ControlFlowTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message)));
-        Assert.Contains("((a > 0) && (b < 100))", result.GeneratedCode);
+        Assert.Contains("a > 0 && b < 100", result.GeneratedCode);
     }
 
     [Fact]
@@ -674,7 +674,7 @@ public class ControlFlowTests
 
         // This may have type issues due to mixing int loop var with float bound,
         // but it should at least parse the S-expression correctly
-        Assert.Contains("(start - 0.5)", result.GeneratedCode);
+        Assert.Contains("start - 0.5", result.GeneratedCode);
     }
 
     [Fact]

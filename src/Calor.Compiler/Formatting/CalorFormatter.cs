@@ -601,9 +601,44 @@ public sealed class CalorFormatter
                 AppendLine("§RT");
                 break;
 
+            case CompoundAssignmentStatementNode compound:
+                var compTarget = FormatExpression(compound.Target);
+                var compValue = FormatExpression(compound.Value);
+                var compOp = compound.Operator switch
+                {
+                    CompoundAssignmentOperator.Add => "+",
+                    CompoundAssignmentOperator.Subtract => "-",
+                    CompoundAssignmentOperator.Multiply => "*",
+                    CompoundAssignmentOperator.Divide => "/",
+                    CompoundAssignmentOperator.Modulo => "%",
+                    CompoundAssignmentOperator.BitwiseAnd => "&",
+                    CompoundAssignmentOperator.BitwiseOr => "|",
+                    CompoundAssignmentOperator.BitwiseXor => "^",
+                    CompoundAssignmentOperator.LeftShift => "<<",
+                    CompoundAssignmentOperator.RightShift => ">>",
+                    CompoundAssignmentOperator.NullCoalesce => "??",
+                    _ => "+"
+                };
+                if (compound.Operator == CompoundAssignmentOperator.NullCoalesce)
+                    AppendLine($"§ASSIGN {compTarget} (?? {compTarget} {compValue})");
+                else
+                    AppendLine($"§ASSIGN {compTarget} ({compOp} {compTarget} {compValue})");
+                break;
+
             case PrintStatementNode print:
                 var printTag = print.IsWriteLine ? "§P" : "§Pf";
                 AppendLine($"{printTag} {FormatExpression(print.Expression)}");
+                break;
+
+            case PreprocessorDirectiveNode pp:
+                AppendLine($"§PP{{{pp.Condition}}}");
+                foreach (var s in pp.Body) FormatStatement(s);
+                if (pp.ElseBody != null && pp.ElseBody.Count > 0)
+                {
+                    AppendLine("§PPE");
+                    foreach (var s in pp.ElseBody) FormatStatement(s);
+                }
+                AppendLine($"§/PP{{{pp.Condition}}}");
                 break;
 
             default:
@@ -689,6 +724,9 @@ public sealed class CalorFormatter
             GenericTypeNode gen => gen.TypeArguments.Count > 0
                 ? $"{CompactTypeName(gen.TypeName)}<{string.Join(", ", gen.TypeArguments.Select(CompactTypeName))}>"
                 : CompactTypeName(gen.TypeName),
+            // Throw expression
+            ThrowExpressionNode t => $"§TH {FormatExpression(t.Exception)}",
+            RawCSharpExpressionNode r => $"§CS{{{r.CSharpCode}}}",
             // Internal keyword argument (should not appear in final AST, but handle gracefully)
             KeywordArgNode kw => $":{kw.Name}",
             _ => $"/* {expr.GetType().Name} */"

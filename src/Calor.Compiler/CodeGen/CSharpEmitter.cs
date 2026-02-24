@@ -51,6 +51,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     // Track declared variables in current function scope for reassignment detection
     private readonly HashSet<string> _declaredVariablesInCurrentScope = new(StringComparer.Ordinal);
 
+    // AST-level namespace usage tracking for conditional using emission
+    private bool _usesCalorRuntime;
+    private bool _usesSystemLinq;
+    private bool _usesCollectionsGeneric;
+
     public CSharpEmitter() : this(EmitContractMode.Debug)
     {
     }
@@ -122,29 +127,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("#nullable enable");
         AppendLine();
 
-        // Always include System, Calor.Runtime, and commonly-needed namespaces
-        var emittedUsings = new HashSet<string>(StringComparer.Ordinal)
-            { "System", "Calor.Runtime", "System.Collections.Generic", "System.Linq" };
-        AppendLine("using System;");
-        AppendLine("using Calor.Runtime;");
-        AppendLine("using System.Collections.Generic;");
-        AppendLine("using System.Linq;");
+        // Placeholder for using directives — replaced after body emission
+        const string usingPlaceholder = "/* __CALOR_USINGS_PLACEHOLDER__ */";
+        AppendLine(usingPlaceholder);
+        AppendLine();
 
-        // Emit user-defined using directives
+        // Collect user-defined usings for dedup
+        var userUsings = new List<string>();
         foreach (var usingDirective in node.Usings)
         {
             var usingCode = Visit(usingDirective);
             if (!string.IsNullOrEmpty(usingCode))
-            {
-                // Track to avoid duplicates
-                if (!emittedUsings.Contains(usingDirective.Namespace))
-                {
-                    AppendLine(usingCode);
-                    emittedUsings.Add(usingDirective.Namespace);
-                }
-            }
+                userUsings.Add(usingDirective.Namespace);
         }
-        AppendLine();
 
         var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
         var namespaceName = isGlobalNamespace ? "" : SanitizeNamespace(node.Name);
@@ -267,7 +262,56 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine("}");
         }
 
-        return _builder.ToString();
+        // Replace using placeholder with only the namespaces actually referenced.
+        // Uses AST-level flags set during emission, with string-scanning fallback
+        // for raw C# passthrough (§CS{}, §RAW) that may reference these namespaces.
+        var output = _builder.ToString();
+        var usingBlock = new StringBuilder();
+        var emittedUsings = new HashSet<string>(StringComparer.Ordinal);
+
+        // System is always needed
+        usingBlock.AppendLine("using System;");
+        emittedUsings.Add("System");
+
+        // Calor.Runtime only if Option/Result/Contract types were emitted
+        if (_usesCalorRuntime || output.Contains("Calor.Runtime."))
+        {
+            usingBlock.AppendLine("using Calor.Runtime;");
+            emittedUsings.Add("Calor.Runtime");
+        }
+
+        // System.Collections.Generic if collection creation nodes were emitted
+        if (_usesCollectionsGeneric || output.Contains("List<") || output.Contains("Dictionary<") || output.Contains("HashSet<"))
+        {
+            usingBlock.AppendLine("using System.Collections.Generic;");
+            emittedUsings.Add("System.Collections.Generic");
+        }
+
+        // System.Linq only if quantifier nodes were emitted, or raw C# uses LINQ methods
+        if (_usesSystemLinq || output.Contains("Enumerable.")
+            || output.Contains(".Select(") || output.Contains(".Where(")
+            || output.Contains(".Any(") || output.Contains(".All(")
+            || output.Contains(".First(") || output.Contains(".OrderBy(")
+            || output.Contains(".GroupBy(") || output.Contains(".ToList(")
+            || output.Contains(".ToArray("))
+        {
+            usingBlock.AppendLine("using System.Linq;");
+            emittedUsings.Add("System.Linq");
+        }
+
+        // Add user-defined usings
+        foreach (var ns in userUsings)
+        {
+            if (!emittedUsings.Contains(ns))
+            {
+                usingBlock.AppendLine($"using {ns};");
+                emittedUsings.Add(ns);
+            }
+        }
+
+        return output.Replace(usingPlaceholder + Environment.NewLine, usingBlock.ToString())
+                     .Replace(usingPlaceholder + "\n", usingBlock.ToString())
+                     .Replace(usingPlaceholder, usingBlock.ToString());
     }
 
     public string Visit(UsingDirectiveNode node)
@@ -876,16 +920,50 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         var op = node.Operator.ToCSharpOperator();
-        return $"({left} {op} {right})";
+        var parentPrecedence = GetPrecedence(node.Operator);
+
+        // Only wrap children when their precedence is lower than parent's
+        if (node.Left is BinaryOperationNode leftBin && GetPrecedence(leftBin.Operator) < parentPrecedence)
+            left = $"({left})";
+        if (node.Right is BinaryOperationNode rightBin && GetPrecedence(rightBin.Operator) <= parentPrecedence)
+            right = $"({right})";
+
+        return $"{left} {op} {right}";
     }
 
     public string Visit(UnaryOperationNode node)
     {
         var operand = node.Operand.Accept(this);
         var op = node.Operator.ToCSharpOperator();
+        // Only parenthesize when operand is a binary expression (lower precedence than unary)
+        var needsParens = node.Operand is BinaryOperationNode;
         if (node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
-            return $"({operand}{op})";
-        return $"({op}{operand})";
+            return needsParens ? $"({operand}){op}" : $"{operand}{op}";
+        return needsParens ? $"{op}({operand})" : $"{op}{operand}";
+    }
+
+    /// <summary>
+    /// Returns C# operator precedence (higher = binds tighter).
+    /// Based on C# specification operator precedence table.
+    /// </summary>
+    private static int GetPrecedence(BinaryOperator op)
+    {
+        return op switch
+        {
+            BinaryOperator.Power => 13,
+            BinaryOperator.Multiply or BinaryOperator.Divide or BinaryOperator.Modulo => 12,
+            BinaryOperator.Add or BinaryOperator.Subtract => 11,
+            BinaryOperator.LeftShift or BinaryOperator.RightShift => 10,
+            BinaryOperator.LessThan or BinaryOperator.LessOrEqual
+                or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual => 9,
+            BinaryOperator.Equal or BinaryOperator.NotEqual => 8,
+            BinaryOperator.BitwiseAnd => 7,
+            BinaryOperator.BitwiseXor => 6,
+            BinaryOperator.BitwiseOr => 5,
+            BinaryOperator.And => 4,
+            BinaryOperator.Or => 3,
+            _ => 1
+        };
     }
 
     public string Visit(PrintStatementNode node)
@@ -1187,12 +1265,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(SomeExpressionNode node)
     {
+        _usesCalorRuntime = true;
         var value = node.Value.Accept(this);
         return $"Calor.Runtime.Option.Some({value})";
     }
 
     public string Visit(NoneExpressionNode node)
     {
+        _usesCalorRuntime = true;
         if (node.TypeName != null)
         {
             var typeName = MapTypeName(node.TypeName);
@@ -1203,12 +1283,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(OkExpressionNode node)
     {
+        _usesCalorRuntime = true;
         var value = node.Value.Accept(this);
         return $"Calor.Runtime.Result.Ok<{GetInferredTypeName(node.Value)}, string>({value})";
     }
 
     public string Visit(ErrExpressionNode node)
     {
+        _usesCalorRuntime = true;
         var error = node.Error.Accept(this);
         return $"Calor.Runtime.Result.Err<object, {GetInferredTypeName(node.Error)}>({error})";
     }
@@ -1343,6 +1425,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return ""; // No check emitted
         }
 
+        _usesCalorRuntime = true;
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
 
@@ -1389,6 +1472,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return ""; // No check emitted
         }
 
+        _usesCalorRuntime = true;
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
 
@@ -1434,6 +1518,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return ""; // No check emitted
         }
 
+        _usesCalorRuntime = true;
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
 
@@ -1578,6 +1663,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ListCreationNode node)
     {
+        _usesCollectionsGeneric = true;
         var elementType = MapTypeName(node.ElementType);
 
         if (node.Elements.Count > 0)
@@ -1593,6 +1679,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(DictionaryCreationNode node)
     {
+        _usesCollectionsGeneric = true;
         var keyType = MapTypeName(node.KeyType);
         var valueType = MapTypeName(node.ValueType);
 
@@ -1621,6 +1708,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(SetCreationNode node)
     {
+        _usesCollectionsGeneric = true;
         var elementType = MapTypeName(node.ElementType);
 
         if (node.Elements.Count > 0)
@@ -2673,6 +2761,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             CompoundAssignmentOperator.BitwiseXor => "^=",
             CompoundAssignmentOperator.LeftShift => "<<=",
             CompoundAssignmentOperator.RightShift => ">>=",
+            CompoundAssignmentOperator.NullCoalesce => "??=",
             _ => "+="
         };
         return $"{target} {op} {value};";
@@ -2792,6 +2881,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return $"throw {exception};";
         }
         return "throw;";
+    }
+
+    public string Visit(ThrowExpressionNode node)
+    {
+        var exception = node.Exception.Accept(this);
+        if (node.Exception is StringLiteralNode or InterpolatedStringNode)
+        {
+            return $"throw new System.Exception({exception})";
+        }
+        if (node.Exception is IntLiteralNode or BoolLiteralNode or FloatLiteralNode or DecimalLiteralNode or CharOperationNode)
+        {
+            return $"throw new System.Exception({exception}.ToString())";
+        }
+        return $"throw {exception}";
     }
 
     public string Visit(RethrowStatementNode node)
@@ -3514,13 +3617,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(CalorAttributeNode node)
     {
+        var targetPrefix = node.Target != null ? $"{node.Target}: " : "";
         if (node.Arguments.Count == 0)
         {
-            return $"[{node.Name}]";
+            return $"[{targetPrefix}{node.Name}]";
         }
 
         var args = string.Join(", ", node.Arguments.Select(FormatCSharpAttributeArgument));
-        return $"[{node.Name}({args})]";
+        return $"[{targetPrefix}{node.Name}({args})]";
     }
 
     private static string FormatCSharpAttributeArgument(CalorAttributeArgument arg)
@@ -3544,6 +3648,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ForallExpressionNode node)
     {
+        _usesSystemLinq = true;
         // Try to extract finite range from the pattern:
         // (forall ((i type)) (-> (&& (>= i 0) (< i n)) body))
         var range = TryExtractFiniteRange(node);
@@ -3587,6 +3692,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ExistsExpressionNode node)
     {
+        _usesSystemLinq = true;
         // Try to extract finite range from the pattern:
         // (exists ((i type)) (&& (>= i 0) (< i n) body))
         var range = TryExtractFiniteRangeForExists(node);
@@ -3846,6 +3952,29 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             _builder.AppendLine(line.TrimEnd('\r'));
         }
+        return "";
+    }
+
+    public string Visit(RawCSharpExpressionNode node) => node.CSharpCode;
+
+    public string Visit(PreprocessorDirectiveNode node)
+    {
+        AppendLine($"#if {node.Condition}");
+        foreach (var stmt in node.Body)
+        {
+            var code = stmt.Accept(this);
+            if (!string.IsNullOrEmpty(code)) AppendLine(code);
+        }
+        if (node.ElseBody != null && node.ElseBody.Count > 0)
+        {
+            AppendLine("#else");
+            foreach (var stmt in node.ElseBody)
+            {
+                var code = stmt.Accept(this);
+                if (!string.IsNullOrEmpty(code)) AppendLine(code);
+            }
+        }
+        AppendLine("#endif");
         return "";
     }
 

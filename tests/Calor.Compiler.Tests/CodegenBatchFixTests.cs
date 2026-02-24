@@ -76,12 +76,16 @@ public class CodegenBatchFixTests
     // ========== Fix 2: Auto-using ==========
 
     [Fact]
-    public void Fix2_GeneratedCSharp_ContainsCollectionsGenericUsing()
+    public void Fix2_GeneratedCSharp_ContainsCollectionsGenericUsing_WhenUsed()
     {
+        // Collections.Generic using is conditionally emitted when collection types are referenced
         var source = @"
 §M{m1:Test}
 §F{f001:Main:pub}
   §O{void}
+  §LIST{result:i32}
+    1
+  §/LIST{result}
 §/F{f001}
 §/M{m1}
 ";
@@ -92,8 +96,9 @@ public class CodegenBatchFixTests
     }
 
     [Fact]
-    public void Fix2_GeneratedCSharp_ContainsLinqUsing()
+    public void Fix2_GeneratedCSharp_OmitsLinqUsing_WhenNotUsed()
     {
+        // System.Linq is only emitted when LINQ methods are actually used
         var source = @"
 §M{m1:Test}
 §F{f001:Main:pub}
@@ -104,7 +109,7 @@ public class CodegenBatchFixTests
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("using System.Linq;", result);
+        Assert.DoesNotContain("using System.Linq;", result);
     }
 
     // ========== Fix 3: Decimal literals ==========

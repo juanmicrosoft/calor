@@ -1084,8 +1084,8 @@ public class CollectionOperationsTests
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
 
-        Assert.Contains("(1 + 2)", code);
-        Assert.Contains("(3 * 4)", code);
+        Assert.Contains("1 + 2", code);
+        Assert.Contains("3 * 4", code);
     }
 
     #endregion

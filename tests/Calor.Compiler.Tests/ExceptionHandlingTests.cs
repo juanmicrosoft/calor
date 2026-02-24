@@ -34,7 +34,7 @@ public class ExceptionHandlingTests
 
         Assert.Contains("try", result);
         Assert.Contains("catch (DivideByZeroException ex)", result);
-        Assert.Contains("return (a / b);", result);
+        Assert.Contains("return a / b;", result);
         Assert.Contains("return 0;", result);
     }
 
@@ -169,7 +169,7 @@ public class ExceptionHandlingTests
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("when ((code == 42))", result);
+        Assert.Contains("when (code == 42)", result);
     }
 
     [Fact]

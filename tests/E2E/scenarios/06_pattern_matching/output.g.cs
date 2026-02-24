@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace PatternDemo
 {
@@ -26,7 +23,7 @@ namespace PatternDemo
 
         public static string Describe(int x)
         {
-            return x switch { var n when (n > 100) => "large", var n when (n < 0) => "negative", 0 => "zero", _ => "normal" };
+            return x switch { var n when n > 100 => "large", var n when n < 0 => "negative", 0 => "zero", _ => "normal" };
         }
 
     }

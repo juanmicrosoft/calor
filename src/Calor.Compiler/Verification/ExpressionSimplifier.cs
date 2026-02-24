@@ -1317,6 +1317,13 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(TryStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(CatchClauseNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ThrowStatementNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(ThrowExpressionNode node)
+    {
+        var exception = node.Exception.Accept(this);
+        return exception == node.Exception
+            ? node
+            : new ThrowExpressionNode(node.Span, exception);
+    }
     public ExpressionNode Visit(RethrowStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(LambdaParameterNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(DelegateDefinitionNode node) => throw new InvalidOperationException();
@@ -1414,6 +1421,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(YieldReturnStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(YieldBreakStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RawCSharpNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(RawCSharpExpressionNode node) => node;
+    public ExpressionNode Visit(PreprocessorDirectiveNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(CSharpInteropBlockNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(StackAllocNode node) => node;
     public ExpressionNode Visit(UnsafeBlockNode node) => throw new InvalidOperationException();

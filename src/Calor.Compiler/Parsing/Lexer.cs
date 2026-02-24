@@ -612,6 +612,12 @@ public sealed class Lexer
                 return MakeToken(kind);
             }
 
+            // Special handling for §/PP{CONDITION}: preprocessor conditional end (closing tag)
+            if (keyword.Equals("/PP", StringComparison.Ordinal) && Current == '{')
+            {
+                return ScanPreprocessorCondition(TokenKind.EndPreprocessor);
+            }
+
             // Unknown closing tag - provide helpful suggestions
             ReportUnknownSectionMarker(keyword);
             return MakeToken(TokenKind.Error);
@@ -657,6 +663,30 @@ public sealed class Lexer
         if (fullKeyword.Equals("CSHARP", StringComparison.Ordinal))
         {
             return ScanCSharpInteropBlock();
+        }
+
+        // Special handling for §CS{expr}: inline C# expression with balanced braces
+        if (fullKeyword.Equals("CS", StringComparison.Ordinal) && Current == '{')
+        {
+            return ScanRawCSharpExpression();
+        }
+
+        // Special handling for §PP{CONDITION}: preprocessor conditional start
+        if (fullKeyword.Equals("PP", StringComparison.Ordinal) && Current == '{')
+        {
+            return ScanPreprocessorCondition(TokenKind.Preprocessor);
+        }
+
+        // Special handling for §/PP{CONDITION}: preprocessor conditional end (closing tag)
+        if (fullKeyword.Equals("/PP", StringComparison.Ordinal) && Current == '{')
+        {
+            return ScanPreprocessorCondition(TokenKind.EndPreprocessor);
+        }
+
+        // Special handling for §PPE: preprocessor else
+        if (fullKeyword.Equals("PPE", StringComparison.Ordinal))
+        {
+            return MakeToken(TokenKind.PreprocessorElse);
         }
 
         if (Keywords.TryGetValue(fullKeyword, out var keywordKind))
@@ -764,6 +794,104 @@ public sealed class Lexer
         _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedCSharpInteropBlock,
             "Unterminated §CSHARP block: expected }§/CSHARP before end of file.");
         return MakeToken(TokenKind.Error);
+    }
+
+    /// <summary>
+    /// Scans an inline raw C# expression. Called after §CS has been consumed.
+    /// Expects { immediately after, then captures everything until the matching } (tracking brace depth).
+    /// </summary>
+    private Token ScanRawCSharpExpression()
+    {
+        Advance(); // consume '{'
+        var contentStart = _position;
+        int depth = 1;
+
+        while (!IsAtEnd && depth > 0)
+        {
+            // Skip braces inside string literals
+            if (Current == '"')
+            {
+                Advance(); // consume opening "
+                while (!IsAtEnd && Current != '"')
+                {
+                    if (Current == '\\') Advance(); // skip escape char
+                    Advance();
+                }
+                if (!IsAtEnd) Advance(); // consume closing "
+                continue;
+            }
+            // Skip braces inside char literals
+            if (Current == '\'')
+            {
+                Advance(); // consume opening '
+                while (!IsAtEnd && Current != '\'')
+                {
+                    if (Current == '\\') Advance(); // skip escape char
+                    Advance();
+                }
+                if (!IsAtEnd) Advance(); // consume closing '
+                continue;
+            }
+            if (Current == '{')
+            {
+                depth++;
+            }
+            else if (Current == '}')
+            {
+                depth--;
+                if (depth == 0)
+                    break;
+            }
+            Advance();
+        }
+
+        if (IsAtEnd && depth > 0)
+        {
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedCSharpInteropBlock,
+                "Unterminated §CS{ block: expected matching '}' before end of file.");
+            return MakeToken(TokenKind.Error);
+        }
+
+        var content = _source[contentStart.._position];
+        Advance(); // consume closing '}'
+        return MakeToken(TokenKind.RawCSharpExpression, content);
+    }
+
+    /// <summary>
+    /// Scans a preprocessor condition from inside braces: §PP{CONDITION} or §/PP{CONDITION}.
+    /// Called after §PP or §/PP has been consumed and '{' is the current character.
+    /// </summary>
+    private Token ScanPreprocessorCondition(TokenKind kind)
+    {
+        Advance(); // consume '{'
+        var contentStart = _position;
+        int depth = 1;
+
+        while (!IsAtEnd && depth > 0)
+        {
+            if (Current == '{')
+            {
+                depth++;
+            }
+            else if (Current == '}')
+            {
+                depth--;
+                if (depth == 0)
+                    break;
+            }
+            Advance();
+        }
+
+        if (IsAtEnd && depth > 0)
+        {
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedCSharpInteropBlock,
+                $"Unterminated preprocessor directive: expected matching '}}' before end of file.");
+            return MakeToken(TokenKind.Error);
+        }
+
+        var condition = _source[contentStart.._position];
+        Advance(); // consume closing '}'
+        return MakeToken(kind, condition);
     }
 
     /// <summary>
