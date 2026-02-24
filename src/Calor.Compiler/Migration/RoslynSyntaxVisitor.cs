@@ -4101,16 +4101,61 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertConditionalExpression(ConditionalExpressionSyntax conditional)
     {
-        // Ternary is converted to a conditional expression: (? cond then else)
-        var condition = ConvertExpression(conditional.Condition);
+        var span = GetTextSpan(conditional);
+
+        // Handle ternary with throw in false branch: flag ? value : throw new E(...)
+        // Hoist to: if (!flag) throw new E(...); return value;
+        if (conditional.WhenFalse is ThrowExpressionSyntax throwFalse)
+        {
+            _context.RecordFeatureUsage("ternary-throw");
+            _context.IncrementConverted();
+            var condition = ConvertExpression(conditional.Condition);
+            var exceptionExpr = ConvertExpression(throwFalse.Expression);
+
+            var negatedCondition = new UnaryOperationNode(span, UnaryOperator.Not, condition);
+            var throwStmt = new ThrowStatementNode(GetTextSpan(throwFalse), exceptionExpr);
+            var guard = new IfStatementNode(
+                span,
+                _context.GenerateId("if"),
+                negatedCondition,
+                new List<StatementNode> { throwStmt },
+                Array.Empty<ElseIfClauseNode>(),
+                null,
+                new AttributeCollection());
+
+            _pendingStatements.Add(guard);
+            return ConvertExpression(conditional.WhenTrue);
+        }
+
+        // Handle ternary with throw in true branch: flag ? throw new E(...) : value
+        // Hoist to: if (flag) throw new E(...); return value;
+        if (conditional.WhenTrue is ThrowExpressionSyntax throwTrue)
+        {
+            _context.RecordFeatureUsage("ternary-throw");
+            _context.IncrementConverted();
+            var condition = ConvertExpression(conditional.Condition);
+            var exceptionExpr = ConvertExpression(throwTrue.Expression);
+
+            var throwStmt = new ThrowStatementNode(GetTextSpan(throwTrue), exceptionExpr);
+            var guard = new IfStatementNode(
+                span,
+                _context.GenerateId("if"),
+                condition,
+                new List<StatementNode> { throwStmt },
+                Array.Empty<ElseIfClauseNode>(),
+                null,
+                new AttributeCollection());
+
+            _pendingStatements.Add(guard);
+            return ConvertExpression(conditional.WhenFalse);
+        }
+
+        // Standard ternary: (? cond then else)
+        var cond = ConvertExpression(conditional.Condition);
         var whenTrue = ConvertExpression(conditional.WhenTrue);
         var whenFalse = ConvertExpression(conditional.WhenFalse);
 
-        return new ConditionalExpressionNode(
-            GetTextSpan(conditional),
-            condition,
-            whenTrue,
-            whenFalse);
+        return new ConditionalExpressionNode(span, cond, whenTrue, whenFalse);
     }
 
     private ExpressionNode ConvertCastExpression(CastExpressionSyntax cast)

@@ -220,7 +220,7 @@ public class ConverterImprovementTests
     }
 
     [Fact]
-    public void Migration_ThrowExpressionInTernary_ConvertsToErr()
+    public void Migration_ThrowExpressionInTernary_HoistsGuard()
     {
         var csharp = """
             public class Service
@@ -237,9 +237,16 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
-        var conditional = Assert.IsType<ConditionalExpressionNode>(ret.Expression);
-        Assert.IsType<ErrExpressionNode>(conditional.WhenFalse);
+
+        // Ternary throw is now hoisted to a guard: if (!flag) throw ...
+        Assert.Equal(2, method.Body.Count);
+        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
+        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
+        Assert.IsType<NewExpressionNode>(throwStmt.Exception);
+
+        // Return statement has the value directly (no conditional)
+        var ret = Assert.IsType<ReturnStatementNode>(method.Body[1]);
+        Assert.IsType<IntLiteralNode>(ret.Expression);
     }
 
     #endregion
