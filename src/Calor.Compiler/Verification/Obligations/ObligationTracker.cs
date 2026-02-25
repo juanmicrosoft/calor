@@ -64,6 +64,18 @@ public sealed class Obligation
     public TimeSpan? SolverDuration { get; internal set; }
     public string? SuggestedFix { get; internal set; }
 
+    /// <summary>
+    /// For RefinementEntry obligations: the parameter name being constrained.
+    /// Used by ObligationSolver to bind # (self-ref) to the correct Z3 variable.
+    /// </summary>
+    public string? ParameterName { get; internal set; }
+
+    /// <summary>
+    /// For ProofObligation: the source proof ID from §PROOF{id}.
+    /// Used by CSharpEmitter to match obligations to AST nodes.
+    /// </summary>
+    public string? SourceProofId { get; internal set; }
+
     public Obligation(
         string id,
         ObligationKind kind,

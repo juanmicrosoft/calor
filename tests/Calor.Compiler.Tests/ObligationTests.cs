@@ -256,6 +256,114 @@ public sealed class ObligationTests
         Assert.Equal(ObligationStatus.Failed, proofObl.Status);
         Assert.NotNull(proofObl.CounterexampleDescription);
         Assert.Contains("Counterexample", proofObl.CounterexampleDescription);
+        // Counterexample should contain a meaningful variable assignment
+        Assert.Contains("x=", proofObl.CounterexampleDescription);
+    }
+
+    [SkippableFact]
+    public void Solve_InlineRefinementWithSelfRef_DischargesViaZ3()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // Private function with precondition that guarantees the inline refinement.
+        // The # in (>= # INT:0) should resolve to 'age' via PushSelfVariable.
+        var source = """
+            §M{m001:Test}
+            §F{f001:Validate:priv}
+              §I{i32:age} | (>= # INT:0)
+              §O{void}
+              §Q (>= age INT:0)
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var options = new CompilationOptions { VerifyRefinements = true };
+        var result = Program.Compile(source, "test.calr", options);
+
+        Assert.NotNull(options.ObligationResults);
+
+        var refObl = options.ObligationResults.Obligations.FirstOrDefault(
+            o => o.Kind == ObligationKind.RefinementEntry);
+        Assert.NotNull(refObl);
+        Assert.Equal("age", refObl.ParameterName);
+        // Precondition (>= age 0) should discharge the inline refinement (>= # 0)
+        Assert.Equal(ObligationStatus.Discharged, refObl.Status);
+    }
+
+    [SkippableFact]
+    public void Solve_InlineRefinementWithoutPrecondition_Fails()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // Private function WITHOUT precondition — inline refinement can't be verified
+        var source = """
+            §M{m001:Test}
+            §F{f001:Validate:priv}
+              §I{i32:age} | (>= # INT:0)
+              §O{void}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var options = new CompilationOptions { VerifyRefinements = true };
+        var result = Program.Compile(source, "test.calr", options);
+
+        Assert.NotNull(options.ObligationResults);
+
+        var refObl = options.ObligationResults.Obligations.FirstOrDefault(
+            o => o.Kind == ObligationKind.RefinementEntry);
+        Assert.NotNull(refObl);
+        Assert.Equal(ObligationStatus.Failed, refObl.Status);
+        Assert.NotNull(refObl.CounterexampleDescription);
+    }
+
+    // ───── Obligation Metadata ─────
+
+    [Fact]
+    public void Generate_SetsParameterNameOnRefinementEntry()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §I{i32:myParam} | (>= # INT:0)
+              §O{void}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        var generator = new ObligationGenerator(tracker);
+        generator.Generate(module);
+
+        var obl = Assert.Single(tracker.Obligations);
+        Assert.Equal("myParam", obl.ParameterName);
+    }
+
+    [Fact]
+    public void Generate_SetsSourceProofIdOnProofObligation()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:pub}
+              §I{i32:x}
+              §O{void}
+              §PROOF{p1:check} (>= x INT:0)
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        var generator = new ObligationGenerator(tracker);
+        generator.Generate(module);
+
+        var obl = Assert.Single(tracker.Obligations);
+        Assert.Equal("p1", obl.SourceProofId);
     }
 
     // ───── Full Pipeline Integration ─────

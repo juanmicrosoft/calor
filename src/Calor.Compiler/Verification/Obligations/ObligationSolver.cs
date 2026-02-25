@@ -67,31 +67,11 @@ public sealed class ObligationSolver : IDisposable
             }
         }
 
-        // For RefinementEntry obligations, declare the self-variable
+        // For RefinementEntry obligations, push the self-variable
         // so # in the predicate resolves to the parameter being checked
-        if (obligation.Kind == ObligationKind.RefinementEntry)
+        if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
         {
-            // The self variable is the parameter itself — it's already declared above.
-            // We push it as the self-ref target for predicate translation.
-            var paramName = ExtractParameterName(obligation.Description);
-            if (paramName != null)
-            {
-                translator.PushSelfVariable(paramName);
-            }
-        }
-
-        // Assert preconditions as assumptions
-        foreach (var pre in info.Preconditions)
-        {
-            var preExpr = translator.TranslateBoolExpr(pre.Condition);
-            if (preExpr != null)
-            {
-                // Preconditions are assumed true
-            }
-            else
-            {
-                // Can't translate precondition — continue without it
-            }
+            translator.PushSelfVariable(obligation.ParameterName);
         }
 
         // Translate the obligation condition
@@ -105,7 +85,7 @@ public sealed class ObligationSolver : IDisposable
                 ?? "Obligation condition could not be translated to Z3";
             obligation.SolverDuration = sw.Elapsed;
 
-            if (obligation.Kind == ObligationKind.RefinementEntry)
+            if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
                 translator.PopSelfVariable();
             return;
         }
@@ -159,7 +139,7 @@ public sealed class ObligationSolver : IDisposable
         }
         finally
         {
-            if (obligation.Kind == ObligationKind.RefinementEntry)
+            if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
                 translator.PopSelfVariable();
         }
     }
@@ -194,19 +174,6 @@ public sealed class ObligationSolver : IDisposable
             return "Counterexample found (values unavailable)";
 
         return $"Counterexample: {string.Join(", ", values)}";
-    }
-
-    /// <summary>
-    /// Extract the parameter name from an obligation description like
-    /// "Parameter 'x' must satisfy inline refinement".
-    /// </summary>
-    private static string? ExtractParameterName(string description)
-    {
-        var start = description.IndexOf('\'');
-        var end = description.IndexOf('\'', start + 1);
-        if (start >= 0 && end > start)
-            return description[(start + 1)..end];
-        return null;
     }
 
     private static Dictionary<string, FunctionInfo> BuildFunctionInfo(ModuleNode module)

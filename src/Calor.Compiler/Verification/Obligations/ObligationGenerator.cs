@@ -60,12 +60,13 @@ public sealed class ObligationGenerator
         {
             if (stmt is ProofObligationNode proof)
             {
-                _tracker.Add(
+                var obl = _tracker.Add(
                     ObligationKind.ProofObligation,
                     func.Id,
                     proof.Description ?? $"Proof obligation {proof.Id}",
                     proof.Condition,
                     proof.Span);
+                obl.SourceProofId = proof.Id;
             }
         }
     }
@@ -81,12 +82,13 @@ public sealed class ObligationGenerator
         {
             if (stmt is ProofObligationNode proof)
             {
-                _tracker.Add(
+                var obl = _tracker.Add(
                     ObligationKind.ProofObligation,
                     method.Id,
                     proof.Description ?? $"Proof obligation {proof.Id}",
                     proof.Condition,
                     proof.Span);
+                obl.SourceProofId = proof.Id;
             }
         }
     }
@@ -101,6 +103,7 @@ public sealed class ObligationGenerator
                 $"Parameter '{param.Name}' must satisfy inline refinement",
                 param.InlineRefinement.Predicate,
                 param.Span);
+            obl.ParameterName = param.Name;
 
             // Public functions get boundary status — can't statically verify caller behavior
             if (visibility == Visibility.Public)
@@ -119,6 +122,7 @@ public sealed class ObligationGenerator
                 $"Parameter '{param.Name}' must satisfy refinement type '{rtype.Name}'",
                 rtype.Predicate,
                 param.Span);
+            obl.ParameterName = param.Name;
 
             if (visibility == Visibility.Public)
             {

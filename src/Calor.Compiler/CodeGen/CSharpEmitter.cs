@@ -4422,7 +4422,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             var matching = _obligationTracker.Obligations
                 .FirstOrDefault(o => o.Kind == Verification.Obligations.ObligationKind.ProofObligation
-                    && o.Span.Start == node.Span.Start);
+                    && o.SourceProofId == node.Id);
 
             if (matching != null)
             {
