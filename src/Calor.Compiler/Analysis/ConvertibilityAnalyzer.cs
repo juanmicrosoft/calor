@@ -10,7 +10,8 @@ namespace Calor.Compiler.Analysis;
 public sealed record ConvertibilityBlocker(
     string Name,
     string Description,
-    int Count);
+    int Count,
+    string Category = "language_unsupported");
 
 /// <summary>
 /// Result of a convertibility analysis on a single C# file.
@@ -127,7 +128,7 @@ public sealed class ConvertibilityAnalyzer
             {
                 if (!blockers.Any(b => b.Name == featureName) && instances.Count > 0)
                 {
-                    blockers.Add(new ConvertibilityBlocker(featureName, $"{featureName} not supported", instances.Count));
+                    blockers.Add(new ConvertibilityBlocker(featureName, $"{featureName} not supported", instances.Count, ClassifyBlocker(featureName)));
                     totalBlockerInstances += instances.Count;
                     constructTypes++;
                 }
@@ -289,9 +290,19 @@ public sealed class ConvertibilityAnalyzer
     {
         return unsupported
             .Where(c => c.Count > 0)
-            .Select(c => new ConvertibilityBlocker(c.Name, c.Description, c.Count))
+            .Select(c => new ConvertibilityBlocker(c.Name, c.Description, c.Count, ClassifyBlocker(c.Name)))
             .OrderByDescending(b => b.Count)
             .ToList();
+    }
+
+    private static string ClassifyBlocker(string blockerName)
+    {
+        var level = FeatureSupport.GetSupportLevel(blockerName);
+        // If FeatureSupport says Full/Partial but it's still a blocker → converter bug
+        // If NotSupported/ManualRequired → genuine language gap
+        return level is SupportLevel.NotSupported or SupportLevel.ManualRequired
+            ? "language_unsupported"
+            : "converter_not_implemented";
     }
 
     private static string BuildSummary(int score, List<ConvertibilityBlocker> blockers)
