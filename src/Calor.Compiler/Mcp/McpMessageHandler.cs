@@ -54,6 +54,8 @@ public sealed class McpMessageHandler
         RegisterTool(new CallGraphTool());
         RegisterTool(new EditPreviewTool());
         RegisterTool(new ScopeInfoTool());
+        RegisterTool(new ObligationsTool());
+        RegisterTool(new SuggestFixesTool());
     }
 
     private void RegisterTool(IMcpTool tool)
