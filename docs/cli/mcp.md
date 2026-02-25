@@ -46,7 +46,7 @@ The server communicates over stdio using the [Model Context Protocol](https://mo
 
 ## Available Tools
 
-The MCP server exposes 32 tools organized by category:
+The MCP server exposes 33 tools organized by category:
 
 ### Compilation & Verification
 
@@ -79,6 +79,7 @@ The MCP server exposes 32 tools organized by category:
 | `calor_assess` | Score C# files for migration potential |
 | `calor_analyze_convertibility` | Analyze C# code for Calor conversion likelihood |
 | `calor_convert` | Convert between C# and Calor |
+| `calor_convert_validated` | Full validated conversion pipeline (convert → fix → diagnose → compat) |
 | `calor_impact_analysis` | Compute what would be affected by changing a symbol |
 | `calor_call_graph` | Get callers/callees with effect annotations |
 | `calor_edit_preview` | Preview effects of an edit before committing |
@@ -316,6 +317,24 @@ Convert C# source code to Calor.
 ```
 
 **Output:** Generated Calor code and conversion statistics.
+
+### calor_convert_validated
+
+Full validated conversion pipeline: convert C# to Calor, auto-fix parse errors, run diagnostics, and verify generated C# compatibility — all in one call.
+
+**Input Schema:**
+```json
+{
+  "source": "string (required) - C# source code to convert to Calor",
+  "moduleName": "string - Module name for the generated Calor code",
+  "mode": "string - Conversion mode: 'standard' (default) or 'interop'",
+  "expectedNamespace": "string - Expected namespace in generated C# (for compat check)",
+  "expectedPatterns": "array of strings - Patterns that must appear in generated C#",
+  "forbiddenPatterns": "array of strings - Patterns that must NOT appear in generated C#"
+}
+```
+
+**Output:** Stage-by-stage results (convert, fix, diagnose, compat) with the final Calor code and any issues found at each stage.
 
 ### calor_analyze_convertibility
 
@@ -725,7 +744,7 @@ When you run `calor init --ai claude`, the MCP server is automatically configure
 
 This configures two servers:
 - **calor-lsp**: Language server for IDE features (diagnostics, hover, go-to-definition)
-- **calor**: MCP server with all 32 tools
+- **calor**: MCP server with all 33 tools
 
 ### Gemini CLI (via calor init)
 

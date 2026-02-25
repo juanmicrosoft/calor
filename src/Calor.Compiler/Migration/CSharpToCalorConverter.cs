@@ -271,6 +271,8 @@ public sealed class CSharpToCalorConverter
         };
     }
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("SingleFile", "IL3000",
+        Justification = "Assembly.Location is checked for empty string; gracefully returns no references in single-file mode.")]
     private static MetadataReference[] GetBasicMetadataReferences()
     {
         var refs = new List<MetadataReference>();

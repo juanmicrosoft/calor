@@ -123,23 +123,68 @@ public sealed class ConvertTool : McpToolBase
             }).ToList();
 
             var success = result.Success;
+            var calorSourceForOutput = result.CalorSource;
 
-            if (success && !string.IsNullOrWhiteSpace(result.CalorSource))
+            if (success && !string.IsNullOrWhiteSpace(calorSourceForOutput))
             {
-                var parseResult = CalorSourceHelper.Parse(result.CalorSource, "converted-output.calr");
+                var parseResult = CalorSourceHelper.Parse(calorSourceForOutput, "converted-output.calr");
                 if (!parseResult.IsSuccess)
                 {
-                    success = false;
-                    foreach (var error in parseResult.Errors)
+                    // Attempt auto-fix before reporting errors
+                    var fixer = new PostConversionFixer();
+                    var fixResult = fixer.Fix(calorSourceForOutput);
+
+                    if (fixResult.WasModified)
                     {
-                        issues.Add(new ConversionIssueOutput
+                        var retryParse = CalorSourceHelper.Parse(fixResult.FixedSource, "converted-output.calr");
+                        if (retryParse.IsSuccess)
                         {
-                            Severity = "error",
-                            Message = $"Generated Calor failed to parse: {error}",
-                            Line = 0,
-                            Column = 0,
-                            Suggestion = "The converter produced invalid Calor syntax. This is a converter bug — please report it."
-                        });
+                            // Auto-fix succeeded — use fixed source
+                            calorSourceForOutput = fixResult.FixedSource;
+                            foreach (var fix in fixResult.AppliedFixes)
+                            {
+                                issues.Add(new ConversionIssueOutput
+                                {
+                                    Severity = "info",
+                                    Message = $"Auto-fixed: {fix.Description} (rule: {fix.Rule})",
+                                    Line = 0,
+                                    Column = 0,
+                                    Suggestion = null
+                                });
+                            }
+                        }
+                        else
+                        {
+                            // Auto-fix didn't fully resolve — report original errors
+                            success = false;
+                            foreach (var error in parseResult.Errors)
+                            {
+                                issues.Add(new ConversionIssueOutput
+                                {
+                                    Severity = "error",
+                                    Message = $"Generated Calor failed to parse: {error}",
+                                    Line = 0,
+                                    Column = 0,
+                                    Suggestion = "The converter produced invalid Calor syntax. This is a converter bug — please report it."
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // No fixes applicable — report original errors
+                        success = false;
+                        foreach (var error in parseResult.Errors)
+                        {
+                            issues.Add(new ConversionIssueOutput
+                            {
+                                Severity = "error",
+                                Message = $"Generated Calor failed to parse: {error}",
+                                Line = 0,
+                                Column = 0,
+                                Suggestion = "The converter produced invalid Calor syntax. This is a converter bug — please report it."
+                            });
+                        }
                     }
                 }
             }
@@ -147,7 +192,7 @@ public sealed class ConvertTool : McpToolBase
             var output = new ConvertToolOutput
             {
                 Success = success,
-                CalorSource = result.CalorSource,
+                CalorSource = calorSourceForOutput,
                 Issues = issues,
                 Stats = new ConversionStatsOutput
                 {
@@ -228,48 +273,5 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("suggestion")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Suggestion { get; init; }
-    }
-
-    private sealed class ConversionIssueOutput
-    {
-        [JsonPropertyName("severity")]
-        public required string Severity { get; init; }
-
-        [JsonPropertyName("message")]
-        public required string Message { get; init; }
-
-        [JsonPropertyName("line")]
-        public int Line { get; init; }
-
-        [JsonPropertyName("column")]
-        public int Column { get; init; }
-
-        [JsonPropertyName("suggestion")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Suggestion { get; init; }
-    }
-
-    private sealed class ConversionStatsOutput
-    {
-        [JsonPropertyName("classesConverted")]
-        public int ClassesConverted { get; init; }
-
-        [JsonPropertyName("interfacesConverted")]
-        public int InterfacesConverted { get; init; }
-
-        [JsonPropertyName("methodsConverted")]
-        public int MethodsConverted { get; init; }
-
-        [JsonPropertyName("propertiesConverted")]
-        public int PropertiesConverted { get; init; }
-
-        [JsonPropertyName("fieldsConverted")]
-        public int FieldsConverted { get; init; }
-
-        [JsonPropertyName("interopBlocksEmitted")]
-        public int InteropBlocksEmitted { get; init; }
-
-        [JsonPropertyName("durationMs")]
-        public int DurationMs { get; init; }
     }
 }

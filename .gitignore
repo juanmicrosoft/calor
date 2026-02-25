@@ -60,4 +60,10 @@ src/Calor.Compiler/.z3-temp/
 
 # VS Code extension build artifacts
 editors/vscode/server/
-editors/vscode/*.vsixconversion-reports/
+editors/vscode/*.vsix
+
+# Conversion reports (generated locally)
+conversion-reports/
+
+# Stale report files
+report.json
