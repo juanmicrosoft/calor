@@ -3619,6 +3619,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Convert nameof(x) to NameOfExpressionNode
         if (target == "nameof" && invocation.ArgumentList.Arguments.Count == 1)
         {
+            _context.RecordFeatureUsage("nameof");
+            _context.IncrementConverted();
             var argText = invocation.ArgumentList.Arguments[0].Expression.ToString();
             return new NameOfExpressionNode(GetTextSpan(invocation), argText);
         }

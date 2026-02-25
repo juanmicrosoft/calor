@@ -1050,6 +1050,35 @@ public class AttributeConversionTests
         Assert.Contains("nameof(obj.Property)", outputCode);
     }
 
+    [Fact]
+    public void Parser_Roundtrip_NameofWithKeywordArg_ToCSharp()
+    {
+        // Calor keywords used as nameof arguments should still work
+        var calorSource = """
+            §M{m1:Test}
+            §F{f1:GetName}
+              §O{str}
+              §R (nameof value)
+            §/F{f1}
+            §/M{m1}
+            """;
+
+        var compilationResult = Program.Compile(calorSource);
+
+        Assert.False(compilationResult.HasErrors,
+            string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("nameof(value)", compilationResult.GeneratedCode);
+    }
+
+    [Fact]
+    public void FeatureSupport_Nameof_IsRegistered()
+    {
+        var info = FeatureSupport.GetFeatureInfo("nameof");
+
+        Assert.NotNull(info);
+        Assert.Equal(SupportLevel.Full, info.Support);
+    }
+
     #endregion
 
     private static string GetErrorMessage(ConversionResult result)
