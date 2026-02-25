@@ -57,6 +57,14 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
                 ? analyzer.AnalyzeQuick(source)
                 : analyzer.Analyze(source);
 
+            var blockers = result.Blockers.Select(b => new ToolBlocker
+            {
+                Name = b.Name,
+                Description = b.Description,
+                Count = b.Count,
+                Category = b.Category
+            }).ToList();
+
             var output = new ToolOutput
             {
                 Score = result.Score,
@@ -65,13 +73,10 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
                 ConversionSucceeded = result.ConversionSucceeded,
                 CompilationSucceeded = result.CompilationSucceeded,
                 ConversionRate = result.ConversionRate,
-                Blockers = result.Blockers.Select(b => new ToolBlocker
-                {
-                    Name = b.Name,
-                    Description = b.Description,
-                    Count = b.Count
-                }).ToList(),
+                Blockers = blockers,
                 TotalBlockerInstances = result.TotalBlockerInstances,
+                LanguageGapCount = blockers.Count(b => b.Category == "language_unsupported"),
+                ConverterBugCount = blockers.Count(b => b.Category == "converter_not_implemented"),
                 DurationMs = (int)result.Duration.TotalMilliseconds
             };
 
@@ -110,6 +115,12 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
         [JsonPropertyName("totalBlockerInstances")]
         public int TotalBlockerInstances { get; init; }
 
+        [JsonPropertyName("languageGapCount")]
+        public int LanguageGapCount { get; init; }
+
+        [JsonPropertyName("converterBugCount")]
+        public int ConverterBugCount { get; init; }
+
         [JsonPropertyName("durationMs")]
         public int DurationMs { get; init; }
     }
@@ -124,5 +135,8 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
 
         [JsonPropertyName("count")]
         public int Count { get; init; }
+
+        [JsonPropertyName("category")]
+        public required string Category { get; init; }
     }
 }
