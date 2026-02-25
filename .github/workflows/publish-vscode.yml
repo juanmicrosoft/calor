@@ -62,6 +62,7 @@ jobs:
           timeout_minutes: 5
           max_attempts: 3
           retry_wait_seconds: 15
+          shell: bash
           command: cd editors/vscode && npm ci
 
       - name: Update version (if specified)
