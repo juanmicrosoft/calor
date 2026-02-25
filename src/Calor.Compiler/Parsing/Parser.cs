@@ -1339,15 +1339,24 @@ public sealed class Parser
         }
 
         // Handle nameof: (nameof name) or (nameof obj.Property)
+        // Accept identifiers and keywords (e.g., nameof(value), nameof(return))
         if (opText == "nameof")
         {
-            var nameToken = Expect(TokenKind.Identifier);
+            var nameToken = Current;
+            if (nameToken.Kind != TokenKind.Identifier && !nameToken.IsKeyword)
+            {
+                _diagnostics.ReportUnexpectedToken(nameToken.Span, "identifier", nameToken.Kind);
+                Expect(TokenKind.CloseParen);
+                return new StringLiteralNode(startToken.Span, "");
+            }
             var name = nameToken.Text;
+            Advance();
             while (Check(TokenKind.Dot))
             {
                 Advance();
-                var partToken = Expect(TokenKind.Identifier);
+                var partToken = Current;
                 name += "." + partToken.Text;
+                Advance();
             }
             var nameofEnd = Expect(TokenKind.CloseParen);
             return new NameOfExpressionNode(startToken.Span.Union(nameofEnd.Span), name);

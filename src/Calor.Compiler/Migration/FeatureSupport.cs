@@ -423,6 +423,12 @@ public static class FeatureSupport
             Description = "Throw expressions are converted to §ERR nodes",
             Workaround = "Review converted §ERR expressions for error semantics"
         },
+        ["nameof"] = new FeatureInfo
+        {
+            Name = "nameof",
+            Support = SupportLevel.Full,
+            Description = "nameof() expressions are preserved as (nameof x) in Calor and emit nameof(x) in C#"
+        },
         ["nested-generic-type"] = new FeatureInfo
         {
             Name = "nested-generic-type",
