@@ -548,47 +548,48 @@ public class Program
 
             options.ObligationResults = obligationTracker;
 
-            // Report diagnostics for obligation results
+            // Report diagnostics for obligation results using policy
+            var obligationPolicy = options.ObligationPolicy;
             foreach (var obl in obligationTracker.Obligations)
             {
-                switch (obl.Status)
+                var action = obligationPolicy.GetAction(obl.Status);
+                if (action == Verification.Obligations.ObligationAction.Ignore)
+                    continue;
+
+                var code = (obl.Status, obl.Kind) switch
                 {
-                    case Verification.Obligations.ObligationStatus.Discharged:
-                        var dischargedCode = obl.Kind == Verification.Obligations.ObligationKind.ProofObligation
-                            ? DiagnosticCode.ProofObligationDischarged
-                            : DiagnosticCode.ObligationDischarged;
-                        diagnostics.Report(obl.Span, dischargedCode,
-                            $"Obligation [{obl.Id}] discharged: {obl.Description}",
-                            DiagnosticSeverity.Info);
-                        break;
+                    (Verification.Obligations.ObligationStatus.Discharged, Verification.Obligations.ObligationKind.ProofObligation) => DiagnosticCode.ProofObligationDischarged,
+                    (Verification.Obligations.ObligationStatus.Discharged, _) => DiagnosticCode.ObligationDischarged,
+                    (Verification.Obligations.ObligationStatus.Failed, Verification.Obligations.ObligationKind.ProofObligation) => DiagnosticCode.ProofObligationFailed,
+                    (Verification.Obligations.ObligationStatus.Failed, _) => DiagnosticCode.ObligationFailed,
+                    (Verification.Obligations.ObligationStatus.Timeout, _) => DiagnosticCode.ObligationTimeout,
+                    (Verification.Obligations.ObligationStatus.Boundary, _) => DiagnosticCode.ObligationBoundary,
+                    (Verification.Obligations.ObligationStatus.Unsupported, _) => DiagnosticCode.ObligationUnsupported,
+                    _ => DiagnosticCode.ObligationUnsupported
+                };
 
-                    case Verification.Obligations.ObligationStatus.Failed:
-                        var failedCode = obl.Kind == Verification.Obligations.ObligationKind.ProofObligation
-                            ? DiagnosticCode.ProofObligationFailed
-                            : DiagnosticCode.ObligationFailed;
-                        diagnostics.Report(obl.Span, failedCode,
-                            $"Obligation [{obl.Id}] failed: {obl.Description}. {obl.CounterexampleDescription}",
-                            DiagnosticSeverity.Error);
-                        break;
+                var severity = Verification.Obligations.ObligationPolicy.IsError(action)
+                    ? DiagnosticSeverity.Error
+                    : action == Verification.Obligations.ObligationAction.WarnOnly
+                        || action == Verification.Obligations.ObligationAction.WarnAndGuard
+                        ? DiagnosticSeverity.Warning
+                        : DiagnosticSeverity.Info;
 
-                    case Verification.Obligations.ObligationStatus.Timeout:
-                        diagnostics.Report(obl.Span, DiagnosticCode.ObligationTimeout,
-                            $"Obligation [{obl.Id}] timed out: {obl.Description}",
-                            DiagnosticSeverity.Warning);
-                        break;
+                var message = obl.Status switch
+                {
+                    Verification.Obligations.ObligationStatus.Discharged =>
+                        $"Obligation [{obl.Id}] discharged: {obl.Description}",
+                    Verification.Obligations.ObligationStatus.Failed =>
+                        $"Obligation [{obl.Id}] failed: {obl.Description}. {obl.CounterexampleDescription}",
+                    Verification.Obligations.ObligationStatus.Timeout =>
+                        $"Obligation [{obl.Id}] timed out: {obl.Description}",
+                    Verification.Obligations.ObligationStatus.Boundary =>
+                        $"Obligation [{obl.Id}] is a boundary check: {obl.Description}",
+                    _ =>
+                        $"Obligation [{obl.Id}] unsupported: {obl.Description}. {obl.CounterexampleDescription}"
+                };
 
-                    case Verification.Obligations.ObligationStatus.Boundary:
-                        diagnostics.Report(obl.Span, DiagnosticCode.ObligationBoundary,
-                            $"Obligation [{obl.Id}] is a boundary check: {obl.Description}",
-                            DiagnosticSeverity.Info);
-                        break;
-
-                    case Verification.Obligations.ObligationStatus.Unsupported:
-                        diagnostics.Report(obl.Span, DiagnosticCode.ObligationUnsupported,
-                            $"Obligation [{obl.Id}] unsupported: {obl.Description}. {obl.CounterexampleDescription}",
-                            DiagnosticSeverity.Warning);
-                        break;
-                }
+                diagnostics.Report(obl.Span, code, message, severity);
             }
 
             phaseSw.Stop();
@@ -837,6 +838,12 @@ public sealed class CompilationOptions
     /// Obligation tracker populated after running obligation verification.
     /// </summary>
     public Verification.Obligations.ObligationTracker? ObligationResults { get; internal set; }
+
+    /// <summary>
+    /// Policy controlling how obligation statuses map to compiler behavior.
+    /// Default: failed=Error, boundary=AlwaysGuard, timeout=WarnAndGuard.
+    /// </summary>
+    public Verification.Obligations.ObligationPolicy ObligationPolicy { get; init; } = Verification.Obligations.ObligationPolicy.Default;
 }
 
 /// <summary>

@@ -57,15 +57,13 @@ public sealed class DiagnoseRefinementTool : McpToolBase
 
             var tracker = options.ObligationResults;
 
-            // Get type suggestions from usage analysis
-            var diagnostics = new Diagnostics.DiagnosticBag();
-            var lexer = new Parsing.Lexer(source, diagnostics);
-            var tokens = lexer.TokenizeAll();
-            var parser = new Parsing.Parser(tokens, diagnostics);
-            var module = parser.Parse();
-
-            var typeSuggester = new TypeSuggester();
-            var typeSuggestions = typeSuggester.Suggest(module);
+            // Get type suggestions from usage analysis (reuse AST from compilation)
+            var typeSuggestions = new List<TypeSuggestion>();
+            if (result.Ast != null)
+            {
+                var typeSuggester = new TypeSuggester();
+                typeSuggestions = typeSuggester.Suggest(result.Ast);
+            }
 
             // Get guard discoveries
             var guardDiscovery = new GuardDiscovery();

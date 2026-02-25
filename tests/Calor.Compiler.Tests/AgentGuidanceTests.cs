@@ -425,4 +425,186 @@ public sealed class AgentGuidanceTests
                 $"{tool.Name} schema missing source property");
         }
     }
+
+    // ───── GuardDiscovery: Nested FormatCondition ─────
+
+    [Fact]
+    public void GuardDiscovery_NestedAndPredicate_FormatsCorrectly()
+    {
+        // Test that a compound predicate like (&& (>= # INT:0) (<= # INT:100)) formats correctly
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:priv}
+              §I{i32:x} | (&& (>= # INT:0) (<= # INT:100))
+              §O{void}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        var generator = new ObligationGenerator(tracker);
+        generator.Generate(module);
+
+        // Mark as failed to trigger guard discovery
+        foreach (var obl in tracker.Obligations)
+            obl.Status = ObligationStatus.Failed;
+
+        var discovery = new GuardDiscovery();
+        var guards = discovery.DiscoverGuards(tracker);
+
+        Assert.NotEmpty(guards);
+        // The precondition guard should contain the formatted condition with >= and <=
+        var precondGuard = guards.First(g => g.InsertionKind == "precondition");
+        Assert.Contains(">=", precondGuard.CalorExpression);
+        Assert.Contains("<=", precondGuard.CalorExpression);
+        Assert.Contains("§Q", precondGuard.CalorExpression);
+    }
+
+    [Fact]
+    public void GuardDiscovery_SelfRefInPredicate_ReplacedWithParamName()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:priv}
+              §I{i32:age} | (>= # INT:0)
+              §O{void}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        var generator = new ObligationGenerator(tracker);
+        generator.Generate(module);
+
+        foreach (var obl in tracker.Obligations)
+            obl.Status = ObligationStatus.Failed;
+
+        var discovery = new GuardDiscovery();
+        var guards = discovery.DiscoverGuards(tracker);
+
+        // # should be replaced with the parameter name 'age'
+        var precondGuard = guards.First(g => g.InsertionKind == "precondition");
+        Assert.Contains("age", precondGuard.CalorExpression);
+        Assert.DoesNotContain("#", precondGuard.CalorExpression);
+    }
+
+    // ───── GuardDiscovery: Z3 Validation ─────
+
+    [SkippableFact]
+    public void GuardDiscovery_ValidateWithZ3_PreconditionGuardsValidated()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        var source = """
+            §M{m001:Test}
+            §F{f001:Main:priv}
+              §I{i32:x} | (>= # INT:0)
+              §O{void}
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        var generator = new ObligationGenerator(tracker);
+        generator.Generate(module);
+
+        foreach (var obl in tracker.Obligations)
+            obl.Status = ObligationStatus.Failed;
+
+        var discovery = new GuardDiscovery();
+        var guards = discovery.DiscoverGuards(tracker);
+
+        // Validate guards with Z3
+        var parameters = module.Functions[0].Parameters
+            .Select(p => (p.Name, p.TypeName))
+            .ToList();
+        discovery.ValidateWithZ3(guards, tracker.Obligations, parameters);
+
+        // Precondition guards should be validated (assuming the condition discharges it)
+        var precondGuard = guards.First(g => g.InsertionKind == "precondition");
+        Assert.True(precondGuard.Validated);
+
+        // if_guard guards should have null (not applicable for Z3 validation)
+        var ifGuard = guards.First(g => g.InsertionKind == "if_guard");
+        Assert.Null(ifGuard.Validated);
+    }
+
+    // ───── Policy Pipeline Integration ─────
+
+    [Fact]
+    public void Pipeline_PermissivePolicy_FailedIsWarningNotError()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Check:priv}
+              §I{i32:x}
+              §O{void}
+              §PROOF{p1:always-positive} (> x INT:0)
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var options = new CompilationOptions
+        {
+            VerifyRefinements = true,
+            ObligationPolicy = ObligationPolicy.Permissive
+        };
+
+        var result = Program.Compile(source, "test.calr", options);
+
+        // Under permissive policy, failed obligations should be warnings, not errors
+        Assert.NotNull(options.ObligationResults);
+        var proofObl = options.ObligationResults.Obligations.FirstOrDefault(
+            o => o.Kind == ObligationKind.ProofObligation);
+
+        if (proofObl != null && proofObl.Status == ObligationStatus.Failed)
+        {
+            // The diagnostic should be a warning, not an error
+            Assert.DoesNotContain(result.Diagnostics.Errors,
+                d => d.Code == DiagnosticCode.ProofObligationFailed);
+        }
+    }
+
+    [Fact]
+    public void Pipeline_DefaultPolicy_FailedIsError()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Check:priv}
+              §I{i32:x}
+              §O{void}
+              §PROOF{p1:always-positive} (> x INT:0)
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var options = new CompilationOptions
+        {
+            VerifyRefinements = true,
+            ObligationPolicy = ObligationPolicy.Default
+        };
+
+        var result = Program.Compile(source, "test.calr", options);
+
+        Assert.NotNull(options.ObligationResults);
+        var proofObl = options.ObligationResults.Obligations.FirstOrDefault(
+            o => o.Kind == ObligationKind.ProofObligation);
+
+        if (proofObl != null && proofObl.Status == ObligationStatus.Failed)
+        {
+            // Under default policy, failed obligations should produce errors
+            Assert.Contains(result.Diagnostics.Errors,
+                d => d.Code == DiagnosticCode.ObligationFailed
+                    || d.Code == DiagnosticCode.ProofObligationFailed);
+        }
+    }
 }

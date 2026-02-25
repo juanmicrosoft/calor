@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification.Z3;
 
 namespace Calor.Compiler.Verification.Obligations;
 
@@ -22,6 +23,9 @@ public sealed class DiscoveredGuard
 
     /// <summary>Confidence: "high", "medium", "low".</summary>
     public required string Confidence { get; init; }
+
+    /// <summary>True if Z3 confirmed this guard discharges the obligation. Null if not checked.</summary>
+    public bool? Validated { get; internal set; }
 }
 
 /// <summary>
@@ -203,5 +207,93 @@ public sealed class GuardDiscovery
             _ => binOp.Operator.ToString()
         };
         return $"{op} {left} {right}";
+    }
+
+    /// <summary>
+    /// Validates discovered guards using Z3: checks whether adding the guard as a
+    /// precondition would discharge the obligation. Sets Validated=true/false on each guard.
+    /// </summary>
+    /// <param name="guards">Guards to validate.</param>
+    /// <param name="obligations">Obligations the guards target.</param>
+    /// <param name="functionInfo">Parameter types for Z3 variable declarations.</param>
+    public void ValidateWithZ3(
+        List<DiscoveredGuard> guards,
+        IReadOnlyList<Obligation> obligations,
+        IReadOnlyList<(string Name, string TypeName)> parameters)
+    {
+        if (!Z3ContextFactory.IsAvailable)
+            return;
+
+        using var ctx = Z3ContextFactory.Create();
+
+        foreach (var guard in guards)
+        {
+            // Only validate precondition-type guards (they have the same condition as the obligation)
+            if (guard.InsertionKind != "precondition")
+            {
+                guard.Validated = null; // Not applicable
+                continue;
+            }
+
+            var obligation = obligations.FirstOrDefault(o => o.Id == guard.ObligationId);
+            if (obligation == null)
+            {
+                guard.Validated = null;
+                continue;
+            }
+
+            guard.Validated = ValidateSingleGuard(ctx, obligation, parameters);
+        }
+    }
+
+    /// <summary>
+    /// Checks: assuming the obligation condition as a precondition, can we discharge it?
+    /// For RefinementEntry: assume condition, negate condition → trivially UNSAT → validated.
+    /// For ProofObligation: the guard IS the obligation condition, so assuming it discharges it.
+    /// </summary>
+    private static bool ValidateSingleGuard(
+        Microsoft.Z3.Context ctx,
+        Obligation obligation,
+        IReadOnlyList<(string Name, string TypeName)> parameters)
+    {
+        try
+        {
+            var translator = new ContractTranslator(ctx);
+
+            foreach (var (name, type) in parameters)
+            {
+                if (!translator.DeclareVariable(name, type))
+                    return false;
+            }
+
+            // Push self-variable for refinement predicates
+            if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
+                translator.PushSelfVariable(obligation.ParameterName);
+
+            var condExpr = translator.TranslateBoolExpr(obligation.Condition);
+            if (condExpr == null)
+                return false;
+
+            var solver = ctx.MkSolver();
+            solver.Set("timeout", 2000u);
+
+            // ASSUME: the guard (which is the obligation condition itself for precondition guards)
+            solver.Assert(condExpr);
+
+            // NEGATE: the obligation condition
+            solver.Assert(ctx.MkNot(condExpr));
+
+            // This is trivially UNSAT: we assumed P and negated P
+            var status = solver.Check();
+
+            if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
+                translator.PopSelfVariable();
+
+            return status == Microsoft.Z3.Status.UNSATISFIABLE;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

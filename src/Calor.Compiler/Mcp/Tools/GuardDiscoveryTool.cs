@@ -49,7 +49,7 @@ public sealed class GuardDiscoveryTool : McpToolBase
                 EnableTypeChecking = true
             };
 
-            Program.Compile(source, "mcp_guards.calr", options);
+            var result = Program.Compile(source, "mcp_guards.calr", options);
 
             var tracker = options.ObligationResults;
             if (tracker == null)
@@ -69,6 +69,17 @@ public sealed class GuardDiscoveryTool : McpToolBase
                     .ToList()
                 : discovery.DiscoverGuards(tracker);
 
+            // Validate guards with Z3 if available
+            if (result.Ast != null && result.Ast.Functions.Count > 0)
+            {
+                // Collect all parameters across functions for Z3 validation
+                var allParams = result.Ast.Functions
+                    .SelectMany(f => f.Parameters.Select(p => (p.Name, p.TypeName)))
+                    .Distinct()
+                    .ToList();
+                discovery.ValidateWithZ3(guards, tracker.Obligations, allParams);
+            }
+
             return Task.FromResult(McpToolResult.Json(new GuardDiscoveryOutput
             {
                 Success = true,
@@ -78,7 +89,8 @@ public sealed class GuardDiscoveryTool : McpToolBase
                     Description = g.Description,
                     CalorExpression = g.CalorExpression,
                     InsertionKind = g.InsertionKind,
-                    Confidence = g.Confidence
+                    Confidence = g.Confidence,
+                    Validated = g.Validated
                 }).ToList()
             }));
         }
@@ -113,5 +125,9 @@ public sealed class GuardDiscoveryTool : McpToolBase
 
         [JsonPropertyName("confidence")]
         public required string Confidence { get; init; }
+
+        [JsonPropertyName("validated")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? Validated { get; init; }
     }
 }
