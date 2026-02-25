@@ -269,6 +269,11 @@ public sealed class Lexer
         ["IDX2D"] = TokenKind.Index2D,              // §IDX2D
         ["ROW"] = TokenKind.Row,                    // §ROW
 
+        // Dependent Types: Refinement Types and Proof Obligations
+        ["RTYPE"] = TokenKind.RefinedType,           // §RTYPE
+        ["/RTYPE"] = TokenKind.EndRefinedType,       // §/RTYPE
+        ["PROOF"] = TokenKind.Proof,                 // §PROOF
+
         // Built-in aliases for common operations
         ["P"] = TokenKind.Print,            // §P = Console.WriteLine
         ["Pf"] = TokenKind.PrintF,          // §Pf = Console.Write

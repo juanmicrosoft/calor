@@ -364,6 +364,65 @@ public static class DiagnosticCode
     /// Info: Raw C# code preserved in interop block for unsupported feature.
     /// </summary>
     public const string CSharpInteropBlockPreserved = "Calor1011";
+
+    // Refinement type diagnostics (Calor1100-1109)
+
+    /// <summary>
+    /// Error: Refinement type predicate does not evaluate to a boolean.
+    /// </summary>
+    public const string RefinementPredicateNotBoolean = "Calor1100";
+
+    /// <summary>
+    /// Error: Self-reference placeholder (#) used outside a refinement predicate.
+    /// </summary>
+    public const string SelfRefOutsidePredicate = "Calor1101";
+
+    /// <summary>
+    /// Error: Refinement type references an undefined base type.
+    /// </summary>
+    public const string RefinementUndefinedBaseType = "Calor1102";
+
+    /// <summary>
+    /// Error: Duplicate refinement type name.
+    /// </summary>
+    public const string RefinementDuplicateName = "Calor1103";
+
+    // Obligation verification diagnostics (Calor1120-1141)
+
+    /// <summary>
+    /// Info: Obligation successfully discharged (proven).
+    /// </summary>
+    public const string ObligationDischarged = "Calor1120";
+
+    /// <summary>
+    /// Error: Obligation failed — counterexample found.
+    /// </summary>
+    public const string ObligationFailed = "Calor1121";
+
+    /// <summary>
+    /// Warning: Obligation solver timed out.
+    /// </summary>
+    public const string ObligationTimeout = "Calor1122";
+
+    /// <summary>
+    /// Info: Boundary obligation — requires runtime check.
+    /// </summary>
+    public const string ObligationBoundary = "Calor1123";
+
+    /// <summary>
+    /// Warning: Obligation contains unsupported constructs.
+    /// </summary>
+    public const string ObligationUnsupported = "Calor1124";
+
+    /// <summary>
+    /// Error: Proof obligation failed.
+    /// </summary>
+    public const string ProofObligationFailed = "Calor1140";
+
+    /// <summary>
+    /// Info: Proof obligation discharged (proven).
+    /// </summary>
+    public const string ProofObligationDischarged = "Calor1141";
 }
 
 /// <summary>

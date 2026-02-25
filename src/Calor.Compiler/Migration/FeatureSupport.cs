@@ -727,6 +727,20 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Multidimensional arrays (int[,], int[,,]) are fully supported"
         },
+
+        // Dependent Types
+        ["refinement-type"] = new FeatureInfo
+        {
+            Name = "refinement-type",
+            Support = SupportLevel.Full,
+            Description = "Refinement types (§RTYPE) define base types constrained by predicates; erased to base types in C#"
+        },
+        ["proof-obligation"] = new FeatureInfo
+        {
+            Name = "proof-obligation",
+            Support = SupportLevel.Full,
+            Description = "Proof obligations (§PROOF) declare conditions to be verified; emitted as comments or runtime checks"
+        },
     };
 
     /// <summary>

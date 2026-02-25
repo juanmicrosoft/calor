@@ -31,6 +31,8 @@ public sealed class ModuleNode : AstNode
     public ContextNode? Context { get; }
     // C# Interop Blocks (member-level raw C# preserved during partial conversion)
     public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
+    // Dependent Types: Refinement type definitions at module level
+    public IReadOnlyList<RefinementTypeNode> RefinementTypes { get; }
 
     public ModuleNode(
         TextSpan span,
@@ -165,7 +167,8 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<InvariantNode> invariants,
         IReadOnlyList<DecisionNode> decisions,
         ContextNode? context,
-        IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null)
+        IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
+        IReadOnlyList<RefinementTypeNode>? refinementTypes = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -184,6 +187,7 @@ public sealed class ModuleNode : AstNode
         Decisions = decisions ?? throw new ArgumentNullException(nameof(decisions));
         Context = context;
         InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
+        RefinementTypes = refinementTypes ?? Array.Empty<RefinementTypeNode>();
     }
 
     /// <summary>

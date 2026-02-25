@@ -311,6 +311,11 @@ public enum TokenKind
     Index2D,            // §IDX2D - multidimensional array access
     Row,                // §ROW - row separator in array initializer
 
+    // Dependent Types: Refinement Types and Proof Obligations
+    RefinedType,        // §RTYPE - refinement type definition
+    EndRefinedType,     // §/RTYPE - end refinement type
+    Proof,              // §PROOF - proof obligation
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
@@ -346,7 +351,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Row;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Proof;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;

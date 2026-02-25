@@ -529,6 +529,81 @@ public class Program
             Console.WriteLine("Contract simplification completed");
         }
 
+        // Refinement type obligation generation and verification (optional)
+        if (options.VerifyRefinements)
+        {
+            phaseSw.Restart();
+            var obligationTracker = new Verification.Obligations.ObligationTracker();
+            var obligationGenerator = new Verification.Obligations.ObligationGenerator(obligationTracker);
+            obligationGenerator.Generate(ast);
+
+            // Solve obligations with Z3 if available
+            if (Verification.Z3.Z3ContextFactory.IsAvailable)
+            {
+                using var ctx = Verification.Z3.Z3ContextFactory.Create();
+                using var solver = new Verification.Obligations.ObligationSolver(
+                    ctx, options.VerificationTimeoutMs);
+                solver.SolveAll(obligationTracker, ast);
+            }
+
+            options.ObligationResults = obligationTracker;
+
+            // Report diagnostics for obligation results using policy
+            var obligationPolicy = options.ObligationPolicy;
+            foreach (var obl in obligationTracker.Obligations)
+            {
+                var action = obligationPolicy.GetAction(obl.Status);
+                if (action == Verification.Obligations.ObligationAction.Ignore)
+                    continue;
+
+                var code = (obl.Status, obl.Kind) switch
+                {
+                    (Verification.Obligations.ObligationStatus.Discharged, Verification.Obligations.ObligationKind.ProofObligation) => DiagnosticCode.ProofObligationDischarged,
+                    (Verification.Obligations.ObligationStatus.Discharged, _) => DiagnosticCode.ObligationDischarged,
+                    (Verification.Obligations.ObligationStatus.Failed, Verification.Obligations.ObligationKind.ProofObligation) => DiagnosticCode.ProofObligationFailed,
+                    (Verification.Obligations.ObligationStatus.Failed, _) => DiagnosticCode.ObligationFailed,
+                    (Verification.Obligations.ObligationStatus.Timeout, _) => DiagnosticCode.ObligationTimeout,
+                    (Verification.Obligations.ObligationStatus.Boundary, _) => DiagnosticCode.ObligationBoundary,
+                    (Verification.Obligations.ObligationStatus.Unsupported, _) => DiagnosticCode.ObligationUnsupported,
+                    _ => DiagnosticCode.ObligationUnsupported
+                };
+
+                var severity = Verification.Obligations.ObligationPolicy.IsError(action)
+                    ? DiagnosticSeverity.Error
+                    : action == Verification.Obligations.ObligationAction.WarnOnly
+                        || action == Verification.Obligations.ObligationAction.WarnAndGuard
+                        ? DiagnosticSeverity.Warning
+                        : DiagnosticSeverity.Info;
+
+                var message = obl.Status switch
+                {
+                    Verification.Obligations.ObligationStatus.Discharged =>
+                        $"Obligation [{obl.Id}] discharged: {obl.Description}",
+                    Verification.Obligations.ObligationStatus.Failed =>
+                        $"Obligation [{obl.Id}] failed: {obl.Description}. {obl.CounterexampleDescription}",
+                    Verification.Obligations.ObligationStatus.Timeout =>
+                        $"Obligation [{obl.Id}] timed out: {obl.Description}",
+                    Verification.Obligations.ObligationStatus.Boundary =>
+                        $"Obligation [{obl.Id}] is a boundary check: {obl.Description}",
+                    _ =>
+                        $"Obligation [{obl.Id}] unsupported: {obl.Description}. {obl.CounterexampleDescription}"
+                };
+
+                diagnostics.Report(obl.Span, code, message, severity);
+            }
+
+            phaseSw.Stop();
+            telemetry?.TrackPhase("ObligationVerification", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+
+            if (options.Verbose)
+            {
+                var summary = obligationTracker.GetSummary();
+                Console.WriteLine($"Obligation verification: {summary.Total} total, " +
+                    $"{summary.Discharged} discharged, {summary.Failed} failed, " +
+                    $"{summary.Boundary} boundary, {summary.Timeout} timeout");
+            }
+        }
+
         // Static contract verification with Z3 (optional)
         if (options.VerifyContracts)
         {
@@ -576,7 +651,7 @@ public class Program
 
         // Code generation
         phaseSw.Restart();
-        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult);
+        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult, options.ObligationResults);
         var generatedCode = emitter.Emit(ast);
         phaseSw.Stop();
         telemetry?.TrackPhase("CodeGen", phaseSw.ElapsedMilliseconds, true);
@@ -753,6 +828,22 @@ public sealed class CompilationOptions
     /// Enable type checking phase.
     /// </summary>
     public bool EnableTypeChecking { get; init; }
+
+    /// <summary>
+    /// Enable refinement type verification (obligation generation + Z3 solving).
+    /// </summary>
+    public bool VerifyRefinements { get; init; }
+
+    /// <summary>
+    /// Obligation tracker populated after running obligation verification.
+    /// </summary>
+    public Verification.Obligations.ObligationTracker? ObligationResults { get; internal set; }
+
+    /// <summary>
+    /// Policy controlling how obligation statuses map to compiler behavior.
+    /// Default: failed=Error, boundary=AlwaysGuard, timeout=WarnAndGuard.
+    /// </summary>
+    public Verification.Obligations.ObligationPolicy ObligationPolicy { get; init; } = Verification.Obligations.ObligationPolicy.Default;
 }
 
 /// <summary>

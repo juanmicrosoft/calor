@@ -12,6 +12,7 @@ public sealed class Parser
     private readonly DiagnosticBag _diagnostics;
     private int _position;
     private bool _insideArgContext;
+    private bool _insideRefinementPredicate;
 
     public Parser(IEnumerable<Token> tokens, DiagnosticBag diagnostics)
     {
@@ -100,6 +101,7 @@ public sealed class Parser
         var decisions = new List<DecisionNode>();
         ContextNode? context = null;
         var interopBlocks = new List<CSharpInteropBlockNode>();
+        var refinementTypes = new List<RefinementTypeNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndModule))
         {
@@ -174,9 +176,13 @@ public sealed class Parser
             {
                 interopBlocks.Add(ParseCSharpInteropBlock());
             }
+            else if (Check(TokenKind.RefinedType))
+            {
+                refinementTypes.Add(ParseRefinementType());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, DEL, FUNC, CSHARP, or END_MODULE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, or END_MODULE", Current.Kind);
                 Advance();
             }
         }
@@ -194,7 +200,7 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return new ModuleNode(span, id, moduleName, usings, interfaces, classes,
             enums, enumExtensions, delegates, functions, attrs,
-            issues, assumptions, invariants, decisions, context, interopBlocks);
+            issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes);
     }
 
     /// <summary>
@@ -655,6 +661,24 @@ public sealed class Parser
 
         var csharpAttrs = ParseCSharpAttributes();
 
+        // Parse optional inline refinement: §I{type:name | (predicate using #)}
+        InlineRefinementInfo? inlineRefinement = null;
+        if (Check(TokenKind.Pipe))
+        {
+            Advance(); // consume '|'
+            var saved = _insideRefinementPredicate;
+            _insideRefinementPredicate = true;
+            try
+            {
+                var predicate = ParseExpression();
+                inlineRefinement = new InlineRefinementInfo(typeName, predicate);
+            }
+            finally
+            {
+                _insideRefinementPredicate = saved;
+            }
+        }
+
         // Parse optional default value: §I{type:name} = expression
         ExpressionNode? defaultValue = null;
         if (Check(TokenKind.Equals))
@@ -663,7 +687,7 @@ public sealed class Parser
             defaultValue = ParseExpression();
         }
 
-        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, csharpAttrs, defaultValue);
+        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, csharpAttrs, defaultValue, inlineRefinement);
     }
 
     private OutputNode ParseOutput()
@@ -717,6 +741,77 @@ public sealed class Parser
 
         var span = startToken.Span.Union(condition.Span);
         return new EnsuresNode(span, condition, message, attrs);
+    }
+
+    /// <summary>
+    /// Parses a refinement type definition.
+    /// §RTYPE{id:Name:baseType} (predicate using #)
+    /// </summary>
+    private RefinementTypeNode ParseRefinementType()
+    {
+        var startToken = Expect(TokenKind.RefinedType);
+        var attrs = ParseAttributes();
+
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+        var baseTypeName = attrs["_pos2"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "RTYPE", "id");
+        if (string.IsNullOrEmpty(name))
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "RTYPE", "name");
+        if (string.IsNullOrEmpty(baseTypeName))
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "RTYPE", "baseType");
+
+        var saved = _insideRefinementPredicate;
+        _insideRefinementPredicate = true;
+        ExpressionNode predicate;
+        try
+        {
+            predicate = ParseExpression();
+        }
+        finally
+        {
+            _insideRefinementPredicate = saved;
+        }
+
+        var span = startToken.Span.Union(predicate.Span);
+        return new RefinementTypeNode(span, id, name, baseTypeName, predicate, attrs);
+    }
+
+    /// <summary>
+    /// Parses a proof obligation statement.
+    /// §PROOF{id:description} (boolean-expression)
+    /// </summary>
+    private ProofObligationNode ParseProofObligation()
+    {
+        var startToken = Expect(TokenKind.Proof);
+        var attrs = ParseAttributes();
+
+        var id = attrs["_pos0"] ?? "";
+        var description = attrs["_pos1"];
+
+        if (string.IsNullOrEmpty(id))
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "PROOF", "id");
+
+        var condition = ParseExpression();
+
+        var span = startToken.Span.Union(condition.Span);
+        return new ProofObligationNode(span, id, description, condition, attrs);
+    }
+
+    /// <summary>
+    /// Parses # (self-reference) inside a refinement predicate.
+    /// </summary>
+    private ExpressionNode ParseSelfRef()
+    {
+        var token = Advance(); // consume #
+        if (!_insideRefinementPredicate)
+        {
+            _diagnostics.Report(token.Span, DiagnosticCode.SelfRefOutsidePredicate,
+                "Self-reference '#' can only be used inside a refinement type predicate");
+        }
+        return new SelfRefNode(token.Span);
     }
 
     private List<StatementNode> ParseBody()
@@ -913,6 +1008,11 @@ public sealed class Parser
         {
             return ParseFixedStatement();
         }
+        // Proof obligations
+        else if (Check(TokenKind.Proof))
+        {
+            return ParseProofObligation();
+        }
         // Expression statement: bare lisp expression like (inc x), (post-dec y)
         else if (Check(TokenKind.OpenParen))
         {
@@ -1074,7 +1174,9 @@ public sealed class Parser
             or TokenKind.Index2D
             or TokenKind.Throw
             // Inline raw C# expression
-            or TokenKind.RawCSharpExpression;
+            or TokenKind.RawCSharpExpression
+            // Dependent Types: Self-reference in refinement predicates
+            or TokenKind.Hash;
     }
 
     private ExpressionNode ParseExpression()
@@ -1142,6 +1244,8 @@ public sealed class Parser
             TokenKind.Throw => ParseThrowExpression(),
             // Inline raw C# expression
             TokenKind.RawCSharpExpression => ParseRawCSharpExpression(),
+            // Dependent Types: Self-reference in refinement predicates
+            TokenKind.Hash => ParseSelfRef(),
             _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
         };
     }
@@ -1929,6 +2033,9 @@ public sealed class Parser
                 break;
             case TokenKind.Count:
                 expr = ParseCollectionCount(); // §CNT inside Lisp
+                break;
+            case TokenKind.Hash:
+                expr = ParseSelfRef(); // # inside Lisp (refinement predicates)
                 break;
             default:
                 // Provide helpful message for unexpected tokens

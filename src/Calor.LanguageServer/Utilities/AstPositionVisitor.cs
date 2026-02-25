@@ -250,4 +250,8 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Multidimensional arrays
     public virtual T Visit(MultiDimArrayCreationNode node) => DefaultVisit(node)!;
     public virtual T Visit(MultiDimArrayAccessNode node) => DefaultVisit(node)!;
+    // Dependent Types: Refinement Types and Proof Obligations
+    public virtual T Visit(RefinementTypeNode node) => DefaultVisit(node)!;
+    public virtual T Visit(SelfRefNode node) => DefaultVisit(node)!;
+    public virtual T Visit(ProofObligationNode node) => DefaultVisit(node)!;
 }

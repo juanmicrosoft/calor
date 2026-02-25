@@ -33,5 +33,11 @@ public enum IdKind
     EnumExtension,
 
     /// <summary>Operator overload declaration (§OP).</summary>
-    OperatorOverload
+    OperatorOverload,
+
+    /// <summary>Refinement type definition (§RTYPE).</summary>
+    RefinementType,
+
+    /// <summary>Proof obligation (§PROOF).</summary>
+    ProofObligation
 }

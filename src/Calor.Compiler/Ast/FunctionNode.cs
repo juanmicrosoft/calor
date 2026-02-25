@@ -263,6 +263,12 @@ public sealed class ParameterNode : AstNode
     /// </summary>
     public ExpressionNode? DefaultValue { get; }
 
+    /// <summary>
+    /// Optional inline refinement constraint on the parameter type.
+    /// Parsed from §I{baseType:name | (predicate using #)}.
+    /// </summary>
+    public InlineRefinementInfo? InlineRefinement { get; }
+
     public ParameterNode(
         TextSpan span,
         string name,
@@ -300,7 +306,8 @@ public sealed class ParameterNode : AstNode
         ParameterModifier modifier,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
-        ExpressionNode? defaultValue)
+        ExpressionNode? defaultValue,
+        InlineRefinementInfo? inlineRefinement = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -309,6 +316,7 @@ public sealed class ParameterNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
         DefaultValue = defaultValue;
+        InlineRefinement = inlineRefinement;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

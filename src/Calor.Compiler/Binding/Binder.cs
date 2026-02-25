@@ -107,8 +107,15 @@ public sealed class Binder
             ContinueStatementNode continueStmt => new BoundContinueStatement(continueStmt.Span),
             TryStatementNode tryStmt => BindTryStatement(tryStmt),
             MatchStatementNode matchStmt => BindMatchStatement(matchStmt),
+            ProofObligationNode proof => BindProofObligation(proof),
             _ => throw new InvalidOperationException($"Unknown statement type: {stmt.GetType().Name}")
         };
+    }
+
+    private BoundProofObligation BindProofObligation(ProofObligationNode proof)
+    {
+        var condition = BindExpression(proof.Condition);
+        return new BoundProofObligation(proof.Span, proof.Id, proof.Description, condition);
     }
 
     private BoundCallStatement BindCallStatement(CallStatementNode call)

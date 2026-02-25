@@ -482,3 +482,21 @@ public sealed class BoundMatchCase : BoundNode
         Body = body;
     }
 }
+
+/// <summary>
+/// Bound proof obligation statement.
+/// </summary>
+public sealed class BoundProofObligation : BoundStatement
+{
+    public string Id { get; }
+    public string? Description { get; }
+    public BoundExpression Condition { get; }
+
+    public BoundProofObligation(TextSpan span, string id, string? description, BoundExpression condition)
+        : base(span)
+    {
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        Description = description;
+    }
+}

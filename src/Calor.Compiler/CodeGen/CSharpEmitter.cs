@@ -43,6 +43,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly EmitContractMode _contractMode;
     private readonly ModuleVerificationResult? _verificationResults;
     private readonly ModuleInheritanceResult? _inheritanceResult;
+    private readonly Verification.Obligations.ObligationTracker? _obligationTracker;
 
     // Track current indices for contract emission
     private int _currentPreconditionIndex;
@@ -69,7 +70,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
     }
 
-    public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults, ModuleInheritanceResult? inheritanceResult)
+    public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults, ModuleInheritanceResult? inheritanceResult,
+        Verification.Obligations.ObligationTracker? obligationTracker = null)
     {
         _contractMode = contractMode switch
         {
@@ -79,6 +81,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
         _verificationResults = verificationResults;
         _inheritanceResult = inheritanceResult;
+        _obligationTracker = obligationTracker;
     }
 
     public CSharpEmitter(EmitContractMode contractMode)
@@ -4394,5 +4397,55 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             conjuncts.Add(expr);
         }
+    }
+
+    // Dependent Types: Refinement Types and Proof Obligations
+
+    public string Visit(RefinementTypeNode node)
+    {
+        // Refinement types are erased in C# emission — emit nothing
+        return "";
+    }
+
+    public string Visit(SelfRefNode node)
+    {
+        // Self-reference placeholder; only reachable inside emitted runtime checks (M1+)
+        return "__self__";
+    }
+
+    public string Visit(ProofObligationNode node)
+    {
+        var desc = node.Description != null ? $": {node.Description}" : "";
+
+        // Consult obligation tracker for status if available
+        if (_obligationTracker != null)
+        {
+            var matching = _obligationTracker.Obligations
+                .FirstOrDefault(o => o.Kind == Verification.Obligations.ObligationKind.ProofObligation
+                    && o.SourceProofId == node.Id);
+
+            if (matching != null)
+            {
+                switch (matching.Status)
+                {
+                    case Verification.Obligations.ObligationStatus.Discharged:
+                        AppendLine($"// PROVEN: proof obligation [{node.Id}{desc}]");
+                        return "";
+
+                    case Verification.Obligations.ObligationStatus.Boundary:
+                    case Verification.Obligations.ObligationStatus.Failed:
+                    case Verification.Obligations.ObligationStatus.Timeout:
+                        // Emit runtime guard
+                        var condition = node.Condition.Accept(this);
+                        AppendLine($"if (!({condition})) throw new InvalidOperationException(" +
+                            $"\"Proof obligation [{node.Id}{desc}] violated\");");
+                        return "";
+                }
+            }
+        }
+
+        // Default: no tracker or pending status — emit as comment
+        AppendLine($"// TODO: proof obligation [{node.Id}{desc}]");
+        return "";
     }
 }
