@@ -220,6 +220,35 @@ public sealed class FunctionType : CalorType
 }
 
 /// <summary>
+/// Represents a refinement type: a base type constrained by a predicate.
+/// E.g., NatInt is i32 where # >= 0.
+/// At runtime, refinement types erase to their base type.
+/// </summary>
+public sealed class RefinedType : CalorType
+{
+    public CalorType BaseType { get; }
+    public string PredicateText { get; }
+    public Ast.ExpressionNode Predicate { get; }
+    public override string Name => $"{BaseType.Name}{{{PredicateText}}}";
+
+    public RefinedType(CalorType baseType, string predicateText, Ast.ExpressionNode predicate)
+    {
+        BaseType = baseType ?? throw new ArgumentNullException(nameof(baseType));
+        PredicateText = predicateText ?? throw new ArgumentNullException(nameof(predicateText));
+        Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+    }
+
+    public override bool Equals(CalorType? other)
+    {
+        if (other is RefinedType rt)
+            return BaseType.Equals(rt.BaseType) && PredicateText == rt.PredicateText;
+        return false;
+    }
+
+    public override int GetHashCode() => HashCode.Combine("Refined", BaseType, PredicateText);
+}
+
+/// <summary>
 /// Represents an unknown/error type used during type checking.
 /// </summary>
 public sealed class ErrorType : CalorType

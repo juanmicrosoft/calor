@@ -1433,6 +1433,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(SizeOfNode node) => node;
     public ExpressionNode Visit(MultiDimArrayCreationNode node) => node;
     public ExpressionNode Visit(MultiDimArrayAccessNode node) => node;
+    // Dependent Types: Refinement Types and Proof Obligations
+    public ExpressionNode Visit(RefinementTypeNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(SelfRefNode node) => node;
+    public ExpressionNode Visit(ProofObligationNode node) => throw new InvalidOperationException();
 
     #endregion
 }

@@ -19,6 +19,12 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
+        // Pass 0: register refinement type definitions
+        foreach (var rtype in module.RefinementTypes)
+        {
+            RegisterRefinementType(rtype);
+        }
+
         // First pass: register all type definitions
         foreach (var func in module.Functions)
         {
@@ -30,6 +36,29 @@ public sealed class TypeChecker
         {
             CheckFunction(func);
         }
+    }
+
+    private void RegisterRefinementType(RefinementTypeNode rtype)
+    {
+        var baseType = ResolveTypeName(rtype.BaseTypeName, rtype.Span);
+        if (baseType is ErrorType)
+        {
+            _diagnostics.ReportError(rtype.Span, DiagnosticCode.RefinementUndefinedBaseType,
+                $"Refinement type '{rtype.Name}' references undefined base type '{rtype.BaseTypeName}'");
+            return;
+        }
+
+        if (_env.LookupType(rtype.Name) != null)
+        {
+            _diagnostics.ReportError(rtype.Span, DiagnosticCode.RefinementDuplicateName,
+                $"Duplicate refinement type name '{rtype.Name}'");
+            return;
+        }
+
+        // Use a simple string representation for the predicate text
+        var predicateText = $"#{rtype.BaseTypeName}";
+        var refinedType = new RefinedType(baseType, predicateText, rtype.Predicate);
+        _env.DefineType(rtype.Name, refinedType);
     }
 
     private void RegisterFunction(FunctionNode func)
@@ -1163,6 +1192,8 @@ public sealed class TypeChecker
         if (target.Equals(source)) return true;
         if (source is ErrorType) return true; // Allow error types to be assigned anywhere
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)) return true;
+        // Refined type is a subtype of its base type (erasure)
+        if (source is RefinedType refinedSource && IsAssignable(target, refinedSource.BaseType)) return true;
         return false;
     }
 

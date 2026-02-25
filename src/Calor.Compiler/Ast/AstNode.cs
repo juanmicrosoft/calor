@@ -225,6 +225,10 @@ public interface IAstVisitor
     void Visit(RawCSharpExpressionNode node);
     // Preprocessor directives
     void Visit(PreprocessorDirectiveNode node);
+    // Dependent Types: Refinement Types and Proof Obligations
+    void Visit(RefinementTypeNode node);
+    void Visit(SelfRefNode node);
+    void Visit(ProofObligationNode node);
 }
 
 /// <summary>
@@ -434,6 +438,10 @@ public interface IAstVisitor<T>
     T Visit(RawCSharpExpressionNode node);
     // Preprocessor directives
     T Visit(PreprocessorDirectiveNode node);
+    // Dependent Types: Refinement Types and Proof Obligations
+    T Visit(RefinementTypeNode node);
+    T Visit(SelfRefNode node);
+    T Visit(ProofObligationNode node);
 }
 
 /// <summary>

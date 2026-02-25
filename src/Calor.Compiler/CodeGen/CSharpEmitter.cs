@@ -4395,4 +4395,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             conjuncts.Add(expr);
         }
     }
+
+    // Dependent Types: Refinement Types and Proof Obligations
+
+    public string Visit(RefinementTypeNode node)
+    {
+        // Refinement types are erased in C# emission — emit nothing
+        return "";
+    }
+
+    public string Visit(SelfRefNode node)
+    {
+        // Self-reference placeholder; only reachable inside emitted runtime checks (M1+)
+        return "__self__";
+    }
+
+    public string Visit(ProofObligationNode node)
+    {
+        // No solver yet — emit as a comment
+        var desc = node.Description != null ? $": {node.Description}" : "";
+        AppendLine($"// TODO: proof obligation [{node.Id}{desc}]");
+        return "";
+    }
 }

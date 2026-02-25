@@ -124,6 +124,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit refinement type definitions
+        foreach (var rtype in node.RefinementTypes)
+        {
+            Visit(rtype);
+        }
+
         // Emit module-level functions
         foreach (var func in node.Functions)
         {
@@ -198,7 +204,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// </summary>
     private string? TryFormatInlineParams(IReadOnlyList<ParameterNode> parameters)
     {
-        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null))
+        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null || p.InlineRefinement != null))
             return null;
 
         return string.Join(", ", parameters.Select(p =>
@@ -713,6 +719,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
         var result = $"§I{{{typeName}:{node.Name}{modStr}}}{attrs}";
+        if (node.InlineRefinement != null)
+        {
+            var predicate = node.InlineRefinement.Predicate.Accept(this);
+            result += $" | {predicate}";
+        }
         if (node.DefaultValue != null)
         {
             result += $" = {node.DefaultValue.Accept(this)}";
@@ -2672,5 +2683,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var array = node.Array.Accept(this);
         var indices = string.Join(" ", node.Indices.Select(i => i.Accept(this)));
         return $"§IDX2D {array} {indices}";
+    }
+
+    // Dependent Types: Refinement Types and Proof Obligations
+
+    public string Visit(RefinementTypeNode node)
+    {
+        var predicate = node.Predicate.Accept(this);
+        AppendLine($"§RTYPE{{{node.Id}:{node.Name}:{node.BaseTypeName}}} {predicate}");
+        return "";
+    }
+
+    public string Visit(SelfRefNode node)
+    {
+        return "#";
+    }
+
+    public string Visit(ProofObligationNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        var desc = node.Description != null ? $":{node.Description}" : "";
+        AppendLine($"§PROOF{{{node.Id}{desc}}} {condition}");
+        return "";
     }
 }

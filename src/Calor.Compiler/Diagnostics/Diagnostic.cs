@@ -364,6 +364,28 @@ public static class DiagnosticCode
     /// Info: Raw C# code preserved in interop block for unsupported feature.
     /// </summary>
     public const string CSharpInteropBlockPreserved = "Calor1011";
+
+    // Refinement type diagnostics (Calor1100-1109)
+
+    /// <summary>
+    /// Error: Refinement type predicate does not evaluate to a boolean.
+    /// </summary>
+    public const string RefinementPredicateNotBoolean = "Calor1100";
+
+    /// <summary>
+    /// Error: Self-reference placeholder (#) used outside a refinement predicate.
+    /// </summary>
+    public const string SelfRefOutsidePredicate = "Calor1101";
+
+    /// <summary>
+    /// Error: Refinement type references an undefined base type.
+    /// </summary>
+    public const string RefinementUndefinedBaseType = "Calor1102";
+
+    /// <summary>
+    /// Error: Duplicate refinement type name.
+    /// </summary>
+    public const string RefinementDuplicateName = "Calor1103";
 }
 
 /// <summary>
