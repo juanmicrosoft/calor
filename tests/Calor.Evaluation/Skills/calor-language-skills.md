@@ -1744,3 +1744,39 @@ Alternative alias `§SW` is available for `§W`:
 ```
 §ADD{collection} item     Add item to collection
 ```
+
+## Preprocessor Directives
+
+Calor supports C# preprocessor directives (`#if`/`#else`/`#endif`) via `§PP` blocks.
+These are used for conditional compilation (e.g., `DEBUG`, `NET8_0_OR_GREATER`).
+
+### Syntax
+
+```
+§PP{CONDITION}
+  ... body (compiled when CONDITION is defined) ...
+§PPE
+  ... else body (compiled when CONDITION is NOT defined) ...
+§/PP{CONDITION}
+```
+
+The `§PPE` (else) section is optional. The condition can be any preprocessor symbol.
+
+### Example
+
+```calor
+§PP{DEBUG}
+  §P "Debug mode enabled"
+§PPE
+  §P "Release mode"
+§/PP{DEBUG}
+```
+
+Compiles to:
+```csharp
+#if DEBUG
+    Console.WriteLine("Debug mode enabled");
+#else
+    Console.WriteLine("Release mode");
+#endif
+```

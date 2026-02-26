@@ -1152,4 +1152,107 @@ public class Test
     }
 
     #endregion
+
+    #region Fix: Lock/Checked/For body ordering
+
+    [Fact]
+    public void Converter_LockStatement_CommentBeforeBody()
+    {
+        var csharp = @"
+public class Test
+{
+    private readonly object _sync = new object();
+    public void M()
+    {
+        lock (_sync)
+        {
+            var x = 1;
+        }
+    }
+}";
+        var calor = ConvertToCalor(csharp);
+
+        // The lock comment should appear before the body statement
+        var commentIdx = calor.IndexOf("lock(");
+        var bindIdx = calor.IndexOf("§B{", commentIdx > 0 ? commentIdx : 0);
+        Assert.True(commentIdx >= 0, "Lock comment not found");
+        Assert.True(bindIdx > commentIdx, "Lock comment should appear before body statements");
+    }
+
+    [Fact]
+    public void Converter_CheckedStatement_CommentBeforeBody()
+    {
+        var csharp = @"
+public class Test
+{
+    public int M(int a, int b)
+    {
+        checked
+        {
+            var result = a + b;
+            return result;
+        }
+    }
+}";
+        var calor = ConvertToCalor(csharp);
+
+        // The checked comment should appear before the body
+        var commentIdx = calor.IndexOf("checked");
+        var bindIdx = calor.IndexOf("§B{", commentIdx > 0 ? commentIdx : 0);
+        Assert.True(commentIdx >= 0, "Checked comment not found");
+        Assert.True(bindIdx > commentIdx, "Checked comment should appear before body statements");
+    }
+
+    [Fact]
+    public void Converter_NonStandardForLoop_InitializersBeforeWhile()
+    {
+        // Non-standard for loop with multiple variables
+        var csharp = @"
+public class Test
+{
+    public void M()
+    {
+        for (int i = 0, j = 10; i < j; i++)
+        {
+            var x = i;
+        }
+    }
+}";
+        var calor = ConvertToCalor(csharp);
+
+        // The initializer binds should appear before the while loop
+        var bindIdx = calor.IndexOf("§B{");
+        var whileIdx = calor.IndexOf("§WH{");
+        Assert.True(bindIdx >= 0, "Initializer bind not found");
+        Assert.True(whileIdx > bindIdx, "Initializer binds should appear before while loop");
+    }
+
+    [Fact]
+    public void Converter_ForLoopWithExpressionInit_InitializerBeforeWhile()
+    {
+        // For loop with expression initializer (no declaration)
+        var csharp = @"
+public class Test
+{
+    private int x;
+    public void M()
+    {
+        for (x = 0; x < 10; x++)
+        {
+            var y = x;
+        }
+    }
+}";
+        var calor = ConvertToCalor(csharp);
+
+        // The assignment should appear before the while loop
+        var assignIdx = calor.IndexOf("§ASSIGN");
+        // For non-standard for loops it falls back to while
+        var whileIdx = calor.IndexOf("§WH{");
+        Assert.True(whileIdx >= 0, "While loop not found (expected for non-standard for-loop fallback)");
+        Assert.True(assignIdx >= 0, "Initializer assignment not found");
+        Assert.True(assignIdx < whileIdx, "Initializer assignment should appear before while loop");
+    }
+
+    #endregion
 }

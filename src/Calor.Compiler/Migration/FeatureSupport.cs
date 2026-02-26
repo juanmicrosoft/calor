@@ -544,6 +544,12 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Readonly structs are converted with struct and readonly modifiers"
         },
+        ["preprocessor-directive"] = new FeatureInfo
+        {
+            Name = "preprocessor-directive",
+            Support = SupportLevel.Full,
+            Description = "Preprocessor directives (#if/#else/#endif) are converted to §PP blocks"
+        },
 
         // Phase 4 features (C# 11-13)
         ["default-lambda-parameter"] = new FeatureInfo
