@@ -2091,6 +2091,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit preprocessor blocks
+        foreach (var ppBlock in node.PreprocessorBlocks)
+        {
+            Visit(ppBlock);
+            AppendLine();
+        }
+
         _currentClassName = null;
 
         Dedent();
@@ -4009,6 +4016,81 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         AppendLine("#endif");
         return "";
+    }
+
+    public string Visit(MemberPreprocessorBlockNode node)
+    {
+        EmitMemberPreprocessorBlock(node, isFirst: true);
+        return "";
+    }
+
+    private void EmitMemberPreprocessorBlock(MemberPreprocessorBlockNode node, bool isFirst)
+    {
+        AppendLine(isFirst ? $"#if {node.Condition}" : $"#elif {node.Condition}");
+
+        foreach (var field in node.Fields)
+            Visit(field);
+        foreach (var prop in node.Properties)
+        {
+            Visit(prop);
+            AppendLine();
+        }
+        foreach (var ctor in node.Constructors)
+        {
+            Visit(ctor);
+            AppendLine();
+        }
+        foreach (var method in node.Methods)
+        {
+            Visit(method);
+            AppendLine();
+        }
+        foreach (var op in node.OperatorOverloads)
+        {
+            Visit(op);
+            AppendLine();
+        }
+        foreach (var evt in node.Events)
+            Visit(evt);
+
+        if (node.ElseBranch != null)
+        {
+            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
+            {
+                EmitMemberPreprocessorBlock(node.ElseBranch, isFirst: false);
+                return; // #endif already emitted by recursive call
+            }
+            else
+            {
+                AppendLine("#else");
+                foreach (var field in node.ElseBranch.Fields)
+                    Visit(field);
+                foreach (var prop in node.ElseBranch.Properties)
+                {
+                    Visit(prop);
+                    AppendLine();
+                }
+                foreach (var ctor in node.ElseBranch.Constructors)
+                {
+                    Visit(ctor);
+                    AppendLine();
+                }
+                foreach (var method in node.ElseBranch.Methods)
+                {
+                    Visit(method);
+                    AppendLine();
+                }
+                foreach (var op in node.ElseBranch.OperatorOverloads)
+                {
+                    Visit(op);
+                    AppendLine();
+                }
+                foreach (var evt in node.ElseBranch.Events)
+                    Visit(evt);
+            }
+        }
+
+        AppendLine("#endif");
     }
 
     public string Visit(CSharpInteropBlockNode node)

@@ -301,6 +301,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// </summary>
     public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
 
+    /// <summary>
+    /// Preprocessor conditional blocks wrapping class members (#if/#elif/#else/#endif).
+    /// </summary>
+    public IReadOnlyList<MemberPreprocessorBlockNode> PreprocessorBlocks { get; }
+
     public ClassDefinitionNode(
         TextSpan span,
         string id,
@@ -429,7 +434,8 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         bool isStruct = false,
         bool isReadOnly = false,
         Visibility visibility = Visibility.Internal,
-        IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null)
+        IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
+        IReadOnlyList<MemberPreprocessorBlockNode>? preprocessorBlocks = null)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
@@ -450,6 +456,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         OperatorOverloads = operatorOverloads ?? Array.Empty<OperatorOverloadNode>();
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
         InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
+        PreprocessorBlocks = preprocessorBlocks ?? Array.Empty<MemberPreprocessorBlockNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

@@ -271,4 +271,288 @@ public class Test
         var endifCount = csharp.Split("#endif").Length - 1;
         Assert.True(endifCount >= 2, $"Expected at least 2 #endif, got {endifCount}");
     }
+
+    // ========================
+    // Member-level preprocessor tests
+    // ========================
+
+    [Fact]
+    public void Converter_MemberLevelIf_ProducesPreprocessorBlock()
+    {
+        var csharp = @"
+public class Test
+{
+#if DEBUG
+    public void DebugMethod() { }
+#endif
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{DEBUG}", calor);
+        Assert.Contains("§/PP{DEBUG}", calor);
+    }
+
+    [Fact]
+    public void Converter_MemberLevelIfElse_PreservesBothBranches()
+    {
+        var csharp = @"
+public class Test
+{
+#if DEBUG
+    private int _debugField;
+#else
+    private int _releaseField;
+#endif
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{DEBUG}", calor);
+        Assert.Contains("§PPE", calor);
+        Assert.Contains("§/PP{DEBUG}", calor);
+    }
+
+    [Fact]
+    public void Converter_MemberLevelMultipleMembers_GroupedInBlock()
+    {
+        var csharp = @"
+public class Test
+{
+#if DEBUG
+    private int _debugField;
+    public void DebugMethod() { }
+#endif
+    public void AlwaysPresent() { }
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{DEBUG}", calor);
+        Assert.Contains("§/PP{DEBUG}", calor);
+        // The always-present method should NOT be inside the PP block
+        Assert.Contains("AlwaysPresent", calor);
+    }
+
+    [Fact]
+    public void Converter_MemberLevelIfElif_ProducesNestedBlocks()
+    {
+        var csharp = @"
+public class Test
+{
+#if NET8_0_OR_GREATER
+    public void NetEight() { }
+#elif NET6_0_OR_GREATER
+    public void NetSix() { }
+#else
+    public void Legacy() { }
+#endif
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{NET8_0_OR_GREATER}", calor);
+        Assert.Contains("§/PP{NET8_0_OR_GREATER}", calor);
+    }
+
+    [Fact]
+    public void Converter_MemberLevelDisabledRecovery_ParsesMembers()
+    {
+        // When no symbol is defined, the #if body is all disabled text
+        // The converter should re-parse it and recover the members
+        var csharp = @"
+public class Test
+{
+#if SOME_UNDEFINED_SYMBOL
+    public void DisabledMethod() { }
+#endif
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{SOME_UNDEFINED_SYMBOL}", calor);
+        Assert.Contains("§/PP{SOME_UNDEFINED_SYMBOL}", calor);
+    }
+
+    [Fact]
+    public void Converter_MemberLevelPP_RoundTripsCalorToCSharp()
+    {
+        var calor = @"
+§M{m1:Test}
+  §CL{c1:Test}
+    §PP{DEBUG}
+      §MT{mt1:DebugMethod:pub}
+        §O{void}
+      §/MT{mt1}
+    §/PP{DEBUG}
+  §/CL{c1}
+§/M{m1}
+";
+        var csharp = CompileCalorToCSharp(calor);
+        Assert.Contains("#if DEBUG", csharp);
+        Assert.Contains("#endif", csharp);
+        Assert.Contains("DebugMethod", csharp);
+    }
+
+    [Fact]
+    public void Converter_StructMemberLevelIf_Works()
+    {
+        var csharp = @"
+public struct TestStruct
+{
+#if DEBUG
+    public int DebugValue;
+#endif
+    public int AlwaysValue;
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{DEBUG}", calor);
+        Assert.Contains("§/PP{DEBUG}", calor);
+        Assert.Contains("AlwaysValue", calor);
+    }
+
+    [Fact]
+    public void Converter_MixedStatementAndMemberPP_BothWork()
+    {
+        var csharp = @"
+public class Test
+{
+#if DEBUG
+    private int _debugField;
+#endif
+    public int M()
+    {
+#if DEBUG
+        return 1;
+#else
+        return 2;
+#endif
+    }
+}";
+        var calor = ConvertToCalor(csharp);
+        // Should have PP blocks at both member and statement level
+        var ppCount = calor.Split("§PP{DEBUG}").Length - 1;
+        Assert.True(ppCount >= 2, $"Expected at least 2 §PP{{DEBUG}} blocks, got {ppCount}. Output:\n{calor}");
+    }
+
+    [Fact]
+    public void Converter_MemberLevelActiveBranch_PreservesActiveMembers()
+    {
+        // Use #if true so Roslyn parses the #if body as active (real parsed members)
+        // This exercises the path where ActiveStart < ActiveEnd in ExtractMemberPreprocessorRegions
+        var csharp = @"
+public class Test
+{
+#if true
+    public int ActiveField;
+    public void ActiveMethod() { }
+#else
+    public int InactiveField;
+#endif
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{true}", calor);
+        Assert.Contains("§PPE", calor);
+        Assert.Contains("§/PP{true}", calor);
+        // Active members should be present
+        Assert.Contains("ActiveField", calor);
+        Assert.Contains("ActiveMethod", calor);
+        // Inactive member should also be recovered from disabled text
+        Assert.Contains("InactiveField", calor);
+    }
+
+    [Fact]
+    public void Converter_MemberLevelActiveBranchMultiple_GroupsCorrectly()
+    {
+        // #if true wrapping 2 members + an unconditional member after
+        var csharp = @"
+public class Test
+{
+#if true
+    public int ConditionalField;
+#endif
+    public int AlwaysField;
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{true}", calor);
+        Assert.Contains("§/PP{true}", calor);
+        Assert.Contains("ConditionalField", calor);
+        Assert.Contains("AlwaysField", calor);
+    }
+
+    [Fact]
+    public void Converter_RealisticHumanizerPattern_MemberLevelPP_FullRoundTrip()
+    {
+        // Realistic pattern from Humanizer-style code: platform-specific implementations
+        // with properties, fields, and methods guarded by #if
+        var csharp = @"
+using System;
+
+public class NumberToWordsExtension
+{
+    private static readonly string[] UnitsMap = { ""zero"", ""one"", ""two"" };
+
+#if NET6_0_OR_GREATER
+    public static string ToWords(this int number)
+    {
+        return UnitsMap[number];
+    }
+
+    public static ReadOnlySpan<char> ToWordsSpan(this int number)
+    {
+        return UnitsMap[number].AsSpan();
+    }
+#else
+    public static string ToWords(this int number)
+    {
+        return UnitsMap[number];
+    }
+#endif
+
+    public string Format(int value)
+    {
+        return value.ToString();
+    }
+}";
+        // Step 1: Convert C# to Calor
+        var calor = ConvertToCalor(csharp);
+
+        // Should have member-level PP block
+        Assert.Contains("§PP{NET6_0_OR_GREATER}", calor);
+        Assert.Contains("§/PP{NET6_0_OR_GREATER}", calor);
+        Assert.Contains("§PPE", calor);
+
+        // Unconditional members should still be present
+        Assert.Contains("UnitsMap", calor);
+        Assert.Contains("Format", calor);
+
+        // Step 2: Round-trip back to C#
+        var csharpOutput = CompileCalorToCSharp(calor);
+
+        // C# output should have the #if structure
+        Assert.Contains("#if NET6_0_OR_GREATER", csharpOutput);
+        Assert.Contains("#endif", csharpOutput);
+        Assert.Contains("Format", csharpOutput);
+    }
+
+    [Fact]
+    public void Converter_NestedMemberAndStatementPP_BothLevelsCompose()
+    {
+        // Member-level #if wrapping a method whose body contains a statement-level #if.
+        // Both levels should produce independent §PP blocks that compose correctly.
+        var csharp = @"
+public class Test
+{
+#if NET6_0_OR_GREATER
+    public int Compute(int x)
+    {
+#if DEBUG
+        return x * 2;
+#else
+        return x;
+#endif
+    }
+#endif
+}";
+        var calor = ConvertToCalor(csharp);
+
+        // Member-level PP
+        Assert.Contains("§PP{NET6_0_OR_GREATER}", calor);
+        Assert.Contains("§/PP{NET6_0_OR_GREATER}", calor);
+
+        // Round-trip: parse Calor back to C#
+        var csharpOutput = CompileCalorToCSharp(calor);
+        Assert.Contains("#if NET6_0_OR_GREATER", csharpOutput);
+        Assert.Contains("#endif", csharpOutput);
+    }
 }

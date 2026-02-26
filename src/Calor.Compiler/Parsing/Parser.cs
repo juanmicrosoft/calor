@@ -5276,6 +5276,7 @@ public sealed class Parser
         var events = new List<EventDefinitionNode>();
         var operatorOverloads = new List<OperatorOverloadNode>();
         var interopBlocks = new List<CSharpInteropBlockNode>();
+        var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndClass))
         {
@@ -5335,9 +5336,13 @@ public sealed class Parser
             {
                 interopBlocks.Add(ParseCSharpInteropBlock());
             }
+            else if (Check(TokenKind.Preprocessor))
+            {
+                preprocessorBlocks.Add(ParseMemberPreprocessorBlock());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, OP, METHOD, AMT, EVT, CSHARP, or END_CLASS", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, or END_CLASS", Current.Kind);
                 Advance();
             }
         }
@@ -5354,7 +5359,8 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
             implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, operatorOverloads, attrs, csharpAttrs,
-            isStruct: isStruct, isReadOnly: isReadOnly, visibility: visibility, interopBlocks: interopBlocks);
+            isStruct: isStruct, isReadOnly: isReadOnly, visibility: visibility, interopBlocks: interopBlocks,
+            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null);
     }
 
     /// <summary>
@@ -6710,6 +6716,95 @@ public sealed class Parser
 
         Expect(TokenKind.EndPreprocessor);
         return new PreprocessorDirectiveNode(startToken.Span, condition, body, elseBody);
+    }
+
+    /// <summary>
+    /// Parses a member-level preprocessor block inside a class body.
+    /// §PP{CONDITION} ... members ... §PPE ... §/PP{CONDITION}
+    /// </summary>
+    private MemberPreprocessorBlockNode ParseMemberPreprocessorBlock()
+    {
+        var startToken = Expect(TokenKind.Preprocessor);
+        var condition = startToken.Value as string ?? "";
+
+        var fields = new List<ClassFieldNode>();
+        var properties = new List<PropertyNode>();
+        var constructors = new List<ConstructorNode>();
+        var methods = new List<MethodNode>();
+        var events = new List<EventDefinitionNode>();
+        var operatorOverloads = new List<OperatorOverloadNode>();
+
+        // Parse members until §PPE or §/PP
+        while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        {
+            ParseMemberInPreprocessorBlock(fields, properties, constructors, methods, events, operatorOverloads);
+        }
+
+        MemberPreprocessorBlockNode? elseBranch = null;
+        if (Match(TokenKind.PreprocessorElse))
+        {
+            // Check if the next token is another §PP (for #elif chains)
+            if (Check(TokenKind.Preprocessor))
+            {
+                elseBranch = ParseMemberPreprocessorBlock();
+            }
+            else
+            {
+                // #else — parse members directly with empty condition
+                var elseFields = new List<ClassFieldNode>();
+                var elseProperties = new List<PropertyNode>();
+                var elseConstructors = new List<ConstructorNode>();
+                var elseMethods = new List<MethodNode>();
+                var elseEvents = new List<EventDefinitionNode>();
+                var elseOperatorOverloads = new List<OperatorOverloadNode>();
+
+                while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+                {
+                    ParseMemberInPreprocessorBlock(elseFields, elseProperties, elseConstructors, elseMethods, elseEvents, elseOperatorOverloads);
+                }
+
+                elseBranch = new MemberPreprocessorBlockNode(startToken.Span, "",
+                    elseFields, elseProperties, elseConstructors, elseMethods, elseEvents, elseOperatorOverloads);
+            }
+        }
+
+        // Only expect EndPreprocessor if we didn't recurse into an #elif (which consumes its own end)
+        if (elseBranch == null || string.IsNullOrEmpty(elseBranch.Condition))
+        {
+            Expect(TokenKind.EndPreprocessor);
+        }
+
+        return new MemberPreprocessorBlockNode(startToken.Span, condition,
+            fields, properties, constructors, methods, events, operatorOverloads, elseBranch);
+    }
+
+    private void ParseMemberInPreprocessorBlock(
+        List<ClassFieldNode> fields,
+        List<PropertyNode> properties,
+        List<ConstructorNode> constructors,
+        List<MethodNode> methods,
+        List<EventDefinitionNode> events,
+        List<OperatorOverloadNode> operatorOverloads)
+    {
+        if (Check(TokenKind.FieldDef))
+            fields.Add(ParseClassField());
+        else if (Check(TokenKind.Property))
+            properties.Add(ParseProperty());
+        else if (Check(TokenKind.Constructor))
+            constructors.Add(ParseConstructor());
+        else if (Check(TokenKind.OperatorOverload))
+            operatorOverloads.Add(ParseOperatorOverload());
+        else if (Check(TokenKind.Method))
+            methods.Add(ParseMethodDefinition());
+        else if (Check(TokenKind.AsyncMethod))
+            methods.Add(ParseAsyncMethodDefinition());
+        else if (Check(TokenKind.Event))
+            events.Add(ParseEventDefinition());
+        else
+        {
+            _diagnostics.ReportUnexpectedToken(Current.Span, "FLD, PROP, CTOR, OP, METHOD, AMT, EVT, PPE, or END_PP", Current.Kind);
+            Advance();
+        }
     }
 
     /// <summary>

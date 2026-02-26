@@ -356,6 +356,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit preprocessor blocks
+        foreach (var ppBlock in node.PreprocessorBlocks)
+        {
+            Visit(ppBlock);
+            AppendLine();
+        }
+
         Dedent();
         AppendLine($"§/CL{{{node.Id}}}");
 
@@ -2589,6 +2596,38 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         AppendLine($"§/PP{{{node.Condition}}}");
         return "";
+    }
+
+    public string Visit(MemberPreprocessorBlockNode node)
+    {
+        AppendLine($"§PP{{{node.Condition}}}");
+        EmitMemberPreprocessorMembers(node);
+        if (node.ElseBranch != null)
+        {
+            AppendLine("§PPE");
+            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
+            {
+                // #elif chain — emit as nested §PP{cond} inside the else
+                Visit(node.ElseBranch);
+            }
+            else
+            {
+                // #else — emit members directly
+                EmitMemberPreprocessorMembers(node.ElseBranch);
+            }
+        }
+        AppendLine($"§/PP{{{node.Condition}}}");
+        return "";
+    }
+
+    private void EmitMemberPreprocessorMembers(MemberPreprocessorBlockNode node)
+    {
+        foreach (var field in node.Fields) Visit(field);
+        foreach (var prop in node.Properties) Visit(prop);
+        foreach (var ctor in node.Constructors) Visit(ctor);
+        foreach (var method in node.Methods) { Visit(method); AppendLine(); }
+        foreach (var op in node.OperatorOverloads) { Visit(op); AppendLine(); }
+        foreach (var evt in node.Events) Visit(evt);
     }
 
     public string Visit(CSharpInteropBlockNode node)
