@@ -1268,8 +1268,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && IsChainedInvocation(chainInit)
                 && !WouldChainUseNativeOps(chainInit))
             {
-                statements.AddRange(DecomposeChainedLocalDeclaration(chainDecl));
+                // CollectChainSteps may hoist lambdas to _pendingStatements;
+                // flush them before the chain binds so they are defined in order.
+                var localChainResults = DecomposeChainedLocalDeclaration(chainDecl);
                 FlushPendingStatements(statements);
+                statements.AddRange(localChainResults);
                 continue;
             }
 
@@ -1280,8 +1283,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && IsChainedInvocation(chainExpr)
                 && !WouldChainUseNativeOps(chainExpr))
             {
-                statements.AddRange(DecomposeChainedExpressionStatement(exprStmt));
+                // CollectChainSteps may hoist lambdas to _pendingStatements;
+                // flush them before the chain binds so they are defined in order.
+                var exprChainResults = DecomposeChainedExpressionStatement(exprStmt);
                 FlushPendingStatements(statements);
+                statements.AddRange(exprChainResults);
                 continue;
             }
 
@@ -1292,8 +1298,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && IsChainedInvocation(returnChain)
                 && !WouldChainUseNativeOps(returnChain))
             {
-                statements.AddRange(DecomposeChainedReturnStatement(returnStmt));
+                // CollectChainSteps may hoist lambdas to _pendingStatements;
+                // flush them before the chain binds so they are defined in order.
+                var chainResults = DecomposeChainedReturnStatement(returnStmt);
                 FlushPendingStatements(statements);
+                statements.AddRange(chainResults);
                 continue;
             }
 
@@ -2047,6 +2056,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .Select(a => ConvertExpression(a.Expression))
                 .ToList();
             var span = GetTextSpan(current);
+
+            // Hoist lambda arguments to temp bindings — prevents §LAM nesting inside §C
+            for (int i = 0; i < args.Count; i++)
+            {
+                if (args[i] is LambdaExpressionNode)
+                {
+                    var tempName = _context.GenerateId("_lam");
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, tempName, null, false, args[i], new AttributeCollection()));
+                    args[i] = new ReferenceNode(args[i].Span, tempName);
+                }
+            }
 
             if (memberAccess.Expression is InvocationExpressionSyntax inner)
             {
@@ -3451,12 +3472,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(a => ConvertExpression(a.Expression))
             .ToList();
 
-        // Hoist §NEW arguments to temp bindings — the parser cannot handle §NEW nested inside §C
+        // Hoist §NEW and §LAM arguments to temp bindings — the parser cannot handle them nested inside §C
         for (int i = 0; i < args.Count; i++)
         {
             if (args[i] is NewExpressionNode)
             {
                 var tempName = _context.GenerateId("_new");
+                _pendingStatements.Add(new BindStatementNode(
+                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                args[i] = new ReferenceNode(args[i].Span, tempName);
+            }
+            else if (args[i] is LambdaExpressionNode)
+            {
+                var tempName = _context.GenerateId("_lam");
                 _pendingStatements.Add(new BindStatementNode(
                     args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                 args[i] = new ReferenceNode(args[i].Span, tempName);

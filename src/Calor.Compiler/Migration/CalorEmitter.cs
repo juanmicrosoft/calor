@@ -1704,7 +1704,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var array = node.Array.Accept(this);
         var index = node.Index.Accept(this);
-        // Use §IDX syntax for element access (no braces — parser expects space-separated)
+        if (node.Array is ReferenceNode)
+            return $"§IDX{{{array}}} {index}";
         return $"§IDX {array} {index}";
     }
 

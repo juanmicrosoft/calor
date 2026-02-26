@@ -1383,7 +1383,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return pattern switch
         {
             WildcardPatternNode => "_",
-            VariablePatternNode vp => $"var {SanitizeIdentifier(vp.Name)}",
+            VariablePatternNode vp => vp.Name.Contains('.')
+                ? SanitizeIdentifier(vp.Name)
+                : $"var {SanitizeIdentifier(vp.Name)}",
             VarPatternNode varP => $"var {SanitizeIdentifier(varP.Name)}",
             LiteralPatternNode lp => lp.Literal.Accept(this),
             RelationalPatternNode rp => Visit(rp),
@@ -1411,7 +1413,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(WildcardPatternNode node) => "_";
 
-    public string Visit(VariablePatternNode node) => $"var {SanitizeIdentifier(node.Name)}";
+    public string Visit(VariablePatternNode node) => node.Name.Contains('.')
+        ? SanitizeIdentifier(node.Name)
+        : $"var {SanitizeIdentifier(node.Name)}";
 
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
 
