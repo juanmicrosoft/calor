@@ -148,7 +148,7 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["modifiers"] = ["static", "abstract", "sealed", "virtual", "override", "readonly", "partial"],
         ["indexers"] = ["indexer", "§IDX{", "this[]"],
         ["yield"] = ["yield", "iterator", "IEnumerable"],
-        ["preprocessor"] = ["preprocessor", "#if", "#endif", "#else", "§PP", "§PPE", "conditional compilation"],
+        ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
         ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues"],
     };
 

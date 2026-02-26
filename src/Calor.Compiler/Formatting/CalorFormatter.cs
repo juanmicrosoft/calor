@@ -268,7 +268,40 @@ public sealed class CalorFormatter
             AppendLine($"§CSHARP{{{interop.CSharpCode}}}§/CSHARP");
         }
 
+        // Preprocessor blocks
+        foreach (var ppBlock in cls.PreprocessorBlocks)
+        {
+            FormatMemberPreprocessorBlock(ppBlock);
+        }
+
         AppendLine($"§/CL{{{clsId}}}");
+    }
+
+    private void FormatMemberPreprocessorBlock(MemberPreprocessorBlockNode node)
+    {
+        AppendLine($"§PP{{{node.Condition}}}");
+        foreach (var field in node.Fields) FormatField(field);
+        foreach (var prop in node.Properties) FormatProperty(prop);
+        foreach (var ctor in node.Constructors) FormatConstructor(ctor);
+        foreach (var method in node.Methods) FormatMethod(method);
+        foreach (var op in node.OperatorOverloads) FormatOperatorOverload(op);
+        if (node.ElseBranch != null)
+        {
+            AppendLine("§PPE");
+            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
+            {
+                FormatMemberPreprocessorBlock(node.ElseBranch);
+            }
+            else
+            {
+                foreach (var field in node.ElseBranch.Fields) FormatField(field);
+                foreach (var prop in node.ElseBranch.Properties) FormatProperty(prop);
+                foreach (var ctor in node.ElseBranch.Constructors) FormatConstructor(ctor);
+                foreach (var method in node.ElseBranch.Methods) FormatMethod(method);
+                foreach (var op in node.ElseBranch.OperatorOverloads) FormatOperatorOverload(op);
+            }
+        }
+        AppendLine($"§/PP{{{node.Condition}}}");
     }
 
     private void FormatField(ClassFieldNode field)

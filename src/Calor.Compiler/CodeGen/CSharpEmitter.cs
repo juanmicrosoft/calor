@@ -43,6 +43,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly EmitContractMode _contractMode;
     private readonly ModuleVerificationResult? _verificationResults;
     private readonly ModuleInheritanceResult? _inheritanceResult;
+    private readonly Verification.Obligations.ObligationTracker? _obligationTracker;
 
     // Track current indices for contract emission
     private int _currentPreconditionIndex;
@@ -55,6 +56,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private bool _usesCalorRuntime;
     private bool _usesSystemLinq;
     private bool _usesCollectionsGeneric;
+
+    // Indexed type name → base type for erasure (populated during Visit(ModuleNode))
+    private readonly Dictionary<string, string> _indexedTypeErasure = new(StringComparer.Ordinal);
 
     public CSharpEmitter() : this(EmitContractMode.Debug)
     {
@@ -69,7 +73,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
     }
 
-    public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults, ModuleInheritanceResult? inheritanceResult)
+    public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults, ModuleInheritanceResult? inheritanceResult,
+        Verification.Obligations.ObligationTracker? obligationTracker = null)
     {
         _contractMode = contractMode switch
         {
@@ -79,6 +84,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
         _verificationResults = verificationResults;
         _inheritanceResult = inheritanceResult;
+        _obligationTracker = obligationTracker;
     }
 
     public CSharpEmitter(EmitContractMode contractMode)
@@ -139,6 +145,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var usingCode = Visit(usingDirective);
             if (!string.IsNullOrEmpty(usingCode))
                 userUsings.Add(usingDirective.Namespace);
+        }
+
+        // Register indexed type erasure mappings (name → base type)
+        foreach (var itype in node.IndexedTypes)
+        {
+            _indexedTypeErasure[itype.Name] = itype.BaseTypeName;
         }
 
         var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
@@ -1371,7 +1383,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return pattern switch
         {
             WildcardPatternNode => "_",
-            VariablePatternNode vp => $"var {SanitizeIdentifier(vp.Name)}",
+            VariablePatternNode vp => vp.Name.Contains('.')
+                ? SanitizeIdentifier(vp.Name)
+                : $"var {SanitizeIdentifier(vp.Name)}",
             VarPatternNode varP => $"var {SanitizeIdentifier(varP.Name)}",
             LiteralPatternNode lp => lp.Literal.Accept(this),
             RelationalPatternNode rp => Visit(rp),
@@ -1399,7 +1413,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(WildcardPatternNode node) => "_";
 
-    public string Visit(VariablePatternNode node) => $"var {SanitizeIdentifier(node.Name)}";
+    public string Visit(VariablePatternNode node) => node.Name.Contains('.')
+        ? SanitizeIdentifier(node.Name)
+        : $"var {SanitizeIdentifier(node.Name)}";
 
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
 
@@ -2072,6 +2088,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var interop in node.InteropBlocks)
         {
             Visit(interop);
+            AppendLine();
+        }
+
+        // Emit preprocessor blocks
+        foreach (var ppBlock in node.PreprocessorBlocks)
+        {
+            Visit(ppBlock);
             AppendLine();
         }
 
@@ -3459,10 +3482,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
     }
 
-    private static string MapTypeName(string calorType)
+    private string MapTypeName(string calorType)
     {
+        // Check indexed type erasure: SizedList → List, NonEmptyArr → int[], etc.
+        var baseTypeName = calorType;
+        var genericIdx = calorType.IndexOf('<');
+        var lookupName = genericIdx > 0 ? calorType.Substring(0, genericIdx) : calorType;
+        if (_indexedTypeErasure.TryGetValue(lookupName, out var erasedBase))
+        {
+            // Preserve generic arguments: SizedList<i32> → List<int>
+            baseTypeName = genericIdx > 0
+                ? erasedBase + calorType.Substring(genericIdx)
+                : erasedBase;
+        }
+
         // Use the centralized TypeMapper for bidirectional type mapping
-        return TypeMapper.CalorToCSharp(calorType);
+        return TypeMapper.CalorToCSharp(baseTypeName);
     }
 
     /// <summary>
@@ -3983,6 +4018,81 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(MemberPreprocessorBlockNode node)
+    {
+        EmitMemberPreprocessorBlock(node, isFirst: true);
+        return "";
+    }
+
+    private void EmitMemberPreprocessorBlock(MemberPreprocessorBlockNode node, bool isFirst)
+    {
+        AppendLine(isFirst ? $"#if {node.Condition}" : $"#elif {node.Condition}");
+
+        foreach (var field in node.Fields)
+            Visit(field);
+        foreach (var prop in node.Properties)
+        {
+            Visit(prop);
+            AppendLine();
+        }
+        foreach (var ctor in node.Constructors)
+        {
+            Visit(ctor);
+            AppendLine();
+        }
+        foreach (var method in node.Methods)
+        {
+            Visit(method);
+            AppendLine();
+        }
+        foreach (var op in node.OperatorOverloads)
+        {
+            Visit(op);
+            AppendLine();
+        }
+        foreach (var evt in node.Events)
+            Visit(evt);
+
+        if (node.ElseBranch != null)
+        {
+            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
+            {
+                EmitMemberPreprocessorBlock(node.ElseBranch, isFirst: false);
+                return; // #endif already emitted by recursive call
+            }
+            else
+            {
+                AppendLine("#else");
+                foreach (var field in node.ElseBranch.Fields)
+                    Visit(field);
+                foreach (var prop in node.ElseBranch.Properties)
+                {
+                    Visit(prop);
+                    AppendLine();
+                }
+                foreach (var ctor in node.ElseBranch.Constructors)
+                {
+                    Visit(ctor);
+                    AppendLine();
+                }
+                foreach (var method in node.ElseBranch.Methods)
+                {
+                    Visit(method);
+                    AppendLine();
+                }
+                foreach (var op in node.ElseBranch.OperatorOverloads)
+                {
+                    Visit(op);
+                    AppendLine();
+                }
+                foreach (var evt in node.ElseBranch.Events)
+                    Visit(evt);
+            }
+        }
+
+        AppendLine("#endif");
+    }
+
     public string Visit(CSharpInteropBlockNode node)
     {
         // Emit raw C# content verbatim, same as RawCSharpNode
@@ -4394,5 +4504,61 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             conjuncts.Add(expr);
         }
+    }
+
+    // Dependent Types: Refinement Types and Proof Obligations
+
+    public string Visit(RefinementTypeNode node)
+    {
+        // Refinement types are erased in C# emission — emit nothing
+        return "";
+    }
+
+    public string Visit(IndexedTypeNode node)
+    {
+        // Indexed types are erased in C# emission — emit nothing
+        return "";
+    }
+
+    public string Visit(SelfRefNode node)
+    {
+        // Self-reference placeholder; only reachable inside emitted runtime checks (M1+)
+        return "__self__";
+    }
+
+    public string Visit(ProofObligationNode node)
+    {
+        var desc = node.Description != null ? $": {node.Description}" : "";
+
+        // Consult obligation tracker for status if available
+        if (_obligationTracker != null)
+        {
+            var matching = _obligationTracker.Obligations
+                .FirstOrDefault(o => o.Kind == Verification.Obligations.ObligationKind.ProofObligation
+                    && o.SourceProofId == node.Id);
+
+            if (matching != null)
+            {
+                switch (matching.Status)
+                {
+                    case Verification.Obligations.ObligationStatus.Discharged:
+                        AppendLine($"// PROVEN: proof obligation [{node.Id}{desc}]");
+                        return "";
+
+                    case Verification.Obligations.ObligationStatus.Boundary:
+                    case Verification.Obligations.ObligationStatus.Failed:
+                    case Verification.Obligations.ObligationStatus.Timeout:
+                        // Emit runtime guard
+                        var condition = node.Condition.Accept(this);
+                        AppendLine($"if (!({condition})) throw new InvalidOperationException(" +
+                            $"\"Proof obligation [{node.Id}{desc}] violated\");");
+                        return "";
+                }
+            }
+        }
+
+        // Default: no tracker or pending status — emit as comment
+        AppendLine($"// TODO: proof obligation [{node.Id}{desc}]");
+        return "";
     }
 }

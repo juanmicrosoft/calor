@@ -1652,8 +1652,8 @@ public class CollectionOperationsTests
         var emitter = new CalorEmitter();
         var calorOutput = emitter.Emit(module);
 
-        // Should contain §IDX syntax (space-separated, no braces)
-        Assert.Contains("§IDX ", calorOutput);
+        // Should contain §IDX syntax (brace format for simple references)
+        Assert.Contains("§IDX{", calorOutput);
 
         // Re-parse the emitted Calor
         var reparsed = Parse(calorOutput, out var rediagnostics);
@@ -2474,9 +2474,9 @@ public class CollectionOperationsTests
     }
 
     [Fact]
-    public void Emit_ArrayAccess_EmitsSpaceFormat()
+    public void Emit_ArrayAccess_EmitsBraceFormat()
     {
-        // CalorEmitter should emit §IDX arr 0 (no braces)
+        // CalorEmitter should emit §IDX{arr} 0 (brace format for simple references)
         var span = new TextSpan(0, 0, 0, 0);
         var arrayRef = new ReferenceNode(span, "arr");
         var index = new IntLiteralNode(span, 0);
@@ -2485,8 +2485,7 @@ public class CollectionOperationsTests
         var emitter = new CalorEmitter();
         var output = accessNode.Accept(emitter);
 
-        Assert.Equal("§IDX arr 0", output);
-        Assert.DoesNotContain("{", output);
+        Assert.Equal("§IDX{arr} 0", output);
     }
 
     [Fact]
@@ -2531,8 +2530,7 @@ public class CollectionOperationsTests
         // Emit → reparse roundtrip
         var emitter = new CalorEmitter();
         var calorOutput = emitter.Emit(module);
-        Assert.Contains("§IDX ", calorOutput);
-        Assert.DoesNotContain("§IDX{", calorOutput);
+        Assert.Contains("§IDX{", calorOutput);
 
         var reparsed = Parse(calorOutput, out var rediagnostics);
         Assert.False(rediagnostics.HasErrors, $"Round-trip failed: {string.Join(", ", rediagnostics.Select(d => d.Message))}");

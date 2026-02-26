@@ -115,7 +115,7 @@ Copilot will use the MCP server when Agent mode is enabled in VS Code.
 
 ## Available Tools
 
-The MCP server exposes 19 tools organized by category:
+The MCP server exposes 33 tools organized by category:
 
 ### Compilation & Verification
 
@@ -136,6 +136,7 @@ The MCP server exposes 19 tools organized by category:
 | `calor_symbol_info` | Get type, contracts, and signature for a symbol |
 | `calor_document_outline` | Get hierarchical structure of a file |
 | `calor_find_symbol` | Search symbols by name across files |
+| `calor_scope_info` | Get everything in scope at a given position |
 
 ### Analysis & Migration
 
@@ -143,8 +144,13 @@ The MCP server exposes 19 tools organized by category:
 |:-----|:------------|
 | `calor_analyze` | Advanced verification (dataflow, taint, bug patterns) |
 | `calor_assess` | Score C# files for migration potential |
+| `calor_analyze_convertibility` | Analyze C# code for Calor conversion likelihood |
 | `calor_convert` | Convert between C# and Calor |
+| `calor_convert_validated` | Full validated conversion pipeline (convert → fix → diagnose → compat) |
 | `calor_compile_check_compat` | Check compatibility of generated C# |
+| `calor_impact_analysis` | Compute what would be affected by changing a symbol |
+| `calor_call_graph` | Get callers/callees with effect annotations |
+| `calor_edit_preview` | Preview effects of an edit before committing |
 
 ### Code Quality
 
@@ -154,13 +160,25 @@ The MCP server exposes 19 tools organized by category:
 | `calor_format` | Format source to canonical style |
 | `calor_validate_snippet` | Validate incremental code snippets |
 
-### Syntax Help
+### Refinement Types & Obligations
 
 | Tool | Description |
 |:-----|:------------|
-| `calor_syntax_help` | Get syntax documentation |
-| `calor_syntax_lookup` | Look up specific syntax elements |
-| `calor_ids` | Generate unique IDs for code elements |
+| `calor_obligations` | Generate and verify refinement type obligations |
+| `calor_suggest_fixes` | Suggest ranked fix strategies for failed obligations |
+| `calor_discover_guards` | Discover Z3-validated guards for failed obligations |
+| `calor_suggest_types` | Analyze parameter usage and suggest refinement types |
+| `calor_diagnose_refinement` | All-in-one repair tool with ranked patches |
+
+### Syntax & Help
+
+| Tool | Description |
+|:-----|:------------|
+| `calor_syntax_help` | Get syntax documentation for a feature |
+| `calor_syntax_lookup` | Look up Calor syntax for a C# construct |
+| `calor_explain_error` | Explain an error code or message with fix patterns |
+| `calor_ids` | Check/assign declaration IDs |
+| `calor_self_test` | Run compiler self-test against golden files |
 
 ---
 
@@ -364,6 +382,206 @@ Get a hierarchical outline of all symbols in a file.
   }
 }
 ```
+
+---
+
+### calor_obligations
+
+Generate and verify refinement type obligations using Z3.
+
+**Input:**
+```json
+{
+  "source": "§M{m001:Test} §RTYPE{r1:NatInt:i32} (>= # INT:0) ...",
+  "timeout": 5000,
+  "function_id": "f001"
+}
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "summary": {
+    "total": 2,
+    "discharged": 1,
+    "failed": 0,
+    "timeout": 0,
+    "boundary": 1
+  },
+  "obligations": [
+    {
+      "id": "obl_0",
+      "kind": "RefinementEntry",
+      "function_id": "f001",
+      "description": "x must satisfy (>= # INT:0)",
+      "status": "Boundary",
+      "line": 5,
+      "column": 3
+    }
+  ],
+  "compilation_errors": []
+}
+```
+
+**Obligation Statuses:**
+- `Discharged` — Z3 proved the condition
+- `Failed` — Z3 found a counterexample (includes `counterexample` field)
+- `Timeout` — Solver exceeded time limit
+- `Boundary` — Public API entry point, can't verify callers
+- `Unsupported` — Contains unsupported Z3 constructs
+
+---
+
+### calor_suggest_types
+
+Analyze parameter usage patterns and suggest refinement types.
+
+**Input:**
+```json
+{
+  "source": "§M{m001:Test} ...",
+  "function_id": "f001"
+}
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "suggestions": [
+    {
+      "function_id": "f001",
+      "parameter_name": "b",
+      "current_type": "i32",
+      "suggested_predicate": "(!= # INT:0)",
+      "reason": "used_as_divisor",
+      "confidence": "high",
+      "calor_syntax": "§I{i32:b} | (!= # INT:0)"
+    }
+  ]
+}
+```
+
+**Detection Patterns:**
+- `used_as_divisor` (high) — Parameter appears as divisor
+- `used_as_index` (high) — Parameter used as array index
+- `compared_geq_zero` (medium) — Compared against zero
+- `compared_gt_zero` (medium) — Compared strictly greater than zero
+
+---
+
+### calor_suggest_fixes
+
+Suggest ranked fix strategies for failed obligations.
+
+**Input:**
+```json
+{
+  "source": "...",
+  "obligation_id": "obl_0"
+}
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "fixes": [
+    {
+      "obligation_id": "obl_0",
+      "strategy": "add_precondition",
+      "description": "Require callers to satisfy constraint",
+      "confidence": "high",
+      "template": "§Q (>= x INT:0)"
+    }
+  ]
+}
+```
+
+**Strategies:**
+- `add_precondition` — Require callers to satisfy constraint via `§Q`
+- `add_guard` — Runtime check at function entry
+- `refine_parameter` — Change parameter type to use a refinement type
+- `strengthen_precondition` — Make existing preconditions stricter
+- `mark_unsafe` — Suppress obligation (not recommended)
+
+---
+
+### calor_discover_guards
+
+Discover guards that would discharge failed obligations, validated by Z3.
+
+**Input:**
+```json
+{
+  "source": "...",
+  "obligation_id": "obl_0"
+}
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "guards": [
+    {
+      "obligation_id": "obl_0",
+      "description": "Add precondition requiring b != 0",
+      "calor_expression": "§Q (!= b INT:0)",
+      "insertion_kind": "precondition",
+      "confidence": "high",
+      "validated": true
+    }
+  ]
+}
+```
+
+**Insertion Kinds:**
+- `precondition` — Add as `§Q (...)` before function body
+- `if_guard` — Wrap in `§IF` returning error
+- `assert` — Use `§PROOF{...} (...)`
+
+---
+
+### calor_diagnose_refinement
+
+All-in-one repair tool — combines obligations, guards, and type suggestions into ranked patches.
+
+**Input:**
+```json
+{
+  "source": "...",
+  "policy": "default"
+}
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "policy": "default",
+  "summary": { "total": 2, "discharged": 1, "boundary": 1 },
+  "patches": [
+    {
+      "obligation_id": "obl_0",
+      "obligation_status": "Boundary",
+      "policy_action": "AlwaysGuard",
+      "patch_kind": "precondition",
+      "calor_code": "§Q (!= b INT:0)",
+      "description": "Add precondition for b",
+      "confidence": "high",
+      "discharges_obligations": ["obl_0"]
+    }
+  ],
+  "compilation_errors": []
+}
+```
+
+**Policies:**
+- `default` — Failed = Error, Timeout = WarnAndGuard, Boundary = AlwaysGuard
+- `strict` — All non-discharged = Error
+- `permissive` — Failed = WarnAndGuard, never errors
 
 ---
 

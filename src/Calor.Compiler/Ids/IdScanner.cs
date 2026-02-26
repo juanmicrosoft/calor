@@ -63,11 +63,21 @@ public sealed class IdScanner : IAstVisitor
 
         foreach (var enumDef in node.Enums)
             enumDef.Accept(this);
+
+        foreach (var rtype in node.RefinementTypes)
+            rtype.Accept(this);
+
+        foreach (var itype in node.IndexedTypes)
+            itype.Accept(this);
     }
 
     public void Visit(FunctionNode node)
     {
         AddEntry(node.Id, IdKind.Function, node.Name, node.Span);
+
+        // Scan body statements for proof obligations and other ID-bearing nodes
+        foreach (var stmt in node.Body)
+            stmt.Accept(this);
     }
 
     public void Visit(InterfaceDefinitionNode node)
@@ -290,6 +300,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(RawCSharpNode node) { }
     public void Visit(RawCSharpExpressionNode node) { }
     public void Visit(PreprocessorDirectiveNode node) { }
+    public void Visit(MemberPreprocessorBlockNode node) { }
     public void Visit(CSharpInteropBlockNode node) { }
     public void Visit(StackAllocNode node) { }
     public void Visit(UnsafeBlockNode node) { }
@@ -299,4 +310,21 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(SizeOfNode node) { }
     public void Visit(MultiDimArrayCreationNode node) { }
     public void Visit(MultiDimArrayAccessNode node) { }
+    // Dependent Types: Refinement Types and Proof Obligations
+    public void Visit(RefinementTypeNode node)
+    {
+        if (!string.IsNullOrEmpty(node.Id))
+            AddEntry(node.Id, IdKind.RefinementType, node.Name, node.Span);
+    }
+    public void Visit(SelfRefNode node) { }
+    public void Visit(ProofObligationNode node)
+    {
+        if (!string.IsNullOrEmpty(node.Id))
+            AddEntry(node.Id, IdKind.ProofObligation, node.Description ?? node.Id, node.Span);
+    }
+    public void Visit(IndexedTypeNode node)
+    {
+        if (!string.IsNullOrEmpty(node.Id))
+            AddEntry(node.Id, IdKind.IndexedType, node.Name, node.Span);
+    }
 }

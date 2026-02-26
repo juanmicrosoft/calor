@@ -535,6 +535,12 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Readonly structs are converted with struct and readonly modifiers"
         },
+        ["preprocessor-directive"] = new FeatureInfo
+        {
+            Name = "preprocessor-directive",
+            Support = SupportLevel.Full,
+            Description = "Preprocessor directives (#if/#else/#endif) are converted to §PP blocks"
+        },
 
         // Phase 4 features (C# 11-13)
         ["default-lambda-parameter"] = new FeatureInfo
@@ -718,12 +724,31 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Multidimensional arrays (int[,], int[,,]) are fully supported"
         },
-        ["preprocessor-directive"] = new FeatureInfo
+
+        // Dependent Types
+        ["refinement-type"] = new FeatureInfo
         {
-            Name = "preprocessor-directive",
-            Support = SupportLevel.Partial,
-            Description = "Statement-level §PP{CONDITION} supported. Declaration-level #if/#endif (wrapping classes/methods) silently dropped during conversion.",
-            Workaround = "Use §PP inside method bodies, or §CSHARP{...}§/CSHARP interop for declaration-level conditionals"
+            Name = "refinement-type",
+            Support = SupportLevel.Full,
+            Description = "Refinement types (§RTYPE) define base types constrained by predicates; erased to base types in C#"
+        },
+        ["proof-obligation"] = new FeatureInfo
+        {
+            Name = "proof-obligation",
+            Support = SupportLevel.Full,
+            Description = "Proof obligations (§PROOF) declare conditions to be verified; emitted as comments or runtime checks"
+        },
+        ["indexed-type"] = new FeatureInfo
+        {
+            Name = "indexed-type",
+            Support = SupportLevel.Full,
+            Description = "Indexed types (§ITYPE) define size-parameterized types for bounds checking; erased to base types in C#"
+        },
+        ["index-bounds"] = new FeatureInfo
+        {
+            Name = "index-bounds",
+            Support = SupportLevel.Full,
+            Description = "Index bounds obligations verify array/list accesses are within bounds using Z3"
         },
     };
 

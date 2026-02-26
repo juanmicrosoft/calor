@@ -1747,7 +1747,8 @@ Alternative alias `§SW` is available for `§W`:
 
 ## Preprocessor Directives
 
-Calor supports statement-level conditional compilation via `§PP` (preprocessor) blocks.
+Calor supports C# preprocessor directives (`#if`/`#else`/`#endif`) via `§PP` blocks.
+These are used for conditional compilation (e.g., `DEBUG`, `NET8_0_OR_GREATER`).
 
 ### Syntax
 
@@ -1763,7 +1764,7 @@ Calor supports statement-level conditional compilation via `§PP` (preprocessor)
 
 ```calor
 §PP{DEBUG}
-  §CALL Console.WriteLine("Debug mode")
+  §P "Debug mode enabled"
 §/PP{DEBUG}
 
 §PP{NET8_0_OR_GREATER}
@@ -1777,7 +1778,7 @@ Calor supports statement-level conditional compilation via `§PP` (preprocessor)
 
 ```csharp
 #if DEBUG
-Console.WriteLine("Debug mode");
+    Console.WriteLine("Debug mode enabled");
 #endif
 
 #if NET8_0_OR_GREATER
@@ -1786,11 +1787,6 @@ var result = SomeNewApi();
 var result = LegacyFallback();
 #endif
 ```
-
-### Limitations
-
-- **Statement-level only**: `§PP` works inside method bodies. Declaration-level `#if`/`#endif` (wrapping entire classes or methods) is silently dropped during C#→Calor conversion.
-- For declaration-level conditionals, use `§CSHARP{...}§/CSHARP` interop blocks to preserve the original C# with its preprocessor directives.
 
 ## Known Limitations & C# Migration Notes
 
@@ -1816,7 +1812,6 @@ When converting C# code to Calor, some features have limited or no support. Use 
 | `dynamic` | Partial | Converted to 'any' with warning |
 | `lock` statement | Partial | Body preserved, lock semantics stripped |
 | `checked` / `unchecked` | Partial | Wrapper stripped, body preserved |
-| `preprocessor directive` | Partial | Statement-level only (see above) |
 | `postfix operator` | Not Supported | Use as statement or rewrite as x = x + 1 |
 
 ### Fully Supported (previously thought missing)
@@ -1831,3 +1826,4 @@ These features are fully supported in the converter:
 - **Range expressions**: `§RANGE` / `start..end`
 - **Index from end**: `§^` / `^n`
 - **with-expression**: `§WITH` blocks for record copying
+- **Preprocessor directives**: `§PP` blocks for `#if`/`#else`/`#endif`

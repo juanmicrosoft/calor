@@ -243,6 +243,24 @@ To disable caching (e.g., for debugging), use `--no-cache`. To clear the cache, 
 
 ---
 
+## Beyond Contracts: Refinement Types
+
+Contracts verify *behavior* — preconditions and postconditions on function boundaries. **Refinement types** extend this to *type-level constraints*: instead of asserting `(>= x 0)` as a precondition, you declare the parameter as `§I{i32:x} | (>= # INT:0)` and the constraint becomes part of the type itself.
+
+The obligation engine is an evolution of the assume-negate-check pattern described above:
+
+1. **Generation** — The compiler creates verification obligations for every refined parameter and `§PROOF` statement
+2. **Solving** — Each obligation goes through the same Z3 pipeline: assume preconditions, negate the condition, check satisfiability
+3. **Guard Discovery** — For failed obligations, the engine discovers the simplest guard that would discharge them, validated by Z3
+4. **Policy** — Configurable policies (default, strict, permissive) control whether failures are errors, warnings, or runtime guards
+
+Where contracts are function-level assertions, refinement types are type-level invariants that propagate across function boundaries. A parameter typed `Port` (an `i32` between 1 and 65535) carries its constraint everywhere it flows — no manual validation at each call site.
+
+- [Refinement Types Reference](/calor/syntax-reference/refinement-types/)
+- [Dependent Types Tutorial](/calor/guides/dependent-types-tutorial/)
+
+---
+
 ## See Also
 
 - [Contracts in Calor](/calor/language/contracts/)

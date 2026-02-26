@@ -89,6 +89,12 @@ public sealed class ContractTranslator
     private readonly List<string> _warnings = new();
 
     /// <summary>
+    /// Stack of self-variable names for refinement predicate contexts.
+    /// When translating a refinement predicate, # resolves to the variable at the top of this stack.
+    /// </summary>
+    private readonly Stack<string> _selfVariableStack = new();
+
+    /// <summary>
     /// Gets warnings that were generated during translation.
     /// Warnings indicate features that were silently handled in a potentially unexpected way.
     /// </summary>
@@ -102,6 +108,24 @@ public sealed class ContractTranslator
     public ContractTranslator(Context ctx)
     {
         _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
+    }
+
+    /// <summary>
+    /// Pushes a self-variable name for refinement predicate translation.
+    /// When SelfRefNode (#) is encountered, it resolves to the variable with this name.
+    /// </summary>
+    public void PushSelfVariable(string variableName)
+    {
+        _selfVariableStack.Push(variableName);
+    }
+
+    /// <summary>
+    /// Pops the current self-variable name.
+    /// </summary>
+    public void PopSelfVariable()
+    {
+        if (_selfVariableStack.Count > 0)
+            _selfVariableStack.Pop();
     }
 
     /// <summary>
@@ -180,6 +204,9 @@ public sealed class ContractTranslator
             StringLiteralNode strLit => TrackString(_ctx.MkString(strLit.Value)),
             StringOperationNode strOp => TranslateStringOperation(strOp),
 
+            // Dependent Types: Self-reference in refinement predicates
+            SelfRefNode => TranslateSelfRef(),
+
             // Unsupported constructs - return null
             FloatLiteralNode => null,
             CallExpressionNode => null,
@@ -193,6 +220,21 @@ public sealed class ContractTranslator
             return variable.Expr;
 
         // Unknown variable - might be a reference to something we don't know about
+        return null;
+    }
+
+    /// <summary>
+    /// Translates # (self-reference) by looking up the current self-variable from the stack.
+    /// </summary>
+    private Expr? TranslateSelfRef()
+    {
+        if (_selfVariableStack.Count == 0)
+            return null;
+
+        var selfName = _selfVariableStack.Peek();
+        if (_variables.TryGetValue(selfName, out var variable))
+            return variable.Expr;
+
         return null;
     }
 

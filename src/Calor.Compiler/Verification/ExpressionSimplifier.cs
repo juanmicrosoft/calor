@@ -1424,6 +1424,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(RawCSharpNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RawCSharpExpressionNode node) => node;
     public ExpressionNode Visit(PreprocessorDirectiveNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(MemberPreprocessorBlockNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(CSharpInteropBlockNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(StackAllocNode node) => node;
     public ExpressionNode Visit(UnsafeBlockNode node) => throw new InvalidOperationException();
@@ -1433,6 +1434,11 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(SizeOfNode node) => node;
     public ExpressionNode Visit(MultiDimArrayCreationNode node) => node;
     public ExpressionNode Visit(MultiDimArrayAccessNode node) => node;
+    // Dependent Types: Refinement Types and Proof Obligations
+    public ExpressionNode Visit(RefinementTypeNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(SelfRefNode node) => node;
+    public ExpressionNode Visit(ProofObligationNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(IndexedTypeNode node) => throw new InvalidOperationException();
 
     #endregion
 }

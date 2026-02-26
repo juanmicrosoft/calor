@@ -443,9 +443,69 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
+        var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
 
-        foreach (var member in node.Members)
+        // Extract member-level preprocessor regions
+        var ppRegions = ExtractMemberPreprocessorRegions(node);
+        // Index regions by start — use first-wins for safety if duplicates exist
+        var ppRegionsByStart = new Dictionary<int, PreprocessorRegion>();
+        var ppCoveredIndices = new HashSet<int>();
+        foreach (var region in ppRegions)
         {
+            if (region.ActiveStart < region.ActiveEnd)
+                ppRegionsByStart.TryAdd(region.ActiveStart, region);
+            for (int idx = region.ActiveStart; idx < region.ActiveEnd; idx++)
+                ppCoveredIndices.Add(idx);
+        }
+
+        // Handle PP regions with no active members (all disabled) before the loop
+        foreach (var emptyRegion in ppRegions.Where(r => r.ActiveStart == r.ActiveEnd))
+        {
+            _context.RecordFeatureUsage("preprocessor-directive");
+            preprocessorBlocks.Add(BuildMemberPreprocessorNode(TextSpan.Empty, emptyRegion.Branches,
+                new List<ClassFieldNode>(), new List<PropertyNode>(), new List<ConstructorNode>(),
+                new List<MethodNode>(), new List<EventDefinitionNode>(), new List<OperatorOverloadNode>()));
+        }
+
+        for (int memberIndex = 0; memberIndex < node.Members.Count; memberIndex++)
+        {
+            // Handle preprocessor regions that cover parsed members
+            if (ppRegionsByStart.TryGetValue(memberIndex, out var ppRegion))
+            {
+                _context.RecordFeatureUsage("preprocessor-directive");
+                var span = GetTextSpan(node.Members[ppRegion.ActiveStart]);
+
+                // Convert active members
+                var ppFields = new List<ClassFieldNode>();
+                var ppProperties = new List<PropertyNode>();
+                var ppConstructors = new List<ConstructorNode>();
+                var ppMethods = new List<MethodNode>();
+                var ppEvents = new List<EventDefinitionNode>();
+                var ppOperatorOverloads = new List<OperatorOverloadNode>();
+
+                for (int bi = ppRegion.ActiveStart; bi < ppRegion.ActiveEnd; bi++)
+                {
+                    try
+                    {
+                        ConvertClassMember(node.Members[bi], ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads);
+                    }
+                    catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                    {
+                        // Skip unconvertible members in PP blocks
+                    }
+                }
+
+                preprocessorBlocks.Add(BuildMemberPreprocessorNode(span, ppRegion.Branches,
+                    ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads));
+
+                memberIndex = ppRegion.ActiveEnd - 1; // loop will increment
+                continue;
+            }
+
+            if (ppCoveredIndices.Contains(memberIndex))
+                continue;
+
+            var member = node.Members[memberIndex];
             try
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
@@ -485,7 +545,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection(),
             csharpAttrs,
             visibility: visibility,
-            interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null);
+            interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null,
+            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null);
     }
 
     private void ConvertClassMember(
@@ -638,9 +699,66 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var events = new List<EventDefinitionNode>();
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
+        var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
 
-        foreach (var member in node.Members)
+        // Extract member-level preprocessor regions
+        var ppRegions = ExtractMemberPreprocessorRegions(node);
+        var ppRegionsByStart = new Dictionary<int, PreprocessorRegion>();
+        var ppCoveredIndices = new HashSet<int>();
+        foreach (var region in ppRegions)
         {
+            if (region.ActiveStart < region.ActiveEnd)
+                ppRegionsByStart.TryAdd(region.ActiveStart, region);
+            for (int idx = region.ActiveStart; idx < region.ActiveEnd; idx++)
+                ppCoveredIndices.Add(idx);
+        }
+
+        // Handle PP regions with no active members (all disabled)
+        foreach (var emptyRegion in ppRegions.Where(r => r.ActiveStart == r.ActiveEnd))
+        {
+            _context.RecordFeatureUsage("preprocessor-directive");
+            preprocessorBlocks.Add(BuildMemberPreprocessorNode(TextSpan.Empty, emptyRegion.Branches,
+                new List<ClassFieldNode>(), new List<PropertyNode>(), new List<ConstructorNode>(),
+                new List<MethodNode>(), new List<EventDefinitionNode>(), new List<OperatorOverloadNode>()));
+        }
+
+        for (int memberIndex = 0; memberIndex < node.Members.Count; memberIndex++)
+        {
+            if (ppRegionsByStart.TryGetValue(memberIndex, out var ppRegion))
+            {
+                _context.RecordFeatureUsage("preprocessor-directive");
+                var span = GetTextSpan(node.Members[ppRegion.ActiveStart]);
+
+                var ppFields = new List<ClassFieldNode>();
+                var ppProperties = new List<PropertyNode>();
+                var ppConstructors = new List<ConstructorNode>();
+                var ppMethods = new List<MethodNode>();
+                var ppEvents = new List<EventDefinitionNode>();
+                var ppOperatorOverloads = new List<OperatorOverloadNode>();
+
+                for (int bi = ppRegion.ActiveStart; bi < ppRegion.ActiveEnd; bi++)
+                {
+                    try
+                    {
+                        ConvertClassMember(node.Members[bi], ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads);
+                    }
+                    catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                    {
+                        // Skip unconvertible members in PP blocks
+                    }
+                }
+
+                preprocessorBlocks.Add(BuildMemberPreprocessorNode(span, ppRegion.Branches,
+                    ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads));
+
+                memberIndex = ppRegion.ActiveEnd - 1; // loop will increment
+                continue;
+            }
+
+            if (ppCoveredIndices.Contains(memberIndex))
+                continue;
+
+            var member = node.Members[memberIndex];
             try
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
@@ -686,7 +804,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             isStruct: true,
             isReadOnly: isReadOnly,
             visibility: visibility,
-            interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null);
+            interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null,
+            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -1241,12 +1360,901 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             isAsync);
     }
 
+    /// <summary>
+    /// A single branch within a preprocessor region (#if, #elif, or #else).
+    /// </summary>
+    private sealed class PreprocessorBranch
+    {
+        /// <summary>The condition for #if/#elif, or null for #else.</summary>
+        public string? Condition;
+        /// <summary>Disabled text if this branch is inactive, null if active.</summary>
+        public string? DisabledText;
+        /// <summary>True if this branch contains the parsed (active) statements.</summary>
+        public bool IsActive;
+    }
+
+    /// <summary>
+    /// Represents a preprocessor region extracted from Roslyn trivia.
+    /// Contains an ordered list of branches (#if, then #elif(s), then optional #else).
+    /// </summary>
+    private sealed class PreprocessorRegion
+    {
+        /// <summary>Start index in block.Statements for active (parsed) statements.</summary>
+        public int ActiveStart;
+        /// <summary>End index (exclusive) in block.Statements for active statements.</summary>
+        public int ActiveEnd;
+        /// <summary>All branches in order: [0] is #if, [1..n-1] are #elif, last may be #else (Condition==null).</summary>
+        public List<PreprocessorBranch> Branches = new();
+
+        /// <summary>The #if condition (shortcut for Branches[0].Condition).</summary>
+        public string Condition => Branches.Count > 0 ? Branches[0].Condition ?? "" : "";
+    }
+
+    /// <summary>
+    /// Extracts preprocessor directive regions (#if/#elif/#else/#endif) from block trivia.
+    ///
+    /// Roslyn trivia layout depends on which branch is active:
+    /// - First branch active (#if defined): #if on statement trivia, inactive branches on close brace
+    /// - Middle branch active (#elif defined): #if+disabled+#elif on statement trivia, rest on close brace
+    /// - Last branch active (#else, no symbols): #if+disabled+[#elif+disabled]*+#else on statement trivia
+    /// - Nothing active (no #else, no symbols): everything on close brace
+    /// </summary>
+    private static List<PreprocessorRegion> ExtractPreprocessorRegions(BlockSyntax block)
+    {
+        var regions = new List<PreprocessorRegion>();
+        var statements = block.Statements;
+
+        // Scan all statement leading trivia for top-level #if directives
+        for (int i = 0; i < statements.Count; i++)
+        {
+            var leadingTrivia = statements[i].GetLeadingTrivia().ToList();
+
+            // Check if this statement has a #if directive in its trivia
+            bool hasIf = leadingTrivia.Any(t => t.IsKind(SyntaxKind.IfDirectiveTrivia));
+            if (!hasIf) continue;
+
+            // Collect branches from statement leading trivia
+            // These are the inactive branches BEFORE the active branch
+            var stmtBranches = new List<PreprocessorBranch>();
+            string? ifCondition = null;
+            string? currentDisabled = null;
+            string? currentCondition = null;
+            int triviaDepth = 0;
+
+            foreach (var trivia in leadingTrivia)
+            {
+                if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+                {
+                    if (triviaDepth == 0 && ifCondition == null)
+                    {
+                        if (trivia.GetStructure() is IfDirectiveTriviaSyntax ifDir)
+                            ifCondition = ifDir.Condition.ToString();
+                        currentCondition = ifCondition;
+                        currentDisabled = null;
+                    }
+                    else
+                    {
+                        triviaDepth++;
+                    }
+                }
+                else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+                {
+                    if (triviaDepth > 0) { triviaDepth--; continue; }
+                }
+                else if (triviaDepth > 0)
+                {
+                    continue;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElifDirectiveTrivia) && ifCondition != null)
+                {
+                    stmtBranches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = currentDisabled,
+                        IsActive = false
+                    });
+                    if (trivia.GetStructure() is ElifDirectiveTriviaSyntax elifDir)
+                        currentCondition = elifDir.Condition.ToString();
+                    else
+                        currentCondition = "ELIF";
+                    currentDisabled = null;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElseDirectiveTrivia) && ifCondition != null)
+                {
+                    stmtBranches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = currentDisabled,
+                        IsActive = false
+                    });
+                    currentCondition = null; // #else
+                    currentDisabled = null;
+                }
+                else if (trivia.IsKind(SyntaxKind.DisabledTextTrivia) && ifCondition != null && triviaDepth == 0)
+                {
+                    currentDisabled = trivia.ToString();
+                }
+            }
+
+            if (ifCondition == null) continue;
+
+            // Find where this region ends: scan forward for matching #endif
+            int endIdx = statements.Count;
+            int scanDepth = 1;
+            for (int j = i; j < statements.Count; j++)
+            {
+                var jTrivia = j == i ? leadingTrivia : statements[j].GetLeadingTrivia().ToList();
+                bool skipFirst = (j == i);
+                foreach (var trivia in jTrivia)
+                {
+                    if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+                    {
+                        if (skipFirst) { skipFirst = false; continue; }
+                        scanDepth++;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+                    {
+                        scanDepth--;
+                        if (scanDepth == 0)
+                        {
+                            endIdx = j;
+                            goto foundEnd;
+                        }
+                    }
+                }
+            }
+
+            // Collect branches from close brace trivia (inactive branches AFTER active)
+            {
+                var closeBraceTrivia = block.CloseBraceToken.LeadingTrivia.ToList();
+                int braceDepth = 0;
+                foreach (var trivia in closeBraceTrivia)
+                {
+                    if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+                    {
+                        braceDepth++;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+                    {
+                        if (braceDepth > 0) { braceDepth--; continue; }
+                        scanDepth--;
+                        if (scanDepth == 0)
+                        {
+                            endIdx = statements.Count;
+                            break;
+                        }
+                    }
+                    else if (braceDepth > 0)
+                    {
+                        continue;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.ElifDirectiveTrivia))
+                    {
+                        // Close previous branch (which was active — the parsed statements)
+                        stmtBranches.Add(new PreprocessorBranch
+                        {
+                            Condition = currentCondition,
+                            DisabledText = null, // active branch
+                            IsActive = true
+                        });
+                        if (trivia.GetStructure() is ElifDirectiveTriviaSyntax elifDir)
+                            currentCondition = elifDir.Condition.ToString();
+                        else
+                            currentCondition = "ELIF";
+                        currentDisabled = null;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.ElseDirectiveTrivia))
+                    {
+                        stmtBranches.Add(new PreprocessorBranch
+                        {
+                            Condition = currentCondition,
+                            DisabledText = null,
+                            IsActive = true
+                        });
+                        currentCondition = null;
+                        currentDisabled = null;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                    {
+                        currentDisabled = trivia.ToString();
+                    }
+                }
+            }
+            foundEnd:
+
+            // The last accumulated branch is the active one (the parsed statements)
+            // unless we already added it when processing close brace #elif/#else
+            bool activeAlreadyAdded = stmtBranches.Any(b => b.IsActive);
+            if (!activeAlreadyAdded)
+            {
+                stmtBranches.Add(new PreprocessorBranch
+                {
+                    Condition = currentCondition,
+                    DisabledText = null,
+                    IsActive = true
+                });
+            }
+            else if (currentDisabled != null)
+            {
+                // There's a trailing disabled branch after the active one
+                stmtBranches.Add(new PreprocessorBranch
+                {
+                    Condition = currentCondition,
+                    DisabledText = currentDisabled,
+                    IsActive = false
+                });
+            }
+
+            regions.Add(new PreprocessorRegion
+            {
+                ActiveStart = i,
+                ActiveEnd = endIdx,
+                Branches = stmtBranches
+            });
+
+            i = endIdx - 1;
+        }
+
+        // Check close brace for #if with no parsed statements (everything disabled)
+        {
+            var closeBraceTrivia = block.CloseBraceToken.LeadingTrivia.ToList();
+            string? ifCondition = null;
+            string? currentCond = null;
+            string? currentDis = null;
+            var branches = new List<PreprocessorBranch>();
+            int braceDepth = 0;
+
+            foreach (var trivia in closeBraceTrivia)
+            {
+                if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+                {
+                    if (braceDepth == 0 && ifCondition == null)
+                    {
+                        if (trivia.GetStructure() is IfDirectiveTriviaSyntax ifDir)
+                            ifCondition = ifDir.Condition.ToString();
+                        currentCond = ifCondition;
+                        currentDis = null;
+                    }
+                    braceDepth++;
+                }
+                else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+                {
+                    braceDepth--;
+                    if (braceDepth == 0 && ifCondition != null)
+                    {
+                        branches.Add(new PreprocessorBranch
+                        {
+                            Condition = currentCond,
+                            DisabledText = currentDis,
+                            IsActive = false
+                        });
+                        regions.Add(new PreprocessorRegion
+                        {
+                            ActiveStart = statements.Count,
+                            ActiveEnd = statements.Count,
+                            Branches = branches
+                        });
+                        ifCondition = null;
+                        branches = new List<PreprocessorBranch>();
+                    }
+                }
+                else if (braceDepth != 1 || ifCondition == null)
+                {
+                    continue;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElifDirectiveTrivia))
+                {
+                    branches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCond,
+                        DisabledText = currentDis,
+                        IsActive = false
+                    });
+                    if (trivia.GetStructure() is ElifDirectiveTriviaSyntax elifDir)
+                        currentCond = elifDir.Condition.ToString();
+                    else
+                        currentCond = "ELIF";
+                    currentDis = null;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElseDirectiveTrivia))
+                {
+                    branches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCond,
+                        DisabledText = currentDis,
+                        IsActive = false
+                    });
+                    currentCond = null;
+                    currentDis = null;
+                }
+                else if (trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                {
+                    currentDis = trivia.ToString();
+                }
+            }
+        }
+
+        return regions;
+    }
+
+    /// <summary>
+    /// Parses disabled text (from an inactive preprocessor branch) as C# statements
+    /// and converts them to Calor statement nodes.
+    /// </summary>
+    private List<StatementNode> ConvertDisabledText(string disabledText)
+    {
+        // Wrap the disabled text in a method body to parse it as statements
+        var wrapper = $"class _PP {{ void _M() {{ {disabledText} }} }}";
+        try
+        {
+            var tree = CSharpSyntaxTree.ParseText(wrapper);
+            var root = tree.GetCompilationUnitRoot();
+            var method = root.DescendantNodes()
+                .OfType<MethodDeclarationSyntax>()
+                .FirstOrDefault();
+            if (method?.Body == null) return new List<StatementNode>();
+
+            // Merge reassigned variables from disabled text so mutability is correct
+            var disabledReassigned = CollectReassignedVariables(method.Body);
+            foreach (var name in disabledReassigned)
+                _reassignedVariables.Add(name);
+
+            var results = new List<StatementNode>();
+            foreach (var stmt in method.Body.Statements)
+            {
+                var converted = ConvertStatement(stmt);
+                if (converted != null) results.Add(converted);
+            }
+            return results;
+        }
+        catch
+        {
+            // If we can't parse the disabled text, emit it as a raw comment
+            return new List<StatementNode>
+            {
+                new FallbackCommentNode(TextSpan.Empty, disabledText.Trim(), "preprocessor-disabled", "Disabled preprocessor text could not be parsed")
+            };
+        }
+    }
+
+    /// <summary>
+    /// Builds a (potentially nested) PreprocessorDirectiveNode from an ordered list of branches.
+    /// For #if/#elif/#else, #elif branches are represented as nested §PP in the else body:
+    /// #if A / #elif B / #else → §PP{A} body §PPE §PP{B} body §PPE else §/PP{B} §/PP{A}
+    /// </summary>
+    private PreprocessorDirectiveNode BuildPreprocessorNode(
+        TextSpan span,
+        List<PreprocessorBranch> branches,
+        List<StatementNode> activeStatements)
+    {
+        if (branches.Count == 0)
+        {
+            // Shouldn't happen, but safety
+            return new PreprocessorDirectiveNode(span, "UNKNOWN", activeStatements, null);
+        }
+
+        // Convert each branch's body
+        var convertedBodies = new List<(string? condition, List<StatementNode> body)>();
+        foreach (var branch in branches)
+        {
+            if (branch.IsActive)
+            {
+                convertedBodies.Add((branch.Condition, activeStatements));
+            }
+            else if (branch.DisabledText != null)
+            {
+                convertedBodies.Add((branch.Condition, ConvertDisabledText(branch.DisabledText)));
+            }
+            else
+            {
+                convertedBodies.Add((branch.Condition, new List<StatementNode>()));
+            }
+        }
+
+        // Build nested structure from right to left:
+        // Start with the last branch and work backwards, nesting each #elif as §PP in the else
+        List<StatementNode>? currentElse = null;
+
+        for (int idx = convertedBodies.Count - 1; idx >= 1; idx--)
+        {
+            var (condition, body) = convertedBodies[idx];
+            if (condition == null)
+            {
+                // #else branch — becomes the innermost else
+                currentElse = body;
+            }
+            else
+            {
+                // #elif branch — wrap in a new PreprocessorDirectiveNode
+                var elifNode = new PreprocessorDirectiveNode(span, condition, body, currentElse);
+                currentElse = new List<StatementNode> { elifNode };
+            }
+        }
+
+        // Build the outermost #if node
+        var (ifCondition, ifBody) = convertedBodies[0];
+        return new PreprocessorDirectiveNode(span, ifCondition ?? "IF", ifBody, currentElse);
+    }
+
+    /// <summary>
+    /// Extracts preprocessor regions from member-level trivia on a type declaration.
+    /// Adapts the same logic as ExtractPreprocessorRegions(BlockSyntax) but for type members.
+    /// </summary>
+    private static List<PreprocessorRegion> ExtractMemberPreprocessorRegions(TypeDeclarationSyntax typeDecl)
+    {
+        var regions = new List<PreprocessorRegion>();
+        var members = typeDecl.Members;
+
+        for (int i = 0; i < members.Count; i++)
+        {
+            var leadingTrivia = members[i].GetLeadingTrivia().ToList();
+
+            bool hasIf = leadingTrivia.Any(t => t.IsKind(SyntaxKind.IfDirectiveTrivia));
+            if (!hasIf) continue;
+
+            var stmtBranches = new List<PreprocessorBranch>();
+            string? ifCondition = null;
+            string? currentDisabled = null;
+            string? currentCondition = null;
+            int triviaDepth = 0;
+
+            foreach (var trivia in leadingTrivia)
+            {
+                if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+                {
+                    if (triviaDepth == 0 && ifCondition == null)
+                    {
+                        if (trivia.GetStructure() is IfDirectiveTriviaSyntax ifDir)
+                            ifCondition = ifDir.Condition.ToString();
+                        currentCondition = ifCondition;
+                        currentDisabled = null;
+                    }
+                    else
+                    {
+                        triviaDepth++;
+                    }
+                }
+                else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+                {
+                    if (triviaDepth > 0) { triviaDepth--; continue; }
+                }
+                else if (triviaDepth > 0)
+                {
+                    continue;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElifDirectiveTrivia) && ifCondition != null)
+                {
+                    stmtBranches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = currentDisabled,
+                        IsActive = false
+                    });
+                    if (trivia.GetStructure() is ElifDirectiveTriviaSyntax elifDir)
+                        currentCondition = elifDir.Condition.ToString();
+                    else
+                        currentCondition = "ELIF";
+                    currentDisabled = null;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElseDirectiveTrivia) && ifCondition != null)
+                {
+                    stmtBranches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = currentDisabled,
+                        IsActive = false
+                    });
+                    currentCondition = null;
+                    currentDisabled = null;
+                }
+                else if (trivia.IsKind(SyntaxKind.DisabledTextTrivia) && ifCondition != null && triviaDepth == 0)
+                {
+                    currentDisabled = trivia.ToString();
+                }
+            }
+
+            if (ifCondition == null) continue;
+
+            // Find where this region ends
+            int endIdx = members.Count;
+            int scanDepth = 1;
+            for (int j = i; j < members.Count; j++)
+            {
+                var jTrivia = j == i ? leadingTrivia : members[j].GetLeadingTrivia().ToList();
+                bool skipFirst = (j == i);
+                foreach (var trivia in jTrivia)
+                {
+                    if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+                    {
+                        if (skipFirst) { skipFirst = false; continue; }
+                        scanDepth++;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+                    {
+                        scanDepth--;
+                        if (scanDepth == 0)
+                        {
+                            endIdx = j;
+                            goto memberFoundEnd;
+                        }
+                    }
+                }
+            }
+
+            // Check close brace trivia
+            {
+                var closeBraceTrivia = typeDecl.CloseBraceToken.LeadingTrivia.ToList();
+                int braceDepth = 0;
+                foreach (var trivia in closeBraceTrivia)
+                {
+                    if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+                    {
+                        braceDepth++;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+                    {
+                        if (braceDepth > 0) { braceDepth--; continue; }
+                        scanDepth--;
+                        if (scanDepth == 0)
+                        {
+                            endIdx = members.Count;
+                            break;
+                        }
+                    }
+                    else if (braceDepth > 0)
+                    {
+                        continue;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.ElifDirectiveTrivia))
+                    {
+                        stmtBranches.Add(new PreprocessorBranch
+                        {
+                            Condition = currentCondition,
+                            DisabledText = null,
+                            IsActive = true
+                        });
+                        if (trivia.GetStructure() is ElifDirectiveTriviaSyntax elifDir)
+                            currentCondition = elifDir.Condition.ToString();
+                        else
+                            currentCondition = "ELIF";
+                        currentDisabled = null;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.ElseDirectiveTrivia))
+                    {
+                        stmtBranches.Add(new PreprocessorBranch
+                        {
+                            Condition = currentCondition,
+                            DisabledText = null,
+                            IsActive = true
+                        });
+                        currentCondition = null;
+                        currentDisabled = null;
+                    }
+                    else if (trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                    {
+                        currentDisabled = trivia.ToString();
+                    }
+                }
+            }
+            memberFoundEnd:
+
+            // If there's accumulated disabled text that hasn't been added as a branch
+            // (no #elif/#else transition happened), add it now
+            if (stmtBranches.Count == 0 && currentDisabled != null)
+            {
+                // Simple #if with all disabled text, no #elif/#else
+                stmtBranches.Add(new PreprocessorBranch
+                {
+                    Condition = currentCondition,
+                    DisabledText = currentDisabled,
+                    IsActive = false
+                });
+            }
+            else
+            {
+                bool activeAlreadyAdded = stmtBranches.Any(b => b.IsActive);
+                if (!activeAlreadyAdded)
+                {
+                    stmtBranches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = null,
+                        IsActive = true
+                    });
+                }
+                else if (currentDisabled != null)
+                {
+                    stmtBranches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = currentDisabled,
+                        IsActive = false
+                    });
+                }
+            }
+
+            regions.Add(new PreprocessorRegion
+            {
+                ActiveStart = i,
+                ActiveEnd = endIdx,
+                Branches = stmtBranches
+            });
+
+            // Advance past the region; when endIdx == i (no active members), stay at i
+            // so the for loop increment advances to i+1
+            i = Math.Max(i, endIdx - 1);
+        }
+
+        // Check close brace for #if with no parsed members (everything disabled)
+        {
+            var closeBraceTrivia = typeDecl.CloseBraceToken.LeadingTrivia.ToList();
+            string? ifCondition = null;
+            string? currentCond = null;
+            string? currentDis = null;
+            var branches = new List<PreprocessorBranch>();
+            int braceDepth = 0;
+
+            foreach (var trivia in closeBraceTrivia)
+            {
+                if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+                {
+                    if (braceDepth == 0 && ifCondition == null)
+                    {
+                        if (trivia.GetStructure() is IfDirectiveTriviaSyntax ifDir)
+                            ifCondition = ifDir.Condition.ToString();
+                        currentCond = ifCondition;
+                        currentDis = null;
+                    }
+                    braceDepth++;
+                }
+                else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+                {
+                    braceDepth--;
+                    if (braceDepth == 0 && ifCondition != null)
+                    {
+                        branches.Add(new PreprocessorBranch
+                        {
+                            Condition = currentCond,
+                            DisabledText = currentDis,
+                            IsActive = false
+                        });
+                        regions.Add(new PreprocessorRegion
+                        {
+                            ActiveStart = members.Count,
+                            ActiveEnd = members.Count,
+                            Branches = branches
+                        });
+                        ifCondition = null;
+                        branches = new List<PreprocessorBranch>();
+                    }
+                }
+                else if (braceDepth != 1 || ifCondition == null)
+                {
+                    continue;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElifDirectiveTrivia))
+                {
+                    branches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCond,
+                        DisabledText = currentDis,
+                        IsActive = false
+                    });
+                    if (trivia.GetStructure() is ElifDirectiveTriviaSyntax elifDir)
+                        currentCond = elifDir.Condition.ToString();
+                    else
+                        currentCond = "ELIF";
+                    currentDis = null;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElseDirectiveTrivia))
+                {
+                    branches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCond,
+                        DisabledText = currentDis,
+                        IsActive = false
+                    });
+                    currentCond = null;
+                    currentDis = null;
+                }
+                else if (trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                {
+                    currentDis = trivia.ToString();
+                }
+            }
+        }
+
+        return regions;
+    }
+
+    /// <summary>
+    /// Parses disabled text (from an inactive preprocessor branch) as class members
+    /// and converts them to typed member lists for MemberPreprocessorBlockNode.
+    /// </summary>
+    private (List<ClassFieldNode> fields, List<PropertyNode> properties, List<ConstructorNode> constructors,
+             List<MethodNode> methods, List<EventDefinitionNode> events, List<OperatorOverloadNode> operatorOverloads)
+        ConvertDisabledMemberText(string disabledText)
+    {
+        var fields = new List<ClassFieldNode>();
+        var properties = new List<PropertyNode>();
+        var constructors = new List<ConstructorNode>();
+        var methods = new List<MethodNode>();
+        var events = new List<EventDefinitionNode>();
+        var operatorOverloads = new List<OperatorOverloadNode>();
+
+        var wrapper = $"class _PP {{ {disabledText} }}";
+        try
+        {
+            var tree = CSharpSyntaxTree.ParseText(wrapper);
+            var root = tree.GetCompilationUnitRoot();
+            var classDecl = root.DescendantNodes()
+                .OfType<ClassDeclarationSyntax>()
+                .FirstOrDefault();
+            if (classDecl == null) return (fields, properties, constructors, methods, events, operatorOverloads);
+
+            foreach (var member in classDecl.Members)
+            {
+                try
+                {
+                    ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
+                }
+                catch
+                {
+                    // Preserve unconvertible members as a method with fallback comment body
+                    var fallbackId = _context.GenerateId("m");
+                    var fallbackBody = new List<StatementNode>
+                    {
+                        new FallbackCommentNode(TextSpan.Empty, member.ToString().Trim(), "preprocessor-disabled",
+                            "Member in disabled preprocessor branch could not be converted")
+                    };
+                    methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
+                        Visibility.Private, MethodModifiers.None,
+                        Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
+                        null, null, Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(),
+                        fallbackBody, new AttributeCollection()));
+                }
+            }
+        }
+        catch
+        {
+            // If the disabled text can't be parsed at all, preserve it as a fallback method
+            var fallbackId = _context.GenerateId("m");
+            var fallbackBody = new List<StatementNode>
+            {
+                new FallbackCommentNode(TextSpan.Empty, disabledText.Trim(), "preprocessor-disabled",
+                    "Disabled preprocessor text could not be parsed as class members")
+            };
+            methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
+                Visibility.Private, MethodModifiers.None,
+                Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
+                null, null, Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(),
+                fallbackBody, new AttributeCollection()));
+        }
+
+        return (fields, properties, constructors, methods, events, operatorOverloads);
+    }
+
+    /// <summary>
+    /// Builds a (potentially nested) MemberPreprocessorBlockNode from an ordered list of branches.
+    /// Same right-to-left nesting strategy as BuildPreprocessorNode.
+    /// </summary>
+    private MemberPreprocessorBlockNode BuildMemberPreprocessorNode(
+        TextSpan span,
+        List<PreprocessorBranch> branches,
+        List<ClassFieldNode> activeFields,
+        List<PropertyNode> activeProperties,
+        List<ConstructorNode> activeConstructors,
+        List<MethodNode> activeMethods,
+        List<EventDefinitionNode> activeEvents,
+        List<OperatorOverloadNode> activeOperatorOverloads)
+    {
+        if (branches.Count == 0)
+        {
+            return new MemberPreprocessorBlockNode(span, "UNKNOWN",
+                activeFields, activeProperties, activeConstructors,
+                activeMethods, activeEvents, activeOperatorOverloads);
+        }
+
+        // Convert each branch's body
+        var convertedBodies = new List<(string? condition, List<ClassFieldNode> fields, List<PropertyNode> properties,
+            List<ConstructorNode> constructors, List<MethodNode> methods,
+            List<EventDefinitionNode> events, List<OperatorOverloadNode> operatorOverloads)>();
+
+        foreach (var branch in branches)
+        {
+            if (branch.IsActive)
+            {
+                convertedBodies.Add((branch.Condition, activeFields, activeProperties,
+                    activeConstructors, activeMethods, activeEvents, activeOperatorOverloads));
+            }
+            else if (branch.DisabledText != null)
+            {
+                var (fields, properties, constructors, methods, events, operatorOverloads) =
+                    ConvertDisabledMemberText(branch.DisabledText);
+                convertedBodies.Add((branch.Condition, fields, properties, constructors, methods, events, operatorOverloads));
+            }
+            else
+            {
+                convertedBodies.Add((branch.Condition, new List<ClassFieldNode>(), new List<PropertyNode>(),
+                    new List<ConstructorNode>(), new List<MethodNode>(),
+                    new List<EventDefinitionNode>(), new List<OperatorOverloadNode>()));
+            }
+        }
+
+        // Build nested structure from right to left
+        MemberPreprocessorBlockNode? currentElse = null;
+
+        for (int idx = convertedBodies.Count - 1; idx >= 1; idx--)
+        {
+            var (condition, fields, properties, constructors, methods, events, operatorOverloads) = convertedBodies[idx];
+            if (condition == null)
+            {
+                // #else branch — becomes the innermost else (empty condition)
+                currentElse = new MemberPreprocessorBlockNode(span, "",
+                    fields, properties, constructors, methods, events, operatorOverloads);
+            }
+            else
+            {
+                // #elif branch — wrap in a new MemberPreprocessorBlockNode
+                var elifNode = new MemberPreprocessorBlockNode(span, condition,
+                    fields, properties, constructors, methods, events, operatorOverloads, currentElse);
+                currentElse = elifNode;
+            }
+        }
+
+        // Build the outermost #if node
+        var first = convertedBodies[0];
+        return new MemberPreprocessorBlockNode(span, first.condition ?? "IF",
+            first.fields, first.properties, first.constructors,
+            first.methods, first.events, first.operatorOverloads, currentElse);
+    }
+
     private IReadOnlyList<StatementNode> ConvertBlock(BlockSyntax block)
     {
         var statements = new List<StatementNode>();
 
-        foreach (var statement in block.Statements)
+        // Extract preprocessor regions from trivia
+        var ppRegions = ExtractPreprocessorRegions(block);
+        var ppRegionsByStart = new Dictionary<int, PreprocessorRegion>();
+        var ppCoveredIndices = new HashSet<int>();
+        foreach (var region in ppRegions)
         {
+            ppRegionsByStart.TryAdd(region.ActiveStart, region);
+            for (int idx = region.ActiveStart; idx < region.ActiveEnd; idx++)
+                ppCoveredIndices.Add(idx);
+        }
+
+        for (int stmtIndex = 0; stmtIndex < block.Statements.Count; stmtIndex++)
+        {
+            // Handle preprocessor regions
+            if (ppRegionsByStart.TryGetValue(stmtIndex, out var ppRegion))
+            {
+                _context.RecordFeatureUsage("preprocessor-directive");
+                var span = ppRegion.ActiveStart < block.Statements.Count
+                    ? GetTextSpan(block.Statements[ppRegion.ActiveStart])
+                    : TextSpan.Empty;
+
+                // Convert active (parsed) body statements
+                var activeStatements = new List<StatementNode>();
+                for (int bi = ppRegion.ActiveStart; bi < ppRegion.ActiveEnd; bi++)
+                {
+                    var ppConverted = ConvertStatement(block.Statements[bi]);
+                    if (ppConverted != null) activeStatements.Add(ppConverted);
+                }
+
+                statements.Add(BuildPreprocessorNode(span, ppRegion.Branches, activeStatements));
+
+                // Skip past the region
+                stmtIndex = ppRegion.ActiveEnd - 1; // loop will increment
+                continue;
+            }
+
+            // Skip indices covered by a preprocessor region (shouldn't happen due to skip above, but safety)
+            if (ppCoveredIndices.Contains(stmtIndex))
+                continue;
+
+            var statement = block.Statements[stmtIndex];
+
             // Clear pending statements before each statement conversion.
             // Expression-level chain hoisting in ConvertInvocationExpression may add
             // temp bind statements here; they must be flushed before the containing statement.
@@ -1268,8 +2276,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && IsChainedInvocation(chainInit)
                 && !WouldChainUseNativeOps(chainInit))
             {
-                statements.AddRange(DecomposeChainedLocalDeclaration(chainDecl));
+                // CollectChainSteps may hoist lambdas to _pendingStatements;
+                // flush them before the chain binds so they are defined in order.
+                var localChainResults = DecomposeChainedLocalDeclaration(chainDecl);
                 FlushPendingStatements(statements);
+                statements.AddRange(localChainResults);
                 continue;
             }
 
@@ -1280,8 +2291,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && IsChainedInvocation(chainExpr)
                 && !WouldChainUseNativeOps(chainExpr))
             {
-                statements.AddRange(DecomposeChainedExpressionStatement(exprStmt));
+                // CollectChainSteps may hoist lambdas to _pendingStatements;
+                // flush them before the chain binds so they are defined in order.
+                var exprChainResults = DecomposeChainedExpressionStatement(exprStmt);
                 FlushPendingStatements(statements);
+                statements.AddRange(exprChainResults);
                 continue;
             }
 
@@ -1292,8 +2306,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && IsChainedInvocation(returnChain)
                 && !WouldChainUseNativeOps(returnChain))
             {
-                statements.AddRange(DecomposeChainedReturnStatement(returnStmt));
+                // CollectChainSteps may hoist lambdas to _pendingStatements;
+                // flush them before the chain binds so they are defined in order.
+                var chainResults = DecomposeChainedReturnStatement(returnStmt);
                 FlushPendingStatements(statements);
+                statements.AddRange(chainResults);
                 continue;
             }
 
@@ -1360,6 +2377,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 continue;
             }
 
+            // Handle lock statements: comment before body (correct semantic order)
+            if (statement is LockStatementSyntax lockStmt)
+            {
+                statements.AddRange(ConvertLockStatements(lockStmt));
+                FlushPendingStatements(statements);
+                continue;
+            }
+
+            // Handle checked/unchecked statements: comment before body
+            if (statement is CheckedStatementSyntax checkedStmt)
+            {
+                statements.AddRange(ConvertCheckedStatements(checkedStmt));
+                FlushPendingStatements(statements);
+                continue;
+            }
+
+            // Handle for statements: initializers before while (for non-standard patterns)
+            if (statement is ForStatementSyntax forStmt)
+            {
+                statements.AddRange(ConvertForStatements(forStmt));
+                FlushPendingStatements(statements);
+                continue;
+            }
+
             var converted = ConvertStatement(statement);
             if (converted != null)
             {
@@ -1367,6 +2408,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 FlushPendingStatements(statements);
                 statements.Add(converted);
             }
+        }
+
+        // Handle preprocessor regions with no parsed statements (entirely disabled text on close brace)
+        if (ppRegionsByStart.TryGetValue(block.Statements.Count, out var trailingPP))
+        {
+            _context.RecordFeatureUsage("preprocessor-directive");
+            statements.Add(BuildPreprocessorNode(TextSpan.Empty, trailingPP.Branches, new List<StatementNode>()));
         }
 
         return statements;
@@ -1478,41 +2526,55 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private StatementNode ConvertLockStatement(LockStatementSyntax node)
     {
+        // Delegate to multi-statement version; return first element for backward compat
+        var results = ConvertLockStatements(node);
+        return results[0];
+    }
+
+    private List<StatementNode> ConvertLockStatements(LockStatementSyntax node)
+    {
         _context.RecordFeatureUsage("lock");
         _context.IncrementConverted();
 
-        // Calor doesn't have a lock construct, so we preserve the body statements
-        // with a comment annotation indicating the lock
+        var result = new List<StatementNode>();
+
+        // Comment first (correct semantic order: annotation before body)
+        var lockExpr = node.Expression.ToString();
+        result.Add(new FallbackCommentNode(GetTextSpan(node), $"lock({lockExpr})", "lock", "Lock semantics are preserved but lock keyword is not emitted"));
+
+        // Then body statements
         var bodyStatements = node.Statement is BlockSyntax block
             ? ConvertBlock(block)
             : new List<StatementNode> { ConvertStatement(node.Statement)! };
+        result.AddRange(bodyStatements);
 
-        // Add body statements to pending so they're emitted inline
-        foreach (var stmt in bodyStatements)
-        {
-            _pendingStatements.Add(stmt);
-        }
-
-        // Return a fallback comment node indicating the lock
-        var lockExpr = node.Expression.ToString();
-        return new FallbackCommentNode(GetTextSpan(node), $"lock({lockExpr})", "lock", "Lock semantics are preserved but lock keyword is not emitted");
+        return result;
     }
 
     private StatementNode ConvertCheckedStatement(CheckedStatementSyntax node)
     {
+        // Delegate to multi-statement version; return first element for backward compat
+        var results = ConvertCheckedStatements(node);
+        return results[0];
+    }
+
+    private List<StatementNode> ConvertCheckedStatements(CheckedStatementSyntax node)
+    {
         _context.RecordFeatureUsage("checked-block");
         _context.IncrementConverted();
 
-        // Strip the checked/unchecked wrapper and convert the body statements
-        var bodyStatements = ConvertBlock(node.Block);
-        foreach (var stmt in bodyStatements)
-        {
-            _pendingStatements.Add(stmt);
-        }
+        var result = new List<StatementNode>();
 
+        // Comment first (correct semantic order: annotation before body)
         var keyword = node.IsKind(SyntaxKind.CheckedStatement) ? "checked" : "unchecked";
-        return new FallbackCommentNode(GetTextSpan(node), keyword, "checked-block",
-            "Checked/unchecked semantics stripped; handle overflow manually if needed");
+        result.Add(new FallbackCommentNode(GetTextSpan(node), keyword, "checked-block",
+            "Checked/unchecked semantics stripped; handle overflow manually if needed"));
+
+        // Then body statements
+        var bodyStatements = ConvertBlock(node.Block);
+        result.AddRange(bodyStatements);
+
+        return result;
     }
 
     /// <summary>
@@ -2048,6 +3110,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .ToList();
             var span = GetTextSpan(current);
 
+            // Hoist lambda arguments to temp bindings — prevents §LAM nesting inside §C
+            for (int i = 0; i < args.Count; i++)
+            {
+                if (args[i] is LambdaExpressionNode)
+                {
+                    var tempName = _context.GenerateId("_lam");
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, tempName, null, false, args[i], new AttributeCollection()));
+                    args[i] = new ReferenceNode(args[i].Span, tempName);
+                }
+            }
+
             if (memberAccess.Expression is InvocationExpressionSyntax inner)
             {
                 // Intermediate step — target comes from previous chain step
@@ -2335,13 +3409,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection());
     }
 
+    /// <summary>
+    /// Single-statement entry point for ConvertStatement switch dispatch.
+    /// Used when for-loops appear as non-block bodies (e.g., if (x) for (...) ...).
+    /// ConvertBlock uses ConvertForStatements directly for correct ordering.
+    /// </summary>
     private StatementNode ConvertForStatement(ForStatementSyntax node)
+    {
+        var results = ConvertForStatements(node);
+        for (int i = 0; i < results.Count - 1; i++)
+            _pendingStatements.Add(results[i]);
+        return results[results.Count - 1];
+    }
+
+    private List<StatementNode> ConvertForStatements(ForStatementSyntax node)
     {
         _context.RecordFeatureUsage("for");
         _context.IncrementConverted();
 
         var id = _context.GenerateId("for");
         var span = GetTextSpan(node);
+        var result = new List<StatementNode>();
 
         // Try to extract standard for loop pattern: for (var i = from; i <= to; i += step)
         var varName = (string?)null;
@@ -2353,6 +3441,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Extract variable name and initial value from declaration
         if (node.Declaration?.Variables.Count > 0)
         {
+            if (node.Declaration.Variables.Count > 1)
+            {
+                isStandard = false; // Multiple variables — non-standard
+            }
             var decl = node.Declaration.Variables[0];
             varName = decl.Identifier.Text;
             if (decl.Initializer != null)
@@ -2386,6 +3478,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // Extract step from incrementors
+        if (node.Incrementors.Count > 1)
+        {
+            isStandard = false; // Multiple incrementors — non-standard
+        }
         if (node.Incrementors.Count > 0)
         {
             var incrementor = node.Incrementors[0];
@@ -2416,7 +3512,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var whileBody = new List<StatementNode>();
 
-            // Prepend initializer(s) as statements before the while
+            // Prepend initializer(s) directly to result (before the while loop)
             if (node.Declaration != null)
             {
                 foreach (var variable in node.Declaration.Variables)
@@ -2424,7 +3520,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     var initExpr = variable.Initializer != null
                         ? ConvertExpression(variable.Initializer.Value)
                         : new ReferenceNode(span, "default");
-                    _pendingStatements.Add(new BindStatementNode(
+                    result.Add(new BindStatementNode(
                         span, variable.Identifier.Text,
                         TypeMapper.CSharpToCalor(node.Declaration.Type.ToString()),
                         true, initExpr, new AttributeCollection()));
@@ -2435,7 +3531,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 foreach (var init in node.Initializers)
                 {
                     var initStmt = ConvertExpressionToStatement(init, span);
-                    if (initStmt != null) _pendingStatements.Add(initStmt);
+                    if (initStmt != null) result.Add(initStmt);
                 }
             }
 
@@ -2451,10 +3547,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ? ConvertExpression(node.Condition)
                 : new BoolLiteralNode(span, true);
 
-            return new WhileStatementNode(span, id, condition, whileBody, new AttributeCollection());
+            result.Add(new WhileStatementNode(span, id, condition, whileBody, new AttributeCollection()));
+            return result;
         }
 
-        return new ForStatementNode(
+        result.Add(new ForStatementNode(
             span,
             id,
             varName ?? "i",
@@ -2462,7 +3559,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             to ?? new IntLiteralNode(TextSpan.Empty, 10),
             step,
             body,
-            new AttributeCollection());
+            new AttributeCollection()));
+        return result;
     }
 
     private ForeachStatementNode ConvertForEachStatement(ForEachStatementSyntax node)
@@ -3497,12 +4595,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(a => ConvertExpression(a.Expression))
             .ToList();
 
-        // Hoist §NEW arguments to temp bindings — the parser cannot handle §NEW nested inside §C
+        // Hoist §NEW and §LAM arguments to temp bindings — the parser cannot handle them nested inside §C
         for (int i = 0; i < args.Count; i++)
         {
             if (args[i] is NewExpressionNode)
             {
                 var tempName = _context.GenerateId("_new");
+                _pendingStatements.Add(new BindStatementNode(
+                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                args[i] = new ReferenceNode(args[i].Span, tempName);
+            }
+            else if (args[i] is LambdaExpressionNode)
+            {
+                var tempName = _context.GenerateId("_lam");
                 _pendingStatements.Add(new BindStatementNode(
                     args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                 args[i] = new ReferenceNode(args[i].Span, tempName);

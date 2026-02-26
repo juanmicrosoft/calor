@@ -239,6 +239,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(RawCSharpNode node) => DefaultVisit(node)!;
     public virtual T Visit(RawCSharpExpressionNode node) => DefaultVisit(node)!;
     public virtual T Visit(PreprocessorDirectiveNode node) => DefaultVisit(node)!;
+    public virtual T Visit(MemberPreprocessorBlockNode node) => DefaultVisit(node)!;
     public virtual T Visit(CSharpInteropBlockNode node) => DefaultVisit(node)!;
     // Unsafe/low-level nodes
     public virtual T Visit(StackAllocNode node) => DefaultVisit(node)!;
@@ -250,4 +251,10 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Multidimensional arrays
     public virtual T Visit(MultiDimArrayCreationNode node) => DefaultVisit(node)!;
     public virtual T Visit(MultiDimArrayAccessNode node) => DefaultVisit(node)!;
+    // Dependent Types: Refinement Types and Proof Obligations
+    public virtual T Visit(RefinementTypeNode node) => DefaultVisit(node)!;
+    public virtual T Visit(SelfRefNode node) => DefaultVisit(node)!;
+    public virtual T Visit(ProofObligationNode node) => DefaultVisit(node)!;
+    // Dependent Types: Indexed Types (size-parameterized)
+    public virtual T Visit(IndexedTypeNode node) => DefaultVisit(node)!;
 }

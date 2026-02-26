@@ -436,6 +436,15 @@ This function is pure (no `§E` declaration) even though the precondition might 
 
 ---
 
+## See Also: Refinement Types
+
+Contracts define what a function requires and guarantees. **Refinement types** extend this idea to the type level — instead of writing `§Q (>= x 0)` at the function, you declare `§I{i32:x} | (>= # INT:0)` on the parameter itself. The constraint becomes part of the type, and the obligation engine verifies it automatically.
+
+- [Refinement Types](/calor/syntax-reference/refinement-types/) — Type-level constraints with `§RTYPE`, inline `|`, and `§PROOF`
+- [Dependent Types Tutorial](/calor/guides/dependent-types-tutorial/) — Progressive walkthrough
+
+---
+
 ## Next
 
 - [Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/) - Why this matters

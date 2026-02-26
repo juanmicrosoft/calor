@@ -124,6 +124,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit refinement type definitions
+        foreach (var rtype in node.RefinementTypes)
+        {
+            Visit(rtype);
+        }
+
+        // Emit indexed type definitions
+        foreach (var itype in node.IndexedTypes)
+        {
+            Visit(itype);
+        }
+
         // Emit module-level functions
         foreach (var func in node.Functions)
         {
@@ -198,7 +210,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// </summary>
     private string? TryFormatInlineParams(IReadOnlyList<ParameterNode> parameters)
     {
-        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null))
+        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null || p.InlineRefinement != null))
             return null;
 
         return string.Join(", ", parameters.Select(p =>
@@ -341,6 +353,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var interop in node.InteropBlocks)
         {
             Visit(interop);
+            AppendLine();
+        }
+
+        // Emit preprocessor blocks
+        foreach (var ppBlock in node.PreprocessorBlocks)
+        {
+            Visit(ppBlock);
             AppendLine();
         }
 
@@ -713,6 +732,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
         var result = $"§I{{{typeName}:{node.Name}{modStr}}}{attrs}";
+        if (node.InlineRefinement != null)
+        {
+            var predicate = node.InlineRefinement.Predicate.Accept(this);
+            result += $" | {predicate}";
+        }
         if (node.DefaultValue != null)
         {
             result += $" = {node.DefaultValue.Accept(this)}";
@@ -1687,7 +1711,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var array = node.Array.Accept(this);
         var index = node.Index.Accept(this);
-        // Use §IDX syntax for element access (no braces — parser expects space-separated)
+        if (node.Array is ReferenceNode)
+            return $"§IDX{{{array}}} {index}";
         return $"§IDX {array} {index}";
     }
 
@@ -2578,6 +2603,38 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(MemberPreprocessorBlockNode node)
+    {
+        AppendLine($"§PP{{{node.Condition}}}");
+        EmitMemberPreprocessorMembers(node);
+        if (node.ElseBranch != null)
+        {
+            AppendLine("§PPE");
+            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
+            {
+                // #elif chain — emit as nested §PP{cond} inside the else
+                Visit(node.ElseBranch);
+            }
+            else
+            {
+                // #else — emit members directly
+                EmitMemberPreprocessorMembers(node.ElseBranch);
+            }
+        }
+        AppendLine($"§/PP{{{node.Condition}}}");
+        return "";
+    }
+
+    private void EmitMemberPreprocessorMembers(MemberPreprocessorBlockNode node)
+    {
+        foreach (var field in node.Fields) Visit(field);
+        foreach (var prop in node.Properties) Visit(prop);
+        foreach (var ctor in node.Constructors) Visit(ctor);
+        foreach (var method in node.Methods) { Visit(method); AppendLine(); }
+        foreach (var op in node.OperatorOverloads) { Visit(op); AppendLine(); }
+        foreach (var evt in node.Events) Visit(evt);
+    }
+
     public string Visit(CSharpInteropBlockNode node)
     {
         AppendLine($"§CSHARP{{{node.CSharpCode}}}§/CSHARP");
@@ -2677,5 +2734,40 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var array = node.Array.Accept(this);
         var indices = string.Join(" ", node.Indices.Select(i => i.Accept(this)));
         return $"§IDX2D {array} {indices}";
+    }
+
+    // Dependent Types: Refinement Types and Proof Obligations
+
+    public string Visit(RefinementTypeNode node)
+    {
+        var predicate = node.Predicate.Accept(this);
+        AppendLine($"§RTYPE{{{node.Id}:{node.Name}:{node.BaseTypeName}}} {predicate}");
+        return "";
+    }
+
+    public string Visit(SelfRefNode node)
+    {
+        return "#";
+    }
+
+    public string Visit(ProofObligationNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        var desc = node.Description != null ? $":{node.Description}" : "";
+        AppendLine($"§PROOF{{{node.Id}{desc}}} {condition}");
+        return "";
+    }
+
+    public string Visit(IndexedTypeNode node)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"§ITYPE{{{node.Id}:{node.Name}:{node.BaseTypeName}:{node.SizeParam}}}");
+        if (node.Constraint != null)
+        {
+            var constraint = node.Constraint.Accept(this);
+            sb.Append($" {constraint}");
+        }
+        AppendLine(sb.ToString());
+        return "";
     }
 }
