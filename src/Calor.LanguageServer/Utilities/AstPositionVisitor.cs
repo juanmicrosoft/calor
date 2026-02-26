@@ -239,6 +239,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(RawCSharpNode node) => DefaultVisit(node)!;
     public virtual T Visit(RawCSharpExpressionNode node) => DefaultVisit(node)!;
     public virtual T Visit(PreprocessorDirectiveNode node) => DefaultVisit(node)!;
+    public virtual T Visit(MemberPreprocessorBlockNode node) => DefaultVisit(node)!;
     public virtual T Visit(CSharpInteropBlockNode node) => DefaultVisit(node)!;
     // Unsafe/low-level nodes
     public virtual T Visit(StackAllocNode node) => DefaultVisit(node)!;

@@ -193,6 +193,50 @@ public sealed class PreprocessorDirectiveNode : StatementNode
 }
 
 /// <summary>
+/// Represents a preprocessor conditional block wrapping class members.
+/// §PP{CONDITION}
+///   ... fields, properties, methods, etc. ...
+/// §PPE (optional else/elif)
+/// §/PP{CONDITION}
+/// </summary>
+public sealed class MemberPreprocessorBlockNode : AstNode
+{
+    public string Condition { get; }
+    public IReadOnlyList<ClassFieldNode> Fields { get; }
+    public IReadOnlyList<PropertyNode> Properties { get; }
+    public IReadOnlyList<ConstructorNode> Constructors { get; }
+    public IReadOnlyList<MethodNode> Methods { get; }
+    public IReadOnlyList<EventDefinitionNode> Events { get; }
+    public IReadOnlyList<OperatorOverloadNode> OperatorOverloads { get; }
+    public MemberPreprocessorBlockNode? ElseBranch { get; }
+
+    public MemberPreprocessorBlockNode(
+        TextSpan span,
+        string condition,
+        IReadOnlyList<ClassFieldNode> fields,
+        IReadOnlyList<PropertyNode> properties,
+        IReadOnlyList<ConstructorNode> constructors,
+        IReadOnlyList<MethodNode> methods,
+        IReadOnlyList<EventDefinitionNode> events,
+        IReadOnlyList<OperatorOverloadNode> operatorOverloads,
+        MemberPreprocessorBlockNode? elseBranch = null)
+        : base(span)
+    {
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        Fields = fields ?? Array.Empty<ClassFieldNode>();
+        Properties = properties ?? Array.Empty<PropertyNode>();
+        Constructors = constructors ?? Array.Empty<ConstructorNode>();
+        Methods = methods ?? Array.Empty<MethodNode>();
+        Events = events ?? Array.Empty<EventDefinitionNode>();
+        OperatorOverloads = operatorOverloads ?? Array.Empty<OperatorOverloadNode>();
+        ElseBranch = elseBranch;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Kind of C# member preserved in an interop block.
 /// </summary>
 public enum InteropMemberKind
