@@ -200,7 +200,8 @@ public class CSharpToCalorConversionTests
         Assert.Single(result.Ast.Functions);
 
         var mainFunc = result.Ast.Functions[0];
-        Assert.Equal(2, mainFunc.Body.Count);
+        // 3 statements: numbers bind, lambda temp bind, doubled bind
+        Assert.Equal(3, mainFunc.Body.Count);
     }
 
     [Fact]

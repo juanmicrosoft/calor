@@ -791,6 +791,247 @@ public class Test
 
     #endregion
 
+    #region Bug: Enum pattern var prefix (Humanizer gap)
+
+    [Fact]
+    public void EmitPattern_DottedIdentifier_NoVarPrefix()
+    {
+        // VariablePatternNode("Status.OK") should emit "Status.OK", not "var Status.OK"
+        var node = new Ast.VariablePatternNode(Parsing.TextSpan.Empty, "Status.OK");
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+
+        Assert.Equal("Status.OK", result);
+        Assert.DoesNotContain("var", result);
+    }
+
+    [Fact]
+    public void EmitPattern_SimpleVariable_StillGetsVarPrefix()
+    {
+        // VariablePatternNode("x") should still emit "var x"
+        var node = new Ast.VariablePatternNode(Parsing.TextSpan.Empty, "x");
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+
+        Assert.Equal("var x", result);
+    }
+
+    [Fact]
+    public void EmitPattern_DottedEnumInMatchExpression_ValidCSharp()
+    {
+        // Full match expression with dotted enum case and wildcard
+        var span = Parsing.TextSpan.Empty;
+        var matchExpr = new Ast.MatchExpressionNode(
+            span, "m1",
+            new Ast.ReferenceNode(span, "status"),
+            new List<Ast.MatchCaseNode>
+            {
+                new(span,
+                    new Ast.VariablePatternNode(span, "Status.OK"),
+                    null,
+                    new List<Ast.StatementNode>
+                    {
+                        new Ast.ReturnStatementNode(span, new Ast.StringLiteralNode(span, "ok"))
+                    }),
+                new(span,
+                    new Ast.WildcardPatternNode(span),
+                    null,
+                    new List<Ast.StatementNode>
+                    {
+                        new Ast.ReturnStatementNode(span, new Ast.StringLiteralNode(span, "other"))
+                    })
+            },
+            new Ast.AttributeCollection());
+
+        var emitter = new CSharpEmitter();
+        var result = matchExpr.Accept(emitter);
+
+        Assert.Contains("Status.OK", result);
+        Assert.DoesNotContain("var Status.OK", result);
+    }
+
+    [Fact]
+    public void Parser_DottedIdentifierInPattern_ParsesAsConstant()
+    {
+        // §K Status.OK in Calor source should parse correctly and emit Status.OK in C#
+        var source = @"
+§M{m1:Test}
+§F{f001:Describe:pub}
+  §I{i32:status}
+  §O{str}
+  §R §W{m1} status
+    §K Status.OK → ""ok""
+    §K Status.Error → ""error""
+    §K _ → ""unknown""
+  §/W{m1}
+§/F{f001}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+
+        Assert.Contains("Status.OK", result);
+        Assert.Contains("Status.Error", result);
+        Assert.DoesNotContain("var Status.OK", result);
+        Assert.DoesNotContain("var Status.Error", result);
+    }
+
+    [Fact]
+    public void RoundTrip_EnumSwitchExpression_ProducesValidCSharp()
+    {
+        // Full C# → Calor → C# round-trip with enum switch expression
+        var csharp = @"
+public enum Status { OK, Error, Pending }
+public class Test
+{
+    public string Describe(Status s)
+    {
+        return s switch
+        {
+            Status.OK => ""ok"",
+            Status.Error => ""error"",
+            _ => ""unknown""
+        };
+    }
+}";
+        var output = ConvertAndRoundTrip(csharp);
+
+        Assert.Contains("Status.OK", output);
+        Assert.Contains("Status.Error", output);
+        Assert.DoesNotContain("var Status", output);
+    }
+
+    #endregion
+
+    #region Bug: §IDX brace syntax round-trip (Humanizer gap)
+
+    [Fact]
+    public void IDX_SimpleRef_ParsesAndEmitsValidCSharp()
+    {
+        var source = @"
+§M{m1:Test}
+§F{f001:Main:pub}
+  §O{void}
+  §B{~result:str} §IDX{words} 0
+§/F{f001}
+§/M{m1}
+";
+        var result = ParseAndEmit(source);
+        Assert.Contains("words[0]", result);
+    }
+
+    [Fact]
+    public void IDX_CalorEmitter_EmitsBraceSyntaxForSimpleRef()
+    {
+        var span = Parsing.TextSpan.Empty;
+        var arrayAccess = new Ast.ArrayAccessNode(
+            span,
+            new Ast.ReferenceNode(span, "words"),
+            new Ast.IntLiteralNode(span, 0));
+
+        var calorEmitter = new CalorEmitter();
+        var calorOutput = arrayAccess.Accept(calorEmitter);
+
+        Assert.Equal("§IDX{words} 0", calorOutput);
+    }
+
+    [Fact]
+    public void IDX_CSharpIndexer_RoundTrips()
+    {
+        var csharp = @"
+public class Test
+{
+    public string GetFirst(string[] words)
+    {
+        return words[0];
+    }
+}";
+        var output = ConvertAndRoundTrip(csharp);
+        Assert.Contains("words[0]", output);
+    }
+
+    #endregion
+
+    #region Bug: Lambda hoisting in converter (Humanizer gap)
+
+    [Fact]
+    public void Lambda_InMethodCall_ConvertsWithoutCrash()
+    {
+        var csharp = @"
+using System.Linq;
+public class Test
+{
+    public int[] Double(int[] numbers)
+    {
+        return numbers.Select(x => x * 2).ToArray();
+    }
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.NotNull(calor);
+
+        // Lambda should be hoisted to a temp binding
+        Assert.Contains("_lam", calor);
+    }
+
+    [Fact]
+    public void Lambda_LinqChain_ConvertsWithoutCrash()
+    {
+        var csharp = @"
+using System.Linq;
+public class Test
+{
+    public int[] FilterAndDouble(int[] numbers)
+    {
+        return numbers.Where(x => x > 0).Select(x => x * 2).ToArray();
+    }
+}";
+        var calor = ConvertToCalor(csharp);
+        Assert.NotNull(calor);
+
+        // Both lambdas should be hoisted
+        Assert.Contains("_lam", calor);
+    }
+
+    [Fact]
+    public void RoundTrip_Lambda_InMethodCall_ProducesValidCSharp()
+    {
+        var csharp = @"
+using System.Linq;
+public class Test
+{
+    public int[] Double(int[] numbers)
+    {
+        return numbers.Select(x => x * 2).ToArray();
+    }
+}";
+        var output = ConvertAndRoundTrip(csharp);
+
+        // Should produce a valid Select call with a lambda
+        Assert.Contains("Select(", output);
+        Assert.Contains("ToArray()", output);
+    }
+
+    [Fact]
+    public void RoundTrip_Lambda_LinqChain_ProducesValidCSharp()
+    {
+        var csharp = @"
+using System.Linq;
+public class Test
+{
+    public int[] FilterAndDouble(int[] numbers)
+    {
+        return numbers.Where(x => x > 0).Select(x => x * 2).ToArray();
+    }
+}";
+        var output = ConvertAndRoundTrip(csharp);
+
+        // Should produce valid chained calls
+        Assert.Contains("Where(", output);
+        Assert.Contains("Select(", output);
+        Assert.Contains("ToArray()", output);
+    }
+
+    #endregion
+
     #region Ternary Expression Round-Trip Tests
 
     [Fact]

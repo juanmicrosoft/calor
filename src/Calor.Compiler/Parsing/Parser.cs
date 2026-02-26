@@ -2740,6 +2740,20 @@ public sealed class Parser
             {
                 return new WildcardPatternNode(token.Span);
             }
+
+            // Handle dotted identifier (e.g., Status.OK — enum member constant)
+            if (Check(TokenKind.Dot))
+            {
+                var name = token.Text;
+                while (Check(TokenKind.Dot) && Peek(1).Kind == TokenKind.Identifier)
+                {
+                    Advance(); // consume .
+                    var next = Advance(); // consume identifier
+                    name += "." + next.Text;
+                }
+                return new ConstantPatternNode(token.Span, new ReferenceNode(token.Span, name));
+            }
+
             return new VariablePatternNode(token.Span, token.Text);
         }
 
