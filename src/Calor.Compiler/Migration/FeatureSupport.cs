@@ -234,9 +234,8 @@ public static class FeatureSupport
         ["attributes"] = new FeatureInfo
         {
             Name = "attributes",
-            Support = SupportLevel.Partial,
-            Description = "Attributes are converted to comments",
-            Workaround = "Add Calor metadata annotations manually if needed"
+            Support = SupportLevel.Full,
+            Description = "Attributes are preserved via [@Name] syntax with proper AST"
         },
         ["dynamic"] = new FeatureInfo
         {
@@ -264,9 +263,8 @@ public static class FeatureSupport
         ["generic-type-constraint"] = new FeatureInfo
         {
             Name = "generic-type-constraint",
-            Support = SupportLevel.NotSupported,
-            Description = "Generic type constraints (where T : class) are not supported",
-            Workaround = "Remove constraints or add runtime type checks"
+            Support = SupportLevel.Full,
+            Description = "Generic type constraints are supported via §WHERE syntax"
         },
         ["goto"] = new FeatureInfo
         {
@@ -377,16 +375,14 @@ public static class FeatureSupport
         ["range-expression"] = new FeatureInfo
         {
             Name = "range-expression",
-            Support = SupportLevel.NotSupported,
-            Description = "Range expressions (0..5, ..5, 5..) are not supported",
-            Workaround = "Use explicit loop bounds or Substring/Take methods"
+            Support = SupportLevel.Full,
+            Description = "Range expressions (0..5, ..5, 5..) are converted to §RANGE nodes"
         },
         ["index-from-end"] = new FeatureInfo
         {
             Name = "index-from-end",
-            Support = SupportLevel.NotSupported,
-            Description = "Index from end expressions (^1) are not supported",
-            Workaround = "Use array.Length - 1 instead of ^1"
+            Support = SupportLevel.Full,
+            Description = "Index from end expressions (^1) are converted to §^ nodes"
         },
         ["target-typed-new"] = new FeatureInfo
         {
@@ -405,9 +401,8 @@ public static class FeatureSupport
         ["named-argument"] = new FeatureInfo
         {
             Name = "named-argument",
-            Support = SupportLevel.NotSupported,
-            Description = "Named arguments (param: value) are not supported",
-            Workaround = "Use positional arguments in the correct order"
+            Support = SupportLevel.Full,
+            Description = "Named arguments (param: value) are supported in both statement and expression contexts"
         },
         ["declaration-pattern"] = new FeatureInfo
         {
@@ -462,23 +457,20 @@ public static class FeatureSupport
         ["with-expression"] = new FeatureInfo
         {
             Name = "with-expression",
-            Support = SupportLevel.NotSupported,
-            Description = "with expressions (record copying) are not supported",
-            Workaround = "Create a new instance and copy properties manually"
+            Support = SupportLevel.Full,
+            Description = "with expressions (record copying) are converted to §WITH blocks"
         },
         ["init-accessor"] = new FeatureInfo
         {
             Name = "init-accessor",
-            Support = SupportLevel.NotSupported,
-            Description = "init accessors are not supported",
-            Workaround = "Use regular set accessor or constructor initialization"
+            Support = SupportLevel.Full,
+            Description = "init keyword is handled in property accessors"
         },
         ["required-member"] = new FeatureInfo
         {
             Name = "required-member",
-            Support = SupportLevel.NotSupported,
-            Description = "required members (C# 11) are not supported",
-            Workaround = "Use constructor parameters to enforce required values"
+            Support = SupportLevel.Full,
+            Description = "required modifier on properties and fields is detected and emitted"
         },
         ["list-pattern"] = new FeatureInfo
         {
@@ -506,8 +498,8 @@ public static class FeatureSupport
         ["lock-statement"] = new FeatureInfo
         {
             Name = "lock-statement",
-            Support = SupportLevel.NotSupported,
-            Description = "lock statements are not supported",
+            Support = SupportLevel.Partial,
+            Description = "Body preserved, lock semantics stripped with comment",
             Workaround = "Use explicit Monitor.Enter/Exit or other synchronization primitives"
         },
         ["await-foreach"] = new FeatureInfo
@@ -534,9 +526,8 @@ public static class FeatureSupport
         ["collection-expression"] = new FeatureInfo
         {
             Name = "collection-expression",
-            Support = SupportLevel.NotSupported,
-            Description = "collection expressions [1, 2, 3] (C# 12) are not supported",
-            Workaround = "Use explicit array or list construction: new[] { 1, 2, 3 }"
+            Support = SupportLevel.Full,
+            Description = "C# 12 collection expressions [1, 2, 3] are converted via ConvertCollectionExpression"
         },
         ["readonly-struct"] = new FeatureInfo
         {

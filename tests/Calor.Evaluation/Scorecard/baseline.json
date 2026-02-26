@@ -3212,10 +3212,8 @@
       "status": "FullyConverted",
       "conversionSuccess": true,
       "conversionErrors": 0,
-      "conversionWarnings": 1,
-      "conversionIssues": [
-        "Warning [unknown-expression] (line 11): Unsupported feature [unknown-expression] replaced with fallback: this with { Age = newAge }"
-      ],
+      "conversionWarnings": 0,
+      "conversionIssues": [],
       "compilationSuccess": true,
       "compilationErrors": 0,
       "compilationDiagnostics": [],

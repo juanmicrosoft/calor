@@ -2128,28 +2128,33 @@ public sealed class CalorEmitter : IAstVisitor<string>
     // Modern operator nodes
     public string Visit(RangeExpressionNode node)
     {
-        var start = node.Start?.Accept(this) ?? "";
-        var end = node.End?.Accept(this) ?? "";
-        return $"{start}..{end}";
+        var parts = new List<string> { "§RANGE" };
+        if (node.Start != null)
+            parts.Add(node.Start.Accept(this));
+        if (node.End != null)
+            parts.Add(node.End.Accept(this));
+        return string.Join(" ", parts);
     }
 
     public string Visit(IndexFromEndNode node)
     {
         var offset = node.Offset.Accept(this);
-        return $"^{offset}";
+        return $"§^ {offset}";
     }
 
     public string Visit(WithExpressionNode node)
     {
         var target = node.Target.Accept(this);
-        var assignments = string.Join(", ", node.Assignments.Select(a => a.Accept(this)));
-        return $"{target} with {{ {assignments} }}";
+        var assignments = string.Join("\n  ", node.Assignments.Select(a => a.Accept(this)));
+        if (assignments.Length > 0)
+            return $"§WITH {target}\n  {assignments}\n§/WITH";
+        return $"§WITH {target}\n§/WITH";
     }
 
     public string Visit(WithPropertyAssignmentNode node)
     {
         var value = node.Value.Accept(this);
-        return $"{node.PropertyName} = {value}";
+        return $"§SET{{{node.PropertyName}}} {value}";
     }
 
     // Extended metadata nodes - emit as comments

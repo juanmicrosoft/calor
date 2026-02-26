@@ -630,6 +630,13 @@ public sealed class Lexer
             return MakeToken(TokenKind.Error);
         }
 
+        // Check for §^ = IndexFromEnd
+        if (Current == '^')
+        {
+            Advance(); // consume '^'
+            return MakeToken(TokenKind.IndexEnd);
+        }
+
         // Check for special operators that start with '?'
         // §?? = NullCoalesce, §?. = NullConditional
         if (Current == '?')

@@ -149,6 +149,7 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["indexers"] = ["indexer", "§IDX{", "this[]"],
         ["yield"] = ["yield", "iterator", "IEnumerable"],
         ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
+        ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues"],
     };
 
     public override string Name => "calor_syntax_help";

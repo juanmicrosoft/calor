@@ -2566,6 +2566,355 @@ public class CSharpToCalorConversionTests
 
     #endregion
 
+    #region Range, Index-from-End, and With-Expression Tests
+
+    [Fact]
+    public void Convert_RangeExpression_FullRange_CreatesRangeNode()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    int[] arr = { 1, 2, 3, 4, 5 };
+                    var slice = arr[1..3];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§RANGE", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_RangeExpression_OpenEndedStart_CreatesRangeNode()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    int[] arr = { 1, 2, 3, 4, 5 };
+                    var slice = arr[..3];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§RANGE", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_RangeExpression_OpenEndedEnd_CreatesRangeNode()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    int[] arr = { 1, 2, 3, 4, 5 };
+                    var slice = arr[2..];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§RANGE", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_IndexFromEnd_CreatesIndexFromEndNode()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    int[] arr = { 1, 2, 3, 4, 5 };
+                    var last = arr[^1];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§^ 1", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_IndexFromEnd_InRangeExpression()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    int[] arr = { 1, 2, 3, 4, 5 };
+                    var slice = arr[1..^1];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§RANGE", result.CalorSource);
+        Assert.Contains("§^ 1", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_WithExpression_SingleProperty_CreatesWithNode()
+    {
+        var csharpSource = """
+            public record Person(string Name, int Age);
+            public class Test
+            {
+                void M()
+                {
+                    var p = new Person("Alice", 30);
+                    var p2 = p with { Name = "Bob" };
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§WITH", result.CalorSource);
+        Assert.Contains("§SET{Name}", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_WithExpression_MultipleProperties_CreatesWithNode()
+    {
+        var csharpSource = """
+            public record Person(string Name, int Age);
+            public class Test
+            {
+                void M()
+                {
+                    var p = new Person("Alice", 30);
+                    var p2 = p with { Name = "Bob", Age = 25 };
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("§WITH", result.CalorSource);
+        Assert.Contains("§SET{Name}", result.CalorSource);
+        Assert.Contains("§SET{Age}", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_WithExpression_AstStructure()
+    {
+        var csharpSource = """
+            public record Point(int X, int Y);
+            public class Test
+            {
+                void M()
+                {
+                    var p = new Point(1, 2);
+                    var p2 = p with { X = 10 };
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        // Find the with-expression in the AST
+        var testClass = result.Ast.Classes.FirstOrDefault(c => c.Name == "Test");
+        Assert.NotNull(testClass);
+        var method = testClass.Methods.FirstOrDefault(m => m.Name == "M");
+        Assert.NotNull(method);
+
+        // Second statement should be a bind with a with-expression
+        Assert.True(method.Body.Count >= 2, $"Expected at least 2 statements, got {method.Body.Count}");
+        var bindStmt = Assert.IsType<BindStatementNode>(method.Body[1]);
+        var withExpr = Assert.IsType<WithExpressionNode>(bindStmt.Initializer);
+
+        Assert.Single(withExpr.Assignments);
+        Assert.Equal("X", withExpr.Assignments[0].PropertyName);
+    }
+
+    [Fact]
+    public void Convert_RangeExpression_AstStructure()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    var r = 1..5;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var testClass = result.Ast.Classes.FirstOrDefault(c => c.Name == "Test");
+        Assert.NotNull(testClass);
+        var method = testClass.Methods.FirstOrDefault(m => m.Name == "M");
+        Assert.NotNull(method);
+
+        Assert.Single(method.Body);
+        var bindStmt = Assert.IsType<BindStatementNode>(method.Body[0]);
+        var rangeExpr = Assert.IsType<RangeExpressionNode>(bindStmt.Initializer);
+
+        Assert.NotNull(rangeExpr.Start);
+        Assert.NotNull(rangeExpr.End);
+    }
+
+    [Fact]
+    public void Convert_IndexFromEnd_AstStructure()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                void M()
+                {
+                    int[] arr = { 1, 2, 3 };
+                    var last = arr[^1];
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var testClass = result.Ast.Classes.FirstOrDefault(c => c.Name == "Test");
+        Assert.NotNull(testClass);
+        var method = testClass.Methods.FirstOrDefault(m => m.Name == "M");
+        Assert.NotNull(method);
+
+        // Find the IndexFromEndNode in the AST somewhere in the second statement
+        Assert.True(method.Body.Count >= 2, $"Expected at least 2 statements, got {method.Body.Count}");
+    }
+
+    [Fact]
+    public void Convert_WithExpression_RoundTrip()
+    {
+        var csharpSource = """
+            public record Person(string Name, int Age);
+            public class Test
+            {
+                void M()
+                {
+                    var p = new Person("Alice", 30);
+                    var p2 = p with { Name = "Bob" };
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Emit back to C# and verify key patterns survive
+        var emitter = new Calor.Compiler.CodeGen.CSharpEmitter();
+        var emittedCSharp = emitter.Emit(result.Ast!);
+
+        Assert.Contains("with", emittedCSharp);
+        Assert.Contains("Name", emittedCSharp);
+    }
+
+    [Fact]
+    public void Convert_RequiredMember_Property()
+    {
+        var csharpSource = """
+            public class Config
+            {
+                public required string Name { get; set; }
+                public required int Value { get; set; }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var classNode = Assert.Single(result.Ast.Classes);
+        Assert.Equal(2, classNode.Properties.Count);
+        Assert.True(classNode.Properties[0].IsRequired);
+        Assert.True(classNode.Properties[1].IsRequired);
+    }
+
+    [Fact]
+    public void Convert_RequiredMember_Field()
+    {
+        var csharpSource = """
+            public class Config
+            {
+                public required string Name;
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        var classNode = Assert.Single(result.Ast.Classes);
+        Assert.Single(classNode.Fields);
+        Assert.True(classNode.Fields[0].IsRequired);
+    }
+
+    [Fact]
+    public void Convert_NamedArguments_InExpression()
+    {
+        var csharpSource = """
+            public class Test
+            {
+                int Add(int a, int b) => a + b;
+                void M()
+                {
+                    var result = Add(b: 2, a: 1);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static string GetErrorMessage(ConversionResult result)

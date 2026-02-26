@@ -48,9 +48,7 @@ public class FeatureCheckCommandTests
 
     [Theory]
     [InlineData("goto", SupportLevel.NotSupported)]
-    [InlineData("lock-statement", SupportLevel.NotSupported)]
     [InlineData("await-foreach", SupportLevel.NotSupported)]
-    [InlineData("collection-expression", SupportLevel.NotSupported)]
     [InlineData("file-scoped-type", SupportLevel.NotSupported)]
     [InlineData("utf8-string-literal", SupportLevel.NotSupported)]
     public void FeatureCheck_NotSupported_ReturnsNotSupportedLevel(string feature, SupportLevel expected)
@@ -120,7 +118,6 @@ public class FeatureCheckCommandTests
     [Theory]
     [InlineData("goto")]
     [InlineData("lock-statement")]
-    [InlineData("collection-expression")]
     public void FeatureCheck_UnsupportedFeature_HasWorkaround(string feature)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);

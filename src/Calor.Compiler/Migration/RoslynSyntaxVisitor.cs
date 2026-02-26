@@ -3962,6 +3962,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
             PrefixUnaryExpressionSyntax addrOf when addrOf.IsKind(SyntaxKind.AddressOfExpression) => ConvertAddressOfExpression(addrOf),
             PrefixUnaryExpressionSyntax deref when deref.IsKind(SyntaxKind.PointerIndirectionExpression) => ConvertPointerDereferenceExpression(deref),
+            PrefixUnaryExpressionSyntax indexFromEnd when indexFromEnd.IsKind(SyntaxKind.IndexExpression) => ConvertIndexFromEndExpression(indexFromEnd),
             PrefixUnaryExpressionSyntax prefix => ConvertPrefixUnaryExpression(prefix),
             PostfixUnaryExpressionSyntax postfix => ConvertPostfixUnaryExpression(postfix),
             ParenthesizedExpressionSyntax paren => ConvertExpression(paren.Expression),
@@ -3998,6 +3999,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             StackAllocArrayCreationExpressionSyntax stackAlloc => ConvertStackAllocExpression(stackAlloc),
             ImplicitStackAllocArrayCreationExpressionSyntax implicitStackAlloc => ConvertImplicitStackAllocExpression(implicitStackAlloc),
             SizeOfExpressionSyntax sizeOf => ConvertSizeOfExpression(sizeOf),
+            RangeExpressionSyntax rangeExpr => ConvertRangeExpression(rangeExpr),
+            WithExpressionSyntax withExpr => ConvertWithExpression(withExpr),
             _ => CreateFallbackExpression(expression, "unknown-expression")
         };
     }
@@ -4498,6 +4501,49 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var unaryOp = UnaryOperatorExtensions.FromString(op) ?? UnaryOperator.Negate;
 
         return new UnaryOperationNode(GetTextSpan(prefix), unaryOp, operand);
+    }
+
+    private IndexFromEndNode ConvertIndexFromEndExpression(PrefixUnaryExpressionSyntax node)
+    {
+        _context.RecordFeatureUsage("index-from-end");
+        _context.IncrementConverted();
+        var operand = ConvertExpression(node.Operand);
+        return new IndexFromEndNode(GetTextSpan(node), operand);
+    }
+
+    private RangeExpressionNode ConvertRangeExpression(RangeExpressionSyntax rangeExpr)
+    {
+        _context.RecordFeatureUsage("range-expression");
+        _context.IncrementConverted();
+        var start = rangeExpr.LeftOperand != null ? ConvertExpression(rangeExpr.LeftOperand) : null;
+        var end = rangeExpr.RightOperand != null ? ConvertExpression(rangeExpr.RightOperand) : null;
+        return new RangeExpressionNode(GetTextSpan(rangeExpr), start, end);
+    }
+
+    private WithExpressionNode ConvertWithExpression(WithExpressionSyntax withExpr)
+    {
+        _context.RecordFeatureUsage("with-expression");
+        _context.IncrementConverted();
+        var target = ConvertExpression(withExpr.Expression);
+        var assignments = new List<WithPropertyAssignmentNode>();
+
+        foreach (var expr in withExpr.Initializer.Expressions)
+        {
+            if (expr is AssignmentExpressionSyntax assignment)
+            {
+                var propName = assignment.Left.ToString();
+                var value = ConvertExpression(assignment.Right);
+                assignments.Add(new WithPropertyAssignmentNode(GetTextSpan(expr), propName, value));
+            }
+            else
+            {
+                // Unexpected expression in with-initializer; convert as a named assignment using the expression text
+                var value = ConvertExpression(expr);
+                assignments.Add(new WithPropertyAssignmentNode(GetTextSpan(expr), expr.ToString(), value));
+            }
+        }
+
+        return new WithExpressionNode(GetTextSpan(withExpr), target, assignments);
     }
 
     private ExpressionNode ConvertPostfixUnaryExpression(PostfixUnaryExpressionSyntax postfix)
