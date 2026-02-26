@@ -4,12 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-02-26
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
 ### Added
+- **Preprocessor directive conversion** — C# `#if`/`#elif`/`#else`/`#endif` directives are now converted to Calor `§PP` blocks by extracting Roslyn trivia; handles nested `#if` and `#elif` chains as nested `§PP` nodes
+- **MCP preprocessor discoverability** — `FeatureSupport` entry, `SyntaxHelpTool` aliases, `AGENTS.md` template row, and `calor-language-skills.md` section for `§PP`
 - **Refinement types** — `§RTYPE{id:Name:base} (predicate)` for named refinement types, inline `§I{type:param} | (predicate)` on parameters, `§PROOF{id:desc} (expr)` for proof obligations, and `#` self-reference in predicates
 - **Obligation engine** — Z3-powered verification pipeline: obligation generation, assume-negate-check solving, guard discovery, and configurable policies (default, strict, permissive)
 - **5 MCP agent guidance tools** — `calor_obligations` (verify obligations), `calor_suggest_types` (detect parameters needing refinements), `calor_discover_guards` (Z3-validated fix suggestions), `calor_suggest_fixes` (ranked fix strategies), `calor_diagnose_refinement` (all-in-one repair loop)
 - **Obligation policy** — Configurable per-status actions (Ignore, WarnOnly, WarnAndGuard, AlwaysGuard, Error) with three built-in policies
 - **101 new tests** — Refinement type parsing, obligation solving, guard discovery, MCP tool integration, and Z3 self-reference resolution
+
+### Fixed
+- **Lock/checked body ordering** — Comment annotations now correctly appear before body statements instead of after
+- **Non-standard for-loop fallback** — Multi-variable declarations and expression initializers now emit in correct order; multi-incrementor patterns detected as non-standard
 
 ## [0.3.3] - 2026-02-25
 
