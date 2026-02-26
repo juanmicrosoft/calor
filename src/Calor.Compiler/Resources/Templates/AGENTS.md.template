@@ -105,6 +105,7 @@ calor convert file.calr              # Convert Calor to C#
 | Loop | `§L{id:var:from:to:step}` ... `§/L{id}` |
 | Conditional | `§IF{id} condition → action` |
 | Try/Catch | `§TR{id}` ... `§CA{Type:var}` ... `§FI` ... `§/TR{id}` |
+| Preprocessor | `§PP{CONDITION}` ... `§PPE` ... `§/PP{CONDITION}` |
 
 **Expressions (Lisp-style):** `(+ a b)`, `(== x 0)`, `(% i 15)`
 
