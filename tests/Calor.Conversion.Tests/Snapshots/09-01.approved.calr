@@ -1,0 +1,9 @@
+§M{m003:Test_09_01}
+  §CL{c001:RangeDemo:pub}
+    §MT{m002:Slice:pub} ([i32]:array) -> [i32]
+      §R §IDX array §RANGE 0 5
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m003}

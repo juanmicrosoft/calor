@@ -1744,3 +1744,90 @@ Alternative alias `§SW` is available for `§W`:
 ```
 §ADD{collection} item     Add item to collection
 ```
+
+## Preprocessor Directives
+
+Calor supports statement-level conditional compilation via `§PP` (preprocessor) blocks.
+
+### Syntax
+
+```calor
+§PP{CONDITION}
+  // Code included when CONDITION is defined
+§PPE
+  // Code included when CONDITION is NOT defined (optional else branch)
+§/PP{CONDITION}
+```
+
+### Examples
+
+```calor
+§PP{DEBUG}
+  §CALL Console.WriteLine("Debug mode")
+§/PP{DEBUG}
+
+§PP{NET8_0_OR_GREATER}
+  §BIND result = §CALL SomeNewApi()
+§PPE
+  §BIND result = §CALL LegacyFallback()
+§/PP{NET8_0_OR_GREATER}
+```
+
+### C# Emission
+
+```csharp
+#if DEBUG
+Console.WriteLine("Debug mode");
+#endif
+
+#if NET8_0_OR_GREATER
+var result = SomeNewApi();
+#else
+var result = LegacyFallback();
+#endif
+```
+
+### Limitations
+
+- **Statement-level only**: `§PP` works inside method bodies. Declaration-level `#if`/`#endif` (wrapping entire classes or methods) is silently dropped during C#→Calor conversion.
+- For declaration-level conditionals, use `§CSHARP{...}§/CSHARP` interop blocks to preserve the original C# with its preprocessor directives.
+
+## Known Limitations & C# Migration Notes
+
+When converting C# code to Calor, some features have limited or no support. Use `calor_feature_support` to query the latest status.
+
+| Feature | Support | Notes / Workaround |
+|---|---|---|
+| `goto` / `labeled-statement` | Not Supported | Refactor to structured control flow |
+| `volatile` | Not Supported | Remove modifier; use Interlocked operations |
+| `await foreach` | Not Supported | Enumerate async enumerable manually with explicit await |
+| `await using` | Not Supported | Use try/finally with await DisposeAsync() |
+| `in` parameter | Not Supported | Pass by value or use regular ref |
+| `scoped` parameter | Not Supported | Remove scoped keyword |
+| `list-pattern` | Not Supported | Use explicit indexing and Length checks |
+| `static abstract member` | Not Supported | Use instance methods or regular statics |
+| `ref struct` | Not Supported | Use regular struct or class |
+| `file-scoped type` | Not Supported | Use internal access modifier |
+| `default lambda parameter` | Not Supported | Use method overloads or null checks |
+| `generic-attribute` | Not Supported | Use typeof() parameter |
+| `using type alias` | Not Supported | Define explicit record or class types |
+| `UTF-8 string literal` | Not Supported | Use Encoding.UTF8.GetBytes() |
+| `ref` / `out` parameter | Partial | Kept as-is with warning; consider tuples |
+| `dynamic` | Partial | Converted to 'any' with warning |
+| `lock` statement | Partial | Body preserved, lock semantics stripped |
+| `checked` / `unchecked` | Partial | Wrapper stripped, body preserved |
+| `preprocessor directive` | Partial | Statement-level only (see above) |
+| `postfix operator` | Not Supported | Use as statement or rewrite as x = x + 1 |
+
+### Fully Supported (previously thought missing)
+
+These features are fully supported in the converter:
+- **Attributes**: `[@Name]` syntax with proper AST
+- **Generic type constraints**: `§WHERE` syntax
+- **Collection expressions**: C# 12 `[1, 2, 3]` syntax
+- **init accessor**: Handled in property accessors
+- **Named arguments**: Supported in both statement and expression contexts
+- **required modifier**: Detected and emitted on properties/fields
+- **Range expressions**: `§RANGE` / `start..end`
+- **Index from end**: `§^` / `^n`
+- **with-expression**: `§WITH` blocks for record copying

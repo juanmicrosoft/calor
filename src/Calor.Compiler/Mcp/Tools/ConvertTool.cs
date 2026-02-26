@@ -75,11 +75,20 @@ public sealed class ConvertTool : McpToolBase
             var converter = new CSharpToCalorConverter(options);
             var result = converter.Convert(source);
 
-            // Build explanation if requested
+            // Always compute explanation for unsupported feature summary
+            var explanation = result.Context.GetExplanation();
+            var unsupportedFeatureCount = explanation.TotalUnsupportedCount;
+            var unsupportedFeatureSummary = explanation.UnsupportedFeatures.Count > 0
+                ? explanation.UnsupportedFeatures
+                    .Select(kvp => $"{kvp.Key} ({kvp.Value.Count})")
+                    .OrderBy(s => s)
+                    .ToList()
+                : null;
+
+            // Build detailed explanation if requested
             ExplanationOutput? explanationOutput = null;
             if (explain)
             {
-                var explanation = result.Context.GetExplanation();
                 explanationOutput = new ExplanationOutput
                 {
                     UnsupportedFeatures = explanation.UnsupportedFeatures
@@ -103,12 +112,11 @@ public sealed class ConvertTool : McpToolBase
             // Track unsupported features in telemetry
             if (CalorTelemetry.IsInitialized)
             {
-                var telExplanation = result.Context.GetExplanation();
-                if (telExplanation.TotalUnsupportedCount > 0)
+                if (explanation.TotalUnsupportedCount > 0)
                 {
                     CalorTelemetry.Instance.TrackUnsupportedFeatures(
-                        telExplanation.GetFeatureCounts(),
-                        telExplanation.TotalUnsupportedCount);
+                        explanation.GetFeatureCounts(),
+                        explanation.TotalUnsupportedCount);
                 }
             }
 
@@ -204,6 +212,8 @@ public sealed class ConvertTool : McpToolBase
                     InteropBlocksEmitted = result.Context.Stats.InteropBlocksEmitted,
                     DurationMs = (int)result.Duration.TotalMilliseconds
                 },
+                UnsupportedFeatureCount = unsupportedFeatureCount,
+                UnsupportedFeatureSummary = unsupportedFeatureSummary,
                 Explanation = explanationOutput
             };
 
@@ -229,6 +239,13 @@ public sealed class ConvertTool : McpToolBase
 
         [JsonPropertyName("stats")]
         public required ConversionStatsOutput Stats { get; init; }
+
+        [JsonPropertyName("unsupportedFeatureCount")]
+        public int UnsupportedFeatureCount { get; init; }
+
+        [JsonPropertyName("unsupportedFeatureSummary")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? UnsupportedFeatureSummary { get; init; }
 
         [JsonPropertyName("explanation")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

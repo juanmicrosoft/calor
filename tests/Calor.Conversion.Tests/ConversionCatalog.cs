@@ -428,8 +428,8 @@ public static class ConversionCatalog
 
     // ── 09: Known Gaps ──
 
-    public static readonly ConversionSnippet GapRangeExpression = new(
-        "09-01", "KnownGaps", "Range expressions (C# 8+)",
+    public static readonly ConversionSnippet RangeExpression = new(
+        "09-01", "ModernCSharp", "Range expressions (C# 8+)",
         """
         public class RangeDemo
         {
@@ -438,11 +438,10 @@ public static class ConversionCatalog
                 return array[0..5];
             }
         }
-        """,
-        IsKnownGap: true);
+        """);
 
-    public static readonly ConversionSnippet GapIndexFromEnd = new(
-        "09-02", "KnownGaps", "Index from end (C# 8+)",
+    public static readonly ConversionSnippet IndexFromEnd = new(
+        "09-02", "ModernCSharp", "Index from end (C# 8+)",
         """
         public class IndexDemo
         {
@@ -451,8 +450,7 @@ public static class ConversionCatalog
                 return items[^1];
             }
         }
-        """,
-        IsKnownGap: true);
+        """);
 
     public static readonly ConversionSnippet GapListPatterns = new(
         "09-03", "KnownGaps", "List patterns (C# 11+)",
@@ -582,6 +580,8 @@ public static class ConversionCatalog
         SizeOfExpression,
         MultiDimArrayCreation,
         TupleReturnTypeMapped,
+        RangeExpression,
+        IndexFromEnd,
     };
 
     /// <summary>
@@ -589,8 +589,6 @@ public static class ConversionCatalog
     /// </summary>
     public static IReadOnlyList<ConversionSnippet> KnownGapSnippets { get; } = new[]
     {
-        GapRangeExpression,
-        GapIndexFromEnd,
         GapListPatterns,
         GapRawStringLiterals,
         GapCollectionSpread,
