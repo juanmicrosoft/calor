@@ -7,7 +7,7 @@ nav_order: 3
 
 # Dependent Types Tutorial
 
-This tutorial walks through refinement types in three parts: basic parameter validation, financial proof obligations, and the MCP-guided agent repair loop. Each part shows where Calor's type-level constraints go beyond what plain C# can express.
+This tutorial walks through dependent types in four parts: basic parameter validation, financial proof obligations, the MCP-guided agent repair loop, and indexed types for safe collection access. Each part shows where Calor's type-level constraints go beyond what plain C# can express.
 
 ---
 
@@ -376,9 +376,138 @@ The tools **prune the agent's search space**. Instead of guessing, the agent get
 
 ---
 
+## Part 4 — Indexed Types and Safe Array Access
+
+### The Problem
+
+Array out-of-bounds errors are one of the most common runtime bugs. In C#, the compiler can't help — it doesn't track collection sizes:
+
+```csharp
+public int Sum(int[] items, int i)
+{
+    return items[i]; // Will it crash? The compiler doesn't know.
+}
+```
+
+### Indexed Types in Calor
+
+Calor's indexed types (`§ITYPE`) attach a size parameter to a collection type. The compiler then tracks bounds and uses Z3 to prove accesses are safe:
+
+```
+§ITYPE{it1:SizedList:List:n}
+```
+
+This declares `SizedList` as a `List` with `n` elements. The size parameter `n` becomes a Z3 variable.
+
+### Proving Access Safety
+
+When you access an indexed-typed array, the obligation engine generates an `IndexBounds` obligation. If the function has preconditions bounding the index, Z3 proves it safe:
+
+```
+§M{m001:SafeAccess}
+§ITYPE{it1:SizedList:List:n}
+
+§F{f001:GetElement:priv}
+  §I{SizedList:items}
+  §I{i32:n}
+  §I{i32:i}
+  §O{i32}
+  §Q (&& (>= i INT:0) (< i n))    // precondition bounds the index
+  §R §IDX items i                   // Z3 proves: 0 <= i < n ✓
+§/F{f001}
+§/M{m001}
+```
+
+The obligation engine:
+1. Creates an `IndexBounds` obligation for `§IDX items i`
+2. The obligation condition is `(&& (>= i INT:0) (< i n))`
+3. The precondition `§Q (&& (>= i INT:0) (< i n))` provides the same guarantee
+4. Z3 negates the obligation, finds UNSAT → **Discharged**
+
+### Unbounded Access — Counterexample
+
+Without a precondition, Z3 finds a counterexample:
+
+```
+§F{f002:UnsafeGet:priv}
+  §I{SizedList:items}
+  §I{i32:n}
+  §I{i32:i}
+  §O{i32}
+  §R §IDX items i                   // FAILED: Counterexample: n=1, i=-1
+§/F{f002}
+```
+
+### Constrained Sizes
+
+Indexed types can have constraints on the size parameter:
+
+```
+§ITYPE{it1:NonEmptyList:List:n} (> # INT:0)   // n must be > 0
+```
+
+This constraint is added as a Z3 assumption when solving bounds obligations, making it easier to prove access safety.
+
+### The MCP Bounds Check Tool
+
+Use `calor_bounds_check` to analyze all index access sites at once:
+
+```json
+{
+  "tool": "calor_bounds_check",
+  "arguments": {
+    "source": "... calor source with §ITYPE and §IDX ..."
+  }
+}
+```
+
+Returns:
+```json
+{
+  "safe": true,
+  "total_access_sites": 1,
+  "discharged": 1,
+  "failed": 0,
+  "access_sites": [
+    {
+      "obligation_id": "obl_0",
+      "function_id": "f001",
+      "array_name": "items",
+      "status": "Discharged",
+      "description": "Index access on 'items' must be within bounds [0, n)"
+    }
+  ]
+}
+```
+
+### Erasure
+
+Like refinement types, indexed types are erased in C#:
+
+| Calor | C# |
+|:------|:---|
+| `§ITYPE{it1:SizedList:List:n}` | *(nothing)* |
+| `§I{SizedList:items}` | `List items` |
+| `§I{SizedList<i32>:items}` | `List<int> items` |
+
+The size parameter and bounds proofs exist only at compile time. The emitted C# uses the base type directly.
+
+### Tool Summary
+
+| Tool | Purpose | When to use |
+|:-----|:--------|:------------|
+| `calor_suggest_types` | Detect parameters needing refinements | First — before adding any refinements |
+| `calor_obligations` | Generate and verify all obligations | After adding refinements — see what's proven |
+| `calor_discover_guards` | Find guards for failed obligations | When obligations fail — get fix candidates |
+| `calor_suggest_fixes` | Get ranked fix strategies | When you need alternative approaches |
+| `calor_diagnose_refinement` | Full repair loop in one call | When you want everything at once |
+| `calor_bounds_check` | Verify index access safety | After adding indexed types — check all accesses |
+
+---
+
 ## See Also
 
-- [Refinement Types Reference](/calor/syntax-reference/refinement-types/) — Complete syntax reference
+- [Refinement Types Reference](/calor/syntax-reference/refinement-types/) — Complete syntax reference including indexed types
 - [Contracts](/calor/syntax-reference/contracts/) — Preconditions and postconditions
 - [Static Verification](/calor/philosophy/static-verification/) — Z3-based verification
 - [MCP Server](/calor/cli/mcp/) — All MCP tools

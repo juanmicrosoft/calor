@@ -66,6 +66,9 @@ public sealed class IdScanner : IAstVisitor
 
         foreach (var rtype in node.RefinementTypes)
             rtype.Accept(this);
+
+        foreach (var itype in node.IndexedTypes)
+            itype.Accept(this);
     }
 
     public void Visit(FunctionNode node)
@@ -317,5 +320,10 @@ public sealed class IdScanner : IAstVisitor
     {
         if (!string.IsNullOrEmpty(node.Id))
             AddEntry(node.Id, IdKind.ProofObligation, node.Description ?? node.Id, node.Span);
+    }
+    public void Visit(IndexedTypeNode node)
+    {
+        if (!string.IsNullOrEmpty(node.Id))
+            AddEntry(node.Id, IdKind.IndexedType, node.Name, node.Span);
     }
 }

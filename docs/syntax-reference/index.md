@@ -62,6 +62,9 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Relational | `§PREL{op} value` | `§PREL{gte} 90` |
 | Var Pattern | `§VAR{name}` | `§VAR{n}` |
 | Guard | `§WHEN condition` | `§WHEN (> n 0)` |
+| Refinement Type | `§RTYPE{id:Name:base} (pred)` | `§RTYPE{r1:NatInt:i32} (>= # INT:0)` |
+| Indexed Type | `§ITYPE{id:Name:base:size}` | `§ITYPE{it1:SizedList:List:n}` |
+| Proof Obligation | `§PROOF{id:desc} (expr)` | `§PROOF{p1:check} (>= x INT:0)` |
 
 ---
 
@@ -150,3 +153,4 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`, `(upper s)`
 - [Contracts](/calor/syntax-reference/contracts/) - Requires, ensures
 - [Effects](/calor/syntax-reference/effects/) - Effect declarations
 - [String Operations](/calor/syntax-reference/string-operations/) - String, char, regex, StringBuilder operations
+- [Refinement Types](/calor/syntax-reference/refinement-types/) - Refinement types, indexed types, proof obligations

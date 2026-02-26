@@ -167,6 +167,9 @@ The tool scores files based on patterns like null handling, error handling, asyn
 - [x] Interprocedural effect analysis (SCC-based)
 - [x] MSBuild SDK integration
 - [x] Evaluation framework (8 metrics, 28 programs)
+- [x] Refinement types with Z3 verification (M0-M1)
+- [x] Agent guidance tools and obligation policy (M3)
+- [x] Indexed types and bounds checking (M2)
 - [ ] Direct IL emission
 - [ ] IDE language server
 

@@ -254,4 +254,6 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(RefinementTypeNode node) => DefaultVisit(node)!;
     public virtual T Visit(SelfRefNode node) => DefaultVisit(node)!;
     public virtual T Visit(ProofObligationNode node) => DefaultVisit(node)!;
+    // Dependent Types: Indexed Types (size-parameterized)
+    public virtual T Visit(IndexedTypeNode node) => DefaultVisit(node)!;
 }

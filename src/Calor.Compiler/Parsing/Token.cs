@@ -315,6 +315,8 @@ public enum TokenKind
     RefinedType,        // §RTYPE - refinement type definition
     EndRefinedType,     // §/RTYPE - end refinement type
     Proof,              // §PROOF - proof obligation
+    IndexedType,        // §ITYPE - indexed type definition (size-parameterized)
+    EndIndexedType,     // §/ITYPE - end indexed type
 
     // Typed Literals
     IntLiteral,         // INT:42
@@ -351,7 +353,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.Proof;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndIndexedType;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;

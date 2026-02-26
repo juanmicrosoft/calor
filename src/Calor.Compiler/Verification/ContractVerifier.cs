@@ -20,10 +20,21 @@ public sealed class ContractVerifier
     }
 
     /// <summary>
+    /// Indexed type size parameter names, valid as identifiers in contracts.
+    /// </summary>
+    private readonly HashSet<string> _indexedTypeSizeParams = new(StringComparer.Ordinal);
+
+    /// <summary>
     /// Verifies all contracts in a module.
     /// </summary>
     public void Verify(ModuleNode module)
     {
+        // Collect indexed type size parameter names
+        foreach (var itype in module.IndexedTypes)
+        {
+            _indexedTypeSizeParams.Add(itype.SizeParam);
+        }
+
         foreach (var function in module.Functions)
         {
             VerifyFunction(function);
@@ -63,13 +74,13 @@ public sealed class ContractVerifier
         // Verify quantifier variable types
         VerifyQuantifierTypes(requires.Condition);
 
-        // Verify that the condition only references parameters and constants
+        // Verify that the condition only references parameters, indexed type size params, and constants
         var referencedNames = CollectReferences(requires.Condition);
         var parameterNames = function.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
 
         foreach (var name in referencedNames)
         {
-            if (!parameterNames.Contains(name))
+            if (!parameterNames.Contains(name) && !_indexedTypeSizeParams.Contains(name))
             {
                 _diagnostics.Report(
                     requires.Span,
@@ -111,7 +122,7 @@ public sealed class ContractVerifier
                     DiagnosticCode.InvalidReference,
                     "Cannot reference 'result' in postcondition of void function");
             }
-            else if (!validNames.Contains(name))
+            else if (!validNames.Contains(name) && !_indexedTypeSizeParams.Contains(name))
             {
                 _diagnostics.Report(
                     ensures.Span,

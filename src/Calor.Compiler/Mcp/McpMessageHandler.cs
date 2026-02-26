@@ -60,6 +60,7 @@ public sealed class McpMessageHandler
         RegisterTool(new GuardDiscoveryTool());
         RegisterTool(new TypeSuggestionTool());
         RegisterTool(new DiagnoseRefinementTool());
+        RegisterTool(new BoundsCheckTool());
     }
 
     private void RegisterTool(IMcpTool tool)

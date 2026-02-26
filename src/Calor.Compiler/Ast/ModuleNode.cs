@@ -33,6 +33,8 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
     // Dependent Types: Refinement type definitions at module level
     public IReadOnlyList<RefinementTypeNode> RefinementTypes { get; }
+    // Dependent Types: Indexed type definitions at module level
+    public IReadOnlyList<IndexedTypeNode> IndexedTypes { get; }
 
     public ModuleNode(
         TextSpan span,
@@ -168,7 +170,8 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<DecisionNode> decisions,
         ContextNode? context,
         IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
-        IReadOnlyList<RefinementTypeNode>? refinementTypes = null)
+        IReadOnlyList<RefinementTypeNode>? refinementTypes = null,
+        IReadOnlyList<IndexedTypeNode>? indexedTypes = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -188,6 +191,7 @@ public sealed class ModuleNode : AstNode
         Context = context;
         InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
         RefinementTypes = refinementTypes ?? Array.Empty<RefinementTypeNode>();
+        IndexedTypes = indexedTypes ?? Array.Empty<IndexedTypeNode>();
     }
 
     /// <summary>
