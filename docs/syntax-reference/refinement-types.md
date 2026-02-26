@@ -16,6 +16,8 @@ Refinement types let you constrain values at the type level. A refined type is a
 | Syntax | Purpose | Example |
 |:-------|:--------|:--------|
 | `§RTYPE{id:Name:base} (pred)` | Define a named refinement type | `§RTYPE{r1:NatInt:i32} (>= # INT:0)` |
+| `§ITYPE{id:Name:base:size}` | Define an indexed (size-parameterized) type | `§ITYPE{it1:SizedList:List:n}` |
+| `§ITYPE{id:Name:base:size} (pred)` | Indexed type with size constraint | `§ITYPE{it1:NonEmpty:List:n} (> # INT:0)` |
 | `§I{type:param} \| (pred)` | Inline refinement on a parameter | `§I{i32:age} \| (>= # INT:0)` |
 | `§PROOF{id:desc} (expr)` | Proof obligation (assert a fact) | `§PROOF{p1:positive} (>= x INT:0)` |
 | `#` | Self-reference (the value being refined) | `(>= # INT:0)` |
@@ -163,6 +165,62 @@ Z3 proves this: given `balance >= amount` and `amount > 0`, then `balance - amou
 
 ---
 
+## Indexed Types (`§ITYPE`)
+
+Indexed types are size-parameterized types — a collection type annotated with a size variable so the compiler can track bounds and prove array/list accesses are safe using Z3.
+
+### Syntax
+
+```
+§ITYPE{id:Name:baseType:sizeParam}                     // no constraint
+§ITYPE{id:Name:baseType:sizeParam} (constraint on #)   // with constraint
+```
+
+- `id` — unique identifier (e.g., `it1`)
+- `Name` — the indexed type name, used in parameter declarations
+- `baseType` — the underlying collection type (`List`, `i32[]`, etc.)
+- `sizeParam` — name of the size variable (becomes a Z3 integer)
+- `constraint` — optional predicate on the size (e.g., `(> # INT:0)` for non-empty)
+
+### Examples
+
+```
+§ITYPE{it1:SizedList:List:n}                            // List with n elements
+§ITYPE{it2:NonEmptyArr:i32[]:n} (> # INT:0)             // array with n > 0 elements
+§ITYPE{it3:BoundedVec:List:n} (&& (> # INT:0) (< # INT:1000))
+```
+
+### Using Indexed Types
+
+Declare a parameter with the indexed type name. The size parameter becomes a Z3 variable available in preconditions and postconditions:
+
+```
+§ITYPE{it1:SizedList:List:n}
+
+§F{f001:Sum:priv}
+  §I{SizedList:items}        // items has n elements
+  §I{i32:n}                  // size parameter as explicit param
+  §I{i32:i}
+  §O{i32}
+  §Q (&& (>= i INT:0) (< i n))
+  §R §IDX items i            // proven safe: 0 <= i < n
+§/F{f001}
+```
+
+The obligation engine creates an `IndexBounds` obligation for each `§IDX` on an indexed-typed array. The condition is `(&& (>= index INT:0) (< index sizeParam))`. When the function has preconditions or inline refinements bounding the index, Z3 discharges the obligation automatically.
+
+### Erasure
+
+Indexed type definitions are erased in C#. Parameters with indexed type names are mapped to their base types:
+
+| Calor | Emitted C# |
+|:------|:-----------|
+| `§ITYPE{it1:SizedList:List:n}` | *(nothing — erased)* |
+| `§I{SizedList:items}` | `List items` |
+| `§I{SizedList<i32>:items}` | `List<int> items` |
+
+---
+
 ## Erasure
 
 Refinement types are a **compile-time construct**. In the emitted C#, they are erased:
@@ -199,6 +257,7 @@ The obligation engine is the verification pipeline for refinement types:
 |:-----|:-------|
 | `RefinementEntry` | Parameter with inline or named refinement |
 | `ProofObligation` | `§PROOF` statement |
+| `IndexBounds` | `§IDX` on an indexed-typed array |
 
 ### Public vs Private Functions
 

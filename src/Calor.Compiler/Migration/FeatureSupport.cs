@@ -741,6 +741,18 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Proof obligations (§PROOF) declare conditions to be verified; emitted as comments or runtime checks"
         },
+        ["indexed-type"] = new FeatureInfo
+        {
+            Name = "indexed-type",
+            Support = SupportLevel.Full,
+            Description = "Indexed types (§ITYPE) define size-parameterized types for bounds checking; erased to base types in C#"
+        },
+        ["index-bounds"] = new FeatureInfo
+        {
+            Name = "index-bounds",
+            Support = SupportLevel.Full,
+            Description = "Index bounds obligations verify array/list accesses are within bounds using Z3"
+        },
     };
 
     /// <summary>

@@ -102,6 +102,7 @@ public sealed class Parser
         ContextNode? context = null;
         var interopBlocks = new List<CSharpInteropBlockNode>();
         var refinementTypes = new List<RefinementTypeNode>();
+        var indexedTypes = new List<IndexedTypeNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndModule))
         {
@@ -180,9 +181,13 @@ public sealed class Parser
             {
                 refinementTypes.Add(ParseRefinementType());
             }
+            else if (Check(TokenKind.IndexedType))
+            {
+                indexedTypes.Add(ParseIndexedType());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, or END_MODULE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, or END_MODULE", Current.Kind);
                 Advance();
             }
         }
@@ -200,7 +205,7 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return new ModuleNode(span, id, moduleName, usings, interfaces, classes,
             enums, enumExtensions, delegates, functions, attrs,
-            issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes);
+            issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes, indexedTypes);
     }
 
     /// <summary>
@@ -777,6 +782,53 @@ public sealed class Parser
 
         var span = startToken.Span.Union(predicate.Span);
         return new RefinementTypeNode(span, id, name, baseTypeName, predicate, attrs);
+    }
+
+    /// <summary>
+    /// Parses an indexed type definition.
+    /// §ITYPE{id:Name:baseType:sizeParam}                     // no constraint
+    /// §ITYPE{id:Name:baseType:sizeParam} (constraint on #)   // with constraint
+    /// </summary>
+    private IndexedTypeNode ParseIndexedType()
+    {
+        var startToken = Expect(TokenKind.IndexedType);
+        var attrs = ParseAttributes();
+
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+        var baseTypeName = attrs["_pos2"] ?? "";
+        var sizeParam = attrs["_pos3"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ITYPE", "id");
+        if (string.IsNullOrEmpty(name))
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ITYPE", "name");
+        if (string.IsNullOrEmpty(baseTypeName))
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ITYPE", "baseType");
+        if (string.IsNullOrEmpty(sizeParam))
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "ITYPE", "sizeParam");
+
+        ExpressionNode? constraint = null;
+        var lastSpan = startToken.Span;
+
+        // Check if there's a constraint expression (starts with '(')
+        if (Check(TokenKind.OpenParen))
+        {
+            var saved = _insideRefinementPredicate;
+            _insideRefinementPredicate = true;
+            try
+            {
+                constraint = ParseExpression();
+                lastSpan = constraint.Span;
+            }
+            finally
+            {
+                _insideRefinementPredicate = saved;
+            }
+        }
+
+        var span = startToken.Span.Union(lastSpan);
+        return new IndexedTypeNode(span, id, name, baseTypeName, sizeParam, constraint, attrs);
     }
 
     /// <summary>
@@ -3372,20 +3424,31 @@ public sealed class Parser
                 Advance();
             }
 
-            // Handle multi-dim array suffix: int[,] or int[,,]
-            if (Check(TokenKind.OpenBracket) && Peek(1).Kind == TokenKind.Comma)
+            // Handle array suffix: i32[] or int[,] or int[,,]
+            if (Check(TokenKind.OpenBracket))
             {
-                sb.Append('[');
-                Advance(); // consume [
-                while (Check(TokenKind.Comma))
+                if (Peek(1).Kind == TokenKind.CloseBracket)
                 {
-                    sb.Append(',');
-                    Advance();
+                    // Simple array suffix: i32[]
+                    sb.Append("[]");
+                    Advance(); // consume [
+                    Advance(); // consume ]
                 }
-                if (Check(TokenKind.CloseBracket))
+                else if (Peek(1).Kind == TokenKind.Comma)
                 {
-                    sb.Append(']');
-                    Advance();
+                    // Multi-dim array suffix: int[,] or int[,,]
+                    sb.Append('[');
+                    Advance(); // consume [
+                    while (Check(TokenKind.Comma))
+                    {
+                        sb.Append(',');
+                        Advance();
+                    }
+                    if (Check(TokenKind.CloseBracket))
+                    {
+                        sb.Append(']');
+                        Advance();
+                    }
                 }
             }
 

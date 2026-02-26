@@ -39,5 +39,8 @@ public enum IdKind
     RefinementType,
 
     /// <summary>Proof obligation (§PROOF).</summary>
-    ProofObligation
+    ProofObligation,
+
+    /// <summary>Indexed type definition (§ITYPE).</summary>
+    IndexedType
 }

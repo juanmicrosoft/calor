@@ -229,6 +229,8 @@ public interface IAstVisitor
     void Visit(RefinementTypeNode node);
     void Visit(SelfRefNode node);
     void Visit(ProofObligationNode node);
+    // Dependent Types: Indexed Types (size-parameterized)
+    void Visit(IndexedTypeNode node);
 }
 
 /// <summary>
@@ -442,6 +444,8 @@ public interface IAstVisitor<T>
     T Visit(RefinementTypeNode node);
     T Visit(SelfRefNode node);
     T Visit(ProofObligationNode node);
+    // Dependent Types: Indexed Types (size-parameterized)
+    T Visit(IndexedTypeNode node);
 }
 
 /// <summary>
