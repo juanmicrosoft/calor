@@ -46,7 +46,7 @@ The server communicates over stdio using the [Model Context Protocol](https://mo
 
 ## Available Tools
 
-The MCP server exposes 33 tools organized by category:
+The MCP server exposes 34 tools organized by category:
 
 ### Compilation & Verification
 
@@ -93,6 +93,7 @@ The MCP server exposes 33 tools organized by category:
 | `calor_discover_guards` | Discover Z3-validated guards for failed obligations |
 | `calor_suggest_types` | Analyze parameter usage and suggest refinement types |
 | `calor_diagnose_refinement` | All-in-one repair tool with ranked patches |
+| `calor_bounds_check` | Verify index access safety on indexed types using Z3 |
 
 ### Code Quality
 
@@ -607,6 +608,37 @@ All-in-one repair tool — combines obligations, guards, and type suggestions in
 
 **Output:** Obligation summary, plus an array of patches. Each patch includes the obligation it addresses, the policy action, patch kind (precondition, if_guard, refine_parameter), Calor code to insert, confidence, and which obligation IDs it discharges.
 
+### calor_bounds_check
+
+Analyze index access sites on indexed types (`§ITYPE`) and verify bounds safety using Z3.
+
+**Input Schema:**
+```json
+{
+  "source": "string (required) - Calor source code containing §ITYPE definitions and array accesses",
+  "function_id": "string - Optional: filter results to a specific function ID"
+}
+```
+
+**Output:**
+```json
+{
+  "safe": true,
+  "total_access_sites": 1,
+  "discharged": 1,
+  "failed": 0,
+  "access_sites": [
+    {
+      "obligation_id": "obl_0",
+      "function_id": "f001",
+      "array_name": "items",
+      "status": "Discharged",
+      "description": "Index access on 'items' must be within bounds [0, n)"
+    }
+  ]
+}
+```
+
 ### calor_lint
 
 Check Calor source code for agent-optimal format compliance.
@@ -744,7 +776,7 @@ When you run `calor init --ai claude`, the MCP server is automatically configure
 
 This configures two servers:
 - **calor-lsp**: Language server for IDE features (diagnostics, hover, go-to-definition)
-- **calor**: MCP server with all 33 tools
+- **calor**: MCP server with all 34 tools
 
 ### Gemini CLI (via calor init)
 

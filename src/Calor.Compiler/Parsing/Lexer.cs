@@ -273,6 +273,8 @@ public sealed class Lexer
         ["RTYPE"] = TokenKind.RefinedType,           // §RTYPE
         ["/RTYPE"] = TokenKind.EndRefinedType,       // §/RTYPE
         ["PROOF"] = TokenKind.Proof,                 // §PROOF
+        ["ITYPE"] = TokenKind.IndexedType,           // §ITYPE
+        ["/ITYPE"] = TokenKind.EndIndexedType,       // §/ITYPE
 
         // Built-in aliases for common operations
         ["P"] = TokenKind.Print,            // §P = Console.WriteLine

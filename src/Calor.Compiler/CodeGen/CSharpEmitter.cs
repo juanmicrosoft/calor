@@ -57,6 +57,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private bool _usesSystemLinq;
     private bool _usesCollectionsGeneric;
 
+    // Indexed type name → base type for erasure (populated during Visit(ModuleNode))
+    private readonly Dictionary<string, string> _indexedTypeErasure = new(StringComparer.Ordinal);
+
     public CSharpEmitter() : this(EmitContractMode.Debug)
     {
     }
@@ -142,6 +145,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var usingCode = Visit(usingDirective);
             if (!string.IsNullOrEmpty(usingCode))
                 userUsings.Add(usingDirective.Namespace);
+        }
+
+        // Register indexed type erasure mappings (name → base type)
+        foreach (var itype in node.IndexedTypes)
+        {
+            _indexedTypeErasure[itype.Name] = itype.BaseTypeName;
         }
 
         var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
@@ -3462,10 +3471,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
     }
 
-    private static string MapTypeName(string calorType)
+    private string MapTypeName(string calorType)
     {
+        // Check indexed type erasure: SizedList → List, NonEmptyArr → int[], etc.
+        var baseTypeName = calorType;
+        var genericIdx = calorType.IndexOf('<');
+        var lookupName = genericIdx > 0 ? calorType.Substring(0, genericIdx) : calorType;
+        if (_indexedTypeErasure.TryGetValue(lookupName, out var erasedBase))
+        {
+            // Preserve generic arguments: SizedList<i32> → List<int>
+            baseTypeName = genericIdx > 0
+                ? erasedBase + calorType.Substring(genericIdx)
+                : erasedBase;
+        }
+
         // Use the centralized TypeMapper for bidirectional type mapping
-        return TypeMapper.CalorToCSharp(calorType);
+        return TypeMapper.CalorToCSharp(baseTypeName);
     }
 
     /// <summary>
@@ -4404,6 +4425,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(RefinementTypeNode node)
     {
         // Refinement types are erased in C# emission — emit nothing
+        return "";
+    }
+
+    public string Visit(IndexedTypeNode node)
+    {
+        // Indexed types are erased in C# emission — emit nothing
         return "";
     }
 

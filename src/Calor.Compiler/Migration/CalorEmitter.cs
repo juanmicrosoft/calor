@@ -130,6 +130,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Visit(rtype);
         }
 
+        // Emit indexed type definitions
+        foreach (var itype in node.IndexedTypes)
+        {
+            Visit(itype);
+        }
+
         // Emit module-level functions
         foreach (var func in node.Functions)
         {
@@ -2704,6 +2710,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var condition = node.Condition.Accept(this);
         var desc = node.Description != null ? $":{node.Description}" : "";
         AppendLine($"§PROOF{{{node.Id}{desc}}} {condition}");
+        return "";
+    }
+
+    public string Visit(IndexedTypeNode node)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"§ITYPE{{{node.Id}:{node.Name}:{node.BaseTypeName}:{node.SizeParam}}}");
+        if (node.Constraint != null)
+        {
+            var constraint = node.Constraint.Accept(this);
+            sb.Append($" {constraint}");
+        }
+        AppendLine(sb.ToString());
         return "";
     }
 }

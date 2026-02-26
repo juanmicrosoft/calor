@@ -59,11 +59,27 @@ public sealed class ObligationSolver : IDisposable
         {
             if (!translator.DeclareVariable(name, type))
             {
+                // For IndexBounds obligations, skip undeclarable parameters
+                // (e.g., indexed type names like SizedList that aren't Z3-translatable).
+                // The obligation condition only references the index and size variables.
+                if (obligation.Kind == ObligationKind.IndexBounds)
+                    continue;
+
                 obligation.Status = ObligationStatus.Unsupported;
                 obligation.CounterexampleDescription =
                     ContractTranslator.DiagnoseUnsupportedType(type);
                 obligation.SolverDuration = sw.Elapsed;
                 return;
+            }
+        }
+
+        // Declare extra variables (e.g., indexed type size parameters)
+        foreach (var (name, type) in info.ExtraVariables)
+        {
+            // Only declare if not already declared (could overlap with a parameter name)
+            if (!translator.Variables.ContainsKey(name))
+            {
+                translator.DeclareVariable(name, type);
             }
         }
 
@@ -102,6 +118,21 @@ public sealed class ObligationSolver : IDisposable
                 if (preExpr != null)
                 {
                     solver.Assert(preExpr);
+                }
+            }
+
+            // ASSUME: Assert collected flow-sensitive facts (loop bounds, parameter refinements, etc.)
+            // For RefinementEntry obligations, skip collected facts to avoid circular reasoning
+            // (the obligation IS the refinement, not an assumption for it).
+            if (obligation.Kind != ObligationKind.RefinementEntry)
+            {
+                foreach (var fact in info.CollectedFacts)
+                {
+                    var factExpr = translator.TranslateBoolExpr(fact);
+                    if (factExpr != null)
+                    {
+                        solver.Assert(factExpr);
+                    }
                 }
             }
 
@@ -180,16 +211,52 @@ public sealed class ObligationSolver : IDisposable
     {
         var result = new Dictionary<string, FunctionInfo>(StringComparer.Ordinal);
 
+        // Build indexed type lookup for size parameter injection
+        var indexedTypes = new Dictionary<string, IndexedTypeNode>(StringComparer.Ordinal);
+        foreach (var itype in module.IndexedTypes)
+        {
+            indexedTypes[itype.Name] = itype;
+        }
+
         foreach (var func in module.Functions)
         {
             var parameters = func.Parameters
                 .Select(p => (p.Name, p.TypeName))
                 .ToList();
 
+            // Collect flow-sensitive facts (loop bounds, etc.)
+            var factCollector = new FactCollector();
+            factCollector.CollectFromFunction(func);
+
+            // Add size parameter variables for indexed-typed parameters
+            var extraVars = new List<(string Name, string TypeName)>();
+            foreach (var param in func.Parameters)
+            {
+                var baseTypeName = param.TypeName;
+                var genericIdx = baseTypeName.IndexOf('<');
+                if (genericIdx > 0)
+                    baseTypeName = baseTypeName.Substring(0, genericIdx);
+
+                if (indexedTypes.TryGetValue(baseTypeName, out var itype))
+                {
+                    // Add the size parameter as an integer variable
+                    extraVars.Add((itype.SizeParam, "i32"));
+
+                    // If the indexed type has a constraint, add it as a fact
+                    if (itype.Constraint != null)
+                    {
+                        factCollector.Facts.Add(
+                            FactCollector.SubstituteSelfRefStatic(itype.Constraint, itype.SizeParam));
+                    }
+                }
+            }
+
             result[func.Id] = new FunctionInfo(
                 parameters,
                 func.Preconditions,
-                func.Output?.TypeName);
+                func.Output?.TypeName,
+                factCollector.Facts,
+                extraVars);
         }
 
         foreach (var cls in module.Classes)
@@ -203,7 +270,9 @@ public sealed class ObligationSolver : IDisposable
                 result[method.Id] = new FunctionInfo(
                     parameters,
                     method.Preconditions,
-                    method.Output?.TypeName);
+                    method.Output?.TypeName,
+                    new List<ExpressionNode>(),
+                    new List<(string, string)>());
             }
         }
 
@@ -213,7 +282,9 @@ public sealed class ObligationSolver : IDisposable
     private sealed record FunctionInfo(
         List<(string Name, string TypeName)> Parameters,
         IReadOnlyList<RequiresNode> Preconditions,
-        string? OutputType);
+        string? OutputType,
+        List<ExpressionNode> CollectedFacts,
+        List<(string Name, string TypeName)> ExtraVariables);
 
     public void Dispose()
     {

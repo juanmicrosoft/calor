@@ -1437,6 +1437,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(RefinementTypeNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(SelfRefNode node) => node;
     public ExpressionNode Visit(ProofObligationNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(IndexedTypeNode node) => throw new InvalidOperationException();
 
     #endregion
 }
