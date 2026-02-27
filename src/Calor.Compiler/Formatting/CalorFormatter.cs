@@ -215,16 +215,31 @@ public sealed class CalorFormatter
     private void FormatClass(ClassDefinitionNode cls)
     {
         var clsId = AbbreviateId(cls.Id);
-        var modifiers = new List<string>();
-        if (cls.IsAbstract) modifiers.Add("abs");
-        if (cls.IsSealed) modifiers.Add("sealed");
-        if (cls.IsPartial) modifiers.Add("partial");
-        if (cls.IsStatic) modifiers.Add("static");
 
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-        var baseStr = cls.BaseClass != null ? $":{cls.BaseClass}" : "";
+        // Build combined visibility+modifiers for the 3rd position
+        var parts = new List<string>();
 
-        AppendLine($"§CL{{{clsId}:{cls.Name}{baseStr}{modStr}}}");
+        // Add visibility if not Internal (the default)
+        if (cls.Visibility == Visibility.Public) parts.Add("pub");
+        else if (cls.Visibility == Visibility.Private) parts.Add("pri");
+        else if (cls.Visibility == Visibility.Protected) parts.Add("pro");
+        else if (cls.Visibility == Visibility.ProtectedInternal) parts.Add("int pro");
+
+        // Add modifiers
+        if (cls.IsAbstract) parts.Add("abs");
+        if (cls.IsSealed) parts.Add("seal");
+        if (cls.IsPartial) parts.Add("partial");
+        if (cls.IsStatic) parts.Add("stat");
+
+        var combinedStr = parts.Count > 0 ? $":{string.Join(" ", parts)}" : "";
+
+        AppendLine($"§CL{{{clsId}:{cls.Name}{combinedStr}}}");
+
+        // Base class as separate §EXT tag (not inline in class tag)
+        if (cls.BaseClass != null)
+        {
+            AppendLine($"§EXT{{{cls.BaseClass}}}");
+        }
 
         // Implemented interfaces
         foreach (var impl in cls.ImplementedInterfaces)
@@ -448,13 +463,23 @@ public sealed class CalorFormatter
     {
         var methodId = AbbreviateId(method.Id);
         var visibility = method.Visibility == Visibility.Public ? "pub" : "priv";
+
+        // Build method modifiers string
+        var mods = new List<string>();
+        if (method.IsAbstract) mods.Add("abs");
+        if (method.IsVirtual) mods.Add("virt");
+        if (method.IsOverride) mods.Add("over");
+        if (method.IsSealed) mods.Add("seal");
+        if (method.IsStatic) mods.Add("stat");
+        var modStr = mods.Count > 0 ? $":{string.Join(" ", mods)}" : "";
+
         var paramList = string.Join(", ", method.Parameters.Select(p =>
         {
             var defaultVal = p.DefaultValue != null ? $" = {FormatExpression(p.DefaultValue)}" : "";
             return $"{CompactTypeName(p.TypeName)}:{p.Name}{defaultVal}";
         }));
         var returnType = method.Output != null ? $" -> {CompactTypeName(method.Output.TypeName)}" : "";
-        AppendLine($"§MT{{{methodId}:{method.Name}:{visibility}}} ({paramList}){returnType}");
+        AppendLine($"§MT{{{methodId}:{method.Name}:{visibility}{modStr}}} ({paramList}){returnType}");
 
         foreach (var stmt in method.Body)
         {
