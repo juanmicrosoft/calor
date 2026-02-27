@@ -135,6 +135,54 @@ public class BenchmarkVerificationTests
             "Escaped input should not trigger SQL injection warning");
     }
 
+    [Fact]
+    public void TaintAnalysis_ParamLogging_NotExcluded()
+    {
+        // db.execute_with_param_logging should NOT be excluded — it's a real sink
+        var source = @"
+§M{m001:Test}
+§F{f001:ParamLogging:pub}
+  §I{string:user_input}
+  §O{string}
+  §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
+  §C db.execute_with_param_logging query
+  §R query
+§/F{f001}
+§/M{m001}";
+
+        var module = ParseAndBind(source, out var parseDiag);
+        if (parseDiag.HasErrors) return;
+
+        var diagnostics = RunTaintAnalysis(module!);
+
+        Assert.True(HasDiagnosticCode(diagnostics, DiagnosticCode.SqlInjection),
+            "db.execute_with_param_logging should be flagged as a SQL sink (not falsely excluded)");
+    }
+
+    [Fact]
+    public void TaintAnalysis_ExecuteParam_StillExcluded()
+    {
+        // db.execute_param should still be excluded — it's a parameterized query
+        var source = @"
+§M{m001:Test}
+§F{f001:ExecuteParam:pub}
+  §I{string:user_input}
+  §O{string}
+  §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
+  §C db.execute_param query user_input
+  §R query
+§/F{f001}
+§/M{m001}";
+
+        var module = ParseAndBind(source, out var parseDiag);
+        if (parseDiag.HasErrors) return;
+
+        var diagnostics = RunTaintAnalysis(module!);
+
+        Assert.False(HasDiagnosticCode(diagnostics, DiagnosticCode.SqlInjection),
+            "db.execute_param should be excluded as a parameterized query");
+    }
+
     #endregion
 
     #region Command Injection Benchmark Tests

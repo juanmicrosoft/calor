@@ -1,4 +1,5 @@
 using Calor.Compiler.Analysis.BugPatterns;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Analysis.Security;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
@@ -580,6 +581,140 @@ public class NegativeVerificationTests
         var bound = Bind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
         Assert.NotNull(bound);
+    }
+
+    [SkippableFact]
+    public void Binding_NoneExpression_ProducesBoundNoneLiteral()
+    {
+        var source = @"
+§M{m001:Test}
+§F{f001:TestNone:pub}
+  §I{string:maybeNull}
+  §O{i32}
+  §IF{if1} (!= maybeNull §NN)
+    §R INT:1
+  §EL
+    §R INT:0
+  §/I{if1}
+§/F{f001}
+§/M{m001}";
+
+        var bound = Bind(source, out var parseDiag);
+        Skip.If(parseDiag.HasErrors || bound == null, "Calor syntax not supported by parser");
+
+        // Walk the bound tree looking for a BoundNoneLiteral
+        var func = bound!.Functions.First();
+        BoundNoneLiteral? foundNone = null;
+
+        void CheckExpr(BoundExpression? expr)
+        {
+            if (expr is BoundNoneLiteral nl) foundNone = nl;
+            if (expr is BoundBinaryExpression bin)
+            {
+                CheckExpr(bin.Left);
+                CheckExpr(bin.Right);
+            }
+        }
+
+        foreach (var stmt in func.Body)
+        {
+            if (stmt is BoundIfStatement ifStmt)
+            {
+                CheckExpr(ifStmt.Condition);
+            }
+        }
+
+        Assert.NotNull(foundNone);
+
+        // BoundNoneLiteral must NOT be treated as a numeric constant or as literal zero
+        Assert.False(BoundNodeHelpers.IsConstant(foundNone),
+            "BoundNoneLiteral should not be considered a numeric constant");
+        Assert.False(BoundNodeHelpers.IsLiteralZero(foundNone),
+            "BoundNoneLiteral should not be confused with literal zero");
+    }
+
+    [SkippableFact]
+    public void SafeCode_DivisionByClamp_NoWarning()
+    {
+        // math.clamp(y, 1, 10) has lower bound 1, so it's always >= 1 (non-zero)
+        // The call must appear directly as the divisor so Z3 can translate it
+        // (the translator doesn't follow variable initializers)
+        var source = @"
+§M{m001:Test}
+§F{f001:ClampDiv:pub}
+  §I{i32:x}
+  §I{i32:y}
+  §O{i32}
+  §R (/ x (CALL math.clamp y INT:1 INT:10))
+§/F{f001}
+§/M{m001}";
+
+        AssertNoDivisionByZeroWarnings(source);
+    }
+
+    [SkippableFact]
+    public void SafeCode_DivisionBySignGuarded_NoWarning()
+    {
+        // math.sign(y) can be zero when y == 0, so a guard is needed
+        // The call must appear directly as the divisor so Z3 can translate it
+        var source = @"
+§M{m001:Test}
+§F{f001:SignDiv:pub}
+  §I{i32:x}
+  §I{i32:y}
+  §O{i32}
+  §IF{if1} (!= y INT:0)
+    §R (/ x (CALL math.sign y))
+  §EL
+    §R INT:0
+  §/I{if1}
+§/F{f001}
+§/M{m001}";
+
+        AssertNoDivisionByZeroWarnings(source);
+    }
+
+    [SkippableFact]
+    public void SafeCode_DivisionByConstantInIfBlock_NoWarning()
+    {
+        // Constant declared inside an if block — requires deep constant propagation
+        var source = @"
+§M{m001:Test}
+§F{f001:DeepConst:pub}
+  §I{i32:x}
+  §I{i32:flag}
+  §O{i32}
+  §B{result} INT:0
+  §IF{if1} (> flag INT:0)
+    §B{divisor:i32} INT:5
+    §B{result:i32} (/ x divisor)
+  §/I{if1}
+  §R result
+§/F{f001}
+§/M{m001}";
+
+        AssertNoDivisionByZeroWarnings(source);
+    }
+
+    [SkippableFact]
+    public void SafeCode_DivisionByConstantInLoopBody_NoWarning()
+    {
+        // Constant declared inside a for-loop body — requires recursive FindVariableInitializer
+        var source = @"
+§M{m001:Test}
+§F{f001:LoopConst:pub}
+  §I{i32:x}
+  §O{i32}
+  §B{result} INT:0
+  §L{l1:i:0:3:1}
+    §B{divisor:i32} INT:7
+    §B{result:i32} (+ result (/ x divisor))
+  §/L{l1}
+  §R result
+§/F{f001}
+§/M{m001}";
+
+        AssertNoDivisionByZeroWarnings(source);
     }
 
     #endregion
