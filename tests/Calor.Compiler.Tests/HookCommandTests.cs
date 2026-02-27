@@ -81,7 +81,7 @@ public class HookCommandTests : IDisposable
     [Fact]
     public void ValidateWrite_AllowsGeneratedCsFilesInObjDirectory()
     {
-        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj/Debug/net8.0/calor/Test.g.cs\"}");
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj/Debug/net10.0/calor/Test.g.cs\"}");
 
         Assert.Equal(0, result);
     }
@@ -89,7 +89,7 @@ public class HookCommandTests : IDisposable
     [Fact]
     public void ValidateWrite_AllowsFilesInObjDirectory()
     {
-        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj/Debug/net8.0/SomeFile.cs\"}");
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj/Debug/net10.0/SomeFile.cs\"}");
 
         Assert.Equal(0, result);
     }
@@ -97,7 +97,7 @@ public class HookCommandTests : IDisposable
     [Fact]
     public void ValidateWrite_AllowsFilesInObjDirectoryWindowsPath()
     {
-        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj\\\\Debug\\\\net8.0\\\\SomeFile.cs\"}");
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj\\\\Debug\\\\net10.0\\\\SomeFile.cs\"}");
 
         Assert.Equal(0, result);
     }
@@ -257,7 +257,7 @@ public class HookCommandTests : IDisposable
     public void ValidateWrite_ObjSubdirectory_IsAllowed()
     {
         // Nested subdirectory in obj
-        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj/Debug/net8.0/ref/MyAssembly.cs\"}");
+        var result = HookCommand.ValidateWrite("{\"file_path\": \"obj/Debug/net10.0/ref/MyAssembly.cs\"}");
 
         Assert.Equal(0, result);
     }

@@ -70,7 +70,7 @@
   </ItemGroup>
 
   <!-- Include Z3 native libraries for all platforms -->
-  <!-- For global tools, these go to tools/net8.0/any/runtimes/ via CopyToOutputDirectory -->
+  <!-- For global tools, these go to tools/net10.0/any/runtimes/ via CopyToOutputDirectory -->
   <ItemGroup>
     <None Include="runtimes\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

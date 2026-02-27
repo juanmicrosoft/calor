@@ -33,7 +33,7 @@ public static class ProjectConfigs
             LibrarySourceRelativePath = "SyntheticLib",
             SolutionOrProjectFile = "SyntheticLib.Tests/SyntheticLib.Tests.csproj",
             DotnetPath = dotnetPath,
-            TargetFramework = "net8.0",
+            TargetFramework = "net10.0",
         };
     }
 
@@ -77,6 +77,6 @@ public static class ProjectConfigs
         LibrarySourceRelativePath = "src/FluentValidation",
         SolutionOrProjectFile = "src/FluentValidation.Tests/FluentValidation.Tests.csproj",
         DotnetPath = dotnetPath,
-        TargetFramework = "net8.0",
+        TargetFramework = "net10.0",
     };
 }

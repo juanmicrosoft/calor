@@ -9,7 +9,7 @@ const commands = [
   {
     label: 'Install Calor',
     command: 'dotnet tool install -g calor',
-    description: 'One command. Works on Windows, Mac, and Linux. Requires .NET 8+.',
+    description: 'One command. Works on Windows, Mac, and Linux. Requires .NET 10+.',
   },
   {
     label: 'Set up your AI agent',

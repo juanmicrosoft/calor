@@ -5,7 +5,7 @@
   <PropertyGroup>
     <!-- CalorCompilerOverride: point at a local Calor.Tasks.dll to use a dev-built compiler -->
     <CalorTasksAssembly Condition="'$(CalorCompilerOverride)' != '' and '$(CalorTasksAssembly)' == ''">$(CalorCompilerOverride)</CalorTasksAssembly>
-    <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net8.0\Calor.Tasks.dll</CalorTasksAssembly>
+    <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net10.0\Calor.Tasks.dll</CalorTasksAssembly>
   </PropertyGroup>
 
   <UsingTask TaskName="Calor.Tasks.CompileCalor" AssemblyFile="$(CalorTasksAssembly)" />

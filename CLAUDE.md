@@ -1,6 +1,6 @@
 # CLAUDE.md — Calor Compiler
 
-Calor is a DSL designed for AI agents that compiles to C# on .NET 8. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (currently 0.3.5).
+Calor is a DSL designed for AI agents that compiles to C# on .NET 10. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (currently 0.3.5).
 
 ## Build & Test
 
@@ -10,7 +10,7 @@ dotnet test           # Run all tests
 dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 ```
 
-- .NET 8 SDK required (pinned in `global.json` to 8.0.100, rollForward: latestMinor)
+- .NET 10 SDK required (pinned in `global.json` to 10.0.100, rollForward: latestMinor)
 - `TreatWarningsAsErrors` is enabled globally — fix all warnings before committing
 - GPG signing workaround (1Password agent): `git -c commit.gpgsign=false commit -m "message"`
 

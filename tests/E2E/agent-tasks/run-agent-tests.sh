@@ -298,7 +298,7 @@ Majority Voting:
 Requirements:
   - Claude CLI (claude command)
   - jq (for reliable JSON parsing)
-  - .NET 8 SDK (for dotnet build)
+  - .NET 10 SDK (for dotnet build)
   - Z3 (optional, for contract verification)
 
 Exit Codes:

@@ -28,8 +28,8 @@ public class LspE2ETests : IDisposable
     {
         // Find the LSP server DLL - check both Release and Debug configurations
         var solutionDir = FindSolutionDirectory();
-        var releasePath = Path.Combine(solutionDir, "src", "Calor.LanguageServer", "bin", "Release", "net8.0", "calor-lsp.dll");
-        var debugPath = Path.Combine(solutionDir, "src", "Calor.LanguageServer", "bin", "Debug", "net8.0", "calor-lsp.dll");
+        var releasePath = Path.Combine(solutionDir, "src", "Calor.LanguageServer", "bin", "Release", "net10.0", "calor-lsp.dll");
+        var debugPath = Path.Combine(solutionDir, "src", "Calor.LanguageServer", "bin", "Debug", "net10.0", "calor-lsp.dll");
 
         // Prefer Release (used in CI) over Debug
         var lspServerPath = File.Exists(releasePath) ? releasePath : debugPath;

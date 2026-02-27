@@ -93,7 +93,7 @@ function findServerPath(context: vscode.ExtensionContext, config: vscode.Workspa
                     folder.uri.fsPath,
                     'src/Calor.LanguageServer/bin',
                     buildConfig,
-                    'net8.0/calor-lsp.dll'
+                    'net10.0/calor-lsp.dll'
                 );
                 if (fs.existsSync(dllPath)) {
                     outputChannel.appendLine(`Using workspace server: ${dllPath}`);

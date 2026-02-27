@@ -18,5 +18,5 @@ When inlining a method call:
 ```
 
 ### Code Conventions
-- Use C# 12 features where appropriate
+- Use C# 14 features where appropriate
 - Keep code readable - don't inline if it makes code harder to understand

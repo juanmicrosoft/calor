@@ -26,7 +26,7 @@ You don't need to convert everything at once. Calor and C# coexist seamlessly.
 
 ## Prerequisites
 
-- .NET 8.0 SDK or later
+- .NET 10.0 SDK or later
 - `calor` global tool installed: `dotnet tool install -g calor`
 - An existing C# project
 
@@ -156,7 +156,7 @@ The build process:
 Check the generated C# to understand what Calor produces:
 
 ```bash
-cat obj/Debug/net8.0/calor/Calculator.g.cs
+cat obj/Debug/net10.0/calor/Calculator.g.cs
 ```
 
 ---
@@ -285,7 +285,7 @@ MyProject/
 │       ├── PaymentService.calr    # Converted to Calor
 │       └── OrderService.calr      # Converted to Calor
 └── obj/
-    └── Debug/net8.0/calor/
+    └── Debug/net10.0/calor/
         ├── PaymentService.g.cs    # Generated C#
         └── OrderService.g.cs      # Generated C#
 ```

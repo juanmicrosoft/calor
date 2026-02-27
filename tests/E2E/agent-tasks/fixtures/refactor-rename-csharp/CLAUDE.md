@@ -11,7 +11,7 @@ This is a C# project. Write code in `.cs` files.
   - In contract comments
 
 ### Code Conventions
-- Use C# 12 features where appropriate
+- Use C# 14 features where appropriate
 - Follow Microsoft naming conventions (PascalCase for methods, camelCase for parameters)
 
 ### Contract Comments

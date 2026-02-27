@@ -9,7 +9,7 @@ This is a C# project. Write code in `.cs` files.
 - Use guard clauses for validation
 
 ### Code Conventions
-- Use C# 12 features where appropriate
+- Use C# 14 features where appropriate
 - Follow Microsoft naming conventions (PascalCase for methods, camelCase for parameters)
 - Keep methods focused on a single responsibility
 
