@@ -357,6 +357,89 @@ public class CompactSyntaxTests
     }
 
     [Fact]
+    public void Interface_BaseInterface_FromThirdAttribute()
+    {
+        var source = """
+            §M{m001:Test}
+            §IFACE{i001:IChild:IParent}
+            §MT{m001:DoWork}
+            §O{void}
+            §/MT{m001}
+            §/IFACE{i001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var iface = Assert.Single(module.Interfaces);
+        Assert.Equal("IChild", iface.Name);
+        Assert.Single(iface.BaseInterfaces);
+        Assert.Equal("IParent", iface.BaseInterfaces[0]);
+
+        // Verify C# emission includes base interface
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+        Assert.Contains(": IParent", csharp);
+    }
+
+    [Fact]
+    public void Interface_MultipleBaseInterfaces_FromThirdAttribute()
+    {
+        var source = """
+            §M{m001:Test}
+            §IFACE{i001:IChild:IParent,IDisposable}
+            §MT{m001:DoWork}
+            §O{void}
+            §/MT{m001}
+            §/IFACE{i001}
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var iface = Assert.Single(module.Interfaces);
+        Assert.Equal("IChild", iface.Name);
+        Assert.Equal(2, iface.BaseInterfaces.Count);
+        Assert.Equal("IParent", iface.BaseInterfaces[0]);
+        Assert.Equal("IDisposable", iface.BaseInterfaces[1]);
+
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+        Assert.Contains(": IParent, IDisposable", csharp);
+    }
+
+    [Fact]
+    public void Interface_BaseInterface_RoundTrip()
+    {
+        var source = """
+            §M{m001:Test}
+            §IFACE{i001:IChild:IParent}
+            §MT{m001:DoWork}
+            §O{void}
+            §/MT{m001}
+            §/IFACE{i001}
+            §/M{m001}
+            """;
+
+        // Parse → Calor emit → Re-parse → verify base interface preserved
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var calorEmitter = new CalorEmitter();
+        var calorCode = calorEmitter.Emit(module);
+
+        var module2 = Parse(calorCode, out var diagnostics2);
+        Assert.False(diagnostics2.HasErrors, string.Join("\n", diagnostics2.Select(d => d.Message)));
+
+        var iface = Assert.Single(module2.Interfaces);
+        Assert.Equal("IChild", iface.Name);
+        Assert.Single(iface.BaseInterfaces);
+        Assert.Equal("IParent", iface.BaseInterfaces[0]);
+    }
+
+    [Fact]
     public void OptionalId_Enum_NameOnly()
     {
         // §EN{Color} instead of §EN{e001:Color}
