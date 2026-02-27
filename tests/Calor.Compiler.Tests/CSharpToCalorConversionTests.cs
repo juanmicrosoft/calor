@@ -3640,6 +3640,48 @@ public class CSharpToCalorConversionTests
         Assert.Equal("0x01 | 0x02", enumDef.Members.First(m => m.Name == "All").Value);
     }
 
+    [Fact]
+    public void Convert_EnumWithLargeHexValue_HandlesOverflow()
+    {
+        // 0xFFFFFFFF exceeds int.MaxValue — should not throw, should round-trip
+        var csharpSource = """
+            public enum LargeFlags : uint
+            {
+                None = 0x00000000,
+                All = 0xFFFFFFFF
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "LargeFlags");
+        Assert.Equal("0xFFFFFFFF", enumDef.Members.First(m => m.Name == "All").Value);
+        Assert.Equal("0x00000000", enumDef.Members.First(m => m.Name == "None").Value);
+    }
+
+    [Fact]
+    public void Lexer_HexLiteral_LargeValue_DoesNotThrow()
+    {
+        // Directly test the lexer with a large hex value
+        var diagnostics = new DiagnosticBag();
+        var source = "§EN{e1:Test}\nVal = 0xFFFFFFFF\n§/EN{e1}";
+        var lexer = new Lexer(source, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var intToken = tokens.First(t => t.Kind == TokenKind.IntLiteral);
+        Assert.Equal("0xFFFFFFFF", intToken.Text);
+    }
+
     #endregion
 
     #region Tuple Deconstruction in Setter Tests

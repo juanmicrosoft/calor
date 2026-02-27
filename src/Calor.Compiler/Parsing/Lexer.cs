@@ -1035,7 +1035,8 @@ public sealed class Lexer
             if (long.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var hexVal))
             {
-                return MakeToken(TokenKind.IntLiteral, (int)hexVal);
+                // Use unchecked to handle values > int.MaxValue (e.g., 0xFFFFFFFF → -1)
+                return MakeToken(TokenKind.IntLiteral, unchecked((int)hexVal));
             }
 
             _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
@@ -1368,7 +1369,8 @@ public sealed class Lexer
                 System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var hexValue))
             {
-                return MakeToken(TokenKind.IntLiteral, (int)hexValue);
+                // Use unchecked to handle values > int.MaxValue (e.g., 0xFFFFFFFF → -1)
+                return MakeToken(TokenKind.IntLiteral, unchecked((int)hexValue));
             }
 
             _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "hex number");
