@@ -582,7 +582,7 @@ public class InheritanceTests
 
     #region Round-Trip Tests
 
-    [Fact(Skip = "CalorFormatter doesn't preserve class definitions - requires formatter fix")]
+    [Fact]
     public void RoundTrip_AbstractClass_FormatsAndReparses()
     {
         var source = @"
@@ -620,7 +620,7 @@ public class InheritanceTests
         Assert.True(classNode.IsAbstract);
     }
 
-    [Fact(Skip = "CalorFormatter doesn't preserve class definitions - requires formatter fix")]
+    [Fact]
     public void RoundTrip_InheritanceHierarchy_FormatsAndReparses()
     {
         var source = @"
