@@ -426,6 +426,34 @@ public class SwitchExpressionConversionTests
         Assert.IsType<MatchExpressionNode>(conditional.WhenTrue);
     }
 
+    [Fact]
+    public void Convert_SwitchExpression_ComplexDiscriminant_Parenthesized()
+    {
+        var csharpSource = """
+            public class Formatter
+            {
+                public string GetSuffix(int number) => (number % 10) switch
+                {
+                    1 => "st",
+                    2 => "nd",
+                    3 => "rd",
+                    _ => "th"
+                };
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var emitter = new CSharpEmitter();
+        var emittedCSharp = emitter.Emit(result.Ast!);
+
+        // The discriminant should be wrapped in parentheses
+        Assert.Contains("(number % 10) switch", emittedCSharp);
+        // Should NOT produce "number % 10 switch" (no parens)
+        Assert.DoesNotContain("number % 10 switch", emittedCSharp);
+    }
+
     #endregion
 
     #region Helpers

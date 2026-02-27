@@ -3956,6 +3956,19 @@ public sealed class Parser
                 return new TypeOfReference(typeName);
             }
 
+            // Handle nameof(identifier)
+            if (text == "nameof" && Check(TokenKind.OpenParen))
+            {
+                Advance(); // consume (
+                var name = "";
+                while (!IsAtEnd && !Check(TokenKind.CloseParen))
+                {
+                    name += Advance().Text;
+                }
+                Expect(TokenKind.CloseParen);
+                return new NameOfReference(name);
+            }
+
             // Handle qualified names like System.String or enum values like AccessLevel.Admin
             while (Current.Text == ".")
             {
@@ -4972,14 +4985,17 @@ public sealed class Parser
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
-        // Positional: [id:name]
+        // Positional: [id:name:baseInterface?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
+        var pos2 = attrs["_pos2"] ?? "";
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 2 && !IsIdPattern(id))
+        if (posCount >= 1 && !IsIdPattern(id))
         {
+            // Shift all positionals right: id becomes name, name becomes pos2, etc.
+            pos2 = name;
             name = id;
             id = GenerateParserAutoId("i");
         }
@@ -5032,6 +5048,17 @@ public sealed class Parser
         }
 
         var baseInterfaces = new List<string>();
+        if (!string.IsNullOrEmpty(pos2))
+        {
+            foreach (var baseIface in pos2.Split(','))
+            {
+                var trimmed = baseIface.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                {
+                    baseInterfaces.Add(trimmed);
+                }
+            }
+        }
         var methods = new List<MethodSignatureNode>();
         var properties = new List<PropertyNode>();
 
@@ -8311,7 +8338,7 @@ public sealed class Parser
     {
         if (Check(TokenKind.IntLiteral))
         {
-            return Advance().Value?.ToString();
+            return Advance().Text;
         }
         if (Check(TokenKind.Identifier))
         {
@@ -8333,7 +8360,7 @@ public sealed class Parser
         if (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral)
         {
             Advance(); // consume -
-            return $"-{Advance().Value}";
+            return $"-{Advance().Text}";
         }
         if (Check(TokenKind.Tilde))
         {
