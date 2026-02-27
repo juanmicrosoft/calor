@@ -3956,6 +3956,19 @@ public sealed class Parser
                 return new TypeOfReference(typeName);
             }
 
+            // Handle nameof(identifier)
+            if (text == "nameof" && Check(TokenKind.OpenParen))
+            {
+                Advance(); // consume (
+                var name = "";
+                while (!IsAtEnd && !Check(TokenKind.CloseParen))
+                {
+                    name += Advance().Text;
+                }
+                Expect(TokenKind.CloseParen);
+                return new NameOfReference(name);
+            }
+
             // Handle qualified names like System.String or enum values like AccessLevel.Admin
             while (Current.Text == ".")
             {

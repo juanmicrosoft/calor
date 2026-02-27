@@ -7367,6 +7367,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.BitwiseNotExpression)
                 => new BitwiseNotExpression(ConvertAttributeValue(prefix.Operand)),
             ParenthesizedExpressionSyntax paren => ConvertAttributeValue(paren.Expression),
+            InvocationExpressionSyntax invocation
+                when invocation.Expression is IdentifierNameSyntax { Identifier.Text: "nameof" }
+                => new NameOfReference(invocation.ArgumentList.Arguments[0].Expression.ToString()),
             _ => expression.ToString()
         };
     }
