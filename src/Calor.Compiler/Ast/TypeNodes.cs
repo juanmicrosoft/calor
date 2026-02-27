@@ -326,6 +326,11 @@ public sealed class EnumDefinitionNode : TypeDefinitionNode
     /// </summary>
     public IReadOnlyList<EnumMemberNode> Members { get; }
 
+    /// <summary>
+    /// C#-style attributes (e.g., [@Flags], [@Obsolete]).
+    /// </summary>
+    public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
+
     public EnumDefinitionNode(
         TextSpan span,
         string id,
@@ -333,10 +338,23 @@ public sealed class EnumDefinitionNode : TypeDefinitionNode
         string? underlyingType,
         IReadOnlyList<EnumMemberNode> members,
         AttributeCollection attributes)
+        : this(span, id, name, underlyingType, members, attributes, Array.Empty<CalorAttributeNode>())
+    {
+    }
+
+    public EnumDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        string? underlyingType,
+        IReadOnlyList<EnumMemberNode> members,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span, id, name, attributes)
     {
         UnderlyingType = underlyingType;
         Members = members ?? throw new ArgumentNullException(nameof(members));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

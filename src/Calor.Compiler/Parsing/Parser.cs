@@ -6185,7 +6185,7 @@ public sealed class Parser
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 2 && !IsIdPattern(id) && IsVisibilityKeyword(id))
+        if (posCount < 2 && !IsIdPattern(id) && (IsVisibilityKeyword(id) || id.Equals("stat", StringComparison.OrdinalIgnoreCase)))
         {
             visStr = id;
             id = GenerateParserAutoId("ctor");
@@ -6196,7 +6196,8 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CTOR", "id");
         }
 
-        var visibility = ParseVisibility(visStr);
+        var isStatic = visStr.Equals("stat", StringComparison.OrdinalIgnoreCase);
+        var visibility = isStatic ? Visibility.Private : ParseVisibility(visStr);
 
         // --- Compact syntax: inline signature (consume but parameters already parsed via §I) ---
         var _inlineParams = new List<ParameterNode>();
@@ -6251,7 +6252,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs);
+        return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs, isStatic);
     }
 
     /// <summary>

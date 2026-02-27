@@ -174,6 +174,7 @@ public sealed class ConstructorNode : AstNode
 {
     public string Id { get; }
     public Visibility Visibility { get; }
+    public bool IsStatic { get; }
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public IReadOnlyList<RequiresNode> Preconditions { get; }
     public ConstructorInitializerNode? Initializer { get; }
@@ -194,7 +195,7 @@ public sealed class ConstructorNode : AstNode
         ConstructorInitializerNode? initializer,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes)
-        : this(span, id, visibility, parameters, preconditions, initializer, body, attributes, Array.Empty<CalorAttributeNode>())
+        : this(span, id, visibility, parameters, preconditions, initializer, body, attributes, Array.Empty<CalorAttributeNode>(), isStatic: false)
     {
     }
 
@@ -208,10 +209,26 @@ public sealed class ConstructorNode : AstNode
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, id, visibility, parameters, preconditions, initializer, body, attributes, csharpAttributes, isStatic: false)
+    {
+    }
+
+    public ConstructorNode(
+        TextSpan span,
+        string id,
+        Visibility visibility,
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<RequiresNode> preconditions,
+        ConstructorInitializerNode? initializer,
+        IReadOnlyList<StatementNode> body,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        bool isStatic)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Visibility = visibility;
+        IsStatic = isStatic;
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Preconditions = preconditions ?? throw new ArgumentNullException(nameof(preconditions));
         Initializer = initializer;
