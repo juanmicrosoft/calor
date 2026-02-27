@@ -745,6 +745,64 @@ public class TypeSystemTests
 
     #endregion
 
+    #region TypeMapper - Interface vs Concrete Collection Tests
+
+    [Theory]
+    [InlineData("IList", "IList")]
+    [InlineData("IDictionary", "IDict")]
+    [InlineData("ICollection", "ICollection")]
+    [InlineData("ISet", "ISet")]
+    [InlineData("List", "List")]
+    [InlineData("Dictionary", "Dict")]
+    [InlineData("HashSet", "Set")]
+    [InlineData("IEnumerable", "Seq")]
+    public void CSharpToCalor_CollectionTypes_PreservesInterfaceDistinction(string csharp, string calor)
+    {
+        var result = Migration.TypeMapper.CSharpToCalor(csharp);
+        Assert.Equal(calor, result);
+    }
+
+    [Theory]
+    [InlineData("IList", "IList")]
+    [InlineData("IDict", "IDictionary")]
+    [InlineData("ICollection", "ICollection")]
+    [InlineData("ISet", "ISet")]
+    [InlineData("List", "List")]
+    [InlineData("Dict", "Dictionary")]
+    [InlineData("Set", "HashSet")]
+    [InlineData("Seq", "IEnumerable")]
+    public void CalorToCSharp_CollectionTypes_PreservesInterfaceDistinction(string calor, string csharp)
+    {
+        var result = Migration.TypeMapper.CalorToCSharp(calor);
+        Assert.Equal(csharp, result);
+    }
+
+    [Fact]
+    public void CSharpToCalor_GenericIList_PreservesInterface()
+    {
+        var result = Migration.TypeMapper.CSharpToCalor("IList<int>");
+        Assert.Equal("IList<i32>", result);
+    }
+
+    [Fact]
+    public void CSharpToCalor_GenericList_StaysConcrete()
+    {
+        var result = Migration.TypeMapper.CSharpToCalor("List<int>");
+        Assert.Equal("List<i32>", result);
+    }
+
+    [Fact]
+    public void CalorToCSharp_GenericIList_RoundTrips()
+    {
+        var calor = Migration.TypeMapper.CSharpToCalor("IList<string>");
+        Assert.Equal("IList<str>", calor);
+
+        var csharp = Migration.TypeMapper.CalorToCSharp(calor);
+        Assert.Equal("IList<string>", csharp);
+    }
+
+    #endregion
+
     #region End-to-End: Option/Result Return Types
 
     [Fact]
