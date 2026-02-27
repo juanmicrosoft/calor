@@ -307,6 +307,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     public IReadOnlyList<MemberPreprocessorBlockNode> PreprocessorBlocks { get; }
 
     /// <summary>
+    /// Source file path for partial class tracking (set during project-level migration).
+    /// </summary>
+    public string? SourceFile { get; set; }
+
+    /// <summary>
     /// Nested class/struct/record declarations inside this type.
     /// </summary>
     public IReadOnlyList<ClassDefinitionNode> NestedClasses { get; }

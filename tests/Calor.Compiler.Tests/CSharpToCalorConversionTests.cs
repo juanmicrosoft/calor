@@ -3883,6 +3883,173 @@ public class CSharpToCalorConversionTests
 
     #endregion
 
+    #region Partial Class Merger Tests
+
+    [Fact]
+    public void PartialClassMerger_MergesTwoPartials()
+    {
+        var csharp1 = """
+            public partial class Foo
+            {
+                public int X { get; set; }
+                public void DoA() { }
+            }
+            """;
+
+        var csharp2 = """
+            public partial class Foo
+            {
+                public string Y { get; set; }
+                public void DoB() { }
+            }
+            """;
+
+        // Same module name = same namespace — should merge
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        // Should still have 2 modules, but merged class is in the first one
+        var allClasses = merged.SelectMany(m => m.Classes).Where(c => c.Name == "Foo").ToList();
+        Assert.Single(allClasses);
+
+        var mergedClass = allClasses[0];
+        Assert.True(mergedClass.IsPartial);
+        Assert.Equal(2, mergedClass.Properties.Count);
+        Assert.Equal(2, mergedClass.Methods.Count);
+    }
+
+    [Fact]
+    public void PartialClassMerger_PreservesBaseClass()
+    {
+        var csharp1 = """
+            public partial class Bar : BaseType
+            {
+                public void MethodA() { }
+            }
+            """;
+
+        var csharp2 = """
+            public partial class Bar
+            {
+                public void MethodB() { }
+            }
+            """;
+
+        // Same module name = same namespace — should merge
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        var mergedClass = merged.SelectMany(m => m.Classes).First(c => c.Name == "Bar");
+        Assert.Equal("BaseType", mergedClass.BaseClass);
+        Assert.Equal(2, mergedClass.Methods.Count);
+    }
+
+    [Fact]
+    public void PartialClassMerger_MergesInterfaces()
+    {
+        var csharp1 = """
+            public partial class Baz : IDisposable
+            {
+                public void Dispose() { }
+            }
+            """;
+
+        var csharp2 = """
+            public partial class Baz : ICloneable
+            {
+                public object Clone() { return this; }
+            }
+            """;
+
+        // Same module name = same namespace — should merge
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        var mergedClass = merged.SelectMany(m => m.Classes).First(c => c.Name == "Baz");
+        Assert.Contains("IDisposable", mergedClass.ImplementedInterfaces);
+        Assert.Contains("ICloneable", mergedClass.ImplementedInterfaces);
+    }
+
+    [Fact]
+    public void PartialClassMerger_NonPartialClassesUnchanged()
+    {
+        var csharp1 = """
+            public class Regular
+            {
+                public int X { get; set; }
+            }
+            """;
+
+        var csharp2 = """
+            public class Other
+            {
+                public int Y { get; set; }
+            }
+            """;
+
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Reg" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Other" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        Assert.Equal(2, merged.Count);
+        Assert.Single(merged[0].Classes);
+        Assert.Single(merged[1].Classes);
+    }
+
+    [Fact]
+    public void PartialClassMerger_DifferentNamespaces_DoesNotMerge()
+    {
+        var csharp1 = """
+            public partial class Widget
+            {
+                public int X { get; set; }
+            }
+            """;
+
+        var csharp2 = """
+            public partial class Widget
+            {
+                public int Y { get; set; }
+            }
+            """;
+
+        // Different module names = different namespaces — should NOT merge
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "App.Models" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "App.Views" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        // Both Widget classes should remain separate (different namespaces)
+        var allWidgets = merged.SelectMany(m => m.Classes).Where(c => c.Name == "Widget").ToList();
+        Assert.Equal(2, allWidgets.Count);
+        Assert.Single(allWidgets[0].Properties);
+        Assert.Single(allWidgets[1].Properties);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static string GetErrorMessage(ConversionResult result)

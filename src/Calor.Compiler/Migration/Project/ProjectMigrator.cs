@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
+using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Verification.Z3;
 
 namespace Calor.Compiler.Migration.Project;
@@ -112,7 +114,15 @@ public sealed class ProjectMigrator
         // Add recommendations based on results
         AddRecommendations(reportBuilder, plan);
 
-        return reportBuilder.Build();
+        var report = reportBuilder.Build();
+
+        // Post-conversion: merge partial classes if enabled
+        if (_options.MergePartialClasses && !dryRun && plan.Direction == MigrationDirection.CSharpToCalor)
+        {
+            await MergePartialClassesAsync(report);
+        }
+
+        return report;
     }
 
     /// <summary>
@@ -121,6 +131,67 @@ public sealed class ProjectMigrator
     public async Task<MigrationReport> DryRunAsync(MigrationPlan plan)
     {
         return await ExecuteAsync(plan, dryRun: true);
+    }
+
+    /// <summary>
+    /// Merges partial class definitions from successfully converted files.
+    /// Re-reads, merges, and re-writes the output Calor files.
+    /// </summary>
+    private async Task MergePartialClassesAsync(MigrationReport report)
+    {
+        var successfulFiles = report.FileResults
+            .Where(f => f.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial
+                        && f.OutputPath != null)
+            .ToList();
+
+        if (successfulFiles.Count < 2)
+            return;
+
+        // Parse all successful output files
+        var modules = new List<(FileMigrationResult File, ModuleNode Module)>();
+        foreach (var file in successfulFiles)
+        {
+            try
+            {
+                var source = await File.ReadAllTextAsync(file.OutputPath!);
+                var parseResult = CalorSourceHelper.Parse(source, file.OutputPath!);
+                if (parseResult.IsSuccess && parseResult.Ast != null)
+                {
+                    // Tag partial classes with source file
+                    foreach (var cls in parseResult.Ast.Classes.Where(c => c.IsPartial))
+                    {
+                        cls.SourceFile = file.SourcePath;
+                    }
+                    modules.Add((file, parseResult.Ast));
+                }
+            }
+            catch
+            {
+                // Skip files that can't be parsed
+            }
+        }
+
+        // Check if there are any partial classes to merge
+        var hasPartials = modules
+            .SelectMany(m => m.Module.Classes)
+            .Any(c => c.IsPartial);
+
+        if (!hasPartials)
+            return;
+
+        var merger = new PartialClassMerger();
+        var mergedModules = merger.Merge(modules.Select(m => m.Module).ToList());
+
+        // Re-emit only modules that changed
+        var emitter = new CalorEmitter();
+        for (var i = 0; i < mergedModules.Count; i++)
+        {
+            if (mergedModules[i] != modules[i].Module)
+            {
+                var newSource = emitter.Emit(mergedModules[i]);
+                await File.WriteAllTextAsync(modules[i].File.OutputPath!, newSource);
+            }
+        }
     }
 
     private async Task<FileMigrationResult> ProcessEntryAsync(MigrationPlanEntry entry, MigrationDirection direction, bool dryRun)
@@ -162,6 +233,15 @@ public sealed class ProjectMigrator
         });
 
         var result = await converter.ConvertFileAsync(entry.SourcePath);
+
+        // Tag partial classes with source file for merging
+        if (result.Success && result.Ast != null && _options.MergePartialClasses)
+        {
+            foreach (var cls in result.Ast.Classes.Where(c => c.IsPartial))
+            {
+                cls.SourceFile = entry.SourcePath;
+            }
+        }
 
         FileMetrics? metrics = null;
         if (result.Success && result.CalorSource != null && _options.IncludeBenchmark)
