@@ -334,17 +334,64 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
 
     /// <summary>
     /// Finds the initializer expression for a variable declared in the function body.
+    /// Searches recursively into if/loop/try blocks.
     /// Returns null if not found or if the variable is reassigned.
     /// </summary>
     private static BoundExpression? FindVariableInitializer(string variableName, BoundFunction function)
     {
-        foreach (var stmt in function.Body)
+        return FindVariableInitializerInStatements(variableName, function.Body);
+    }
+
+    private static BoundExpression? FindVariableInitializerInStatements(string variableName, IReadOnlyList<BoundStatement> statements)
+    {
+        foreach (var stmt in statements)
         {
             if (stmt is BoundBindStatement bind &&
                 bind.Variable.Name == variableName &&
                 bind.Initializer != null)
             {
                 return bind.Initializer;
+            }
+
+            if (stmt is BoundIfStatement ifStmt)
+            {
+                var thenResult = FindVariableInitializerInStatements(variableName, ifStmt.ThenBody);
+                if (thenResult != null) return thenResult;
+                foreach (var elseIf in ifStmt.ElseIfClauses)
+                {
+                    var elseIfResult = FindVariableInitializerInStatements(variableName, elseIf.Body);
+                    if (elseIfResult != null) return elseIfResult;
+                }
+                if (ifStmt.ElseBody != null)
+                {
+                    var elseResult = FindVariableInitializerInStatements(variableName, ifStmt.ElseBody);
+                    if (elseResult != null) return elseResult;
+                }
+            }
+            else if (stmt is BoundForStatement forStmt)
+            {
+                var forResult = FindVariableInitializerInStatements(variableName, forStmt.Body);
+                if (forResult != null) return forResult;
+            }
+            else if (stmt is BoundWhileStatement whileStmt)
+            {
+                var whileResult = FindVariableInitializerInStatements(variableName, whileStmt.Body);
+                if (whileResult != null) return whileResult;
+            }
+            else if (stmt is BoundTryStatement tryStmt)
+            {
+                var tryResult = FindVariableInitializerInStatements(variableName, tryStmt.TryBody);
+                if (tryResult != null) return tryResult;
+                foreach (var catchClause in tryStmt.CatchClauses)
+                {
+                    var catchResult = FindVariableInitializerInStatements(variableName, catchClause.Body);
+                    if (catchResult != null) return catchResult;
+                }
+                if (tryStmt.FinallyBody != null)
+                {
+                    var finallyResult = FindVariableInitializerInStatements(variableName, tryStmt.FinallyBody);
+                    if (finallyResult != null) return finallyResult;
+                }
             }
         }
         return null;
@@ -473,6 +520,36 @@ internal sealed class BoundExpressionTranslator
             var y = TranslateExpr(callExpr.Arguments[1]);
             if (x is BitVecExpr bvX && y is BitVecExpr bvY)
                 return _ctx.MkITE(_ctx.MkBVSGE(bvX, bvY), bvX, bvY);
+        }
+
+        // math.clamp / clamp: clamp(x, min, max) → max(min, min(x, max))
+        if ((target == "math.clamp" || target == "clamp") && callExpr.Arguments.Count == 3)
+        {
+            var x = TranslateExpr(callExpr.Arguments[0]);
+            var lo = TranslateExpr(callExpr.Arguments[1]);
+            var hi = TranslateExpr(callExpr.Arguments[2]);
+            if (x is BitVecExpr bvX && lo is BitVecExpr bvLo && hi is BitVecExpr bvHi)
+            {
+                // ite(x < lo, lo, ite(x > hi, hi, x))
+                return _ctx.MkITE(
+                    _ctx.MkBVSLT(bvX, bvLo), bvLo,
+                    _ctx.MkITE(_ctx.MkBVSGT(bvX, bvHi), bvHi, bvX));
+            }
+        }
+
+        // math.sign / sign: ite(x > 0, 1, ite(x < 0, -1, 0))
+        if ((target == "math.sign" || target == "sign") && callExpr.Arguments.Count == 1)
+        {
+            var arg = TranslateExpr(callExpr.Arguments[0]);
+            if (arg is BitVecExpr bv)
+            {
+                var zero = _ctx.MkBV(0, bv.SortSize);
+                var one = _ctx.MkBV(1, bv.SortSize);
+                var negOne = _ctx.MkBVNeg(one);
+                return _ctx.MkITE(
+                    _ctx.MkBVSGT(bv, zero), one,
+                    _ctx.MkITE(_ctx.MkBVSLT(bv, zero), negOne, zero));
+            }
         }
 
         // Unknown function — return null (inconclusive)

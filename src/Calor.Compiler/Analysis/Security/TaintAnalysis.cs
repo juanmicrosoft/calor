@@ -477,9 +477,7 @@ public sealed class TaintAnalysis
              lowerTarget.Contains("db.raw") ||
              lowerTarget.Contains("execute_sql")))
         {
-            if (lowerTarget.Contains("_param") ||
-                lowerTarget.Contains("parameterized") ||
-                lowerTarget.Contains("prepared"))
+            if (IsParameterizedQuery(lowerTarget))
             {
                 return null; // Parameterized queries are safe
             }
@@ -522,6 +520,25 @@ public sealed class TaintAnalysis
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Checks if the target represents a parameterized/prepared query (safe by design).
+    /// Uses precise method-segment matching to avoid false exclusions like "execute_with_param_logging".
+    /// </summary>
+    private static bool IsParameterizedQuery(string lowerTarget)
+    {
+        // Extract the final method segment (after last '.')
+        var dotIndex = lowerTarget.LastIndexOf('.');
+        var methodSegment = dotIndex >= 0 ? lowerTarget[(dotIndex + 1)..] : lowerTarget;
+
+        return methodSegment.EndsWith("_param") ||
+               methodSegment.EndsWith("_parameterized") ||
+               methodSegment.EndsWith("_prepared") ||
+               methodSegment == "parameterized" ||
+               methodSegment == "prepared" ||
+               methodSegment.StartsWith("parameterized_") ||
+               methodSegment.StartsWith("prepared_");
     }
 
     /// <summary>

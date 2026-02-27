@@ -311,6 +311,19 @@ public sealed class BoundFloatLiteral : BoundExpression
 }
 
 /// <summary>
+/// Bound None literal (Option.None / null).
+/// </summary>
+public sealed class BoundNoneLiteral : BoundExpression
+{
+    public override string TypeName { get; }
+
+    public BoundNoneLiteral(TextSpan span, string? optionType = null) : base(span)
+    {
+        TypeName = optionType ?? "NONE";
+    }
+}
+
+/// <summary>
 /// Bound unary operation.
 /// </summary>
 public sealed class BoundUnaryExpression : BoundExpression
