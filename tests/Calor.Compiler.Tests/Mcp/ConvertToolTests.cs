@@ -246,4 +246,119 @@ public class ConvertToolTests
             i.GetProperty("message").GetString()?.Contains("Auto-fixed") == true).ToList();
         Assert.Empty(autoFixIssues);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInputPath_ReadsFromFile()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(tempFile, "public class FromFile { public int X { get; set; } }");
+
+            var args = JsonDocument.Parse($$"""
+                {
+                    "inputPath": {{JsonSerializer.Serialize(tempFile)}}
+                }
+                """).RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.False(result.IsError);
+            var text = result.Content[0].Text!;
+            Assert.Contains("success", text);
+            Assert.Contains("calorSource", text);
+            Assert.Contains("FromFile", text);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInputPath_DerivesModuleNameFromFilename()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, "MyService.cs");
+        try
+        {
+            await File.WriteAllTextAsync(tempFile, "public class MyService { }");
+
+            var args = JsonDocument.Parse($$"""
+                {
+                    "inputPath": {{JsonSerializer.Serialize(tempFile)}}
+                }
+                """).RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.False(result.IsError);
+            var text = result.Content[0].Text!;
+            Assert.Contains("MyService", text);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithOutputPath_WritesFile()
+    {
+        var outputFile = Path.Combine(Path.GetTempPath(), $"calor_output_{Guid.NewGuid():N}.calr");
+        try
+        {
+            var args = JsonDocument.Parse($$"""
+                {
+                    "source": "public class OutputTest { public int Y { get; set; } }",
+                    "outputPath": {{JsonSerializer.Serialize(outputFile)}}
+                }
+                """).RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.False(result.IsError);
+            Assert.True(File.Exists(outputFile), "Output file should be created");
+            var content = await File.ReadAllTextAsync(outputFile);
+            Assert.Contains("OutputTest", content);
+
+            // Verify outputPath appears in the JSON response
+            var text = result.Content[0].Text!;
+            Assert.Contains("outputPath", text);
+        }
+        finally
+        {
+            if (File.Exists(outputFile)) File.Delete(outputFile);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMissingInputPath_ReturnsError()
+    {
+        var args = JsonDocument.Parse("""
+            {
+                "inputPath": "/nonexistent/path/file.cs"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.True(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.Contains("not found", text.ToLower());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithNeitherSourceNorInputPath_ReturnsError()
+    {
+        var args = JsonDocument.Parse("""{}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.True(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.Contains("source", text.ToLower());
+        Assert.Contains("inputPath", text);
+    }
 }

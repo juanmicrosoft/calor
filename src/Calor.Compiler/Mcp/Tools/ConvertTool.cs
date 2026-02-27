@@ -21,7 +21,15 @@ public sealed class ConvertTool : McpToolBase
             "properties": {
                 "source": {
                     "type": "string",
-                    "description": "C# source code to convert to Calor"
+                    "description": "C# source code to convert to Calor (required unless inputPath is provided)"
+                },
+                "inputPath": {
+                    "type": "string",
+                    "description": "Path to a C# file to convert (alternative to source for large files)"
+                },
+                "outputPath": {
+                    "type": "string",
+                    "description": "Path to write the generated Calor output file (optional)"
                 },
                 "moduleName": {
                     "type": "string",
@@ -40,20 +48,45 @@ public sealed class ConvertTool : McpToolBase
                     "enum": ["standard", "interop"],
                     "description": "Conversion mode: 'standard' (default) produces TODO comments for unsupported code, 'interop' wraps unsupported members in §CSHARP{...}§/CSHARP blocks"
                 }
-            },
-            "required": ["source"]
+            }
         }
         """;
 
     public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
     {
         var source = GetString(arguments, "source");
+        var inputPath = GetString(arguments, "inputPath");
+        var outputPath = GetString(arguments, "outputPath");
+
+        // Resolve source from file if inputPath provided
+        if (!string.IsNullOrEmpty(inputPath))
+        {
+            if (!File.Exists(inputPath))
+            {
+                return Task.FromResult(McpToolResult.Error($"Input file not found: {inputPath}"));
+            }
+
+            try
+            {
+                source = File.ReadAllText(inputPath);
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(McpToolResult.Error($"Failed to read input file: {ex.Message}"));
+            }
+        }
+
         if (string.IsNullOrEmpty(source))
         {
-            return Task.FromResult(McpToolResult.Error("Missing required parameter: source"));
+            return Task.FromResult(McpToolResult.Error("Either 'source' or 'inputPath' must be provided"));
         }
 
         var moduleName = GetString(arguments, "moduleName");
+        // Derive module name from filename when not specified
+        if (string.IsNullOrEmpty(moduleName) && !string.IsNullOrEmpty(inputPath))
+        {
+            moduleName = Path.GetFileNameWithoutExtension(inputPath);
+        }
         var fallback = GetBool(arguments, "fallback", defaultValue: true);
         var explain = GetBool(arguments, "explain", defaultValue: false);
         var modeStr = GetString(arguments, "mode") ?? "standard";
@@ -197,10 +230,36 @@ public sealed class ConvertTool : McpToolBase
                 }
             }
 
+            // Write output file if requested
+            if (!string.IsNullOrEmpty(outputPath) && success && !string.IsNullOrWhiteSpace(calorSourceForOutput))
+            {
+                try
+                {
+                    var outputDir = Path.GetDirectoryName(outputPath);
+                    if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+                    {
+                        Directory.CreateDirectory(outputDir);
+                    }
+                    File.WriteAllText(outputPath, calorSourceForOutput);
+                }
+                catch (Exception ex)
+                {
+                    issues.Add(new ConversionIssueOutput
+                    {
+                        Severity = "warning",
+                        Message = $"Failed to write output file: {ex.Message}",
+                        Line = 0,
+                        Column = 0,
+                        Suggestion = null
+                    });
+                }
+            }
+
             var output = new ConvertToolOutput
             {
                 Success = success,
                 CalorSource = calorSourceForOutput,
+                OutputPath = outputPath,
                 Issues = issues,
                 Stats = new ConversionStatsOutput
                 {
@@ -234,6 +293,10 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("calorSource")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? CalorSource { get; init; }
+
+        [JsonPropertyName("outputPath")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? OutputPath { get; init; }
 
         [JsonPropertyName("issues")]
         public required List<ConversionIssueOutput> Issues { get; init; }

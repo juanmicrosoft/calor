@@ -24,7 +24,15 @@ public sealed class ConvertValidatedTool : McpToolBase
             "properties": {
                 "source": {
                     "type": "string",
-                    "description": "C# source code to convert to Calor"
+                    "description": "C# source code to convert to Calor (required unless inputPath is provided)"
+                },
+                "inputPath": {
+                    "type": "string",
+                    "description": "Path to a C# file to convert (alternative to source for large files)"
+                },
+                "outputPath": {
+                    "type": "string",
+                    "description": "Path to write the generated Calor output file (optional)"
                 },
                 "moduleName": {
                     "type": "string",
@@ -49,20 +57,45 @@ public sealed class ConvertValidatedTool : McpToolBase
                     "items": { "type": "string" },
                     "description": "Patterns that must NOT appear in generated C#"
                 }
-            },
-            "required": ["source"]
+            }
         }
         """;
 
     public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
     {
         var source = GetString(arguments, "source");
+        var inputPath = GetString(arguments, "inputPath");
+        var outputPath = GetString(arguments, "outputPath");
+
+        // Resolve source from file if inputPath provided
+        if (!string.IsNullOrEmpty(inputPath))
+        {
+            if (!File.Exists(inputPath))
+            {
+                return Task.FromResult(McpToolResult.Error($"Input file not found: {inputPath}"));
+            }
+
+            try
+            {
+                source = File.ReadAllText(inputPath);
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(McpToolResult.Error($"Failed to read input file: {ex.Message}"));
+            }
+        }
+
         if (string.IsNullOrEmpty(source))
         {
-            return Task.FromResult(McpToolResult.Error("Missing required parameter: source"));
+            return Task.FromResult(McpToolResult.Error("Either 'source' or 'inputPath' must be provided"));
         }
 
         var moduleName = GetString(arguments, "moduleName");
+        // Derive module name from filename when not specified
+        if (string.IsNullOrEmpty(moduleName) && !string.IsNullOrEmpty(inputPath))
+        {
+            moduleName = Path.GetFileNameWithoutExtension(inputPath);
+        }
         var modeStr = GetString(arguments, "mode") ?? "standard";
         var mode = modeStr.Equals("interop", StringComparison.OrdinalIgnoreCase)
             ? ConversionMode.Interop : ConversionMode.Standard;
@@ -241,6 +274,31 @@ public sealed class ConvertValidatedTool : McpToolBase
                         calorSource: calorSource, generatedCSharp: generatedCSharp,
                         conversionIssues, autoFixes, diagnosticMessages, compatIssues,
                         convResult.Context.Stats, sw.Elapsed), isError: true));
+                }
+            }
+
+            // Write output file if requested
+            if (!string.IsNullOrEmpty(outputPath))
+            {
+                try
+                {
+                    var outputDir = Path.GetDirectoryName(outputPath);
+                    if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+                    {
+                        Directory.CreateDirectory(outputDir);
+                    }
+                    File.WriteAllText(outputPath, calorSource);
+                }
+                catch (Exception ex)
+                {
+                    conversionIssues.Add(new ConversionIssueOutput
+                    {
+                        Severity = "warning",
+                        Message = $"Failed to write output file: {ex.Message}",
+                        Line = 0,
+                        Column = 0,
+                        Suggestion = null
+                    });
                 }
             }
 
