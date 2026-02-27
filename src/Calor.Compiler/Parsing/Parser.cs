@@ -8308,7 +8308,7 @@ public sealed class Parser
     {
         if (Check(TokenKind.IntLiteral))
         {
-            return Advance().Value?.ToString();
+            return Advance().Text;
         }
         if (Check(TokenKind.Identifier))
         {
@@ -8330,7 +8330,7 @@ public sealed class Parser
         if (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral)
         {
             Advance(); // consume -
-            return $"-{Advance().Value}";
+            return $"-{Advance().Text}";
         }
         if (Check(TokenKind.Tilde))
         {

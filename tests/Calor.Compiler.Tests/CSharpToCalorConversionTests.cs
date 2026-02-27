@@ -3552,6 +3552,94 @@ public class CSharpToCalorConversionTests
         Assert.Equal("SomeOther.Value", enumDef.Members.First(m => m.Name == "Custom").Value);
     }
 
+    [Fact]
+    public void Convert_EnumWithHexValues_PreservesHexNotation()
+    {
+        var csharpSource = """
+            public enum Flags
+            {
+                None = 0x00,
+                Read = 0x01,
+                Write = 0x80,
+                All = 0xFF
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Verify the Calor source preserves hex notation
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Flags");
+        Assert.Equal("0x00", enumDef.Members.First(m => m.Name == "None").Value);
+        Assert.Equal("0x01", enumDef.Members.First(m => m.Name == "Read").Value);
+        Assert.Equal("0x80", enumDef.Members.First(m => m.Name == "Write").Value);
+        Assert.Equal("0xFF", enumDef.Members.First(m => m.Name == "All").Value);
+    }
+
+    [Fact]
+    public void Convert_EnumWithMixedHexAndDecimal_PreservesNotation()
+    {
+        var csharpSource = """
+            public enum Mixed
+            {
+                A = 0,
+                B = 0x10,
+                C = 32,
+                D = 0x80
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Mixed");
+        Assert.Equal("0", enumDef.Members.First(m => m.Name == "A").Value);
+        Assert.Equal("0x10", enumDef.Members.First(m => m.Name == "B").Value);
+        Assert.Equal("32", enumDef.Members.First(m => m.Name == "C").Value);
+        Assert.Equal("0x80", enumDef.Members.First(m => m.Name == "D").Value);
+    }
+
+    [Fact]
+    public void Convert_EnumWithHexBitwiseOr_PreservesNotation()
+    {
+        var csharpSource = """
+            public enum Access
+            {
+                Read = 0x01,
+                Write = 0x02,
+                All = 0x01 | 0x02
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Access");
+        Assert.Equal("0x01 | 0x02", enumDef.Members.First(m => m.Name == "All").Value);
+    }
+
     #endregion
 
     #region Tuple Deconstruction in Setter Tests
