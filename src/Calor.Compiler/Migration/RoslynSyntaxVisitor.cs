@@ -1317,6 +1317,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Setters/init accessors: expression is a statement (assignment, method call, etc.)
             if (accessor.Keyword.IsKind(SyntaxKind.SetKeyword) || accessor.Keyword.IsKind(SyntaxKind.InitKeyword))
             {
+                // Handle tuple deconstruction: set => (a, b) = (x, y)
+                if (accessor.ExpressionBody.Expression is AssignmentExpressionSyntax tupleAssign
+                    && tupleAssign.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                    && tupleAssign.Left is TupleExpressionSyntax leftTuple
+                    && tupleAssign.Right is TupleExpressionSyntax rightTuple
+                    && leftTuple.Arguments.Count == rightTuple.Arguments.Count)
+                {
+                    var stmts = new List<StatementNode>();
+                    for (int i = 0; i < leftTuple.Arguments.Count; i++)
+                    {
+                        stmts.Add(new AssignmentStatementNode(span,
+                            ConvertExpression(leftTuple.Arguments[i].Expression),
+                            ConvertExpression(rightTuple.Arguments[i].Expression)));
+                    }
+                    return stmts;
+                }
                 var stmt = ConvertExpressionToStatement(accessor.ExpressionBody.Expression, span);
                 return stmt != null ? new List<StatementNode> { stmt } : Array.Empty<StatementNode>();
             }
