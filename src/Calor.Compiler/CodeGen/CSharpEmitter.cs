@@ -1060,6 +1060,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(EnumDefinitionNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
         // Generate C# enum with optional underlying type
         var typeName = SanitizeIdentifier(node.Name);
         var baseType = node.UnderlyingType != null
@@ -2641,28 +2643,36 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
-        var visibility = node.Visibility switch
-        {
-            Visibility.Public => "public",
-            Visibility.ProtectedInternal => "protected internal",
-            Visibility.Internal => "internal",
-            Visibility.Protected => "protected",
-            Visibility.Private => "private",
-            _ => "public"
-        };
-
         // Constructor name is the class name
         var ctorName = _currentClassName ?? "UnknownClass";
-        var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
-        var initializerStr = "";
-        if (node.Initializer != null)
+        if (node.IsStatic)
         {
-            var initArgs = string.Join(", ", node.Initializer.Arguments.Select(a => a.Accept(this)));
-            initializerStr = node.Initializer.IsBaseCall ? $" : base({initArgs})" : $" : this({initArgs})";
+            AppendLine($"static {ctorName}()");
         }
+        else
+        {
+            var visibility = node.Visibility switch
+            {
+                Visibility.Public => "public",
+                Visibility.ProtectedInternal => "protected internal",
+                Visibility.Internal => "internal",
+                Visibility.Protected => "protected",
+                Visibility.Private => "private",
+                _ => "public"
+            };
 
-        AppendLine($"{visibility} {ctorName}({parameters}){initializerStr}");
+            var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
+
+            var initializerStr = "";
+            if (node.Initializer != null)
+            {
+                var initArgs = string.Join(", ", node.Initializer.Arguments.Select(a => a.Accept(this)));
+                initializerStr = node.Initializer.IsBaseCall ? $" : base({initArgs})" : $" : this({initArgs})";
+            }
+
+            AppendLine($"{visibility} {ctorName}({parameters}){initializerStr}");
+        }
         AppendLine("{");
         Indent();
 

@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
@@ -2911,6 +2912,180 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    #endregion
+
+    #region Converter Gap Fix Tests
+
+    [Fact]
+    public void Convert_EnumWithFlagsAttribute_PreservesAttribute()
+    {
+        var csharpSource = """
+            using System;
+
+            [Flags]
+            public enum Permissions
+            {
+                Read = 1,
+                Write = 2,
+                Execute = 4
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Single(result.Ast.Enums);
+
+        var enumNode = result.Ast.Enums[0];
+        Assert.Equal("Permissions", enumNode.Name);
+        Assert.Single(enumNode.CSharpAttributes);
+        Assert.Equal("Flags", enumNode.CSharpAttributes[0].Name);
+
+        // Verify CalorEmitter output contains the attribute
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("[@Flags]", result.CalorSource);
+
+        // Verify CSharpEmitter round-trip emits [Flags]
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast);
+        Assert.Contains("[Flags]", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_InterfaceWithProperties_PreservesProperties()
+    {
+        var csharpSource = """
+            public interface IFoo
+            {
+                int X { get; }
+                string Name { get; set; }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Single(result.Ast.Interfaces);
+
+        var iface = result.Ast.Interfaces[0];
+        Assert.Equal("IFoo", iface.Name);
+        Assert.Equal(2, iface.Properties.Count);
+        Assert.Equal("X", iface.Properties[0].Name);
+        Assert.Equal("Name", iface.Properties[1].Name);
+
+        // Verify interface properties are public (implicit in C#)
+        Assert.Equal(Visibility.Public, iface.Properties[0].Visibility);
+        Assert.Equal(Visibility.Public, iface.Properties[1].Visibility);
+
+        // Verify emitter output contains property declarations
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§PROP", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_NestedClass_FlattensToModuleLevel()
+    {
+        var csharpSource = """
+            public class Outer
+            {
+                public int Value { get; set; }
+
+                public class Inner
+                {
+                    public string Name { get; set; }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        // Both Outer and Inner should appear as top-level classes
+        Assert.Equal(2, result.Ast.Classes.Count);
+        var classNames = result.Ast.Classes.Select(c => c.Name).ToList();
+        Assert.Contains("Outer", classNames);
+        Assert.Contains("Inner", classNames);
+
+        // Verify emitter output contains both classes as separate §CL blocks
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§CL{", result.CalorSource);
+        Assert.Contains(":Outer", result.CalorSource);
+        Assert.Contains(":Inner", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_StaticConstructor_PreservesStaticModifier()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private static int _count;
+
+                static Foo()
+                {
+                    _count = 0;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Single(result.Ast.Classes);
+
+        var cls = result.Ast.Classes[0];
+        Assert.Single(cls.Constructors);
+        Assert.True(cls.Constructors[0].IsStatic);
+
+        // Verify CalorEmitter uses "stat" modifier
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§CTOR{", result.CalorSource);
+        Assert.Contains(":stat}", result.CalorSource);
+
+        // Verify CSharpEmitter outputs "static Foo()"
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast);
+        Assert.Contains("static Foo()", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_StaticConstructor_RoundTrips()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private static int _count;
+
+                static Foo()
+                {
+                    _count = 0;
+                }
+            }
+            """;
+
+        // C# → Calor
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Calor → AST (parse the emitted Calor source)
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        // Verify the parsed AST preserves IsStatic
+        var parsedClass = module.Classes.FirstOrDefault(c => c.Name == "Foo");
+        Assert.NotNull(parsedClass);
+        Assert.Single(parsedClass.Constructors);
+        Assert.True(parsedClass.Constructors[0].IsStatic);
     }
 
     #endregion
