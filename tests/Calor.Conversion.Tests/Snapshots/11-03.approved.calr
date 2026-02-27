@@ -1,0 +1,19 @@
+§M{m006:Test_11_03}
+  §CL{c001:Container:pub}
+    §MT{m005:GetStatus:pub} () -> Status
+      §R Status.Active
+    §/MT{m005}
+
+    §CL{c003:Inner:priv}
+      §PROP{p004:Value:i32:pub:get,set}
+
+    §/CL{c003}
+
+    §EN{e002:Status:priv}
+      Active
+      Inactive
+    §/EN{e002}
+
+  §/CL{c001}
+
+§/M{m006}

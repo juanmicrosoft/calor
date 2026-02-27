@@ -198,6 +198,24 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Object initializers are converted to Calor §NEW with property assignments"
         },
+        ["dictionary-initializer"] = new FeatureInfo
+        {
+            Name = "dictionary-initializer",
+            Support = SupportLevel.Full,
+            Description = "Dictionary initializers ({ key, value } and [key] = value syntax) are supported for Dictionary, SortedDictionary, ConcurrentDictionary, FrozenDictionary, and ImmutableDictionary"
+        },
+        ["list-initializer"] = new FeatureInfo
+        {
+            Name = "list-initializer",
+            Support = SupportLevel.Full,
+            Description = "List initializers are converted to Calor §LIST nodes"
+        },
+        ["hashset-initializer"] = new FeatureInfo
+        {
+            Name = "hashset-initializer",
+            Support = SupportLevel.Full,
+            Description = "HashSet initializers are converted to Calor §SET nodes"
+        },
         ["anonymous-type"] = new FeatureInfo
         {
             Name = "anonymous-type",
@@ -249,16 +267,14 @@ public static class FeatureSupport
         ["relational-pattern"] = new FeatureInfo
         {
             Name = "relational-pattern",
-            Support = SupportLevel.NotSupported,
-            Description = "Relational patterns (is > x, is < x) are not supported",
-            Workaround = "Use explicit comparison expressions"
+            Support = SupportLevel.Full,
+            Description = "Relational patterns (is > x, is < x) are converted to comparison expressions"
         },
         ["compound-pattern"] = new FeatureInfo
         {
             Name = "compound-pattern",
-            Support = SupportLevel.NotSupported,
-            Description = "Compound patterns (and/or) are not supported",
-            Workaround = "Use explicit boolean expressions"
+            Support = SupportLevel.Full,
+            Description = "Compound patterns (and/or) are converted to boolean expressions"
         },
         ["generic-type-constraint"] = new FeatureInfo
         {
@@ -430,6 +446,12 @@ public static class FeatureSupport
             Support = SupportLevel.Partial,
             Description = "Nested generic types (Expression<Func<T, U>>) may have issues",
             Workaround = "Simplify generic nesting where possible"
+        },
+        ["nested-type"] = new FeatureInfo
+        {
+            Name = "nested-type",
+            Support = SupportLevel.Full,
+            Description = "Nested type declarations (classes, structs, interfaces, enums inside other types) are supported"
         },
         ["out-var"] = new FeatureInfo
         {

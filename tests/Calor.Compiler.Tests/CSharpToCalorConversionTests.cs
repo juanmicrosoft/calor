@@ -2986,7 +2986,7 @@ public class CSharpToCalorConversionTests
     }
 
     [Fact]
-    public void Convert_NestedClass_FlattensToModuleLevel()
+    public void Convert_NestedClass_PreservesNesting()
     {
         var csharpSource = """
             public class Outer
@@ -3005,13 +3005,13 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.Ast);
 
-        // Both Outer and Inner should appear as top-level classes
-        Assert.Equal(2, result.Ast.Classes.Count);
-        var classNames = result.Ast.Classes.Select(c => c.Name).ToList();
-        Assert.Contains("Outer", classNames);
-        Assert.Contains("Inner", classNames);
+        // Outer should appear as top-level class, Inner should be nested
+        var outerClass = Assert.Single(result.Ast.Classes);
+        Assert.Equal("Outer", outerClass.Name);
+        var innerClass = Assert.Single(outerClass.NestedClasses);
+        Assert.Equal("Inner", innerClass.Name);
 
-        // Verify emitter output contains both classes as separate §CL blocks
+        // Verify emitter output contains both classes as §CL blocks
         Assert.NotNull(result.CalorSource);
         Assert.Contains("§CL{", result.CalorSource);
         Assert.Contains(":Outer", result.CalorSource);

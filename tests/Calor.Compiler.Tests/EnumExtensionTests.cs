@@ -313,7 +313,7 @@ public class EnumExtensionTests
         var emitter = new CalorEmitter();
         var code = emitter.Emit(module);
 
-        Assert.Contains("§EN{e001:Color}", code);
+        Assert.Contains("§EN{e001:Color:pub}", code);
         Assert.Contains("§/EN{e001}", code);
         // Should NOT contain old ENUM syntax
         Assert.DoesNotContain("§ENUM", code);

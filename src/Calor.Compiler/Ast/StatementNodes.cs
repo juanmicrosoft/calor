@@ -237,6 +237,44 @@ public sealed class MemberPreprocessorBlockNode : AstNode
 }
 
 /// <summary>
+/// Represents a preprocessor conditional block wrapping entire type declarations at module level.
+/// §PP{CONDITION}
+///   ... class, interface, enum, delegate declarations ...
+/// §PPE (optional else/elif)
+/// §/PP{CONDITION}
+/// </summary>
+public sealed class TypePreprocessorBlockNode : AstNode
+{
+    public string Condition { get; }
+    public IReadOnlyList<ClassDefinitionNode> Classes { get; }
+    public IReadOnlyList<InterfaceDefinitionNode> Interfaces { get; }
+    public IReadOnlyList<EnumDefinitionNode> Enums { get; }
+    public IReadOnlyList<DelegateDefinitionNode> Delegates { get; }
+    public TypePreprocessorBlockNode? ElseBranch { get; }
+
+    public TypePreprocessorBlockNode(
+        TextSpan span,
+        string condition,
+        IReadOnlyList<ClassDefinitionNode> classes,
+        IReadOnlyList<InterfaceDefinitionNode> interfaces,
+        IReadOnlyList<EnumDefinitionNode> enums,
+        IReadOnlyList<DelegateDefinitionNode> delegates,
+        TypePreprocessorBlockNode? elseBranch = null)
+        : base(span)
+    {
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        Classes = classes ?? Array.Empty<ClassDefinitionNode>();
+        Interfaces = interfaces ?? Array.Empty<InterfaceDefinitionNode>();
+        Enums = enums ?? Array.Empty<EnumDefinitionNode>();
+        Delegates = delegates ?? Array.Empty<DelegateDefinitionNode>();
+        ElseBranch = elseBranch;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Kind of C# member preserved in an interop block.
 /// </summary>
 public enum InteropMemberKind

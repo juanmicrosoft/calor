@@ -31,6 +31,8 @@ public sealed class ModuleNode : AstNode
     public ContextNode? Context { get; }
     // C# Interop Blocks (member-level raw C# preserved during partial conversion)
     public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
+    // Preprocessor conditional blocks wrapping entire type declarations
+    public IReadOnlyList<TypePreprocessorBlockNode> TypePreprocessorBlocks { get; }
     // Dependent Types: Refinement type definitions at module level
     public IReadOnlyList<RefinementTypeNode> RefinementTypes { get; }
     // Dependent Types: Indexed type definitions at module level
@@ -171,7 +173,8 @@ public sealed class ModuleNode : AstNode
         ContextNode? context,
         IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
         IReadOnlyList<RefinementTypeNode>? refinementTypes = null,
-        IReadOnlyList<IndexedTypeNode>? indexedTypes = null)
+        IReadOnlyList<IndexedTypeNode>? indexedTypes = null,
+        IReadOnlyList<TypePreprocessorBlockNode>? typePreprocessorBlocks = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -192,6 +195,7 @@ public sealed class ModuleNode : AstNode
         InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
         RefinementTypes = refinementTypes ?? Array.Empty<RefinementTypeNode>();
         IndexedTypes = indexedTypes ?? Array.Empty<IndexedTypeNode>();
+        TypePreprocessorBlocks = typePreprocessorBlocks ?? Array.Empty<TypePreprocessorBlockNode>();
     }
 
     /// <summary>

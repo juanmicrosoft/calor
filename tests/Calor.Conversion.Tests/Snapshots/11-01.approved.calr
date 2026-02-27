@@ -1,0 +1,17 @@
+§M{m005:Test_11_01}
+  §CL{c001:Validator:pub}
+    §MT{m002:IsInRange:pub} (i32:x) -> bool
+      §R (&& (> x 0) (< x 100))
+    §/MT{m002}
+
+    §MT{m003:IsOutOfRange:pub} (i32:x) -> bool
+      §R (|| (< x 0) (> x 100))
+    §/MT{m003}
+
+    §MT{m004:IsNotNegative:pub} (i32:x) -> bool
+      §R (! (< x 0))
+    §/MT{m004}
+
+  §/CL{c001}
+
+§/M{m005}

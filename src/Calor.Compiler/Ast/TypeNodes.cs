@@ -309,7 +309,7 @@ public sealed class EnumMemberNode : AstNode
 
 /// <summary>
 /// Represents an enum type definition.
-/// §EN{id:Name} or §EN{id:Name:underlyingType}
+/// §EN{id:Name:vis} or §EN{id:Name:vis:underlyingType}
 ///   Red
 ///   Green = 1
 /// §/EN{id}
@@ -325,6 +325,11 @@ public sealed class EnumDefinitionNode : TypeDefinitionNode
     /// The enum members.
     /// </summary>
     public IReadOnlyList<EnumMemberNode> Members { get; }
+
+    /// <summary>
+    /// The visibility of the enum (public, internal, private, etc.).
+    /// </summary>
+    public Visibility Visibility { get; }
 
     /// <summary>
     /// C#-style attributes (e.g., [@Flags], [@Obsolete]).
@@ -349,11 +354,13 @@ public sealed class EnumDefinitionNode : TypeDefinitionNode
         string? underlyingType,
         IReadOnlyList<EnumMemberNode> members,
         AttributeCollection attributes,
-        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        Visibility visibility = Visibility.Public)
         : base(span, id, name, attributes)
     {
         UnderlyingType = underlyingType;
         Members = members ?? throw new ArgumentNullException(nameof(members));
+        Visibility = visibility;
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 

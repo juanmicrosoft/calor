@@ -150,6 +150,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit type-level preprocessor blocks
+        foreach (var tpp in node.TypePreprocessorBlocks)
+        {
+            Visit(tpp);
+            AppendLine();
+        }
+
         Dedent();
         AppendLine($"§/M{{{node.Id}}}");
 
@@ -360,6 +367,23 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var ppBlock in node.PreprocessorBlocks)
         {
             Visit(ppBlock);
+            AppendLine();
+        }
+
+        // Emit nested types
+        foreach (var nestedClass in node.NestedClasses)
+        {
+            Visit(nestedClass);
+            AppendLine();
+        }
+        foreach (var nestedIface in node.NestedInterfaces)
+        {
+            Visit(nestedIface);
+            AppendLine();
+        }
+        foreach (var nestedEnum in node.NestedEnums)
+        {
+            Visit(nestedEnum);
             AppendLine();
         }
 
@@ -1975,11 +1999,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EnumDefinitionNode node)
     {
-        // Format: §EN{id:Name} or §EN{id:Name:underlyingType}
+        // Format: §EN{id:Name:vis} or §EN{id:Name:vis:underlyingType}
+        var vis = GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
         var header = node.UnderlyingType != null
-            ? $"§EN{{{node.Id}:{node.Name}:{node.UnderlyingType}}}{attrs}"
-            : $"§EN{{{node.Id}:{node.Name}}}{attrs}";
+            ? $"§EN{{{node.Id}:{node.Name}:{vis}:{node.UnderlyingType}}}{attrs}"
+            : $"§EN{{{node.Id}:{node.Name}:{vis}}}{attrs}";
         AppendLine(header);
         Indent();
 
@@ -2634,6 +2659,34 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var method in node.Methods) { Visit(method); AppendLine(); }
         foreach (var op in node.OperatorOverloads) { Visit(op); AppendLine(); }
         foreach (var evt in node.Events) Visit(evt);
+    }
+
+    public string Visit(TypePreprocessorBlockNode node)
+    {
+        AppendLine($"§PP{{{node.Condition}}}");
+        EmitTypePreprocessorTypes(node);
+        if (node.ElseBranch != null)
+        {
+            AppendLine("§PPE");
+            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
+            {
+                Visit(node.ElseBranch);
+            }
+            else
+            {
+                EmitTypePreprocessorTypes(node.ElseBranch);
+            }
+        }
+        AppendLine($"§/PP{{{node.Condition}}}");
+        return "";
+    }
+
+    private void EmitTypePreprocessorTypes(TypePreprocessorBlockNode node)
+    {
+        foreach (var cls in node.Classes) { Visit(cls); AppendLine(); }
+        foreach (var iface in node.Interfaces) { Visit(iface); AppendLine(); }
+        foreach (var en in node.Enums) { Visit(en); AppendLine(); }
+        foreach (var del in node.Delegates) { Visit(del); AppendLine(); }
     }
 
     public string Visit(CSharpInteropBlockNode node)

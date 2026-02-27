@@ -301,6 +301,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(RawCSharpExpressionNode node) { }
     public void Visit(PreprocessorDirectiveNode node) { }
     public void Visit(MemberPreprocessorBlockNode node) { }
+    public void Visit(TypePreprocessorBlockNode node) { }
     public void Visit(CSharpInteropBlockNode node) { }
     public void Visit(StackAllocNode node) { }
     public void Visit(UnsafeBlockNode node) { }

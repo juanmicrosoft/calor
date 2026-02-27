@@ -543,6 +543,97 @@ public static class ConversionCatalog
         """,
         RoundTripSupported: false);
 
+    // ── 11: Gap Closures ──
+
+    public static readonly ConversionSnippet RelationalIsPattern = new(
+        "11-01", "GapClosures", "Relational and compound is patterns",
+        """
+        public class Validator
+        {
+            public bool IsInRange(int x)
+            {
+                return x is > 0 and < 100;
+            }
+            public bool IsOutOfRange(int x)
+            {
+                return x is < 0 or > 100;
+            }
+            public bool IsNotNegative(int x)
+            {
+                return x is not < 0;
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet InternalEnum = new(
+        "11-02", "GapClosures", "Enum with non-public visibility",
+        """
+        internal enum Priority
+        {
+            Low,
+            Medium,
+            High
+        }
+        """);
+
+    public static readonly ConversionSnippet NestedTypes = new(
+        "11-03", "GapClosures", "Nested class and enum inside a class",
+        """
+        public class Container
+        {
+            private enum Status
+            {
+                Active,
+                Inactive
+            }
+
+            private class Inner
+            {
+                public int Value { get; set; }
+            }
+
+            public Status GetStatus() => Status.Active;
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet PreprocessorWrappedType = new(
+        "11-04", "GapClosures", "Type declaration wrapped in #if",
+        """
+        #if NET6_0_OR_GREATER
+        public class NetSixFeature
+        {
+            public string Name { get; set; }
+        }
+        #endif
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet DictionaryInitializerComplex = new(
+        "11-05", "GapClosures", "Dictionary with complex initializer and immutable dictionary type",
+        """
+        using System.Collections.Generic;
+        using System.Collections.Immutable;
+        public class DictExample
+        {
+            public Dictionary<string, int> GetScores()
+            {
+                return new Dictionary<string, int>
+                {
+                    { "Alice", 95 },
+                    { "Bob", 87 },
+                    { "Charlie", 92 }
+                };
+            }
+            public ImmutableDictionary<string, int> GetImmutableScores()
+            {
+                return ImmutableDictionary<string, int>.Empty;
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
     /// <summary>
     /// All snippets that should successfully convert.
     /// </summary>
@@ -582,6 +673,11 @@ public static class ConversionCatalog
         TupleReturnTypeMapped,
         RangeExpression,
         IndexFromEnd,
+        RelationalIsPattern,
+        InternalEnum,
+        NestedTypes,
+        PreprocessorWrappedType,
+        DictionaryInitializerComplex,
     };
 
     /// <summary>
