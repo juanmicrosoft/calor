@@ -1129,6 +1129,45 @@ public class AttributeConversionTests
     }
 
     [Fact]
+    public void RoundTrip_DottedNameofInAttributeArgument_Preserved()
+    {
+        var csharpSource = """
+            using System.Diagnostics.CodeAnalysis;
+
+            public class Transformer
+            {
+                [return: NotNullIfNotNull(nameof(Transformer.Transform))]
+                public string? Transform(string? value) => value;
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        // Verify the AST has the right value
+        var cls = result.Ast!.Classes[0];
+        var method = cls.Methods[0];
+        var returnAttr = method.CSharpAttributes.First(a => a.Name == "NotNullIfNotNull");
+        var nameOfRef = Assert.IsType<NameOfReference>(returnAttr.Arguments[0].Value);
+        Assert.Equal("Transformer.Transform", nameOfRef.Name);
+
+        // Full round-trip: C# → Calor → re-parse → C#
+        var calorEmitter = new CalorEmitter();
+        var calorCode = calorEmitter.Emit(result.Ast!);
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(calorCode, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var parsedModule = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var csharpEmitter = new CSharpEmitter();
+        var outputCode = csharpEmitter.Emit(parsedModule);
+        Assert.Contains("nameof(Transformer.Transform)", outputCode);
+    }
+
+    [Fact]
     public void FeatureSupport_Nameof_IsRegistered()
     {
         var info = FeatureSupport.GetFeatureInfo("nameof");
