@@ -198,11 +198,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
 
             var methods = new List<MethodSignatureNode>();
+            var properties = new List<PropertyNode>();
             foreach (var member in node.Members)
             {
                 if (member is MethodDeclarationSyntax methodSyntax)
                 {
                     methods.Add(ConvertMethodSignature(methodSyntax));
+                }
+                else if (member is PropertyDeclarationSyntax propertySyntax)
+                {
+                    properties.Add(ConvertProperty(propertySyntax));
                 }
             }
 
@@ -213,6 +218,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 baseInterfaces,
                 typeParameters,
                 methods,
+                properties,
                 new AttributeCollection(),
                 csharpAttrs);
 
@@ -300,6 +306,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var id = _context.GenerateId("e");
             var name = node.Identifier.Text;
+            var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
             // Get the underlying type if specified (e.g., : byte, : int)
             string? underlyingType = null;
@@ -324,7 +331,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 name,
                 underlyingType,
                 members,
-                new AttributeCollection());
+                new AttributeCollection(),
+                csharpAttrs);
 
             _enums.Add(enumNode);
             _context.Stats.EnumsConverted++;
@@ -580,6 +588,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 break;
             case EventFieldDeclarationSyntax eventSyntax:
                 events.AddRange(ConvertEventFields(eventSyntax));
+                break;
+            case ClassDeclarationSyntax nestedClass:
+                _classes.Add(ConvertClass(nestedClass));
+                _context.Stats.ClassesConverted++;
+                break;
+            case StructDeclarationSyntax nestedStruct:
+                VisitStructDeclaration(nestedStruct);
+                break;
+            case InterfaceDeclarationSyntax nestedInterface:
+                VisitInterfaceDeclaration(nestedInterface);
+                break;
+            case EnumDeclarationSyntax nestedEnum:
+                VisitEnumDeclaration(nestedEnum);
                 break;
             default:
                 if (_context.Mode == ConversionMode.Interop)
@@ -998,6 +1019,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _reassignedVariables = CollectReassignedVariables(node);
 
         var id = _context.GenerateId("ctor");
+        var isStatic = node.Modifiers.Any(SyntaxKind.StaticKeyword);
         var visibility = GetVisibility(node.Modifiers);
         var parameters = ConvertParameters(node.ParameterList);
         var body = ConvertMethodBody(node.Body, node.ExpressionBody);
@@ -1028,7 +1050,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             initializer,
             body,
             new AttributeCollection(),
-            csharpAttrs);
+            csharpAttrs,
+            isStatic);
     }
 
     private OperatorOverloadNode ConvertOperatorOverload(OperatorDeclarationSyntax node)
@@ -1172,7 +1195,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var name = node.Identifier.Text;
         var typeName = TypeMapper.CSharpToCalor(node.Type.ToString());
-        var visibility = GetVisibility(node.Modifiers);
+        var defaultVis = node.Parent is InterfaceDeclarationSyntax ? Visibility.Public : Visibility.Private;
+        var visibility = GetVisibility(node.Modifiers, defaultVis);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         PropertyAccessorNode? getter = null;
