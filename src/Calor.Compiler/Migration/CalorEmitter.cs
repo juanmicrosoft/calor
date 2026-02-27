@@ -2020,6 +2020,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EnumMemberNode node)
     {
+        var attrs = EmitCSharpAttributes(node.CSharpAttributes);
+        if (attrs.Length > 0)
+            AppendLine(attrs);
         var line = node.Value != null
             ? $"{node.Name} = {node.Value}"
             : node.Name;

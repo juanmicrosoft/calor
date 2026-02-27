@@ -1102,6 +1102,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(EnumMemberNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
         var memberName = SanitizeIdentifier(node.Name);
         var value = node.Value != null ? $" = {node.Value}" : "";
         AppendLine($"{memberName}{value},");

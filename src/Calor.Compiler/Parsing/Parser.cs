@@ -8238,6 +8238,9 @@ public sealed class Parser
         // Parse enum members until we hit the closing tag
         while (!IsAtEnd && !Check(TokenKind.EndEnum))
         {
+            // Parse optional C# attributes before enum member (e.g., [@Obsolete])
+            var memberAttrs = ParseCSharpAttributes();
+
             // Each enum member is an identifier optionally followed by = value
             if (Check(TokenKind.Identifier))
             {
@@ -8253,7 +8256,7 @@ public sealed class Parser
                 }
 
                 var memberSpan = memberStartToken.Span.Union(Current.Span);
-                members.Add(new EnumMemberNode(memberSpan, memberName, memberValue));
+                members.Add(new EnumMemberNode(memberSpan, memberName, memberValue, memberAttrs));
             }
             else
             {

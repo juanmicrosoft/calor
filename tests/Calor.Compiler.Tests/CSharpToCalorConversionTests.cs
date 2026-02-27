@@ -3554,6 +3554,107 @@ public class CSharpToCalorConversionTests
 
     #endregion
 
+    #region Enum Member Attribute Tests
+
+    [Fact]
+    public void Convert_EnumMemberWithObsolete_PreservesAttribute()
+    {
+        var csharpSource = """
+            public enum Status
+            {
+                Active = 0,
+                [Obsolete]
+                Legacy = 1,
+                Current = 2
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Verify the AST preserves the attribute
+        var enumDef = result.Ast!.Enums.First(e => e.Name == "Status");
+        var legacyMember = enumDef.Members.First(m => m.Name == "Legacy");
+        Assert.Single(legacyMember.CSharpAttributes);
+        Assert.Equal("Obsolete", legacyMember.CSharpAttributes[0].Name);
+
+        // Verify round-trip through Calor parse
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var parsedMember = module.Enums.First(e => e.Name == "Status").Members.First(m => m.Name == "Legacy");
+        Assert.Single(parsedMember.CSharpAttributes);
+        Assert.Equal("Obsolete", parsedMember.CSharpAttributes[0].Name);
+    }
+
+    [Fact]
+    public void Convert_EnumMemberWithObsoleteMessage_PreservesArgument()
+    {
+        var csharpSource = """
+            public enum Color
+            {
+                Red = 0,
+                [Obsolete("Use Crimson instead")]
+                DarkRed = 1,
+                Crimson = 2
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var enumDef = result.Ast!.Enums.First(e => e.Name == "Color");
+        var member = enumDef.Members.First(m => m.Name == "DarkRed");
+        Assert.Single(member.CSharpAttributes);
+        Assert.Equal("Obsolete", member.CSharpAttributes[0].Name);
+        Assert.Single(member.CSharpAttributes[0].Arguments);
+    }
+
+    [Fact]
+    public void Convert_EnumMemberWithObsolete_RoundTrip_EmitsCSharp()
+    {
+        var csharpSource = """
+            public enum Status
+            {
+                Active = 0,
+                [Obsolete]
+                Legacy = 1
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("[Obsolete]", csharpOutput);
+        Assert.Contains("Legacy = 1", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_EnumMemberWithoutAttributes_HasEmptyList()
+    {
+        var csharpSource = """
+            public enum Direction
+            {
+                Up,
+                Down
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var enumDef = result.Ast!.Enums.First(e => e.Name == "Direction");
+        Assert.All(enumDef.Members, m => Assert.Empty(m.CSharpAttributes));
+    }
+
+    #endregion
+
     #region Tuple Deconstruction in Setter Tests
 
     [Fact]
