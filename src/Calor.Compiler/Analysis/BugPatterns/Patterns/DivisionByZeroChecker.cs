@@ -175,6 +175,23 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
             return;
         }
 
+        // Simple constant propagation: if divisor is a variable initialized to a non-zero constant, it's safe
+        if (divisor is BoundVariableExpression constVarExpr)
+        {
+            var initValue = FindVariableInitializer(constVarExpr.Variable.Name, function);
+            if (initValue != null && BoundNodeHelpers.IsConstant(initValue) && !BoundNodeHelpers.IsLiteralZero(initValue))
+            {
+                return;
+            }
+
+            // Loop bound tracking: if divisor is a loop variable with lower bound > 0, it's safe
+            var lowerBound = FindLoopLowerBound(constVarExpr.Variable.Name, function);
+            if (lowerBound is BoundIntLiteral lowerLit && lowerLit.Value > 0)
+            {
+                return;
+            }
+        }
+
         // If Z3 verification is enabled, use SMT solving
         if (_options.UseZ3Verification)
         {
@@ -315,6 +332,66 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
         return false;
     }
 
+    /// <summary>
+    /// Finds the initializer expression for a variable declared in the function body.
+    /// Returns null if not found or if the variable is reassigned.
+    /// </summary>
+    private static BoundExpression? FindVariableInitializer(string variableName, BoundFunction function)
+    {
+        foreach (var stmt in function.Body)
+        {
+            if (stmt is BoundBindStatement bind &&
+                bind.Variable.Name == variableName &&
+                bind.Initializer != null)
+            {
+                return bind.Initializer;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Finds the enclosing for-loop for a variable and returns the lower bound if it's a positive constant.
+    /// Returns null if not found or if the lower bound is not a positive constant.
+    /// </summary>
+    private static BoundExpression? FindLoopLowerBound(string variableName, BoundFunction function)
+    {
+        return FindLoopLowerBoundInStatements(variableName, function.Body);
+    }
+
+    private static BoundExpression? FindLoopLowerBoundInStatements(string variableName, IReadOnlyList<BoundStatement> statements)
+    {
+        foreach (var stmt in statements)
+        {
+            if (stmt is BoundForStatement forStmt)
+            {
+                if (forStmt.LoopVariable.Name == variableName)
+                {
+                    return forStmt.From;
+                }
+                // Check nested statements
+                var nested = FindLoopLowerBoundInStatements(variableName, forStmt.Body);
+                if (nested != null) return nested;
+            }
+            else if (stmt is BoundIfStatement ifStmt)
+            {
+                var thenResult = FindLoopLowerBoundInStatements(variableName, ifStmt.ThenBody);
+                if (thenResult != null) return thenResult;
+                if (ifStmt.ElseBody != null)
+                {
+                    var elseResult = FindLoopLowerBoundInStatements(variableName, ifStmt.ElseBody);
+                    if (elseResult != null) return elseResult;
+                }
+            }
+            else if (stmt is BoundWhileStatement whileStmt)
+            {
+                var whileResult = FindLoopLowerBoundInStatements(variableName, whileStmt.Body);
+                if (whileResult != null) return whileResult;
+            }
+        }
+        return null;
+    }
+
     private static bool IsVariableAndZero(BoundExpression maybeVar, BoundExpression maybeZero, string variableName)
     {
         return maybeVar is BoundVariableExpression varExpr &&
@@ -360,8 +437,46 @@ internal sealed class BoundExpressionTranslator
             BoundVariableExpression varExpr => TranslateVariable(varExpr),
             BoundBinaryExpression binExpr => TranslateBinaryOp(binExpr),
             BoundUnaryExpression unaryExpr => TranslateUnaryOp(unaryExpr),
+            BoundCallExpression callExpr => TranslateCall(callExpr),
             _ => null
         };
+    }
+
+    private Expr? TranslateCall(BoundCallExpression callExpr)
+    {
+        var target = callExpr.Target.ToLowerInvariant();
+
+        // math.abs / abs: ite(x >= 0, x, -x)
+        if ((target == "math.abs" || target == "abs") && callExpr.Arguments.Count == 1)
+        {
+            var arg = TranslateExpr(callExpr.Arguments[0]);
+            if (arg is BitVecExpr bv)
+            {
+                var zero = _ctx.MkBV(0, bv.SortSize);
+                return _ctx.MkITE(_ctx.MkBVSGE(bv, zero), bv, _ctx.MkBVNeg(bv));
+            }
+        }
+
+        // math.min / min: ite(x <= y, x, y)
+        if ((target == "math.min" || target == "min") && callExpr.Arguments.Count == 2)
+        {
+            var x = TranslateExpr(callExpr.Arguments[0]);
+            var y = TranslateExpr(callExpr.Arguments[1]);
+            if (x is BitVecExpr bvX && y is BitVecExpr bvY)
+                return _ctx.MkITE(_ctx.MkBVSLE(bvX, bvY), bvX, bvY);
+        }
+
+        // math.max / max: ite(x >= y, x, y)
+        if ((target == "math.max" || target == "max") && callExpr.Arguments.Count == 2)
+        {
+            var x = TranslateExpr(callExpr.Arguments[0]);
+            var y = TranslateExpr(callExpr.Arguments[1]);
+            if (x is BitVecExpr bvX && y is BitVecExpr bvY)
+                return _ctx.MkITE(_ctx.MkBVSGE(bvX, bvY), bvX, bvY);
+        }
+
+        // Unknown function — return null (inconclusive)
+        return null;
     }
 
     private Expr? TranslateVariable(BoundVariableExpression varExpr)

@@ -328,10 +328,11 @@ public class CompilerBugFixTests
     [Fact]
     public void Binder_FallbackExpression_ReportsDiagnostic()
     {
-        var noneExpr = new NoneExpressionNode(DummySpan, null);
+        // Use SomeExpressionNode since NoneExpressionNode is now properly bound
+        var someExpr = new SomeExpressionNode(DummySpan, new IntLiteralNode(DummySpan, 42));
 
         var func = MakeFunction("Foo", "INT",
-            body: new List<StatementNode> { new ReturnStatementNode(DummySpan, noneExpr) });
+            body: new List<StatementNode> { new ReturnStatementNode(DummySpan, someExpr) });
         var module = MakeModule(func);
 
         var diagnostics = new DiagnosticBag();

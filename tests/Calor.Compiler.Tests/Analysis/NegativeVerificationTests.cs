@@ -138,7 +138,7 @@ public class NegativeVerificationTests
         AssertNoTaintVulnerabilities(source);
     }
 
-    [Fact(Skip = "Requires parameterized query recognition - taint analysis doesn't yet distinguish db.execute_param from db.execute")]
+    [SkippableFact]
     public void SafeCode_ParameterizedQuery_NoWarning()
     {
         var source = @"
@@ -160,7 +160,7 @@ public class NegativeVerificationTests
         AssertNoTaintVulnerabilities(source);
     }
 
-    [Fact(Skip = "Requires sanitizer recognition - taint analysis doesn't yet recognize sql_escape as a sanitizing function")]
+    [SkippableFact]
     public void SafeCode_SanitizedInput_NoWarning()
     {
         var source = @"
@@ -182,7 +182,7 @@ public class NegativeVerificationTests
         AssertNoTaintVulnerabilities(source);
     }
 
-    [Fact(Skip = "Requires sanitizer recognition - taint analysis doesn't yet recognize html_escape as a sanitizing function")]
+    [SkippableFact]
     public void SafeCode_EncodedHtmlOutput_NoWarning()
     {
         var source = @"
@@ -279,7 +279,7 @@ public class NegativeVerificationTests
         AssertNoDivisionByZeroWarnings(source);
     }
 
-    [Fact(Skip = "Requires constant propagation analysis - not yet implemented")]
+    [SkippableFact]
     public void SafeCode_DivisionByPositiveConstant_NoWarning()
     {
         // This test requires constant propagation to track that divisor = INT:10
@@ -314,7 +314,7 @@ public class NegativeVerificationTests
         AssertNoDivisionByZeroWarnings(source);
     }
 
-    [Fact(Skip = "Requires loop bound tracking - analysis doesn't yet know loop variable starts at 1")]
+    [SkippableFact]
     public void SafeCode_DivisionInLoopWithNonZeroInit_NoWarning()
     {
         // Note: Using constant bound (10) because parser doesn't support variable bounds
@@ -335,7 +335,7 @@ public class NegativeVerificationTests
         AssertNoDivisionByZeroWarnings(source);
     }
 
-    [Fact(Skip = "Requires (CALL ...) operator support in parser - not yet implemented")]
+    [SkippableFact]
     public void SafeCode_DivisionAfterAbsoluteValue_NoWarning()
     {
         var source = @"
@@ -360,7 +360,7 @@ public class NegativeVerificationTests
 
     #region Null - Safe Patterns
 
-    [Fact(Skip = "Requires (CALL ...) operator support in parser - not yet implemented")]
+    [SkippableFact]
     public void SafeCode_NullCheckBeforeUse_NoWarning()
     {
         var source = @"
@@ -368,7 +368,7 @@ public class NegativeVerificationTests
 §F{f001:SafeNullCheck:pub}
   §I{string:maybeNull}
   §O{i32}
-  §IF{if1} (!= maybeNull NONE)
+  §IF{if1} (!= maybeNull §NN)
     §R (CALL string.length maybeNull)
   §EL
     §R INT:0
@@ -416,7 +416,7 @@ public class NegativeVerificationTests
         AssertNoNullDereferenceWarnings(source);
     }
 
-    [Fact(Skip = "Requires (CALL ...) operator support in parser - not yet implemented")]
+    [SkippableFact]
     public void SafeCode_DefaultValueProvided_NoWarning()
     {
         var source = @"
@@ -495,7 +495,7 @@ public class NegativeVerificationTests
         AssertNoBoundsWarnings(source);
     }
 
-    [Fact(Skip = "Requires (CALL ...) operator support in parser - not yet implemented")]
+    [SkippableFact]
     public void SafeCode_ClampedIndex_NoWarning()
     {
         var source = @"
