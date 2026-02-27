@@ -1102,6 +1102,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(EnumMemberNode node)
     {
+        EmitCSharpAttributes(node.CSharpAttributes);
         var memberName = SanitizeIdentifier(node.Name);
         var value = node.Value != null ? $" = {node.Value}" : "";
         AppendLine($"{memberName}{value},");
@@ -1331,7 +1332,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Generate as switch expression
         var target = node.Target.Accept(this);
         var sb = new System.Text.StringBuilder();
-        sb.Append($"{target} switch {{ ");
+        sb.Append($"({target}) switch {{ ");
 
         for (int i = 0; i < node.Cases.Count; i++)
         {

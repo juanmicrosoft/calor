@@ -3552,6 +3552,282 @@ public class CSharpToCalorConversionTests
         Assert.Equal("SomeOther.Value", enumDef.Members.First(m => m.Name == "Custom").Value);
     }
 
+    [Fact]
+    public void Convert_EnumWithHexValues_PreservesHexNotation()
+    {
+        var csharpSource = """
+            public enum Flags
+            {
+                None = 0x00,
+                Read = 0x01,
+                Write = 0x80,
+                All = 0xFF
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Verify the Calor source preserves hex notation
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Flags");
+        Assert.Equal("0x00", enumDef.Members.First(m => m.Name == "None").Value);
+        Assert.Equal("0x01", enumDef.Members.First(m => m.Name == "Read").Value);
+        Assert.Equal("0x80", enumDef.Members.First(m => m.Name == "Write").Value);
+        Assert.Equal("0xFF", enumDef.Members.First(m => m.Name == "All").Value);
+    }
+
+    [Fact]
+    public void Convert_EnumWithMixedHexAndDecimal_PreservesNotation()
+    {
+        var csharpSource = """
+            public enum Mixed
+            {
+                A = 0,
+                B = 0x10,
+                C = 32,
+                D = 0x80
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Mixed");
+        Assert.Equal("0", enumDef.Members.First(m => m.Name == "A").Value);
+        Assert.Equal("0x10", enumDef.Members.First(m => m.Name == "B").Value);
+        Assert.Equal("32", enumDef.Members.First(m => m.Name == "C").Value);
+        Assert.Equal("0x80", enumDef.Members.First(m => m.Name == "D").Value);
+    }
+
+    [Fact]
+    public void Convert_EnumWithHexBitwiseOr_PreservesNotation()
+    {
+        var csharpSource = """
+            public enum Access
+            {
+                Read = 0x01,
+                Write = 0x02,
+                All = 0x01 | 0x02
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Access");
+        Assert.Equal("0x01 | 0x02", enumDef.Members.First(m => m.Name == "All").Value);
+    }
+
+    [Fact]
+    public void Convert_EnumWithLargeHexValue_HandlesOverflow()
+    {
+        // 0xFFFFFFFF exceeds int.MaxValue — should not throw, should round-trip
+        var csharpSource = """
+            public enum LargeFlags : uint
+            {
+                None = 0x00000000,
+                All = 0xFFFFFFFF
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "LargeFlags");
+        Assert.Equal("0xFFFFFFFF", enumDef.Members.First(m => m.Name == "All").Value);
+        Assert.Equal("0x00000000", enumDef.Members.First(m => m.Name == "None").Value);
+    }
+
+    [Fact]
+    public void Lexer_HexLiteral_LargeValue_DoesNotThrow()
+    {
+        // Directly test the lexer with a large hex value
+        var diagnostics = new DiagnosticBag();
+        var source = "§EN{e1:Test}\nVal = 0xFFFFFFFF\n§/EN{e1}";
+        var lexer = new Lexer(source, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var intToken = tokens.First(t => t.Kind == TokenKind.IntLiteral);
+        Assert.Equal("0xFFFFFFFF", intToken.Text);
+    }
+
+    #endregion
+
+    #region Enum Member Attribute Tests
+
+    [Fact]
+    public void Convert_EnumMemberWithObsolete_PreservesAttribute()
+    {
+        var csharpSource = """
+            public enum Status
+            {
+                Active = 0,
+                [Obsolete]
+                Legacy = 1,
+                Current = 2
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Verify the AST preserves the attribute
+        var enumDef = result.Ast!.Enums.First(e => e.Name == "Status");
+        var legacyMember = enumDef.Members.First(m => m.Name == "Legacy");
+        Assert.Single(legacyMember.CSharpAttributes);
+        Assert.Equal("Obsolete", legacyMember.CSharpAttributes[0].Name);
+
+        // Verify round-trip through Calor parse
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var parsedMember = module.Enums.First(e => e.Name == "Status").Members.First(m => m.Name == "Legacy");
+        Assert.Single(parsedMember.CSharpAttributes);
+        Assert.Equal("Obsolete", parsedMember.CSharpAttributes[0].Name);
+    }
+
+    [Fact]
+    public void Convert_EnumMemberWithObsoleteMessage_PreservesArgument()
+    {
+        var csharpSource = """
+            public enum Color
+            {
+                Red = 0,
+                [Obsolete("Use Crimson instead")]
+                DarkRed = 1,
+                Crimson = 2
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var enumDef = result.Ast!.Enums.First(e => e.Name == "Color");
+        var member = enumDef.Members.First(m => m.Name == "DarkRed");
+        Assert.Single(member.CSharpAttributes);
+        Assert.Equal("Obsolete", member.CSharpAttributes[0].Name);
+        Assert.Single(member.CSharpAttributes[0].Arguments);
+    }
+
+    [Fact]
+    public void Convert_EnumMemberWithObsolete_RoundTrip_EmitsCSharp()
+    {
+        var csharpSource = """
+            public enum Status
+            {
+                Active = 0,
+                [Obsolete]
+                Legacy = 1
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("[Obsolete]", csharpOutput);
+        Assert.Contains("Legacy = 1", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_EnumMemberWithMultipleAttributes_PreservesAll()
+    {
+        var csharpSource = """
+            using System;
+            using System.ComponentModel;
+
+            public enum Status
+            {
+                Active = 0,
+                [Obsolete("Use Current instead")]
+                [Description("Legacy status")]
+                Legacy = 1,
+                Current = 2
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        // Verify AST has both attributes
+        var enumDef = result.Ast!.Enums.First(e => e.Name == "Status");
+        var legacyMember = enumDef.Members.First(m => m.Name == "Legacy");
+        Assert.Equal(2, legacyMember.CSharpAttributes.Count);
+        Assert.Equal("Obsolete", legacyMember.CSharpAttributes[0].Name);
+        Assert.Equal("Description", legacyMember.CSharpAttributes[1].Name);
+
+        // Verify full round-trip: C# → Calor → parse → C#
+        Assert.NotNull(result.CalorSource);
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var parsedMember = module.Enums.First(e => e.Name == "Status").Members.First(m => m.Name == "Legacy");
+        Assert.Equal(2, parsedMember.CSharpAttributes.Count);
+
+        // Verify C# output has both attributes
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("[Obsolete", csharpOutput);
+        Assert.Contains("[Description", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_EnumMemberWithoutAttributes_HasEmptyList()
+    {
+        var csharpSource = """
+            public enum Direction
+            {
+                Up,
+                Down
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var enumDef = result.Ast!.Enums.First(e => e.Name == "Direction");
+        Assert.All(enumDef.Members, m => Assert.Empty(m.CSharpAttributes));
+    }
+
     #endregion
 
     #region Tuple Deconstruction in Setter Tests

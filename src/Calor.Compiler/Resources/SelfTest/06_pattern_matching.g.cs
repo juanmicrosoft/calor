@@ -13,17 +13,17 @@ namespace PatternDemo
     {
         public static string GetGrade(int score)
         {
-            return score switch { >= 90 => "A", >= 80 => "B", >= 70 => "C", >= 60 => "D", _ => "F" };
+            return (score) switch { >= 90 => "A", >= 80 => "B", >= 70 => "C", >= 60 => "D", _ => "F" };
         }
 
         public static string GetHttpStatus(int code)
         {
-            return code switch { 200 => "OK", 404 => "Not Found", 500 => "Server Error", _ => "Unknown" };
+            return (code) switch { 200 => "OK", 404 => "Not Found", 500 => "Server Error", _ => "Unknown" };
         }
 
         public static string Describe(int x)
         {
-            return x switch { var n when n > 100 => "large", var n when n < 0 => "negative", 0 => "zero", _ => "normal" };
+            return (x) switch { var n when n > 100 => "large", var n when n < 0 => "negative", 0 => "zero", _ => "normal" };
         }
 
     }

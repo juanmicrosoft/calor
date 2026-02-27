@@ -70,14 +70,17 @@ public static class TypeMapper
         ["Object"] = "any",
         ["System.Object"] = "any",
 
-        // Common collections
+        // Common collections (concrete)
         ["List"] = "List",
         ["Dictionary"] = "Dict",
         ["HashSet"] = "Set",
+
+        // Common collections (interfaces — preserve interface distinction)
         ["IEnumerable"] = "Seq",
-        ["IList"] = "List",
-        ["IDictionary"] = "Dict",
-        ["ICollection"] = "Collection",
+        ["IList"] = "IList",
+        ["IDictionary"] = "IDict",
+        ["ICollection"] = "ICollection",
+        ["ISet"] = "ISet",
 
         // Read-only collections
         ["IReadOnlyList"] = "ReadList",
@@ -173,12 +176,17 @@ public static class TypeMapper
         ["any"] = "object",
         ["object"] = "object",
 
-        // Collections
+        // Collections (concrete)
         ["List"] = "List",
         ["Dict"] = "Dictionary",
         ["Set"] = "HashSet",
+
+        // Collections (interfaces)
         ["Seq"] = "IEnumerable",
-        ["Collection"] = "ICollection",
+        ["IList"] = "IList",
+        ["IDict"] = "IDictionary",
+        ["ICollection"] = "ICollection",
+        ["ISet"] = "ISet",
 
         // Read-only collections
         ["ReadList"] = "IReadOnlyList",

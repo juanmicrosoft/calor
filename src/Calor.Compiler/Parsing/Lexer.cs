@@ -1020,6 +1020,29 @@ public sealed class Lexer
             Advance();
         }
 
+        // Check for hex prefix in typed literal: INT:0xFF
+        if (Current == '0' && Lookahead is 'x' or 'X')
+        {
+            Advance(); // consume '0'
+            Advance(); // consume 'x'/'X'
+            while (IsHexDigit(Current))
+            {
+                Advance();
+            }
+
+            var hexValueText = _source[valueStart.._position];
+            var hexPart = hexValueText.AsSpan(hexValueText.IndexOf('x') + 1);
+            if (long.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture, out var hexVal))
+            {
+                // Use unchecked to handle values > int.MaxValue (e.g., 0xFFFFFFFF → -1)
+                return MakeToken(TokenKind.IntLiteral, unchecked((int)hexVal));
+            }
+
+            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
+            return MakeToken(TokenKind.Error);
+        }
+
         while (char.IsDigit(Current))
         {
             Advance();
@@ -1321,11 +1344,37 @@ public sealed class Lexer
         return MakeToken(TokenKind.StrLiteral, sb.ToString());
     }
 
+    private static bool IsHexDigit(char c)
+        => c is (>= '0' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F');
+
     private Token ScanNumber()
     {
         if (Current == '-')
         {
             Advance();
+        }
+
+        // Check for hex literal: 0x or 0X prefix
+        if (Current == '0' && Lookahead is 'x' or 'X')
+        {
+            Advance(); // consume '0'
+            Advance(); // consume 'x'/'X'
+            while (IsHexDigit(Current))
+            {
+                Advance();
+            }
+
+            var hexText = CurrentText();
+            if (long.TryParse(hexText.AsSpan(hexText.IndexOf('x') + 1),
+                System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture, out var hexValue))
+            {
+                // Use unchecked to handle values > int.MaxValue (e.g., 0xFFFFFFFF → -1)
+                return MakeToken(TokenKind.IntLiteral, unchecked((int)hexValue));
+            }
+
+            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "hex number");
+            return MakeToken(TokenKind.Error);
         }
 
         while (char.IsDigit(Current))
