@@ -209,6 +209,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     properties.Add(ConvertProperty(propertySyntax));
                 }
+                else
+                {
+                    _context.AddWarning(
+                        $"Dropped unsupported interface member of kind '{member.Kind()}' in interface '{name}'",
+                        feature: "unsupported-member",
+                        line: member.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+                    _context.Stats.MembersDropped++;
+                }
             }
 
             var interfaceNode = new InterfaceDefinitionNode(
@@ -607,6 +615,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     throw new NotSupportedException($"Unsupported member type: {member.Kind()}");
                 }
+                var typeName = (member.Parent as TypeDeclarationSyntax)?.Identifier.Text ?? "unknown";
+                _context.AddWarning(
+                    $"Dropped unsupported class member of kind '{member.Kind()}' in type '{typeName}'",
+                    feature: "unsupported-member",
+                    line: member.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+                _context.Stats.MembersDropped++;
                 break;
         }
     }
@@ -1299,11 +1313,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         else if (accessor.ExpressionBody != null)
         {
+            var span = GetTextSpan(accessor.ExpressionBody);
+            // Setters/init accessors: expression is a statement (assignment, method call, etc.)
+            if (accessor.Keyword.IsKind(SyntaxKind.SetKeyword) || accessor.Keyword.IsKind(SyntaxKind.InitKeyword))
+            {
+                var stmt = ConvertExpressionToStatement(accessor.ExpressionBody.Expression, span);
+                return stmt != null ? new List<StatementNode> { stmt } : Array.Empty<StatementNode>();
+            }
+            // Getters: expression is a return value
             return new List<StatementNode>
             {
-                new ReturnStatementNode(
-                    GetTextSpan(accessor.ExpressionBody),
-                    ConvertExpression(accessor.ExpressionBody.Expression))
+                new ReturnStatementNode(span, ConvertExpression(accessor.ExpressionBody.Expression))
             };
         }
         return Array.Empty<StatementNode>();
@@ -2650,6 +2670,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ? CompoundAssignmentOperator.Add
                 : CompoundAssignmentOperator.Subtract;
             return new CompoundAssignmentStatementNode(span, target, op, new IntLiteralNode(span, 1));
+        }
+        // Handle throw expressions: set => throw new NotSupportedException()
+        if (expr is ThrowExpressionSyntax throwExpr)
+        {
+            var exception = throwExpr.Expression != null ? ConvertExpression(throwExpr.Expression) : null;
+            return new ThrowStatementNode(span, exception);
         }
         // Fallback: convert expression and wrap as a discarded bind
         var exprNode = ConvertExpression(expr);
