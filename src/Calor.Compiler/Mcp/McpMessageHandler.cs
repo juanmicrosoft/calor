@@ -41,6 +41,7 @@ public sealed class McpMessageHandler
         RegisterTool(new ValidateSnippetTool());
         RegisterTool(new CompatCheckTool());
         RegisterTool(new ConvertValidatedTool());
+        RegisterTool(new BatchConvertTool());
 
         RegisterTool(new SelfTestTool());
 
