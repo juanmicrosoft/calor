@@ -100,13 +100,14 @@ public sealed class PartialClassMerger
 
     private static string GetQualifiedName(ModuleNode module, ClassDefinitionNode cls)
     {
-        // Use class name for grouping. In real projects, partial classes share the same
-        // namespace and class name. The module name is file-derived and would differ.
-        // Type parameters are included to distinguish generic overloads.
+        // Group by module name (= C# namespace) + class name + arity.
+        // In project migration, the converter derives module name from the C# namespace,
+        // so partial classes in the same namespace get the same module name and merge.
+        // Classes with the same name in different namespaces stay separate.
         var typeParamSuffix = cls.TypeParameters.Count > 0
             ? $"`{cls.TypeParameters.Count}"
             : "";
-        return $"{cls.Name}{typeParamSuffix}";
+        return $"{module.Name}.{cls.Name}{typeParamSuffix}";
     }
 
     /// <summary>

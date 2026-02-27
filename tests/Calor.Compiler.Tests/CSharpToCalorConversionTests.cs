@@ -3628,8 +3628,9 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Foo1" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Foo2" }).Convert(csharp2);
+        // Same module name = same namespace — should merge
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -3663,8 +3664,9 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Bar1" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Bar2" }).Convert(csharp2);
+        // Same module name = same namespace — should merge
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -3693,8 +3695,9 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Baz1" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Baz2" }).Convert(csharp2);
+        // Same module name = same namespace — should merge
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -3734,6 +3737,39 @@ public class CSharpToCalorConversionTests
         Assert.Equal(2, merged.Count);
         Assert.Single(merged[0].Classes);
         Assert.Single(merged[1].Classes);
+    }
+
+    [Fact]
+    public void PartialClassMerger_DifferentNamespaces_DoesNotMerge()
+    {
+        var csharp1 = """
+            public partial class Widget
+            {
+                public int X { get; set; }
+            }
+            """;
+
+        var csharp2 = """
+            public partial class Widget
+            {
+                public int Y { get; set; }
+            }
+            """;
+
+        // Different module names = different namespaces — should NOT merge
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "App.Models" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "App.Views" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        // Both Widget classes should remain separate (different namespaces)
+        var allWidgets = merged.SelectMany(m => m.Classes).Where(c => c.Name == "Widget").ToList();
+        Assert.Equal(2, allWidgets.Count);
+        Assert.Single(allWidgets[0].Properties);
+        Assert.Single(allWidgets[1].Properties);
     }
 
     #endregion
