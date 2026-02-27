@@ -8085,25 +8085,7 @@ public sealed class Parser
                 if (Check(TokenKind.Equals))
                 {
                     Advance(); // consume =
-                    // Value can be an integer literal or identifier
-                    if (Check(TokenKind.IntLiteral))
-                    {
-                        var valueToken = Advance();
-                        memberValue = valueToken.Value?.ToString();
-                    }
-                    else if (Check(TokenKind.Identifier))
-                    {
-                        // Could be a reference to another enum member or expression
-                        var valueToken = Advance();
-                        memberValue = valueToken.Text;
-                    }
-                    else if (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral)
-                    {
-                        // Negative value
-                        Advance(); // consume -
-                        var valueToken = Advance();
-                        memberValue = $"-{valueToken.Value}";
-                    }
+                    memberValue = ParseEnumMemberValue();
                 }
 
                 var memberSpan = memberStartToken.Span.Union(Current.Span);
@@ -8127,6 +8109,68 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new EnumDefinitionNode(span, id, name, underlyingType, members, attrs);
+    }
+
+    /// <summary>
+    /// Parses an enum member value, which can be a single token or a binary expression chain
+    /// (e.g., <c>Ignore | Populate</c>, <c>1 &lt;&lt; 2</c>, <c>(Read | Write) &amp; ~Execute</c>).
+    /// </summary>
+    private string? ParseEnumMemberValue()
+    {
+        var value = ParseEnumOperand();
+        if (value == null)
+            return null;
+
+        // Extend with binary operators: |, &, ^, <<, >>
+        while (Check(TokenKind.Pipe) || Check(TokenKind.Amp) || Check(TokenKind.Caret) ||
+               Check(TokenKind.LessLess) || Check(TokenKind.GreaterGreater))
+        {
+            var op = Advance().Text;
+            var rhs = ParseEnumOperand();
+            if (rhs == null)
+                break;
+            value = $"{value} {op} {rhs}";
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// Parses a single operand in an enum value expression: integer literal, identifier,
+    /// negative integer, bitwise complement (~), or parenthesized subexpression.
+    /// </summary>
+    private string? ParseEnumOperand()
+    {
+        if (Check(TokenKind.IntLiteral))
+        {
+            return Advance().Value?.ToString();
+        }
+        if (Check(TokenKind.Identifier))
+        {
+            return Advance().Text;
+        }
+        if (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral)
+        {
+            Advance(); // consume -
+            return $"-{Advance().Value}";
+        }
+        if (Check(TokenKind.Tilde))
+        {
+            Advance(); // consume ~
+            var inner = ParseEnumOperand();
+            return inner != null ? $"~{inner}" : null;
+        }
+        if (Check(TokenKind.OpenParen))
+        {
+            Advance(); // consume (
+            var inner = ParseEnumMemberValue(); // recursive — full expression inside parens
+            if (inner != null && Check(TokenKind.CloseParen))
+            {
+                Advance(); // consume )
+                return $"({inner})";
+            }
+        }
+        return null;
     }
 
     /// <summary>

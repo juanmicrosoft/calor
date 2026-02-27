@@ -156,6 +156,7 @@ public sealed class ConversionStats
     public int StatementsConverted { get; set; }
     public int ExpressionsConverted { get; set; }
     public int InteropBlocksEmitted { get; set; }
+    public int MembersDropped { get; set; }
 
     public double ConversionRate => TotalNodes > 0 ? (double)ConvertedNodes / TotalNodes * 100 : 0;
 }

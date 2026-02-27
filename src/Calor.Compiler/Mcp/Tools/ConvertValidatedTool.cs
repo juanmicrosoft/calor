@@ -286,6 +286,7 @@ public sealed class ConvertValidatedTool : McpToolBase
                 PropertiesConverted = stats.PropertiesConverted,
                 FieldsConverted = stats.FieldsConverted,
                 InteropBlocksEmitted = stats.InteropBlocksEmitted,
+                MembersDropped = stats.MembersDropped,
                 DurationMs = (int)duration.TotalMilliseconds
             },
             DurationMs = (int)duration.TotalMilliseconds

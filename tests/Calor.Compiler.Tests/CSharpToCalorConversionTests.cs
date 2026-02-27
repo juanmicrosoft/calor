@@ -3090,6 +3090,377 @@ public class CSharpToCalorConversionTests
 
     #endregion
 
+    #region Expression-Bodied Setter Tests
+
+    [Fact]
+    public void Convert_ExpressionBodiedSetter_ProducesAssignment()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    set => _name = value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Setter);
+        // Setter body should be an assignment, not a return
+        Assert.Single(prop.Setter.Body);
+        Assert.IsType<AssignmentStatementNode>(prop.Setter.Body[0]);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedInitAccessor_ProducesAssignment()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    init => _name = value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Initer);
+        Assert.Single(prop.Initer.Body);
+        Assert.IsType<AssignmentStatementNode>(prop.Initer.Body[0]);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedGetter_StillReturns()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    set => _name = value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Getter);
+        Assert.Single(prop.Getter.Body);
+        Assert.IsType<ReturnStatementNode>(prop.Getter.Body[0]);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedSetter_RoundTrip_NoReturnInSetter()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    set => _name = value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("_name = value;", csharpOutput);
+        Assert.DoesNotContain("return _name = value;", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedSetter_ThrowExpression_ProducesThrowStatement()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                public string Name
+                {
+                    get => "";
+                    set => throw new System.NotSupportedException();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Setter);
+        Assert.Single(prop.Setter.Body);
+        Assert.IsType<ThrowStatementNode>(prop.Setter.Body[0]);
+
+        // Round-trip: C# output should have throw, not return
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("throw new", csharpOutput);
+        Assert.DoesNotContain("return throw", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedSetter_MethodCall_ProducesBindStatement()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    set => SetField(value);
+                }
+                private void SetField(string v) { _name = v; }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Setter);
+        Assert.Single(prop.Setter.Body);
+        // Method calls in setters should not be wrapped in ReturnStatementNode
+        Assert.IsNotType<ReturnStatementNode>(prop.Setter.Body[0]);
+    }
+
+    #endregion
+
+    #region Enum Bitwise OR Tests
+
+    [Fact]
+    public void Convert_EnumBitwiseOr_ParsesCompoundValue()
+    {
+        var csharpSource = """
+            public enum Permissions
+            {
+                None = 0,
+                Read = 1,
+                Write = 2,
+                ReadWrite = Read | Write
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Verify the Calor source preserves the compound value
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Permissions");
+        var rwMember = enumDef.Members.First(m => m.Name == "ReadWrite");
+        Assert.Equal("Read | Write", rwMember.Value);
+    }
+
+    [Fact]
+    public void Convert_EnumShiftOperator_ParsesValue()
+    {
+        var csharpSource = """
+            public enum FileAccess
+            {
+                None = 0,
+                Read = 1 << 0,
+                Write = 1 << 1,
+                Execute = 1 << 2
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "FileAccess");
+        var writeMember = enumDef.Members.First(m => m.Name == "Write");
+        Assert.Equal("1 << 1", writeMember.Value);
+    }
+
+    [Fact]
+    public void Convert_EnumMultipleBitwiseOr_ParsesChain()
+    {
+        var csharpSource = """
+            public enum Access
+            {
+                None = 0,
+                Read = 1,
+                Write = 2,
+                Execute = 4,
+                All = Read | Write | Execute
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Access");
+        var allMember = enumDef.Members.First(m => m.Name == "All");
+        Assert.Equal("Read | Write | Execute", allMember.Value);
+    }
+
+    [Fact]
+    public void Convert_FlagsEnum_RoundTrip_PreservesCompoundValues()
+    {
+        var csharpSource = """
+            public enum Modes
+            {
+                None = 0,
+                A = 1,
+                B = 2,
+                AB = A | B
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("A | B", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_EnumParenthesizedBitwiseExpr_ParsesValue()
+    {
+        var csharpSource = """
+            public enum Flags
+            {
+                A = 1,
+                B = 2,
+                C = 4,
+                NotC = (A | B) & ~C
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Flags");
+        var member = enumDef.Members.First(m => m.Name == "NotC");
+        Assert.Equal("(A | B) & ~C", member.Value);
+    }
+
+    #endregion
+
+    #region Dropped Member Warning Tests
+
+    [Fact]
+    public void Convert_ClassWithDestructor_WarnsAboutDroppedMember()
+    {
+        var csharpSource = """
+            public class MyClass
+            {
+                public int Value { get; set; }
+                ~MyClass() { }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(result.Issues, i =>
+            i.Severity == ConversionIssueSeverity.Warning &&
+            i.Message.Contains("Dropped"));
+        Assert.True(result.Context.Stats.MembersDropped > 0);
+    }
+
+    [Fact]
+    public void Convert_InterfaceWithEvent_WarnsAboutDroppedMember()
+    {
+        var csharpSource = """
+            public interface INotify
+            {
+                void DoWork();
+                event System.EventHandler Changed;
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(result.Issues, i =>
+            i.Severity == ConversionIssueSeverity.Warning &&
+            i.Message.Contains("Dropped"));
+        Assert.True(result.Context.Stats.MembersDropped > 0);
+    }
+
+    [Fact]
+    public void Convert_ClassWithAllSupportedMembers_NoDroppedMembers()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private int _x;
+                public int X { get; set; }
+                public Foo() { _x = 0; }
+                public void DoWork() { }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Equal(0, result.Context.Stats.MembersDropped);
+    }
+
+    [Fact]
+    public void Convert_DroppedMemberWarning_ContainsTypeName()
+    {
+        var csharpSource = """
+            public class MyService
+            {
+                public void DoWork() { }
+                ~MyService() { }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var warning = result.Issues.First(i =>
+            i.Severity == ConversionIssueSeverity.Warning &&
+            i.Message.Contains("Dropped"));
+        Assert.Contains("MyService", warning.Message);
+        Assert.Contains("DestructorDeclaration", warning.Message);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static string GetErrorMessage(ConversionResult result)
