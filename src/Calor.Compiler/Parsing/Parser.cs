@@ -1766,6 +1766,20 @@ public sealed class Parser
             return new TypeOperationNode(span, typeOp.Value, operandArg, typeRef.Name);
         }
 
+        // Handle function calls: (CALL target arg1 arg2 ...)
+        if (opText.Equals("CALL", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
+        {
+            // First arg is the target — extract dotted name from AST node
+            var target = args[0] switch
+            {
+                ReferenceNode r => r.Name,
+                FieldAccessNode f => ExtractDottedName(f),
+                _ => args[0].ToString() ?? ""
+            };
+            var callArgs = args.Skip(1).ToList();
+            return new CallExpressionNode(span, target, callArgs);
+        }
+
         // Unknown operator - provide helpful suggestions
         var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
         var suggestion = OperatorSuggestions.FindSimilarOperator(opText);
@@ -2089,6 +2103,12 @@ public sealed class Parser
             case TokenKind.Hash:
                 expr = ParseSelfRef(); // # inside Lisp (refinement predicates)
                 break;
+            case TokenKind.None:
+                expr = ParseNoneExpression(); // §NN inside Lisp
+                break;
+            case TokenKind.Some:
+                expr = ParseSomeExpression(); // §SM inside Lisp
+                break;
             default:
                 // Provide helpful message for unexpected tokens
                 var hint = Current.Kind switch
@@ -2159,6 +2179,21 @@ public sealed class Parser
             }
         }
         return expr;
+    }
+
+    /// <summary>
+    /// Recursively extracts a dotted name from a FieldAccessNode chain.
+    /// e.g., FieldAccessNode(ReferenceNode("math"), "abs") → "math.abs"
+    /// </summary>
+    private static string ExtractDottedName(FieldAccessNode node)
+    {
+        var prefix = node.Target switch
+        {
+            ReferenceNode r => r.Name,
+            FieldAccessNode f => ExtractDottedName(f),
+            _ => node.Target.ToString() ?? ""
+        };
+        return $"{prefix}.{node.FieldName}";
     }
 
     /// <summary>

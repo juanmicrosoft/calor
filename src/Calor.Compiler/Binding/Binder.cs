@@ -256,6 +256,7 @@ public sealed class Binder
             CallExpressionNode callExpr => BindCallExpression(callExpr),
             ConditionalExpressionNode condExpr => BindConditionalExpression(condExpr),
             NameOfExpressionNode nameOf => new BoundStringLiteral(nameOf.Span, nameOf.Name),
+            NoneExpressionNode none => new BoundIntLiteral(none.Span, 0), // None → null placeholder
             _ => BindFallbackExpression(expr)
         };
     }

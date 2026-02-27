@@ -162,6 +162,17 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
     {
         var lowerTarget = target.ToLowerInvariant();
 
+        // Safe unwrap calls provide fallbacks — skip checking
+        if (IsSafeUnwrapCall(lowerTarget))
+        {
+            // Still check arguments recursively
+            foreach (var arg in arguments)
+            {
+                CheckExpression(arg, function, diagnostics, checkedVariables, pathConditions);
+            }
+            return;
+        }
+
         // Check for unsafe unwrap calls
         if (IsUnsafeUnwrapCall(lowerTarget))
         {

@@ -336,6 +336,9 @@ public sealed class TaintAnalysis
         if (bind.Initializer == null)
             return;
 
+        // Check initializer expressions for sink calls (e.g., file.read with tainted args)
+        AnalyzeExpression(bind.Initializer);
+
         // Check if the initializer is a taint source
         var sourceLabels = GetTaintLabelsFromExpression(bind.Initializer);
 
@@ -465,7 +468,7 @@ public sealed class TaintAnalysis
         // Fall back to pattern matching for external/unknown functions
         var lowerTarget = target.ToLowerInvariant();
 
-        // SQL sinks
+        // SQL sinks (but not parameterized/prepared queries, which are safe by design)
         if (_options.DetectSqlInjection &&
             (lowerTarget.Contains("sql.execute") ||
              lowerTarget.Contains("sql.query") ||
@@ -474,6 +477,12 @@ public sealed class TaintAnalysis
              lowerTarget.Contains("db.raw") ||
              lowerTarget.Contains("execute_sql")))
         {
+            if (lowerTarget.Contains("_param") ||
+                lowerTarget.Contains("parameterized") ||
+                lowerTarget.Contains("prepared"))
+            {
+                return null; // Parameterized queries are safe
+            }
             return TaintSink.SqlQuery;
         }
 
