@@ -1331,7 +1331,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Generate as switch expression
         var target = node.Target.Accept(this);
         var sb = new System.Text.StringBuilder();
-        sb.Append($"{target} switch {{ ");
+        sb.Append($"({target}) switch {{ ");
 
         for (int i = 0; i < node.Cases.Count; i++)
         {
