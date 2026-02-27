@@ -399,7 +399,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             foreach (var member in node.Members)
             {
                 var memberName = member.Identifier.Text;
-                var memberValue = member.EqualsValue?.Value.ToString();
+                var memberValue = GetEnumMemberValueText(member.EqualsValue);
                 members.Add(new EnumMemberNode(GetTextSpan(member), memberName, memberValue));
             }
 
@@ -672,7 +672,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     if (nestedEnum.BaseList?.Types.Count > 0)
                         nestedUnderlying = TypeMapper.CSharpToCalor(nestedEnum.BaseList.Types.First().Type.ToString());
                     var nestedMembers = nestedEnum.Members
-                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, m.EqualsValue?.Value.ToString()))
+                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, GetEnumMemberValueText(m.EqualsValue)))
                         .ToList();
                     var nestedVis = GetVisibility(nestedEnum.Modifiers, Visibility.Private);
                     var nestedAttrs = ConvertAttributes(nestedEnum.AttributeLists);
@@ -995,7 +995,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     if (ne.BaseList?.Types.Count > 0)
                         nestedUnderlying = TypeMapper.CSharpToCalor(ne.BaseList.Types.First().Type.ToString());
                     var nestedMembers = ne.Members
-                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, m.EqualsValue?.Value.ToString()))
+                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, GetEnumMemberValueText(m.EqualsValue)))
                         .ToList();
                     var nestedVis = GetVisibility(ne.Modifiers, Visibility.Private);
                     var nestedAttrs = ConvertAttributes(ne.AttributeLists);
@@ -6829,6 +6829,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     defaultValue);
             })
             .ToList();
+    }
+
+    /// <summary>
+    /// Gets the source text for an enum member's value, preserving hex notation and other
+    /// literal representations that would be lost by calling Value.ToString().
+    /// </summary>
+    private static string? GetEnumMemberValueText(EqualsValueClauseSyntax? equalsValue)
+    {
+        if (equalsValue == null)
+            return null;
+
+        // Use source text for literals to preserve hex notation (0xFF vs 255)
+        if (equalsValue.Value is LiteralExpressionSyntax literal)
+            return literal.Token.Text;
+
+        // For compound expressions (bitwise OR, shifts, etc.), use ToString()
+        return equalsValue.Value.ToString();
     }
 
     private static Visibility GetVisibility(SyntaxTokenList modifiers)
