@@ -4972,14 +4972,17 @@ public sealed class Parser
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
-        // Positional: [id:name]
+        // Positional: [id:name:baseInterface?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
+        var pos2 = attrs["_pos2"] ?? "";
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 2 && !IsIdPattern(id))
+        if (posCount >= 1 && !IsIdPattern(id))
         {
+            // Shift all positionals right: id becomes name, name becomes pos2, etc.
+            pos2 = name;
             name = id;
             id = GenerateParserAutoId("i");
         }
@@ -5032,6 +5035,17 @@ public sealed class Parser
         }
 
         var baseInterfaces = new List<string>();
+        if (!string.IsNullOrEmpty(pos2))
+        {
+            foreach (var baseIface in pos2.Split(','))
+            {
+                var trimmed = baseIface.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                {
+                    baseInterfaces.Add(trimmed);
+                }
+            }
+        }
         var methods = new List<MethodSignatureNode>();
         var properties = new List<PropertyNode>();
 
