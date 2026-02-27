@@ -3461,6 +3461,152 @@ public class CSharpToCalorConversionTests
 
     #endregion
 
+    #region Enum Attribute Re-Parsing Tests
+
+    [Fact]
+    public void Convert_FlagsEnumWithBitwiseOr_RoundTrips()
+    {
+        var csharpSource = """
+            [Flags]
+            public enum Perms
+            {
+                None = 0,
+                Read = 1,
+                Write = 2,
+                All = Read | Write
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("[@Flags]", result.CalorSource);
+
+        // Re-parse the Calor output — should not produce errors
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Perms");
+        Assert.Single(enumDef.CSharpAttributes);
+        Assert.Equal("Flags", enumDef.CSharpAttributes[0].Name);
+        Assert.Equal("Read | Write", enumDef.Members.First(m => m.Name == "All").Value);
+    }
+
+    [Fact]
+    public void Convert_EnumWithMultipleAttributes_RoundTrips()
+    {
+        var csharpSource = """
+            [Flags]
+            [System.Obsolete("Use NewEnum")]
+            public enum OldPerms
+            {
+                None = 0,
+                Read = 1
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "OldPerms");
+        Assert.Equal(2, enumDef.CSharpAttributes.Count);
+    }
+
+    #endregion
+
+    #region Complex Enum Value Tests
+
+    [Fact]
+    public void Convert_EnumWithDottedIdentifier_ParsesValue()
+    {
+        var csharpSource = """
+            public enum Mode
+            {
+                Default = 0,
+                Custom = SomeOther.Value
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Mode");
+        Assert.Equal("SomeOther.Value", enumDef.Members.First(m => m.Name == "Custom").Value);
+    }
+
+    #endregion
+
+    #region Tuple Deconstruction in Setter Tests
+
+    [Fact]
+    public void Convert_SetterWithTupleDeconstruction_ProducesMultipleAssignments()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private int _x;
+                private int _y;
+                public (int, int) Point
+                {
+                    get => (_x, _y);
+                    set => (_x, _y) = (value.Item1, value.Item2);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Point");
+        Assert.NotNull(prop.Setter);
+        Assert.Equal(2, prop.Setter.Body.Count);
+        Assert.All(prop.Setter.Body, stmt => Assert.IsType<AssignmentStatementNode>(stmt));
+    }
+
+    [Fact]
+    public void Convert_SetterWithTupleDeconstruction_RoundTrip_NoReturn()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private int _x;
+                private int _y;
+                public (int, int) Point
+                {
+                    get => (_x, _y);
+                    set => (_x, _y) = (value.Item1, value.Item2);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.DoesNotContain("return", csharpOutput.Split("set")[1]);
+        Assert.Contains("_x =", csharpOutput);
+        Assert.Contains("_y =", csharpOutput);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static string GetErrorMessage(ConversionResult result)
