@@ -6209,7 +6209,7 @@ public sealed class Parser
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 2 && !IsIdPattern(id) && IsVisibilityKeyword(id))
+        if (posCount < 2 && !IsIdPattern(id) && (IsVisibilityKeyword(id) || id.Equals("stat", StringComparison.OrdinalIgnoreCase)))
         {
             visStr = id;
             id = GenerateParserAutoId("ctor");
@@ -6220,7 +6220,8 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CTOR", "id");
         }
 
-        var visibility = ParseVisibility(visStr);
+        var isStatic = visStr.Equals("stat", StringComparison.OrdinalIgnoreCase);
+        var visibility = isStatic ? Visibility.Private : ParseVisibility(visStr);
 
         // --- Compact syntax: inline signature (consume but parameters already parsed via §I) ---
         var _inlineParams = new List<ParameterNode>();
@@ -6275,7 +6276,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs);
+        return new ConstructorNode(span, id, visibility, parameters, preconditions, initializer, body, attrs, csharpAttrs, isStatic);
     }
 
     /// <summary>
@@ -8151,6 +8152,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Enum);
         var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
 
         // Positional: [id:name] or [id:name:vis] or [id:name:underlyingType] or [id:name:vis:underlyingType]
         var id = attrs["_pos0"] ?? "";
@@ -8212,25 +8214,7 @@ public sealed class Parser
                 if (Check(TokenKind.Equals))
                 {
                     Advance(); // consume =
-                    // Value can be an integer literal or identifier
-                    if (Check(TokenKind.IntLiteral))
-                    {
-                        var valueToken = Advance();
-                        memberValue = valueToken.Value?.ToString();
-                    }
-                    else if (Check(TokenKind.Identifier))
-                    {
-                        // Could be a reference to another enum member or expression
-                        var valueToken = Advance();
-                        memberValue = valueToken.Text;
-                    }
-                    else if (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral)
-                    {
-                        // Negative value
-                        Advance(); // consume -
-                        var valueToken = Advance();
-                        memberValue = $"-{valueToken.Value}";
-                    }
+                    memberValue = ParseEnumMemberValue();
                 }
 
                 var memberSpan = memberStartToken.Span.Union(Current.Span);
@@ -8253,7 +8237,137 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new EnumDefinitionNode(span, id, name, underlyingType, members, attrs, visibility);
+        return new EnumDefinitionNode(span, id, name, underlyingType, members, attrs, csharpAttrs, visibility);
+    }
+
+    /// <summary>
+    /// Parses an enum member value, which can be a single token or a binary expression chain
+    /// (e.g., <c>Ignore | Populate</c>, <c>1 &lt;&lt; 2</c>, <c>(Read | Write) &amp; ~Execute</c>).
+    /// </summary>
+    private string? ParseEnumMemberValue()
+    {
+        var value = ParseEnumOperand();
+        if (value == null)
+            return null;
+
+        // Extend with binary operators: |, &, ^, <<, >>
+        while (Check(TokenKind.Pipe) || Check(TokenKind.Amp) || Check(TokenKind.Caret) ||
+               Check(TokenKind.LessLess) || Check(TokenKind.GreaterGreater))
+        {
+            var op = Advance().Text;
+            var rhs = ParseEnumOperand();
+            if (rhs == null)
+                break;
+            value = $"{value} {op} {rhs}";
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// Parses a single operand in an enum value expression: integer literal, identifier,
+    /// negative integer, bitwise complement (~), parenthesized subexpression, or
+    /// function-call-like expressions (e.g., <c>unchecked((int)0xFFFF)</c>).
+    /// </summary>
+    private string? ParseEnumOperand()
+    {
+        if (Check(TokenKind.IntLiteral))
+        {
+            return Advance().Value?.ToString();
+        }
+        if (Check(TokenKind.Identifier))
+        {
+            var text = Advance().Text;
+            // Handle function-call-like expressions: unchecked(...), nameof(...)
+            if (Check(TokenKind.OpenParen))
+            {
+                var args = ConsumeBalancedParens();
+                return $"{text}{args}";
+            }
+            // Handle dotted identifiers: SomeType.Value
+            while (Check(TokenKind.Dot) && Peek(1).Kind == TokenKind.Identifier)
+            {
+                Advance(); // consume .
+                text += $".{Advance().Text}";
+            }
+            return text;
+        }
+        if (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral)
+        {
+            Advance(); // consume -
+            return $"-{Advance().Value}";
+        }
+        if (Check(TokenKind.Tilde))
+        {
+            Advance(); // consume ~
+            var inner = ParseEnumOperand();
+            return inner != null ? $"~{inner}" : null;
+        }
+        if (Check(TokenKind.OpenParen))
+        {
+            // Could be a parenthesized subexpression or a cast: (int)value
+            var saved = _position;
+            Advance(); // consume (
+            var inner = ParseEnumMemberValue(); // recursive — full expression inside parens
+            if (inner != null && Check(TokenKind.CloseParen))
+            {
+                Advance(); // consume )
+                // Check if this is a cast: (type)operand — if next token can be an operand
+                if (IsEnumOperandStart())
+                {
+                    var castTarget = ParseEnumOperand();
+                    return castTarget != null ? $"({inner}){castTarget}" : $"({inner})";
+                }
+                return $"({inner})";
+            }
+            // Failed to parse inside parens — restore and fall through
+            _position = saved;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns true if the current token can start an enum operand.
+    /// </summary>
+    private bool IsEnumOperandStart()
+    {
+        return Check(TokenKind.IntLiteral) || Check(TokenKind.Identifier) ||
+               Check(TokenKind.Tilde) || Check(TokenKind.OpenParen) ||
+               (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral);
+    }
+
+    /// <summary>
+    /// Consumes a balanced parenthesized token sequence including the outer parens,
+    /// returning the reconstructed text (e.g., <c>((int)0xFFFF)</c>).
+    /// Uses source positions to preserve original spacing between tokens.
+    /// </summary>
+    private string ConsumeBalancedParens()
+    {
+        var sb = new System.Text.StringBuilder();
+        var openParen = Advance(); // consume opening (
+        sb.Append(openParen.Text);
+        int depth = 1;
+        var prevEnd = openParen.Span.Start + openParen.Span.Length;
+        while (!IsAtEnd && depth > 0)
+        {
+            if (Check(TokenKind.OpenParen)) depth++;
+            else if (Check(TokenKind.CloseParen)) depth--;
+            if (depth > 0)
+            {
+                if (Current.Span.Start > prevEnd)
+                    sb.Append(' ');
+                prevEnd = Current.Span.Start + Current.Span.Length;
+                sb.Append(Current.Text);
+                Advance();
+            }
+        }
+        if (Check(TokenKind.CloseParen))
+        {
+            if (Current.Span.Start > prevEnd)
+                sb.Append(' ');
+            sb.Append(Advance().Text); // consume closing )
+        }
+        return sb.ToString();
     }
 
     /// <summary>

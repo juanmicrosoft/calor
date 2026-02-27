@@ -210,6 +210,7 @@ public sealed class ConvertTool : McpToolBase
                     PropertiesConverted = result.Context.Stats.PropertiesConverted,
                     FieldsConverted = result.Context.Stats.FieldsConverted,
                     InteropBlocksEmitted = result.Context.Stats.InteropBlocksEmitted,
+                    MembersDropped = result.Context.Stats.MembersDropped,
                     DurationMs = (int)result.Duration.TotalMilliseconds
                 },
                 UnsupportedFeatureCount = unsupportedFeatureCount,

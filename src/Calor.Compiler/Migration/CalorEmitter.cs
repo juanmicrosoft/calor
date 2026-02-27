@@ -508,7 +508,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ConstructorNode node)
     {
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        var visibility = node.IsStatic ? "stat" : GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         // Inline params: §CTOR{id:vis} (type:name, type:name)
@@ -2001,9 +2001,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Format: §EN{id:Name:vis} or §EN{id:Name:vis:underlyingType}
         var vis = GetVisibilityShorthand(node.Visibility);
+        var attrs = EmitCSharpAttributes(node.CSharpAttributes);
         var header = node.UnderlyingType != null
-            ? $"§EN{{{node.Id}:{node.Name}:{vis}:{node.UnderlyingType}}}"
-            : $"§EN{{{node.Id}:{node.Name}:{vis}}}";
+            ? $"§EN{{{node.Id}:{node.Name}:{vis}:{node.UnderlyingType}}}{attrs}"
+            : $"§EN{{{node.Id}:{node.Name}:{vis}}}{attrs}";
         AppendLine(header);
         Indent();
 

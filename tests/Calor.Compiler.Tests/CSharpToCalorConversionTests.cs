@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
@@ -2911,6 +2912,697 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
+    }
+
+    #endregion
+
+    #region Converter Gap Fix Tests
+
+    [Fact]
+    public void Convert_EnumWithFlagsAttribute_PreservesAttribute()
+    {
+        var csharpSource = """
+            using System;
+
+            [Flags]
+            public enum Permissions
+            {
+                Read = 1,
+                Write = 2,
+                Execute = 4
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Single(result.Ast.Enums);
+
+        var enumNode = result.Ast.Enums[0];
+        Assert.Equal("Permissions", enumNode.Name);
+        Assert.Single(enumNode.CSharpAttributes);
+        Assert.Equal("Flags", enumNode.CSharpAttributes[0].Name);
+
+        // Verify CalorEmitter output contains the attribute
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("[@Flags]", result.CalorSource);
+
+        // Verify CSharpEmitter round-trip emits [Flags]
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast);
+        Assert.Contains("[Flags]", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_InterfaceWithProperties_PreservesProperties()
+    {
+        var csharpSource = """
+            public interface IFoo
+            {
+                int X { get; }
+                string Name { get; set; }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Single(result.Ast.Interfaces);
+
+        var iface = result.Ast.Interfaces[0];
+        Assert.Equal("IFoo", iface.Name);
+        Assert.Equal(2, iface.Properties.Count);
+        Assert.Equal("X", iface.Properties[0].Name);
+        Assert.Equal("Name", iface.Properties[1].Name);
+
+        // Verify interface properties are public (implicit in C#)
+        Assert.Equal(Visibility.Public, iface.Properties[0].Visibility);
+        Assert.Equal(Visibility.Public, iface.Properties[1].Visibility);
+
+        // Verify emitter output contains property declarations
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§PROP", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_NestedClass_PreservesNesting()
+    {
+        var csharpSource = """
+            public class Outer
+            {
+                public int Value { get; set; }
+
+                public class Inner
+                {
+                    public string Name { get; set; }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+
+        // Outer should appear as top-level class, Inner should be nested
+        var outerClass = Assert.Single(result.Ast.Classes);
+        Assert.Equal("Outer", outerClass.Name);
+        var innerClass = Assert.Single(outerClass.NestedClasses);
+        Assert.Equal("Inner", innerClass.Name);
+
+        // Verify emitter output contains both classes as §CL blocks
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§CL{", result.CalorSource);
+        Assert.Contains(":Outer", result.CalorSource);
+        Assert.Contains(":Inner", result.CalorSource);
+    }
+
+    [Fact]
+    public void Convert_StaticConstructor_PreservesStaticModifier()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private static int _count;
+
+                static Foo()
+                {
+                    _count = 0;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Single(result.Ast.Classes);
+
+        var cls = result.Ast.Classes[0];
+        Assert.Single(cls.Constructors);
+        Assert.True(cls.Constructors[0].IsStatic);
+
+        // Verify CalorEmitter uses "stat" modifier
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§CTOR{", result.CalorSource);
+        Assert.Contains(":stat}", result.CalorSource);
+
+        // Verify CSharpEmitter outputs "static Foo()"
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast);
+        Assert.Contains("static Foo()", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_StaticConstructor_RoundTrips()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private static int _count;
+
+                static Foo()
+                {
+                    _count = 0;
+                }
+            }
+            """;
+
+        // C# → Calor
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Calor → AST (parse the emitted Calor source)
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        // Verify the parsed AST preserves IsStatic
+        var parsedClass = module.Classes.FirstOrDefault(c => c.Name == "Foo");
+        Assert.NotNull(parsedClass);
+        Assert.Single(parsedClass.Constructors);
+        Assert.True(parsedClass.Constructors[0].IsStatic);
+    }
+
+    #endregion
+
+    #region Expression-Bodied Setter Tests
+
+    [Fact]
+    public void Convert_ExpressionBodiedSetter_ProducesAssignment()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    set => _name = value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Setter);
+        // Setter body should be an assignment, not a return
+        Assert.Single(prop.Setter.Body);
+        Assert.IsType<AssignmentStatementNode>(prop.Setter.Body[0]);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedInitAccessor_ProducesAssignment()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    init => _name = value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Initer);
+        Assert.Single(prop.Initer.Body);
+        Assert.IsType<AssignmentStatementNode>(prop.Initer.Body[0]);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedGetter_StillReturns()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    set => _name = value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Getter);
+        Assert.Single(prop.Getter.Body);
+        Assert.IsType<ReturnStatementNode>(prop.Getter.Body[0]);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedSetter_RoundTrip_NoReturnInSetter()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    set => _name = value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("_name = value;", csharpOutput);
+        Assert.DoesNotContain("return _name = value;", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedSetter_ThrowExpression_ProducesThrowStatement()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                public string Name
+                {
+                    get => "";
+                    set => throw new System.NotSupportedException();
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Setter);
+        Assert.Single(prop.Setter.Body);
+        Assert.IsType<ThrowStatementNode>(prop.Setter.Body[0]);
+
+        // Round-trip: C# output should have throw, not return
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("throw new", csharpOutput);
+        Assert.DoesNotContain("return throw", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_ExpressionBodiedSetter_MethodCall_ProducesBindStatement()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private string _name;
+                public string Name
+                {
+                    get => _name;
+                    set => SetField(value);
+                }
+                private void SetField(string v) { _name = v; }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Name");
+        Assert.NotNull(prop.Setter);
+        Assert.Single(prop.Setter.Body);
+        // Method calls in setters should not be wrapped in ReturnStatementNode
+        Assert.IsNotType<ReturnStatementNode>(prop.Setter.Body[0]);
+    }
+
+    #endregion
+
+    #region Enum Bitwise OR Tests
+
+    [Fact]
+    public void Convert_EnumBitwiseOr_ParsesCompoundValue()
+    {
+        var csharpSource = """
+            public enum Permissions
+            {
+                None = 0,
+                Read = 1,
+                Write = 2,
+                ReadWrite = Read | Write
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Verify the Calor source preserves the compound value
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Permissions");
+        var rwMember = enumDef.Members.First(m => m.Name == "ReadWrite");
+        Assert.Equal("Read | Write", rwMember.Value);
+    }
+
+    [Fact]
+    public void Convert_EnumShiftOperator_ParsesValue()
+    {
+        var csharpSource = """
+            public enum FileAccess
+            {
+                None = 0,
+                Read = 1 << 0,
+                Write = 1 << 1,
+                Execute = 1 << 2
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "FileAccess");
+        var writeMember = enumDef.Members.First(m => m.Name == "Write");
+        Assert.Equal("1 << 1", writeMember.Value);
+    }
+
+    [Fact]
+    public void Convert_EnumMultipleBitwiseOr_ParsesChain()
+    {
+        var csharpSource = """
+            public enum Access
+            {
+                None = 0,
+                Read = 1,
+                Write = 2,
+                Execute = 4,
+                All = Read | Write | Execute
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Access");
+        var allMember = enumDef.Members.First(m => m.Name == "All");
+        Assert.Equal("Read | Write | Execute", allMember.Value);
+    }
+
+    [Fact]
+    public void Convert_FlagsEnum_RoundTrip_PreservesCompoundValues()
+    {
+        var csharpSource = """
+            public enum Modes
+            {
+                None = 0,
+                A = 1,
+                B = 2,
+                AB = A | B
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.Contains("A | B", csharpOutput);
+    }
+
+    [Fact]
+    public void Convert_EnumParenthesizedBitwiseExpr_ParsesValue()
+    {
+        var csharpSource = """
+            public enum Flags
+            {
+                A = 1,
+                B = 2,
+                C = 4,
+                NotC = (A | B) & ~C
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Flags");
+        var member = enumDef.Members.First(m => m.Name == "NotC");
+        Assert.Equal("(A | B) & ~C", member.Value);
+    }
+
+    #endregion
+
+    #region Dropped Member Warning Tests
+
+    [Fact]
+    public void Convert_ClassWithDestructor_WarnsAboutDroppedMember()
+    {
+        var csharpSource = """
+            public class MyClass
+            {
+                public int Value { get; set; }
+                ~MyClass() { }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(result.Issues, i =>
+            i.Severity == ConversionIssueSeverity.Warning &&
+            i.Message.Contains("Dropped"));
+        Assert.True(result.Context.Stats.MembersDropped > 0);
+    }
+
+    [Fact]
+    public void Convert_InterfaceWithEvent_WarnsAboutDroppedMember()
+    {
+        var csharpSource = """
+            public interface INotify
+            {
+                void DoWork();
+                event System.EventHandler Changed;
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(result.Issues, i =>
+            i.Severity == ConversionIssueSeverity.Warning &&
+            i.Message.Contains("Dropped"));
+        Assert.True(result.Context.Stats.MembersDropped > 0);
+    }
+
+    [Fact]
+    public void Convert_ClassWithAllSupportedMembers_NoDroppedMembers()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private int _x;
+                public int X { get; set; }
+                public Foo() { _x = 0; }
+                public void DoWork() { }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Equal(0, result.Context.Stats.MembersDropped);
+    }
+
+    [Fact]
+    public void Convert_DroppedMemberWarning_ContainsTypeName()
+    {
+        var csharpSource = """
+            public class MyService
+            {
+                public void DoWork() { }
+                ~MyService() { }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var warning = result.Issues.First(i =>
+            i.Severity == ConversionIssueSeverity.Warning &&
+            i.Message.Contains("Dropped"));
+        Assert.Contains("MyService", warning.Message);
+        Assert.Contains("DestructorDeclaration", warning.Message);
+    }
+
+    #endregion
+
+    #region Enum Attribute Re-Parsing Tests
+
+    [Fact]
+    public void Convert_FlagsEnumWithBitwiseOr_RoundTrips()
+    {
+        var csharpSource = """
+            [Flags]
+            public enum Perms
+            {
+                None = 0,
+                Read = 1,
+                Write = 2,
+                All = Read | Write
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("[@Flags]", result.CalorSource);
+
+        // Re-parse the Calor output — should not produce errors
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Perms");
+        Assert.Single(enumDef.CSharpAttributes);
+        Assert.Equal("Flags", enumDef.CSharpAttributes[0].Name);
+        Assert.Equal("Read | Write", enumDef.Members.First(m => m.Name == "All").Value);
+    }
+
+    [Fact]
+    public void Convert_EnumWithMultipleAttributes_RoundTrips()
+    {
+        var csharpSource = """
+            [Flags]
+            [System.Obsolete("Use NewEnum")]
+            public enum OldPerms
+            {
+                None = 0,
+                Read = 1
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "OldPerms");
+        Assert.Equal(2, enumDef.CSharpAttributes.Count);
+    }
+
+    #endregion
+
+    #region Complex Enum Value Tests
+
+    [Fact]
+    public void Convert_EnumWithDottedIdentifier_ParsesValue()
+    {
+        var csharpSource = """
+            public enum Mode
+            {
+                Default = 0,
+                Custom = SomeOther.Value
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var enumDef = module.Enums.First(e => e.Name == "Mode");
+        Assert.Equal("SomeOther.Value", enumDef.Members.First(m => m.Name == "Custom").Value);
+    }
+
+    #endregion
+
+    #region Tuple Deconstruction in Setter Tests
+
+    [Fact]
+    public void Convert_SetterWithTupleDeconstruction_ProducesMultipleAssignments()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private int _x;
+                private int _y;
+                public (int, int) Point
+                {
+                    get => (_x, _y);
+                    set => (_x, _y) = (value.Item1, value.Item2);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Point");
+        Assert.NotNull(prop.Setter);
+        Assert.Equal(2, prop.Setter.Body.Count);
+        Assert.All(prop.Setter.Body, stmt => Assert.IsType<AssignmentStatementNode>(stmt));
+    }
+
+    [Fact]
+    public void Convert_SetterWithTupleDeconstruction_RoundTrip_NoReturn()
+    {
+        var csharpSource = """
+            public class Foo
+            {
+                private int _x;
+                private int _y;
+                public (int, int) Point
+                {
+                    get => (_x, _y);
+                    set => (_x, _y) = (value.Item1, value.Item2);
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
+        Assert.DoesNotContain("return", csharpOutput.Split("set")[1]);
+        Assert.Contains("_x =", csharpOutput);
+        Assert.Contains("_y =", csharpOutput);
     }
 
     #endregion

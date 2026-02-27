@@ -47,6 +47,9 @@ internal sealed class ConversionStatsOutput
     [JsonPropertyName("interopBlocksEmitted")]
     public int InteropBlocksEmitted { get; init; }
 
+    [JsonPropertyName("membersDropped")]
+    public int MembersDropped { get; init; }
+
     [JsonPropertyName("durationMs")]
     public int DurationMs { get; init; }
 }
