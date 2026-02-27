@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 WORK_DIR="${CALOR_TEST_WORKDIR:-/tmp/calor-e2e-project-init}"
-COMPILER="$REPO_ROOT/src/Calor.Compiler/bin/Debug/net8.0/calor"
+COMPILER="$REPO_ROOT/src/Calor.Compiler/bin/Debug/net10.0/calor"
 RUNTIME_PROJ="$REPO_ROOT/src/Calor.Runtime/Calor.Runtime.csproj"
 
 # Configuration
@@ -188,15 +188,15 @@ test_github_project() {
         rm "$project_dir/version.json"
     fi
 
-    # Patch target frameworks to net8.0 if they target newer versions
-    step "Patching target frameworks to net8.0..."
+    # Patch target frameworks to net10.0 if they target other versions
+    step "Patching target frameworks to net10.0..."
     find "$project_dir" -name "*.csproj" -exec sed -i.bak \
-        -e 's/<TargetFramework>net9\.0</<TargetFramework>net8.0</g' \
-        -e 's/<TargetFramework>net10\.0</<TargetFramework>net8.0</g' \
-        -e 's/net9\.0;/net8.0;/g' \
-        -e 's/net10\.0;/net8.0;/g' \
-        -e 's/;net9\.0/;net8.0/g' \
-        -e 's/;net10\.0/;net8.0/g' \
+        -e 's/<TargetFramework>net8\.0</<TargetFramework>net10.0</g' \
+        -e 's/<TargetFramework>net9\.0</<TargetFramework>net10.0</g' \
+        -e 's/net8\.0;/net10.0;/g' \
+        -e 's/net9\.0;/net10.0;/g' \
+        -e 's/;net8\.0/;net10.0/g' \
+        -e 's/;net9\.0/;net10.0/g' \
         {} \;
     find "$project_dir" -name "*.csproj.bak" -delete 2>/dev/null || true
 
@@ -375,7 +375,7 @@ test_basic_console_app() {
     cd "$test_dir"
 
     step "Creating console project..."
-    dotnet new console --name TestApp --output . -f net8.0 > /dev/null 2>&1
+    dotnet new console --name TestApp --output . -f net10.0 > /dev/null 2>&1
     add_calor_runtime "TestApp.csproj"
 
     step "Running calor init --ai claude..."
@@ -452,7 +452,7 @@ test_multiple_projects_detection() {
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 </Project>
 EOF
@@ -460,7 +460,7 @@ EOF
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 </Project>
 EOF
@@ -504,7 +504,7 @@ test_full_pipeline() {
     cd "$test_dir"
 
     step "Creating project with convertible C# files..."
-    dotnet new console --name PipelineTest --output . -f net8.0 > /dev/null 2>&1
+    dotnet new console --name PipelineTest --output . -f net10.0 > /dev/null 2>&1
     add_calor_runtime "PipelineTest.csproj"
 
     # Create a C# file that should score well for conversion

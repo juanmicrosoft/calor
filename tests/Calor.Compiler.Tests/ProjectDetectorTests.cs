@@ -232,7 +232,7 @@ public class ProjectDetectorTests : IDisposable
         <Project Sdk="Microsoft.NET.Sdk">
           <PropertyGroup>
             <OutputType>Exe</OutputType>
-            <TargetFramework>net8.0</TargetFramework>
+            <TargetFramework>net10.0</TargetFramework>
           </PropertyGroup>
         </Project>
         """;
@@ -252,7 +252,7 @@ public class ProjectDetectorTests : IDisposable
           <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
           <PropertyGroup>
             <OutputType>Exe</OutputType>
-            <TargetFramework>net8.0</TargetFramework>
+            <TargetFramework>net10.0</TargetFramework>
           </PropertyGroup>
           <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
         </Project>
@@ -262,7 +262,7 @@ public class ProjectDetectorTests : IDisposable
         <Project Sdk="Microsoft.NET.Sdk">
           <PropertyGroup>
             <OutputType>Exe</OutputType>
-            <TargetFramework>net8.0</TargetFramework>
+            <TargetFramework>net10.0</TargetFramework>
           </PropertyGroup>
           <Target Name="CompileCalorFiles" BeforeTargets="BeforeCompile">
             <Exec Command="calor --input %(CalorCompile.FullPath)" />

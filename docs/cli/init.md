@@ -389,7 +389,7 @@ Generated C# files are placed in the intermediate output directory:
 obj/<Configuration>/<TargetFramework>/calor/
 ```
 
-For example: `obj/Debug/net8.0/calor/MyModule.g.cs`
+For example: `obj/Debug/net10.0/calor/MyModule.g.cs`
 
 This keeps generated files out of your source tree while still making them part of the build.
 
@@ -437,7 +437,7 @@ MyProject/
 │   ├── UserService.cs      # Existing C# service
 │   └── PaymentService.calr # New Calor service
 └── obj/
-    └── Debug/net8.0/calor/
+    └── Debug/net10.0/calor/
         └── PaymentService.g.cs  # Generated C#
 ```
 

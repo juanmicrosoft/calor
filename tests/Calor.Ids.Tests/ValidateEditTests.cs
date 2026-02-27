@@ -46,7 +46,7 @@ public class ValidateEditTests
     }
 
     [Theory]
-    [InlineData("{\"file_path\": \"obj/Debug/net8.0/Test.cs\"}")]
+    [InlineData("{\"file_path\": \"obj/Debug/net10.0/Test.cs\"}")]
     [InlineData("{\"file_path\": \"obj/Release/AssemblyInfo.cs\"}")]
     public void EditObjFile_IsAllowed(string json)
     {

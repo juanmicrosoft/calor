@@ -13,7 +13,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_TASKS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$AGENT_TASKS_DIR/../../.." && pwd)"
-COMPILER="$REPO_ROOT/src/Calor.Compiler/bin/Debug/net8.0/calor"
+COMPILER="$REPO_ROOT/src/Calor.Compiler/bin/Debug/net10.0/calor"
 FIXTURES_DIR="$AGENT_TASKS_DIR/fixtures"
 TASKS_DIR="$AGENT_TASKS_DIR/tasks"
 

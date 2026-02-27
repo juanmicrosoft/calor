@@ -30,6 +30,6 @@ Update when signature changes:
 ```
 
 ### Code Conventions
-- Use C# 12 features where appropriate
+- Use C# 14 features where appropriate
 - Consider adding default parameter values for backwards compatibility
 - Update XML documentation if present

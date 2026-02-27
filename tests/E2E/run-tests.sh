@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-COMPILER="$REPO_ROOT/src/Calor.Compiler/bin/Debug/net8.0/calor"
+COMPILER="$REPO_ROOT/src/Calor.Compiler/bin/Debug/net10.0/calor"
 SCENARIOS_DIR="$SCRIPT_DIR/scenarios"
 
 # Colors

@@ -33,7 +33,7 @@ your_code.calr → Calor Compiler → your_code.g.cs → .NET Build → executab
 
 ## Prerequisites
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
 - A terminal or command prompt
 
 ---

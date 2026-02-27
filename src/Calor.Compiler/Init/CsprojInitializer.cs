@@ -179,7 +179,7 @@ public sealed class CsprojInitializer
                 new XAttribute("Condition", "'$(CalorToolVersion)' == ''"),
                 EmbeddedResourceHelper.GetVersion()),
             new XElement("CalorRuntimePath",
-                @"$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net8.0/any/Calor.Runtime.dll"));
+                @"$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net10.0/any/Calor.Runtime.dll"));
 
         root.Add(runtimePropertyGroup);
 
@@ -297,7 +297,7 @@ public sealed class CsprojInitializer
 
             <PropertyGroup>
               <CalorToolVersion Condition="'$(CalorToolVersion)' == ''">{EmbeddedResourceHelper.GetVersion()}</CalorToolVersion>
-              <CalorRuntimePath>$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net8.0/any/Calor.Runtime.dll</CalorRuntimePath>
+              <CalorRuntimePath>$(HOME)/.dotnet/tools/.store/calor/$(CalorToolVersion)/calor/$(CalorToolVersion)/tools/net10.0/any/Calor.Runtime.dll</CalorRuntimePath>
             </PropertyGroup>
 
             <ItemGroup Condition="'$(CalorSkipRuntimeReference)' != 'true'">
