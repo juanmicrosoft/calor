@@ -4979,8 +4979,10 @@ public sealed class Parser
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
-        if (posCount < 2 && !IsIdPattern(id))
+        if (posCount >= 1 && !IsIdPattern(id))
         {
+            // Shift all positionals right: id becomes name, name becomes pos2, etc.
+            pos2 = name;
             name = id;
             id = GenerateParserAutoId("i");
         }

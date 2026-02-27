@@ -357,6 +357,34 @@ public class CompactSyntaxTests
     }
 
     [Fact]
+    public void OptionalId_Interface_WithBaseInterface()
+    {
+        // §IFACE{IChild:IParent} — no explicit ID, with base interface
+        var source = """
+            §M{m001:Test}
+            §IFACE{IChild:IParent}
+            §MT{m001:DoWork}
+            §O{void}
+            §/MT{m001}
+            §/IFACE
+            §/M{m001}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var iface = Assert.Single(module.Interfaces);
+        Assert.Equal("IChild", iface.Name);
+        Assert.Contains("_auto", iface.Id);
+        Assert.Single(iface.BaseInterfaces);
+        Assert.Equal("IParent", iface.BaseInterfaces[0]);
+
+        var emitter = new CSharpEmitter();
+        var csharp = emitter.Emit(module);
+        Assert.Contains(": IParent", csharp);
+    }
+
+    [Fact]
     public void Interface_BaseInterface_FromThirdAttribute()
     {
         var source = """
