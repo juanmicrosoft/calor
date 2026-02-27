@@ -97,4 +97,7 @@ public sealed class MigrationPlanOptions
 
     /// <summary>Z3 verification timeout in milliseconds.</summary>
     public uint VerificationTimeoutMs { get; set; } = Verification.Z3.VerificationOptions.DefaultTimeoutMs;
+
+    /// <summary>Whether to merge partial class definitions from multiple files into one.</summary>
+    public bool MergePartialClasses { get; set; } = true;
 }

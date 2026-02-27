@@ -3607,6 +3607,137 @@ public class CSharpToCalorConversionTests
 
     #endregion
 
+    #region Partial Class Merger Tests
+
+    [Fact]
+    public void PartialClassMerger_MergesTwoPartials()
+    {
+        var csharp1 = """
+            public partial class Foo
+            {
+                public int X { get; set; }
+                public void DoA() { }
+            }
+            """;
+
+        var csharp2 = """
+            public partial class Foo
+            {
+                public string Y { get; set; }
+                public void DoB() { }
+            }
+            """;
+
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Foo1" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Foo2" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        // Should still have 2 modules, but merged class is in the first one
+        var allClasses = merged.SelectMany(m => m.Classes).Where(c => c.Name == "Foo").ToList();
+        Assert.Single(allClasses);
+
+        var mergedClass = allClasses[0];
+        Assert.True(mergedClass.IsPartial);
+        Assert.Equal(2, mergedClass.Properties.Count);
+        Assert.Equal(2, mergedClass.Methods.Count);
+    }
+
+    [Fact]
+    public void PartialClassMerger_PreservesBaseClass()
+    {
+        var csharp1 = """
+            public partial class Bar : BaseType
+            {
+                public void MethodA() { }
+            }
+            """;
+
+        var csharp2 = """
+            public partial class Bar
+            {
+                public void MethodB() { }
+            }
+            """;
+
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Bar1" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Bar2" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        var mergedClass = merged.SelectMany(m => m.Classes).First(c => c.Name == "Bar");
+        Assert.Equal("BaseType", mergedClass.BaseClass);
+        Assert.Equal(2, mergedClass.Methods.Count);
+    }
+
+    [Fact]
+    public void PartialClassMerger_MergesInterfaces()
+    {
+        var csharp1 = """
+            public partial class Baz : IDisposable
+            {
+                public void Dispose() { }
+            }
+            """;
+
+        var csharp2 = """
+            public partial class Baz : ICloneable
+            {
+                public object Clone() { return this; }
+            }
+            """;
+
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Baz1" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Baz2" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        var mergedClass = merged.SelectMany(m => m.Classes).First(c => c.Name == "Baz");
+        Assert.Contains("IDisposable", mergedClass.ImplementedInterfaces);
+        Assert.Contains("ICloneable", mergedClass.ImplementedInterfaces);
+    }
+
+    [Fact]
+    public void PartialClassMerger_NonPartialClassesUnchanged()
+    {
+        var csharp1 = """
+            public class Regular
+            {
+                public int X { get; set; }
+            }
+            """;
+
+        var csharp2 = """
+            public class Other
+            {
+                public int Y { get; set; }
+            }
+            """;
+
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Reg" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Other" }).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merger = new PartialClassMerger();
+        var merged = merger.Merge(new[] { result1.Ast!, result2.Ast! });
+
+        Assert.Equal(2, merged.Count);
+        Assert.Single(merged[0].Classes);
+        Assert.Single(merged[1].Classes);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static string GetErrorMessage(ConversionResult result)
