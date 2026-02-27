@@ -107,6 +107,8 @@ public sealed class CalorAttributeArgument
             Type t => $"typeof({t.Name})",
             // For type name strings that represent typeof expressions
             TypeOfReference tr => $"typeof({tr.TypeName})",
+            // nameof() expression (e.g., nameof(value))
+            NameOfReference nr => $"nameof({nr.Name})",
             // Member access expression (e.g., AttributeTargets.Method)
             MemberAccessReference ma => ma.Expression,
             // Bitwise binary expression (e.g., A | B, A & B, A ^ B)
@@ -163,6 +165,21 @@ public sealed class TypeOfReference
     }
 
     public override string ToString() => $"typeof({TypeName})";
+}
+
+/// <summary>
+/// Represents a nameof() expression in an attribute argument (e.g., nameof(value)).
+/// </summary>
+public sealed class NameOfReference
+{
+    public string Name { get; }
+
+    public NameOfReference(string name)
+    {
+        Name = name;
+    }
+
+    public override string ToString() => $"nameof({Name})";
 }
 
 /// <summary>
