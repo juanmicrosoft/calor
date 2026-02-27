@@ -1,5 +1,5 @@
 §M{m002:Test_02_04}
-  §EN{e001:HttpStatus}
+  §EN{e001:HttpStatus:pub}
     Ok = 200
     NotFound = 404
     ServerError = 500

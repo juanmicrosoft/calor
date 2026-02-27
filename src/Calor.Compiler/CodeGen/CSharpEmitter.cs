@@ -246,6 +246,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        // Emit type-level preprocessor blocks
+        foreach (var tpp in node.TypePreprocessorBlocks)
+        {
+            Visit(tpp);
+            AppendLine();
+        }
+
         // Emit module-level functions in a static class
         if (node.Functions.Count > 0)
         {
@@ -1066,7 +1073,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             ? $" : {MapTypeName(node.UnderlyingType)}"
             : "";
 
-        AppendLine($"public enum {typeName}{baseType}");
+        var visibility = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
+            Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
+            Visibility.Private => "private",
+            _ => "internal"
+        };
+
+        AppendLine($"{visibility} enum {typeName}{baseType}");
         AppendLine("{");
         Indent();
 
@@ -2095,6 +2112,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var ppBlock in node.PreprocessorBlocks)
         {
             Visit(ppBlock);
+            AppendLine();
+        }
+
+        // Emit nested types
+        foreach (var nestedClass in node.NestedClasses)
+        {
+            Visit(nestedClass);
+            AppendLine();
+        }
+        foreach (var nestedIface in node.NestedInterfaces)
+        {
+            Visit(nestedIface);
+            AppendLine();
+        }
+        foreach (var nestedEnum in node.NestedEnums)
+        {
+            Visit(nestedEnum);
             AppendLine();
         }
 
@@ -4087,6 +4121,73 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 }
                 foreach (var evt in node.ElseBranch.Events)
                     Visit(evt);
+            }
+        }
+
+        AppendLine("#endif");
+    }
+
+    public string Visit(TypePreprocessorBlockNode node)
+    {
+        EmitTypePreprocessorBlock(node, isFirst: true);
+        return "";
+    }
+
+    private void EmitTypePreprocessorBlock(TypePreprocessorBlockNode node, bool isFirst)
+    {
+        AppendLine(isFirst ? $"#if {node.Condition}" : $"#elif {node.Condition}");
+
+        foreach (var cls in node.Classes)
+        {
+            Visit(cls);
+            AppendLine();
+        }
+        foreach (var iface in node.Interfaces)
+        {
+            Visit(iface);
+            AppendLine();
+        }
+        foreach (var en in node.Enums)
+        {
+            Visit(en);
+            AppendLine();
+        }
+        foreach (var del in node.Delegates)
+        {
+            Visit(del);
+            AppendLine();
+        }
+
+        if (node.ElseBranch != null)
+        {
+            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
+            {
+                EmitTypePreprocessorBlock(node.ElseBranch, isFirst: false);
+                return; // #endif already emitted by recursive call
+            }
+            else
+            {
+                AppendLine("#else");
+                foreach (var cls in node.ElseBranch.Classes)
+                {
+                    Visit(cls);
+                    AppendLine();
+                }
+                foreach (var iface in node.ElseBranch.Interfaces)
+                {
+                    Visit(iface);
+                    AppendLine();
+                }
+                foreach (var en in node.ElseBranch.Enums)
+                {
+                    Visit(en);
+                    AppendLine();
+                }
+                foreach (var del in node.ElseBranch.Delegates)
+                {
+                    Visit(del);
+                    AppendLine();
+                }
             }
         }
 

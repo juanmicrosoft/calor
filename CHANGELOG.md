@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-02-27
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Added
+- **Relational/compound `is` patterns** — `x is > 5 or < 3` now converts to equivalent boolean expressions `(|| (> x 5) (< x 3))` instead of falling back to §CSHARP; supports `and`, `or`, `not`, parenthesized, and nested pattern combinations
+- **Type-level preprocessor blocks** — `#if`-wrapped entire type declarations (class, interface, enum) at module level are now converted to `§PP` blocks; handles disabled branches where Roslyn excludes types from the syntax tree
+- **Enum visibility modifiers** — Enums now support `public`, `internal`, `private`, `protected` visibility via `§EN{id:Name:vis}` syntax instead of hardcoded `public`
+- **Nested type declarations** — Classes, structs, records, interfaces, and enums defined inside other types are now parsed, converted, and emitted correctly
+- **Extended dictionary initializer support** — `SortedDictionary`, `ConcurrentDictionary`, `FrozenDictionary`, `ImmutableDictionary`, and `ImmutableSortedDictionary` now use the same initializer conversion as `Dictionary`
+- **5 new conversion snapshot tests** — Relational patterns, internal enums, nested types, preprocessor-wrapped types, and dictionary initializers
+- **Feature registry entries** — Added `dictionary-initializer`, `list-initializer`, `hashset-initializer`, `nested-type` to FeatureSupport; updated `relational-pattern` and `compound-pattern` from NotSupported to Full
+
 ## [0.3.4] - 2026-02-26
 
 ### Benchmark Results (Statistical: 30 runs)

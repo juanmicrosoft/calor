@@ -1,6 +1,6 @@
 # CLAUDE.md — Calor Compiler
 
-Calor is a DSL designed for AI agents that compiles to C# on .NET 8. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (currently 0.3.4).
+Calor is a DSL designed for AI agents that compiles to C# on .NET 8. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (currently 0.3.5).
 
 ## Build & Test
 

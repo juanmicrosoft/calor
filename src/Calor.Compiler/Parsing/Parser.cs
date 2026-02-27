@@ -103,6 +103,7 @@ public sealed class Parser
         var interopBlocks = new List<CSharpInteropBlockNode>();
         var refinementTypes = new List<RefinementTypeNode>();
         var indexedTypes = new List<IndexedTypeNode>();
+        var typePreprocessorBlocks = new List<TypePreprocessorBlockNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndModule))
         {
@@ -185,9 +186,13 @@ public sealed class Parser
             {
                 indexedTypes.Add(ParseIndexedType());
             }
+            else if (Check(TokenKind.Preprocessor))
+            {
+                typePreprocessorBlocks.Add(ParseTypePreprocessorBlock());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, or END_MODULE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE", Current.Kind);
                 Advance();
             }
         }
@@ -205,7 +210,8 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return new ModuleNode(span, id, moduleName, usings, interfaces, classes,
             enums, enumExtensions, delegates, functions, attrs,
-            issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes, indexedTypes);
+            issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes, indexedTypes,
+            typePreprocessorBlocks.Count > 0 ? typePreprocessorBlocks : null);
     }
 
     /// <summary>
@@ -5277,6 +5283,9 @@ public sealed class Parser
         var operatorOverloads = new List<OperatorOverloadNode>();
         var interopBlocks = new List<CSharpInteropBlockNode>();
         var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
+        var nestedClasses = new List<ClassDefinitionNode>();
+        var nestedInterfaces = new List<InterfaceDefinitionNode>();
+        var nestedEnums = new List<EnumDefinitionNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndClass))
         {
@@ -5340,9 +5349,21 @@ public sealed class Parser
             {
                 preprocessorBlocks.Add(ParseMemberPreprocessorBlock());
             }
+            else if (Check(TokenKind.Class))
+            {
+                nestedClasses.Add(ParseClassDefinition());
+            }
+            else if (Check(TokenKind.Interface))
+            {
+                nestedInterfaces.Add(ParseInterfaceDefinition());
+            }
+            else if (Check(TokenKind.Enum))
+            {
+                nestedEnums.Add(ParseEnumDefinition());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, or END_CLASS", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, or END_CLASS", Current.Kind);
                 Advance();
             }
         }
@@ -5360,7 +5381,10 @@ public sealed class Parser
         return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
             implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, operatorOverloads, attrs, csharpAttrs,
             isStruct: isStruct, isReadOnly: isReadOnly, visibility: visibility, interopBlocks: interopBlocks,
-            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null);
+            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null,
+            nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
+            nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
+            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null);
     }
 
     /// <summary>
@@ -6778,6 +6802,88 @@ public sealed class Parser
             fields, properties, constructors, methods, events, operatorOverloads, elseBranch);
     }
 
+    /// <summary>
+    /// Parses a type-level preprocessor block at module level.
+    /// §PP{CONDITION} ... type declarations ... §PPE ... §/PP{CONDITION}
+    /// </summary>
+    private TypePreprocessorBlockNode ParseTypePreprocessorBlock()
+    {
+        var startToken = Expect(TokenKind.Preprocessor);
+        var condition = startToken.Value as string ?? "";
+
+        var classes = new List<ClassDefinitionNode>();
+        var interfaces = new List<InterfaceDefinitionNode>();
+        var enums = new List<EnumDefinitionNode>();
+        var delegates = new List<DelegateDefinitionNode>();
+
+        // Parse type declarations until §PPE or §/PP
+        while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        {
+            ParseTypeInPreprocessorBlock(classes, interfaces, enums, delegates);
+        }
+
+        TypePreprocessorBlockNode? elseBranch = null;
+        if (Match(TokenKind.PreprocessorElse))
+        {
+            if (Check(TokenKind.Preprocessor))
+            {
+                elseBranch = ParseTypePreprocessorBlock();
+            }
+            else
+            {
+                var elseClasses = new List<ClassDefinitionNode>();
+                var elseInterfaces = new List<InterfaceDefinitionNode>();
+                var elseEnums = new List<EnumDefinitionNode>();
+                var elseDelegates = new List<DelegateDefinitionNode>();
+
+                while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+                {
+                    ParseTypeInPreprocessorBlock(elseClasses, elseInterfaces, elseEnums, elseDelegates);
+                }
+
+                elseBranch = new TypePreprocessorBlockNode(startToken.Span, "",
+                    elseClasses, elseInterfaces, elseEnums, elseDelegates);
+            }
+        }
+
+        if (elseBranch == null || string.IsNullOrEmpty(elseBranch.Condition))
+        {
+            Expect(TokenKind.EndPreprocessor);
+        }
+
+        return new TypePreprocessorBlockNode(startToken.Span, condition,
+            classes, interfaces, enums, delegates, elseBranch);
+    }
+
+    private void ParseTypeInPreprocessorBlock(
+        List<ClassDefinitionNode> classes,
+        List<InterfaceDefinitionNode> interfaces,
+        List<EnumDefinitionNode> enums,
+        List<DelegateDefinitionNode> delegates)
+    {
+        if (Check(TokenKind.Class))
+        {
+            classes.Add(ParseClassDefinition());
+        }
+        else if (Check(TokenKind.Interface))
+        {
+            interfaces.Add(ParseInterfaceDefinition());
+        }
+        else if (Check(TokenKind.Enum))
+        {
+            enums.Add(ParseEnumDefinition());
+        }
+        else if (Check(TokenKind.Delegate))
+        {
+            delegates.Add(ParseDelegateDefinition());
+        }
+        else
+        {
+            _diagnostics.ReportUnexpectedToken(Current.Span, "CLASS, IFACE, EN, DEL, PPE, or END_PP", Current.Kind);
+            Advance();
+        }
+    }
+
     private void ParseMemberInPreprocessorBlock(
         List<ClassFieldNode> fields,
         List<PropertyNode> properties,
@@ -8046,10 +8152,11 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Enum);
         var attrs = ParseAttributes();
 
-        // Positional: [id:name] or [id:name:underlyingType]
+        // Positional: [id:name] or [id:name:vis] or [id:name:underlyingType] or [id:name:vis:underlyingType]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
-        var underlyingType = attrs["_pos2"]; // optional
+        var pos2 = attrs["_pos2"];
+        var pos3 = attrs["_pos3"];
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
@@ -8057,6 +8164,27 @@ public sealed class Parser
         {
             name = id;
             id = GenerateParserAutoId("e");
+        }
+
+        // Disambiguate pos2: visibility keyword vs underlying type
+        Visibility visibility = Visibility.Public;
+        string? underlyingType;
+        if (pos3 != null)
+        {
+            // 4 positionals: §EN{id:Name:vis:underlyingType}
+            visibility = ParseVisibility(pos2);
+            underlyingType = pos3;
+        }
+        else if (pos2 != null && IsVisibilityKeyword(pos2))
+        {
+            // 3 positionals with visibility: §EN{id:Name:vis}
+            visibility = ParseVisibility(pos2);
+            underlyingType = null;
+        }
+        else
+        {
+            // 3 positionals with underlying type or 2 positionals: §EN{id:Name} or §EN{id:Name:underlyingType}
+            underlyingType = pos2;
         }
 
         if (string.IsNullOrEmpty(id))
@@ -8125,7 +8253,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new EnumDefinitionNode(span, id, name, underlyingType, members, attrs);
+        return new EnumDefinitionNode(span, id, name, underlyingType, members, attrs, visibility);
     }
 
     /// <summary>

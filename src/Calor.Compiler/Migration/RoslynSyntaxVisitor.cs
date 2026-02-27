@@ -23,6 +23,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<FunctionNode> _functions = new();
     private readonly List<StatementNode> _topLevelStatements = new();
     private readonly List<CSharpInteropBlockNode> _moduleInteropBlocks = new();
+    private readonly List<TypePreprocessorBlockNode> _typePreprocessorBlocks = new();
+    private bool _insideTypePreprocessorConversion;
     private HashSet<string> _reassignedVariables = new();
 
     /// <summary>
@@ -57,7 +59,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _functions.Clear();
         _topLevelStatements.Clear();
         _moduleInteropBlocks.Clear();
+        _typePreprocessorBlocks.Clear();
         _reassignedVariables = CollectReassignedVariables(root);
+
+        // Scan for module-level #if blocks wrapping type declarations
+        // (disabled by preprocessor — Roslyn excludes them from the tree)
+        ScanModuleLevelPreprocessorBlocks(root);
 
         // Visit all nodes
         Visit(root);
@@ -100,7 +107,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<InvariantNode>(),
             Array.Empty<DecisionNode>(),
             null,
-            _moduleInteropBlocks.Count > 0 ? _moduleInteropBlocks.ToList() : null);
+            _moduleInteropBlocks.Count > 0 ? _moduleInteropBlocks.ToList() : null,
+            refinementTypes: null,
+            indexedTypes: null,
+            typePreprocessorBlocks: _typePreprocessorBlocks.Count > 0 ? _typePreprocessorBlocks.ToList() : null);
     }
 
     public override void VisitUsingDirective(UsingDirectiveSyntax node)
@@ -185,37 +195,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitInterfaceDeclaration(InterfaceDeclarationSyntax node)
     {
+        // Check for #if wrapping entire type declaration
+        if (!_insideTypePreprocessorConversion)
+        {
+            var ppCondition = GetTypePreprocessorCondition(node);
+            if (ppCondition != null)
+            {
+                _context.RecordFeatureUsage("preprocessor-directive");
+                WrapTypeInPreprocessorBlock(node, ppCondition);
+                return;
+            }
+        }
+
         _context.RecordFeatureUsage("interface");
         _context.EnterType(node.Identifier.Text);
         try
         {
-            var id = _context.GenerateId("i");
-            var name = node.Identifier.Text;
-            var baseInterfaces = node.BaseList?.Types
-                .Select(t => t.Type.ToString())
-                .ToList() ?? new List<string>();
-            var csharpAttrs = ConvertAttributes(node.AttributeLists);
-            var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
-
-            var methods = new List<MethodSignatureNode>();
-            foreach (var member in node.Members)
-            {
-                if (member is MethodDeclarationSyntax methodSyntax)
-                {
-                    methods.Add(ConvertMethodSignature(methodSyntax));
-                }
-            }
-
-            var interfaceNode = new InterfaceDefinitionNode(
-                GetTextSpan(node),
-                id,
-                name,
-                baseInterfaces,
-                typeParameters,
-                methods,
-                new AttributeCollection(),
-                csharpAttrs);
-
+            var interfaceNode = ConvertInterface(node);
             _interfaces.Add(interfaceNode);
             _context.Stats.InterfacesConverted++;
             _context.IncrementConverted();
@@ -230,8 +226,49 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
     }
 
+    private InterfaceDefinitionNode ConvertInterface(InterfaceDeclarationSyntax node)
+    {
+        var id = _context.GenerateId("i");
+        var name = node.Identifier.Text;
+        var baseInterfaces = node.BaseList?.Types
+            .Select(t => t.Type.ToString())
+            .ToList() ?? new List<string>();
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
+        var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
+
+        var methods = new List<MethodSignatureNode>();
+        foreach (var member in node.Members)
+        {
+            if (member is MethodDeclarationSyntax methodSyntax)
+            {
+                methods.Add(ConvertMethodSignature(methodSyntax));
+            }
+        }
+
+        return new InterfaceDefinitionNode(
+            GetTextSpan(node),
+            id,
+            name,
+            baseInterfaces,
+            typeParameters,
+            methods,
+            new AttributeCollection(),
+            csharpAttrs);
+    }
+
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
+        if (!_insideTypePreprocessorConversion)
+        {
+            var ppCondition = GetTypePreprocessorCondition(node);
+            if (ppCondition != null)
+            {
+                _context.RecordFeatureUsage("preprocessor-directive");
+                WrapTypeInPreprocessorBlock(node, ppCondition);
+                return;
+            }
+        }
+
         _context.RecordFeatureUsage("class");
         _context.EnterType(node.Identifier.Text);
         try
@@ -253,6 +290,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
+        if (!_insideTypePreprocessorConversion)
+        {
+            var ppCondition = GetTypePreprocessorCondition(node);
+            if (ppCondition != null)
+            {
+                _context.RecordFeatureUsage("preprocessor-directive");
+                WrapTypeInPreprocessorBlock(node, ppCondition);
+                return;
+            }
+        }
+
         _context.RecordFeatureUsage("record");
         _context.EnterType(node.Identifier.Text);
         try
@@ -274,6 +322,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitStructDeclaration(StructDeclarationSyntax node)
     {
+        if (!_insideTypePreprocessorConversion)
+        {
+            var ppCondition = GetTypePreprocessorCondition(node);
+            if (ppCondition != null)
+            {
+                _context.RecordFeatureUsage("preprocessor-directive");
+                WrapTypeInPreprocessorBlock(node, ppCondition);
+                return;
+            }
+        }
+
         _context.RecordFeatureUsage("struct");
         _context.EnterType(node.Identifier.Text);
         try
@@ -295,6 +354,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitEnumDeclaration(EnumDeclarationSyntax node)
     {
+        if (!_insideTypePreprocessorConversion)
+        {
+            var ppCondition = GetTypePreprocessorCondition(node);
+            if (ppCondition != null)
+            {
+                _context.RecordFeatureUsage("preprocessor-directive");
+                WrapTypeInPreprocessorBlock(node, ppCondition);
+                return;
+            }
+        }
+
         _context.RecordFeatureUsage("enum");
         try
         {
@@ -318,13 +388,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 members.Add(new EnumMemberNode(GetTextSpan(member), memberName, memberValue));
             }
 
+            var visibility = GetVisibility(node.Modifiers, Visibility.Internal);
+
             var enumNode = new EnumDefinitionNode(
                 GetTextSpan(node),
                 id,
                 name,
                 underlyingType,
                 members,
-                new AttributeCollection());
+                new AttributeCollection(),
+                visibility);
 
             _enums.Add(enumNode);
             _context.Stats.EnumsConverted++;
@@ -444,6 +517,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
         var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
+        var nestedClasses = new List<ClassDefinitionNode>();
+        var nestedInterfaces = new List<InterfaceDefinitionNode>();
+        var nestedEnums = new List<EnumDefinitionNode>();
 
         // Extract member-level preprocessor regions
         var ppRegions = ExtractMemberPreprocessorRegions(node);
@@ -506,6 +582,93 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 continue;
 
             var member = node.Members[memberIndex];
+
+            // Handle nested type declarations
+            if (member is ClassDeclarationSyntax nestedClass)
+            {
+                try
+                {
+                    _context.RecordFeatureUsage("nested-type");
+                    _context.EnterType(nestedClass.Identifier.Text);
+                    nestedClasses.Add(ConvertClass(nestedClass));
+                    _context.ExitType();
+                }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                {
+                    _context.ExitType();
+                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                }
+                continue;
+            }
+            if (member is StructDeclarationSyntax nestedStruct)
+            {
+                try
+                {
+                    _context.RecordFeatureUsage("nested-type");
+                    _context.EnterType(nestedStruct.Identifier.Text);
+                    nestedClasses.Add(ConvertStruct(nestedStruct));
+                    _context.ExitType();
+                }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                {
+                    _context.ExitType();
+                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                }
+                continue;
+            }
+            if (member is RecordDeclarationSyntax nestedRecord)
+            {
+                try
+                {
+                    _context.RecordFeatureUsage("nested-type");
+                    _context.EnterType(nestedRecord.Identifier.Text);
+                    nestedClasses.Add(ConvertRecord(nestedRecord));
+                    _context.ExitType();
+                }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                {
+                    _context.ExitType();
+                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                }
+                continue;
+            }
+            if (member is InterfaceDeclarationSyntax nestedIface)
+            {
+                try
+                {
+                    _context.RecordFeatureUsage("nested-type");
+                    nestedInterfaces.Add(ConvertInterface(nestedIface));
+                }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                {
+                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                }
+                continue;
+            }
+            if (member is EnumDeclarationSyntax nestedEnum)
+            {
+                try
+                {
+                    _context.RecordFeatureUsage("nested-type");
+                    var nestedId = _context.GenerateId("e");
+                    var nestedName = nestedEnum.Identifier.Text;
+                    string? nestedUnderlying = null;
+                    if (nestedEnum.BaseList?.Types.Count > 0)
+                        nestedUnderlying = TypeMapper.CSharpToCalor(nestedEnum.BaseList.Types.First().Type.ToString());
+                    var nestedMembers = nestedEnum.Members
+                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, m.EqualsValue?.Value.ToString()))
+                        .ToList();
+                    var nestedVis = GetVisibility(nestedEnum.Modifiers, Visibility.Private);
+                    nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(nestedEnum), nestedId, nestedName,
+                        nestedUnderlying, nestedMembers, new AttributeCollection(), nestedVis));
+                }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                {
+                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                }
+                continue;
+            }
+
             try
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
@@ -546,7 +709,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             csharpAttrs,
             visibility: visibility,
             interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null,
-            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null);
+            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null,
+            nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
+            nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
+            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null);
     }
 
     private void ConvertClassMember(
@@ -700,6 +866,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
         var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
+        var nestedClasses = new List<ClassDefinitionNode>();
+        var nestedInterfaces = new List<InterfaceDefinitionNode>();
+        var nestedEnums = new List<EnumDefinitionNode>();
 
         // Extract member-level preprocessor regions
         var ppRegions = ExtractMemberPreprocessorRegions(node);
@@ -759,6 +928,47 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 continue;
 
             var member = node.Members[memberIndex];
+
+            // Handle nested type declarations in struct
+            if (member is ClassDeclarationSyntax nc)
+            {
+                try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(nc.Identifier.Text); nestedClasses.Add(ConvertClass(nc)); _context.ExitType(); }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                continue;
+            }
+            if (member is StructDeclarationSyntax ns)
+            {
+                try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(ns.Identifier.Text); nestedClasses.Add(ConvertStruct(ns)); _context.ExitType(); }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                continue;
+            }
+            if (member is InterfaceDeclarationSyntax ni)
+            {
+                try { _context.RecordFeatureUsage("nested-type"); nestedInterfaces.Add(ConvertInterface(ni)); }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                continue;
+            }
+            if (member is EnumDeclarationSyntax ne)
+            {
+                try
+                {
+                    _context.RecordFeatureUsage("nested-type");
+                    var nestedId = _context.GenerateId("e");
+                    var nestedName = ne.Identifier.Text;
+                    string? nestedUnderlying = null;
+                    if (ne.BaseList?.Types.Count > 0)
+                        nestedUnderlying = TypeMapper.CSharpToCalor(ne.BaseList.Types.First().Type.ToString());
+                    var nestedMembers = ne.Members
+                        .Select(m => new EnumMemberNode(GetTextSpan(m), m.Identifier.Text, m.EqualsValue?.Value.ToString()))
+                        .ToList();
+                    var nestedVis = GetVisibility(ne.Modifiers, Visibility.Private);
+                    nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(ne), nestedId, nestedName,
+                        nestedUnderlying, nestedMembers, new AttributeCollection(), nestedVis));
+                }
+                catch (Exception) when (_context.Mode == ConversionMode.Interop) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                continue;
+            }
+
             try
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
@@ -805,7 +1015,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             isReadOnly: isReadOnly,
             visibility: visibility,
             interopBlocks: interopBlocks.Count > 0 ? interopBlocks : null,
-            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null);
+            preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null,
+            nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
+            nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
+            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -2207,6 +2420,531 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new MemberPreprocessorBlockNode(span, first.condition ?? "IF",
             first.fields, first.properties, first.constructors,
             first.methods, first.events, first.operatorOverloads, currentElse);
+    }
+
+    /// <summary>
+    /// Scans the compilation unit for top-level #if directives that wrap entire type declarations.
+    /// When Roslyn encounters #if with a false condition, it excludes the type from the syntax tree
+    /// and stores the disabled text as trivia. This method finds those blocks and converts them.
+    /// </summary>
+    private void ScanModuleLevelPreprocessorBlocks(CompilationUnitSyntax root)
+    {
+        // Collect all trivia from the compilation unit
+        var allTrivia = root.DescendantTrivia(descendIntoTrivia: true).ToList();
+
+        string? currentCondition = null;
+        var branches = new List<(string? condition, string? disabledText)>();
+        int depth = 0;
+        bool inTopLevelIf = false;
+
+        for (int i = 0; i < allTrivia.Count; i++)
+        {
+            var trivia = allTrivia[i];
+
+            if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+            {
+                if (!inTopLevelIf && depth == 0)
+                {
+                    // Check if this is a module-level #if (not inside a type/method)
+                    var parentToken = trivia.Token;
+                    var parentNode = parentToken.Parent;
+                    bool isModuleLevel = parentNode is CompilationUnitSyntax
+                        || parentNode is BaseNamespaceDeclarationSyntax
+                        || (parentNode?.Parent is CompilationUnitSyntax)
+                        || (parentNode?.Parent is BaseNamespaceDeclarationSyntax);
+
+                    if (isModuleLevel && trivia.GetStructure() is IfDirectiveTriviaSyntax ifDir)
+                    {
+                        currentCondition = ifDir.Condition.ToString();
+                        inTopLevelIf = true;
+                        continue;
+                    }
+                }
+                if (inTopLevelIf) depth++;
+            }
+            else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+            {
+                if (inTopLevelIf && depth > 0) { depth--; continue; }
+                if (inTopLevelIf && depth == 0)
+                {
+                    // End of our top-level #if — build the block if we have disabled text
+                    if (branches.Count > 0 || currentCondition != null)
+                    {
+                        BuildModuleLevelPreprocessorBlock(currentCondition, branches);
+                    }
+                    inTopLevelIf = false;
+                    currentCondition = null;
+                    branches.Clear();
+                }
+            }
+            else if (inTopLevelIf && depth == 0)
+            {
+                if (trivia.IsKind(SyntaxKind.ElifDirectiveTrivia))
+                {
+                    var elifCond = (trivia.GetStructure() as ElifDirectiveTriviaSyntax)?.Condition.ToString();
+                    branches.Add((currentCondition, null));
+                    currentCondition = elifCond;
+                }
+                else if (trivia.IsKind(SyntaxKind.ElseDirectiveTrivia))
+                {
+                    branches.Add((currentCondition, null));
+                    currentCondition = null; // #else has no condition
+                }
+                else if (trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                {
+                    // Accumulate disabled text for the current branch
+                    var text = trivia.ToString();
+                    if (branches.Count > 0)
+                    {
+                        var last = branches[^1];
+                        branches[^1] = (last.condition, (last.disabledText ?? "") + text);
+                    }
+                    else
+                    {
+                        // First branch (the #if condition itself) — store as first branch
+                        branches.Add((currentCondition, text));
+                        currentCondition = "__active__"; // marker — this branch has been stored
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Builds a TypePreprocessorBlockNode from module-level preprocessor branches
+    /// where the code was disabled by Roslyn.
+    /// </summary>
+    private void BuildModuleLevelPreprocessorBlock(
+        string? condition,
+        List<(string? condition, string? disabledText)> branches)
+    {
+        if (branches.Count == 0) return;
+
+        var convertedBranches = new List<(string condition, List<ClassDefinitionNode> classes,
+            List<InterfaceDefinitionNode> interfaces, List<EnumDefinitionNode> enums,
+            List<DelegateDefinitionNode> delegates)>();
+
+        foreach (var (branchCondition, disabledText) in branches)
+        {
+            var cond = branchCondition ?? "";
+            if (cond == "__active__") cond = condition ?? "IF";
+
+            if (!string.IsNullOrEmpty(disabledText))
+            {
+                var (classes, interfaces, enums, delegates) = ConvertDisabledTypeText(disabledText);
+                if (classes.Count > 0 || interfaces.Count > 0 || enums.Count > 0 || delegates.Count > 0)
+                {
+                    convertedBranches.Add((cond, classes, interfaces, enums, delegates));
+                }
+            }
+        }
+
+        if (convertedBranches.Count == 0) return;
+
+        // Build nested structure right-to-left
+        TypePreprocessorBlockNode? currentElse = null;
+        for (int idx = convertedBranches.Count - 1; idx >= 1; idx--)
+        {
+            var (cond, classes, interfaces, enums, delegates) = convertedBranches[idx];
+            currentElse = new TypePreprocessorBlockNode(TextSpan.Empty, cond,
+                classes, interfaces, enums, delegates, currentElse);
+        }
+
+        var first = convertedBranches[0];
+        var ppNode = new TypePreprocessorBlockNode(TextSpan.Empty, first.condition,
+            first.classes, first.interfaces, first.enums, first.delegates, currentElse);
+
+        _typePreprocessorBlocks.Add(ppNode);
+        _context.RecordFeatureUsage("preprocessor-directive");
+    }
+
+    /// <summary>
+    /// Wraps a type declaration that has #if trivia into a TypePreprocessorBlockNode.
+    /// Saves/restores the type collection lists and captures the active branch.
+    /// </summary>
+    private void WrapTypeInPreprocessorBlock(MemberDeclarationSyntax typeDecl, string condition)
+    {
+        var span = GetTextSpan(typeDecl);
+
+        // Save current type lists
+        var savedClasses = _classes.ToList();
+        var savedInterfaces = _interfaces.ToList();
+        var savedEnums = _enums.ToList();
+        var savedDelegates = _delegates.ToList();
+
+        _classes.Clear();
+        _interfaces.Clear();
+        _enums.Clear();
+        _delegates.Clear();
+
+        // Convert the active type (it's inside the #if's active branch)
+        _insideTypePreprocessorConversion = true;
+        try
+        {
+            switch (typeDecl)
+            {
+                case ClassDeclarationSyntax cls:
+                    VisitClassDeclaration(cls);
+                    break;
+                case RecordDeclarationSyntax rec:
+                    VisitRecordDeclaration(rec);
+                    break;
+                case StructDeclarationSyntax str:
+                    VisitStructDeclaration(str);
+                    break;
+                case InterfaceDeclarationSyntax iface:
+                    VisitInterfaceDeclaration(iface);
+                    break;
+                case EnumDeclarationSyntax en:
+                    VisitEnumDeclaration(en);
+                    break;
+                case DelegateDeclarationSyntax del:
+                    VisitDelegateDeclaration(del);
+                    break;
+            }
+        }
+        finally
+        {
+            _insideTypePreprocessorConversion = false;
+        }
+
+        // Capture what was added
+        var activeClasses = _classes.ToList();
+        var activeInterfaces = _interfaces.ToList();
+        var activeEnums = _enums.ToList();
+        var activeDelegates = _delegates.ToList();
+
+        // Restore saved lists
+        _classes.Clear();
+        _classes.AddRange(savedClasses);
+        _interfaces.Clear();
+        _interfaces.AddRange(savedInterfaces);
+        _enums.Clear();
+        _enums.AddRange(savedEnums);
+        _delegates.Clear();
+        _delegates.AddRange(savedDelegates);
+
+        // Extract disabled branches from trivia
+        var branches = ExtractTypePreprocessorBranches(typeDecl);
+
+        var ppNode = BuildTypePreprocessorNode(span, condition,
+            activeClasses, activeInterfaces, activeEnums, activeDelegates, branches);
+
+        _typePreprocessorBlocks.Add(ppNode);
+    }
+
+    /// <summary>
+    /// Checks if a type declaration is wrapped in a top-level #if directive.
+    /// Returns the condition string if found, null otherwise.
+    /// </summary>
+    private static string? GetTypePreprocessorCondition(MemberDeclarationSyntax typeDecl)
+    {
+        var leadingTrivia = typeDecl.GetLeadingTrivia();
+        string? condition = null;
+        foreach (var trivia in leadingTrivia)
+        {
+            if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia) &&
+                trivia.GetStructure() is IfDirectiveTriviaSyntax ifDir)
+            {
+                condition = ifDir.Condition.ToString();
+            }
+        }
+
+        // Verify there's a matching #endif in the trailing trivia
+        if (condition != null)
+        {
+            var trailingTrivia = typeDecl.GetTrailingTrivia();
+            bool hasEndif = trailingTrivia.Any(t => t.IsKind(SyntaxKind.EndIfDirectiveTrivia));
+            if (!hasEndif)
+            {
+                // Check if #endif is attached to the next token or the closing brace
+                var lastToken = typeDecl.GetLastToken();
+                var trailingOfLast = lastToken.TrailingTrivia;
+                hasEndif = trailingOfLast.Any(t => t.IsKind(SyntaxKind.EndIfDirectiveTrivia));
+            }
+            if (!hasEndif)
+                return null; // Not a complete wrapping #if
+        }
+
+        return condition;
+    }
+
+    /// <summary>
+    /// Extracts disabled branch text and conditions from the trivia of a #if-wrapped type declaration.
+    /// Returns a list of (condition, disabledText) pairs for #elif/#else branches.
+    /// </summary>
+    private static List<PreprocessorBranch> ExtractTypePreprocessorBranches(MemberDeclarationSyntax typeDecl)
+    {
+        var branches = new List<PreprocessorBranch>();
+        var allTrivia = typeDecl.DescendantTrivia(descendIntoTrivia: true).ToList();
+
+        string? currentCondition = null;
+        string? currentDisabled = null;
+        bool foundIf = false;
+        int depth = 0;
+
+        foreach (var trivia in allTrivia)
+        {
+            if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia))
+            {
+                if (!foundIf)
+                {
+                    foundIf = true;
+                    if (trivia.GetStructure() is IfDirectiveTriviaSyntax ifDir)
+                        currentCondition = ifDir.Condition.ToString();
+                }
+                else
+                {
+                    depth++;
+                }
+            }
+            else if (trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia))
+            {
+                if (depth > 0) { depth--; continue; }
+                // End of our top-level #if — record any remaining branch
+                if (currentDisabled != null || currentCondition == null)
+                {
+                    branches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = currentDisabled,
+                        IsActive = false
+                    });
+                }
+                break;
+            }
+            else if (depth > 0)
+            {
+                continue;
+            }
+            else if (trivia.IsKind(SyntaxKind.ElifDirectiveTrivia))
+            {
+                // Save current disabled text for the previous branch
+                if (currentDisabled != null)
+                {
+                    branches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = currentDisabled,
+                        IsActive = false
+                    });
+                }
+                if (trivia.GetStructure() is ElifDirectiveTriviaSyntax elifDir)
+                    currentCondition = elifDir.Condition.ToString();
+                else
+                    currentCondition = "ELIF";
+                currentDisabled = null;
+            }
+            else if (trivia.IsKind(SyntaxKind.ElseDirectiveTrivia))
+            {
+                if (currentDisabled != null)
+                {
+                    branches.Add(new PreprocessorBranch
+                    {
+                        Condition = currentCondition,
+                        DisabledText = currentDisabled,
+                        IsActive = false
+                    });
+                }
+                currentCondition = null; // #else has no condition
+                currentDisabled = null;
+            }
+            else if (trivia.IsKind(SyntaxKind.DisabledTextTrivia) && foundIf && depth == 0)
+            {
+                currentDisabled = (currentDisabled ?? "") + trivia.ToString();
+            }
+        }
+
+        return branches;
+    }
+
+    /// <summary>
+    /// Converts disabled type text (from preprocessor branches) into type definition nodes.
+    /// Parses the text as a C# compilation unit and converts any type declarations found.
+    /// </summary>
+    private (List<ClassDefinitionNode> classes, List<InterfaceDefinitionNode> interfaces,
+             List<EnumDefinitionNode> enums, List<DelegateDefinitionNode> delegates)
+        ConvertDisabledTypeText(string disabledText)
+    {
+        var classes = new List<ClassDefinitionNode>();
+        var interfaces = new List<InterfaceDefinitionNode>();
+        var enums = new List<EnumDefinitionNode>();
+        var delegates = new List<DelegateDefinitionNode>();
+
+        try
+        {
+            var tree = CSharpSyntaxTree.ParseText(disabledText);
+            var root = tree.GetCompilationUnitRoot();
+
+            foreach (var member in root.Members)
+            {
+                try
+                {
+                    switch (member)
+                    {
+                        case ClassDeclarationSyntax or RecordDeclarationSyntax or StructDeclarationSyntax:
+                            // Save and restore state
+                            var savedClasses = _classes.ToList();
+                            _classes.Clear();
+                            if (member is ClassDeclarationSyntax topClass) VisitClassDeclaration(topClass);
+                            else if (member is RecordDeclarationSyntax topRecord) VisitRecordDeclaration(topRecord);
+                            else if (member is StructDeclarationSyntax topStruct) VisitStructDeclaration(topStruct);
+                            classes.AddRange(_classes);
+                            _classes.Clear();
+                            _classes.AddRange(savedClasses);
+                            break;
+                        case InterfaceDeclarationSyntax ifaceDecl:
+                            var savedInterfaces = _interfaces.ToList();
+                            _interfaces.Clear();
+                            VisitInterfaceDeclaration(ifaceDecl);
+                            interfaces.AddRange(_interfaces);
+                            _interfaces.Clear();
+                            _interfaces.AddRange(savedInterfaces);
+                            break;
+                        case EnumDeclarationSyntax enumDecl:
+                            var savedEnums = _enums.ToList();
+                            _enums.Clear();
+                            VisitEnumDeclaration(enumDecl);
+                            enums.AddRange(_enums);
+                            _enums.Clear();
+                            _enums.AddRange(savedEnums);
+                            break;
+                        case DelegateDeclarationSyntax delDecl:
+                            var savedDelegates = _delegates.ToList();
+                            _delegates.Clear();
+                            VisitDelegateDeclaration(delDecl);
+                            delegates.AddRange(_delegates);
+                            _delegates.Clear();
+                            _delegates.AddRange(savedDelegates);
+                            break;
+                    }
+                }
+                catch
+                {
+                    // Skip unconvertible types in disabled branches
+                }
+            }
+
+            // Also check inside namespace declarations
+            foreach (var ns in root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>())
+            {
+                foreach (var member in ns.Members)
+                {
+                    try
+                    {
+                        switch (member)
+                        {
+                            case ClassDeclarationSyntax or RecordDeclarationSyntax or StructDeclarationSyntax:
+                                var savedClasses2 = _classes.ToList();
+                                _classes.Clear();
+                                if (member is ClassDeclarationSyntax nsClass) VisitClassDeclaration(nsClass);
+                                else if (member is RecordDeclarationSyntax nsRecord) VisitRecordDeclaration(nsRecord);
+                                else if (member is StructDeclarationSyntax nsStruct) VisitStructDeclaration(nsStruct);
+                                classes.AddRange(_classes);
+                                _classes.Clear();
+                                _classes.AddRange(savedClasses2);
+                                break;
+                            case InterfaceDeclarationSyntax ifaceDecl2:
+                                var savedInterfaces2 = _interfaces.ToList();
+                                _interfaces.Clear();
+                                VisitInterfaceDeclaration(ifaceDecl2);
+                                interfaces.AddRange(_interfaces);
+                                _interfaces.Clear();
+                                _interfaces.AddRange(savedInterfaces2);
+                                break;
+                            case EnumDeclarationSyntax enumDecl2:
+                                var savedEnums2 = _enums.ToList();
+                                _enums.Clear();
+                                VisitEnumDeclaration(enumDecl2);
+                                enums.AddRange(_enums);
+                                _enums.Clear();
+                                _enums.AddRange(savedEnums2);
+                                break;
+                            case DelegateDeclarationSyntax delDecl2:
+                                var savedDelegates2 = _delegates.ToList();
+                                _delegates.Clear();
+                                VisitDelegateDeclaration(delDecl2);
+                                delegates.AddRange(_delegates);
+                                _delegates.Clear();
+                                _delegates.AddRange(savedDelegates2);
+                                break;
+                        }
+                    }
+                    catch
+                    {
+                        // Skip unconvertible types
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // If text can't be parsed, return empty lists
+        }
+
+        return (classes, interfaces, enums, delegates);
+    }
+
+    /// <summary>
+    /// Builds a TypePreprocessorBlockNode with active types and disabled branches.
+    /// </summary>
+    private TypePreprocessorBlockNode BuildTypePreprocessorNode(
+        TextSpan span,
+        string condition,
+        List<ClassDefinitionNode> activeClasses,
+        List<InterfaceDefinitionNode> activeInterfaces,
+        List<EnumDefinitionNode> activeEnums,
+        List<DelegateDefinitionNode> activeDelegates,
+        List<PreprocessorBranch> disabledBranches)
+    {
+        if (disabledBranches.Count == 0)
+        {
+            return new TypePreprocessorBlockNode(span, condition,
+                activeClasses, activeInterfaces, activeEnums, activeDelegates);
+        }
+
+        // Convert disabled branches and build right-to-left nested structure
+        var convertedBodies = new List<(string? condition, List<ClassDefinitionNode> classes,
+            List<InterfaceDefinitionNode> interfaces, List<EnumDefinitionNode> enums,
+            List<DelegateDefinitionNode> delegates)>();
+
+        // First entry is the active branch
+        convertedBodies.Add((condition, activeClasses, activeInterfaces, activeEnums, activeDelegates));
+
+        foreach (var branch in disabledBranches)
+        {
+            if (branch.DisabledText != null)
+            {
+                var (classes, interfaces, enums, delegates) = ConvertDisabledTypeText(branch.DisabledText);
+                convertedBodies.Add((branch.Condition, classes, interfaces, enums, delegates));
+            }
+            else
+            {
+                convertedBodies.Add((branch.Condition, new List<ClassDefinitionNode>(),
+                    new List<InterfaceDefinitionNode>(), new List<EnumDefinitionNode>(),
+                    new List<DelegateDefinitionNode>()));
+            }
+        }
+
+        TypePreprocessorBlockNode? currentElse = null;
+        for (int idx = convertedBodies.Count - 1; idx >= 1; idx--)
+        {
+            var (cond, classes, interfaces, enums, delegates) = convertedBodies[idx];
+            if (cond == null)
+            {
+                currentElse = new TypePreprocessorBlockNode(span, "",
+                    classes, interfaces, enums, delegates);
+            }
+            else
+            {
+                currentElse = new TypePreprocessorBlockNode(span, cond,
+                    classes, interfaces, enums, delegates, currentElse);
+            }
+        }
+
+        var first = convertedBodies[0];
+        return new TypePreprocessorBlockNode(span, first.condition ?? "IF",
+            first.classes, first.interfaces, first.enums, first.delegates, currentElse);
     }
 
     private IReadOnlyList<StatementNode> ConvertBlock(BlockSyntax block)
@@ -4143,9 +4881,67 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         TypeMapper.CSharpToCalor(notType.Type.ToString()))),
             DeclarationPatternSyntax declPattern =>
                 ConvertDeclarationPattern(isPattern, left, declPattern),
+            RelationalPatternSyntax relPattern =>
+                // "x is > 5" → "(> x 5)"
+                ConvertPatternToExpression(relPattern, left),
+            BinaryPatternSyntax binaryPattern =>
+                // "x is > 5 or < 3" → "(|| (> x 5) (< x 3))"
+                ConvertPatternToExpression(binaryPattern, left),
+            UnaryPatternSyntax { OperatorToken.Text: "not" } unaryPattern =>
+                // "x is not > 5" → "(! (> x 5))"
+                ConvertPatternToExpression(unaryPattern, left),
             _ =>
                 // For other patterns, create a fallback expression
                 CreateFallbackExpression(isPattern, "complex-is-pattern")
+        };
+    }
+
+    /// <summary>
+    /// Converts a pattern used in an <c>is</c> expression into an equivalent boolean expression.
+    /// For example, <c>x is > 5 or < 3</c> becomes <c>(|| (> x 5) (< x 3))</c>.
+    /// </summary>
+    private ExpressionNode ConvertPatternToExpression(PatternSyntax pattern, ExpressionNode subject)
+    {
+        return pattern switch
+        {
+            RelationalPatternSyntax relPattern =>
+                new BinaryOperationNode(
+                    GetTextSpan(relPattern),
+                    relPattern.OperatorToken.Kind() switch
+                    {
+                        SyntaxKind.LessThanToken => BinaryOperator.LessThan,
+                        SyntaxKind.LessThanEqualsToken => BinaryOperator.LessOrEqual,
+                        SyntaxKind.GreaterThanToken => BinaryOperator.GreaterThan,
+                        SyntaxKind.GreaterThanEqualsToken => BinaryOperator.GreaterOrEqual,
+                        _ => BinaryOperator.Equal
+                    },
+                    subject,
+                    ConvertExpression(relPattern.Expression)),
+            BinaryPatternSyntax binaryPattern =>
+                new BinaryOperationNode(
+                    GetTextSpan(binaryPattern),
+                    binaryPattern.OperatorToken.Kind() switch
+                    {
+                        SyntaxKind.OrKeyword => BinaryOperator.Or,
+                        _ => BinaryOperator.And
+                    },
+                    ConvertPatternToExpression(binaryPattern.Left, subject),
+                    ConvertPatternToExpression(binaryPattern.Right, subject)),
+            UnaryPatternSyntax { OperatorToken.Text: "not" } unaryPattern =>
+                new UnaryOperationNode(
+                    GetTextSpan(unaryPattern),
+                    UnaryOperator.Not,
+                    ConvertPatternToExpression(unaryPattern.Pattern, subject)),
+            ConstantPatternSyntax constant =>
+                new BinaryOperationNode(
+                    GetTextSpan(constant),
+                    BinaryOperator.Equal,
+                    subject,
+                    ConvertExpression(constant.Expression)),
+            ParenthesizedPatternSyntax parenPattern =>
+                ConvertPatternToExpression(parenPattern.Pattern, subject),
+            _ =>
+                CreateFallbackExpression(pattern, "complex-is-pattern")
         };
     }
 
@@ -5052,7 +5848,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 return ConvertListCreation(objCreation, typeArgs[0]);
             }
-            else if (typeName == "Dictionary" && typeArgs.Count == 2 && !hasCtorArgs)
+            else if (IsDictionaryType(typeName) && typeArgs.Count == 2 && !hasCtorArgs)
             {
                 return ConvertDictionaryCreation(objCreation, typeArgs[0], typeArgs[1]);
             }
@@ -5321,6 +6117,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             elements,
             new AttributeCollection());
     }
+
+    private static bool IsDictionaryType(string typeName) =>
+        typeName is "Dictionary" or "SortedDictionary" or "ConcurrentDictionary"
+            or "FrozenDictionary" or "ImmutableDictionary" or "ImmutableSortedDictionary";
 
     private DictionaryCreationNode ConvertDictionaryCreation(ObjectCreationExpressionSyntax objCreation, string keyType, string valueType)
     {

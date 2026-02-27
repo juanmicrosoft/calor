@@ -227,6 +227,8 @@ public interface IAstVisitor
     void Visit(PreprocessorDirectiveNode node);
     // Member-level preprocessor blocks
     void Visit(MemberPreprocessorBlockNode node);
+    // Type-level preprocessor blocks
+    void Visit(TypePreprocessorBlockNode node);
     // Dependent Types: Refinement Types and Proof Obligations
     void Visit(RefinementTypeNode node);
     void Visit(SelfRefNode node);
@@ -444,6 +446,8 @@ public interface IAstVisitor<T>
     T Visit(PreprocessorDirectiveNode node);
     // Member-level preprocessor blocks
     T Visit(MemberPreprocessorBlockNode node);
+    // Type-level preprocessor blocks
+    T Visit(TypePreprocessorBlockNode node);
     // Dependent Types: Refinement Types and Proof Obligations
     T Visit(RefinementTypeNode node);
     T Visit(SelfRefNode node);

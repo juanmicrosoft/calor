@@ -306,6 +306,21 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// </summary>
     public IReadOnlyList<MemberPreprocessorBlockNode> PreprocessorBlocks { get; }
 
+    /// <summary>
+    /// Nested class/struct/record declarations inside this type.
+    /// </summary>
+    public IReadOnlyList<ClassDefinitionNode> NestedClasses { get; }
+
+    /// <summary>
+    /// Nested interface declarations inside this type.
+    /// </summary>
+    public IReadOnlyList<InterfaceDefinitionNode> NestedInterfaces { get; }
+
+    /// <summary>
+    /// Nested enum declarations inside this type.
+    /// </summary>
+    public IReadOnlyList<EnumDefinitionNode> NestedEnums { get; }
+
     public ClassDefinitionNode(
         TextSpan span,
         string id,
@@ -435,7 +450,10 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         bool isReadOnly = false,
         Visibility visibility = Visibility.Internal,
         IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
-        IReadOnlyList<MemberPreprocessorBlockNode>? preprocessorBlocks = null)
+        IReadOnlyList<MemberPreprocessorBlockNode>? preprocessorBlocks = null,
+        IReadOnlyList<ClassDefinitionNode>? nestedClasses = null,
+        IReadOnlyList<InterfaceDefinitionNode>? nestedInterfaces = null,
+        IReadOnlyList<EnumDefinitionNode>? nestedEnums = null)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
@@ -457,6 +475,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
         InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
         PreprocessorBlocks = preprocessorBlocks ?? Array.Empty<MemberPreprocessorBlockNode>();
+        NestedClasses = nestedClasses ?? Array.Empty<ClassDefinitionNode>();
+        NestedInterfaces = nestedInterfaces ?? Array.Empty<InterfaceDefinitionNode>();
+        NestedEnums = nestedEnums ?? Array.Empty<EnumDefinitionNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
