@@ -295,12 +295,22 @@ public sealed class EnumMemberNode : AstNode
 {
     public string Name { get; }
     public string? Value { get; }
+    public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
     public EnumMemberNode(TextSpan span, string name, string? value)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Value = value;
+        CSharpAttributes = Array.Empty<CalorAttributeNode>();
+    }
+
+    public EnumMemberNode(TextSpan span, string name, string? value, IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : base(span)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Value = value;
+        CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
