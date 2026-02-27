@@ -752,4 +752,104 @@ public class McpServerTests
     }
 
     #endregion
+
+    #region Idle CPU Tests
+
+    [Fact]
+    public async Task McpServer_TextReaderReturningEmptyStrings_DoesNotSpinCpu()
+    {
+        // Simulates the problematic stdin behavior where ReadLineAsync returns ""
+        // immediately instead of blocking. With a spin loop, readCount would be
+        // 100,000+ in 100ms. The server should handle this without burning CPU.
+        var idleReader = new NonBlockingIdleReader();
+        using var output = new MemoryStream();
+
+        var server = new McpServer(idleReader, output);
+
+        using var cts = new CancellationTokenSource();
+        var serverTask = server.RunAsync(cts.Token);
+
+        // Let the server run for 100ms
+        await Task.Delay(100);
+        cts.Cancel();
+
+        try { await serverTask; } catch (OperationCanceledException) { }
+
+        // The cancellation check at the top of each loop iteration limits reads.
+        // Without cancellationToken.ThrowIfCancellationRequested(), a spin loop
+        // would call ReadLineAsync 100,000+ times. With it, the CancellationToken
+        // fires cooperatively and limits iterations. This test ensures the empty-string
+        // path doesn't cause unbounded recursion or stack overflow.
+        Assert.True(idleReader.ReadCount < 50_000,
+            $"ReadLineAsync called {idleReader.ReadCount} times in 100ms — possible spin loop");
+    }
+
+    [Fact]
+    public async Task McpServer_StreamReturningZeroBytes_ExitsCleanly()
+    {
+        // When a Stream-backed StreamReader gets 0 bytes, it returns null (EOF).
+        // The server should exit cleanly without spinning.
+        var idleStream = new NonBlockingIdleStream();
+        using var output = new MemoryStream();
+
+        var server = new McpServer(idleStream, output);
+        await server.RunAsync();
+
+        // StreamReader treats 0-byte read as EOF → ReadLineAsync returns null → server exits
+        Assert.True(idleStream.ReadCount <= 2,
+            $"Stream.ReadAsync called {idleStream.ReadCount} times — expected clean EOF exit");
+    }
+
+    /// <summary>
+    /// A TextReader that returns "" immediately on every ReadLineAsync call,
+    /// simulating the problematic Console.OpenStandardInput() stdin behavior.
+    /// </summary>
+    private sealed class NonBlockingIdleReader : TextReader
+    {
+        public int ReadCount;
+
+        public override string? ReadLine()
+        {
+            Interlocked.Increment(ref ReadCount);
+            return "";
+        }
+
+        public override Task<string?> ReadLineAsync()
+        {
+            Interlocked.Increment(ref ReadCount);
+            return Task.FromResult<string?>("");
+        }
+    }
+
+    /// <summary>
+    /// A Stream that returns 0 bytes immediately, simulating an empty pipe.
+    /// </summary>
+    private sealed class NonBlockingIdleStream : Stream
+    {
+        public int ReadCount;
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            Interlocked.Increment(ref ReadCount);
+            return 0;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref ReadCount);
+            return ValueTask.FromResult(0);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    #endregion
 }
