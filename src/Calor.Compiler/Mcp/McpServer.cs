@@ -9,17 +9,28 @@ namespace Calor.Compiler.Mcp;
 public sealed class McpServer
 {
     private readonly McpMessageHandler _handler;
-    private readonly Stream _input;
+    private readonly TextReader _reader;
     private readonly Stream _output;
     private readonly TextWriter? _log;
     private readonly bool _verbose;
 
     /// <summary>
     /// Creates an MCP server with the given streams.
+    /// The input stream is wrapped in a StreamReader internally.
     /// </summary>
     public McpServer(Stream input, Stream output, bool verbose = false, TextWriter? log = null)
+        : this(new StreamReader(input ?? throw new ArgumentNullException(nameof(input)), Encoding.UTF8, leaveOpen: true),
+               output, verbose, log)
     {
-        _input = input ?? throw new ArgumentNullException(nameof(input));
+    }
+
+    /// <summary>
+    /// Creates an MCP server with a TextReader for input.
+    /// Prefer this constructor when a blocking TextReader is available (e.g., Console.In).
+    /// </summary>
+    public McpServer(TextReader reader, Stream output, bool verbose = false, TextWriter? log = null)
+    {
+        _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         _output = output ?? throw new ArgumentNullException(nameof(output));
         _verbose = verbose;
         _log = log;
@@ -28,13 +39,14 @@ public sealed class McpServer
 
     /// <summary>
     /// Creates an MCP server using standard input/output.
+    /// Uses Console.In which properly blocks when no data is available,
+    /// unlike raw Console.OpenStandardInput() which can spin on empty reads.
     /// </summary>
     public static McpServer CreateStdio(bool verbose = false)
     {
-        var input = Console.OpenStandardInput();
         var output = Console.OpenStandardOutput();
         var log = verbose ? Console.Error : null;
-        return new McpServer(input, output, verbose, log);
+        return new McpServer(Console.In, output, verbose, log);
     }
 
     /// <summary>
@@ -44,13 +56,11 @@ public sealed class McpServer
     {
         Log("MCP server starting...");
 
-        using var reader = new StreamReader(_input, Encoding.UTF8, leaveOpen: true);
-
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                var message = await ReadMessageAsync(reader, cancellationToken);
+                var message = await ReadMessageAsync(cancellationToken);
                 if (message == null)
                 {
                     Log("End of input stream, shutting down");
@@ -92,24 +102,23 @@ public sealed class McpServer
     /// Reads a message from the input stream.
     /// MCP stdio uses newline-delimited JSON (NDJSON) - each message is a single line.
     /// </summary>
-    private async Task<string?> ReadMessageAsync(StreamReader reader, CancellationToken cancellationToken)
+    private async Task<string?> ReadMessageAsync(CancellationToken cancellationToken)
     {
-        // Read a single line - MCP uses newline-delimited JSON
-        var line = await reader.ReadLineAsync(cancellationToken);
-
-        if (line == null)
+        while (true)
         {
-            return null;
-        }
+            cancellationToken.ThrowIfCancellationRequested();
 
-        // Skip empty lines
-        if (string.IsNullOrWhiteSpace(line))
-        {
-            return await ReadMessageAsync(reader, cancellationToken);
-        }
+            var line = await _reader.ReadLineAsync(cancellationToken);
 
-        Log($"Read message: {line.Length} bytes");
-        return line;
+            if (line == null)
+                return null;
+
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                Log($"Read message: {line.Length} bytes");
+                return line;
+            }
+        }
     }
 
     /// <summary>
