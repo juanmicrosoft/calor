@@ -16,7 +16,10 @@ public sealed class BatchConvertTool : McpToolBase
     public override string Description =>
         "Convert an entire C# project to Calor in a single call. " +
         "Discovers .cs files, converts each to Calor, and writes output files. " +
-        "Returns per-file results and a summary.";
+        "Returns per-file results and a summary. " +
+        "IMPORTANT: If results contain §CSHARP interop blocks, check calor_syntax_lookup " +
+        "or calor_feature_support — many C# constructs (foreach, switch, async, yield, structs, " +
+        "events, operators, preprocessor directives) have native Calor equivalents.";
 
     protected override string GetInputSchemaJson() => """
         {
@@ -167,6 +170,17 @@ public sealed class BatchConvertTool : McpToolBase
                     .ToList()
             }).ToList();
 
+            // Add feature hint recommendation if any files had interop blocks
+            var recommendations = report.Recommendations.ToList();
+            var hasInteropBlocks = report.Summary.PartialFiles > 0;
+            if (hasInteropBlocks)
+            {
+                recommendations.Add(
+                    "Some files contain §CSHARP interop blocks. Many C# constructs have native Calor equivalents " +
+                    "(foreach, switch, async/await, yield, structs, delegates, events, operators, preprocessor directives). " +
+                    "Use calor_syntax_lookup or calor_feature_support to check before leaving code in §CSHARP blocks.");
+            }
+
             var output = new BatchConvertOutput
             {
                 Success = report.Summary.FailedFiles == 0,
@@ -181,7 +195,7 @@ public sealed class BatchConvertTool : McpToolBase
                     TotalDurationMs = (int)report.Summary.TotalDuration.TotalMilliseconds
                 },
                 Files = fileResults,
-                Recommendations = report.Recommendations
+                Recommendations = recommendations
             };
 
             return McpToolResult.Json(output, isError: report.Summary.FailedFiles > 0);

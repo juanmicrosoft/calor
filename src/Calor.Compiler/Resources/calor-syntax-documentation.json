@@ -886,6 +886,155 @@
           "calor": "§B{~c:char} 'A'"
         }
       ]
+    },
+    {
+      "id": "yield_return",
+      "csharpConstruct": "yield return",
+      "keywords": ["yield", "yield return", "yield break", "iterator", "IEnumerable", "generator", "lazy"],
+      "calorSyntax": "§YIELD expression or §YBRK (yield break)",
+      "description": "Produces values lazily from an iterator method. §YIELD returns a value, §YBRK stops iteration.",
+      "examples": [
+        {
+          "csharp": "yield return item;",
+          "calor": "§YIELD item"
+        },
+        {
+          "csharp": "yield break;",
+          "calor": "§YBRK"
+        },
+        {
+          "csharp": "public IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }",
+          "calor": "§MT{1:GetNumbers:pub}\n  §O{IEnumerable<i32>}\n  §L{i:0..10}\n    §YIELD i\n  §/L\n§/MT"
+        }
+      ]
+    },
+    {
+      "id": "delegate_definition",
+      "csharpConstruct": "delegate definition",
+      "keywords": ["delegate", "callback", "function pointer", "multicast", "action", "func", "predicate"],
+      "calorSyntax": "§DEL{id:name:visibility} §I{type:param}... §O{returnType} §/DEL",
+      "description": "Defines a delegate type (function signature). Use for callbacks, event handlers, and function references.",
+      "examples": [
+        {
+          "csharp": "public delegate void EventCallback(string message);",
+          "calor": "§DEL{1:EventCallback:pub}\n  §I{str:message}\n  §O{void}\n§/DEL"
+        },
+        {
+          "csharp": "public delegate int Transformer(int value);",
+          "calor": "§DEL{1:Transformer:pub}\n  §I{i32:value}\n  §O{i32}\n§/DEL"
+        }
+      ]
+    },
+    {
+      "id": "preprocessor_directive",
+      "csharpConstruct": "preprocessor directive",
+      "keywords": ["preprocessor", "#if", "#else", "#endif", "#elif", "conditional compilation", "DEBUG", "RELEASE"],
+      "calorSyntax": "§PP{CONDITION} body §PPE body §/PP{CONDITION}",
+      "description": "Conditional compilation blocks. §PP for #if, §PPE for #else/#elif, §/PP to close. Code inside is conditionally included based on defined symbols.",
+      "examples": [
+        {
+          "csharp": "#if DEBUG\n    Console.WriteLine(\"Debug mode\");\n#endif",
+          "calor": "§PP{DEBUG}\n  §!{Console.WriteLine}(\"Debug mode\")§/!\n§/PP{DEBUG}"
+        },
+        {
+          "csharp": "#if NET8_0_OR_GREATER\n    UseNewApi();\n#else\n    UseLegacyApi();\n#endif",
+          "calor": "§PP{NET8_0_OR_GREATER}\n  §!{UseNewApi}()§/!\n§PPE\n  §!{UseLegacyApi}()§/!\n§/PP{NET8_0_OR_GREATER}"
+        }
+      ]
+    },
+    {
+      "id": "struct_definition",
+      "csharpConstruct": "struct definition",
+      "keywords": ["struct", "value type", "stack allocated", "readonly struct"],
+      "calorSyntax": "§CL{id:name:visibility:struct} members... §/CL",
+      "description": "Defines a value type (struct). Uses the 'struct' modifier on §CL. Supports readonly structs with additional 'ro' modifier.",
+      "examples": [
+        {
+          "csharp": "public struct Point { public int X; public int Y; }",
+          "calor": "§CL{1:Point:pub:struct}\n  §FLD{i32:X:pub}\n  §FLD{i32:Y:pub}\n§/CL"
+        },
+        {
+          "csharp": "public readonly struct Vector2D { public readonly double X; public readonly double Y; }",
+          "calor": "§CL{1:Vector2D:pub:ro:struct}\n  §FLD{f64:X:pub:ro}\n  §FLD{f64:Y:pub:ro}\n§/CL"
+        }
+      ]
+    },
+    {
+      "id": "generic_constraint",
+      "csharpConstruct": "generic type constraint",
+      "keywords": ["where", "constraint", "generic constraint", "type constraint", "class constraint", "new()", "struct constraint"],
+      "calorSyntax": "§G{T} for type parameter, §WHERE{T:constraint} for constraints",
+      "description": "Constrains generic type parameters. Supports class, struct, new(), interface, and base class constraints.",
+      "examples": [
+        {
+          "csharp": "public class Repository<T> where T : class, IEntity { }",
+          "calor": "§CL{1:Repository:pub}\n  §G{T}\n  §WHERE{T:class,IEntity}\n§/CL"
+        },
+        {
+          "csharp": "public T Create<T>() where T : new() { return new T(); }",
+          "calor": "§MT{1:Create:pub}\n  §G{T}\n  §WHERE{T:new()}\n  §O{T}\n  §R §NEW{T}() §/R\n§/MT"
+        },
+        {
+          "csharp": "public void Process<T>(T item) where T : struct { }",
+          "calor": "§MT{1:Process:pub}\n  §G{T}\n  §WHERE{T:struct}\n  §I{T:item}\n  §O{void}\n§/MT"
+        }
+      ]
+    },
+    {
+      "id": "do_while_loop",
+      "csharpConstruct": "do-while loop",
+      "keywords": ["do", "do while", "do-while", "loop", "repeat until", "at least once"],
+      "calorSyntax": "§DO{id} body §/DO{id} condition",
+      "description": "Executes the body at least once, then continues while condition is true. The condition expression follows the closing tag.",
+      "examples": [
+        {
+          "csharp": "do { Process(); } while (HasMore());",
+          "calor": "§DO{d1}\n  §!{Process}()§/!\n§/DO{d1} §!{HasMore}()§/!"
+        }
+      ]
+    },
+    {
+      "id": "partial_class",
+      "csharpConstruct": "partial class",
+      "keywords": ["partial", "partial class", "split", "multiple files"],
+      "calorSyntax": "§CL{id:name:visibility:partial} members... §/CL",
+      "description": "Defines part of a class that can be split across multiple files. Uses the 'partial' modifier.",
+      "examples": [
+        {
+          "csharp": "public partial class UserService { public void Save() { } }",
+          "calor": "§CL{1:UserService:pub:partial}\n  §MT{1:Save:pub}\n    §O{void}\n  §/MT\n§/CL"
+        }
+      ]
+    },
+    {
+      "id": "unsafe_block",
+      "csharpConstruct": "unsafe block",
+      "keywords": ["unsafe", "pointer", "fixed", "stackalloc", "unmanaged"],
+      "calorSyntax": "§UNSAFE{id} body §/UNSAFE{id}",
+      "description": "Marks a block for unsafe pointer operations. Required for pointer arithmetic, fixed statements, and stackalloc.",
+      "examples": [
+        {
+          "csharp": "unsafe { int* ptr = &value; *ptr = 42; }",
+          "calor": "§UNSAFE{u1}\n  §B{~ptr:i32*} §ADDR value\n  §DEREF ptr = 42\n§/UNSAFE{u1}"
+        }
+      ]
+    },
+    {
+      "id": "attribute_annotation",
+      "csharpConstruct": "attribute",
+      "keywords": ["attribute", "annotation", "metadata", "decorator", "Serializable", "Obsolete", "DllImport"],
+      "calorSyntax": "[@AttributeName] or [@Attr(arg1, arg2)]",
+      "description": "Attaches metadata to declarations. Placed before the declaration they annotate.",
+      "examples": [
+        {
+          "csharp": "[Serializable]\npublic class Data { }",
+          "calor": "[@Serializable]\n§CL{1:Data:pub}\n§/CL"
+        },
+        {
+          "csharp": "[Obsolete(\"Use NewMethod\")]\npublic void OldMethod() { }",
+          "calor": "[@Obsolete(\"Use NewMethod\")]\n§MT{1:OldMethod:pub}\n  §O{void}\n§/MT"
+        }
+      ]
     }
   ],
   "tags": {

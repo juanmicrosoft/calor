@@ -19,6 +19,7 @@ public class ConvertValidatedToolTests
     {
         Assert.Contains("pipeline", _tool.Description);
         Assert.Contains("convert", _tool.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("calor_syntax_lookup", _tool.Description);
     }
 
     [Fact]
