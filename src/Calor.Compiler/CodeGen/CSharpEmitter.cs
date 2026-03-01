@@ -40,6 +40,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string? _currentClassName;
     private string? _currentFunctionId;
     private string? _currentFilePath;
+    private string _currentNamespace = "";
     private readonly EmitContractMode _contractMode;
     private readonly ModuleVerificationResult? _verificationResults;
     private readonly ModuleInheritanceResult? _inheritanceResult;
@@ -155,6 +156,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
         var namespaceName = isGlobalNamespace ? "" : SanitizeNamespace(node.Name);
+        _currentNamespace = namespaceName;
 
         // Emit module-level extended metadata as file-level comments
         if (node.Context != null)
@@ -1283,7 +1285,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(RecordCreationNode node)
     {
-        var typeName = SanitizeIdentifier(node.TypeName);
+        var typeName = MapTypeName(node.TypeName);
         var fields = string.Join(", ", node.Fields.Select(f => f.Value.Accept(this)));
         return $"new {typeName}({fields})";
     }
@@ -2478,7 +2480,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(NewExpressionNode node)
     {
-        var typeName = SanitizeIdentifier(node.TypeName);
+        var typeName = MapTypeName(node.TypeName);
         if (node.TypeArguments.Count > 0)
         {
             typeName += "<" + string.Join(", ", node.TypeArguments.Select(MapTypeName)) + ">";
@@ -2904,7 +2906,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var catchPart = "catch";
         if (node.ExceptionType != null)
         {
-            var exType = SanitizeIdentifier(node.ExceptionType);
+            var exType = MapTypeName(node.ExceptionType);
             if (node.VariableName != null)
             {
                 var varName = SanitizeIdentifier(node.VariableName);
@@ -3040,7 +3042,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
 
         var eventName = SanitizeIdentifier(node.Name);
-        var delegateType = SanitizeIdentifier(node.DelegateType);
+        var delegateType = MapTypeName(node.DelegateType);
 
         AppendLine($"{visibility} event {delegateType} {eventName};");
         return "";
@@ -3176,13 +3178,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(PositionalPatternNode node)
     {
         var patterns = string.Join(", ", node.Patterns.Select(p => p.Accept(this)));
-        return $"{SanitizeIdentifier(node.TypeName)}({patterns})";
+        return $"{MapTypeName(node.TypeName)}({patterns})";
     }
 
     public string Visit(PropertyPatternNode node)
     {
         var matches = string.Join(", ", node.Matches.Select(m => m.Accept(this)));
-        var typePart = string.IsNullOrEmpty(node.TypeName) ? "" : SanitizeIdentifier(node.TypeName) + " ";
+        var typePart = string.IsNullOrEmpty(node.TypeName) ? "" : MapTypeName(node.TypeName) + " ";
         return $"{typePart}{{ {matches} }}";
     }
 
@@ -3740,7 +3742,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(QuantifierVariableNode node)
     {
         // Variable nodes are handled internally by quantifier translation
-        return $"{node.Name}: {node.TypeName}";
+        return $"{node.Name}: {MapTypeName(node.TypeName)}";
     }
 
     public string Visit(ForallExpressionNode node)
@@ -4224,12 +4226,232 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(CSharpInteropBlockNode node)
     {
-        // Emit raw C# content verbatim, same as RawCSharpNode
-        foreach (var line in node.CSharpCode.Split('\n'))
+        var code = node.CSharpCode;
+
+        // Strip namespace declarations that match the current module namespace
+        // to avoid doubled namespace wrappers when raw C# is emitted inside a module.
+        if (!string.IsNullOrEmpty(_currentNamespace))
+        {
+            code = StripMatchingNamespace(code, _currentNamespace);
+        }
+
+        foreach (var line in code.Split('\n'))
         {
             _builder.AppendLine(line.TrimEnd('\r'));
         }
         return "";
+    }
+
+    private static string StripMatchingNamespace(string code, string namespaceName)
+    {
+        var lines = code.Split('\n');
+
+        // Try file-scoped namespace: "namespace Foo;"
+        var fileScopedPattern = $"namespace {namespaceName};";
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].TrimEnd('\r').Trim() == fileScopedPattern)
+            {
+                var result = new List<string>(lines.Length);
+                for (int j = 0; j < lines.Length; j++)
+                {
+                    if (j != i)
+                        result.Add(lines[j]);
+                }
+                return string.Join("\n", result);
+            }
+        }
+
+        // Try block-scoped namespace: "namespace Foo {" ... "}"
+        var blockPattern = $"namespace {namespaceName}";
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].TrimEnd('\r').Trim();
+            // Match "namespace Foo {", "namespace Foo{", or "namespace Foo" (brace on next line)
+            // Also handle trailing comments: "namespace Foo { // comment"
+            if (!trimmed.StartsWith(blockPattern, StringComparison.Ordinal))
+                continue;
+
+            var afterPattern = trimmed.Substring(blockPattern.Length).TrimStart();
+            bool hasBraceOnThisLine = afterPattern.StartsWith("{");
+            if (afterPattern.Length > 0 && !hasBraceOnThisLine)
+                continue; // Not a match — extra text that isn't a brace
+
+            int openBraceLineIndex = hasBraceOnThisLine ? i : -1;
+            if (openBraceLineIndex == -1)
+            {
+                for (int j = i + 1; j < lines.Length; j++)
+                {
+                    var nextTrimmed = lines[j].TrimEnd('\r').Trim();
+                    if (nextTrimmed.StartsWith("{"))
+                    {
+                        openBraceLineIndex = j;
+                        break;
+                    }
+                    if (!string.IsNullOrWhiteSpace(lines[j]))
+                        break;
+                }
+            }
+            if (openBraceLineIndex == -1)
+                break;
+
+            // Find the matching closing brace, skipping braces inside strings and comments
+            int closeBraceLineIndex = -1;
+            int braceDepth = 0;
+            for (int j = openBraceLineIndex; j < lines.Length; j++)
+            {
+                CountBracesInLine(lines[j], ref braceDepth);
+                if (braceDepth == 0)
+                {
+                    closeBraceLineIndex = j;
+                    break;
+                }
+            }
+            if (closeBraceLineIndex == -1)
+                break;
+
+            // Detect indentation level of inner content
+            var indentSize = DetectIndentSize(lines, openBraceLineIndex + 1, closeBraceLineIndex);
+
+            // Unwrap: keep inner content, dedented
+            var result = new List<string>();
+            for (int j = 0; j < i; j++)
+                result.Add(lines[j]);
+            for (int j = openBraceLineIndex + 1; j < closeBraceLineIndex; j++)
+            {
+                var line = lines[j].TrimEnd('\r');
+                line = Dedent(line, indentSize);
+                result.Add(line);
+            }
+            for (int j = closeBraceLineIndex + 1; j < lines.Length; j++)
+                result.Add(lines[j]);
+            return string.Join("\n", result);
+        }
+
+        return code;
+    }
+
+    /// <summary>
+    /// Counts net braces in a line, skipping braces inside string literals, char literals,
+    /// verbatim strings, and comments.
+    /// </summary>
+    private static void CountBracesInLine(string line, ref int depth)
+    {
+        bool inLineComment = false;
+        bool inString = false;
+        bool inVerbatimString = false;
+        bool inChar = false;
+
+        for (int i = 0; i < line.Length; i++)
+        {
+            var ch = line[i];
+
+            if (inLineComment)
+                break; // rest of line is comment
+
+            if (inVerbatimString)
+            {
+                if (ch == '"')
+                {
+                    // "" is an escaped quote inside verbatim string
+                    if (i + 1 < line.Length && line[i + 1] == '"')
+                        i++;
+                    else
+                        inVerbatimString = false;
+                }
+                continue;
+            }
+
+            if (inString)
+            {
+                if (ch == '\\') { i++; continue; } // skip escaped char
+                if (ch == '"') inString = false;
+                continue;
+            }
+
+            if (inChar)
+            {
+                if (ch == '\\') { i++; continue; }
+                if (ch == '\'') inChar = false;
+                continue;
+            }
+
+            // Check for comment start
+            if (ch == '/' && i + 1 < line.Length)
+            {
+                if (line[i + 1] == '/')
+                    break; // line comment — done with this line
+                // Note: block comments (/* */) spanning multiple lines are rare in
+                // namespace-level code and not handled here — acceptable limitation.
+            }
+
+            if (ch == '@' && i + 1 < line.Length && line[i + 1] == '"')
+            {
+                inVerbatimString = true;
+                i++; // skip the '"'
+                continue;
+            }
+
+            if (ch == '"') { inString = true; continue; }
+            if (ch == '\'') { inChar = true; continue; }
+
+            if (ch == '{') depth++;
+            else if (ch == '}') depth--;
+        }
+    }
+
+    /// <summary>
+    /// Detects the indentation size of the first non-empty line in a range.
+    /// </summary>
+    private static int DetectIndentSize(string[] lines, int start, int end)
+    {
+        for (int i = start; i < end; i++)
+        {
+            var line = lines[i].TrimEnd('\r');
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            int spaces = 0;
+            foreach (var ch in line)
+            {
+                if (ch == ' ') spaces++;
+                else if (ch == '\t') spaces += 4; // treat tab as 4 spaces
+                else break;
+            }
+            if (spaces > 0)
+                return spaces;
+        }
+        return 4; // default
+    }
+
+    /// <summary>
+    /// Removes leading indentation from a line.
+    /// </summary>
+    private static string Dedent(string line, int spaces)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+            return line;
+
+        int removed = 0;
+        int charIndex = 0;
+        while (charIndex < line.Length && removed < spaces)
+        {
+            if (line[charIndex] == ' ')
+            {
+                removed++;
+                charIndex++;
+            }
+            else if (line[charIndex] == '\t')
+            {
+                removed += 4;
+                charIndex++;
+            }
+            else
+            {
+                break;
+            }
+        }
+        return line.Substring(charIndex);
     }
 
     public string Visit(StackAllocNode node)
