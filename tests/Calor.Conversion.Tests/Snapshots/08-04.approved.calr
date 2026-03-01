@@ -1,4 +1,4 @@
-§M{m003:Test_08_04}
+§M{m001:Test_08_04}
   §CL{c001:NullDemo:pub}
     §MT{m002:GetValue:pub} (?str:input) -> str
       §R (? (== input null) "default" input)
@@ -6,4 +6,4 @@
 
   §/CL{c001}
 
-§/M{m003}
+§/M{m001}

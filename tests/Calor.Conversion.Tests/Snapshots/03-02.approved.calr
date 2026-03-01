@@ -1,4 +1,4 @@
-§M{m004:Test_03_02}
+§M{m001:Test_03_02}
   §CL{c001:Loops:pub}
     §MT{m002:Sum:pub} (i32:n) -> i32
       §B{~total:i32} 0
@@ -10,4 +10,4 @@
 
   §/CL{c001}
 
-§/M{m004}
+§/M{m001}

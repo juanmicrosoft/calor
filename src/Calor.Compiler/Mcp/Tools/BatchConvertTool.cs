@@ -46,6 +46,22 @@ public sealed class BatchConvertTool : McpToolBase
                 "outputDirectory": {
                     "type": "string",
                     "description": "Directory to write converted .calr files (default: alongside source files)"
+                },
+                "maxFiles": {
+                    "type": "integer",
+                    "description": "Maximum number of files to convert in this batch (0 = no limit, default: 0)"
+                },
+                "offset": {
+                    "type": "integer",
+                    "description": "Number of files to skip before processing (for pagination with maxFiles)"
+                },
+                "directoryFilter": {
+                    "type": "string",
+                    "description": "Glob pattern to filter directories (e.g., 'src/**' to only include src/)"
+                },
+                "skipConverted": {
+                    "type": "boolean",
+                    "description": "Skip files that already have a corresponding .calr output file (default: false)"
                 }
             },
             "required": ["projectPath"]
@@ -69,13 +85,21 @@ public sealed class BatchConvertTool : McpToolBase
         var dryRun = GetBool(arguments, "dryRun", defaultValue: false);
         var parallel = GetBool(arguments, "parallel", defaultValue: true);
         var outputDirectory = GetString(arguments, "outputDirectory");
+        var maxFiles = GetInt(arguments, "maxFiles", defaultValue: 0);
+        var offset = GetInt(arguments, "offset", defaultValue: 0);
+        var directoryFilter = GetString(arguments, "directoryFilter");
+        var skipConverted = GetBool(arguments, "skipConverted", defaultValue: false);
 
         try
         {
             var options = new MigrationPlanOptions
             {
                 IncludeTests = includeTests,
-                Parallel = parallel
+                Parallel = parallel,
+                MaxFiles = maxFiles,
+                Offset = offset,
+                DirectoryFilter = directoryFilter,
+                SkipConverted = skipConverted
             };
 
             var migrator = new ProjectMigrator(options);

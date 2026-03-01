@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
 
 namespace Calor.Compiler.Mcp.Tools;
@@ -21,6 +22,10 @@ public sealed class DiagnoseTool : McpToolBase
                 "source": {
                     "type": "string",
                     "description": "Calor source code to diagnose"
+                },
+                "apply": {
+                    "type": "boolean",
+                    "description": "When true, automatically apply all available fix edits and return the fixed source alongside diagnostics (default: false)"
                 },
                 "options": {
                     "type": "object",
@@ -53,6 +58,7 @@ public sealed class DiagnoseTool : McpToolBase
         var options = GetOptions(arguments);
         var strictApi = GetBool(options, "strictApi");
         var requireDocs = GetBool(options, "requireDocs");
+        var applyFixes = GetBool(arguments, "apply");
 
         try
         {
@@ -72,7 +78,7 @@ public sealed class DiagnoseTool : McpToolBase
 
             var diagnostics = result.Diagnostics.Select(d =>
             {
-                var output = new DiagnosticOutput
+                var diagOutput = new DiagnosticOutput
                 {
                     Severity = d.IsError ? "error" : "warning",
                     Code = d.Code.ToString(),
@@ -85,8 +91,8 @@ public sealed class DiagnoseTool : McpToolBase
                 var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
                 if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
                 {
-                    output.Suggestion = diagnosticWithFix.Fix.Description;
-                    output.Fix = new FixOutput
+                    diagOutput.Suggestion = diagnosticWithFix.Fix.Description;
+                    diagOutput.Fix = new FixOutput
                     {
                         Description = diagnosticWithFix.Fix.Description,
                         Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditOutput
@@ -101,20 +107,30 @@ public sealed class DiagnoseTool : McpToolBase
                 }
 
                 // Enrich with common mistake suggestion if no compiler fix was found
-                if (output.Suggestion == null)
+                if (diagOutput.Suggestion == null)
                 {
-                    output.CommonMistake = FindCommonMistake(d.Message, d.Code.ToString());
+                    diagOutput.CommonMistake = FindCommonMistake(d.Message, d.Code.ToString());
                 }
 
-                return output;
+                return diagOutput;
             }).ToList();
+
+            // Auto-apply fixes if requested
+            string? fixedSource = null;
+            var fixesApplied = 0;
+            if (applyFixes)
+            {
+                fixedSource = ApplyFixes(source, result.Diagnostics.DiagnosticsWithFixes, out fixesApplied);
+            }
 
             var output = new DiagnoseToolOutput
             {
                 Success = !result.HasErrors,
                 ErrorCount = diagnostics.Count(d => d.Severity == "error"),
                 WarningCount = diagnostics.Count(d => d.Severity == "warning"),
-                Diagnostics = diagnostics
+                Diagnostics = diagnostics,
+                FixedSource = fixedSource,
+                FixesApplied = applyFixes ? fixesApplied : null
             };
 
             return Task.FromResult(McpToolResult.Json(output, isError: result.HasErrors));
@@ -123,6 +139,57 @@ public sealed class DiagnoseTool : McpToolBase
         {
             return Task.FromResult(McpToolResult.Error($"Diagnose failed: {ex.Message}"));
         }
+    }
+
+    /// <summary>
+    /// Applies fix edits to the source code in reverse position order to avoid offset invalidation.
+    /// </summary>
+    private static string ApplyFixes(string source, IReadOnlyList<DiagnosticWithFix> diagnosticsWithFixes, out int fixesApplied)
+    {
+        // Collect all edits and sort in reverse position order
+        var allEdits = diagnosticsWithFixes
+            .SelectMany(d => d.Fix.Edits)
+            .OrderByDescending(e => e.StartLine)
+            .ThenByDescending(e => e.StartColumn)
+            .ToList();
+
+        fixesApplied = 0;
+        if (allEdits.Count == 0) return source;
+
+        var lines = source.Split('\n');
+
+        foreach (var edit in allEdits)
+        {
+            // Convert 1-based line/column to 0-based indices
+            var startLine = edit.StartLine - 1;
+            var startCol = edit.StartColumn - 1;
+            var endLine = edit.EndLine - 1;
+            var endCol = edit.EndColumn - 1;
+
+            if (startLine < 0 || startLine >= lines.Length) continue;
+            if (endLine < 0 || endLine >= lines.Length) continue;
+
+            // Build the text before and after the edit range
+            var beforeEdit = startCol >= 0 && startCol <= lines[startLine].Length
+                ? lines[startLine][..startCol]
+                : lines[startLine];
+            var afterEdit = endCol >= 0 && endCol <= lines[endLine].Length
+                ? lines[endLine][endCol..]
+                : "";
+
+            // Replace the affected lines
+            var newContent = beforeEdit + edit.NewText + afterEdit;
+            var newLines = newContent.Split('\n');
+
+            var lineList = lines.ToList();
+            lineList.RemoveRange(startLine, endLine - startLine + 1);
+            lineList.InsertRange(startLine, newLines);
+            lines = lineList.ToArray();
+
+            fixesApplied++;
+        }
+
+        return string.Join('\n', lines);
     }
 
     private static readonly Lazy<JsonDocument?> ErrorSuggestions = new(LoadErrorSuggestions);
@@ -198,6 +265,14 @@ public sealed class DiagnoseTool : McpToolBase
 
         [JsonPropertyName("diagnostics")]
         public required List<DiagnosticOutput> Diagnostics { get; init; }
+
+        [JsonPropertyName("fixedSource")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? FixedSource { get; init; }
+
+        [JsonPropertyName("fixesApplied")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? FixesApplied { get; init; }
     }
 
     private sealed class DiagnosticOutput

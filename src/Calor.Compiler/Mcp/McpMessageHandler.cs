@@ -42,6 +42,7 @@ public sealed class McpMessageHandler
         RegisterTool(new CompatCheckTool());
         RegisterTool(new ConvertValidatedTool());
         RegisterTool(new BatchConvertTool());
+        RegisterTool(new CSharpMinimizeTool());
 
         RegisterTool(new SelfTestTool());
 

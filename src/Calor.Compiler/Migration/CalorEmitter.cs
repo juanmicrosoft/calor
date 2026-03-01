@@ -413,6 +413,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Modifiers.HasFlag(MethodModifiers.Static)) modifiers.Add("stat");
         if (node.Modifiers.HasFlag(MethodModifiers.Const)) modifiers.Add("const");
         if (node.Modifiers.HasFlag(MethodModifiers.Readonly)) modifiers.Add("readonly");
+        if (node.IsVolatile) modifiers.Add("volatile");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
         AppendLine($"§FLD{{{typeName}:{node.Name}:{visibility}{modStr}}}{attrs}{defaultVal}");

@@ -5800,6 +5800,9 @@ public sealed class Parser
                 mods |= MethodModifiers.Extern;
             else if (token.Equals("unsafe", StringComparison.OrdinalIgnoreCase))
                 mods |= MethodModifiers.Unsafe;
+            else if (token.Equals("volatile", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("vol", StringComparison.OrdinalIgnoreCase))
+                mods |= MethodModifiers.Volatile;
         }
         return mods;
     }

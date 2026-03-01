@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-03-01
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Fixed
+- **Complete C# keyword sanitization** — `SanitizeIdentifier()` expanded from 27 to 50+ reserved keywords (`as`, `is`, `in`, `event`, `lock`, `delegate`, `checked`, `yield`, `out`, `ref`, `volatile`, `abstract`, `override`, `sealed`, `virtual`, `async`, `await`, `typeof`, `sizeof`, `unchecked`, `unsafe`, `fixed`, `foreach`, `goto`, `throw`, `try`, `catch`, `finally`, `explicit`, `implicit`, `extern`, `operator`, `params`, `readonly`, `stackalloc`, `const`, `var`, `dynamic`, `nameof`, `when`); prevents invalid C# in 5–15% of converted files
+- **Call expression leading dot** — `§C{.Method}` now correctly emits `this.Method()` instead of invalid `.Method()`
+- **Converter module ID consistency** — Module ID is always `m001` instead of inconsistent IDs like `m044` caused by shared counter increment during child node conversion
+- **Interop block namespace duplication** — Use `ToString()` instead of `ToFullString()` for nodes inside namespaces to prevent namespace trivia bleeding into interop blocks
+- **Switch enum value prefix** — Heuristic to detect enum type from qualified case labels and qualify bare identifiers (from `using static`) in switch expressions and statements
+
+### Added
+- **Batch convert chunking** — `calor_batch_convert` MCP tool now supports `maxFiles`, `offset`, `directoryFilter`, and `skipConverted` parameters for converting large projects in manageable chunks
+- **Compile tool batch mode** — `calor_compile` MCP tool now accepts `files` (string array) and `projectPath` (directory) for batch compilation in a single call instead of 200+ individual calls
+- **Diagnose tool auto-apply** — `calor_diagnose` MCP tool now supports `apply` parameter to automatically apply fix edits and return `fixedSource` alongside diagnostics, eliminating one round-trip per diagnostic cycle
+- **CSharp minimize tool** — New `calor_csharp_minimize` MCP tool analyzes `§CSHARP` interop blocks and suggests which constructs could be native Calor, using Roslyn parsing and FeatureSupport registry cross-reference
+- **Volatile keyword support** — `volatile` modifier is now fully supported for fields: `MethodModifiers.Volatile` flag, converter detection, parser recognition (`volatile`/`vol`), emitter output; `FeatureSupport` updated from `NotSupported` to `Full`
+
 ## [0.3.5] - 2026-02-27
 
 ### Benchmark Results (Statistical: 30 runs)

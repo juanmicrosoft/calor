@@ -1,4 +1,4 @@
-§M{m003:Test_10_01}
+§M{m001:Test_10_01}
   §CL{c001:SizeTest:pub:stat}
     §MT{m002:GetSizeOfInt:pub:stat} () -> i32
       §R §SIZEOF{i32}
@@ -6,4 +6,4 @@
 
   §/CL{c001}
 
-§/M{m003}
+§/M{m001}

@@ -69,7 +69,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Visit all nodes
         Visit(root);
 
-        var moduleId = _context.GenerateId("m");
+        // Use a fixed module ID — each file produces exactly one module, and generating
+        // the ID after Visit(root) would give inconsistent IDs like m044 due to the
+        // shared counter being incremented by inner node conversions.
+        var moduleId = "m001";
 
         // If there are top-level statements (C# 9+ feature), wrap them in a synthetic main function
         var functions = _functions.ToList();
@@ -1368,6 +1371,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             modifiers |= MethodModifiers.Readonly;
         if (node.Modifiers.Any(SyntaxKind.RequiredKeyword))
             modifiers |= MethodModifiers.Required;
+        if (node.Modifiers.Any(SyntaxKind.VolatileKeyword))
+            modifiers |= MethodModifiers.Volatile;
 
         foreach (var variable in node.Declaration.Variables)
         {
@@ -4556,15 +4561,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var target = ConvertExpression(node.Expression);
         var cases = new List<MatchCaseNode>();
 
+        // Infer enum type prefix from qualified case labels
+        var enumTypePrefix = InferEnumTypePrefixFromSwitchSections(node.Sections);
+
         foreach (var section in node.Sections)
         {
             foreach (var label in section.Labels)
             {
                 PatternNode pattern = label switch
                 {
-                    CaseSwitchLabelSyntax caseLabel => new LiteralPatternNode(
-                        GetTextSpan(caseLabel),
-                        ConvertExpression(caseLabel.Value)),
+                    CaseSwitchLabelSyntax caseLabel => ConvertCaseLabelWithEnumPrefix(caseLabel, enumTypePrefix),
                     DefaultSwitchLabelSyntax => new WildcardPatternNode(GetTextSpan(label)),
                     _ => new WildcardPatternNode(GetTextSpan(label))
                 };
@@ -4592,9 +4598,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var target = ConvertExpression(node.GoverningExpression);
         var cases = new List<MatchCaseNode>();
 
+        // Infer the enum type prefix from qualified constant patterns (e.g., MyEnum.Value1).
+        // This is used to qualify bare identifiers (e.g., Value1 from 'using static MyEnum')
+        // so the generated C# compiles without needing the using static directive.
+        var enumTypePrefix = InferEnumTypePrefixFromArms(node.Arms);
+
         foreach (var arm in node.Arms)
         {
-            var pattern = ConvertPattern(arm.Pattern);
+            var pattern = ConvertSwitchArmPattern(arm.Pattern, enumTypePrefix);
             ExpressionNode? guard = arm.WhenClause != null
                 ? ConvertExpression(arm.WhenClause.Condition)
                 : null;
@@ -4608,6 +4619,75 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new MatchExpressionNode(GetTextSpan(node), id, target, cases, new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Converts a case label, qualifying bare identifiers with an enum type prefix if available.
+    /// </summary>
+    private PatternNode ConvertCaseLabelWithEnumPrefix(CaseSwitchLabelSyntax caseLabel, string? enumTypePrefix)
+    {
+        if (enumTypePrefix != null
+            && caseLabel.Value is IdentifierNameSyntax identifier
+            && identifier.Identifier.Text.Length > 0
+            && char.IsUpper(identifier.Identifier.Text[0]))
+        {
+            var qualifiedName = $"{enumTypePrefix}.{identifier.Identifier.Text}";
+            return new LiteralPatternNode(GetTextSpan(caseLabel), new ReferenceNode(GetTextSpan(caseLabel), qualifiedName));
+        }
+
+        return new LiteralPatternNode(GetTextSpan(caseLabel), ConvertExpression(caseLabel.Value));
+    }
+
+    /// <summary>
+    /// Infers the enum type prefix from qualified case labels in switch statement sections.
+    /// </summary>
+    private static string? InferEnumTypePrefixFromSwitchSections(SyntaxList<SwitchSectionSyntax> sections)
+    {
+        foreach (var section in sections)
+        {
+            foreach (var label in section.Labels)
+            {
+                if (label is CaseSwitchLabelSyntax { Value: MemberAccessExpressionSyntax memberAccess })
+                {
+                    return memberAccess.Expression.ToString();
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Infers the enum type prefix from qualified member access patterns in switch arms.
+    /// If any arm uses EnumType.Value, returns "EnumType"; otherwise null.
+    /// </summary>
+    private static string? InferEnumTypePrefixFromArms(SeparatedSyntaxList<SwitchExpressionArmSyntax> arms)
+    {
+        foreach (var arm in arms)
+        {
+            if (arm.Pattern is ConstantPatternSyntax { Expression: MemberAccessExpressionSyntax memberAccess })
+            {
+                // Found a qualified reference like EnumType.Value — extract the type
+                return memberAccess.Expression.ToString();
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Converts a switch arm pattern, optionally qualifying bare identifiers with an enum type prefix.
+    /// </summary>
+    private PatternNode ConvertSwitchArmPattern(PatternSyntax pattern, string? enumTypePrefix)
+    {
+        // If the pattern is a bare identifier constant and we have an inferred enum type, qualify it
+        if (enumTypePrefix != null
+            && pattern is ConstantPatternSyntax { Expression: IdentifierNameSyntax identifier }
+            && char.IsUpper(identifier.Identifier.Text[0]))
+        {
+            var qualifiedName = $"{enumTypePrefix}.{identifier.Identifier.Text}";
+            return new LiteralPatternNode(GetTextSpan(pattern), new ReferenceNode(GetTextSpan(pattern), qualifiedName));
+        }
+
+        return ConvertPattern(pattern);
     }
 
     private PatternNode ConvertPattern(PatternSyntax pattern)
@@ -7263,7 +7343,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private CSharpInteropBlockNode CreateInteropBlock(SyntaxNode node, string? featureName, InteropMemberKind kind)
     {
-        var sourceCode = node.ToFullString();
+        // Use ToString() (without trivia) when the node lives inside a namespace.
+        // ToFullString() can capture leading trivia that bleeds namespace context,
+        // causing duplicate namespace wrappers since the module tag already provides one.
+        var sourceCode = node.Parent is BaseNamespaceDeclarationSyntax
+            ? node.ToString()
+            : node.ToFullString();
         var lineSpan = node.GetLocation().GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
 

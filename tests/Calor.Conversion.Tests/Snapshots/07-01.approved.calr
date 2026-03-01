@@ -1,4 +1,4 @@
-§M{m003:Test_07_01}
+§M{m001:Test_07_01}
   §DEL{del001:MyHandler}
     §I{i32:x}
   §/DEL{del001}
@@ -8,4 +8,4 @@
     §O{bool}
   §/DEL{del002}
 
-§/M{m003}
+§/M{m001}

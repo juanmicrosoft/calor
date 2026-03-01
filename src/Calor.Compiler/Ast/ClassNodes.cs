@@ -19,7 +19,8 @@ public enum MethodModifiers
     Required = 128,
     Partial = 256,
     Extern = 512,
-    Unsafe = 1024
+    Unsafe = 1024,
+    Volatile = 2048
 }
 
 /// <summary>
@@ -501,6 +502,7 @@ public sealed class ClassFieldNode : AstNode
     public MethodModifiers Modifiers { get; }
     public bool IsStatic => Modifiers.HasFlag(MethodModifiers.Static);
     public bool IsRequired => Modifiers.HasFlag(MethodModifiers.Required);
+    public bool IsVolatile => Modifiers.HasFlag(MethodModifiers.Volatile);
     public ExpressionNode? DefaultValue { get; }
     public AttributeCollection Attributes { get; }
 

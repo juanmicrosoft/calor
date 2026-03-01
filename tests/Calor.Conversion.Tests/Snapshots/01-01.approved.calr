@@ -1,4 +1,4 @@
-§M{m004:Test_01_01}
+§M{m001:Test_01_01}
   §CL{c001:Calculator:pub}
     §MT{m002:Add:pub} (i32:a, i32:b) -> i32
       §R (+ a b)
@@ -10,4 +10,4 @@
 
   §/CL{c001}
 
-§/M{m004}
+§/M{m001}

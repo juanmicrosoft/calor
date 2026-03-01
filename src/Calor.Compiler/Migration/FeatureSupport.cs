@@ -323,9 +323,8 @@ public static class FeatureSupport
         ["volatile"] = new FeatureInfo
         {
             Name = "volatile",
-            Support = SupportLevel.NotSupported,
-            Description = "Volatile keyword is not yet supported",
-            Workaround = "Remove volatile modifier; use explicit memory barriers or Interlocked operations instead"
+            Support = SupportLevel.Full,
+            Description = "Volatile modifier is passed through to generated C# fields"
         },
 
         // Manual required
