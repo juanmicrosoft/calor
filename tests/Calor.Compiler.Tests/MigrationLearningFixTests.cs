@@ -353,4 +353,525 @@ public class MigrationLearningFixTests
     }
 
     #endregion
+
+    #region Fix 5: Type Names Emitted via MapTypeName Instead of SanitizeIdentifier
+
+    [Fact]
+    public void NewExpression_MapsCalorDateTimeType()
+    {
+        // Direct AST node: "datetime" is a Calor type that must map to "DateTime"
+        var node = new NewExpressionNode(
+            Span, "datetime",
+            Array.Empty<string>(),
+            Array.Empty<ExpressionNode>());
+
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+
+        Assert.Equal("new DateTime()", result);
+    }
+
+    [Fact]
+    public void NewExpression_MapsCalorTimespanType()
+    {
+        var node = new NewExpressionNode(
+            Span, "timespan",
+            Array.Empty<string>(),
+            Array.Empty<ExpressionNode>());
+
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+
+        Assert.Equal("new TimeSpan()", result);
+    }
+
+    [Fact]
+    public void NewExpression_MapsCalorGuidType()
+    {
+        var node = new NewExpressionNode(
+            Span, "guid",
+            Array.Empty<string>(),
+            Array.Empty<ExpressionNode>());
+
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+
+        Assert.Equal("new Guid()", result);
+    }
+
+    [Fact]
+    public void NewExpression_MapsCalorDictType()
+    {
+        // Dict<str, i32> → Dictionary<string, int>
+        var node = new NewExpressionNode(
+            Span, "Dict",
+            new[] { "str", "i32" },
+            Array.Empty<ExpressionNode>());
+
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+
+        Assert.Equal("new Dictionary<string, int>()", result);
+    }
+
+    [Fact]
+    public void CatchClause_MapsCalorExceptionType_Roundtrip()
+    {
+        // Roundtrip: C# → Calor → C# (verifies exception types survive)
+        var csharp = """
+            namespace Test
+            {
+                public class ErrorHandler
+                {
+                    public void Handle()
+                    {
+                        try { }
+                        catch (ArgumentException ex) { }
+                    }
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var emitted = Emit(result.Ast!);
+        Assert.Contains("catch (ArgumentException ex)", emitted);
+    }
+
+    [Fact]
+    public void CatchClause_MapsCalorExceptionType_DirectAST()
+    {
+        // Build AST directly with a Calor type name to verify MapTypeName is called
+        var catchClause = new CatchClauseNode(
+            Span, "str", "ex", null,
+            Array.Empty<StatementNode>(),
+            new AttributeCollection());
+        var tryStmt = new TryStatementNode(
+            Span, "t001",
+            Array.Empty<StatementNode>(),
+            new[] { catchClause },
+            null,
+            new AttributeCollection());
+        var method = new MethodNode(
+            Span, "f001", "Handle", Visibility.Public, MethodModifiers.None,
+            Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
+            null, null,
+            Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(),
+            new StatementNode[] { tryStmt },
+            new AttributeCollection());
+        var classNode = new ClassDefinitionNode(
+            Span, "c001", "TestClass",
+            isAbstract: false, isSealed: false, isPartial: false, isStatic: false,
+            baseClass: null, implementedInterfaces: new List<string>(),
+            typeParameters: new List<TypeParameterNode>(),
+            fields: new List<ClassFieldNode>(),
+            properties: new List<PropertyNode>(),
+            constructors: new List<ConstructorNode>(),
+            methods: new List<MethodNode> { method },
+            events: new List<EventDefinitionNode>(),
+            operatorOverloads: new List<OperatorOverloadNode>(),
+            new AttributeCollection(),
+            Array.Empty<CalorAttributeNode>());
+        var module = new ModuleNode(
+            Span, "m001", "Test",
+            Array.Empty<UsingDirectiveNode>(),
+            Array.Empty<InterfaceDefinitionNode>(),
+            new[] { classNode },
+            new List<FunctionNode>(),
+            new AttributeCollection());
+
+        var emitted = Emit(module);
+        // "str" is a Calor type → should be mapped to "string" in C#
+        Assert.Contains("catch (string ex)", emitted);
+        Assert.DoesNotContain("catch (str ex)", emitted);
+    }
+
+    [Fact]
+    public void EventDefinition_MapsDelegateType_Roundtrip()
+    {
+        // EventHandler is not in TypeMapper, so it passes through unchanged
+        var csharp = """
+            namespace Test
+            {
+                public class Publisher
+                {
+                    public event EventHandler OnChanged;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var emitted = Emit(result.Ast!);
+        Assert.Contains("event EventHandler OnChanged", emitted);
+    }
+
+    [Fact]
+    public void EventDefinition_MapsDelegateType_DirectAST()
+    {
+        // Build AST directly with a Calor type in the delegate type field
+        var classNode = new ClassDefinitionNode(
+            Span, "c001", "TestClass",
+            isAbstract: false, isSealed: false, isPartial: false, isStatic: false,
+            baseClass: null, implementedInterfaces: new List<string>(),
+            typeParameters: new List<TypeParameterNode>(),
+            fields: new List<ClassFieldNode>(),
+            properties: new List<PropertyNode>(),
+            constructors: new List<ConstructorNode>(),
+            methods: new List<MethodNode>(),
+            events: new List<EventDefinitionNode>
+            {
+                // Use "Seq<str>" (Calor type) — should map to "IEnumerable<string>"
+                new(Span, "ev1", "OnChanged", Visibility.Public, "Seq<str>", new AttributeCollection())
+            },
+            operatorOverloads: new List<OperatorOverloadNode>(),
+            new AttributeCollection(),
+            Array.Empty<CalorAttributeNode>());
+        var module = new ModuleNode(
+            Span, "m001", "Test",
+            Array.Empty<UsingDirectiveNode>(),
+            Array.Empty<InterfaceDefinitionNode>(),
+            new[] { classNode },
+            new List<FunctionNode>(),
+            new AttributeCollection());
+
+        var emitted = Emit(module);
+        Assert.Contains("event IEnumerable<string> OnChanged", emitted);
+        Assert.DoesNotContain("Seq<str>", emitted);
+    }
+
+    #endregion
+
+    #region Fix 6: Namespace Stripping in CSHARP Interop Blocks
+
+    private static ModuleNode CreateModuleWithInteropBlock(string namespaceName, string interopCode)
+    {
+        var interopBlock = new CSharpInteropBlockNode(Span, interopCode);
+        return new ModuleNode(
+            Span, "m001", namespaceName,
+            Array.Empty<UsingDirectiveNode>(),
+            Array.Empty<InterfaceDefinitionNode>(),
+            Array.Empty<ClassDefinitionNode>(),
+            Array.Empty<EnumDefinitionNode>(),
+            Array.Empty<EnumExtensionNode>(),
+            Array.Empty<DelegateDefinitionNode>(),
+            Array.Empty<FunctionNode>(),
+            new AttributeCollection(),
+            Array.Empty<IssueNode>(),
+            Array.Empty<AssumeNode>(),
+            Array.Empty<InvariantNode>(),
+            Array.Empty<DecisionNode>(),
+            context: null,
+            interopBlocks: new[] { interopBlock });
+    }
+
+    [Fact]
+    public void CSharpInterop_StripsFileScopedNamespace()
+    {
+        var module = CreateModuleWithInteropBlock("MyLib",
+            "namespace MyLib;\n\npublic static class Helper\n{\n    public static int Add(int a, int b) => a + b;\n}");
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+    }
+
+    [Fact]
+    public void CSharpInterop_StripsBlockScopedNamespace()
+    {
+        var module = CreateModuleWithInteropBlock("MyLib",
+            "namespace MyLib\n{\n    public static class Helper\n    {\n        public static int Add(int a, int b) => a + b;\n    }\n}");
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+    }
+
+    [Fact]
+    public void CSharpInterop_StripsBlockScopedNamespace_BraceOnNextLine()
+    {
+        // Brace on its own line, separate from the namespace declaration
+        var module = CreateModuleWithInteropBlock("MyLib",
+            "namespace MyLib\n\n{\n    public class Foo { }\n}");
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+        Assert.Contains("public class Foo", emitted);
+    }
+
+    [Fact]
+    public void CSharpInterop_PreservesNonMatchingNamespace()
+    {
+        var module = CreateModuleWithInteropBlock("MyLib",
+            "namespace OtherLib;\n\npublic static class Helper { }");
+
+        var emitted = Emit(module);
+        Assert.Contains("namespace MyLib", emitted);
+        Assert.Contains("namespace OtherLib", emitted);
+    }
+
+    [Fact]
+    public void CSharpInterop_BracesInStringLiterals_DoNotConfuseStripping()
+    {
+        // Braces inside a string literal should not affect namespace brace matching
+        var code = "namespace MyLib\n{\n    public class Foo\n    {\n        public string Value = \"{ not a brace }\";\n    }\n}";
+        var module = CreateModuleWithInteropBlock("MyLib", code);
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+        Assert.Contains("\"{ not a brace }\"", emitted);
+    }
+
+    [Fact]
+    public void CSharpInterop_BracesInComments_DoNotConfuseStripping()
+    {
+        // Braces inside comments should not affect namespace brace matching
+        var code = "namespace MyLib\n{\n    // { this is a comment with braces }\n    public class Foo { }\n}";
+        var module = CreateModuleWithInteropBlock("MyLib", code);
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+        Assert.Contains("public class Foo", emitted);
+    }
+
+    [Fact]
+    public void CSharpInterop_BracesInVerbatimString_DoNotConfuseStripping()
+    {
+        // Braces inside verbatim strings should not affect brace matching
+        var code = "namespace MyLib\n{\n    public class Foo\n    {\n        public string Value = @\"{\n}\n{\";\n    }\n}";
+        var module = CreateModuleWithInteropBlock("MyLib", code);
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+    }
+
+    [Fact]
+    public void CSharpInterop_TwoSpaceIndentation_DedentsCorrectly()
+    {
+        // Content indented with 2 spaces instead of 4
+        var code = "namespace MyLib\n{\n  public class Foo\n  {\n    public int X;\n  }\n}";
+        var module = CreateModuleWithInteropBlock("MyLib", code);
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+        Assert.Contains("public class Foo", emitted);
+    }
+
+    [Fact]
+    public void CSharpInterop_TabIndentation_DedentsCorrectly()
+    {
+        // Content indented with tabs
+        var code = "namespace MyLib\n{\n\tpublic class Foo\n\t{\n\t\tpublic int X;\n\t}\n}";
+        var module = CreateModuleWithInteropBlock("MyLib", code);
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+        Assert.Contains("public class Foo", emitted);
+    }
+
+    [Fact]
+    public void CSharpInterop_EmptyInteropBlock_NoError()
+    {
+        var module = CreateModuleWithInteropBlock("MyLib", "");
+
+        var emitted = Emit(module);
+        Assert.Contains("namespace MyLib", emitted);
+    }
+
+    [Fact]
+    public void CSharpInterop_NamespaceWithTrailingComment_Stripped()
+    {
+        var code = "namespace MyLib { // main namespace\n    public class Foo { }\n}";
+        var module = CreateModuleWithInteropBlock("MyLib", code);
+
+        var emitted = Emit(module);
+        var nsCount = CountOccurrences(emitted, "namespace MyLib");
+        Assert.Equal(1, nsCount);
+        Assert.Contains("public class Foo", emitted);
+    }
+
+    #endregion
+
+    #region Fix 7: Primary Constructor Duplicate Fields
+
+    [Fact]
+    public void ClassPrimaryConstructor_SkipsDuplicateField()
+    {
+        var csharp = """
+            namespace Test
+            {
+                public class MyClass(string name, int age)
+                {
+                    public string name = name;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var cls = result.Ast!.Classes.First();
+        // "name" has an explicit field, so primary constructor should NOT create a duplicate
+        var nameFields = cls.Fields.Where(f => f.Name == "name").ToList();
+        Assert.Single(nameFields);
+        // "age" has no explicit member, so primary constructor SHOULD create it
+        var ageFields = cls.Fields.Where(f => f.Name == "age").ToList();
+        Assert.Single(ageFields);
+    }
+
+    [Fact]
+    public void ClassPrimaryConstructor_SkipsDuplicateProperty()
+    {
+        var csharp = """
+            namespace Test
+            {
+                public class MyClass(string name, int age)
+                {
+                    public string Name => name;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var cls = result.Ast!.Classes.First();
+        // "Name" (capital) is an explicit property — case sensitive, should NOT match "name"
+        // Both "name" and "age" should be generated as fields from primary constructor
+        var nameFields = cls.Fields.Where(f => f.Name == "name").ToList();
+        Assert.Single(nameFields);
+        var ageFields = cls.Fields.Where(f => f.Name == "age").ToList();
+        Assert.Single(ageFields);
+        // "Name" should exist as a property
+        Assert.Contains(cls.Properties, p => p.Name == "Name");
+    }
+
+    [Fact]
+    public void StructPrimaryConstructor_GeneratesFields()
+    {
+        var csharp = """
+            namespace Test
+            {
+                public struct Point(int x, int y)
+                {
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var cls = result.Ast!.Classes.First();
+        Assert.Equal(2, cls.Fields.Count);
+        Assert.Contains(cls.Fields, f => f.Name == "x");
+        Assert.Contains(cls.Fields, f => f.Name == "y");
+    }
+
+    [Fact]
+    public void StructPrimaryConstructor_SkipsDuplicateField()
+    {
+        var csharp = """
+            namespace Test
+            {
+                public struct Point(int x, int y)
+                {
+                    public int x = x;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var cls = result.Ast!.Classes.First();
+        // "x" has explicit field — only one should exist
+        var xFields = cls.Fields.Where(f => f.Name == "x").ToList();
+        Assert.Single(xFields);
+        // "y" has no explicit member — should be generated
+        var yFields = cls.Fields.Where(f => f.Name == "y").ToList();
+        Assert.Single(yFields);
+    }
+
+    [Fact]
+    public void StructPrimaryConstructor_SkipsDuplicateProperty()
+    {
+        var csharp = """
+            namespace Test
+            {
+                public struct Point(int x, int y)
+                {
+                    public int x { get; } = x;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var cls = result.Ast!.Classes.First();
+        // "x" has explicit property — primary constructor should skip generating a field for it
+        var xFields = cls.Fields.Where(f => f.Name == "x").ToList();
+        Assert.Empty(xFields);
+        Assert.Contains(cls.Properties, p => p.Name == "x");
+        // "y" has no explicit member — should be generated as field
+        var yFields = cls.Fields.Where(f => f.Name == "y").ToList();
+        Assert.Single(yFields);
+    }
+
+    [Fact]
+    public void RecordPrimaryConstructor_SkipsDuplicateProperty()
+    {
+        var csharp = """
+            namespace Test
+            {
+                public record Person(string Name, int Age)
+                {
+                    public string Name { get; init; } = Name;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var cls = result.Ast!.Classes.First();
+        // "Name" has an explicit property, so primary constructor should NOT create a duplicate
+        var nameProps = cls.Properties.Where(p => p.Name == "Name").ToList();
+        Assert.Single(nameProps);
+        // "Age" has no explicit member, so primary constructor SHOULD create it
+        var ageProps = cls.Properties.Where(p => p.Name == "Age").ToList();
+        Assert.Single(ageProps);
+    }
+
+    [Fact]
+    public void RecordPrimaryConstructor_AllParamsDuplicated_NoExtraProperties()
+    {
+        var csharp = """
+            namespace Test
+            {
+                public record Config(string Key, string Value)
+                {
+                    public string Key { get; init; } = Key;
+                    public string Value { get; init; } = Value;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var cls = result.Ast!.Classes.First();
+        // Both params have explicit properties — no extra properties should be generated
+        Assert.Equal(2, cls.Properties.Count);
+        Assert.Single(cls.Properties.Where(p => p.Name == "Key"));
+        Assert.Single(cls.Properties.Where(p => p.Name == "Value"));
+    }
+
+    #endregion
 }

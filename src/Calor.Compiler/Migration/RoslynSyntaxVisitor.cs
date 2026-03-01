@@ -517,9 +517,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (node.ParameterList != null)
         {
             _context.RecordFeatureUsage("primary-constructor");
+            var explicitNames = CollectExplicitMemberNames(node.Members);
             foreach (var param in node.ParameterList.Parameters)
             {
                 var fieldName = param.Identifier.Text;
+                if (explicitNames.Contains(fieldName))
+                    continue;
                 var fieldTypeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
                 var fieldCsharpAttrs = ConvertAttributes(param.AttributeLists);
 
@@ -736,6 +739,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null);
     }
 
+    private static HashSet<string> CollectExplicitMemberNames(SyntaxList<MemberDeclarationSyntax> members)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var member in members)
+        {
+            switch (member)
+            {
+                case FieldDeclarationSyntax field:
+                    foreach (var variable in field.Declaration.Variables)
+                        names.Add(variable.Identifier.Text);
+                    break;
+                case PropertyDeclarationSyntax prop:
+                    names.Add(prop.Identifier.Text);
+                    break;
+            }
+        }
+        return names;
+    }
+
     private void ConvertClassMember(
         MemberDeclarationSyntax member,
         List<ClassFieldNode> fields,
@@ -812,10 +834,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Convert primary constructor parameters to properties
         if (node.ParameterList != null)
         {
+            var explicitNames = CollectExplicitMemberNames(node.Members);
             foreach (var param in node.ParameterList.Parameters)
             {
-                var propId = _context.GenerateId("p");
                 var propName = param.Identifier.Text;
+                if (explicitNames.Contains(propName))
+                    continue;
+                var propId = _context.GenerateId("p");
                 var typeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
 
                 properties.Add(new PropertyNode(
@@ -903,6 +928,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var methods = new List<MethodNode>();
         var operatorOverloads = new List<OperatorOverloadNode>();
         var events = new List<EventDefinitionNode>();
+
+        // Convert C# 12 primary constructor parameters to readonly fields
+        if (node.ParameterList != null)
+        {
+            _context.RecordFeatureUsage("primary-constructor");
+            var explicitNames = CollectExplicitMemberNames(node.Members);
+            foreach (var param in node.ParameterList.Parameters)
+            {
+                var fieldName = param.Identifier.Text;
+                if (explicitNames.Contains(fieldName))
+                    continue;
+                var fieldTypeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
+                var fieldCsharpAttrs = ConvertAttributes(param.AttributeLists);
+
+                fields.Add(new ClassFieldNode(
+                    GetTextSpan(param),
+                    fieldName,
+                    fieldTypeName,
+                    Visibility.Private,
+                    MethodModifiers.Readonly,
+                    param.Default != null ? ConvertExpression(param.Default.Value) : null,
+                    new AttributeCollection(),
+                    fieldCsharpAttrs));
+            }
+        }
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
         var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
