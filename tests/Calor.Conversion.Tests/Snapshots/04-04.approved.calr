@@ -1,4 +1,4 @@
-§M{m005:Test_04_04}
+§M{m001:Test_04_04}
   §IFACE{i001:IProducer<out T>}
     §MT{m002:Produce} () -> T
     §/MT{m002}
@@ -9,4 +9,4 @@
     §/MT{m004}
   §/IFACE{i003}
 
-§/M{m005}
+§/M{m001}

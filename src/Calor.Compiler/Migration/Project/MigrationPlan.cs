@@ -100,4 +100,16 @@ public sealed class MigrationPlanOptions
 
     /// <summary>Whether to merge partial class definitions from multiple files into one.</summary>
     public bool MergePartialClasses { get; set; } = true;
+
+    /// <summary>Maximum number of files to include in the plan. 0 means no limit.</summary>
+    public int MaxFiles { get; set; } = 0;
+
+    /// <summary>Glob pattern to filter directories (e.g., "src/**" to only include src/).</summary>
+    public string? DirectoryFilter { get; set; }
+
+    /// <summary>Skip files that already have a corresponding .calr output file.</summary>
+    public bool SkipConverted { get; set; } = false;
+
+    /// <summary>Number of files to skip before processing (for pagination with MaxFiles).</summary>
+    public int Offset { get; set; } = 0;
 }

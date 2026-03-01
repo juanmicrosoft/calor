@@ -1,4 +1,4 @@
-§M{m004:Test_01_04}
+§M{m001:Test_01_04}
   §CL{c001:MathUtils:pub:stat}
     §MT{m002:Square:pub:stat} (f64:x) -> f64
       §R (* x x)
@@ -10,4 +10,4 @@
 
   §/CL{c001}
 
-§/M{m004}
+§/M{m001}

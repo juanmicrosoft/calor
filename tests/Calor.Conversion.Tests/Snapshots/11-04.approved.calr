@@ -1,4 +1,4 @@
-§M{m003:Test_11_04}
+§M{m001:Test_11_04}
   §PP{NET6_0_OR_GREATER}
   §CL{c001:NetSixFeature:pub}
     §PROP{p002:Name:str:pub:get,set}
@@ -7,4 +7,4 @@
 
   §/PP{NET6_0_OR_GREATER}
 
-§/M{m003}
+§/M{m001}

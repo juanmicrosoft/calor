@@ -22,11 +22,20 @@ public sealed class CompileTool : McpToolBase
             "properties": {
                 "source": {
                     "type": "string",
-                    "description": "Calor source code to compile"
+                    "description": "Calor source code to compile (single file mode)"
+                },
+                "files": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Array of .calr file paths to compile (batch mode, alternative to source)"
+                },
+                "projectPath": {
+                    "type": "string",
+                    "description": "Path to directory containing .calr files to compile (batch mode, alternative to source)"
                 },
                 "filePath": {
                     "type": "string",
-                    "description": "Optional file path for diagnostic messages"
+                    "description": "Optional file path for diagnostic messages (single file mode)"
                 },
                 "options": {
                     "type": "object",
@@ -55,20 +64,51 @@ public sealed class CompileTool : McpToolBase
                         }
                     }
                 }
-            },
-            "required": ["source"]
+            }
         }
         """;
 
     public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
     {
         var source = GetString(arguments, "source");
+        var projectPath = GetString(arguments, "projectPath");
+
+        // Collect batch file paths from either 'files' array or 'projectPath' directory
+        var filePaths = new List<string>();
+        if (arguments.HasValue && arguments.Value.TryGetProperty("files", out var filesElement)
+            && filesElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in filesElement.EnumerateArray())
+            {
+                var path = item.GetString();
+                if (!string.IsNullOrEmpty(path))
+                    filePaths.Add(path);
+            }
+        }
+
+        if (!string.IsNullOrEmpty(projectPath) && Directory.Exists(projectPath))
+        {
+            filePaths.AddRange(Directory.EnumerateFiles(projectPath, "*.calr", SearchOption.AllDirectories));
+        }
+
+        // Batch mode: compile multiple files
+        if (filePaths.Count > 0)
+        {
+            return Task.FromResult(CompileBatch(filePaths, arguments));
+        }
+
+        // Single-file mode
         if (string.IsNullOrEmpty(source))
         {
-            return Task.FromResult(McpToolResult.Error("Missing required parameter: source"));
+            return Task.FromResult(McpToolResult.Error("Missing required parameter: provide 'source', 'files', or 'projectPath'"));
         }
 
         var filePath = GetString(arguments, "filePath") ?? "mcp-input.calr";
+        return Task.FromResult(CompileSingle(source, filePath, arguments));
+    }
+
+    private McpToolResult CompileSingle(string source, string filePath, JsonElement? arguments)
+    {
         var options = GetOptions(arguments);
 
         var verify = GetBool(options, "verify");
@@ -142,12 +182,85 @@ public sealed class CompileTool : McpToolBase
                 };
             }
 
-            return Task.FromResult(McpToolResult.Json(output, isError: result.HasErrors));
+            return McpToolResult.Json(output, isError: result.HasErrors);
         }
         catch (Exception ex)
         {
-            return Task.FromResult(McpToolResult.Error($"Compilation failed: {ex.Message}"));
+            return McpToolResult.Error($"Compilation failed: {ex.Message}");
         }
+    }
+
+    private static McpToolResult CompileBatch(List<string> filePaths, JsonElement? arguments)
+    {
+        var results = new List<BatchFileCompileResult>();
+        var totalErrors = 0;
+
+        foreach (var path in filePaths)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    results.Add(new BatchFileCompileResult
+                    {
+                        FilePath = path,
+                        Success = false,
+                        ErrorCount = 1,
+                        Errors = new List<string> { $"File not found: {path}" }
+                    });
+                    totalErrors++;
+                    continue;
+                }
+
+                var source = File.ReadAllText(path);
+                var compileOptions = new CompilationOptions
+                {
+                    ContractMode = ContractMode.Off,
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+                };
+
+                var result = Program.Compile(source, path, compileOptions);
+
+                var errors = result.Diagnostics
+                    .Where(d => d.IsError)
+                    .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
+                    .ToList();
+
+                results.Add(new BatchFileCompileResult
+                {
+                    FilePath = path,
+                    Success = !result.HasErrors,
+                    ErrorCount = errors.Count,
+                    WarningCount = result.Diagnostics.Count(d => !d.IsError),
+                    Errors = errors.Count > 0 ? errors : null
+                });
+
+                if (result.HasErrors) totalErrors++;
+            }
+            catch (Exception ex)
+            {
+                results.Add(new BatchFileCompileResult
+                {
+                    FilePath = path,
+                    Success = false,
+                    ErrorCount = 1,
+                    Errors = new List<string> { ex.Message }
+                });
+                totalErrors++;
+            }
+        }
+
+        var output = new BatchCompileOutput
+        {
+            Success = totalErrors == 0,
+            TotalFiles = filePaths.Count,
+            SuccessfulFiles = filePaths.Count - totalErrors,
+            FailedFiles = totalErrors,
+            Files = results
+        };
+
+        return McpToolResult.Json(output, isError: totalErrors > 0);
     }
 
     private sealed class CompileToolOutput
@@ -217,5 +330,42 @@ public sealed class CompileTool : McpToolBase
 
         [JsonPropertyName("dataflowIssues")]
         public int DataflowIssues { get; init; }
+    }
+
+    private sealed class BatchCompileOutput
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; init; }
+
+        [JsonPropertyName("totalFiles")]
+        public int TotalFiles { get; init; }
+
+        [JsonPropertyName("successfulFiles")]
+        public int SuccessfulFiles { get; init; }
+
+        [JsonPropertyName("failedFiles")]
+        public int FailedFiles { get; init; }
+
+        [JsonPropertyName("files")]
+        public required List<BatchFileCompileResult> Files { get; init; }
+    }
+
+    private sealed class BatchFileCompileResult
+    {
+        [JsonPropertyName("filePath")]
+        public required string FilePath { get; init; }
+
+        [JsonPropertyName("success")]
+        public bool Success { get; init; }
+
+        [JsonPropertyName("errorCount")]
+        public int ErrorCount { get; init; }
+
+        [JsonPropertyName("warningCount")]
+        public int WarningCount { get; init; }
+
+        [JsonPropertyName("errors")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? Errors { get; init; }
     }
 }

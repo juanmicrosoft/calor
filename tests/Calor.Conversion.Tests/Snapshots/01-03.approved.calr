@@ -1,4 +1,4 @@
-§M{m004:Test_01_03}
+§M{m001:Test_01_03}
   §CL{c001:Account:pub}
     §FLD{str:_id:priv:readonly}
     §FLD{dec:_balance:priv}
@@ -14,4 +14,4 @@
 
   §/CL{c001}
 
-§/M{m004}
+§/M{m001}

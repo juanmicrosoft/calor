@@ -1,4 +1,4 @@
-§M{m004:Test_03_03}
+§M{m001:Test_03_03}
   §CL{c001:Loops:pub}
     §MT{m002:CountDown:pub} (i32:start) -> i32
       §B{~count:i32} 0
@@ -11,4 +11,4 @@
 
   §/CL{c001}
 
-§/M{m004}
+§/M{m001}

@@ -41,10 +41,35 @@ public sealed class ProjectDiscovery
 
         // Find all C# files
         var csFiles = Directory.EnumerateFiles(searchPath, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !ShouldExclude(f))
-            .ToList();
+            .Where(f => !ShouldExclude(f));
 
-        foreach (var csFile in csFiles)
+        // Apply directory filter if specified (e.g., "src/**")
+        if (!string.IsNullOrEmpty(_options.DirectoryFilter))
+        {
+            var filterBase = _options.DirectoryFilter.Replace("**", "").TrimEnd('/', '\\');
+            var filterDir = Path.Combine(searchPath, filterBase);
+            csFiles = csFiles.Where(f => f.StartsWith(filterDir, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Skip already-converted files if requested
+        if (_options.SkipConverted)
+        {
+            csFiles = csFiles.Where(f => !File.Exists(Path.ChangeExtension(f, ".calr")));
+        }
+
+        var csFileList = csFiles.ToList();
+
+        // Apply offset/limit pagination
+        if (_options.Offset > 0)
+        {
+            csFileList = csFileList.Skip(_options.Offset).ToList();
+        }
+        if (_options.MaxFiles > 0)
+        {
+            csFileList = csFileList.Take(_options.MaxFiles).ToList();
+        }
+
+        foreach (var csFile in csFileList)
         {
             var entry = await AnalyzeFileAsync(csFile, direction);
             entries.Add(entry);

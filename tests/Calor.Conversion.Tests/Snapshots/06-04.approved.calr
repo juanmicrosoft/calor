@@ -1,4 +1,4 @@
-§M{m004:Test_06_04}
+§M{m001:Test_06_04}
   §CL{c001:Combinators:pub}
     §MT{m002:Check:pub} (any:obj) -> str
       §IF{if003} (!= obj null)
@@ -9,4 +9,4 @@
 
   §/CL{c001}
 
-§/M{m004}
+§/M{m001}

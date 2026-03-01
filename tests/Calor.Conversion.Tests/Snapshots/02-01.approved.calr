@@ -1,8 +1,8 @@
-§M{m004:Test_02_01}
+§M{m001:Test_02_01}
   §IFACE{i001:IAnimal}
     §PROP{p003:Name:str:pub:get}
     §MT{m002:Speak} () -> str
     §/MT{m002}
   §/IFACE{i001}
 
-§/M{m004}
+§/M{m001}

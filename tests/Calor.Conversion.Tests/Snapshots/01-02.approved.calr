@@ -1,4 +1,4 @@
-§M{m005:Test_01_02}
+§M{m001:Test_01_02}
   §CL{c001:Person:pub}
     §PROP{p002:Name:str:pub:get,set}
     §PROP{p003:Age:i32:pub:get}
@@ -6,4 +6,4 @@
 
   §/CL{c001}
 
-§/M{m005}
+§/M{m001}

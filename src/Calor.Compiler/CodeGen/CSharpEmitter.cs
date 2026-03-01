@@ -2163,6 +2163,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.Modifiers.HasFlag(MethodModifiers.Const)) parts.Add("const");
         else if (node.IsStatic) parts.Add("static");
         if (node.Modifiers.HasFlag(MethodModifiers.Readonly)) parts.Add("readonly");
+        if (node.IsVolatile) parts.Add("volatile");
         var fullModifiers = string.Join(" ", parts);
 
         var typeName = MapTypeName(node.TypeName);
@@ -2507,6 +2508,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         // Unescape braces that were escaped for Calor syntax: \{ -> { and \} -> }
         var target = UnescapeBraces(node.Target);
+        // A leading dot (e.g., §C{.Method}) means implicit this — prepend "this"
+        if (target.StartsWith("."))
+            target = "this" + target;
         var argStrings = new List<string>();
         for (int i = 0; i < node.Arguments.Count; i++)
         {
@@ -3648,17 +3652,30 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         // Handle reserved words — prefix with @ to make valid C# identifiers.
-        // Exclude this/base/null/true/false — they are C# keywords with special
-        // meaning and should not appear as user-defined identifiers.
+        // Covers C# reserved keywords (ECMA-334 §6.4.4), excluding type alias
+        // keywords (object, byte, char, etc.) since SanitizeIdentifier is also
+        // called on type names in some contexts (NewExpression, CatchClause, etc.).
+        // Exclude this/base/null/true/false — they have special meaning.
         return result switch
         {
-            "class" or "struct" or "interface" or "enum" or
-            "namespace" or "using" or "public" or "private" or
-            "protected" or "internal" or "static" or "void" or
-            "int" or "string" or "bool" or "float" or "double" or
-            "return" or "if" or "else" or "for" or "while" or
-            "do" or "switch" or "case" or "break" or "continue" or
-            "new"
+            "abstract" or "as" or "bool" or "break" or
+            "case" or "catch" or "checked" or
+            "class" or "const" or "continue" or "default" or
+            "delegate" or "do" or "double" or "else" or "enum" or
+            "event" or "explicit" or "extern" or "finally" or "fixed" or
+            "float" or "for" or "foreach" or "goto" or "if" or
+            "implicit" or "in" or "int" or "interface" or "internal" or
+            "is" or "lock" or "namespace" or "new" or
+            "operator" or "out" or "override" or "params" or
+            "private" or "protected" or "public" or "readonly" or "ref" or
+            "return" or "sealed" or "sizeof" or
+            "stackalloc" or "static" or "string" or "struct" or "switch" or
+            "throw" or "try" or "typeof" or
+            "unchecked" or "unsafe" or "using" or "virtual" or
+            "void" or "volatile" or "while" or
+            // Contextual keywords that conflict when used as identifiers
+            "var" or "dynamic" or "yield" or "async" or "await" or
+            "nameof" or "when"
             => "@" + result,
             _ => result
         };

@@ -1,4 +1,4 @@
-§M{m004:Test_04_01}
+§M{m001:Test_04_01}
   §CL{c001:Box<T>:pub}
     §WHERE T : notnull
 
@@ -10,4 +10,4 @@
 
   §/CL{c001}
 
-§/M{m004}
+§/M{m001}

@@ -1,4 +1,4 @@
-§M{m005:Test_11_01}
+§M{m001:Test_11_01}
   §CL{c001:Validator:pub}
     §MT{m002:IsInRange:pub} (i32:x) -> bool
       §R (&& (> x 0) (< x 100))
@@ -14,4 +14,4 @@
 
   §/CL{c001}
 
-§/M{m005}
+§/M{m001}

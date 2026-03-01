@@ -1,4 +1,4 @@
-§M{m005:Test_02_02}
+§M{m001:Test_02_02}
   §U{System.Collections.Generic}
 
   §IFACE{i001:IRepository<T>}
@@ -11,4 +11,4 @@
     §/MT{m004}
   §/IFACE{i001}
 
-§/M{m005}
+§/M{m001}
