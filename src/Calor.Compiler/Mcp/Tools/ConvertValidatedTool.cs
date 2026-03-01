@@ -16,7 +16,10 @@ public sealed class ConvertValidatedTool : McpToolBase
 
     public override string Description =>
         "Full validated conversion pipeline: convert C# to Calor, auto-fix parse errors, " +
-        "run diagnostics, and verify generated C# compatibility — all in one call.";
+        "run diagnostics, and verify generated C# compatibility — all in one call. " +
+        "IMPORTANT: If the result contains §CSHARP interop blocks, check calor_syntax_lookup " +
+        "or calor_feature_support — many C# constructs (foreach, switch, async, yield, structs, " +
+        "events, operators, preprocessor directives) have native Calor equivalents.";
 
     protected override string GetInputSchemaJson() => """
         {
@@ -326,6 +329,8 @@ public sealed class ConvertValidatedTool : McpToolBase
         ConversionStats stats,
         TimeSpan duration)
     {
+        var featureHints = InteropHintAnalyzer.AnalyzeInteropBlocks(calorSource);
+
         return new ValidatedOutput
         {
             Success = success,
@@ -347,7 +352,8 @@ public sealed class ConvertValidatedTool : McpToolBase
                 MembersDropped = stats.MembersDropped,
                 DurationMs = (int)duration.TotalMilliseconds
             },
-            DurationMs = (int)duration.TotalMilliseconds
+            DurationMs = (int)duration.TotalMilliseconds,
+            FeatureHints = featureHints.Count > 0 ? featureHints : null
         };
     }
 
@@ -401,5 +407,9 @@ public sealed class ConvertValidatedTool : McpToolBase
 
         [JsonPropertyName("durationMs")]
         public int DurationMs { get; init; }
+
+        [JsonPropertyName("featureHints")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? FeatureHints { get; init; }
     }
 }

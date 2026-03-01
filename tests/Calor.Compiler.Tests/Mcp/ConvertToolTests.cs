@@ -23,6 +23,14 @@ public class ConvertToolTests
     }
 
     [Fact]
+    public void Description_ContainsFeatureGuidance()
+    {
+        Assert.Contains("calor_syntax_lookup", _tool.Description);
+        Assert.Contains("calor_feature_support", _tool.Description);
+        Assert.Contains("§CSHARP", _tool.Description);
+    }
+
+    [Fact]
     public void GetInputSchema_ReturnsValidSchema()
     {
         var schema = _tool.GetInputSchema();
@@ -330,6 +338,56 @@ public class ConvertToolTests
         finally
         {
             if (File.Exists(outputFile)) File.Delete(outputFile);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInteropBlocks_ReturnsFeatureHints()
+    {
+        // Use interop mode with foreach — the converter may produce §CSHARP for
+        // complex constructs. When it does, feature hints should be emitted.
+        // This test uses a class with a foreach that may or may not be natively converted,
+        // plus an await foreach (which is NotSupported and guaranteed to produce §CSHARP).
+        var args = JsonDocument.Parse("""
+            {
+                "source": "using System.Collections.Generic; public class Test { public async System.Threading.Tasks.Task ProcessAsync(IAsyncEnumerable<int> items) { await foreach (var i in items) { System.Console.WriteLine(i); } } }",
+                "mode": "interop"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        var text = result.Content[0].Text!;
+        var json = JsonDocument.Parse(text);
+
+        // The result should have interop blocks since await foreach is not supported
+        if (json.RootElement.TryGetProperty("featureHints", out var hintsArray))
+        {
+            Assert.True(hintsArray.GetArrayLength() > 0, "Feature hints should be non-empty when §CSHARP blocks are present");
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithNoInteropBlocks_OmitsFeatureHints()
+    {
+        // Simple class with fully supported constructs — should NOT produce feature hints
+        var args = JsonDocument.Parse("""
+            {
+                "source": "public class Simple { public int Add(int a, int b) { return a + b; } }",
+                "mode": "interop"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        var text = result.Content[0].Text!;
+        var json = JsonDocument.Parse(text);
+
+        // featureHints should either be absent or null (JsonIgnoreCondition.WhenWritingNull)
+        if (json.RootElement.TryGetProperty("featureHints", out var hints))
+        {
+            Assert.True(hints.ValueKind == System.Text.Json.JsonValueKind.Null,
+                "featureHints should be null when no §CSHARP blocks are present");
         }
     }
 

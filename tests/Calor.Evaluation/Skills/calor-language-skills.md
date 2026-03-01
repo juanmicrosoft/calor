@@ -22,6 +22,43 @@ Calor has formal semantics (v1.0.0) that differ from C#. **Do not assume C# beha
 | Type Coercion | Explicit for narrowing; implicit only for widening |
 | Contracts | `§Q` before body, `§S` after body |
 
+## Supported C# Features — Quick Reference
+
+Calor natively supports far more C# constructs than you might expect. Before using `§CSHARP` interop, check this list:
+
+| C# Feature | Calor Syntax | Status |
+|-------------|-------------|--------|
+| foreach loop | `§L{item:collection}` | Full |
+| for loop | `§L{var:start..end}` | Full |
+| while loop | `§WH{condition}` | Full |
+| do-while loop | `§DO{id} ... §/DO{id} condition` | Full |
+| switch/match | `§W{expr} §K{pattern} result §/W` | Full |
+| if/else | `§IF{condition} ... §EI ... §EL ... §/IF` | Full |
+| async/await | `§AF{id:name}` / `§AMT{id:name}` / `§AWAIT expr §/AWAIT` | Full |
+| yield return | `§YIELD expr` / `§YBRK` | Full |
+| try/catch/finally | `§TR{} ... §CA{Type:var} ... §FI{} ... §/TR` | Full |
+| using statement | `§USE{var}=expr ... §/USE` | Full |
+| struct types | `§CL{id:Name:vis:struct}` | Full |
+| generic constraints | `§G{T}` / `§WHERE{T:constraint}` | Full |
+| delegates | `§DEL{id:Name:vis}` | Full |
+| events | `§EVT{id:Name:vis}` | Full |
+| operator overloading | `§OP{id:operator:vis}` | Full |
+| implicit/explicit conv. | `§OP{id:implicit:vis}` / `§OP{id:explicit:vis}` | Full |
+| preprocessor (#if) | `§PP{CONDITION} ... §PPE ... §/PP` | Full |
+| pattern matching | `§W{expr} §K{Type var} ...` | Full |
+| extension methods | Supported via `this` parameter modifier | Full |
+| lambda expressions | `§LAM{id:param:type} body §/LAM{id}` | Full |
+| null-coalescing (??) | `expr §??{default}` | Full |
+| string interpolation | `STR:"text ${expr}"` or `§INTERP ... §EXP ... §/INTERP` | Full |
+| records | `§D{id:Name:vis}` | Full |
+| nested types | Nested `§CL`, `§IFACE`, `§EN` | Full |
+| partial classes | `§CL{id:Name:vis:partial}` | Full |
+| attributes | `[@AttributeName]` or `[@Attr(args)]` | Full |
+| LINQ (method syntax) | `§C{coll.Where} §A §LAM{...} ... §/C` | Full |
+| unsafe code | `§UNSAFE{id} ... §/UNSAFE{id}` | Full |
+
+**Key rule**: If a C# construct is in this table, express it natively in Calor. Only use `§CSHARP` for constructs NOT listed here.
+
 ## Contract-First Methodology
 
 **Before writing implementation, extract and express constraints as contracts.** This is your primary tool for ensuring correctness.

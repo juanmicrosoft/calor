@@ -155,7 +155,11 @@ public sealed class SyntaxHelpTool : McpToolBase
     public override string Name => "calor_syntax_help";
 
     public override string Description =>
-        "Get Calor syntax documentation for a specific feature. Returns relevant syntax examples and explanations.";
+        "Get Calor syntax documentation for a specific feature. Calor supports MANY C# constructs " +
+        "natively including: foreach (§L), for (§L), switch/match (§W), async/await (§AMT/§AWAIT), " +
+        "yield (§YIELD), structs, generic constraints (§WHERE), delegates (§DEL), events (§EV), " +
+        "operator overloading (§OP), preprocessor directives (§PP), using statements (§USE), " +
+        "pattern matching, and more. Query a feature name for full syntax.";
 
     protected override string GetInputSchemaJson() => """
         {

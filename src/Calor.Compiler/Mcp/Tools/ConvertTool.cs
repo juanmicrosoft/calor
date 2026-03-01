@@ -13,7 +13,10 @@ public sealed class ConvertTool : McpToolBase
     public override string Name => "calor_convert";
 
     public override string Description =>
-        "Convert C# source code to Calor. Returns the generated Calor code and any conversion issues.";
+        "Convert C# source code to Calor. Returns generated Calor code and conversion issues. " +
+        "IMPORTANT: If the result contains §CSHARP interop blocks, check calor_syntax_lookup " +
+        "or calor_feature_support — many C# constructs (foreach, switch, async, yield, structs, " +
+        "events, operators, preprocessor directives) have native Calor equivalents.";
 
     protected override string GetInputSchemaJson() => """
         {
@@ -255,6 +258,9 @@ public sealed class ConvertTool : McpToolBase
                 }
             }
 
+            // Analyze interop blocks for features that have native Calor equivalents
+            var featureHints = InteropHintAnalyzer.AnalyzeInteropBlocks(calorSourceForOutput);
+
             var output = new ConvertToolOutput
             {
                 Success = success,
@@ -274,7 +280,8 @@ public sealed class ConvertTool : McpToolBase
                 },
                 UnsupportedFeatureCount = unsupportedFeatureCount,
                 UnsupportedFeatureSummary = unsupportedFeatureSummary,
-                Explanation = explanationOutput
+                Explanation = explanationOutput,
+                FeatureHints = featureHints.Count > 0 ? featureHints : null
             };
 
             return Task.FromResult(McpToolResult.Json(output, isError: !success));
@@ -314,6 +321,10 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("explanation")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public ExplanationOutput? Explanation { get; init; }
+
+        [JsonPropertyName("featureHints")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? FeatureHints { get; init; }
     }
 
     private sealed class ExplanationOutput
