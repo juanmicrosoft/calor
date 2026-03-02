@@ -801,6 +801,21 @@ public class TypeSystemTests
         Assert.Equal("IList<string>", csharp);
     }
 
+    [Fact]
+    public void CSharpToCalor_GenericArrayType_MapsCorrectly()
+    {
+        var result = Migration.TypeMapper.CSharpToCalor("KeyValuePair<string, long>[]");
+        Assert.Equal("[KeyValuePair<str, i64>]", result);
+    }
+
+    [Fact]
+    public void CalorToCSharp_GenericArrayType_RoundTrips()
+    {
+        var calor = Migration.TypeMapper.CSharpToCalor("KeyValuePair<string, long>[]");
+        var csharp = Migration.TypeMapper.CalorToCSharp(calor);
+        Assert.Equal("KeyValuePair<string, long>[]", csharp);
+    }
+
     #endregion
 
     #region End-to-End: Option/Result Return Types

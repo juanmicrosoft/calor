@@ -299,6 +299,16 @@ public static class TypeMapper
             return $"[{mappedElement}]";
         }
 
+        // Handle Calor-style array notation [T] (idempotent when double-mapped).
+        // Must be checked before the generic handler, since [GenericType<args>]
+        // would otherwise be misinterpreted as a generic with the wrong closing char.
+        if (csharpType.StartsWith("[") && csharpType.EndsWith("]"))
+        {
+            var elementType = csharpType[1..^1];
+            var mappedElement = CSharpToCalor(elementType);
+            return $"[{mappedElement}]";
+        }
+
         // Handle multi-dim arrays T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
         {
             var bracketStart = csharpType.IndexOf('[');
