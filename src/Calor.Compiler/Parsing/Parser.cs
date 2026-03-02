@@ -6247,6 +6247,7 @@ public sealed class Parser
             var (getter, setter, initer) = ParseAccessorShorthand(accessorStr, startToken.Span, visibility);
 
             // Parse inline parameters: (type:name, type:name)
+            // Supports generic types like (Dictionary<str,i32>:lookup)
             var parameters = new List<ParameterNode>();
             if (Check(TokenKind.OpenParen))
             {
@@ -6257,11 +6258,49 @@ public sealed class Parser
                     {
                         Advance(); // consume ,
                     }
-                    // Parse type:name pair with ExpandType for consistent type names
+                    // Parse type, accumulating generic <...> blocks
                     var paramToken = Current;
-                    var paramText = paramToken.Text;
+                    var typeBuilder = new System.Text.StringBuilder(Current.Text);
                     Advance();
-                    // Expect colon separator
+
+                    // Accumulate generic type arguments: List<int>, Dictionary<string,int>, etc.
+                    if (Check(TokenKind.Less))
+                    {
+                        typeBuilder.Append('<');
+                        Advance();
+                        var depth = 1;
+                        while (!IsAtEnd && depth > 0)
+                        {
+                            if (Check(TokenKind.Less))
+                            {
+                                typeBuilder.Append('<');
+                                depth++;
+                            }
+                            else if (Check(TokenKind.Greater))
+                            {
+                                typeBuilder.Append('>');
+                                depth--;
+                            }
+                            else if (Check(TokenKind.GreaterGreater))
+                            {
+                                typeBuilder.Append(">>");
+                                depth -= 2;
+                            }
+                            else if (Check(TokenKind.Comma))
+                            {
+                                typeBuilder.Append(',');
+                            }
+                            else
+                            {
+                                typeBuilder.Append(Current.Text);
+                            }
+                            Advance();
+                        }
+                    }
+
+                    var paramType = typeBuilder.ToString();
+
+                    // Expect colon separator between type and name
                     if (Check(TokenKind.Colon))
                     {
                         Advance(); // consume :
@@ -6270,7 +6309,7 @@ public sealed class Parser
                         parameters.Add(new ParameterNode(
                             paramToken.Span.Union(paramNameToken.Span),
                             paramNameToken.Text,
-                            AttributeHelper.ExpandType(paramText),
+                            AttributeHelper.ExpandType(paramType),
                             new AttributeCollection()));
                     }
                     else
@@ -6279,7 +6318,7 @@ public sealed class Parser
                         parameters.Add(new ParameterNode(
                             paramToken.Span,
                             "value",
-                            AttributeHelper.ExpandType(paramText),
+                            AttributeHelper.ExpandType(paramType),
                             new AttributeCollection()));
                     }
                 }

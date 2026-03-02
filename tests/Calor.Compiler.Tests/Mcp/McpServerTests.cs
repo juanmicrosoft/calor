@@ -251,6 +251,36 @@ public class McpServerTests
     }
 
     [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_SyntaxHelp_Overview_ReturnsLanguageReference()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("60").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_syntax_help",
+                    "arguments": {
+                        "feature": "overview"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+        Assert.Contains("Calor Language Overview", json);
+        Assert.Contains("Control Flow", json);
+        Assert.Contains("availableFeatures", json);
+    }
+
+    [Fact]
     public async Task McpMessageHandler_HandleToolsCall_SyntaxLookupTool_Success()
     {
         var handler = new McpMessageHandler();
