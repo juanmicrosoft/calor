@@ -403,6 +403,35 @@ public class SyntaxLookupToolTests
         Assert.Contains("\"found\":true", json);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_NullCoalescingAssignment_ReturnsMatch()
+    {
+        // MCP Gap 3: ??= should be findable via calor_syntax_lookup
+        var args = JsonDocument.Parse("""{"query": "??="}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var json = result.Content[0].Text ?? "";
+        Assert.Contains("\"found\":true", json);
+        Assert.Contains("null", json.ToLower());
+        Assert.Contains("IF", json); // workaround uses §IF
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NullCoalescingAssignment_ByName_ReturnsMatch()
+    {
+        var args = JsonDocument.Parse("""{"query": "null coalescing assignment"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var json = result.Content[0].Text ?? "";
+        Assert.Contains("\"found\":true", json);
+        Assert.Contains("null-coalescing assignment", json);
+        Assert.Contains("examples", json);
+    }
+
     #region Fuzzy Matching Edge Cases
 
     [Fact]

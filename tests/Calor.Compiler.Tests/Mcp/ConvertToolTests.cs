@@ -31,6 +31,14 @@ public class ConvertToolTests
     }
 
     [Fact]
+    public void Description_ContainsModuleNameGuidance()
+    {
+        // MCP Gap 4: Description should mention namespace derivation and moduleName override
+        Assert.Contains("namespace", _tool.Description.ToLower());
+        Assert.Contains("moduleName", _tool.Description);
+    }
+
+    [Fact]
     public void GetInputSchema_ReturnsValidSchema()
     {
         var schema = _tool.GetInputSchema();

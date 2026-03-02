@@ -115,4 +115,7 @@ public sealed class MigrationPlanOptions
 
     /// <summary>Whether to validate converted output by parsing and compiling the generated Calor.</summary>
     public bool ValidateOutput { get; set; } = false;
+
+    /// <summary>Override the module name for all converted files. When null, module names are derived from C# namespace declarations.</summary>
+    public string? ModuleNameOverride { get; set; }
 }

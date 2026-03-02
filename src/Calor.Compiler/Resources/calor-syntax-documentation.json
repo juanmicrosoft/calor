@@ -1070,6 +1070,23 @@
       ]
     },
     {
+      "id": "null_coalescing_assignment",
+      "csharpConstruct": "null-coalescing assignment",
+      "keywords": ["??=", "null coalescing assignment", "null-coalescing assignment", "null assign"],
+      "calorSyntax": "§IF{id} (== x null) §ASSIGN x default §/I{id}",
+      "description": "C#'s ??= operator has no direct Calor equivalent. Use an §IF null check with §ASSIGN as a workaround.",
+      "examples": [
+        {
+          "csharp": "x ??= GetDefault();",
+          "calor": "§IF{id} (== x null)\n  §ASSIGN x §C{GetDefault}§/C\n§/I{id}"
+        },
+        {
+          "csharp": "_cache ??= new Dictionary<string, int>();",
+          "calor": "§IF{id} (== _cache null)\n  §ASSIGN _cache §NEW{Dictionary<str, i32>}()\n§/I{id}"
+        }
+      ]
+    },
+    {
       "id": "attribute_annotation",
       "csharpConstruct": "attribute",
       "keywords": ["attribute", "annotation", "metadata", "decorator", "Serializable", "Obsolete", "DllImport"],

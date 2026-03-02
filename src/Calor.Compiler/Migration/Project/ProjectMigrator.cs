@@ -228,10 +228,17 @@ public sealed class ProjectMigrator
 
     private async Task<FileMigrationResult> ProcessCSharpToCalorAsync(MigrationPlanEntry entry, bool dryRun, DateTime startTime)
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions
+        var conversionOptions = new ConversionOptions
         {
             IncludeBenchmark = _options.IncludeBenchmark
-        });
+        };
+
+        if (!string.IsNullOrEmpty(_options.ModuleNameOverride))
+        {
+            conversionOptions.ModuleName = _options.ModuleNameOverride;
+        }
+
+        var converter = new CSharpToCalorConverter(conversionOptions);
 
         var result = await converter.ConvertFileAsync(entry.SourcePath);
 
