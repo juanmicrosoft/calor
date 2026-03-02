@@ -156,7 +156,7 @@ public static class AssessCommand
             {
                 ["durationMs"] = sw.ElapsedMilliseconds.ToString()
             });
-            if (exitCode != 0)
+            if (exitCode == 2)
             {
                 IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "assess", "Assessment failed");
             }
