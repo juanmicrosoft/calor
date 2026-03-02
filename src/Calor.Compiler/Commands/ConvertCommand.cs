@@ -1,7 +1,9 @@
 using System.CommandLine;
 using System.Diagnostics;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
@@ -37,6 +39,15 @@ public static class ConvertCommand
             aliases: new[] { "--no-fallback" },
             description: "Fail conversion when encountering unsupported constructs (instead of emitting TODO comments)");
 
+        var validateOption = new Option<bool>(
+            aliases: new[] { "--validate" },
+            description: "Parse the generated Calor output and report any errors before writing");
+
+        var timeoutOption = new Option<int>(
+            aliases: new[] { "--timeout", "-t" },
+            description: "Timeout in seconds for the conversion (0 = no timeout)",
+            getDefaultValue: () => 0);
+
         var command = new Command("convert", "Convert a single file between C# and Calor")
         {
             inputArgument,
@@ -44,15 +55,17 @@ public static class ConvertCommand
             benchmarkOption,
             verboseOption,
             explainOption,
-            noFallbackOption
+            noFallbackOption,
+            validateOption,
+            timeoutOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, outputOption, benchmarkOption, verboseOption, explainOption, noFallbackOption);
+        command.SetHandler(ExecuteAsync, inputArgument, outputOption, benchmarkOption, verboseOption, explainOption, noFallbackOption, validateOption, timeoutOption);
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback)
+    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, int timeoutSeconds)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -91,7 +104,7 @@ public static class ConvertCommand
             ConversionResult? conversionResult = null;
             if (direction == ConversionDirection.CSharpToCalor)
             {
-                conversionResult = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback);
+                conversionResult = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, timeoutSeconds);
             }
             else
             {
@@ -153,7 +166,7 @@ public static class ConvertCommand
         }
     }
 
-    private static async Task<ConversionResult?> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback)
+    private static async Task<ConversionResult?> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, int timeoutSeconds)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
@@ -163,7 +176,28 @@ public static class ConvertCommand
             GracefulFallback = !noFallback
         });
 
-        var result = await converter.ConvertFileAsync(inputPath);
+        ConversionResult result;
+        if (timeoutSeconds > 0)
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+            try
+            {
+                // Run on a thread pool thread so the cancellation token can
+                // interrupt even CPU-bound conversion hangs (e.g. infinite loops
+                // in preprocessor region extraction).
+                result = await Task.Run(() => converter.ConvertFileAsync(inputPath), cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Console.Error.WriteLine($"Error: Conversion timed out after {timeoutSeconds}s");
+                Environment.ExitCode = 1;
+                return null;
+            }
+        }
+        else
+        {
+            result = await converter.ConvertFileAsync(inputPath);
+        }
 
         if (!result.Success)
         {
@@ -178,6 +212,21 @@ public static class ConvertCommand
 
         // Write output
         await File.WriteAllTextAsync(outputPath, result.CalorSource);
+
+        // Validate generated Calor by parsing it
+        if (validate && result.CalorSource != null)
+        {
+            var validationErrors = ValidateCalorSource(result.CalorSource);
+            if (validationErrors.Count > 0)
+            {
+                Console.Error.WriteLine($"⚠ Validation failed ({validationErrors.Count} error{(validationErrors.Count == 1 ? "" : "s")}):");
+                foreach (var err in validationErrors.Take(5))
+                    Console.Error.WriteLine($"  {err}");
+                if (validationErrors.Count > 5)
+                    Console.Error.WriteLine($"  ... and {validationErrors.Count - 5} more");
+                Console.Error.WriteLine("Output written but may not compile. Use calor diagnose for full report.");
+            }
+        }
 
         Console.WriteLine($"✓ Conversion successful");
 
@@ -248,5 +297,18 @@ public static class ConvertCommand
         return direction == ConversionDirection.CSharpToCalor
             ? Path.ChangeExtension(inputPath, ".calr")
             : Path.ChangeExtension(inputPath, ".g.cs");
+    }
+
+    /// <summary>
+    /// Validates Calor source by lexing and parsing it. Returns a list of error diagnostics.
+    /// </summary>
+    internal static List<Diagnostic> ValidateCalorSource(string calorSource)
+    {
+        var diagBag = new DiagnosticBag();
+        var lexer = new Lexer(calorSource, diagBag);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagBag);
+        parser.Parse();
+        return diagBag.Where(d => d.IsError).ToList();
     }
 }
