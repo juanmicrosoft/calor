@@ -2816,8 +2816,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         EmitCSharpAttributes(node.CSharpAttributes);
 
         var returnType = node.Output != null ? MapTypeName(node.Output.TypeName) : "void";
-        var parameters = string.Join(", ", node.Parameters.Select(p =>
-            $"{MapTypeName(p.TypeName)} {SanitizeIdentifier(p.Name)}"));
+        var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
         if (node.IsConversion)
         {

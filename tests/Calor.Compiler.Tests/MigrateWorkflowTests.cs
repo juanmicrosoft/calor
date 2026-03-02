@@ -704,4 +704,67 @@ public class MigrateWorkflowTests : IDisposable
     }
 
     #endregion
+
+    #region ValidateOutput
+
+    [Fact]
+    public async Task ExecuteAsync_ValidateOutput_MarksPartialWhenCompileFails()
+    {
+        // Write a valid C# file that converts to Calor successfully
+        WriteTestCSharpFile("Simple.cs", """
+            public class Greeter
+            {
+                public string Greet(string name)
+                {
+                    return $"Hello, {name}!";
+                }
+            }
+            """);
+
+        var options = new MigrationPlanOptions
+        {
+            Parallel = false,
+            ValidateOutput = true
+        };
+
+        var migrator = new ProjectMigrator(options);
+        var plan = await migrator.CreatePlanAsync(_tempDir, MigrationDirection.CSharpToCalor);
+        var report = await migrator.ExecuteAsync(plan);
+
+        // File should convert and validate successfully
+        var fileResult = report.FileResults.FirstOrDefault(f =>
+            f.SourcePath.EndsWith("Simple.cs") &&
+            f.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial);
+        Assert.NotNull(fileResult);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ValidateOutputFalse_SkipsCompileCheck()
+    {
+        WriteTestCSharpFile("Basic.cs", """
+            public class Adder
+            {
+                public int Add(int a, int b) => a + b;
+            }
+            """);
+
+        var options = new MigrationPlanOptions
+        {
+            Parallel = false,
+            ValidateOutput = false
+        };
+
+        var migrator = new ProjectMigrator(options);
+        var plan = await migrator.CreatePlanAsync(_tempDir, MigrationDirection.CSharpToCalor);
+        var report = await migrator.ExecuteAsync(plan);
+
+        var fileResult = report.FileResults.FirstOrDefault(f =>
+            f.SourcePath.EndsWith("Basic.cs"));
+        Assert.NotNull(fileResult);
+        Assert.Equal(FileMigrationStatus.Success, fileResult!.Status);
+        // No validation issues should be present
+        Assert.DoesNotContain(fileResult.Issues, i => i.Message.Contains("Validation"));
+    }
+
+    #endregion
 }

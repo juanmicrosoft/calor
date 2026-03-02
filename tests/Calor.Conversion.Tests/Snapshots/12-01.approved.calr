@@ -1,0 +1,13 @@
+§M{m001:Test_12_01}
+  §CL{c001:Formatter:pub}
+    §MT{m002:Format:priv} (i32:value) -> str
+      §R (str value)
+    §/MT{m002}
+
+    §MT{m003:Describe:pub} (i32:x, [str]:labels) -> str
+      §R "The value is ${Format(x)} with label ${labels[0]}"
+    §/MT{m003}
+
+  §/CL{c001}
+
+§/M{m001}

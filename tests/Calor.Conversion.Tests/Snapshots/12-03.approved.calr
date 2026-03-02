@@ -1,0 +1,17 @@
+§M{m001:Test_12_03}
+  §CL{s001:Vector2:pub:struct}
+    §FLD{f32:X:pub}
+    §FLD{f32:Y:pub}
+
+    §CTOR{ctor002:pub} (f32:x, f32:y)
+      §ASSIGN X x
+      §ASSIGN Y y
+    §/CTOR{ctor002}
+
+    §OP{op003:+:pub} (Vector2:a, Vector2:b) -> Vector2
+      §R §NEW{Vector2} §A (+ a.X b.X) §A (+ a.Y b.Y) §/NEW
+    §/OP{op003}
+
+  §/CL{s001}
+
+§/M{m001}

@@ -242,6 +242,27 @@
       ]
     },
     {
+      "id": "ternary_expression",
+      "csharpConstruct": "ternary / conditional expression",
+      "keywords": ["ternary", "conditional", "?:", "question mark", "inline if"],
+      "calorSyntax": "(? condition trueValue falseValue)",
+      "description": "Conditional expression (ternary operator). Uses prefix notation with (? ...) syntax. Both branches are expressions, not statements.",
+      "examples": [
+        {
+          "csharp": "var x = condition ? a : b;",
+          "calor": "§B{x} (? condition a b)"
+        },
+        {
+          "csharp": "return count > 0 ? \"items\" : \"none\";",
+          "calor": "§R (? (> count 0) \"items\" \"none\")"
+        },
+        {
+          "csharp": "var label = isActive ? GetLabel() : \"default\";",
+          "calor": "§B{label} (? isActive §C{GetLabel} §/C \"default\")"
+        }
+      ]
+    },
+    {
       "id": "return_statement",
       "csharpConstruct": "return statement",
       "keywords": ["return", "result", "output", "yield", "value"],
@@ -615,6 +636,10 @@
         {
           "csharp": "$\"{firstName} {lastName}\"",
           "calor": "STR:\"${firstName} ${lastName}\""
+        },
+        {
+          "csharp": "$\"Result: {Calculate(x, y)} units\"",
+          "calor": "\"Result: ${Calculate(x, y)} units\""
         }
       ]
     },
