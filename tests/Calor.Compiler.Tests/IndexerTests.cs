@@ -177,6 +177,31 @@ public class IndexerTests
         Assert.True(indexer.IsVirtual);
     }
 
+    [Fact]
+    public void Parser_CompactGenericTypeParam_ParsesCorrectly()
+    {
+        var source = """
+            §M{m1:Test}
+            §CL{c1:MyDict:pub}
+            §IXER{ix1:List<str>:pub:get,set} (Dictionary<str,i32>:lookup)
+            §/CL{c1}
+            §/M{m1}
+            """;
+
+        var diag = new DiagnosticBag();
+        var lexer = new Lexer(source, diag);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diag);
+        var module = parser.Parse();
+
+        Assert.Empty(diag);
+        var indexer = Assert.Single(module.Classes[0].Indexers);
+        Assert.Equal("List<str>", indexer.TypeName);
+        Assert.Single(indexer.Parameters);
+        Assert.Equal("lookup", indexer.Parameters[0].Name);
+        Assert.Contains("Dictionary", indexer.Parameters[0].TypeName);
+    }
+
     #endregion
 
     #region C# Emission Tests
