@@ -55,6 +55,7 @@ Calor natively supports far more C# constructs than you might expect. Before usi
 | partial classes | `§CL{id:Name:vis:partial}` | Full |
 | attributes | `[@AttributeName]` or `[@Attr(args)]` | Full |
 | LINQ (method syntax) | `§C{coll.Where} §A §LAM{...} ... §/C` | Full |
+| indexers (this[]) | `§IXER{id:type:vis:get,set} (type:param)` | Full |
 | unsafe code | `§UNSAFE{id} ... §/UNSAFE{id}` | Full |
 
 **Key rule**: If a C# construct is in this table, express it natively in Calor. Only use `§CSHARP` for constructs NOT listed here.
@@ -1506,6 +1507,25 @@ For lexicographic comparison, compare character by character using `(char-at)` a
 §FLD{type:name:vis}       Field definition
 §DEFAULT                  Default value expression
 ```
+
+## Indexers
+
+```
+§IXER{id:type:vis:get,set} (type:param)     Compact auto-indexer (single line)
+§IXER{id:type:vis:get,set} (t1:p1, t2:p2)   Multi-parameter indexer
+
+§IXER{id:type:vis}        Full indexer definition
+  §I{type:param}           Parameter
+  §GET                     Getter body
+    §R expression
+  §/GET
+  §SET                     Setter body
+    ...
+  §/SET
+§/IXER{id}
+```
+
+C# `this[string key] { get; set; }` becomes `§IXER{ix1:str:pub:get,set} (str:key)`.
 
 ## Lambdas and Delegates
 

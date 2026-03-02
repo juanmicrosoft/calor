@@ -146,7 +146,7 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["events"] = ["event", "§EV{", "§EVT{"],
         ["using"] = ["using", "§USE{", "dispose", "IDisposable"],
         ["modifiers"] = ["static", "abstract", "sealed", "virtual", "override", "readonly", "partial"],
-        ["indexers"] = ["indexer", "§IDX{", "this[]"],
+        ["indexers"] = ["indexer", "§IXER{", "this[]", "this[int", "this[string"],
         ["yield"] = ["yield", "iterator", "IEnumerable"],
         ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
         ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues"],
@@ -158,8 +158,8 @@ public sealed class SyntaxHelpTool : McpToolBase
         "Get Calor syntax documentation for a specific feature. Calor supports MANY C# constructs " +
         "natively including: foreach (§L), for (§L), switch/match (§W), async/await (§AMT/§AWAIT), " +
         "yield (§YIELD), structs, generic constraints (§WHERE), delegates (§DEL), events (§EV), " +
-        "operator overloading (§OP), preprocessor directives (§PP), using statements (§USE), " +
-        "pattern matching, and more. Query a feature name for full syntax.";
+        "operator overloading (§OP), indexers (§IXER), preprocessor directives (§PP), " +
+        "using statements (§USE), pattern matching, and more. Query a feature name for full syntax.";
 
     protected override string GetInputSchemaJson() => """
         {

@@ -124,6 +124,31 @@
       ]
     },
     {
+      "id": "indexer_definition",
+      "csharpConstruct": "indexer definition",
+      "keywords": ["indexer", "this[]", "this[int", "this[string", "bracket", "index", "§IXER"],
+      "calorSyntax": "§IXER{id:returnType:visibility[:modifiers[:accessors]]} (type:param) or full form with §GET/§SET",
+      "description": "Defines an indexer (this[]) on a class or interface. Compact auto-property form puts accessors and parameters inline. Full form uses §I for parameters and §GET/§SET/§INIT accessor blocks, closed with §/IXER{id}.",
+      "examples": [
+        {
+          "csharp": "public int this[int index] { get; set; }",
+          "calor": "§IXER{ix1:i32:pub:get,set} (i32:index)"
+        },
+        {
+          "csharp": "public string this[string key] { get; set; }",
+          "calor": "§IXER{ix1:str:pub:get,set} (str:key)"
+        },
+        {
+          "csharp": "public int this[int row, int col] { get; set; }",
+          "calor": "§IXER{ix1:i32:pub:get,set} (i32:row, i32:col)"
+        },
+        {
+          "csharp": "public int this[int i] { get { return _data[i]; } set { _data[i] = value; } }",
+          "calor": "§IXER{ix1:i32:pub}\n  §I{i32:i}\n  §GET\n    §R §IDX _data i\n  §/GET\n  §SET\n    §SETIDX _data i value\n  §/SET\n§/IXER{ix1}"
+        }
+      ]
+    },
+    {
       "id": "property_access_vs_method_call",
       "csharpConstruct": "property access vs method call",
       "keywords": ["property access", "member access", "method call", "call", "parentheses", "getter"],

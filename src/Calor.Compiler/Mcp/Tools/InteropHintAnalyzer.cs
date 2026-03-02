@@ -65,6 +65,10 @@ internal static class InteropHintAnalyzer
         (new Regex(@"\bwhere\s+\w+\s*:", RegexOptions.Compiled),
             "generic-constraint", "§WHERE{T:constraint}",
             "generic type constraints are supported via §WHERE — consider converting where clauses"),
+
+        (new Regex(@"\bthis\s*\[", RegexOptions.Compiled),
+            "indexer", "§IXER{id:type:vis}",
+            "indexers (this[]) are supported via §IXER — consider converting indexer definitions to native §IXER{id:type:vis} syntax"),
     ];
 
     /// <summary>
