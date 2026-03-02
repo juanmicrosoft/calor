@@ -470,4 +470,472 @@ public class HumanizerRegressionTests
     }
 
     #endregion
+
+    #region Bug 3: Module name heuristic
+
+    [Fact]
+    public void Bug3_NamespaceDetectedAsModuleName()
+    {
+        var csharp = """
+            namespace Humanizer.Localisation
+            {
+                public class Foo
+                {
+                    public int GetValue() { return 42; }
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        Assert.Equal("Humanizer.Localisation", result.Ast!.Name);
+    }
+
+    [Fact]
+    public void Bug3_FileScopedNamespaceDetected()
+    {
+        var csharp = """
+            namespace Humanizer.DateTimeHumanize;
+            public class Foo
+            {
+                public int GetValue() { return 42; }
+            }
+            """;
+
+        var result = Convert(csharp);
+        Assert.Equal("Humanizer.DateTimeHumanize", result.Ast!.Name);
+    }
+
+    [Fact]
+    public void Bug3_NoNamespaceFallsBackToDefault()
+    {
+        var csharp = """
+            public class Foo
+            {
+                public int GetValue() { return 42; }
+            }
+            """;
+
+        var result = Convert(csharp);
+        Assert.Equal("ConvertedModule", result.Ast!.Name);
+    }
+
+    #endregion
+
+    #region Bug 5: Argument separators
+
+    [Fact]
+    public void Bug5_MultipleArgumentsRoundTrip()
+    {
+        var csharp = """
+            public class Formatter
+            {
+                public string Format(string a, string b)
+                {
+                    return string.Format("{0} {1}", a, b);
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        AssertNoInteropFallback(result.Ast!);
+
+        // Verify the round-trip preserves multiple arguments
+        var output = RoundTrip(csharp);
+        Assert.Contains("Format", output);
+    }
+
+    [Fact]
+    public void Bug5_MethodChainWithMultipleArgs()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            public class Inserter
+            {
+                public void Add(List<string> list, string item)
+                {
+                    list.Insert(0, item);
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        AssertNoInteropFallback(result.Ast!);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("Insert", output);
+    }
+
+    #endregion
+
+    #region Bug 7: Generic method names
+
+    [Fact]
+    public void Bug7_GenericMethodSingleTypeParam()
+    {
+        var csharp = """
+            public class GenericHelper
+            {
+                public T Identity<T>(T value)
+                {
+                    return value;
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        AssertNoInteropFallback(result.Ast!);
+        var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
+        var typeParam = Assert.Single(method.TypeParameters);
+        Assert.Equal("T", typeParam.Name);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("<T>", output);
+    }
+
+    [Fact]
+    public void Bug7_GenericMethodMultipleTypeParams()
+    {
+        var csharp = """
+            public class Converter
+            {
+                public TResult Convert<TIn, TResult>(TIn value) where TResult : new()
+                {
+                    return new TResult();
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        AssertNoInteropFallback(result.Ast!);
+        var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
+        Assert.Equal(2, method.TypeParameters.Count);
+        Assert.Equal("TIn", method.TypeParameters[0].Name);
+        Assert.Equal("TResult", method.TypeParameters[1].Name);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("<TIn, TResult>", output);
+    }
+
+    [Fact]
+    public void Bug7_GenericInterfaceMethod()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            public interface ICollectionFormatter
+            {
+                string Humanize<T>(IEnumerable<T> collection);
+            }
+            """;
+
+        var result = Convert(csharp);
+        var iface = Assert.Single(result.Ast!.Interfaces);
+        var method = Assert.Single(iface.Methods);
+        var typeParam = Assert.Single(method.TypeParameters);
+        Assert.Equal("T", typeParam.Name);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("<T>", output);
+        Assert.Contains("IEnumerable", output);
+    }
+
+    #endregion
+
+    #region Bug 8: Primary constructor base calls
+
+    [Fact]
+    public void Bug8_PrimaryConstructorBaseCallSimple()
+    {
+        var csharp = """
+            public class Base
+            {
+                public Base(string name) { }
+            }
+            public class Derived(string name) : Base(name)
+            {
+            }
+            """;
+
+        var result = Convert(csharp);
+        var derived = result.Ast!.Classes.First(c => c.Name == "Derived");
+        var ctor = Assert.Single(derived.Constructors);
+        Assert.NotNull(ctor.Initializer);
+        Assert.True(ctor.Initializer!.IsBaseCall);
+        Assert.Single(ctor.Initializer.Arguments);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("base(name)", output);
+    }
+
+    [Fact]
+    public void Bug8_PrimaryConstructorBaseCallMultipleArgs()
+    {
+        var csharp = """
+            public class DefaultFormatter
+            {
+                public DefaultFormatter(string locale, int precision) { }
+            }
+            public class ArabicFormatter(string locale, int precision) : DefaultFormatter(locale, precision)
+            {
+            }
+            """;
+
+        var result = Convert(csharp);
+        var arabic = result.Ast!.Classes.First(c => c.Name == "ArabicFormatter");
+        var ctor = Assert.Single(arabic.Constructors);
+        Assert.NotNull(ctor.Initializer);
+        Assert.True(ctor.Initializer!.IsBaseCall);
+        Assert.Equal(2, ctor.Initializer.Arguments.Count);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("base(locale, precision)", output);
+    }
+
+    [Fact]
+    public void Bug8_PrimaryConstructorNoBaseArgs()
+    {
+        // When there's no base call args (just inherits), no synthetic constructor needed
+        var csharp = """
+            public class Foo
+            {
+                public int GetValue() { return 1; }
+            }
+            public class Bar(int x) : Foo
+            {
+                public int GetX() { return x; }
+            }
+            """;
+
+        var result = Convert(csharp);
+        var bar = result.Ast!.Classes.First(c => c.Name == "Bar");
+        // No constructor with base call needed — base type has no argument list
+        Assert.DoesNotContain(bar.Constructors, c => c.Initializer?.IsBaseCall == true);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("Bar", output);
+    }
+
+    #endregion
+
+    #region Bug 9: Complex patterns (cascade from Bug 8)
+
+    [Fact]
+    public void Bug9_PrimaryCtorWithBaseAndOverride()
+    {
+        var csharp = """
+            public class DefaultFormatter
+            {
+                public DefaultFormatter(string locale) { }
+                public virtual string Format(int number) { return number.ToString(); }
+            }
+            public class ArabicFormatter(string locale) : DefaultFormatter(locale)
+            {
+                public override string Format(int number)
+                {
+                    return number > 0 ? number.ToString() : "zero";
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        var arabic = result.Ast!.Classes.First(c => c.Name == "ArabicFormatter");
+        Assert.Single(arabic.Constructors);
+        Assert.NotNull(arabic.Constructors[0].Initializer);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("base(locale)", output);
+        Assert.Contains("override", output);
+    }
+
+    [Fact]
+    public void Bug9_ComplexStringInterpolation()
+    {
+        var csharp = """
+            public class Display
+            {
+                public string Describe(int number)
+                {
+                    return $"{number.ToString()} items";
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        AssertNoInteropFallback(result.Ast!);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("items", output);
+    }
+
+    #endregion
+
+    #region Bug 8 edge cases
+
+    [Fact]
+    public void Bug8_PrimaryCtorWithBaseCallAndExplicitCtor()
+    {
+        // Edge case: class has primary constructor base call AND an explicit constructor.
+        // The synthesized ctor from the primary constructor should coexist with the explicit one.
+        var csharp = """
+            public class Base
+            {
+                public Base(string name) { }
+            }
+            public class Derived(string name) : Base(name)
+            {
+                public Derived() : this("default") { }
+            }
+            """;
+
+        var result = Convert(csharp);
+        var derived = result.Ast!.Classes.First(c => c.Name == "Derived");
+        // Should have 2 constructors: synthesized (base call) + explicit (this call)
+        Assert.Equal(2, derived.Constructors.Count);
+        Assert.Contains(derived.Constructors, c => c.Initializer?.IsBaseCall == true);
+        Assert.Contains(derived.Constructors, c => c.Initializer != null && !c.Initializer.IsBaseCall);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("base(name)", output);
+        Assert.Contains("this(", output);
+    }
+
+    [Fact]
+    public void Bug8_PrimaryCtorBaseCallWithExpressionArg()
+    {
+        // Base call argument is an expression, not just a simple identifier
+        var csharp = """
+            public class Base
+            {
+                public Base(string name) { }
+            }
+            public class Derived(string first, string last) : Base(first + " " + last)
+            {
+            }
+            """;
+
+        var result = Convert(csharp);
+        var derived = result.Ast!.Classes.First(c => c.Name == "Derived");
+        var ctor = Assert.Single(derived.Constructors);
+        Assert.NotNull(ctor.Initializer);
+        Assert.True(ctor.Initializer!.IsBaseCall);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("base(", output);
+    }
+
+    #endregion
+
+    #region Realistic Humanizer patterns
+
+    [Fact]
+    public void Humanizer_ArabicFormatterPattern()
+    {
+        // Mirrors the real ArabicFormatter from Humanizer:
+        // primary ctor with CultureInfo, base call, override method
+        var csharp = """
+            using System.Globalization;
+            public class DefaultFormatter
+            {
+                private readonly CultureInfo _culture;
+                public DefaultFormatter(CultureInfo culture)
+                {
+                    _culture = culture;
+                }
+                public virtual string DataUnitHumanize(int count, string unit, bool toSymbol)
+                {
+                    return count.ToString() + " " + unit;
+                }
+            }
+            public class ArabicFormatter(CultureInfo culture) : DefaultFormatter(culture)
+            {
+                public override string DataUnitHumanize(int count, string unit, bool toSymbol)
+                {
+                    return toSymbol ? unit : count.ToString() + " " + unit;
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        var arabic = result.Ast!.Classes.First(c => c.Name == "ArabicFormatter");
+
+        // Has synthesized constructor with base call
+        var ctor = Assert.Single(arabic.Constructors);
+        Assert.NotNull(ctor.Initializer);
+        Assert.True(ctor.Initializer!.IsBaseCall);
+        Assert.Single(ctor.Initializer.Arguments);
+
+        // Has the override method
+        Assert.Contains(arabic.Methods, m => m.Name == "DataUnitHumanize");
+
+        // Round-trip produces valid C#
+        var output = RoundTrip(csharp);
+        Assert.Contains("base(culture)", output);
+        Assert.Contains("override", output);
+        Assert.Contains("DataUnitHumanize", output);
+    }
+
+    [Fact]
+    public void Humanizer_GermanFormatterPattern()
+    {
+        // Mirrors GermanFormatter: primary ctor, base call, multiple override methods
+        var csharp = """
+            public class DefaultFormatter
+            {
+                public DefaultFormatter(string locale) { }
+                public virtual string Format(string verb) { return verb; }
+                public virtual string Pluralize(string word) { return word + "s"; }
+            }
+            public class GermanFormatter(string locale) : DefaultFormatter(locale)
+            {
+                public override string Format(string verb)
+                {
+                    return verb + "en";
+                }
+                public override string Pluralize(string word)
+                {
+                    return word + "e";
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        var german = result.Ast!.Classes.First(c => c.Name == "GermanFormatter");
+        Assert.Single(german.Constructors);
+        Assert.Equal(2, german.Methods.Count);
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("base(locale)", output);
+        Assert.Contains("Format", output);
+        Assert.Contains("Pluralize", output);
+    }
+
+    [Fact]
+    public void Humanizer_InterfaceWithGenericMethod()
+    {
+        // Mirrors ICollectionFormatter from Humanizer
+        var csharp = """
+            using System.Collections.Generic;
+            public interface ICollectionFormatter
+            {
+                string Humanize<T>(IEnumerable<T> collection, string separator);
+                string Humanize<T>(IEnumerable<T> collection, string separator, string conjunction);
+            }
+            """;
+
+        var result = Convert(csharp);
+        var iface = Assert.Single(result.Ast!.Interfaces);
+        Assert.Equal(2, iface.Methods.Count);
+        Assert.All(iface.Methods, m =>
+        {
+            Assert.Equal("Humanize", m.Name);
+            var tp = Assert.Single(m.TypeParameters);
+            Assert.Equal("T", tp.Name);
+        });
+
+        var output = RoundTrip(csharp);
+        Assert.Contains("Humanize", output);
+        Assert.Contains("<T>", output);
+        Assert.Contains("IEnumerable", output);
+    }
+
+    #endregion
 }

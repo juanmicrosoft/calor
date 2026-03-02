@@ -543,6 +543,38 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     new AttributeCollection(),
                     fieldCsharpAttrs));
             }
+
+            // Synthesize constructor for primary constructor with base class call
+            if (node.BaseList != null)
+            {
+                foreach (var baseType in node.BaseList.Types)
+                {
+                    if (baseType is PrimaryConstructorBaseTypeSyntax primaryBase)
+                    {
+                        var ctorId = _context.GenerateId("ctor");
+                        var ctorParams = ConvertParameters(node.ParameterList);
+                        var baseArgs = primaryBase.ArgumentList.Arguments
+                            .Select(a => ConvertExpression(a.Expression))
+                            .ToList();
+                        var initializer = new ConstructorInitializerNode(
+                            GetTextSpan(primaryBase),
+                            isBaseCall: true,
+                            baseArgs);
+                        constructors.Add(new ConstructorNode(
+                            GetTextSpan(node.ParameterList),
+                            ctorId,
+                            visibility,
+                            ctorParams,
+                            preconditions: Array.Empty<RequiresNode>(),
+                            initializer,
+                            Array.Empty<StatementNode>(),
+                            new AttributeCollection(),
+                            Array.Empty<CalorAttributeNode>(),
+                            isStatic: false));
+                        break; // only one base class
+                    }
+                }
+            }
         }
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
@@ -948,7 +980,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var operatorOverloads = new List<OperatorOverloadNode>();
         var events = new List<EventDefinitionNode>();
 
-        // Convert C# 12 primary constructor parameters to readonly fields
+        // Convert C# 12 primary constructor parameters to readonly fields.
+        // Note: structs cannot have base class calls, so no base call synthesis is needed here
+        // (unlike ConvertClass which synthesizes a ConstructorNode for PrimaryConstructorBaseTypeSyntax).
         if (node.ParameterList != null)
         {
             _context.RecordFeatureUsage("primary-constructor");
