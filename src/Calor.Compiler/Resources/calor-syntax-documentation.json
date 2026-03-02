@@ -1102,6 +1102,82 @@
           "calor": "[@Obsolete(\"Use NewMethod\")]\n§MT{1:OldMethod:pub}\n  §O{void}\n§/MT"
         }
       ]
+    },
+    {
+      "id": "is_pattern_combinators",
+      "csharpConstruct": "is pattern with combinators",
+      "keywords": ["is pattern", "and pattern", "or pattern", "not pattern", "compound pattern", "combinator", "relational pattern", "pattern combinator"],
+      "calorSyntax": "(&& (> x 0) (< x 100)) or (|| (< x 0) (> x 100))",
+      "description": "C# 'is' patterns with and/or/not combinators are decomposed into standard boolean expressions using prefix notation. No special tag needed — fully supported natively.",
+      "examples": [
+        {
+          "csharp": "if (x is > 0 and < 100)",
+          "calor": "§IF{id} (&& (> x 0) (< x 100))"
+        },
+        {
+          "csharp": "return x is < 0 or > 100;",
+          "calor": "§R (|| (< x 0) (> x 100))"
+        },
+        {
+          "csharp": "if (x is not < 0)",
+          "calor": "§IF{id} (! (< x 0))"
+        }
+      ]
+    },
+    {
+      "id": "range_expression",
+      "csharpConstruct": "range expression",
+      "keywords": ["range", "slice", "..", "^", "index from end", "hat", "caret", "span", "array slice"],
+      "calorSyntax": "§IDX{array} §RANGE start end / §IDX{array} §^ n",
+      "description": "C# range expressions (start..end) and index-from-end (^n) are fully supported. Use §RANGE for slicing and §^ for indexing from the end.",
+      "examples": [
+        {
+          "csharp": "var slice = array[0..5];",
+          "calor": "§B{slice} §IDX{array} §RANGE 0 5"
+        },
+        {
+          "csharp": "var last = items[^1];",
+          "calor": "§B{last} §IDX{items} §^ 1"
+        },
+        {
+          "csharp": "var tail = data[2..];",
+          "calor": "§B{tail} §IDX{data} §RANGE 2"
+        }
+      ]
+    },
+    {
+      "id": "positional_property_pattern",
+      "csharpConstruct": "positional and property patterns",
+      "keywords": ["tuple pattern", "positional pattern", "property pattern", "deconstruct", "recursive pattern", "positional", "property"],
+      "calorSyntax": "Supported in C# → Calor migration. Decompose to §IF chains for hand-written Calor.",
+      "description": "Positional patterns (tuple deconstruction) and property patterns are fully supported during C# → Calor migration — the converter preserves them inline. For hand-written Calor, decompose complex patterns into §IF/§EI chains with explicit comparisons.",
+      "examples": [
+        {
+          "csharp": "(hour, minute) switch { (0, 0) => \"midnight\" }",
+          "calor": "§IF{id} (&& (== hour 0) (== minute 0))\n  §R STR:\"midnight\"\n§/I{id}"
+        },
+        {
+          "csharp": "obj switch { { Length: > 0 } => true }",
+          "calor": "§IF{id} (> obj.Length 0)\n  §R BOOL:true\n§/I{id}"
+        }
+      ]
+    },
+    {
+      "id": "pragma_warning",
+      "csharpConstruct": "#pragma warning directive",
+      "keywords": ["pragma", "#pragma", "warning disable", "warning restore", "suppress warning"],
+      "calorSyntax": "NOT SUPPORTED — use §CSHARP if essential",
+      "description": "#pragma warning directives are NOT supported in Calor. They are silently dropped during C# → Calor conversion. If you need to suppress specific warnings, use §CSHARP{#pragma warning disable XXXX}§/CSHARP as a raw passthrough.",
+      "examples": [
+        {
+          "csharp": "#pragma warning disable 1591",
+          "calor": "§CSHARP{#pragma warning disable 1591}§/CSHARP"
+        },
+        {
+          "csharp": "#pragma warning restore 1591",
+          "calor": "§CSHARP{#pragma warning restore 1591}§/CSHARP"
+        }
+      ]
     }
   ],
   "tags": {
@@ -1776,6 +1852,18 @@
       "syntax": "§END_BODY",
       "description": "Explicitly marks the end of a function or method body. Pairs with §BODY. Optional in most cases.",
       "csharpEquivalent": "}"
+    },
+    "§RANGE": {
+      "name": "Range",
+      "syntax": "§RANGE start end",
+      "description": "Represents a range value (start..end) for array/span slicing.",
+      "csharpEquivalent": "start..end"
+    },
+    "§^": {
+      "name": "Index From End",
+      "syntax": "§^ n",
+      "description": "Indexes from the end of a collection. Equivalent to C#'s ^n operator.",
+      "csharpEquivalent": "^n"
     }
   }
 }

@@ -246,6 +246,30 @@ public class SyntaxHelpToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_RangesFeature_IncludesRangeContent()
+    {
+        var args = JsonDocument.Parse("""{"feature": "ranges"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.Contains("RANGE", text);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AvailableFeatures_IncludesRanges()
+    {
+        var args = JsonDocument.Parse("""{"feature": "functions"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.Contains("ranges", text);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_EventsFeature_IncludesEventContent()
     {
         var args = JsonDocument.Parse("""{"feature": "events"}""").RootElement;
