@@ -432,6 +432,59 @@ public class SyntaxLookupToolTests
         Assert.Contains("examples", json);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_IsPatternCombinator_ReturnsMatch()
+    {
+        var args = JsonDocument.Parse("""{"query": "is pattern or"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var json = result.Content[0].Text ?? "";
+        Assert.Contains("\"found\":true", json);
+        Assert.Contains("combinator", json.ToLower());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RangeExpression_ReturnsMatch()
+    {
+        var args = JsonDocument.Parse("""{"query": "range slice"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var json = result.Content[0].Text ?? "";
+        Assert.Contains("\"found\":true", json);
+        Assert.Contains("RANGE", json);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PositionalPattern_ReturnsMatch()
+    {
+        var args = JsonDocument.Parse("""{"query": "positional pattern"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var json = result.Content[0].Text ?? "";
+        Assert.Contains("\"found\":true", json);
+        Assert.Contains("positional", json.ToLower());
+        Assert.Contains("IF", json); // workaround uses §IF decomposition
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PragmaWarning_ReturnsMatch()
+    {
+        var args = JsonDocument.Parse("""{"query": "pragma warning"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var json = result.Content[0].Text ?? "";
+        Assert.Contains("\"found\":true", json);
+        Assert.Contains("NOT SUPPORTED", json);
+    }
+
     #region Fuzzy Matching Edge Cases
 
     [Fact]

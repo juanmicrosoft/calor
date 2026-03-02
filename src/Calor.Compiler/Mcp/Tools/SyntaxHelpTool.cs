@@ -130,7 +130,7 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["classes"] = ["class", "§CL{", "§EXT{", "§IMPL{", "inheritance", "interface"],
         ["generics"] = ["generic", "<T>", "§WHERE", "type parameter", "constraint"],
         ["collections"] = ["list", "dict", "array", "§LIST{", "§DICT{", "§ARR", "§IDX"],
-        ["patterns"] = ["pattern", "match", "switch", "§W{", "§K", "§SW{"],
+        ["patterns"] = ["pattern", "match", "switch", "§W{", "§K", "§SW{", "is pattern", "combinator", "relational pattern", "positional", "property pattern"],
         ["exceptions"] = ["try", "catch", "throw", "exception", "§TR{", "§CA", "§TH"],
         ["lambdas"] = ["lambda", "delegate", "§LAM{", "§DEL{"],
         ["strings"] = ["string", "str", "concat", "substr", "interpolation"],
@@ -149,7 +149,8 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["indexers"] = ["indexer", "§IXER{", "this[]", "this[int", "this[string"],
         ["yield"] = ["yield", "iterator", "IEnumerable"],
         ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
-        ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues"],
+        ["ranges"] = ["range", "slice", "..", "§RANGE", "§^", "index from end", "span", "array slice"],
+        ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues", "pragma", "#pragma"],
         ["overview"] = ["overview", "all", "summary", "syntax", "reference", "cheatsheet", "cheat sheet"],
     };
 
@@ -446,6 +447,8 @@ public sealed class SyntaxHelpTool : McpToolBase
                 §IDX coll index           Element access
                 §PUSH coll item           Add to list/set
                 §PUT dict key value       Add/update dict entry
+                §RANGE start end          Range: start..end (for slicing)
+                §^ n                      Index from end: ^n
                 ```
 
                 ### Preprocessor and Interop
