@@ -150,6 +150,7 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["yield"] = ["yield", "iterator", "IEnumerable"],
         ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
         ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues"],
+        ["overview"] = ["overview", "all", "summary", "syntax", "reference", "cheatsheet", "cheat sheet"],
     };
 
     public override string Name => "calor_syntax_help";
@@ -167,7 +168,7 @@ public sealed class SyntaxHelpTool : McpToolBase
             "properties": {
                 "feature": {
                     "type": "string",
-                    "description": "Feature to get help for (e.g., 'async', 'contracts', 'effects', 'loops', 'patterns')"
+                    "description": "Feature to get help for (e.g., 'overview', 'async', 'contracts', 'effects', 'loops', 'patterns'). Use 'overview' for a complete language syntax reference."
                 }
             },
             "required": ["feature"]
@@ -191,6 +192,13 @@ public sealed class SyntaxHelpTool : McpToolBase
             }
 
             var resolvedCategory = ResolveCategory(feature);
+
+            // Handle overview request — return curated language reference
+            if (resolvedCategory == "overview")
+            {
+                return Task.FromResult(HandleOverview(feature, content));
+            }
+
             var sections = ExtractRelevantSections(content, feature);
 
             // Track telemetry
@@ -278,6 +286,167 @@ public sealed class SyntaxHelpTool : McpToolBase
         }
 
         return sections;
+    }
+
+    private static McpToolResult HandleOverview(string feature, string content)
+    {
+        // Extract the "Supported C# Features — Quick Reference" table and
+        // "Syntax Quick Reference" section from the skills doc for a curated overview
+        var overviewSections = new List<SyntaxSection>();
+
+        // 1. Extract the quick reference table
+        var headerPattern = new Regex(@"^## (.+)$", RegexOptions.Multiline);
+        var matches = headerPattern.Matches(content);
+
+        for (var i = 0; i < matches.Count; i++)
+        {
+            var match = matches[i];
+            var title = match.Groups[1].Value.Trim();
+            var startIndex = match.Index;
+            var endIndex = (i + 1 < matches.Count) ? matches[i + 1].Index : content.Length;
+            var sectionContent = content[startIndex..endIndex].Trim();
+
+            if (title.Contains("Quick Reference", StringComparison.OrdinalIgnoreCase) ||
+                title.Contains("Core Syntax", StringComparison.OrdinalIgnoreCase) ||
+                title.Equals("Properties", StringComparison.OrdinalIgnoreCase) ||
+                title.Equals("Indexers", StringComparison.OrdinalIgnoreCase) ||
+                title.Contains("Structure Tags", StringComparison.OrdinalIgnoreCase))
+            {
+                overviewSections.Add(new SyntaxSection
+                {
+                    Title = title,
+                    Content = sectionContent
+                });
+            }
+        }
+
+        // 2. Add a compact syntax cheatsheet as the first section
+        overviewSections.Insert(0, new SyntaxSection
+        {
+            Title = "Calor Language Overview",
+            Content = """
+                ## Calor Language Overview
+
+                Calor is a DSL that compiles to C# on .NET 10. All constructs use section markers (§).
+
+                ### Core Tags
+                ```
+                §M{id:Name}              Module (close: §/M{id})
+                §F{id:name:vis}           Function (close: §/F{id})
+                §B{name:type}             Immutable binding
+                §B{~name:type}            Mutable binding
+                §I{type:name}             Parameter
+                §O{type}                  Return type
+                §R expr                   Return statement
+                §C{obj.Method} §A arg §/C Method call with argument
+                ```
+
+                ### Control Flow
+                ```
+                §IF{id} (cond) ... §EI (cond2) ... §EL ... §/I{id}   If/ElseIf/Else
+                §L{id:var:from:to:step} ... §/L{id}                  For loop
+                §L{id:item:collection} ... §/L{id}                   Foreach loop
+                §WH{id} (cond) ... §/WH{id}                          While loop
+                §W{expr} §K{pattern} result §/W                      Match/Switch
+                ```
+
+                ### Types and Classes
+                ```
+                §CL{id:Name:vis}          Class (close: §/CL{id})
+                §IFACE{id:Name}           Interface (close: §/IFACE{id})
+                §MT{id:name:vis}          Method (close: §/MT{id})
+                §CTOR{id:vis}             Constructor (close: §/CTOR{id})
+                §PROP{id:Name:type:vis}   Property (close: §/PROP{id})
+                §IXER{id:type:vis}        Indexer (close: §/IXER{id})
+                §FLD{type:name:vis}       Field
+                §EXT{BaseClass}           Extends
+                §IMPL{Interface}          Implements
+                §EN{id:Name}              Enum (close: §/EN{id})
+                ```
+
+                ### Properties and Indexers (compact forms)
+                ```
+                §PROP{id:Name:type:vis:get,set}                      Auto-property
+                §IXER{id:type:vis:get,set} (type:param)              Auto-indexer
+                §IXER{id:type:vis:get,set} (type:p1, type:p2)        Multi-param indexer
+                ```
+
+                ### Contracts and Effects
+                ```
+                §Q (expr)                 Precondition (requires)
+                §S (expr)                 Postcondition (ensures)
+                §INV (expr)               Invariant
+                §E{effect1,effect2}       Effect declarations
+                ```
+
+                ### Async, Exceptions, and Resources
+                ```
+                §AF{id:name:vis}          Async function
+                §AMT{id:name:vis}         Async method
+                §AWAIT expr §/AWAIT       Await expression
+                §TR{id} ... §CA{Type:var} ... §FI{} ... §/TR{id}   Try/Catch/Finally
+                §TH expr                  Throw
+                §USE{var}=expr ... §/USE  Using statement
+                §YIELD expr               Yield return
+                §YBRK                     Yield break
+                ```
+
+                ### Lambdas, Delegates, Events
+                ```
+                §LAM{id:param:type} body §/LAM{id}   Lambda expression
+                §DEL{id:Name:vis}                     Delegate type
+                §EVT{id:Name:vis}                     Event
+                §OP{id:operator:vis}                  Operator overload
+                ```
+
+                ### Collections
+                ```
+                §LIST{id:type}            List<T>
+                §DICT{id:ktype:vtype}     Dictionary<K,V>
+                §HSET{id:type}            HashSet<T>
+                §IDX coll index           Element access
+                §PUSH coll item           Add to list/set
+                §PUT dict key value       Add/update dict entry
+                ```
+
+                ### Preprocessor and Interop
+                ```
+                §PP{CONDITION} ... §PPE ... §/PP{CONDITION}   #if/#else/#endif
+                §CSHARP{code}§/CSHARP                         Raw C# passthrough (member-level)
+                §RAW ... §/RAW                                Raw C# block
+                §UNSAFE{id} ... §/UNSAFE{id}                  Unsafe block
+                ```
+
+                ### Typed Literals
+                ```
+                INT:42    STR:"hello"    BOOL:true    FLOAT:3.14    DECIMAL:18.00
+                ```
+
+                ### Visibility: pub, priv, prot, int, protint
+                ### Modifiers: stat, abs, virt, over, seal, req, partial
+
+                **Key rule**: If a C# construct has a Calor tag, use it natively. Only use §CSHARP for constructs without native support.
+
+                Query a specific feature for detailed syntax and examples (e.g., 'async', 'indexers', 'contracts').
+                """
+        });
+
+        // Track telemetry
+        if (CalorTelemetry.IsInitialized)
+        {
+            var matchedNames = string.Join(";", overviewSections.Select(s => s.Title).Take(5));
+            CalorTelemetry.Instance.TrackSyntaxHelpQuery(
+                feature, "overview", overviewSections.Count, matchedNames);
+        }
+
+        var output = new SyntaxHelpOutput
+        {
+            Feature = feature,
+            Sections = overviewSections,
+            AvailableFeatures = FeatureAliases.Keys.OrderBy(k => k).ToList()
+        };
+
+        return McpToolResult.Json(output);
     }
 
     private static string[] GetSearchTerms(string feature)
