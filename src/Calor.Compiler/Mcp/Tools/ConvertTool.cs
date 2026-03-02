@@ -14,6 +14,7 @@ public sealed class ConvertTool : McpToolBase
 
     public override string Description =>
         "Convert C# source code to Calor. Returns generated Calor code and conversion issues. " +
+        "Module name defaults to the C# namespace in the source file. Pass moduleName to override. " +
         "IMPORTANT: If the result contains §CSHARP interop blocks, check calor_syntax_lookup " +
         "or calor_feature_support — many C# constructs (foreach, switch, async, yield, structs, " +
         "events, operators, indexers, preprocessor directives) have native Calor equivalents.";

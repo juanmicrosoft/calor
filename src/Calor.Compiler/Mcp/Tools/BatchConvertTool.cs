@@ -17,6 +17,7 @@ public sealed class BatchConvertTool : McpToolBase
         "Convert an entire C# project to Calor in a single call. " +
         "Discovers .cs files, converts each to Calor, and writes output files. " +
         "Returns per-file results and a summary. " +
+        "Module names are derived from C# namespace declarations. Use moduleNameOverride to force a specific namespace for all files. " +
         "IMPORTANT: If results contain §CSHARP interop blocks, check calor_syntax_lookup " +
         "or calor_feature_support — many C# constructs (foreach, switch, async, yield, structs, " +
         "events, operators, preprocessor directives) have native Calor equivalents.";
@@ -69,6 +70,10 @@ public sealed class BatchConvertTool : McpToolBase
                 "validate": {
                     "type": "boolean",
                     "description": "Validate each converted file by parsing and compiling the generated Calor (default: false). Catches false-positive successes where conversion output doesn't actually compile."
+                },
+                "moduleNameOverride": {
+                    "type": "string",
+                    "description": "Override the module name for all converted files. By default, module names are derived from C# namespace declarations."
                 }
             },
             "required": ["projectPath"]
@@ -97,6 +102,7 @@ public sealed class BatchConvertTool : McpToolBase
         var directoryFilter = GetString(arguments, "directoryFilter");
         var skipConverted = GetBool(arguments, "skipConverted", defaultValue: false);
         var validate = GetBool(arguments, "validate", defaultValue: false);
+        var moduleNameOverride = GetString(arguments, "moduleNameOverride");
 
         try
         {
@@ -108,7 +114,8 @@ public sealed class BatchConvertTool : McpToolBase
                 Offset = offset,
                 DirectoryFilter = directoryFilter,
                 SkipConverted = skipConverted,
-                ValidateOutput = validate
+                ValidateOutput = validate,
+                ModuleNameOverride = moduleNameOverride
             };
 
             var migrator = new ProjectMigrator(options);

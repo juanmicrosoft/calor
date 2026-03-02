@@ -218,6 +218,45 @@ public sealed class SyntaxHelpTool : McpToolBase
                     $"No documentation found for '{feature}'. Available features: {availableFeatures}"));
             }
 
+            // Truncate if total content exceeds budget to prevent token overflow
+            const int maxContentChars = 15_000;
+            var totalChars = sections.Sum(s => s.Content.Length);
+            List<string>? omittedTitles = null;
+
+            if (totalChars > maxContentChars)
+            {
+                var kept = new List<SyntaxSection>();
+                var budget = 0;
+                omittedTitles = new List<string>();
+
+                foreach (var section in sections)
+                {
+                    if (budget + section.Content.Length <= maxContentChars || kept.Count == 0)
+                    {
+                        kept.Add(section);
+                        budget += section.Content.Length;
+                    }
+                    else
+                    {
+                        omittedTitles.Add(section.Title);
+                    }
+                }
+
+                // Add a tip section listing omitted titles
+                if (omittedTitles.Count > 0)
+                {
+                    kept.Add(new SyntaxSection
+                    {
+                        Title = "Truncated — additional sections available",
+                        Content = $"Response truncated ({totalChars} chars). " +
+                                  $"Query these sections individually for full content:\n" +
+                                  string.Join("\n", omittedTitles.Select(t => $"- {t}"))
+                    });
+                }
+
+                sections = kept;
+            }
+
             var output = new SyntaxHelpOutput
             {
                 Feature = feature,

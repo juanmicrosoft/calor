@@ -414,13 +414,15 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 
 **Array Element Access:**
 ```calor
-// Access element at index - use §IDX (NO braces around array name)
+// Access element at index - both forms are valid
 §B{elem} §IDX arr 0                         // arr[0]
 §B{elem} §IDX arr i                         // arr[i]
+§B{elem} §IDX{arr} i                        // arr[i] - braces form (used by converter)
 §B{last} §IDX arr (- (len arr) 1)           // arr[arr.Length - 1] - last element
 
+// NOTE: The converter uses §IDX{arr} with braces for simple references. Both forms compile identically.
+
 // WRONG: These do NOT work
-// §IDX{arr} i      ❌ ERROR - braces cause parsing issues
 // §IDX arr §^ 1    ❌ ERROR - §^ syntax not supported
 // (get arr i)      ❌ ERROR - not valid
 // (at arr i)       ❌ ERROR - not valid
@@ -1410,8 +1412,9 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 // CORRECT: Type with brackets before
 §I{[i32]:items}                 // ✓ Array of i32
 
-// CORRECT: Element access with §IDX (NO braces)
+// CORRECT: Element access with §IDX (both forms valid)
 §B{x} §IDX arr i                // ✓ arr[i]
+§B{x} §IDX{arr} i               // ✓ arr[i] - braces form also valid
 
 // CORRECT: Element assignment with §SETIDX
 §SETIDX{arr} i value            // ✓ arr[i] = value
@@ -1947,6 +1950,7 @@ When converting C# code to Calor, some features have limited or no support. Use 
 | `dynamic` | Partial | Converted to 'any' with warning |
 | `lock` statement | Partial | Body preserved, lock semantics stripped |
 | `checked` / `unchecked` | Partial | Wrapper stripped, body preserved |
+| `??=` null-coalescing assignment | Not Supported | Use `§IF (== x null) §ASSIGN x default` pattern |
 | `postfix operator` | Not Supported | Use as statement or rewrite as x = x + 1 |
 
 ### Fully Supported (previously thought missing)

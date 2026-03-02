@@ -383,6 +383,78 @@ public class SyntaxHelpToolTests
 
     #endregion
 
+    #region Truncation Tests
+
+    [Fact]
+    public async Task ExecuteAsync_Functions_ResponseIsTruncatedUnder15KChars()
+    {
+        // MCP Gap 2: "functions" query previously returned 70K+ chars.
+        // With truncation, the serialized response should stay under the budget.
+        var args = JsonDocument.Parse("""{"feature": "functions"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        // The JSON-serialized output should stay well under 25K chars
+        // (15K content budget + JSON overhead + availableFeatures list + tip section)
+        Assert.True(text.Length < 25_000,
+            $"Expected truncated response under 25K chars, got {text.Length}");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_LargeResult_IncludesOmittedSectionTip()
+    {
+        // Create a custom skill file with many large sections that will trigger truncation
+        var tempFile = Path.GetTempFileName();
+        var originalValue = Environment.GetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar);
+
+        try
+        {
+            // Generate content with 20 sections each ~2K chars, all matching "bigtopic"
+            var content = string.Join("\n", Enumerable.Range(1, 20).Select(i =>
+                $"## BigSection {i}\nThis bigtopic section has bigtopic content.\n{new string('x', 2000)}\n"));
+            File.WriteAllText(tempFile, content);
+
+            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, tempFile);
+            SyntaxHelpTool.ResetCacheForTesting();
+
+            var tool = new SyntaxHelpTool();
+            var args = JsonDocument.Parse("""{"feature": "bigtopic"}""").RootElement;
+
+            var result = await tool.ExecuteAsync(args);
+
+            Assert.False(result.IsError);
+            var text = result.Content[0].Text!;
+            // Should include truncation notice
+            Assert.Contains("Truncated", text);
+            Assert.Contains("additional sections available", text);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, originalValue);
+            SyntaxHelpTool.ResetCacheForTesting();
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SmallResult_IsNotTruncated()
+    {
+        // A small category like "constructors" should NOT be truncated
+        var args = JsonDocument.Parse("""{"feature": "constructors"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.DoesNotContain("Truncated", text);
+        Assert.DoesNotContain("additional sections available", text);
+    }
+
+    #endregion
+
     #region File Resolution Tests
 
     [Fact]
