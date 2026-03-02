@@ -241,6 +241,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var methods = new List<MethodSignatureNode>();
         var properties = new List<PropertyNode>();
+        var indexers = new List<IndexerNode>();
         foreach (var member in node.Members)
         {
             if (member is MethodDeclarationSyntax methodSyntax)
@@ -250,6 +251,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             else if (member is PropertyDeclarationSyntax propertySyntax)
             {
                 properties.Add(ConvertProperty(propertySyntax));
+            }
+            else if (member is IndexerDeclarationSyntax indexerSyntax)
+            {
+                indexers.Add(ConvertIndexer(indexerSyntax));
             }
             else
             {
@@ -270,7 +275,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             methods,
             properties,
             new AttributeCollection(),
-            csharpAttrs);
+            csharpAttrs,
+            indexers: indexers.Count > 0 ? indexers : null);
     }
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
@@ -508,6 +514,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
+        var indexers = new List<IndexerNode>();
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
         var events = new List<EventDefinitionNode>();
@@ -695,7 +702,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             try
             {
-                ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
+                ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads, indexers);
             }
             catch (Exception) when (_context.Mode == ConversionMode.Interop)
             {
@@ -703,6 +710,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     MethodDeclarationSyntax => InteropMemberKind.Method,
                     PropertyDeclarationSyntax => InteropMemberKind.Property,
+                    IndexerDeclarationSyntax => InteropMemberKind.Property,
                     FieldDeclarationSyntax => InteropMemberKind.Field,
                     ConstructorDeclarationSyntax => InteropMemberKind.Constructor,
                     EventFieldDeclarationSyntax => InteropMemberKind.Event,
@@ -736,7 +744,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null,
             nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
             nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
-            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null);
+            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
+            indexers: indexers.Count > 0 ? indexers : null);
     }
 
     private static HashSet<string> CollectExplicitMemberNames(SyntaxList<MemberDeclarationSyntax> members)
@@ -765,7 +774,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<ConstructorNode> constructors,
         List<MethodNode> methods,
         List<EventDefinitionNode> events,
-        List<OperatorOverloadNode> operatorOverloads)
+        List<OperatorOverloadNode> operatorOverloads,
+        List<IndexerNode>? indexers = null)
     {
         switch (member)
         {
@@ -774,6 +784,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 break;
             case PropertyDeclarationSyntax propertySyntax:
                 properties.Add(ConvertProperty(propertySyntax));
+                break;
+            case IndexerDeclarationSyntax indexerSyntax:
+                indexers?.Add(ConvertIndexer(indexerSyntax));
                 break;
             case ConstructorDeclarationSyntax ctorSyntax:
                 constructors.Add(ConvertConstructor(ctorSyntax));
@@ -858,6 +871,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         var operatorOverloads = new List<OperatorOverloadNode>();
+        var indexers = new List<IndexerNode>();
 
         foreach (var member in node.Members)
         {
@@ -868,6 +882,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     break;
                 case PropertyDeclarationSyntax propertySyntax:
                     properties.Add(ConvertProperty(propertySyntax));
+                    break;
+                case IndexerDeclarationSyntax indexerSyntax:
+                    indexers.Add(ConvertIndexer(indexerSyntax));
                     break;
                 case ConstructorDeclarationSyntax ctorSyntax:
                     constructors.Add(ConvertConstructor(ctorSyntax));
@@ -903,7 +920,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             operatorOverloads,
             new AttributeCollection(),
             Array.Empty<CalorAttributeNode>(),
-            visibility: visibility);
+            visibility: visibility,
+            indexers: indexers.Count > 0 ? indexers : null);
     }
 
     private ClassDefinitionNode ConvertStruct(StructDeclarationSyntax node)
@@ -924,6 +942,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
+        var indexers = new List<IndexerNode>();
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
         var operatorOverloads = new List<OperatorOverloadNode>();
@@ -1062,7 +1081,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             try
             {
-                ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
+                ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads, indexers);
             }
             catch (Exception) when (_context.Mode == ConversionMode.Interop)
             {
@@ -1070,6 +1089,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     MethodDeclarationSyntax => InteropMemberKind.Method,
                     PropertyDeclarationSyntax => InteropMemberKind.Property,
+                    IndexerDeclarationSyntax => InteropMemberKind.Property,
                     FieldDeclarationSyntax => InteropMemberKind.Field,
                     ConstructorDeclarationSyntax => InteropMemberKind.Constructor,
                     EventFieldDeclarationSyntax => InteropMemberKind.Event,
@@ -1109,7 +1129,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null,
             nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
             nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
-            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null);
+            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
+            indexers: indexers.Count > 0 ? indexers : null);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)
@@ -1572,6 +1593,124 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             setter,
             initer,
             defaultValue,
+            new AttributeCollection(),
+            csharpAttrs);
+    }
+
+    private IndexerNode ConvertIndexer(IndexerDeclarationSyntax node)
+    {
+        _context.RecordFeatureUsage("indexer");
+
+        var typeName = TypeMapper.CSharpToCalor(node.Type.ToString());
+        var defaultVis = node.Parent is InterfaceDeclarationSyntax ? Visibility.Public : Visibility.Private;
+        var visibility = GetVisibility(node.Modifiers, defaultVis);
+        var csharpAttrs = ConvertAttributes(node.AttributeLists);
+
+        // Convert parameters (indexers use BracketedParameterListSyntax)
+        var parameters = node.ParameterList.Parameters
+            .Select(p =>
+            {
+                var modifier = ParameterModifier.None;
+                if (p.Modifiers.Any(SyntaxKind.RefKeyword)) modifier |= ParameterModifier.Ref;
+                if (p.Modifiers.Any(SyntaxKind.InKeyword)) modifier |= ParameterModifier.In;
+                if (p.Modifiers.Any(SyntaxKind.ParamsKeyword)) modifier |= ParameterModifier.Params;
+                ExpressionNode? defaultValue = null;
+                if (p.Default != null)
+                {
+                    defaultValue = ConvertExpression(p.Default.Value);
+                }
+                var paramAttrs = ConvertAttributes(p.AttributeLists);
+                return new ParameterNode(
+                    GetTextSpan(p),
+                    p.Identifier.ValueText,
+                    TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
+                    modifier,
+                    new AttributeCollection(),
+                    paramAttrs,
+                    defaultValue);
+            })
+            .ToList() as IReadOnlyList<ParameterNode>;
+
+        PropertyAccessorNode? getter = null;
+        PropertyAccessorNode? setter = null;
+        PropertyAccessorNode? initer = null;
+
+        if (node.AccessorList != null)
+        {
+            foreach (var accessor in node.AccessorList.Accessors)
+            {
+                var accessorVisibility = accessor.Modifiers.Any()
+                    ? GetVisibility(accessor.Modifiers)
+                    : visibility;
+                var accessorAttrs = ConvertAttributes(accessor.AttributeLists);
+
+                if (accessor.Keyword.IsKind(SyntaxKind.GetKeyword))
+                {
+                    getter = new PropertyAccessorNode(
+                        GetTextSpan(accessor),
+                        PropertyAccessorNode.AccessorKind.Get,
+                        accessorVisibility,
+                        preconditions: Array.Empty<RequiresNode>(),
+                        body: ConvertAccessorBody(accessor),
+                        new AttributeCollection(),
+                        accessorAttrs);
+                }
+                else if (accessor.Keyword.IsKind(SyntaxKind.SetKeyword))
+                {
+                    setter = new PropertyAccessorNode(
+                        GetTextSpan(accessor),
+                        PropertyAccessorNode.AccessorKind.Set,
+                        accessorVisibility,
+                        preconditions: Array.Empty<RequiresNode>(),
+                        body: ConvertAccessorBody(accessor),
+                        new AttributeCollection(),
+                        accessorAttrs);
+                }
+                else if (accessor.Keyword.IsKind(SyntaxKind.InitKeyword))
+                {
+                    initer = new PropertyAccessorNode(
+                        GetTextSpan(accessor),
+                        PropertyAccessorNode.AccessorKind.Init,
+                        accessorVisibility,
+                        preconditions: Array.Empty<RequiresNode>(),
+                        body: ConvertAccessorBody(accessor),
+                        new AttributeCollection(),
+                        accessorAttrs);
+                }
+            }
+        }
+        else if (node.ExpressionBody != null)
+        {
+            // Expression-bodied indexer (getter only)
+            getter = new PropertyAccessorNode(
+                GetTextSpan(node),
+                PropertyAccessorNode.AccessorKind.Get,
+                visibility,
+                preconditions: Array.Empty<RequiresNode>(),
+                body: new List<StatementNode>
+                {
+                    new ReturnStatementNode(
+                        GetTextSpan(node.ExpressionBody),
+                        ConvertExpression(node.ExpressionBody.Expression))
+                },
+                new AttributeCollection());
+        }
+
+        _context.Stats.PropertiesConverted++;
+        _context.IncrementConverted();
+
+        var indexerId = _context.GenerateId("ix");
+        var modifiers = GetMethodModifiers(node.Modifiers);
+        return new IndexerNode(
+            GetTextSpan(node),
+            indexerId,
+            typeName,
+            visibility,
+            modifiers,
+            parameters,
+            getter,
+            setter,
+            initer,
             new AttributeCollection(),
             csharpAttrs);
     }

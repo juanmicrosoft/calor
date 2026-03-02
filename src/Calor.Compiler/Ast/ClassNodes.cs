@@ -42,6 +42,11 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
     public IReadOnlyList<PropertyNode> Properties { get; }
 
     /// <summary>
+    /// Interface indexers.
+    /// </summary>
+    public IReadOnlyList<IndexerNode> Indexers { get; }
+
+    /// <summary>
     /// Interfaces this interface extends.
     /// </summary>
     public IReadOnlyList<string> BaseInterfaces { get; }
@@ -102,12 +107,28 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<PropertyNode> properties,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : this(span, id, name, baseInterfaces, typeParameters, methods, properties, attributes, csharpAttributes, indexers: null)
+    {
+    }
+
+    public InterfaceDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        IReadOnlyList<string> baseInterfaces,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<MethodSignatureNode> methods,
+        IReadOnlyList<PropertyNode> properties,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        IReadOnlyList<IndexerNode>? indexers = null)
         : base(span, id, name, attributes)
     {
         BaseInterfaces = baseInterfaces ?? throw new ArgumentNullException(nameof(baseInterfaces));
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
         Properties = properties ?? Array.Empty<PropertyNode>();
+        Indexers = indexers ?? Array.Empty<IndexerNode>();
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
@@ -271,6 +292,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// Properties defined in this class.
     /// </summary>
     public IReadOnlyList<PropertyNode> Properties { get; }
+
+    /// <summary>
+    /// Indexers defined in this class.
+    /// </summary>
+    public IReadOnlyList<IndexerNode> Indexers { get; }
 
     /// <summary>
     /// Constructors defined in this class.
@@ -459,7 +485,8 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<MemberPreprocessorBlockNode>? preprocessorBlocks = null,
         IReadOnlyList<ClassDefinitionNode>? nestedClasses = null,
         IReadOnlyList<InterfaceDefinitionNode>? nestedInterfaces = null,
-        IReadOnlyList<EnumDefinitionNode>? nestedEnums = null)
+        IReadOnlyList<EnumDefinitionNode>? nestedEnums = null,
+        IReadOnlyList<IndexerNode>? indexers = null)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
@@ -474,6 +501,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Fields = fields ?? throw new ArgumentNullException(nameof(fields));
         Properties = properties ?? throw new ArgumentNullException(nameof(properties));
+        Indexers = indexers ?? Array.Empty<IndexerNode>();
         Constructors = constructors ?? throw new ArgumentNullException(nameof(constructors));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
         Events = events ?? Array.Empty<EventDefinitionNode>();

@@ -215,12 +215,12 @@ public class CSharpInteropBlockTests
     [Fact]
     public void Conversion_InteropMode_UnsupportedMember_CreatesCSharpInteropBlock()
     {
-        // An indexer is an unsupported member type that hits the default case in ConvertClassMember
+        // A destructor/finalizer is an unsupported member type that hits the default case in ConvertClassMember
         var csharpSource = """
             public class MyClass
             {
                 public int Add(int a, int b) => a + b;
-                public int this[int index] => index;
+                ~MyClass() { }
             }
             """;
 
@@ -238,7 +238,7 @@ public class CSharpInteropBlockTests
         Assert.NotNull(result.CalorSource);
         // The supported method should be converted normally
         Assert.Contains("Add", result.CalorSource!);
-        // The unsupported indexer should be preserved as an interop block
+        // The unsupported destructor should be preserved as an interop block
         Assert.Contains("§CSHARP{", result.CalorSource!);
         Assert.Contains("}§/CSHARP", result.CalorSource!);
         // Stats should track the interop block
@@ -486,14 +486,14 @@ public class CSharpInteropBlockTests
     [Fact]
     public void Conversion_InteropMode_UnsupportedMemberType_FallsBackToInteropBlock()
     {
-        // A class with an indexer (unsupported member type) should produce an interop block
+        // A class with a destructor (unsupported member type) should produce an interop block
         // for that specific member while converting other members normally
         var csharpSource = """
             public class MyList
             {
                 private int[] _items = new int[10];
                 public int Count => _items.Length;
-                public int this[int index] => _items[index];
+                ~MyList() { }
             }
             """;
 
@@ -508,7 +508,7 @@ public class CSharpInteropBlockTests
 
         Assert.True(result.Success);
         Assert.NotNull(result.CalorSource);
-        // The indexer should be preserved as an interop block
+        // The destructor should be preserved as an interop block
         Assert.Contains("§CSHARP{", result.CalorSource!);
         // The Count property should still be converted
         Assert.Contains("Count", result.CalorSource!);

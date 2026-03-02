@@ -361,7 +361,7 @@ public class OptionResultConversionTests
             Mode = ConversionMode.Interop
         });
 
-        // A struct where most members convert fine but one uses an exotic pattern
+        // A struct where most members convert fine, including an indexer (now supported)
         var csharp = """
             public struct MixedStruct
             {
@@ -374,7 +374,7 @@ public class OptionResultConversionTests
                     var x = 1 + 2;
                 }
 
-                // Indexer — not supported as a regular member conversion
+                // Indexer — now fully supported
                 public int this[int index]
                 {
                     get => index;
@@ -395,9 +395,9 @@ public class OptionResultConversionTests
         // The struct itself should NOT be entirely wrapped — it should exist as a class node
         Assert.True(cls.IsStruct, "Should still be a struct, not entirely wrapped in interop");
 
-        // The unsupported indexer should be captured as an interop block
-        Assert.True(cls.InteropBlocks.Count > 0,
-            "The unsupported indexer should produce an interop block, not silently disappear");
+        // The indexer should be converted as a first-class IndexerNode
+        Assert.True(cls.Indexers.Count > 0,
+            "The indexer should be converted as an IndexerNode");
     }
 
     #endregion

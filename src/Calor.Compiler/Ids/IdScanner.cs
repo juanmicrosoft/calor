@@ -87,6 +87,9 @@ public sealed class IdScanner : IAstVisitor
         foreach (var prop in node.Properties)
             prop.Accept(this);
 
+        foreach (var indexer in node.Indexers)
+            indexer.Accept(this);
+
         foreach (var method in node.Methods)
             method.Accept(this);
     }
@@ -103,6 +106,9 @@ public sealed class IdScanner : IAstVisitor
         foreach (var property in node.Properties)
             property.Accept(this);
 
+        foreach (var indexer in node.Indexers)
+            indexer.Accept(this);
+
         foreach (var constructor in node.Constructors)
             constructor.Accept(this);
 
@@ -116,6 +122,11 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(PropertyNode node)
     {
         AddEntry(node.Id, IdKind.Property, node.Name, node.Span);
+    }
+
+    public void Visit(IndexerNode node)
+    {
+        AddEntry(node.Id, IdKind.Indexer, "this[]", node.Span);
     }
 
     public void Visit(ConstructorNode node)

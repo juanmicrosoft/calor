@@ -5061,6 +5061,7 @@ public sealed class Parser
         }
         var methods = new List<MethodSignatureNode>();
         var properties = new List<PropertyNode>();
+        var indexers = new List<IndexerNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndInterface))
         {
@@ -5090,9 +5091,13 @@ public sealed class Parser
             {
                 properties.Add(ParseProperty());
             }
+            else if (Check(TokenKind.Indexer))
+            {
+                indexers.Add(ParseIndexer());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "EXT, METHOD, PROP, or END_IFACE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "EXT, METHOD, PROP, IXER, or END_IFACE", Current.Kind);
                 Advance();
             }
         }
@@ -5107,7 +5112,8 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new InterfaceDefinitionNode(span, id, name, baseInterfaces, typeParameters, methods, properties, attrs, csharpAttrs);
+        return new InterfaceDefinitionNode(span, id, name, baseInterfaces, typeParameters, methods, properties, attrs, csharpAttrs,
+            indexers: indexers.Count > 0 ? indexers : null);
     }
 
     /// <summary>
@@ -5339,6 +5345,7 @@ public sealed class Parser
         }
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
+        var indexers = new List<IndexerNode>();
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
         var events = new List<EventDefinitionNode>();
@@ -5383,6 +5390,10 @@ public sealed class Parser
             {
                 properties.Add(ParseProperty());
             }
+            else if (Check(TokenKind.Indexer))
+            {
+                indexers.Add(ParseIndexer());
+            }
             else if (Check(TokenKind.Constructor))
             {
                 constructors.Add(ParseConstructor());
@@ -5425,7 +5436,7 @@ public sealed class Parser
             }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, or END_CLASS", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, or END_CLASS", Current.Kind);
                 Advance();
             }
         }
@@ -5446,7 +5457,8 @@ public sealed class Parser
             preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null,
             nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
             nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
-            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null);
+            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
+            indexers: indexers.Count > 0 ? indexers : null);
     }
 
     /// <summary>
@@ -6189,6 +6201,141 @@ public sealed class Parser
     }
 
     /// <summary>
+    /// Parses an indexer definition.
+    /// Full form:
+    ///   §IXER{ix1:int:pub}
+    ///     §I{int:index}
+    ///     §GET ... §/GET
+    ///     §SET ... §/SET
+    ///   §/IXER{ix1}
+    ///
+    /// Compact auto-property form:
+    ///   §IXER{ix1:int:pub:get,set} (int:index)
+    /// </summary>
+    private IndexerNode ParseIndexer()
+    {
+        var startToken = Expect(TokenKind.Indexer);
+        var attrs = ParseAttributes();
+        var csharpAttrs = ParseCSharpAttributes();
+
+        // Positional: {id:returnType:visibility[:modifiers[:accessors]]}
+        var id = attrs["_pos0"] ?? "";
+        var typeName = attrs["_pos1"] ?? "object";
+        var visStr = attrs["_pos2"] ?? "public";
+        var modStr = attrs["_pos3"] ?? "";
+        var accessorStr = attrs["_pos4"] ?? "";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "IXER", "id");
+        }
+
+        // If modStr looks like an accessor shorthand and there's no explicit accessorStr,
+        // shift it to accessorStr
+        if (string.IsNullOrEmpty(accessorStr) && IsAccessorShorthand(modStr))
+        {
+            accessorStr = modStr;
+            modStr = "";
+        }
+
+        var visibility = ParseVisibility(visStr);
+        var modifiers = ParseMethodModifiers(modStr);
+
+        // --- Compact accessor shorthand with inline params ---
+        if (IsAccessorShorthand(accessorStr))
+        {
+            var (getter, setter, initer) = ParseAccessorShorthand(accessorStr, startToken.Span, visibility);
+
+            // Parse inline parameters: (type:name, type:name)
+            var parameters = new List<ParameterNode>();
+            if (Check(TokenKind.OpenParen))
+            {
+                Advance(); // consume (
+                while (!IsAtEnd && !Check(TokenKind.CloseParen))
+                {
+                    if (parameters.Count > 0 && Check(TokenKind.Comma))
+                    {
+                        Advance(); // consume ,
+                    }
+                    // Parse type:name pair with ExpandType for consistent type names
+                    var paramToken = Current;
+                    var paramText = paramToken.Text;
+                    Advance();
+                    // Expect colon separator
+                    if (Check(TokenKind.Colon))
+                    {
+                        Advance(); // consume :
+                        var paramNameToken = Current;
+                        Advance();
+                        parameters.Add(new ParameterNode(
+                            paramToken.Span.Union(paramNameToken.Span),
+                            paramNameToken.Text,
+                            AttributeHelper.ExpandType(paramText),
+                            new AttributeCollection()));
+                    }
+                    else
+                    {
+                        // Just a type, no name
+                        parameters.Add(new ParameterNode(
+                            paramToken.Span,
+                            "value",
+                            AttributeHelper.ExpandType(paramText),
+                            new AttributeCollection()));
+                    }
+                }
+                if (Check(TokenKind.CloseParen))
+                    Advance(); // consume )
+            }
+
+            return new IndexerNode(startToken.Span, id, typeName, visibility, modifiers, parameters,
+                getter, setter, initer, attrs, csharpAttrs);
+        }
+
+        // --- Full form with block parameters and accessors ---
+        var parameters2 = new List<ParameterNode>();
+        PropertyAccessorNode? getter2 = null;
+        PropertyAccessorNode? setter2 = null;
+        PropertyAccessorNode? initer2 = null;
+
+        while (!IsAtEnd && !Check(TokenKind.EndIndexer))
+        {
+            if (Check(TokenKind.In))
+            {
+                parameters2.Add(ParseParameter());
+            }
+            else if (Check(TokenKind.Get))
+            {
+                getter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Get);
+            }
+            else if (Check(TokenKind.Set))
+            {
+                setter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Set);
+            }
+            else if (Check(TokenKind.Init))
+            {
+                initer2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Init);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndIndexer);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (ShouldReportMismatchedId(endId, id, endToken))
+        {
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IXER", id, "END_IXER", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new IndexerNode(span, id, typeName, visibility, modifiers, parameters2,
+            getter2, setter2, initer2, attrs, csharpAttrs);
+    }
+
+    /// <summary>
     /// Parses a property accessor.
     /// §GET
     /// §SET[pri]
@@ -6224,11 +6371,11 @@ public sealed class Parser
             _ => TokenKind.EndProperty // Init doesn't have its own end token
         };
 
-        // Parse optional preconditions and body (for non-auto properties)
+        // Parse optional preconditions and body (for non-auto properties/indexers)
         // Also stop at Equals for property default values, next accessor, or end tokens
         while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
-               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.Equals) &&
-               !Check(TokenKind.EndGet) && !Check(TokenKind.EndSet))
+               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.EndIndexer) &&
+               !Check(TokenKind.Equals) && !Check(TokenKind.EndGet) && !Check(TokenKind.EndSet))
         {
             if (Check(TokenKind.Requires))
             {
@@ -6956,12 +7103,15 @@ public sealed class Parser
         List<ConstructorNode> constructors,
         List<MethodNode> methods,
         List<EventDefinitionNode> events,
-        List<OperatorOverloadNode> operatorOverloads)
+        List<OperatorOverloadNode> operatorOverloads,
+        List<IndexerNode>? indexers = null)
     {
         if (Check(TokenKind.FieldDef))
             fields.Add(ParseClassField());
         else if (Check(TokenKind.Property))
             properties.Add(ParseProperty());
+        else if (Check(TokenKind.Indexer))
+            indexers?.Add(ParseIndexer());
         else if (Check(TokenKind.Constructor))
             constructors.Add(ParseConstructor());
         else if (Check(TokenKind.OperatorOverload))
@@ -6974,7 +7124,7 @@ public sealed class Parser
             events.Add(ParseEventDefinition());
         else
         {
-            _diagnostics.ReportUnexpectedToken(Current.Span, "FLD, PROP, CTOR, OP, METHOD, AMT, EVT, PPE, or END_PP", Current.Kind);
+            _diagnostics.ReportUnexpectedToken(Current.Span, "FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, PPE, or END_PP", Current.Kind);
             Advance();
         }
     }

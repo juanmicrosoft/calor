@@ -204,6 +204,7 @@ public sealed class MemberPreprocessorBlockNode : AstNode
     public string Condition { get; }
     public IReadOnlyList<ClassFieldNode> Fields { get; }
     public IReadOnlyList<PropertyNode> Properties { get; }
+    public IReadOnlyList<IndexerNode> Indexers { get; }
     public IReadOnlyList<ConstructorNode> Constructors { get; }
     public IReadOnlyList<MethodNode> Methods { get; }
     public IReadOnlyList<EventDefinitionNode> Events { get; }
@@ -219,12 +220,14 @@ public sealed class MemberPreprocessorBlockNode : AstNode
         IReadOnlyList<MethodNode> methods,
         IReadOnlyList<EventDefinitionNode> events,
         IReadOnlyList<OperatorOverloadNode> operatorOverloads,
-        MemberPreprocessorBlockNode? elseBranch = null)
+        MemberPreprocessorBlockNode? elseBranch = null,
+        IReadOnlyList<IndexerNode>? indexers = null)
         : base(span)
     {
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
         Fields = fields ?? Array.Empty<ClassFieldNode>();
         Properties = properties ?? Array.Empty<PropertyNode>();
+        Indexers = indexers ?? Array.Empty<IndexerNode>();
         Constructors = constructors ?? Array.Empty<ConstructorNode>();
         Methods = methods ?? Array.Empty<MethodNode>();
         Events = events ?? Array.Empty<EventDefinitionNode>();

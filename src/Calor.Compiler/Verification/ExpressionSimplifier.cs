@@ -1307,6 +1307,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(ClassFieldNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(MethodNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(PropertyNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(IndexerNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(PropertyAccessorNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ConstructorNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(OperatorOverloadNode node) => throw new InvalidOperationException();

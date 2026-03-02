@@ -110,8 +110,9 @@ public interface IAstVisitor
     void Visit(ThisExpressionNode node);
     void Visit(BaseExpressionNode node);
     void Visit(TupleLiteralNode node);
-    // Phase 9: Properties and Constructors
+    // Phase 9: Properties, Indexers, and Constructors
     void Visit(PropertyNode node);
+    void Visit(IndexerNode node);
     void Visit(PropertyAccessorNode node);
     void Visit(ConstructorNode node);
     void Visit(OperatorOverloadNode node);
@@ -329,8 +330,9 @@ public interface IAstVisitor<T>
     T Visit(ThisExpressionNode node);
     T Visit(BaseExpressionNode node);
     T Visit(TupleLiteralNode node);
-    // Phase 9: Properties and Constructors
+    // Phase 9: Properties, Indexers, and Constructors
     T Visit(PropertyNode node);
+    T Visit(IndexerNode node);
     T Visit(PropertyAccessorNode node);
     T Visit(ConstructorNode node);
     T Visit(OperatorOverloadNode node);
