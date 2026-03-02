@@ -4247,6 +4247,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         AppendLine(isFirst ? $"#if {node.Condition}" : $"#elif {node.Condition}");
 
+        foreach (var u in node.Usings)
+            AppendLine(Visit(u));
         foreach (var cls in node.Classes)
         {
             Visit(cls);
@@ -4278,6 +4280,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             else
             {
                 AppendLine("#else");
+                foreach (var u in node.ElseBranch.Usings)
+                    AppendLine(Visit(u));
                 foreach (var cls in node.ElseBranch.Classes)
                 {
                     Visit(cls);
@@ -4553,6 +4557,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(UnsafeBlockNode node)
     {
         AppendLine("unsafe");
+        AppendLine("{");
+        Indent();
+        foreach (var stmt in node.Body)
+        {
+            var stmtCode = stmt.Accept(this);
+            AppendLine(stmtCode);
+        }
+        Dedent();
+        AppendLine("}");
+        return "";
+    }
+
+    public string Visit(SyncBlockNode node)
+    {
+        var lockExpr = node.LockExpression.Accept(this);
+        AppendLine($"lock ({lockExpr})");
         AppendLine("{");
         Indent();
         foreach (var stmt in node.Body)

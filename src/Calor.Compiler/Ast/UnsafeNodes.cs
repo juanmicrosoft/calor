@@ -145,3 +145,30 @@ public sealed class SizeOfNode : ExpressionNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents a lock/synchronization block.
+/// §SYNC{id} (expr) ... §/SYNC{id}
+/// Compiles to: lock (expr) { body }
+/// </summary>
+public sealed class SyncBlockNode : StatementNode
+{
+    public string Id { get; }
+    public ExpressionNode LockExpression { get; }
+    public IReadOnlyList<StatementNode> Body { get; }
+
+    public SyncBlockNode(
+        TextSpan span,
+        string id,
+        ExpressionNode lockExpression,
+        IReadOnlyList<StatementNode> body)
+        : base(span)
+    {
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LockExpression = lockExpression ?? throw new ArgumentNullException(nameof(lockExpression));
+        Body = body ?? throw new ArgumentNullException(nameof(body));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

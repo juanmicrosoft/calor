@@ -316,6 +316,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(CSharpInteropBlockNode node) { }
     public void Visit(StackAllocNode node) { }
     public void Visit(UnsafeBlockNode node) { }
+    public void Visit(SyncBlockNode node) { }
     public void Visit(FixedStatementNode node) { }
     public void Visit(AddressOfNode node) { }
     public void Visit(PointerDereferenceNode node) { }

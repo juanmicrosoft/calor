@@ -149,6 +149,7 @@ public sealed class SyntaxHelpTool : McpToolBase
         ["indexers"] = ["indexer", "§IXER{", "this[]", "this[int", "this[string"],
         ["yield"] = ["yield", "iterator", "IEnumerable"],
         ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
+        ["synchronization"] = ["lock", "sync", "§SYNC", "monitor", "thread safety"],
         ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues"],
         ["overview"] = ["overview", "all", "summary", "syntax", "reference", "cheatsheet", "cheat sheet"],
     };

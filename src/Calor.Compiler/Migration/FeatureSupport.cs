@@ -525,9 +525,8 @@ public static class FeatureSupport
         ["lock-statement"] = new FeatureInfo
         {
             Name = "lock-statement",
-            Support = SupportLevel.Partial,
-            Description = "Body preserved, lock semantics stripped with comment",
-            Workaround = "Use explicit Monitor.Enter/Exit or other synchronization primitives"
+            Support = SupportLevel.Full,
+            Description = "Lock statements are converted to §SYNC blocks with full semantics"
         },
         ["await-foreach"] = new FeatureInfo
         {
@@ -776,6 +775,39 @@ public static class FeatureSupport
             Name = "index-bounds",
             Support = SupportLevel.Full,
             Description = "Index bounds obligations verify array/list accesses are within bounds using Z3"
+        },
+
+        // Newtonsoft.Json gap features
+        ["notnull-constraint"] = new FeatureInfo
+        {
+            Name = "notnull-constraint",
+            Support = SupportLevel.Full,
+            Description = "notnull type constraint supported via TypeConstraintKind.NotNull"
+        },
+        ["explicit-interface"] = new FeatureInfo
+        {
+            Name = "explicit-interface",
+            Support = SupportLevel.Full,
+            Description = "Explicit interface implementations preserved as IInterface.MethodName"
+        },
+        ["verbatim-identifier"] = new FeatureInfo
+        {
+            Name = "verbatim-identifier",
+            Support = SupportLevel.Full,
+            Description = "C# @keyword identifiers mapped to backtick syntax in Calor"
+        },
+        ["pragma"] = new FeatureInfo
+        {
+            Name = "pragma",
+            Support = SupportLevel.NotSupported,
+            Description = "#pragma directives have no Calor equivalent; cosmetic only",
+            Workaround = "Remove #pragma directives; they are cosmetic and do not affect semantics"
+        },
+        ["conditional-using"] = new FeatureInfo
+        {
+            Name = "conditional-using",
+            Support = SupportLevel.Full,
+            Description = "Using directives inside #if blocks supported via §PP wrapping §U"
         },
     };
 

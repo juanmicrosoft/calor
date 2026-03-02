@@ -236,7 +236,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (p.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
             if (p.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
             var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-            return $"{typeName}:{p.Name}{modStr}";
+            return $"{typeName}:{EscapeCalorIdentifier(p.Name)}{modStr}";
         }));
     }
 
@@ -430,7 +430,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsVolatile) modifiers.Add("volatile");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
-        AppendLine($"§FLD{{{typeName}:{node.Name}:{visibility}{modStr}}}{attrs}{defaultVal}");
+        AppendLine($"§FLD{{{typeName}:{EscapeCalorIdentifier(node.Name)}:{visibility}{modStr}}}{attrs}{defaultVal}");
 
         return "";
     }
@@ -466,12 +466,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 accessors.Add("init");
             var accessorStr = string.Join(",", accessors);
             var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
-            AppendLine($"§PROP{{{node.Id}:{node.Name}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{defaultVal}");
+            AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{defaultVal}");
             return "";
         }
 
         // Full property syntax with body and closing tag
-        AppendLine($"§PROP{{{node.Id}:{node.Name}:{typeName}:{visibility}{modStr}}}{attrs}");
+        AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}}}{attrs}");
         Indent();
 
         if (node.Getter != null) Visit(node.Getter);
@@ -709,11 +709,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}" : "";
-            AppendLine($"§{methodTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}{modStr}}}{attrs}{inlineParams}{inlineReturn}");
+            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{methodTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}{modStr}}}{attrs}");
+            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}");
         }
         Indent();
 
@@ -772,11 +772,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}" : "";
-            AppendLine($"§{funcTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}}}{inlineParams}{inlineReturn}");
+            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}}}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{funcTag}{{{node.Id}:{node.Name}{typeParams}:{visibility}}}");
+            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}}}");
         }
         Indent();
 
@@ -827,7 +827,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
-        var result = $"§I{{{typeName}:{node.Name}{modStr}}}{attrs}";
+        var result = $"§I{{{typeName}:{EscapeCalorIdentifier(node.Name)}{modStr}}}{attrs}";
         if (node.InlineRefinement != null)
         {
             var predicate = node.InlineRefinement.Predicate.Accept(this);
@@ -997,13 +997,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             // Mutable: {~name} or {~name:type}
             var typePostfix = node.TypeName != null ? $":{TypeMapper.CSharpToCalor(node.TypeName)}" : "";
-            AppendLine($"§B{{~{node.Name}{typePostfix}}}{initPart}");
+            AppendLine($"§B{{~{EscapeCalorIdentifier(node.Name)}{typePostfix}}}{initPart}");
         }
         else
         {
             // Immutable: {name} or {type:name}
             var typePrefix = node.TypeName != null ? $"{TypeMapper.CSharpToCalor(node.TypeName)}:" : "";
-            AppendLine($"§B{{{typePrefix}{node.Name}}}{initPart}");
+            AppendLine($"§B{{{typePrefix}{EscapeCalorIdentifier(node.Name)}}}{initPart}");
         }
         return "";
     }
@@ -1610,7 +1610,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
-        return node.Name;
+        return EscapeCalorIdentifier(node.Name);
     }
 
     public string Visit(BinaryOperationNode node)
@@ -2445,6 +2445,44 @@ public sealed class CalorEmitter : IAstVisitor<string>
         };
     }
 
+    /// <summary>
+    /// C# reserved words that require backtick escaping when used as identifiers in Calor.
+    /// Matches the set in CSharpEmitter.SanitizeIdentifier (which adds @ prefix for C# output).
+    /// </summary>
+    private static readonly HashSet<string> CSharpReservedWords = new(StringComparer.Ordinal)
+    {
+        "abstract", "as", "bool", "break",
+        "case", "catch", "checked",
+        "class", "const", "continue", "default",
+        "delegate", "do", "double", "else", "enum",
+        "event", "explicit", "extern", "finally", "fixed",
+        "float", "for", "foreach", "goto", "if",
+        "implicit", "in", "int", "interface", "internal",
+        "is", "lock", "namespace", "new",
+        "operator", "out", "override", "params",
+        "private", "protected", "public", "readonly", "ref",
+        "return", "sealed", "sizeof",
+        "stackalloc", "static", "string", "struct", "switch",
+        "throw", "try", "typeof",
+        "unchecked", "unsafe", "using", "virtual",
+        "void", "volatile", "while",
+        // Contextual keywords that conflict when used as identifiers
+        "var", "dynamic", "yield", "async", "await",
+        "nameof", "when"
+    };
+
+    /// <summary>
+    /// Wraps a name in backticks if it's a C# reserved word.
+    /// This is the inverse of CSharpEmitter.SanitizeIdentifier which adds @ prefix.
+    /// Handles both bare names ("class") and @-prefixed names ("@class") from Roslyn.
+    /// </summary>
+    private static string EscapeCalorIdentifier(string name)
+    {
+        // Strip @ prefix if present (Roslyn's Identifier.Text includes it for verbatim identifiers)
+        var bareName = name.StartsWith('@') ? name[1..] : name;
+        return CSharpReservedWords.Contains(bareName) ? $"`{bareName}`" : name;
+    }
+
     private void EmitEffects(EffectsNode? effects)
     {
         if (effects == null || effects.Effects.Count == 0)
@@ -2789,6 +2827,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private void EmitTypePreprocessorTypes(TypePreprocessorBlockNode node)
     {
+        foreach (var u in node.Usings) Visit(u);
         foreach (var cls in node.Classes) { Visit(cls); AppendLine(); }
         foreach (var iface in node.Interfaces) { Visit(iface); AppendLine(); }
         foreach (var en in node.Enums) { Visit(en); AppendLine(); }
@@ -2825,6 +2864,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
             stmt.Accept(this);
         Dedent();
         AppendLine($"§/UNSAFE{{{node.Id}}}");
+        return "";
+    }
+
+    public string Visit(SyncBlockNode node)
+    {
+        var lockExpr = node.LockExpression.Accept(this);
+        AppendLine($"§SYNC{{{node.Id}}} ({lockExpr})");
+        Indent();
+        foreach (var stmt in node.Body)
+            stmt.Accept(this);
+        Dedent();
+        AppendLine($"§/SYNC{{{node.Id}}}");
         return "";
     }
 

@@ -1057,6 +1057,11 @@ public sealed class Parser
         {
             return ParsePreprocessorDirective();
         }
+        // Synchronization
+        else if (Check(TokenKind.SyncBlock))
+        {
+            return ParseSyncBlock();
+        }
         // Unsafe/Low-Level statements
         else if (Check(TokenKind.Unsafe))
         {
@@ -7063,6 +7068,7 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Preprocessor);
         var condition = startToken.Value as string ?? "";
 
+        var usings = new List<UsingDirectiveNode>();
         var classes = new List<ClassDefinitionNode>();
         var interfaces = new List<InterfaceDefinitionNode>();
         var enums = new List<EnumDefinitionNode>();
@@ -7071,7 +7077,7 @@ public sealed class Parser
         // Parse type declarations until §PPE or §/PP
         while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
         {
-            ParseTypeInPreprocessorBlock(classes, interfaces, enums, delegates);
+            ParseTypeInPreprocessorBlock(classes, interfaces, enums, delegates, usings);
         }
 
         TypePreprocessorBlockNode? elseBranch = null;
@@ -7083,6 +7089,7 @@ public sealed class Parser
             }
             else
             {
+                var elseUsings = new List<UsingDirectiveNode>();
                 var elseClasses = new List<ClassDefinitionNode>();
                 var elseInterfaces = new List<InterfaceDefinitionNode>();
                 var elseEnums = new List<EnumDefinitionNode>();
@@ -7090,11 +7097,11 @@ public sealed class Parser
 
                 while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
                 {
-                    ParseTypeInPreprocessorBlock(elseClasses, elseInterfaces, elseEnums, elseDelegates);
+                    ParseTypeInPreprocessorBlock(elseClasses, elseInterfaces, elseEnums, elseDelegates, elseUsings);
                 }
 
                 elseBranch = new TypePreprocessorBlockNode(startToken.Span, "",
-                    elseClasses, elseInterfaces, elseEnums, elseDelegates);
+                    elseClasses, elseInterfaces, elseEnums, elseDelegates, usings: elseUsings);
             }
         }
 
@@ -7104,16 +7111,21 @@ public sealed class Parser
         }
 
         return new TypePreprocessorBlockNode(startToken.Span, condition,
-            classes, interfaces, enums, delegates, elseBranch);
+            classes, interfaces, enums, delegates, elseBranch, usings);
     }
 
     private void ParseTypeInPreprocessorBlock(
         List<ClassDefinitionNode> classes,
         List<InterfaceDefinitionNode> interfaces,
         List<EnumDefinitionNode> enums,
-        List<DelegateDefinitionNode> delegates)
+        List<DelegateDefinitionNode> delegates,
+        List<UsingDirectiveNode>? usings = null)
     {
-        if (Check(TokenKind.Class))
+        if (usings != null && Check(TokenKind.Using))
+        {
+            usings.Add(ParseUsingDirective());
+        }
+        else if (Check(TokenKind.Class))
         {
             classes.Add(ParseClassDefinition());
         }
@@ -7131,7 +7143,7 @@ public sealed class Parser
         }
         else
         {
-            _diagnostics.ReportUnexpectedToken(Current.Span, "CLASS, IFACE, EN, DEL, PPE, or END_PP", Current.Kind);
+            _diagnostics.ReportUnexpectedToken(Current.Span, "U, CLASS, IFACE, EN, DEL, PPE, or END_PP", Current.Kind);
             Advance();
         }
     }
@@ -9329,6 +9341,35 @@ public sealed class Parser
             indices.Add(ParseExpression());
         }
         return new MultiDimArrayAccessNode(startToken.Span, array, indices);
+    }
+
+    /// <summary>
+    /// Parses §SYNC{id} (expr) ... §/SYNC{id}
+    /// </summary>
+    private SyncBlockNode ParseSyncBlock()
+    {
+        var startToken = Expect(TokenKind.SyncBlock);
+        var attrs = ParseAttributes();
+        var id = attrs["_pos0"] ?? "_sync";
+
+        // Parse lock expression in parentheses
+        Expect(TokenKind.OpenParen);
+        var lockExpr = ParseExpression();
+        Expect(TokenKind.CloseParen);
+
+        var body = new List<StatementNode>();
+        while (!IsAtEnd && !Check(TokenKind.EndSyncBlock))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null) body.Add(stmt);
+        }
+        if (Check(TokenKind.EndSyncBlock))
+        {
+            Advance();
+            ParseAttributes(); // consume optional {id} on closing tag
+        }
+
+        return new SyncBlockNode(startToken.Span, id, lockExpr, body);
     }
 
     /// <summary>

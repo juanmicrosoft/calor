@@ -1156,7 +1156,7 @@ public class Test
     #region Fix: Lock/Checked/For body ordering
 
     [Fact]
-    public void Converter_LockStatement_CommentBeforeBody()
+    public void Converter_LockStatement_SyncBlockWrapsBody()
     {
         var csharp = @"
 public class Test
@@ -1172,11 +1172,13 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        // The lock comment should appear before the body statement
-        var commentIdx = calor.IndexOf("lock(");
-        var bindIdx = calor.IndexOf("§B{", commentIdx > 0 ? commentIdx : 0);
-        Assert.True(commentIdx >= 0, "Lock comment not found");
-        Assert.True(bindIdx > commentIdx, "Lock comment should appear before body statements");
+        // Lock is now converted to §SYNC block with body inside
+        var syncIdx = calor.IndexOf("§SYNC{");
+        var bindIdx = calor.IndexOf("§B{", syncIdx > 0 ? syncIdx : 0);
+        var endSyncIdx = calor.IndexOf("§/SYNC{", bindIdx > 0 ? bindIdx : 0);
+        Assert.True(syncIdx >= 0, "§SYNC block not found");
+        Assert.True(bindIdx > syncIdx, "Body statement should appear inside §SYNC block");
+        Assert.True(endSyncIdx > bindIdx, "§/SYNC should close after body statements");
     }
 
     [Fact]

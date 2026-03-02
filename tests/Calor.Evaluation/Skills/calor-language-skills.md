@@ -1948,10 +1948,12 @@ When converting C# code to Calor, some features have limited or no support. Use 
 | `UTF-8 string literal` | Not Supported | Use Encoding.UTF8.GetBytes() |
 | `ref` / `out` parameter | Partial | Kept as-is with warning; consider tuples |
 | `dynamic` | Partial | Converted to 'any' with warning |
-| `lock` statement | Partial | Body preserved, lock semantics stripped |
+| `lock` statement | Full | Converted to `§SYNC` blocks with full semantics |
 | `checked` / `unchecked` | Partial | Wrapper stripped, body preserved |
 | `??=` null-coalescing assignment | Not Supported | Use `§IF (== x null) §ASSIGN x default` pattern |
 | `postfix operator` | Not Supported | Use as statement or rewrite as x = x + 1 |
+| `#pragma` | Not Supported | Cosmetic directive; no Calor equivalent |
+| `goto case` | Not Supported | Refactor to separate methods or if-else chains |
 
 ### Fully Supported (previously thought missing)
 
@@ -1966,3 +1968,37 @@ These features are fully supported in the converter:
 - **Index from end**: `§^` / `^n`
 - **with-expression**: `§WITH` blocks for record copying
 - **Preprocessor directives**: `§PP` blocks for `#if`/`#else`/`#endif`
+- **notnull constraint**: Supported via `TypeConstraintKind.NotNull`
+- **Explicit interface implementations**: Preserved as `IInterface.MethodName`
+- **yield return/break**: `§YIELD` and `§YBRK` syntax
+- **Extension methods**: `this` parameter modifier preserved
+- **§NEW inside §C args**: Object creation hoisted correctly in call arguments
+- **out var declarations**: Pre-declared as bindings with `out-var` support
+- **Verbatim identifiers**: C# `@keyword` mapped to backtick syntax in Calor
+- **Conditional usings**: `§U` directives inside `§PP` blocks
+
+## Synchronization (lock)
+
+Lock statements are converted to `§SYNC` blocks with full round-trip semantics.
+
+### Syntax
+```calor
+§SYNC{id} (lockExpression)
+  ... body statements ...
+§/SYNC{id}
+```
+
+### Example
+```calor
+§SYNC{s1} (_syncRoot)
+  §B{~count:i32} = (+ count INT:1)
+§/SYNC{s1}
+```
+
+Compiles to:
+```csharp
+lock (_syncRoot)
+{
+    count = count + 1;
+}
+```
