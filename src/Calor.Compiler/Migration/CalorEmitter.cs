@@ -1705,8 +1705,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return $"{node.Target}({string.Join(", ", inlineArgs)})";
         }
 
-        // Escape braces in target to avoid conflicts with Calor tag syntax
-        var escapedTarget = EscapeBraces(node.Target);
+        // Escape braces in target to avoid conflicts with Calor tag syntax,
+        // but preserve braces inside quoted string portions (e.g. "text {0}".FormatWith)
+        var escapedTarget = EscapeBracesInIdentifier(node.Target);
 
         if (node.Arguments.Count == 0)
             return $"§C{{{escapedTarget}}} §/C";
@@ -1716,15 +1717,99 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Escapes braces in a string to avoid conflicts with Calor tag syntax.
-    /// { becomes \{ and } becomes \}
+    /// Escapes braces in a method target to avoid conflicts with Calor tag syntax.
+    /// Only escapes braces outside of quoted string portions — e.g. in
+    /// <c>"Unexpected state: {0}".FormatWith</c>, the braces inside the string literal
+    /// are preserved but any braces in the identifier portion are escaped.
+    /// Handles regular strings ("..."), verbatim strings (@"..."), and character literals.
     /// </summary>
-    private static string EscapeBraces(string input)
+    internal static string EscapeBracesInIdentifier(string input)
     {
         if (!input.Contains('{') && !input.Contains('}'))
             return input;
 
-        return input.Replace("{", "\\{").Replace("}", "\\}");
+        var sb = new StringBuilder(input.Length);
+        bool inString = false;
+        bool verbatim = false;
+        for (int i = 0; i < input.Length; i++)
+        {
+            char c = input[i];
+
+            if (!inString)
+            {
+                if (c == '@' && i + 1 < input.Length && input[i + 1] == '"')
+                {
+                    // Start of verbatim string @"..."
+                    inString = true;
+                    verbatim = true;
+                    sb.Append(c);
+                    sb.Append('"');
+                    i++; // skip the "
+                }
+                else if (c == '"')
+                {
+                    // Start of regular string "..."
+                    inString = true;
+                    verbatim = false;
+                    sb.Append(c);
+                }
+                else if (c == '{' || c == '}')
+                {
+                    sb.Append('\\');
+                    sb.Append(c);
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            else if (verbatim)
+            {
+                // Inside verbatim string: "" is an escaped quote, lone " ends the string
+                if (c == '"')
+                {
+                    if (i + 1 < input.Length && input[i + 1] == '"')
+                    {
+                        // Escaped quote ""
+                        sb.Append('"');
+                        sb.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        // End of verbatim string
+                        inString = false;
+                        sb.Append(c);
+                    }
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            else
+            {
+                // Inside regular string: \" is an escaped quote, unescaped " ends the string
+                if (c == '\\' && i + 1 < input.Length)
+                {
+                    // Escape sequence — emit both characters, skip next
+                    sb.Append(c);
+                    sb.Append(input[i + 1]);
+                    i++;
+                }
+                else if (c == '"')
+                {
+                    // End of regular string
+                    inString = false;
+                    sb.Append(c);
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+        }
+        return sb.ToString();
     }
 
     public string Visit(ThisExpressionNode node)

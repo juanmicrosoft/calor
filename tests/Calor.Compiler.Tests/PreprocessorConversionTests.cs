@@ -525,6 +525,80 @@ public class NumberToWordsExtension
         Assert.Contains("Format", csharpOutput);
     }
 
+    [Fact(Timeout = 10_000)]
+    public void Converter_AdjacentIfBlocks_DoesNotHang()
+    {
+        // Adjacent #if blocks where the second starts immediately after the first ends.
+        // This previously caused an infinite loop when endIdx == i in ExtractPreprocessorRegions.
+        var csharp = @"
+public class Test
+{
+    public void M()
+    {
+#if DEBUG
+        var x = 1;
+#endif
+#if TRACE
+        var y = 2;
+#endif
+    }
+}";
+        // The primary assertion: conversion completes without hanging (10s timeout)
+        var calor = ConvertToCalor(csharp);
+        // At least the first #if should be captured
+        Assert.Contains("§PP{DEBUG}", calor);
+    }
+
+    [Fact(Timeout = 10_000)]
+    public void Converter_AdjacentMemberLevelIfBlocks_DoesNotHang()
+    {
+        // Adjacent #if blocks at member level — previously could stall
+        // in ExtractMemberPreprocessorRegions.
+        var csharp = @"
+public class Test
+{
+#if DEBUG
+    public void DebugOnly() { }
+#endif
+#if RELEASE
+    public void ReleaseOnly() { }
+#endif
+    public void Always() { }
+}";
+        // The primary assertion: conversion completes without hanging (10s timeout)
+        var calor = ConvertToCalor(csharp);
+        Assert.Contains("§PP{DEBUG}", calor);
+        Assert.Contains("Always", calor);
+    }
+
+    [Fact(Timeout = 10_000)]
+    public void Converter_IfInsideSwitchCase_DoesNotHang()
+    {
+        // #if inside a switch/case — a pattern found in Newtonsoft.Json that caused hangs.
+        // The switch itself may be emitted as a CSharpInteropBlock, but conversion must complete.
+        var csharp = @"
+public class Test
+{
+    public int M(int x)
+    {
+        switch (x)
+        {
+            case 1:
+#if DEBUG
+                return 10;
+#else
+                return 11;
+#endif
+            default:
+                return 0;
+        }
+    }
+}";
+        // The primary assertion: conversion completes without hanging (10s timeout)
+        var calor = ConvertToCalor(csharp);
+        Assert.NotNull(calor);
+    }
+
     [Fact]
     public void Converter_NestedMemberAndStatementPP_BothLevelsCompose()
     {

@@ -2096,7 +2096,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 Branches = stmtBranches
             });
 
-            i = endIdx - 1;
+            // Advance past the region. Use Math.Max to prevent infinite loops
+            // when endIdx == i (zero-width regions from adjacent #if blocks).
+            i = Math.Max(i, endIdx - 1);
         }
 
         // Check close brace for #if with no parsed statements (everything disabled)
