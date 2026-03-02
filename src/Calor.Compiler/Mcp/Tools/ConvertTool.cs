@@ -16,7 +16,7 @@ public sealed class ConvertTool : McpToolBase
         "Convert C# source code to Calor. Returns generated Calor code and conversion issues. " +
         "IMPORTANT: If the result contains §CSHARP interop blocks, check calor_syntax_lookup " +
         "or calor_feature_support — many C# constructs (foreach, switch, async, yield, structs, " +
-        "events, operators, preprocessor directives) have native Calor equivalents.";
+        "events, operators, indexers, preprocessor directives) have native Calor equivalents.";
 
     protected override string GetInputSchemaJson() => """
         {
