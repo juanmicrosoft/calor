@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-03-02
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Fixed
+- **String interpolation with embedded calls** — CalorEmitter now uses function-call syntax inside `${...}` instead of `§C` tags which were treated as literal text by the parser; fixes 29-file Humanizer conversion blocker
+- **OperatorOverloadNode parameter emission** — CSharpEmitter now uses `Visit(p)` for operator overload parameters, preserving ref/out/in/params modifiers
+- **Interpolation-safe expression emission** — `NewExpression`, `AwaitExpression`, and `ArrayAccess` now emit C#-style syntax inside `${...}` interpolation contexts instead of `§`-prefixed section markers
+
+### Added
+- **Batch conversion validation** — `calor_batch_convert` MCP tool now supports `validate` parameter that parses and compiles each converted file, catching false-positive successes
+- **C#-to-Calor conversion guide** — Skills documentation now includes common conversion patterns (interpolation, ternary, ref/out, chained calls) for agent guidance
+- **Ternary expression syntax entry** — `calor-syntax-documentation.json` now includes `(? condition trueValue falseValue)` with examples
+- **3 new conversion test snapshots** — InterpolationWithMethodCall (12-01, round-trip verified), RefOutParameters (12-02), OperatorOverloadWithModifiers (12-03, round-trip verified)
+
 ## [0.3.6] - 2026-03-01
 
 ### Benchmark Results (Statistical: 30 runs)
