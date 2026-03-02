@@ -57,6 +57,11 @@ Calor natively supports far more C# constructs than you might expect. Before usi
 | LINQ (method syntax) | `§C{coll.Where} §A §LAM{...} ... §/C` | Full |
 | indexers (this[]) | `§IXER{id:type:vis:get,set} (type:param)` | Full |
 | unsafe code | `§UNSAFE{id} ... §/UNSAFE{id}` | Full |
+| is pattern combinators | `(&& (> x 0) (< x 100))` / `(|| ...)` | Full |
+| range expression (0..5) | `§RANGE start end` | Full |
+| index from end (^1) | `§^ n` | Full |
+| positional patterns | Decompose to `§IF` with `(== field value)` | Migration: Full |
+| property patterns | Decompose to `§IF` with `(> obj.Prop 0)` | Migration: Full |
 
 **Key rule**: If a C# construct is in this table, express it natively in Calor. Only use `§CSHARP` for constructs NOT listed here.
 
@@ -1651,6 +1656,19 @@ Alternative alias `§SW` is available for `§W`:
 §PMATCH{property} pattern    Match property value inline
 ```
 
+### Is Pattern with Combinators
+
+C# `is` patterns with `and`/`or`/`not` combinators decompose into standard boolean expressions:
+
+```
+x is > 0 and < 100    →  (&& (> x 0) (< x 100))
+x is < 0 or > 100     →  (|| (< x 0) (> x 100))
+x is not < 0          →  (! (< x 0))
+word is "a" or "an"   →  (|| (== word "a") (== word "an"))
+```
+
+No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, and any expression context.
+
 ## Explicit Body Markers
 
 ```
@@ -1952,6 +1970,7 @@ When converting C# code to Calor, some features have limited or no support. Use 
 | `checked` / `unchecked` | Partial | Wrapper stripped, body preserved |
 | `??=` null-coalescing assignment | Not Supported | Use `§IF (== x null) §ASSIGN x default` pattern |
 | `postfix operator` | Not Supported | Use as statement or rewrite as x = x + 1 |
+| `#pragma warning` | Not Supported | Silently dropped during conversion; use `§CSHARP{#pragma warning disable XXXX}§/CSHARP` if needed |
 
 ### Fully Supported (previously thought missing)
 
