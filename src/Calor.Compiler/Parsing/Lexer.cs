@@ -134,9 +134,11 @@ public sealed class Lexer
         ["/NEW"] = TokenKind.EndNew,
         ["FLD"] = TokenKind.FieldDef,
 
-        // Properties and Constructors
+        // Properties, Indexers, and Constructors
         ["PROP"] = TokenKind.Property,
         ["/PROP"] = TokenKind.EndProperty,
+        ["IXER"] = TokenKind.Indexer,
+        ["/IXER"] = TokenKind.EndIndexer,
         ["GET"] = TokenKind.Get,
         ["/GET"] = TokenKind.EndGet,
         ["SET"] = TokenKind.Set,

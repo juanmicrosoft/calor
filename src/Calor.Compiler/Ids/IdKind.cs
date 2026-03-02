@@ -42,5 +42,8 @@ public enum IdKind
     ProofObligation,
 
     /// <summary>Indexed type definition (§ITYPE).</summary>
-    IndexedType
+    IndexedType,
+
+    /// <summary>Indexer declaration (§IXER).</summary>
+    Indexer
 }

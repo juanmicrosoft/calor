@@ -82,6 +82,12 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Properties are converted to Calor property definitions"
         },
+        ["indexer"] = new FeatureInfo
+        {
+            Name = "indexer",
+            Support = SupportLevel.Full,
+            Description = "Indexers (this[]) are converted to Calor indexer definitions"
+        },
         ["field"] = new FeatureInfo
         {
             Name = "field",

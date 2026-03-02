@@ -1937,6 +1937,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
+        foreach (var indexer in node.Indexers)
+        {
+            Visit(indexer);
+            AppendLine();
+        }
+
         foreach (var method in node.Methods)
         {
             Visit(method);
@@ -2076,6 +2082,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var prop in node.Properties)
         {
             Visit(prop);
+            AppendLine();
+        }
+
+        // Emit indexers
+        foreach (var indexer in node.Indexers)
+        {
+            Visit(indexer);
             AppendLine();
         }
 
@@ -2604,6 +2617,69 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         // Property with accessors
         AppendLine($"{modifierStr} {typeName} {propName}");
+        AppendLine("{");
+        Indent();
+
+        if (node.Getter != null)
+        {
+            Visit(node.Getter);
+        }
+
+        if (node.Setter != null)
+        {
+            Visit(node.Setter);
+        }
+
+        if (node.Initer != null)
+        {
+            Visit(node.Initer);
+        }
+
+        Dedent();
+        AppendLine("}");
+
+        return "";
+    }
+
+    public string Visit(IndexerNode node)
+    {
+        EmitCSharpAttributes(node.CSharpAttributes);
+
+        var visibility = node.Visibility switch
+        {
+            Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
+            Visibility.Internal => "internal",
+            Visibility.Protected => "protected",
+            Visibility.Private => "private",
+            _ => "public"
+        };
+
+        var modifiers = new List<string>();
+        modifiers.Add(visibility);
+        if (node.IsAbstract) modifiers.Add("abstract");
+        else if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsSealed && node.IsOverride) modifiers.Add("sealed");
+
+        var modifierStr = string.Join(" ", modifiers);
+        var typeName = MapTypeName(node.TypeName);
+
+        // Build parameter list
+        var paramList = string.Join(", ", node.Parameters.Select(p => p.Accept(this)));
+
+        // Auto-indexer
+        if (node.IsAutoIndexer)
+        {
+            var accessors = node.Setter != null ? "get; set;" :
+                            node.Initer != null ? "get; init;" :
+                            "get;";
+            AppendLine($"{modifierStr} {typeName} this[{paramList}] {{ {accessors} }}");
+            return "";
+        }
+
+        // Indexer with accessor bodies
+        AppendLine($"{modifierStr} {typeName} this[{paramList}]");
         AppendLine("{");
         Indent();
 
@@ -4097,6 +4173,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var prop in node.Properties)
         {
             Visit(prop);
+            AppendLine();
+        }
+        foreach (var indexer in node.Indexers)
+        {
+            Visit(indexer);
             AppendLine();
         }
         foreach (var ctor in node.Constructors)

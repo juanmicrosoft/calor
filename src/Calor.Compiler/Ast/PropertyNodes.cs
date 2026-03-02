@@ -107,6 +107,81 @@ public sealed class PropertyNode : AstNode
 }
 
 /// <summary>
+/// Represents an indexer in a class or interface.
+/// §IXER{ix1:int:pub}
+///   §I{int:index}
+///   §GET
+///     §R ...
+///   §/GET
+///   §SET
+///     ...
+///   §/SET
+/// §/IXER{ix1}
+///
+/// Compact auto-property form:
+/// §IXER{ix1:int:pub:get,set} (int:index)
+/// </summary>
+public sealed class IndexerNode : AstNode
+{
+    public string Id { get; }
+    public string TypeName { get; }
+    public Visibility Visibility { get; }
+    public MethodModifiers Modifiers { get; }
+    public IReadOnlyList<ParameterNode> Parameters { get; }
+    public PropertyAccessorNode? Getter { get; }
+    public PropertyAccessorNode? Setter { get; }
+    public PropertyAccessorNode? Initer { get; }
+    public AttributeCollection Attributes { get; }
+
+    /// <summary>
+    /// C#-style attributes (e.g., [@JsonProperty], [@Obsolete]).
+    /// </summary>
+    public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
+
+    public bool IsOverride => Modifiers.HasFlag(MethodModifiers.Override);
+    public bool IsVirtual => Modifiers.HasFlag(MethodModifiers.Virtual);
+    public bool IsAbstract => Modifiers.HasFlag(MethodModifiers.Abstract);
+    public bool IsSealed => Modifiers.HasFlag(MethodModifiers.Sealed);
+
+    public IndexerNode(
+        TextSpan span,
+        string id,
+        string typeName,
+        Visibility visibility,
+        MethodModifiers modifiers,
+        IReadOnlyList<ParameterNode> parameters,
+        PropertyAccessorNode? getter,
+        PropertyAccessorNode? setter,
+        PropertyAccessorNode? initer,
+        AttributeCollection attributes,
+        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        : base(span)
+    {
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        Visibility = visibility;
+        Modifiers = modifiers;
+        Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+        Getter = getter;
+        Setter = setter;
+        Initer = initer;
+        Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
+    }
+
+    /// <summary>
+    /// True if this is an auto-implemented indexer (all accessors have empty bodies).
+    /// </summary>
+    public bool IsAutoIndexer =>
+        (Getter == null || Getter.IsAutoImplemented) &&
+        (Setter == null || Setter.IsAutoImplemented) &&
+        (Initer == null || Initer.IsAutoImplemented);
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a property accessor (get, set, or init).
 /// §GET
 /// §SET[pri]

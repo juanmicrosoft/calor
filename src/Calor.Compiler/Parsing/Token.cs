@@ -169,6 +169,8 @@ public enum TokenKind
     // Phase 9: Properties and Constructors
     Property,
     EndProperty,
+    Indexer,        // §IXER - Indexer definition
+    EndIndexer,     // §/IXER - End indexer definition
     Get,
     EndGet,
     Set,

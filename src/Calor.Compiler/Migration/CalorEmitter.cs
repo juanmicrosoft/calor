@@ -200,6 +200,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Visit(prop);
         }
 
+        foreach (var indexer in node.Indexers)
+        {
+            Visit(indexer);
+        }
+
         foreach (var method in node.Methods)
         {
             Visit(method);
@@ -333,6 +338,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Visit(prop);
         }
         if (node.Properties.Count > 0)
+            AppendLine();
+
+        // Emit indexers
+        foreach (var indexer in node.Indexers)
+        {
+            Visit(indexer);
+        }
+        if (node.Indexers.Count > 0)
             AppendLine();
 
         // Emit constructors
@@ -469,6 +482,63 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         Dedent();
         AppendLine($"§/PROP{{{node.Id}}}");
+
+        return "";
+    }
+
+    public string Visit(IndexerNode node)
+    {
+        var visibility = GetVisibilityShorthand(node.Visibility);
+        var typeName = TypeMapper.CSharpToCalor(node.TypeName);
+        var attrs = EmitCSharpAttributes(node.CSharpAttributes);
+
+        var modifiers = new List<string>();
+        if (node.IsVirtual) modifiers.Add("virt");
+        if (node.IsOverride) modifiers.Add("over");
+        if (node.IsAbstract) modifiers.Add("abs");
+        if (node.IsSealed) modifiers.Add("seal");
+        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+
+        // Compact auto-indexer shorthand
+        if (node.IsAutoIndexer && (node.Getter != null || node.Setter != null || node.Initer != null))
+        {
+            var accessors = new List<string>();
+            if (node.Getter != null)
+                accessors.Add(node.Getter.Visibility == Visibility.Private ? "priget" :
+                              node.Getter.Visibility == Visibility.Internal ? "intget" :
+                              node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
+            if (node.Setter != null)
+                accessors.Add(node.Setter.Visibility == Visibility.Private ? "priset" :
+                              node.Setter.Visibility == Visibility.Internal ? "intset" :
+                              node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
+            if (node.Initer != null)
+                accessors.Add("init");
+            var accessorStr = string.Join(",", accessors);
+            var paramParts = node.Parameters.Select(p =>
+            {
+                var pType = TypeMapper.CSharpToCalor(p.TypeName);
+                return $"{pType}:{p.Name}";
+            });
+            var paramStr = string.Join(", ", paramParts);
+            AppendLine($"§IXER{{{node.Id}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs} ({paramStr})");
+            return "";
+        }
+
+        // Full indexer syntax with body and closing tag
+        AppendLine($"§IXER{{{node.Id}:{typeName}:{visibility}{modStr}}}{attrs}");
+        Indent();
+
+        foreach (var param in node.Parameters)
+        {
+            Visit(param);
+        }
+
+        if (node.Getter != null) Visit(node.Getter);
+        if (node.Setter != null) Visit(node.Setter);
+        if (node.Initer != null) Visit(node.Initer);
+
+        Dedent();
+        AppendLine($"§/IXER{{{node.Id}}}");
 
         return "";
     }
@@ -2659,6 +2729,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         foreach (var field in node.Fields) Visit(field);
         foreach (var prop in node.Properties) Visit(prop);
+        foreach (var indexer in node.Indexers) Visit(indexer);
         foreach (var ctor in node.Constructors) Visit(ctor);
         foreach (var method in node.Methods) { Visit(method); AppendLine(); }
         foreach (var op in node.OperatorOverloads) { Visit(op); AppendLine(); }
