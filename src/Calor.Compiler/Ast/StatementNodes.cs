@@ -242,13 +242,14 @@ public sealed class MemberPreprocessorBlockNode : AstNode
 /// <summary>
 /// Represents a preprocessor conditional block wrapping entire type declarations at module level.
 /// §PP{CONDITION}
-///   ... class, interface, enum, delegate declarations ...
+///   ... using directives, class, interface, enum, delegate declarations ...
 /// §PPE (optional else/elif)
 /// §/PP{CONDITION}
 /// </summary>
 public sealed class TypePreprocessorBlockNode : AstNode
 {
     public string Condition { get; }
+    public IReadOnlyList<UsingDirectiveNode> Usings { get; }
     public IReadOnlyList<ClassDefinitionNode> Classes { get; }
     public IReadOnlyList<InterfaceDefinitionNode> Interfaces { get; }
     public IReadOnlyList<EnumDefinitionNode> Enums { get; }
@@ -262,10 +263,12 @@ public sealed class TypePreprocessorBlockNode : AstNode
         IReadOnlyList<InterfaceDefinitionNode> interfaces,
         IReadOnlyList<EnumDefinitionNode> enums,
         IReadOnlyList<DelegateDefinitionNode> delegates,
-        TypePreprocessorBlockNode? elseBranch = null)
+        TypePreprocessorBlockNode? elseBranch = null,
+        IReadOnlyList<UsingDirectiveNode>? usings = null)
         : base(span)
     {
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        Usings = usings ?? Array.Empty<UsingDirectiveNode>();
         Classes = classes ?? Array.Empty<ClassDefinitionNode>();
         Interfaces = interfaces ?? Array.Empty<InterfaceDefinitionNode>();
         Enums = enums ?? Array.Empty<EnumDefinitionNode>();

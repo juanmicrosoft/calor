@@ -246,6 +246,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Unsafe/low-level nodes
     public virtual T Visit(StackAllocNode node) => DefaultVisit(node)!;
     public virtual T Visit(UnsafeBlockNode node) => DefaultVisit(node)!;
+    public virtual T Visit(SyncBlockNode node) => DefaultVisit(node)!;
     public virtual T Visit(FixedStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(AddressOfNode node) => DefaultVisit(node)!;
     public virtual T Visit(PointerDereferenceNode node) => DefaultVisit(node)!;

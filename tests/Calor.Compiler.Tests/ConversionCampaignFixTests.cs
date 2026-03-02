@@ -508,8 +508,9 @@ public class Example
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         var source = result.CalorSource ?? "";
-        Assert.Contains("str:class", source);
-        Assert.Contains("i32:event", source);
+        // Verbatim identifiers are wrapped in backticks in Calor
+        Assert.Contains("str:`class`", source);
+        Assert.Contains("i32:`event`", source);
         Assert.DoesNotContain("@class", source);
         Assert.DoesNotContain("@event", source);
     }

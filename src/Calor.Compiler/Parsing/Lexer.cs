@@ -265,6 +265,10 @@ public sealed class Lexer
         ["DEREF"] = TokenKind.Deref,                // §DEREF
         ["SIZEOF"] = TokenKind.SizeOf,              // §SIZEOF
 
+        // Synchronization
+        ["SYNC"] = TokenKind.SyncBlock,              // §SYNC
+        ["/SYNC"] = TokenKind.EndSyncBlock,          // §/SYNC
+
         // Multidimensional Arrays
         ["ARR2D"] = TokenKind.Array2D,              // §ARR2D
         ["/ARR2D"] = TokenKind.EndArray2D,          // §/ARR2D

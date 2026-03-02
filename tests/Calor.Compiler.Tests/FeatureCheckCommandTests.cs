@@ -117,7 +117,6 @@ public class FeatureCheckCommandTests
 
     [Theory]
     [InlineData("goto")]
-    [InlineData("lock-statement")]
     public void FeatureCheck_UnsupportedFeature_HasWorkaround(string feature)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);

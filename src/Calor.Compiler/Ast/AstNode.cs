@@ -236,6 +236,8 @@ public interface IAstVisitor
     void Visit(ProofObligationNode node);
     // Dependent Types: Indexed Types (size-parameterized)
     void Visit(IndexedTypeNode node);
+    // Synchronization
+    void Visit(SyncBlockNode node);
 }
 
 /// <summary>
@@ -456,6 +458,8 @@ public interface IAstVisitor<T>
     T Visit(ProofObligationNode node);
     // Dependent Types: Indexed Types (size-parameterized)
     T Visit(IndexedTypeNode node);
+    // Synchronization
+    T Visit(SyncBlockNode node);
 }
 
 /// <summary>

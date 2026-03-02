@@ -320,6 +320,10 @@ public enum TokenKind
     IndexedType,        // §ITYPE - indexed type definition (size-parameterized)
     EndIndexedType,     // §/ITYPE - end indexed type
 
+    // Synchronization
+    SyncBlock,          // §SYNC - lock statement
+    EndSyncBlock,       // §/SYNC - end lock statement
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
@@ -355,7 +359,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndIndexedType;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndSyncBlock;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;
