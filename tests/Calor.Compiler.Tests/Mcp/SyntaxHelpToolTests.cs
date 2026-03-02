@@ -326,6 +326,63 @@ public class SyntaxHelpToolTests
 
     #endregion
 
+    #region Overview Tests
+
+    [Theory]
+    [InlineData("overview")]
+    [InlineData("all")]
+    [InlineData("summary")]
+    [InlineData("syntax")]
+    [InlineData("cheatsheet")]
+    public async Task ExecuteAsync_OverviewAliases_ReturnLanguageOverview(string feature)
+    {
+        var args = JsonDocument.Parse($"{{\"feature\": \"{feature}\"}}").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        // Should contain the curated overview — check for section titles and key terms
+        Assert.Contains("Calor Language Overview", text);
+        Assert.Contains("Control Flow", text);
+        Assert.Contains("Module", text);
+        Assert.Contains("Indexer", text);
+        Assert.Contains("Property", text);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Overview_ContainsAllMajorSections()
+    {
+        var args = JsonDocument.Parse("""{"feature": "overview"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        // Verify major language areas are covered
+        Assert.Contains("Control Flow", text);
+        Assert.Contains("Contracts", text);
+        Assert.Contains("Async", text);
+        Assert.Contains("Collections", text);
+        Assert.Contains("Typed Literals", text);
+        Assert.Contains("availableFeatures", text);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Overview_IncludesCallToAction()
+    {
+        var args = JsonDocument.Parse("""{"feature": "overview"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        // Should guide agent to query specific features for more detail
+        Assert.Contains("Query a specific feature", text);
+    }
+
+    #endregion
+
     #region File Resolution Tests
 
     [Fact]
