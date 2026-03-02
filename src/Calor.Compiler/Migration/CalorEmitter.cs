@@ -13,6 +13,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private StringBuilder _builder = new();
     private int _indentLevel;
     private readonly ConversionContext? _context;
+    private bool _inInterpolation;
 
     public CalorEmitter(ConversionContext? context = null)
     {
@@ -1651,6 +1652,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var typeArgs = node.TypeArguments.Count > 0
             ? $"<{string.Join(",", node.TypeArguments)}>"
             : "";
+
+        // Inside interpolation, use C# new() syntax instead of §NEW tags
+        if (_inInterpolation)
+        {
+            var inlineArgs = node.Arguments.Select(a => a.Accept(this));
+            return $"new {node.TypeName}{typeArgs}({string.Join(", ", inlineArgs)})";
+        }
+
         // Arguments need §A prefix for parser to recognize them
         var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
@@ -1685,6 +1694,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CallExpressionNode node)
     {
+        // Inside interpolation expressions, section markers (§C, §A, §/C) would be
+        // treated as literal text by the parser. Use function-call syntax instead.
+        if (_inInterpolation)
+        {
+            if (node.Arguments.Count == 0)
+                return $"{node.Target}()";
+
+            var inlineArgs = node.Arguments.Select(a => a.Accept(this));
+            return $"{node.Target}({string.Join(", ", inlineArgs)})";
+        }
+
         // Escape braces in target to avoid conflicts with Calor tag syntax
         var escapedTarget = EscapeBraces(node.Target);
 
@@ -1806,6 +1826,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var array = node.Array.Accept(this);
         var index = node.Index.Accept(this);
+        if (_inInterpolation)
+            return $"{array}[{index}]";
         if (node.Array is ReferenceNode)
             return $"§IDX{{{array}}} {index}";
         return $"§IDX {array} {index}";
@@ -1892,6 +1914,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(AwaitExpressionNode node)
     {
         var awaited = node.Awaited.Accept(this);
+        if (_inInterpolation)
+            return $"await {awaited}";
         return $"§AWAIT {awaited}";
     }
 
@@ -1909,7 +1933,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             else if (part is InterpolatedStringExpressionNode exprPart)
             {
                 parts.Append("${");
+                var savedInterpolation = _inInterpolation;
+                _inInterpolation = true;
                 parts.Append(exprPart.Expression.Accept(this));
+                _inInterpolation = savedInterpolation;
                 if (!string.IsNullOrEmpty(exprPart.AlignmentClause))
                 {
                     parts.Append(",");
@@ -1935,9 +1962,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(InterpolatedStringExpressionNode node)
     {
+        var savedInterpolation = _inInterpolation;
+        _inInterpolation = true;
         var alignment = !string.IsNullOrEmpty(node.AlignmentClause) ? $",{node.AlignmentClause}" : "";
         var format = !string.IsNullOrEmpty(node.FormatSpecifier) ? $":{node.FormatSpecifier}" : "";
-        return $"${{{node.Expression.Accept(this)}{alignment}{format}}}";
+        var result = $"${{{node.Expression.Accept(this)}{alignment}{format}}}";
+        _inInterpolation = savedInterpolation;
+        return result;
     }
 
     public string Visit(NullCoalesceNode node)

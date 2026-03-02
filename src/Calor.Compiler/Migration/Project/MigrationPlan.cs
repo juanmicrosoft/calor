@@ -112,4 +112,7 @@ public sealed class MigrationPlanOptions
 
     /// <summary>Number of files to skip before processing (for pagination with MaxFiles).</summary>
     public int Offset { get; set; } = 0;
+
+    /// <summary>Whether to validate converted output by parsing and compiling the generated Calor.</summary>
+    public bool ValidateOutput { get; set; } = false;
 }

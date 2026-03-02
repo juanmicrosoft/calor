@@ -65,6 +65,10 @@ public sealed class BatchConvertTool : McpToolBase
                 "skipConverted": {
                     "type": "boolean",
                     "description": "Skip files that already have a corresponding .calr output file (default: false)"
+                },
+                "validate": {
+                    "type": "boolean",
+                    "description": "Validate each converted file by parsing and compiling the generated Calor (default: false). Catches false-positive successes where conversion output doesn't actually compile."
                 }
             },
             "required": ["projectPath"]
@@ -92,6 +96,7 @@ public sealed class BatchConvertTool : McpToolBase
         var offset = GetInt(arguments, "offset", defaultValue: 0);
         var directoryFilter = GetString(arguments, "directoryFilter");
         var skipConverted = GetBool(arguments, "skipConverted", defaultValue: false);
+        var validate = GetBool(arguments, "validate", defaultValue: false);
 
         try
         {
@@ -102,7 +107,8 @@ public sealed class BatchConvertTool : McpToolBase
                 MaxFiles = maxFiles,
                 Offset = offset,
                 DirectoryFilter = directoryFilter,
-                SkipConverted = skipConverted
+                SkipConverted = skipConverted,
+                ValidateOutput = validate
             };
 
             var migrator = new ProjectMigrator(options);

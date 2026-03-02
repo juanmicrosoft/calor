@@ -1,0 +1,18 @@
+§M{m001:Test_12_02}
+  §CL{c001:Parser:pub}
+    §MT{m002:TryParse:pub} (str:input, i32:result:out) -> bool
+      §ASSIGN result 0
+      §IF{if003} (isempty input)
+        §R false
+      §/I{if003}
+      §ASSIGN result §C{int.Parse} §A input §/C
+      §R true
+    §/MT{m002}
+
+    §MT{m004:Increment:pub} (i32:value:ref)
+      §ASSIGN value (+ value 1)
+    §/MT{m004}
+
+  §/CL{c001}
+
+§/M{m001}

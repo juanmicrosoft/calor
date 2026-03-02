@@ -1845,6 +1845,84 @@ var result = LegacyFallback();
 #endif
 ```
 
+## Converting C# to Calor — Common Patterns
+
+When converting C# code to Calor (using `calor_convert` or `calor_batch_convert`), these are the key mappings for constructs that commonly cause confusion.
+
+### String Interpolation with Method Calls
+
+C# string interpolation with embedded method calls maps to Calor interpolation with function-call syntax inside `${...}`:
+
+```
+// C#:
+$"The answer is {Calculate(x, y)} units"
+
+// Calor:
+"The answer is ${Calculate(x, y)} units"
+```
+
+Inside `${...}`, use function-call syntax — NOT `§C` tags. Section markers cannot appear inside string content.
+
+### Ternary / Conditional Expressions
+
+C# ternary maps to Calor `(? ...)` syntax:
+
+```
+// C#:
+var result = condition ? valueA : valueB;
+
+// Calor:
+§B{result} (? condition valueA valueB)
+```
+
+### Method Calls
+
+Simple calls use `§C` tags with `§A` for each argument (space-separated, no commas):
+
+```
+// C#:
+var result = Math.Max(a, b);
+
+// Calor:
+§B{result} §C{Math.Max} §A a §A b §/C
+```
+
+### ref/out Parameters
+
+Parameters with `ref`/`out` modifiers use the third position in `§I` tags:
+
+```
+// C#:
+public bool TryParse(string input, out int result)
+
+// Calor:
+§MT{m1:TryParse:pub} (str:input, i32:result:out) -> bool
+```
+
+### Chained Method Calls
+
+The converter decomposes chained calls into temp bindings:
+
+```
+// C#:
+var result = items.Where(x => x > 0).Select(x => x * 2).ToList();
+
+// Calor (decomposed):
+§B{_chain1} §C{items.Where} §A §LAM{l1:x} (> x 0) §/LAM{l1} §/C
+§B{_chain2} §C{_chain1.Select} §A §LAM{l2:x} (* x 2) §/LAM{l2} §/C
+§B{result} §C{_chain2.ToList} §/C
+```
+
+### Batch Conversion with Validation
+
+Use the `validate` parameter to catch false-positive successes:
+
+```
+calor_batch_convert({ "projectPath": "/path/to/project", "validate": true })
+```
+
+This parses and compiles each converted file, marking files as `partial` if they convert but don't compile.
+
 ## Known Limitations & C# Migration Notes
 
 When converting C# code to Calor, some features have limited or no support. Use `calor_feature_support` to query the latest status.

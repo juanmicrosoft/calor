@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Verification.Z3;
 
@@ -259,6 +260,60 @@ public sealed class ProjectMigrator
             ? (result.Context.HasWarnings ? FileMigrationStatus.Partial : FileMigrationStatus.Success)
             : FileMigrationStatus.Failed;
 
+        // Validate: parse and compile the generated Calor to catch false-positive "success"
+        var issues = result.Issues.ToList();
+        if (_options.ValidateOutput && result.Success && result.CalorSource != null)
+        {
+            var parseResult = CalorSourceHelper.Parse(result.CalorSource, entry.OutputPath);
+            if (!parseResult.IsSuccess)
+            {
+                status = FileMigrationStatus.Partial;
+                foreach (var error in parseResult.Errors)
+                {
+                    issues.Add(new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Error,
+                        Message = $"Validation parse error: {error}"
+                    });
+                }
+            }
+            else
+            {
+                try
+                {
+                    var compileOptions = new CompilationOptions
+                    {
+                        EnforceEffects = false,
+                        UnknownCallPolicy = UnknownCallPolicy.Permissive
+                    };
+                    var compileResult = Program.Compile(result.CalorSource, entry.OutputPath, compileOptions);
+                    if (compileResult.HasErrors)
+                    {
+                        status = FileMigrationStatus.Partial;
+                        foreach (var diag in compileResult.Diagnostics.Errors)
+                        {
+                            issues.Add(new ConversionIssue
+                            {
+                                Severity = ConversionIssueSeverity.Error,
+                                Message = $"Validation compile error: {diag.Message}",
+                                Line = diag.Span.Line,
+                                Column = diag.Span.Column
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    status = FileMigrationStatus.Partial;
+                    issues.Add(new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Warning,
+                        Message = $"Validation compile exception: {ex.Message}"
+                    });
+                }
+            }
+        }
+
         // Attach per-file analysis if available from a prior AnalyzeAsync call
         FileAnalysisResult? analysisResult = null;
         if (entry.AnalysisScore is { WasSkipped: false } score)
@@ -281,7 +336,7 @@ public sealed class ProjectMigrator
             OutputPath = result.Success ? entry.OutputPath : null,
             Status = status,
             Duration = DateTime.UtcNow - startTime,
-            Issues = result.Issues.ToList(),
+            Issues = issues,
             Metrics = metrics,
             Analysis = analysisResult
         };

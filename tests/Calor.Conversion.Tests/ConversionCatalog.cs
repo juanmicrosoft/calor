@@ -634,6 +634,54 @@ public static class ConversionCatalog
         """,
         RoundTripSupported: false);
 
+    public static readonly ConversionSnippet InterpolationWithMethodCall = new(
+        "12-01", "GapClosures", "String interpolation with embedded method calls and array access",
+        """
+        public class Formatter
+        {
+            private string Format(int value) => value.ToString();
+            public string Describe(int x, string[] labels)
+            {
+                return $"The value is {Format(x)} with label {labels[0]}";
+            }
+        }
+        """);
+
+    public static readonly ConversionSnippet RefOutParameters = new(
+        "12-02", "GapClosures", "Methods with ref and out parameters",
+        """
+        public class Parser
+        {
+            public bool TryParse(string input, out int result)
+            {
+                result = 0;
+                if (string.IsNullOrEmpty(input)) return false;
+                result = int.Parse(input);
+                return true;
+            }
+            public void Increment(ref int value)
+            {
+                value++;
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet OperatorOverloadWithModifiers = new(
+        "12-03", "GapClosures", "Operator overload with typed parameters",
+        """
+        public struct Vector2
+        {
+            public float X;
+            public float Y;
+            public Vector2(float x, float y) { X = x; Y = y; }
+            public static Vector2 operator +(Vector2 a, Vector2 b)
+            {
+                return new Vector2(a.X + b.X, a.Y + b.Y);
+            }
+        }
+        """);
+
     /// <summary>
     /// All snippets that should successfully convert.
     /// </summary>
@@ -678,6 +726,9 @@ public static class ConversionCatalog
         NestedTypes,
         PreprocessorWrappedType,
         DictionaryInitializerComplex,
+        InterpolationWithMethodCall,
+        RefOutParameters,
+        OperatorOverloadWithModifiers,
     };
 
     /// <summary>
