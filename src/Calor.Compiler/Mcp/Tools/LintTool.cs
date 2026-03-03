@@ -17,6 +17,9 @@ public sealed class LintTool : McpToolBase
     public override string Description =>
         "Check Calor source code for agent-optimal format compliance. Returns lint issues and optionally the fixed code.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -32,10 +35,14 @@ public sealed class LintTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

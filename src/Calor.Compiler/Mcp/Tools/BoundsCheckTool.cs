@@ -18,6 +18,9 @@ public sealed class BoundsCheckTool : McpToolBase
         "Analyze index access sites on indexed types (§ITYPE) and verify bounds safety using Z3. " +
         "Reports which accesses are proven safe, which fail with counterexamples, and boundary status.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -32,10 +35,14 @@ public sealed class BoundsCheckTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

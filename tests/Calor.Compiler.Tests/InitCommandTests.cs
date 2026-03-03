@@ -304,13 +304,12 @@ Run `dotnet build` to compile.
         Assert.Contains("BEGIN CalorC SECTION", content);
         Assert.Contains("END CalorC SECTION", content);
 
-        // Verify Calor-first mandatory rules are in the generated file
+        // Verify Calor-first rules are in the generated file
         Assert.Contains("Calor-First Project", content);
-        Assert.Contains("MANDATORY Rules for AI Agents", content);
-        Assert.Contains("Rule 1: Never create new `.cs` files", content);
-        Assert.Contains("Rule 2: Convert C# to Calor before modifying", content);
-        Assert.Contains("calor analyze", content);
-        Assert.Contains("guidance-based", content);
+        Assert.Contains("Rules for AI Agents", content);
+        Assert.Contains("must be `.calr` files", content);
+        Assert.Contains("Convert before modifying", content);
+        Assert.Contains("calor_convert", content);
     }
 
     [Fact]

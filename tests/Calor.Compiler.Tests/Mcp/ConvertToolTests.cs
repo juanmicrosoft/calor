@@ -23,19 +23,18 @@ public class ConvertToolTests
     }
 
     [Fact]
-    public void Description_ContainsFeatureGuidance()
+    public void Description_ContainsValidationInfo()
     {
-        Assert.Contains("calor_syntax_lookup", _tool.Description);
-        Assert.Contains("calor_feature_support", _tool.Description);
-        Assert.Contains("§CSHARP", _tool.Description);
+        Assert.Contains("validation", _tool.Description.ToLower());
     }
 
     [Fact]
-    public void Description_ContainsModuleNameGuidance()
+    public void Annotations_IsReadOnlyWithOutputPath()
     {
-        // MCP Gap 4: Description should mention namespace derivation and moduleName override
-        Assert.Contains("namespace", _tool.Description.ToLower());
-        Assert.Contains("moduleName", _tool.Description);
+        // ConvertTool can write files via outputPath, so it's not readOnly
+        Assert.NotNull(_tool.Annotations);
+        Assert.False(_tool.Annotations!.ReadOnlyHint);
+        Assert.True(_tool.Annotations.IdempotentHint);
     }
 
     [Fact]

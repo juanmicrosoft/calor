@@ -174,10 +174,14 @@ public sealed class SyntaxHelpTool : McpToolBase
                 }
             },
             "required": ["feature"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var feature = GetString(arguments, "feature");
         if (string.IsNullOrEmpty(feature))

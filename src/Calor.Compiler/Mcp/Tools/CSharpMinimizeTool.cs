@@ -19,6 +19,9 @@ public sealed class CSharpMinimizeTool : McpToolBase
         "Analyze §CSHARP interop blocks in Calor source and suggest which C# constructs " +
         "could be replaced with native Calor syntax. Helps minimize raw C# in converted files.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -31,11 +34,13 @@ public sealed class CSharpMinimizeTool : McpToolBase
                     "type": "string",
                     "description": "Raw C# code from an interop block to analyze directly"
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var csharpCode = GetString(arguments, "csharpCode");

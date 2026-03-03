@@ -12,6 +12,9 @@ public sealed class SelfTestTool : McpToolBase
         "Run compiler self-test: compiles embedded reference .calr files and diffs output against golden .cs files. " +
         "Use this to verify the compiler is working correctly.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -20,11 +23,13 @@ public sealed class SelfTestTool : McpToolBase
                     "type": "string",
                     "description": "Optional: run only a specific scenario by name (e.g., '01_hello_world')"
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         try
         {

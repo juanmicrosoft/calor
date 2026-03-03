@@ -75,10 +75,14 @@ public sealed class ValidateSnippetTool : McpToolBase
                 }
             },
             "required": ["snippet"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var snippet = GetString(arguments, "snippet");
         if (snippet == null)

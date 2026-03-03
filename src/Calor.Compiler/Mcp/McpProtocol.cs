@@ -102,6 +102,32 @@ public sealed class McpCapabilities
     [JsonPropertyName("tools")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public McpToolsCapability? Tools { get; init; }
+
+    [JsonPropertyName("resources")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public McpResourcesCapability? Resources { get; init; }
+
+    [JsonPropertyName("prompts")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public McpPromptsCapability? Prompts { get; init; }
+}
+
+/// <summary>
+/// Resources capability declaration.
+/// </summary>
+public sealed class McpResourcesCapability
+{
+    [JsonPropertyName("listChanged")]
+    public bool ListChanged { get; init; }
+}
+
+/// <summary>
+/// Prompts capability declaration.
+/// </summary>
+public sealed class McpPromptsCapability
+{
+    [JsonPropertyName("listChanged")]
+    public bool ListChanged { get; init; }
 }
 
 /// <summary>
@@ -126,6 +152,10 @@ public sealed class McpInitializeResult
 
     [JsonPropertyName("serverInfo")]
     public required McpServerInfo ServerInfo { get; init; }
+
+    [JsonPropertyName("instructions")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Instructions { get; init; }
 }
 
 /// <summary>
@@ -141,6 +171,37 @@ public sealed class McpTool
 
     [JsonPropertyName("inputSchema")]
     public required JsonElement InputSchema { get; init; }
+
+    [JsonPropertyName("annotations")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public McpToolAnnotations? Annotations { get; init; }
+}
+
+/// <summary>
+/// Tool annotations providing hints to clients about tool behavior.
+/// All fields are hints — not guarantees — per the MCP spec.
+/// </summary>
+public sealed class McpToolAnnotations
+{
+    /// <summary>If true, the tool does not modify state (safe to call without confirmation).</summary>
+    [JsonPropertyName("readOnlyHint")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ReadOnlyHint { get; init; }
+
+    /// <summary>If true, the tool may perform destructive or irreversible operations.</summary>
+    [JsonPropertyName("destructiveHint")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool DestructiveHint { get; init; }
+
+    /// <summary>If true, calling the tool again with the same arguments produces the same result.</summary>
+    [JsonPropertyName("idempotentHint")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IdempotentHint { get; init; }
+
+    /// <summary>If true, the tool interacts with external entities beyond the server.</summary>
+    [JsonPropertyName("openWorldHint")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool OpenWorldHint { get; init; }
 }
 
 /// <summary>
@@ -234,4 +295,137 @@ public static class McpJsonOptions
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = true
     };
+}
+
+// ── Resources ──────────────────────────────────────────────────────
+
+/// <summary>MCP resource definition (static, URI-addressed content).</summary>
+public sealed class McpResource
+{
+    [JsonPropertyName("uri")]
+    public required string Uri { get; init; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+
+    [JsonPropertyName("description")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    [JsonPropertyName("mimeType")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MimeType { get; init; }
+}
+
+/// <summary>Result for resources/list.</summary>
+public sealed class McpResourcesListResult
+{
+    [JsonPropertyName("resources")]
+    public required IReadOnlyList<McpResource> Resources { get; init; }
+}
+
+/// <summary>Result for resources/read.</summary>
+public sealed class McpResourceReadResult
+{
+    [JsonPropertyName("contents")]
+    public required IReadOnlyList<McpResourceContent> Contents { get; init; }
+}
+
+/// <summary>A single resource content item.</summary>
+public sealed class McpResourceContent
+{
+    [JsonPropertyName("uri")]
+    public required string Uri { get; init; }
+
+    [JsonPropertyName("mimeType")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MimeType { get; init; }
+
+    [JsonPropertyName("text")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Text { get; init; }
+}
+
+// ── Prompts ────────────────────────────────────────────────────────
+
+/// <summary>MCP prompt definition (reusable workflow template).</summary>
+public sealed class McpPrompt
+{
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+
+    [JsonPropertyName("description")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    [JsonPropertyName("arguments")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<McpPromptArgument>? Arguments { get; init; }
+}
+
+/// <summary>A prompt argument definition.</summary>
+public sealed class McpPromptArgument
+{
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+
+    [JsonPropertyName("description")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    [JsonPropertyName("required")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Required { get; init; }
+}
+
+/// <summary>Result for prompts/list.</summary>
+public sealed class McpPromptsListResult
+{
+    [JsonPropertyName("prompts")]
+    public required IReadOnlyList<McpPrompt> Prompts { get; init; }
+}
+
+/// <summary>Result for prompts/get.</summary>
+public sealed class McpPromptGetResult
+{
+    [JsonPropertyName("description")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    [JsonPropertyName("messages")]
+    public required IReadOnlyList<McpPromptMessage> Messages { get; init; }
+}
+
+/// <summary>A message in a prompt result.</summary>
+public sealed class McpPromptMessage
+{
+    [JsonPropertyName("role")]
+    public required string Role { get; init; }
+
+    [JsonPropertyName("content")]
+    public required McpContent Content { get; init; }
+}
+
+// ── Completion ─────────────────────────────────────────────────────
+
+/// <summary>Result for completion/complete.</summary>
+public sealed class McpCompletionResult
+{
+    [JsonPropertyName("completion")]
+    public required McpCompletionData Completion { get; init; }
+}
+
+/// <summary>Completion data with values and pagination.</summary>
+public sealed class McpCompletionData
+{
+    [JsonPropertyName("values")]
+    public required IReadOnlyList<string> Values { get; init; }
+
+    [JsonPropertyName("hasMore")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool HasMore { get; init; }
+
+    [JsonPropertyName("total")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int Total { get; init; }
 }

@@ -22,6 +22,9 @@ public sealed class BatchConvertTool : McpToolBase
         "or calor_feature_support — many C# constructs (foreach, switch, async, yield, structs, " +
         "events, operators, preprocessor directives) have native Calor equivalents.";
 
+    public override McpToolAnnotations? Annotations => new() { DestructiveHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -77,10 +80,14 @@ public sealed class BatchConvertTool : McpToolBase
                 }
             },
             "required": ["projectPath"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var projectPath = GetString(arguments, "projectPath");
         if (string.IsNullOrEmpty(projectPath))

@@ -17,6 +17,9 @@ public sealed class SuggestFixesTool : McpToolBase
         "Analyze failed obligations and suggest ranked fixes. " +
         "Returns fix templates: add precondition, add guard, refine parameter, mark unsafe.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -31,10 +34,14 @@ public sealed class SuggestFixesTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

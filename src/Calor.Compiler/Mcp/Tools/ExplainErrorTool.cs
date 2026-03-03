@@ -17,6 +17,9 @@ public sealed class ExplainErrorTool : McpToolBase
     public override string Description =>
         "Explain a Calor error code or message. Returns the relevant common mistake pattern with the correct fix.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -27,10 +30,14 @@ public sealed class ExplainErrorTool : McpToolBase
                 }
             },
             "required": ["error"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var error = GetString(arguments, "error");
         if (string.IsNullOrEmpty(error))

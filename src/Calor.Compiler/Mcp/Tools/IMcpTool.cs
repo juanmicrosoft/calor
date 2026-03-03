@@ -23,11 +23,17 @@ public interface IMcpTool
     JsonElement GetInputSchema();
 
     /// <summary>
+    /// Optional annotations hinting at tool behavior for clients.
+    /// </summary>
+    McpToolAnnotations? Annotations => null;
+
+    /// <summary>
     /// Executes the tool with the given arguments.
     /// </summary>
     /// <param name="arguments">The tool arguments as a JSON element, or null if no arguments.</param>
+    /// <param name="cancellationToken">Cancellation token for aborting long-running operations.</param>
     /// <returns>The tool result.</returns>
-    Task<McpToolResult> ExecuteAsync(JsonElement? arguments);
+    Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -37,6 +43,9 @@ public abstract class McpToolBase : IMcpTool
 {
     public abstract string Name { get; }
     public abstract string Description { get; }
+
+    /// <summary>Override to provide tool annotations (readOnlyHint, destructiveHint, etc.).</summary>
+    public virtual McpToolAnnotations? Annotations => null;
 
     private JsonElement? _cachedSchema;
 
@@ -51,7 +60,10 @@ public abstract class McpToolBase : IMcpTool
     /// </summary>
     protected abstract string GetInputSchemaJson();
 
-    public abstract Task<McpToolResult> ExecuteAsync(JsonElement? arguments);
+    public abstract Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default);
+
+    // Maximum allowed source input size (512 KB). Larger inputs are rejected.
+    protected const int MaxSourceLength = 512 * 1024;
 
     /// <summary>
     /// Helper to get a required string property from arguments.
@@ -107,6 +119,33 @@ public abstract class McpToolBase : IMcpTool
 
         if (arguments.Value.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.Object)
             return prop;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Validates that a source string is not too large. Returns an error result if it exceeds MaxSourceLength.
+    /// </summary>
+    protected static McpToolResult? ValidateSourceSize(string source, string paramName = "source")
+    {
+        if (source.Length > MaxSourceLength)
+            return McpToolResult.Error($"Parameter '{paramName}' exceeds maximum allowed size of {MaxSourceLength / 1024} KB");
+        return null;
+    }
+
+    /// <summary>
+    /// Validates that a file path is safe (no path traversal, within a reasonable scope).
+    /// Returns an error result if the path is unsafe.
+    /// </summary>
+    protected static McpToolResult? ValidatePath(string path, string paramName = "path")
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return McpToolResult.Error($"Parameter '{paramName}' must not be empty");
+
+        // Reject path traversal attempts
+        var normalized = Path.GetFullPath(path);
+        if (normalized.Contains("..") || path.Contains(".."))
+            return McpToolResult.Error($"Parameter '{paramName}' must not contain path traversal sequences");
 
         return null;
     }

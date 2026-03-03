@@ -18,6 +18,9 @@ public sealed class DiagnoseRefinementTool : McpToolBase
         "Combines obligation analysis, guard discovery, and type suggestions into " +
         "ranked patches with confidence scores and obligation discharge mapping.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -34,10 +37,14 @@ public sealed class DiagnoseRefinementTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

@@ -128,11 +128,9 @@ public class McpServerTests
         Assert.Contains("calor_verify", json);
         Assert.Contains("calor_analyze", json);
         Assert.Contains("calor_convert", json);
-        Assert.Contains("calor_syntax_help", json);
         Assert.Contains("calor_syntax_lookup", json);
         Assert.Contains("calor_assess", json);
-        Assert.Contains("calor_typecheck", json);
-        Assert.Contains("calor_verify_contracts", json);
+        Assert.Contains("calor_diagnose", json);
     }
 
     [Fact]
@@ -223,7 +221,7 @@ public class McpServerTests
     }
 
     [Fact]
-    public async Task McpMessageHandler_HandleToolsCall_SyntaxHelpTool_Success()
+    public async Task McpMessageHandler_HandleToolsCall_SyntaxLookupTool_QueryContracts_Success()
     {
         var handler = new McpMessageHandler();
         var request = new JsonRpcRequest
@@ -232,9 +230,9 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_syntax_help",
+                    "name": "calor_syntax_lookup",
                     "arguments": {
-                        "feature": "contracts"
+                        "query": "contracts"
                     }
                 }
                 """).RootElement
@@ -247,11 +245,11 @@ public class McpServerTests
         Assert.NotNull(response.Result);
 
         var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
-        Assert.Contains("feature", json);
+        Assert.Contains("found", json);
     }
 
     [Fact]
-    public async Task McpMessageHandler_HandleToolsCall_SyntaxHelp_Overview_ReturnsLanguageReference()
+    public async Task McpMessageHandler_HandleToolsCall_SyntaxLookup_ForLoop_ReturnsMatch()
     {
         var handler = new McpMessageHandler();
         var request = new JsonRpcRequest
@@ -260,9 +258,9 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_syntax_help",
+                    "name": "calor_syntax_lookup",
                     "arguments": {
-                        "feature": "overview"
+                        "query": "for loop"
                     }
                 }
                 """).RootElement
@@ -275,9 +273,7 @@ public class McpServerTests
         Assert.NotNull(response.Result);
 
         var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
-        Assert.Contains("Calor Language Overview", json);
-        Assert.Contains("Control Flow", json);
-        Assert.Contains("availableFeatures", json);
+        Assert.Contains("found", json);
     }
 
     [Fact]
@@ -470,11 +466,9 @@ public class McpServerTests
         Assert.Contains("calor_verify", response);
         Assert.Contains("calor_analyze", response);
         Assert.Contains("calor_convert", response);
-        Assert.Contains("calor_syntax_help", response);
         Assert.Contains("calor_syntax_lookup", response);
         Assert.Contains("calor_assess", response);
-        Assert.Contains("calor_typecheck", response);
-        Assert.Contains("calor_verify_contracts", response);
+        Assert.Contains("calor_diagnose", response);
     }
 
     [Fact]

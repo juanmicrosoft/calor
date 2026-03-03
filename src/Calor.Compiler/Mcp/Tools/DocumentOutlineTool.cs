@@ -17,6 +17,9 @@ public sealed class DocumentOutlineTool : McpToolBase
         "Returns a hierarchical tree of modules, classes, functions, methods, fields, etc. " +
         "Useful for understanding file structure before making changes.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -33,11 +36,13 @@ public sealed class DocumentOutlineTool : McpToolBase
                     "type": "boolean",
                     "description": "Include detailed information like parameter types and contracts (default: true)"
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var filePath = GetString(arguments, "filePath");

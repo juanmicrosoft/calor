@@ -60,11 +60,13 @@ public sealed class ConvertValidatedTool : McpToolBase
                     "items": { "type": "string" },
                     "description": "Patterns that must NOT appear in generated C#"
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var inputPath = GetString(arguments, "inputPath");

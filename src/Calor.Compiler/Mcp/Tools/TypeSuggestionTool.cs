@@ -18,6 +18,9 @@ public sealed class TypeSuggestionTool : McpToolBase
         "Analyze how parameters are used in function bodies and suggest refined types. " +
         "Detects patterns: used as divisor (!=0), used as index (>=0), compared with >=0.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -32,10 +35,14 @@ public sealed class TypeSuggestionTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

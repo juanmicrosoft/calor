@@ -1,138 +1,40 @@
 <!-- BEGIN CalorC SECTION - DO NOT EDIT -->
 ## Calor-First Project
 
-This is an **Calor-first project**. All new code MUST be written in Calor. Existing C# files should be converted to Calor before modification.
+This project uses **Calor**, a DSL that compiles to C# on .NET 10. The Calor MCP server provides all compiler capabilities as tools.
 
-### MANDATORY Rules for AI Agents
+### Rules for AI Agents
 
-**Rule 0: Look up syntax reference before writing Calor**
-- Before writing ANY `.calr` code, use `calor_syntax_help` or `calor_syntax_lookup` MCP tools for syntax guidance
-- These provide the authoritative syntax reference on-demand
-- Applies to: new files, conversions, and edits to existing .calr files
+1. **All new code must be `.calr` files** — never create `.cs` files directly.
+2. **Convert before modifying** — convert any `.cs` file to `.calr` using `calor_convert` MCP tool before making changes.
+3. **Never edit `.g.cs` files** — they are auto-generated from `.calr` sources.
+4. **Validate after writing** — run `calor_diagnose` MCP tool after any `.calr` edit.
+5. **Look up syntax first** — use `calor_syntax_lookup` MCP tool before writing Calor code.
 
-**Rule 1: Never create new `.cs` files**
-- All new code MUST be written in Calor (`.calr` files)
-- Calor files compile automatically during `dotnet build`
-- Use `calor_syntax_help` or `calor_syntax_lookup` MCP tools for syntax assistance
+### MCP Tools (available via `calor mcp --stdio`)
 
-**Rule 2: Convert C# to Calor before modifying**
-- Before modifying ANY `.cs` file, convert it to Calor first using `calor_convert` MCP tool
-- Make your changes in the new `.calr` file, not the original `.cs` file
-- Delete the original `.cs` file after successful conversion
-- Run `calor analyze <file.cs>` to understand the file's complexity before conversion
+| Category | Tools |
+|----------|-------|
+| **Compile & Verify** | `calor_compile`, `calor_verify`, `calor_analyze`, `calor_diagnose` |
+| **Convert** | `calor_convert`, `calor_assess`, `calor_batch_convert` |
+| **Navigate** | `calor_goto_definition`, `calor_find_references`, `calor_symbol_info`, `calor_document_outline`, `calor_find_symbol` |
+| **Syntax** | `calor_syntax_lookup`, `calor_explain_error`, `calor_feature_support` |
+| **Edit Support** | `calor_edit_preview`, `calor_impact_analysis`, `calor_lint`, `calor_format` |
+| **Refinement** | `calor_obligations`, `calor_suggest_fixes`, `calor_discover_guards`, `calor_bounds_check` |
 
-**Rule 3: Never edit generated files**
-- Files ending in `.g.cs` are auto-generated from Calor - do not edit them
-- If you need to change generated output, edit the source `.calr` file instead
+### Quick Syntax Reference
 
-**Rule 4: Validate syntax after writing**
-- After writing or editing ANY `.calr` file, run `calor diagnose <file.calr>`
-- Fix any reported errors before proceeding
-- This catches ALL syntax mistakes at once (build only shows first error)
-
-### Workflow for Any Code Change
-
-1. **Always first** → Use `calor_syntax_help` MCP tool to get syntax reference
-2. **New feature/file?** → Create `.calr` file
-3. **Modify existing `.calr` file?** → Edit directly
-4. **Modify existing `.cs` file?** → Convert to `.calr` first
-5. **After any .calr change** → Run `calor diagnose` to validate
-
-### File Types
-- `.calr` - Calor source files (**use this for all code**)
-- `.g.cs` - Generated C# files (never edit)
-- `.cs` - Legacy C# files (**convert to Calor before modifying**)
-
-#### Available MCP Tools
-
-**Compilation & Verification:**
-- `calor_compile` - Compile Calor files to C#
-- `calor_verify` - Verify contracts and correctness
-- `calor_verify_contracts` - Verify function contracts
-
-**Analysis & Security:**
-- `calor_analyze` - Analyze files for migration potential
-- `calor_assess` - Assess code quality and security
-
-**Code Transformation:**
-- `calor_convert` - Convert between C# and Calor
-- `calor_format` - Format Calor source files
-- `calor_lint` - Lint Calor source files
-
-**Diagnostics & Validation:**
-- `calor_diagnose` - Validate syntax and show all errors at once
-- `calor_typecheck` - Type-check Calor source files
-- `calor_validate_snippet` - Validate a Calor code snippet inline
-- `calor_compile_check_compat` - Check compilation compatibility
-
-**Syntax & Documentation:**
-- `calor_syntax_help` - Get comprehensive Calor syntax help
-- `calor_syntax_lookup` - Look up specific syntax constructs
-
-**Navigation (LSP-style):**
-- `calor_goto_definition` - Go to symbol definition
-- `calor_find_references` - Find all references to a symbol
-- `calor_symbol_info` - Get information about a symbol
-- `calor_document_outline` - Get document outline/structure
-- `calor_find_symbol` - Find symbols by name
-
-**ID Management:**
-- `calor_ids` - Manage Calor block IDs
-
-**Testing:**
-- `calor_self_test` - Run Calor self-test suite
-
-#### Key Commands
-```bash
-calor analyze <path>                 # Score files for Calor migration potential
-calor diagnose <file.calr>           # Validate syntax - shows ALL errors at once
-calor --input file.calr -o file.g.cs # Compile Calor to C#
-calor --input file.calr --verify --analyze -v  # Deep analysis (security, bugs, contracts)
-calor convert file.cs                # Convert C# to Calor
-calor convert file.calr              # Convert Calor to C#
-```
-
-#### Calor v2+ Syntax Reference
-
-| Structure | Syntax |
-|-----------|--------|
+| Structure | Calor Syntax |
+|-----------|-------------|
 | Module | `§M{id:Name}` ... `§/M{id}` |
-| Function | `§F{id:Name:vis}` ... `§/F{id}` |
-| Async Func | `§AF{id:Name:vis}` ... `§/AF{id}` |
-| Input | `§I{type:name}` |
-| Output | `§O{type}` |
-| Effects | `§E{cw,db,net}` |
+| Function | `§F{id:name:returnType:vis}` ... `§/F{id}` |
+| Binding | `§B{name:type} expr` (immutable), `§B{~name:type}` (mutable) |
 | Loop | `§L{id:var:from:to:step}` ... `§/L{id}` |
-| Conditional | `§IF{id} condition → action` |
-| Try/Catch | `§TR{id}` ... `§CA{Type:var}` ... `§FI` ... `§/TR{id}` |
-
-**Expressions (Lisp-style):** `(+ a b)`, `(== x 0)`, `(% i 15)`
-
-**Statements:**
-- Print: `§P "message"` or `§P variable`
-- Bind: `§B{name} expr`
-- Return: `§R expr`
-- Await: `§AWAIT expr` or `§AWAIT{false} expr`
-
-**Contracts:** `§Q (> x 0)` (precondition), `§S (>= result 0)` (postcondition)
-
-**Collections:**
-- List: `§LIST{name:type}` ... `§/LIST{name}`, `§PUSH{name} value`
-- Dict: `§DICT{name:key:val}` ... `§KV key val` ... `§/DICT{name}`
-- HashSet: `§HSET{name:type}` ... `§/HSET{name}`
-
-#### Type Mappings
-| C# | Calor |
-|---|---|
-| `int` | `i32` |
-| `long` | `i64` |
-| `string` | `str` |
-| `bool` | `bool` |
-| `void` | `void` |
-| `Task<T>` | (use `§AF`/`§AMT`) |
-
-#### Enforcement Note
-Calor-first enforcement in GitHub Copilot is **guidance-based with MCP tool support**. Unlike Claude Code which uses hooks to block `.cs` creation, Copilot relies on following these instructions and MCP tools. Use `calor_diagnose` and `calor_validate_snippet` via MCP to validate code after generation. Please review file extensions after generation.
+| Conditional | `§IF{id} (cond) → §R expr` |
+| Contracts | `§Q (precondition)`, `§S (postcondition)` |
+| Types | `i32`, `i64`, `str`, `bool`, `f64`, `void`, `?i32` (option), `i32!str` (result) |
+| Expressions | Prefix notation: `(+ a b)`, `(== x 0)`, `(% i 15)` |
+| Literals | `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14` |
 
 *Generated by calor v{{VERSION}}*
 <!-- END CalorC SECTION -->
