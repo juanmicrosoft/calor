@@ -22,6 +22,9 @@ public sealed class EditPreviewTool : McpToolBase
         "contract violations, effect inconsistencies, and dangling references. " +
         "Returns a verdict: safe, safe_with_warnings, or breaking.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -41,10 +44,14 @@ public sealed class EditPreviewTool : McpToolBase
                 }
             },
             "required": ["originalSource", "modifiedSource"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var originalSource = GetString(arguments, "originalSource");
         var modifiedSource = GetString(arguments, "modifiedSource");

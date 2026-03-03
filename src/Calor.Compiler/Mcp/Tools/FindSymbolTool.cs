@@ -19,6 +19,9 @@ public sealed class FindSymbolTool : McpToolBase
         "Can search in inline source, a single file, or a directory of .calr files. " +
         "Returns matching symbols with their kind, location, and file path.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -49,10 +52,14 @@ public sealed class FindSymbolTool : McpToolBase
                 }
             },
             "required": ["query"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var query = GetString(arguments, "query");
         var source = GetString(arguments, "source");

@@ -13,11 +13,10 @@ public sealed class ConvertTool : McpToolBase
     public override string Name => "calor_convert";
 
     public override string Description =>
-        "Convert C# source code to Calor. Returns generated Calor code and conversion issues. " +
-        "Module name defaults to the C# namespace in the source file. Pass moduleName to override. " +
-        "IMPORTANT: If the result contains §CSHARP interop blocks, check calor_syntax_lookup " +
-        "or calor_feature_support — many C# constructs (foreach, switch, async, yield, structs, " +
-        "events, operators, indexers, preprocessor directives) have native Calor equivalents.";
+        "Convert C# source code to Calor. Returns generated Calor code, conversion issues, and validation diagnostics.";
+
+    public override McpToolAnnotations? Annotations => new() { IdempotentHint = true };
+
 
     protected override string GetInputSchemaJson() => """
         {
@@ -29,11 +28,11 @@ public sealed class ConvertTool : McpToolBase
                 },
                 "inputPath": {
                     "type": "string",
-                    "description": "Path to a C# file to convert (alternative to source for large files)"
+                    "description": "Path to a C# file to convert (alternative to source)"
                 },
                 "outputPath": {
                     "type": "string",
-                    "description": "Path to write the generated Calor output file (optional)"
+                    "description": "Path to write the generated Calor output file"
                 },
                 "moduleName": {
                     "type": "string",
@@ -45,18 +44,23 @@ public sealed class ConvertTool : McpToolBase
                 },
                 "explain": {
                     "type": "boolean",
-                    "description": "Include detailed explanation of unsupported features in output (default: false)"
+                    "description": "Include detailed explanation of unsupported features (default: false)"
+                },
+                "validate": {
+                    "type": "boolean",
+                    "description": "Run full validation pipeline: auto-fix, diagnose, and compat check (default: false)"
                 },
                 "mode": {
                     "type": "string",
                     "enum": ["standard", "interop"],
-                    "description": "Conversion mode: 'standard' (default) produces TODO comments for unsupported code, 'interop' wraps unsupported members in §CSHARP{...}§/CSHARP blocks"
+                    "description": "Conversion mode: 'standard' (default) or 'interop' for §CSHARP blocks"
                 }
-            }
+            },
+            "additionalProperties": false
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var inputPath = GetString(arguments, "inputPath");

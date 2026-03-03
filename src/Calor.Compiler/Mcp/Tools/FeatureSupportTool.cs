@@ -15,6 +15,9 @@ public sealed class FeatureSupportTool : McpToolBase
     public override string Description =>
         "Query the Calor feature support registry. Returns support levels, descriptions, and workarounds for C# features during migration.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -28,11 +31,13 @@ public sealed class FeatureSupportTool : McpToolBase
                     "enum": ["Full", "Partial", "NotSupported", "ManualRequired"],
                     "description": "List all features at a specific support level"
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var feature = GetString(arguments, "feature");
         var supportLevelStr = GetString(arguments, "supportLevel");

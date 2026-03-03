@@ -16,6 +16,9 @@ public sealed class IdsTool : McpToolBase
     public override string Description =>
         "Manage Calor declaration IDs. Check for missing, duplicate, or invalid IDs and optionally assign new ones.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -47,10 +50,14 @@ public sealed class IdsTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

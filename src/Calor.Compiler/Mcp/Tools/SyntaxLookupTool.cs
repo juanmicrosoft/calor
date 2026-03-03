@@ -16,6 +16,9 @@ public sealed class SyntaxLookupTool : McpToolBase
     public override string Description =>
         "Look up Calor syntax for a C# construct. Supports fuzzy matching for queries like 'object instantiation', 'for loop', 'async method', etc.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -26,10 +29,14 @@ public sealed class SyntaxLookupTool : McpToolBase
                 }
             },
             "required": ["query"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var query = GetString(arguments, "query");
         if (string.IsNullOrWhiteSpace(query))

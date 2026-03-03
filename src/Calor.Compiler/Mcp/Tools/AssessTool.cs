@@ -16,6 +16,9 @@ public sealed class AssessTool : McpToolBase
         "(contracts, effects, null safety, error handling, pattern matching, API complexity, async, LINQ) " +
         "plus detection of unsupported C# constructs.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -46,11 +49,13 @@ public sealed class AssessTool : McpToolBase
                         }
                     }
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var filesElement = GetArray(arguments, "files");

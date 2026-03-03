@@ -16,6 +16,9 @@ public sealed class GuardDiscoveryTool : McpToolBase
         "Analyze failed obligations and discover the simplest guards (preconditions, if-guards) " +
         "that would discharge them. Returns ranked guard suggestions with Calor syntax.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -30,10 +33,14 @@ public sealed class GuardDiscoveryTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

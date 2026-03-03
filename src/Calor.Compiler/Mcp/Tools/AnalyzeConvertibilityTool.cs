@@ -16,6 +16,9 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
         "Combines static analysis of unsupported constructs with an actual conversion attempt " +
         "to produce a practical score (0-100) with blocker details.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -36,10 +39,14 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

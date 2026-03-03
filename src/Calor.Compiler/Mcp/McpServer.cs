@@ -55,6 +55,7 @@ public sealed class McpServer
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
         Log("MCP server starting...");
+        _handler.SetCancellation(cancellationToken);
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -101,9 +102,13 @@ public sealed class McpServer
     /// <summary>
     /// Reads a message from the input stream.
     /// MCP stdio uses newline-delimited JSON (NDJSON) - each message is a single line.
+    /// Rejects messages exceeding MaxMessageSize to prevent OOM.
     /// </summary>
     private async Task<string?> ReadMessageAsync(CancellationToken cancellationToken)
     {
+        // Maximum message size: 4 MB. Protects against malformed/malicious input.
+        const int MaxMessageSize = 4 * 1024 * 1024;
+
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -115,6 +120,12 @@ public sealed class McpServer
 
             if (!string.IsNullOrWhiteSpace(line))
             {
+                if (line.Length > MaxMessageSize)
+                {
+                    Log($"Rejected oversized message: {line.Length} bytes (max {MaxMessageSize})");
+                    continue;
+                }
+
                 Log($"Read message: {line.Length} bytes");
                 return line;
             }

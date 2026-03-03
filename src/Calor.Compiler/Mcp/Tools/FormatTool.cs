@@ -16,6 +16,9 @@ public sealed class FormatTool : McpToolBase
     public override string Description =>
         "Format Calor source code to canonical style. Returns the formatted code.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -26,10 +29,14 @@ public sealed class FormatTool : McpToolBase
                 }
             },
             "required": ["source"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))

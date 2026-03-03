@@ -17,6 +17,9 @@ public sealed class GotoDefinitionTool : McpToolBase
         "Provide either 'source' for inline code or 'filePath' to read from file. " +
         "Returns the definition location with file path, line, column, and preview.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -39,10 +42,14 @@ public sealed class GotoDefinitionTool : McpToolBase
                 }
             },
             "required": ["line", "column"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var filePath = GetString(arguments, "filePath");

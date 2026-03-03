@@ -16,6 +16,9 @@ public sealed class CompileTool : McpToolBase
     public override string Description =>
         "Compile Calor source code to C#. Returns generated C# code and any compilation diagnostics.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -64,11 +67,13 @@ public sealed class CompileTool : McpToolBase
                         }
                     }
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var projectPath = GetString(arguments, "projectPath");

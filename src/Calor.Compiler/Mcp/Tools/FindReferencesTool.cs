@@ -17,6 +17,9 @@ public sealed class FindReferencesTool : McpToolBase
         "Returns all locations where the symbol is used, including the definition. " +
         "Useful for understanding impact before refactoring.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -53,11 +56,13 @@ public sealed class FindReferencesTool : McpToolBase
                     "type": "boolean",
                     "description": "Group results by kind (definition, call_site, type_usage, reference) (default: false)"
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var filePath = GetString(arguments, "filePath");

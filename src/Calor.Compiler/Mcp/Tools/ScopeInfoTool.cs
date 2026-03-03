@@ -18,6 +18,9 @@ public sealed class ScopeInfoTool : McpToolBase
         "available functions, active contracts, and valid insertion points. " +
         "Useful for understanding what's available when writing new code.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -48,10 +51,14 @@ public sealed class ScopeInfoTool : McpToolBase
                 }
             },
             "required": ["line", "column"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var filePath = GetString(arguments, "filePath");

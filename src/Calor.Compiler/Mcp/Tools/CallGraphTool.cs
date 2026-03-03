@@ -18,6 +18,9 @@ public sealed class CallGraphTool : McpToolBase
         "Useful for understanding function dependencies and effect propagation. " +
         "Detects recursive cycles via strongly connected components.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -55,11 +58,13 @@ public sealed class CallGraphTool : McpToolBase
                     "type": "boolean",
                     "description": "Include effect annotations on each node (default: true)"
                 }
-            }
+            },
+
+            "additionalProperties": false
         }
         """;
 
-    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var filePath = GetString(arguments, "filePath");

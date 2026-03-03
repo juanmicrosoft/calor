@@ -17,6 +17,9 @@ public sealed class SymbolInfoTool : McpToolBase
         "Returns structured information including type, kind, contracts (preconditions/postconditions), " +
         "and a formatted signature.";
 
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+
+
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
@@ -39,10 +42,14 @@ public sealed class SymbolInfoTool : McpToolBase
                 }
             },
             "required": ["line", "column"]
+        ,
+
+        "additionalProperties": false
+
         }
         """;
 
-    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var filePath = GetString(arguments, "filePath");
