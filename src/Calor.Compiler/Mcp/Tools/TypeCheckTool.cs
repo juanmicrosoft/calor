@@ -49,7 +49,8 @@ public sealed class TypeCheckTool : McpToolBase
         {
             var options = new CompilationOptions
             {
-                EnableTypeChecking = true
+                EnableTypeChecking = true,
+                CancellationToken = cancellationToken
             };
 
             var result = Program.Compile(source, filePath, options);

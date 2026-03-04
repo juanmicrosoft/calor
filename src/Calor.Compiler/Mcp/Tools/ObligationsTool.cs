@@ -63,7 +63,8 @@ public sealed class ObligationsTool : McpToolBase
             {
                 VerifyRefinements = true,
                 VerificationTimeoutMs = timeout,
-                EnableTypeChecking = true
+                EnableTypeChecking = true,
+                CancellationToken = cancellationToken
             };
 
             var result = Program.Compile(source, "mcp_obligations.calr", options);

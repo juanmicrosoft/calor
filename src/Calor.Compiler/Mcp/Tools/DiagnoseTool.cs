@@ -72,7 +72,8 @@ public sealed class DiagnoseTool : McpToolBase
             var compileOptions = new CompilationOptions
             {
                 StrictApi = strictApi,
-                RequireDocs = requireDocs
+                RequireDocs = requireDocs,
+                CancellationToken = cancellationToken
             };
 
             var result = Program.Compile(source, "mcp-input.calr", compileOptions);

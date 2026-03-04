@@ -55,7 +55,8 @@ public sealed class BoundsCheckTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true
+                EnableTypeChecking = true,
+                CancellationToken = cancellationToken
             };
 
             Program.Compile(source, "mcp_bounds.calr", options);

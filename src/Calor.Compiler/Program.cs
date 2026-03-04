@@ -607,12 +607,14 @@ public class Program
         // Static contract verification with Z3 (optional)
         if (options.VerifyContracts)
         {
+            options.CancellationToken.ThrowIfCancellationRequested();
             phaseSw.Restart();
             var verificationOptions = new VerificationOptions
             {
                 Verbose = options.Verbose,
                 TimeoutMs = options.VerificationTimeoutMs,
-                CacheOptions = options.VerificationCacheOptions ?? VerificationCacheOptions.Default
+                CacheOptions = options.VerificationCacheOptions ?? VerificationCacheOptions.Default,
+                CancellationToken = options.CancellationToken
             };
             var verificationPass = new ContractVerificationPass(diagnostics, verificationOptions);
             options.VerificationResults = verificationPass.Verify(ast);
@@ -628,6 +630,7 @@ public class Program
         // Advanced verification analyses (dataflow, bug patterns, taint tracking)
         if (options.EnableVerificationAnalyses)
         {
+            options.CancellationToken.ThrowIfCancellationRequested();
             phaseSw.Restart();
             var analysisOptions = options.VerificationAnalysisOptions ?? Analysis.VerificationAnalysisOptions.Default;
             var analysisPass = new Analysis.VerificationAnalysisPass(diagnostics, analysisOptions);
@@ -828,6 +831,12 @@ public sealed class CompilationOptions
     /// Enable type checking phase.
     /// </summary>
     public bool EnableTypeChecking { get; init; }
+
+    /// <summary>
+    /// Cancellation token for aborting long-running operations (e.g., Z3 verification).
+    /// Checked between compilation phases and between individual contract verifications.
+    /// </summary>
+    public CancellationToken CancellationToken { get; init; }
 
     /// <summary>
     /// Enable refinement type verification (obligation generation + Z3 solving).

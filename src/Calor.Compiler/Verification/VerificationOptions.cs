@@ -30,6 +30,11 @@ public sealed class VerificationOptions
     public VerificationCacheOptions CacheOptions { get; init; } = VerificationCacheOptions.Default;
 
     /// <summary>
+    /// Cancellation token for aborting verification between contracts/functions.
+    /// </summary>
+    public CancellationToken CancellationToken { get; init; }
+
+    /// <summary>
     /// Default verification options.
     /// </summary>
     public static VerificationOptions Default { get; } = new();
