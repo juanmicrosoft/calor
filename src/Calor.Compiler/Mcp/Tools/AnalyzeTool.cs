@@ -83,7 +83,8 @@ public sealed class AnalyzeTool : McpToolBase
             {
                 EnableVerificationAnalyses = true,
                 VerificationAnalysisOptions = analysisOptions,
-                VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+                VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                CancellationToken = cancellationToken
             };
 
             var result = Program.Compile(source, "mcp-analyze.calr", compileOptions);

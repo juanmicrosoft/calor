@@ -54,7 +54,8 @@ public sealed class SuggestFixesTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true
+                EnableTypeChecking = true,
+                CancellationToken = cancellationToken
             };
 
             var result = Program.Compile(source, "mcp_suggest.calr", options);

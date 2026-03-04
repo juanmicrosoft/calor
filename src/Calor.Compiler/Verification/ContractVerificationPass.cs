@@ -57,6 +57,8 @@ public sealed class ContractVerificationPass
 
         foreach (var function in module.Functions)
         {
+            _options.CancellationToken.ThrowIfCancellationRequested();
+
             if (!function.HasContracts)
                 continue;
 

@@ -99,7 +99,7 @@ public sealed class CompileTool : McpToolBase
         // Batch mode: compile multiple files
         if (filePaths.Count > 0)
         {
-            return Task.FromResult(CompileBatch(filePaths, arguments));
+            return Task.FromResult(CompileBatch(filePaths, arguments, cancellationToken));
         }
 
         // Single-file mode
@@ -109,10 +109,10 @@ public sealed class CompileTool : McpToolBase
         }
 
         var filePath = GetString(arguments, "filePath") ?? "mcp-input.calr";
-        return Task.FromResult(CompileSingle(source, filePath, arguments));
+        return Task.FromResult(CompileSingle(source, filePath, arguments, cancellationToken));
     }
 
-    private McpToolResult CompileSingle(string source, string filePath, JsonElement? arguments)
+    private McpToolResult CompileSingle(string source, string filePath, JsonElement? arguments, CancellationToken cancellationToken)
     {
         var options = GetOptions(arguments);
 
@@ -144,7 +144,8 @@ public sealed class CompileTool : McpToolBase
                 StrictEffects = strictEffects,
                 VerifyContracts = verify,
                 EnableVerificationAnalyses = analyze,
-                VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+                VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                CancellationToken = cancellationToken
             };
 
             var result = Program.Compile(source, filePath, compileOptions);
@@ -195,7 +196,7 @@ public sealed class CompileTool : McpToolBase
         }
     }
 
-    private static McpToolResult CompileBatch(List<string> filePaths, JsonElement? arguments)
+    private static McpToolResult CompileBatch(List<string> filePaths, JsonElement? arguments, CancellationToken cancellationToken)
     {
         var results = new List<BatchFileCompileResult>();
         var totalErrors = 0;
@@ -224,7 +225,8 @@ public sealed class CompileTool : McpToolBase
                 {
                     ContractMode = ContractMode.Off,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
-                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                    CancellationToken = cancellationToken
                 };
 
                 var result = Program.Compile(source, path, compileOptions);

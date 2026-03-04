@@ -207,7 +207,8 @@ public sealed class ConvertValidatedTool : McpToolBase
                 var compileOptions = new CompilationOptions
                 {
                     EnforceEffects = false,
-                    UnknownCallPolicy = UnknownCallPolicy.Permissive
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    CancellationToken = cancellationToken
                 };
                 var compileResult = Program.Compile(calorSource, "validated-output.calr", compileOptions);
 

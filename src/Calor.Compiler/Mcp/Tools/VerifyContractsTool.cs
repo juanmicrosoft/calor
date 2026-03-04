@@ -55,7 +55,8 @@ public sealed class VerifyContractsTool : McpToolBase
             {
                 VerifyContracts = true,
                 VerificationTimeoutMs = (uint)timeout,
-                VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+                VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                CancellationToken = cancellationToken
             };
 
             var result = Program.Compile(source, "mcp-verify-contracts.calr", options);

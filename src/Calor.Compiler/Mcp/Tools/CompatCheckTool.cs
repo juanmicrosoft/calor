@@ -62,7 +62,7 @@ public sealed class CompatCheckTool : McpToolBase
         try
         {
             // Compile the Calor source to C#
-            var compileResult = Program.Compile(source, "mcp-input.calr", new CompilationOptions());
+            var compileResult = Program.Compile(source, "mcp-input.calr", new CompilationOptions { CancellationToken = cancellationToken });
 
             if (compileResult.HasErrors)
             {
