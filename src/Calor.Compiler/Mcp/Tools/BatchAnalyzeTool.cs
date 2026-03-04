@@ -133,6 +133,7 @@ public sealed class BatchAnalyzeTool : McpToolBase
 
             foreach (var file in csFiles)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var source = File.ReadAllText(file);
                 var result = quick
                     ? analyzer.AnalyzeQuick(source, file)

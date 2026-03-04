@@ -114,6 +114,7 @@ public sealed class ConvertTool : McpToolBase
             };
 
             var converter = new CSharpToCalorConverter(options);
+            cancellationToken.ThrowIfCancellationRequested();
             var result = converter.Convert(source);
 
             // Always compute explanation for unsupported feature summary
@@ -174,6 +175,7 @@ public sealed class ConvertTool : McpToolBase
             var success = result.Success;
             var calorSourceForOutput = result.CalorSource;
 
+            cancellationToken.ThrowIfCancellationRequested();
             if (success && !string.IsNullOrWhiteSpace(calorSourceForOutput))
             {
                 var parseResult = CalorSourceHelper.Parse(calorSourceForOutput, "converted-output.calr");

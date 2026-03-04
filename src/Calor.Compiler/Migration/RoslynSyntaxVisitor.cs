@@ -1456,6 +1456,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .Select(a => ConvertExpression(a.Expression))
                 .ToList();
 
+            // Hoist §NEW, §LAM, §ARR from constructor initializer args — parser can't handle them nested
+            HoistComplexArguments(args);
+
             initializer = new ConstructorInitializerNode(
                 GetTextSpan(node.Initializer),
                 isBase,
@@ -5874,14 +5877,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return CreateFallbackExpression(postfix, "postfix-operator");
     }
 
-    private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
+    /// <summary>
+    /// Hoists complex expression nodes (§NEW, §LAM, §ARR) from argument lists to temp bindings.
+    /// The parser cannot handle these nested inside §C or constructor initializer arguments.
+    /// </summary>
+    private void HoistComplexArguments(List<ExpressionNode> args)
     {
-        var target = invocation.Expression.ToString();
-        var args = invocation.ArgumentList.Arguments
-            .Select(a => ConvertExpression(a.Expression))
-            .ToList();
-
-        // Hoist §NEW and §LAM arguments to temp bindings — the parser cannot handle them nested inside §C
         for (int i = 0; i < args.Count; i++)
         {
             if (args[i] is NewExpressionNode)
@@ -5898,7 +5899,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                 args[i] = new ReferenceNode(args[i].Span, tempName);
             }
+            else if (args[i] is ArrayCreationNode)
+            {
+                var tempName = _context.GenerateId("_arr");
+                _pendingStatements.Add(new BindStatementNode(
+                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                args[i] = new ReferenceNode(args[i].Span, tempName);
+            }
         }
+    }
+
+    private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
+    {
+        var target = invocation.Expression.ToString();
+        var args = invocation.ArgumentList.Arguments
+            .Select(a => ConvertExpression(a.Expression))
+            .ToList();
+
+        // Hoist §NEW, §LAM, §ARR arguments to temp bindings — the parser cannot handle them nested inside §C
+        HoistComplexArguments(args);
 
         var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
         var argNames = hasNamedArgs

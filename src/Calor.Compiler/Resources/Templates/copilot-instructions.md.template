@@ -15,12 +15,27 @@ This project uses **Calor**, a DSL that compiles to C# on .NET 10. The Calor MCP
 
 | Category | Tools |
 |----------|-------|
-| **Compile & Verify** | `calor_compile`, `calor_verify`, `calor_analyze`, `calor_diagnose` |
-| **Convert** | `calor_convert`, `calor_assess`, `calor_batch_convert` |
-| **Navigate** | `calor_goto_definition`, `calor_find_references`, `calor_symbol_info`, `calor_document_outline`, `calor_find_symbol` |
-| **Syntax** | `calor_syntax_lookup`, `calor_explain_error`, `calor_feature_support` |
-| **Edit Support** | `calor_edit_preview`, `calor_impact_analysis`, `calor_lint`, `calor_format` |
+| **Compile & Verify** | `calor_compile`, `calor_verify`, `calor_verify_contracts`, `calor_analyze`, `calor_diagnose`, `calor_diagnose_refinement` |
+| **Convert** | `calor_convert`, `calor_convert_validated`, `calor_assess`, `calor_batch_convert`, `calor_analyze_convertibility` |
+| **Navigate** | `calor_goto_definition`, `calor_find_references`, `calor_symbol_info`, `calor_document_outline`, `calor_find_symbol`, `calor_call_graph`, `calor_scope_info` |
+| **Syntax** | `calor_syntax_lookup`, `calor_syntax_help`, `calor_explain_error`, `calor_feature_support`, `calor_validate_snippet` |
+| **Edit Support** | `calor_edit_preview`, `calor_impact_analysis`, `calor_lint`, `calor_format`, `calor_ids` |
+| **Type System** | `calor_typecheck`, `calor_suggest_types`, `calor_compile_check_compat` |
 | **Refinement** | `calor_obligations`, `calor_suggest_fixes`, `calor_discover_guards`, `calor_bounds_check` |
+| **Migration** | `calor_batch_analyze`, `calor_roundtrip_check`, `calor_get_example`, `calor_csharp_minimize` |
+| **Diagnostics** | `calor_self_test` |
+
+### C# Feature Support for Conversion
+
+Most C# features convert cleanly to Calor. Key supported features include:
+
+**Fully supported**: classes, structs, interfaces, enums, records, abstract/sealed/static classes, generics (including nested/constrained), inheritance, properties (auto/computed/init), fields, constructors (with base/this chains), methods (virtual/override/abstract/async), operators (including implicit/explicit conversion), indexers, events, delegates, lambdas, LINQ, pattern matching (type/constant/relational/logical and/or/not/var/discard/tuple/positional patterns), switch expressions, nullable types, string interpolation, collection expressions, goto/label, yield return/break, throw expressions, lock, stackalloc, volatile, extension methods, using declarations, with expressions, required members, primary constructors, range/index expressions, null-coalescing/null-conditional, tuples, named arguments, attributes.
+
+**Partial support** (most usage converts): is-pattern with complex recursion, implicit `new()` with arguments, checked/unchecked blocks (wrapper stripped, body preserved), ref/out parameters, dynamic types, generic method expressions.
+
+**Not yet supported**: list/slice patterns (`[a, ..rest]`), `ref struct`, `static abstract` interface members, `in` parameters, mixed collection spread (`[1, ..other]`), `await foreach`/`await using`.
+
+Use `calor_feature_support` to check specific features, or `calor_batch_analyze` to assess an entire project.
 
 ### Quick Syntax Reference
 

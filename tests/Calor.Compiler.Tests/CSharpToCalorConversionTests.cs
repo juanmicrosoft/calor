@@ -4050,6 +4050,100 @@ public class CSharpToCalorConversionTests
 
     #endregion
 
+    #region Hoisting Bug Fix Tests
+
+    [Fact]
+    public void Convert_LambdaInBaseConstructorCall_ParsesWithoutErrors()
+    {
+        var csharpSource = """
+            class Registry<T> { public Registry(Func<string, T> factory) { } }
+            class FormatterRegistry : Registry<string>
+            {
+                public FormatterRegistry() : base(c => new object()) { }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.NotEmpty(result.CalorSource!);
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        parser.Parse();
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors in converted Calor:\n{string.Join("\n", diagnostics.Select(d => d.Message))}\nCalor source:\n{result.CalorSource}");
+
+        var compiled = Program.Compile(result.CalorSource!);
+        Assert.False(compiled.HasErrors,
+            $"Compilation errors in converted Calor:\n{string.Join("\n", compiled.Diagnostics.Where(d => d.IsError).Select(d => d.Message))}\nCalor source:\n{result.CalorSource}");
+    }
+
+    [Fact]
+    public void Convert_NewExpressionInThisConstructorCall_ParsesWithoutErrors()
+    {
+        var csharpSource = """
+            class Formatter
+            {
+                private readonly object _config;
+                public Formatter(object config) { _config = config; }
+                public Formatter(string name) : this(new object()) { }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.NotEmpty(result.CalorSource!);
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        parser.Parse();
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors in converted Calor:\n{string.Join("\n", diagnostics.Select(d => d.Message))}\nCalor source:\n{result.CalorSource}");
+
+        var compiled = Program.Compile(result.CalorSource!);
+        Assert.False(compiled.HasErrors,
+            $"Compilation errors in converted Calor:\n{string.Join("\n", compiled.Diagnostics.Where(d => d.IsError).Select(d => d.Message))}\nCalor source:\n{result.CalorSource}");
+    }
+
+    [Fact]
+    public void Convert_ArrayExpressionInMethodCallArguments_ParsesWithoutErrors()
+    {
+        var csharpSource = """
+            class Splitter
+            {
+                public string Process(string input)
+                {
+                    return string.Join(" ", input.Split(new char[] { '_', '-' }));
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharpSource);
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.NotEmpty(result.CalorSource!);
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(result.CalorSource!, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+        parser.Parse();
+        Assert.False(diagnostics.HasErrors,
+            $"Parse errors in converted Calor:\n{string.Join("\n", diagnostics.Select(d => d.Message))}\nCalor source:\n{result.CalorSource}");
+
+        var compiled = Program.Compile(result.CalorSource!);
+        Assert.False(compiled.HasErrors,
+            $"Compilation errors in converted Calor:\n{string.Join("\n", compiled.Diagnostics.Where(d => d.IsError).Select(d => d.Message))}\nCalor source:\n{result.CalorSource}");
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static string GetErrorMessage(ConversionResult result)
