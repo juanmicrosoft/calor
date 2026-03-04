@@ -150,6 +150,7 @@ public sealed class CompileTool : McpToolBase
                 CancellationToken = cancellationToken
             };
 
+            cancellationToken.ThrowIfCancellationRequested();
             var result = Program.Compile(source, filePath, compileOptions);
 
             var output = new CompileToolOutput
@@ -206,6 +207,7 @@ public sealed class CompileTool : McpToolBase
 
         foreach (var path in filePaths)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 if (!File.Exists(path))

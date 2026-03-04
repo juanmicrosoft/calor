@@ -128,6 +128,7 @@ public sealed class BatchConvertTool : McpToolBase
             };
 
             var migrator = new ProjectMigrator(options);
+            cancellationToken.ThrowIfCancellationRequested();
             var plan = await migrator.CreatePlanAsync(projectPath, MigrationDirection.CSharpToCalor);
 
             // Override output directory if specified by rebuilding entries with new output paths
@@ -174,6 +175,7 @@ public sealed class BatchConvertTool : McpToolBase
                 };
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             var report = dryRun
                 ? await migrator.DryRunAsync(plan)
                 : await migrator.ExecuteAsync(plan);

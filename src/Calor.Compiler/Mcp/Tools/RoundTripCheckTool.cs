@@ -53,6 +53,7 @@ public sealed class RoundTripCheckTool : McpToolBase
         var compilationSuccess = false;
 
         // Step 1: Convert C# → Calor
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var options = new ConversionOptions
@@ -86,6 +87,7 @@ public sealed class RoundTripCheckTool : McpToolBase
         }
 
         // Step 2: Compile Calor → C#
+        cancellationToken.ThrowIfCancellationRequested();
         if (conversionSuccess && !string.IsNullOrWhiteSpace(calorSource))
         {
             try
@@ -93,7 +95,8 @@ public sealed class RoundTripCheckTool : McpToolBase
                 var compileOptions = new CompilationOptions
                 {
                     ContractMode = ContractMode.Off,
-                    UnknownCallPolicy = Effects.UnknownCallPolicy.Permissive
+                    UnknownCallPolicy = Effects.UnknownCallPolicy.Permissive,
+                    CancellationToken = cancellationToken
                 };
 
                 var compileResult = Program.Compile(calorSource, "roundtrip.calr", compileOptions);

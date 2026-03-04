@@ -23,6 +23,15 @@ public class FeatureCheckCommandTests
     [InlineData("equals-operator", SupportLevel.Full)]
     [InlineData("linq-method", SupportLevel.Full)]
     [InlineData("linq-query", SupportLevel.Full)]
+    [InlineData("goto", SupportLevel.Full)]
+    [InlineData("labeled-statement", SupportLevel.Full)]
+    [InlineData("postfix-operator", SupportLevel.Full)]
+    [InlineData("is-type-pattern", SupportLevel.Full)]
+    [InlineData("declaration-pattern", SupportLevel.Full)]
+    [InlineData("throw-expression", SupportLevel.Full)]
+    [InlineData("nested-generic-type", SupportLevel.Full)]
+    [InlineData("binary pattern (and/or)", SupportLevel.Full)]
+    [InlineData("unary pattern (not)", SupportLevel.Full)]
     public void FeatureCheck_FullySupported_ReturnsFullLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -47,7 +56,6 @@ public class FeatureCheckCommandTests
     }
 
     [Theory]
-    [InlineData("goto", SupportLevel.NotSupported)]
     [InlineData("await-foreach", SupportLevel.NotSupported)]
     [InlineData("file-scoped-type", SupportLevel.NotSupported)]
     [InlineData("utf8-string-literal", SupportLevel.NotSupported)]
@@ -116,7 +124,7 @@ public class FeatureCheckCommandTests
     #region Workarounds
 
     [Theory]
-    [InlineData("goto")]
+    [InlineData("await-foreach")]
     public void FeatureCheck_UnsupportedFeature_HasWorkaround(string feature)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -129,7 +137,7 @@ public class FeatureCheckCommandTests
     [Fact]
     public void FeatureCheck_GetWorkaround_ReturnsWorkaroundText()
     {
-        var workaround = FeatureSupport.GetWorkaround("goto");
+        var workaround = FeatureSupport.GetWorkaround("await-foreach");
 
         Assert.NotNull(workaround);
         Assert.NotEmpty(workaround);

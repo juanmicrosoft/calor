@@ -291,16 +291,14 @@ public static class FeatureSupport
         ["goto"] = new FeatureInfo
         {
             Name = "goto",
-            Support = SupportLevel.NotSupported,
-            Description = "Goto statements are not supported",
-            Workaround = "Refactor to use structured control flow"
+            Support = SupportLevel.Full,
+            Description = "Goto statements are converted to §GOTO{label} nodes"
         },
         ["labeled-statement"] = new FeatureInfo
         {
             Name = "labeled-statement",
-            Support = SupportLevel.NotSupported,
-            Description = "Labeled statements are not supported",
-            Workaround = "Refactor to use structured control flow"
+            Support = SupportLevel.Full,
+            Description = "Labeled statements are converted to §LABEL{name} nodes"
         },
         ["unsafe"] = new FeatureInfo
         {
@@ -369,9 +367,8 @@ public static class FeatureSupport
         ["is-type-pattern"] = new FeatureInfo
         {
             Name = "is-type-pattern",
-            Support = SupportLevel.Partial,
-            Description = "Type patterns (is Type) are partially supported; declaration patterns (is Type varName) are not",
-            Workaround = "Use GetType() comparison or explicit type checks with separate variable declaration"
+            Support = SupportLevel.Full,
+            Description = "Type test patterns (is Type) are fully supported via TypeOperationNode"
         },
         ["generic-method-expression"] = new FeatureInfo
         {
@@ -428,16 +425,14 @@ public static class FeatureSupport
         ["declaration-pattern"] = new FeatureInfo
         {
             Name = "declaration-pattern",
-            Support = SupportLevel.Partial,
-            Description = "Declaration patterns (is Type varName) are converted via TypeOperationNode",
-            Workaround = "Review converted type checks for variable binding correctness"
+            Support = SupportLevel.Full,
+            Description = "Declaration patterns (is Type name) are fully supported via TypeOperationNode with variable binding"
         },
         ["throw-expression"] = new FeatureInfo
         {
             Name = "throw-expression",
-            Support = SupportLevel.Partial,
-            Description = "Throw expressions are converted to §ERR nodes",
-            Workaround = "Review converted §ERR expressions for error semantics"
+            Support = SupportLevel.Full,
+            Description = "Throw expressions are converted to §ERR nodes"
         },
         ["nameof"] = new FeatureInfo
         {
@@ -448,9 +443,8 @@ public static class FeatureSupport
         ["nested-generic-type"] = new FeatureInfo
         {
             Name = "nested-generic-type",
-            Support = SupportLevel.Partial,
-            Description = "Nested generic types (Expression<Func<T, U>>) may have issues",
-            Workaround = "Simplify generic nesting where possible"
+            Support = SupportLevel.Full,
+            Description = "Nested generic types like Dictionary<string, List<int>> are fully supported with inline angle bracket syntax"
         },
         ["nested-type"] = new FeatureInfo
         {
@@ -623,9 +617,8 @@ public static class FeatureSupport
         ["complex-is-pattern"] = new FeatureInfo
         {
             Name = "complex-is-pattern",
-            Support = SupportLevel.NotSupported,
-            Description = "Complex 'is' pattern matching expression",
-            Workaround = "Break down into simpler type checks or use match expression"
+            Support = SupportLevel.Partial,
+            Description = "Simple is-patterns are fully supported. Complex recursive patterns with nested property checks may fall back to §CSHARP"
         },
         ["collection-spread"] = new FeatureInfo
         {
@@ -637,23 +630,20 @@ public static class FeatureSupport
         ["implicit-new-with-args"] = new FeatureInfo
         {
             Name = "implicit-new-with-args",
-            Support = SupportLevel.NotSupported,
-            Description = "Target-typed new with arguments: new(args)",
-            Workaround = "Use explicit type: new TypeName(args)"
+            Support = SupportLevel.Partial,
+            Description = "Target-typed new expressions are supported but type inference uses 'object' placeholder when target type cannot be determined"
         },
         ["binary pattern (and/or)"] = new FeatureInfo
         {
             Name = "binary pattern (and/or)",
-            Support = SupportLevel.NotSupported,
-            Description = "Pattern combinators: pattern1 and pattern2, pattern1 or pattern2",
-            Workaround = "Use separate match cases or if-else with explicit conditions"
+            Support = SupportLevel.Full,
+            Description = "Pattern combinators (and/or) are converted to AndPatternNode/OrPatternNode"
         },
         ["unary pattern (not)"] = new FeatureInfo
         {
             Name = "unary pattern (not)",
-            Support = SupportLevel.NotSupported,
-            Description = "Negated patterns: not null, not 0",
-            Workaround = "Use guard clause with negated condition"
+            Support = SupportLevel.Full,
+            Description = "Negated patterns (not) are converted to NegatedPatternNode"
         },
         ["unknown-pattern"] = new FeatureInfo
         {
@@ -665,16 +655,14 @@ public static class FeatureSupport
         ["complex-recursive-pattern"] = new FeatureInfo
         {
             Name = "complex-recursive-pattern",
-            Support = SupportLevel.NotSupported,
-            Description = "Complex recursive pattern without clear type",
-            Workaround = "Use positional or property patterns with explicit type"
+            Support = SupportLevel.Partial,
+            Description = "Property patterns and positional patterns are supported. Deeply nested recursive patterns may need manual review"
         },
         ["postfix-operator"] = new FeatureInfo
         {
             Name = "postfix-operator",
-            Support = SupportLevel.NotSupported,
-            Description = "Postfix increment/decrement as expression: i++, i--",
-            Workaround = "Use as statement or rewrite as x = x + 1"
+            Support = SupportLevel.Full,
+            Description = "Postfix i++/i-- is supported via hoisting strategy — original value is preserved in a temp variable"
         },
         ["default-parameter"] = new FeatureInfo
         {
