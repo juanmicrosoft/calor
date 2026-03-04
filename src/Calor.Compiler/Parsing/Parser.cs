@@ -2448,7 +2448,12 @@ public sealed class Parser
     private IntLiteralNode ParseIntLiteral()
     {
         var token = Expect(TokenKind.IntLiteral);
-        var value = token.Value is int i ? i : 0;
+        var value = token.Value switch
+        {
+            int i => (long)i,
+            long l => l,
+            _ => 0L
+        };
         return new IntLiteralNode(token.Span, value);
     }
 

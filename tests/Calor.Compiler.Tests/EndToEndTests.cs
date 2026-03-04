@@ -370,4 +370,81 @@ public class EndToEndTests
         // Should be warnings, not errors
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.CodeGenSyntaxError && d.IsError);
     }
+
+    #region Long Literal Round-Trip Tests
+
+    [Fact]
+    public void Compile_LongLiteral_EmitsWithLSuffix()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:GetBigValue:pub}
+              §O{i64}
+              §R 1000000000000
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("1000000000000L", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void Compile_IntLiteral_NoLSuffix()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:GetValue:pub}
+              §O{i32}
+              §R 42
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("return 42;", result.GeneratedCode);
+        Assert.DoesNotContain("42L", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void Compile_NegativeLongLiteral_EmitsWithLSuffix()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:GetNeg:pub}
+              §O{i64}
+              §R -3000000000
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("-3000000000L", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void Compile_NumericSeparator_ParsesCorrectly()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:GetMillion:pub}
+              §O{i32}
+              §R 1_000_000
+            §/F{f001}
+            §/M{m001}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Select(d => d.Message)));
+        Assert.Contains("return 1000000;", result.GeneratedCode);
+    }
+
+    #endregion
 }

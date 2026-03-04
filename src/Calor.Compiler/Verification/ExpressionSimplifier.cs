@@ -108,7 +108,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         };
     }
 
-    private ExpressionNode? TryFoldIntegerBinaryOp(TextSpan span, BinaryOperator op, int left, int right)
+    private ExpressionNode? TryFoldIntegerBinaryOp(TextSpan span, BinaryOperator op, long left, long right)
     {
         return op switch
         {
@@ -126,8 +126,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             BinaryOperator.BitwiseAnd => new IntLiteralNode(span, left & right),
             BinaryOperator.BitwiseOr => new IntLiteralNode(span, left | right),
             BinaryOperator.BitwiseXor => new IntLiteralNode(span, left ^ right),
-            BinaryOperator.LeftShift => new IntLiteralNode(span, left << right),
-            BinaryOperator.RightShift => new IntLiteralNode(span, left >> right),
+            BinaryOperator.LeftShift => new IntLiteralNode(span, left << (int)right),
+            BinaryOperator.RightShift => new IntLiteralNode(span, left >> (int)right),
             _ => null
         };
     }

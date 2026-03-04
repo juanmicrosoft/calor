@@ -427,4 +427,24 @@ public class ConvertToolTests
         Assert.Contains("source", text.ToLower());
         Assert.Contains("inputPath", text);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WithLongLiteral_PreservesValue()
+    {
+        var args = JsonDocument.Parse("""
+            {
+                "source": "public class Test { public long GetBig() => 1000000000000L; }",
+                "moduleName": "TestModule"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text!;
+        Assert.Contains("success", text);
+        // The converted Calor should contain the full value, not a truncated int
+        Assert.Contains("1000000000000", text);
+        Assert.DoesNotContain("-1486618624", text); // This was the old truncated value
+    }
 }

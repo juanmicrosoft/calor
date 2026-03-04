@@ -16,9 +16,9 @@ public abstract class ExpressionNode : AstNode
 /// </summary>
 public sealed class IntLiteralNode : ExpressionNode
 {
-    public int Value { get; }
+    public long Value { get; }
 
-    public IntLiteralNode(TextSpan span, int value) : base(span)
+    public IntLiteralNode(TextSpan span, long value) : base(span)
     {
         Value = value;
     }

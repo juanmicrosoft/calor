@@ -240,4 +240,132 @@ public class LexerTests
         Assert.Equal(TokenKind.Identifier, tokens[3].Kind);
         Assert.Equal("defaultValue", tokens[3].Text);
     }
+
+    #region Long Literal and Numeric Separator Tests
+
+    [Fact]
+    public void Tokenize_LongLiteral_TypedPrefix_ReturnsCorrectValue()
+    {
+        var tokens = Tokenize("INT:1000000000000", out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
+        Assert.Equal(1000000000000L, tokens[0].Value);
+    }
+
+    [Fact]
+    public void Tokenize_LongLiteral_Bare_ReturnsCorrectValue()
+    {
+        // Bare numeric literal (no INT: prefix) that exceeds int range
+        var source = """
+            §M{m001:Test}
+            §F{f001:Foo:pub}
+              §O{i64}
+              §R 1000000000000
+            §/F{f001}
+            §/M{m001}
+            """;
+        var tokens = Tokenize(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        var intToken = tokens.First(t => t.Kind == TokenKind.IntLiteral);
+        Assert.Equal(1000000000000L, intToken.Value);
+    }
+
+    [Fact]
+    public void Tokenize_LongLiteral_NegativeOutOfIntRange_ReturnsCorrectValue()
+    {
+        var tokens = Tokenize("INT:-3000000000", out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
+        Assert.Equal(-3000000000L, tokens[0].Value);
+    }
+
+    [Fact]
+    public void Tokenize_HexLiteral_ExceedsIntRange_ReturnsLongValue()
+    {
+        // 0xFFFFFFFFFF = 1099511627775, exceeds int.MaxValue
+        var tokens = Tokenize("INT:0xFFFFFFFFFF", out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
+        Assert.Equal(0xFFFFFFFFFFL, tokens[0].Value);
+    }
+
+    [Fact]
+    public void Tokenize_HexLiteral_BareExceedsIntRange_ReturnsLongValue()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Foo:pub}
+              §O{i64}
+              §R 0xFFFFFFFFFF
+            §/F{f001}
+            §/M{m001}
+            """;
+        var tokens = Tokenize(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        var intToken = tokens.First(t => t.Kind == TokenKind.IntLiteral);
+        Assert.Equal(0xFFFFFFFFFFL, intToken.Value);
+    }
+
+    [Fact]
+    public void Tokenize_NumericSeparator_IntRange_ReturnsCorrectValue()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Foo:pub}
+              §O{i32}
+              §R 1_000_000
+            §/F{f001}
+            §/M{m001}
+            """;
+        var tokens = Tokenize(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        var intToken = tokens.First(t => t.Kind == TokenKind.IntLiteral);
+        Assert.Equal(1_000_000, intToken.Value);
+    }
+
+    [Fact]
+    public void Tokenize_NumericSeparator_LongRange_ReturnsCorrectValue()
+    {
+        var source = """
+            §M{m001:Test}
+            §F{f001:Foo:pub}
+              §O{i64}
+              §R 1_000_000_000_000
+            §/F{f001}
+            §/M{m001}
+            """;
+        var tokens = Tokenize(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        var intToken = tokens.First(t => t.Kind == TokenKind.IntLiteral);
+        Assert.Equal(1_000_000_000_000L, intToken.Value);
+    }
+
+    [Fact]
+    public void Tokenize_IntLiteralAtBoundary_MaxInt_ReturnsInt()
+    {
+        var tokens = Tokenize("INT:2147483647", out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
+        Assert.Equal(2147483647, tokens[0].Value); // int.MaxValue stored as int
+    }
+
+    [Fact]
+    public void Tokenize_IntLiteralAtBoundary_MaxIntPlusOne_ReturnsLong()
+    {
+        var tokens = Tokenize("INT:2147483648", out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
+        Assert.Equal(2147483648L, tokens[0].Value); // int.MaxValue + 1 stored as long
+    }
+
+    #endregion
 }

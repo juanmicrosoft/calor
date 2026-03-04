@@ -169,18 +169,36 @@ public sealed class BatchConvertTool : McpToolBase
                 ? await migrator.DryRunAsync(plan)
                 : await migrator.ExecuteAsync(plan);
 
-            var fileResults = report.FileResults.Select(f => new BatchFileResult
+            var fileResults = report.FileResults.Select(f =>
             {
-                SourcePath = f.SourcePath,
-                OutputPath = f.OutputPath,
-                Status = f.Status.ToString().ToLowerInvariant(),
-                DurationMs = (int)f.Duration.TotalMilliseconds,
-                ErrorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
-                WarningCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning),
-                Errors = f.Issues
-                    .Where(i => i.Severity == ConversionIssueSeverity.Error)
-                    .Select(i => i.Message)
-                    .ToList()
+                var errorIssues = f.Issues
+                    .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
+                    .ToList();
+
+                return new BatchFileResult
+                {
+                    SourcePath = f.SourcePath,
+                    OutputPath = f.OutputPath,
+                    Status = f.Status.ToString().ToLowerInvariant(),
+                    DurationMs = (int)f.Duration.TotalMilliseconds,
+                    ErrorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
+                    WarningCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning),
+                    Errors = errorIssues
+                        .Where(i => i.Severity == ConversionIssueSeverity.Error)
+                        .Select(i => i.Message)
+                        .ToList() is { Count: > 0 } errs ? errs : null,
+                    Issues = errorIssues
+                        .Select(i => new BatchIssue
+                        {
+                            Severity = i.Severity == ConversionIssueSeverity.Error ? "error" : "warning",
+                            Message = i.Message,
+                            Line = i.Line,
+                            Column = i.Column,
+                            Category = i.Feature,
+                            Suggestion = i.Suggestion
+                        })
+                        .ToList()
+                };
             }).ToList();
 
             // Add feature hint recommendation if any files had interop blocks
@@ -282,5 +300,34 @@ public sealed class BatchConvertTool : McpToolBase
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? Errors { get; init; }
+
+        [JsonPropertyName("issues")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<BatchIssue>? Issues { get; init; }
+    }
+
+    private sealed class BatchIssue
+    {
+        [JsonPropertyName("severity")]
+        public required string Severity { get; init; }
+
+        [JsonPropertyName("message")]
+        public required string Message { get; init; }
+
+        [JsonPropertyName("line")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Line { get; init; }
+
+        [JsonPropertyName("column")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Column { get; init; }
+
+        [JsonPropertyName("category")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Category { get; init; }
+
+        [JsonPropertyName("suggestion")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Suggestion { get; init; }
     }
 }

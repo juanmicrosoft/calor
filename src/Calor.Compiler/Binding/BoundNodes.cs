@@ -255,10 +255,10 @@ public sealed class BoundBinaryExpression : BoundExpression
 /// </summary>
 public sealed class BoundIntLiteral : BoundExpression
 {
-    public int Value { get; }
-    public override string TypeName => "INT";
+    public long Value { get; }
+    public override string TypeName => Value is > int.MaxValue or < int.MinValue ? "LONG" : "INT";
 
-    public BoundIntLiteral(TextSpan span, int value)
+    public BoundIntLiteral(TextSpan span, long value)
         : base(span)
     {
         Value = value;
