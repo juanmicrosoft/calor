@@ -71,11 +71,15 @@ public class UnsupportedFeatureTelemetryTests
         var csharp = """
             public class Test
             {
-                public void Method()
+                public void Method(int x)
                 {
-                    goto end;
-                    end:
-                    return;
+                    switch (x)
+                    {
+                        case 1:
+                            goto case 2;
+                        case 2:
+                            break;
+                    }
                 }
             }
             """;
@@ -89,7 +93,7 @@ public class UnsupportedFeatureTelemetryTests
         var explanation = result.Context.GetExplanation();
 
         Assert.True(explanation.TotalUnsupportedCount > 0,
-            "Expected at least one unsupported feature to be recorded for goto");
+            "Expected at least one unsupported feature to be recorded for goto-case");
         Assert.True(explanation.GetFeatureCounts().Count > 0,
             "Expected GetFeatureCounts() to return at least one entry");
     }
@@ -99,20 +103,24 @@ public class UnsupportedFeatureTelemetryTests
     {
         var csharp = """
             using System;
-            public class UnsafeExample
+            public class GotoCaseExample
             {
-                public void Run()
+                public void Run(int x)
                 {
-                    goto done;
-                    done:
-                    Console.WriteLine("done");
+                    switch (x)
+                    {
+                        case 1: goto case 2;
+                        case 2: Console.WriteLine("done"); break;
+                    }
                 }
 
-                public void Another()
+                public void Another(int y)
                 {
-                    goto skip;
-                    skip:
-                    return;
+                    switch (y)
+                    {
+                        case 3: goto case 4;
+                        case 4: break;
+                    }
                 }
             }
             """;
@@ -412,8 +420,22 @@ public class UnsupportedFeatureTelemetryTests
         var csharp = """
             public class Test
             {
-                public void A() { goto x; x: return; }
-                public void B() { goto y; y: return; }
+                public void A(int x)
+                {
+                    switch (x)
+                    {
+                        case 1: goto case 2;
+                        case 2: break;
+                    }
+                }
+                public void B(int y)
+                {
+                    switch (y)
+                    {
+                        case 3: goto case 4;
+                        case 4: break;
+                    }
+                }
             }
             """;
 

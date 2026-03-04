@@ -62,6 +62,8 @@ public sealed class Lexer
         ["/SW"] = TokenKind.EndMatch,       // §/SW
         ["BK"] = TokenKind.Break,           // §BK = Break
         ["CN"] = TokenKind.Continue,        // §CN = Continue
+        ["GOTO"] = TokenKind.Goto,          // §GOTO{label} = Goto
+        ["LABEL"] = TokenKind.Label,        // §LABEL{label} = Label
         ["BODY"] = TokenKind.Body,          // §BODY - explicit body start (optional)
         ["END_BODY"] = TokenKind.EndBody,   // §END_BODY - explicit body end (optional)
 
@@ -691,6 +693,18 @@ public sealed class Lexer
             return ScanRawCSharpExpression();
         }
 
+        // Special handling for §GOTO{label}: goto statement with label content
+        if (fullKeyword.Equals("GOTO", StringComparison.Ordinal) && Current == '{')
+        {
+            return ScanBraceContent(TokenKind.Goto);
+        }
+
+        // Special handling for §LABEL{label}: label definition with label content
+        if (fullKeyword.Equals("LABEL", StringComparison.Ordinal) && Current == '{')
+        {
+            return ScanBraceContent(TokenKind.Label);
+        }
+
         // Special handling for §PP{CONDITION}: preprocessor conditional start
         if (fullKeyword.Equals("PP", StringComparison.Ordinal) && Current == '{')
         {
@@ -912,6 +926,32 @@ public sealed class Lexer
         var condition = _source[contentStart.._position];
         Advance(); // consume closing '}'
         return MakeToken(kind, condition);
+    }
+
+    /// <summary>
+    /// Scans simple brace content for section markers like §GOTO{label} or §LABEL{label}.
+    /// Called after the keyword has been consumed and '{' is the current character.
+    /// </summary>
+    private Token ScanBraceContent(TokenKind kind)
+    {
+        Advance(); // consume '{'
+        var contentStart = _position;
+
+        while (!IsAtEnd && Current != '}')
+        {
+            Advance();
+        }
+
+        if (IsAtEnd)
+        {
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedCSharpInteropBlock,
+                $"Unterminated section marker: expected matching '}}' before end of file.");
+            return MakeToken(TokenKind.Error);
+        }
+
+        var content = _source[contentStart.._position];
+        Advance(); // consume closing '}'
+        return MakeToken(kind, content);
     }
 
     /// <summary>

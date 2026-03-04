@@ -13,6 +13,8 @@ public sealed class CompileTool : McpToolBase
 {
     public override string Name => "calor_compile";
 
+    public override int TimeoutSeconds => 120;
+
     public override string Description =>
         "Compile Calor source code to C#. Returns generated C# code and any compilation diagnostics.";
 

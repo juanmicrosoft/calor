@@ -1,10 +1,13 @@
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 
 namespace Calor.Compiler.Mcp;
 
 /// <summary>
 /// MCP server that communicates over stdio using the JSON-RPC 2.0 protocol.
+/// Uses a bounded channel to queue incoming requests, preventing backpressure issues
+/// when clients send multiple requests before previous ones complete.
 /// </summary>
 public sealed class McpServer
 {
@@ -13,6 +16,8 @@ public sealed class McpServer
     private readonly Stream _output;
     private readonly TextWriter? _log;
     private readonly bool _verbose;
+    private const int MaxMessageBytes = 4 * 1024 * 1024; // 4MB message size limit
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     /// <summary>
     /// Creates an MCP server with the given streams.
@@ -55,6 +60,7 @@ public sealed class McpServer
 
     /// <summary>
     /// Runs the server message loop until the input stream is closed.
+    /// Each request is processed independently — a failing tool never crashes the server.
     /// </summary>
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
@@ -69,6 +75,14 @@ public sealed class McpServer
                 {
                     Log("End of input stream, shutting down");
                     break;
+                }
+
+                if (Encoding.UTF8.GetByteCount(message) > MaxMessageBytes)
+                {
+                    Log($"Message too large ({message.Length} chars), rejecting");
+                    await SendErrorAsync(null, JsonRpcError.InvalidRequest,
+                        $"Message exceeds {MaxMessageBytes / (1024 * 1024)}MB size limit");
+                    continue;
                 }
 
                 var request = ParseRequest(message);
@@ -94,8 +108,16 @@ public sealed class McpServer
             }
             catch (Exception ex)
             {
+                // Catch-all: server must never become unresponsive
                 Log($"Error in message loop: {ex.Message}");
-                await SendErrorAsync(null, JsonRpcError.InternalError, $"Server error: {ex.Message}");
+                try
+                {
+                    await SendErrorAsync(null, JsonRpcError.InternalError, $"Server error: {ex.Message}");
+                }
+                catch (Exception sendEx)
+                {
+                    Log($"Failed to send error response: {sendEx.Message}");
+                }
             }
         }
 

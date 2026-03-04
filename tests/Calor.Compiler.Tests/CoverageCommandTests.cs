@@ -241,12 +241,12 @@ public class CoverageCommandTests : IDisposable
         var yieldResult = await _analyzer.AnalyzeFileAsync(CreateTestFile("yield.cs", yieldSource));
         Assert.Contains(yieldResult.UnsupportedConstructs, c => c.Name == "yield-return");
 
-        // Test goto
-        var gotoSource = """
-            public class G { void M() { start: goto start; } }
+        // Test unsafe (goto is now supported)
+        var unsafeSource = """
+            public class U { public unsafe void M() { int x = 1; int* p = &x; } }
             """;
-        var gotoResult = await _analyzer.AnalyzeFileAsync(CreateTestFile("goto.cs", gotoSource));
-        Assert.Contains(gotoResult.UnsupportedConstructs, c => c.Name == "goto");
+        var unsafeResult = await _analyzer.AnalyzeFileAsync(CreateTestFile("unsafe.cs", unsafeSource));
+        Assert.Contains(unsafeResult.UnsupportedConstructs, c => c.Name == "unsafe");
     }
 
     [Fact]

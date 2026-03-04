@@ -446,16 +446,15 @@ public class CSharpInteropBlockTests
     [Fact]
     public void Conversion_InteropMode_UnsupportedStatement_PreservesAsRawCSharp()
     {
-        // 'goto' is an unsupported statement type that triggers HandleUnsupportedStatement
+        // 'unsafe' is an unsupported statement type that triggers HandleUnsupportedStatement
         var csharpSource = """
             public class MyClass
             {
-                public void DoWork()
+                public unsafe void DoWork()
                 {
                     int x = 1;
-                    goto done;
-                    done:
-                    x = 2;
+                    int* ptr = &x;
+                    *ptr = 2;
                 }
             }
             """;

@@ -988,7 +988,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_GotoStatement_DetectedAsUnsupported()
+    public void AnalyzeSource_GotoStatement_NotDetectedAsUnsupported()
     {
         var source = """
             public class Service
@@ -1005,9 +1005,9 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "goto");
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "labeled-statement");
+        // goto and labeled-statement are now fully supported
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "goto");
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "labeled-statement");
     }
 
     [Fact]
@@ -1032,7 +1032,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_VolatileField_DetectedAsUnsupported()
+    public void AnalyzeSource_VolatileField_NotDetectedAsUnsupported()
     {
         var source = """
             public class ThreadSafe
@@ -1043,8 +1043,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "volatile");
+        // Volatile fields are now fully supported
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "volatile");
     }
 
     [Fact]
@@ -1085,7 +1085,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_ExtensionMethod_DetectedAsUnsupported()
+    public void AnalyzeSource_ExtensionMethod_NotDetectedAsUnsupported()
     {
         var source = """
             public static class StringExtensions
@@ -1099,8 +1099,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "extension-method");
+        // Extension methods are now fully supported via :this modifier
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "extension-method");
     }
 
     [Fact]
@@ -1252,7 +1252,7 @@ public class MigrationAnalyzerTests
     #region Phase 3 Unsupported Constructs Detection
 
     [Fact]
-    public void AnalyzeSource_LockStatement_DetectedAsUnsupported()
+    public void AnalyzeSource_LockStatement_NotDetectedAsUnsupported()
     {
         var source = """
             public class ThreadSafe
@@ -1272,8 +1272,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "lock-statement");
+        // Lock statements are now fully supported
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "lock-statement");
     }
 
     [Fact]
@@ -1346,7 +1346,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_CollectionExpression_DetectedAsUnsupported()
+    public void AnalyzeSource_CollectionExpression_NotDetectedAsUnsupported()
     {
         var source = """
             using System.Collections.Generic;
@@ -1361,8 +1361,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "collection-expression");
+        // Collection expressions are now fully supported
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "collection-expression");
     }
 
     [Fact]

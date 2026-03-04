@@ -43,6 +43,9 @@ public sealed class McpMessageHandler
         RegisterTool(new ConvertValidatedTool());
         RegisterTool(new BatchConvertTool());
         RegisterTool(new CSharpMinimizeTool());
+        RegisterTool(new BatchAnalyzeTool());
+        RegisterTool(new RoundTripCheckTool());
+        RegisterTool(new GetExampleTool());
 
         RegisterTool(new SelfTestTool());
 
@@ -169,10 +172,27 @@ public sealed class McpMessageHandler
                 $"Unknown tool: {callParams.Name}");
         }
 
-        var result = await tool.ExecuteAsync(callParams.Arguments);
-        Log($"Tool {callParams.Name} completed (isError: {result.IsError})");
-
-        return JsonRpcResponse.Success(request.Id, result);
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(tool.TimeoutSeconds));
+            var result = await tool.ExecuteAsync(callParams.Arguments).WaitAsync(cts.Token);
+            Log($"Tool {callParams.Name} completed (isError: {result.IsError})");
+            return JsonRpcResponse.Success(request.Id, result);
+        }
+        catch (OperationCanceledException)
+        {
+            Log($"Tool {callParams.Name} timed out after {tool.TimeoutSeconds}s");
+            var errorResult = McpToolResult.Error(
+                $"Tool '{callParams.Name}' timed out after {tool.TimeoutSeconds} seconds. " +
+                "For large operations, consider breaking the input into smaller batches.");
+            return JsonRpcResponse.Success(request.Id, errorResult);
+        }
+        catch (Exception ex)
+        {
+            Log($"Tool {callParams.Name} failed: {ex.Message}");
+            var errorResult = McpToolResult.Error($"Tool execution failed: {ex.Message}");
+            return JsonRpcResponse.Success(request.Id, errorResult);
+        }
     }
 
     private JsonRpcResponse HandlePing(JsonRpcRequest request)
