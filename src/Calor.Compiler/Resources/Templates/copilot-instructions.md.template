@@ -21,6 +21,19 @@ This project uses **Calor**, a DSL that compiles to C# on .NET 10. The Calor MCP
 | **Syntax** | `calor_syntax_lookup`, `calor_explain_error`, `calor_feature_support` |
 | **Edit Support** | `calor_edit_preview`, `calor_impact_analysis`, `calor_lint`, `calor_format` |
 | **Refinement** | `calor_obligations`, `calor_suggest_fixes`, `calor_discover_guards`, `calor_bounds_check` |
+| **Migration** | `calor_batch_analyze`, `calor_roundtrip_check`, `calor_get_example`, `calor_csharp_minimize` |
+
+### C# Feature Support for Conversion
+
+Most C# features convert cleanly to Calor. Key supported features include:
+
+**Fully supported**: classes, structs, interfaces, enums, records, abstract/sealed/static classes, generics (including nested), inheritance, properties (auto/computed/init), fields, constructors (with base/this chains), methods (virtual/override/abstract/async), operators (including implicit/explicit conversion), indexers, events, delegates, lambdas, LINQ, pattern matching (type/constant/relational/logical and/or/not/var/discard/tuple/positional patterns), switch expressions, nullable types, string interpolation, collection expressions, goto/label, yield return/break, throw expressions, lock, stackalloc, volatile, extension methods, using declarations, with expressions, required members.
+
+**Partial support** (most usage converts): is-pattern with complex recursion, implicit `new()` with arguments, checked/unchecked blocks (wrapper stripped, body preserved).
+
+**Not yet supported**: list/slice patterns (`[a, ..rest]`), `ref struct`, `static abstract` interface members, `in` parameters, mixed collection spread (`[1, ..other]`).
+
+Use `calor_feature_support` to check specific features, or `calor_batch_analyze` to assess an entire project.
 
 ### Quick Syntax Reference
 

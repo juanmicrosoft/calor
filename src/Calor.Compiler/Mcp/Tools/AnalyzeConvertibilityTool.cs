@@ -60,6 +60,7 @@ public sealed class AnalyzeConvertibilityTool : McpToolBase
         try
         {
             var analyzer = new ConvertibilityAnalyzer();
+            cancellationToken.ThrowIfCancellationRequested();
             var result = quick
                 ? analyzer.AnalyzeQuick(source)
                 : analyzer.Analyze(source);
