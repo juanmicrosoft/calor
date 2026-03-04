@@ -171,8 +171,8 @@ public sealed class LoopInvariantSynthesizer : IDisposable
         }
 
         // Get bounds
-        int? lower = loop.From is BoundIntLiteral fromLit ? fromLit.Value : null;
-        int? upper = loop.To is BoundIntLiteral toLit ? toLit.Value : null;
+        long? lower = loop.From is BoundIntLiteral fromLit ? fromLit.Value : null;
+        long? upper = loop.To is BoundIntLiteral toLit ? toLit.Value : null;
 
         return new InvariantTemplates.LoopContext
         {

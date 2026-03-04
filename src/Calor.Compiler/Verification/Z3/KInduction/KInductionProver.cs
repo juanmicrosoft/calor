@@ -565,7 +565,7 @@ public sealed class KInductionProver : IDisposable
         return null;
     }
 
-    private static int? GetIntValue(BoundExpression expr)
+    private static long? GetIntValue(BoundExpression expr)
     {
         return expr switch
         {

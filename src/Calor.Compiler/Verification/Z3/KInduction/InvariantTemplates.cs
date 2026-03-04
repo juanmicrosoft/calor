@@ -35,12 +35,12 @@ public static class InvariantTemplates
         /// <summary>
         /// The lower bound of the loop (for for-loops).
         /// </summary>
-        public int? LowerBound { get; init; }
+        public long? LowerBound { get; init; }
 
         /// <summary>
         /// The upper bound of the loop (for for-loops).
         /// </summary>
-        public int? UpperBound { get; init; }
+        public long? UpperBound { get; init; }
 
         /// <summary>
         /// Variables modified in the loop body.

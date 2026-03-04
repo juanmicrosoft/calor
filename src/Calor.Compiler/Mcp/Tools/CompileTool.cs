@@ -199,6 +199,7 @@ public sealed class CompileTool : McpToolBase
     {
         var results = new List<BatchFileCompileResult>();
         var totalErrors = 0;
+        var errorCategories = new Dictionary<string, int>();
 
         foreach (var path in filePaths)
         {
@@ -214,6 +215,7 @@ public sealed class CompileTool : McpToolBase
                         Errors = new List<string> { $"File not found: {path}" }
                     });
                     totalErrors++;
+                    IncrementCategory(errorCategories, "file_not_found");
                     continue;
                 }
 
@@ -231,6 +233,12 @@ public sealed class CompileTool : McpToolBase
                     .Where(d => d.IsError)
                     .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
                     .ToList();
+
+                // Track error categories by error code
+                foreach (var d in result.Diagnostics.Where(d => d.IsError))
+                {
+                    IncrementCategory(errorCategories, d.Code.ToString());
+                }
 
                 results.Add(new BatchFileCompileResult
                 {
@@ -253,6 +261,7 @@ public sealed class CompileTool : McpToolBase
                     Errors = new List<string> { ex.Message }
                 });
                 totalErrors++;
+                IncrementCategory(errorCategories, "exception");
             }
         }
 
@@ -262,10 +271,16 @@ public sealed class CompileTool : McpToolBase
             TotalFiles = filePaths.Count,
             SuccessfulFiles = filePaths.Count - totalErrors,
             FailedFiles = totalErrors,
+            ErrorCategories = errorCategories.Count > 0 ? errorCategories : null,
             Files = results
         };
 
         return McpToolResult.Json(output, isError: totalErrors > 0);
+    }
+
+    private static void IncrementCategory(Dictionary<string, int> categories, string key)
+    {
+        categories[key] = categories.GetValueOrDefault(key) + 1;
     }
 
     private sealed class CompileToolOutput
@@ -350,6 +365,10 @@ public sealed class CompileTool : McpToolBase
 
         [JsonPropertyName("failedFiles")]
         public int FailedFiles { get; init; }
+
+        [JsonPropertyName("errorCategories")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<string, int>? ErrorCategories { get; init; }
 
         [JsonPropertyName("files")]
         public required List<BatchFileCompileResult> Files { get; init; }

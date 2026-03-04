@@ -1041,8 +1041,10 @@ public sealed class Lexer
             if (long.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var hexVal))
             {
-                // Use unchecked to handle values > int.MaxValue (e.g., 0xFFFFFFFF → -1)
-                return MakeToken(TokenKind.IntLiteral, unchecked((int)hexVal));
+                // Store as int when it fits, long otherwise
+                if (hexVal is >= int.MinValue and <= int.MaxValue)
+                    return MakeToken(TokenKind.IntLiteral, (int)hexVal);
+                return MakeToken(TokenKind.IntLiteral, hexVal);
             }
 
             _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
@@ -1058,6 +1060,12 @@ public sealed class Lexer
         if (int.TryParse(valueText, out var value))
         {
             return MakeToken(TokenKind.IntLiteral, value);
+        }
+
+        // Fall back to long for values outside int range
+        if (long.TryParse(valueText, out var longValue))
+        {
+            return MakeToken(TokenKind.IntLiteral, longValue);
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
@@ -1375,15 +1383,17 @@ public sealed class Lexer
                 System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var hexValue))
             {
-                // Use unchecked to handle values > int.MaxValue (e.g., 0xFFFFFFFF → -1)
-                return MakeToken(TokenKind.IntLiteral, unchecked((int)hexValue));
+                // Store as int when it fits, long otherwise
+                if (hexValue is >= int.MinValue and <= int.MaxValue)
+                    return MakeToken(TokenKind.IntLiteral, (int)hexValue);
+                return MakeToken(TokenKind.IntLiteral, hexValue);
             }
 
             _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "hex number");
             return MakeToken(TokenKind.Error);
         }
 
-        while (char.IsDigit(Current))
+        while (char.IsDigit(Current) || Current == '_')
         {
             Advance();
         }
@@ -1392,7 +1402,7 @@ public sealed class Lexer
         if (Current == '.' && char.IsDigit(Lookahead))
         {
             Advance(); // consume '.'
-            while (char.IsDigit(Current))
+            while (char.IsDigit(Current) || Current == '_')
             {
                 Advance();
             }
@@ -1401,7 +1411,7 @@ public sealed class Lexer
             if (Current is 'M' or 'm')
             {
                 Advance(); // consume M/m
-                var decText = CurrentText().TrimEnd('M', 'm');
+                var decText = CurrentText().TrimEnd('M', 'm').Replace("_", "");
                 if (decimal.TryParse(decText, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out var decValue))
                 {
@@ -1409,7 +1419,7 @@ public sealed class Lexer
                 }
             }
 
-            var floatText = CurrentText();
+            var floatText = CurrentText().Replace("_", "");
             if (double.TryParse(floatText, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var floatValue))
             {
@@ -1421,7 +1431,7 @@ public sealed class Lexer
         if (Current is 'M' or 'm')
         {
             Advance(); // consume M/m
-            var decText = CurrentText().TrimEnd('M', 'm');
+            var decText = CurrentText().TrimEnd('M', 'm').Replace("_", "");
             if (decimal.TryParse(decText, System.Globalization.NumberStyles.Integer,
                 System.Globalization.CultureInfo.InvariantCulture, out var decValue))
             {
@@ -1429,10 +1439,16 @@ public sealed class Lexer
             }
         }
 
-        var intText = CurrentText();
+        var intText = CurrentText().Replace("_", "");
         if (int.TryParse(intText, out var intValue))
         {
             return MakeToken(TokenKind.IntLiteral, intValue);
+        }
+
+        // Fall back to long for values outside int range
+        if (long.TryParse(intText, out var longValue))
+        {
+            return MakeToken(TokenKind.IntLiteral, longValue);
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "number");

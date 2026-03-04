@@ -44,6 +44,10 @@ public sealed class McpServer
     /// </summary>
     public static McpServer CreateStdio(bool verbose = false)
     {
+        // Ensure UTF-8 encoding for stdin/stdout to handle § and other non-ASCII correctly
+        Console.InputEncoding = Encoding.UTF8;
+        Console.OutputEncoding = Encoding.UTF8;
+
         var output = Console.OpenStandardOutput();
         var log = verbose ? Console.Error : null;
         return new McpServer(Console.In, output, verbose, log);

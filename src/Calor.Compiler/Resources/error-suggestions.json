@@ -101,6 +101,46 @@
       "wrongExample": "§IF{if1} (condition) → §B{x} 1 → §R x   // ERROR",
       "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x\n§/I{if1}",
       "explanation": "The arrow (→) can only be followed by a single statement. For multiple statements, use the block form with §/I{id} closing tag."
+    },
+    {
+      "id": "new-object-placeholder",
+      "title": "Target-Typed New Placeholder",
+      "matchPatterns": ["§NEW{object}", "§NEW{any}", "new("],
+      "matchCodes": ["Calor0106", "Calor0200"],
+      "description": "The converter generates §NEW{object} when it can't resolve the target type of a C# target-typed 'new()'. Replace 'object' with the actual type.",
+      "wrongExample": "§TH §NEW{object} §A \"Invalid input\" §/NEW   // 'object' is a placeholder",
+      "correctExample": "§TH §NEW{ArgumentException} §A \"Invalid input\" §/NEW",
+      "explanation": "Look at the context — throw statements usually need an Exception type, assignments need the variable's declared type, method returns need the return type. Replace §NEW{object} with the correct concrete type."
+    },
+    {
+      "id": "integer-overflow",
+      "title": "Integer Literal Overflow",
+      "matchPatterns": ["overflow", "integer too large", "number too large", "invalid typed literal"],
+      "matchCodes": ["Calor0112", "Calor0113"],
+      "description": "Large integer literals may overflow i32 range. Calor now supports i64 natively — values outside int range are handled automatically.",
+      "wrongExample": "§C{Method} §A -1486618624   // This was 1000000000000 truncated to i32!",
+      "correctExample": "§C{Method} §A 1000000000000   // Now correctly stored as i64",
+      "explanation": "If you see suspiciously negative numbers where large positive values are expected, the original C# likely used long/Int64 literals. Re-convert the file to pick up the i64 fix."
+    },
+    {
+      "id": "generic-type-in-expr",
+      "title": "Generic Type Parameters in Expressions",
+      "matchPatterns": ["Unexpected token '<'", "Unexpected token '>'", "Unknown operator 'T'"],
+      "matchCodes": ["Calor0106", "Calor0104"],
+      "description": "Generic type arguments like <T> in call expressions are not yet fully supported in expression contexts.",
+      "wrongExample": "§C{EnumCache<T>.GetInfo} §/C   // Parser rejects <T> in expressions",
+      "correctExample": "§B{~info} §C{EnumCache}.GetInfo §/C   // Use without type param, let C# infer",
+      "explanation": "When converting generic method calls, remove the type arguments from the call expression if C# type inference can resolve them. For explicit type args, use a §CSHARP interop block."
+    },
+    {
+      "id": "if-id-mismatch",
+      "title": "IF Block ID Mismatch",
+      "matchPatterns": ["does not match IF id", "END_IF id", "mismatch"],
+      "matchCodes": ["Calor0100", "Calor0102"],
+      "description": "Nested IF blocks have mismatched opening/closing IDs, usually caused by converter bug with continue/break inside nested conditionals.",
+      "wrongExample": "§IF{if016} (condition)\n  §/I{if017}   // ID mismatch!",
+      "correctExample": "§IF{if016} (condition)\n  §/I{if016}   // IDs must match",
+      "explanation": "Manually fix the closing ID to match the opening ID. Count the nesting levels to identify which §/I belongs to which §IF."
     }
   ]
 }
