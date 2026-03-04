@@ -1073,16 +1073,16 @@
       "id": "null_coalescing_assignment",
       "csharpConstruct": "null-coalescing assignment",
       "keywords": ["??=", "null coalescing assignment", "null-coalescing assignment", "null assign"],
-      "calorSyntax": "§IF{id} (== x null) §ASSIGN x default §/I{id}",
+      "calorSyntax": "§IF{id} (== x null) §ASSIGN x default §/IF",
       "description": "C#'s ??= operator has no direct Calor equivalent. Use an §IF null check with §ASSIGN as a workaround.",
       "examples": [
         {
           "csharp": "x ??= GetDefault();",
-          "calor": "§IF{id} (== x null)\n  §ASSIGN x §C{GetDefault}§/C\n§/I{id}"
+          "calor": "§IF{id} (== x null)\n  §ASSIGN x §C{GetDefault}§/C\n§/IF"
         },
         {
           "csharp": "_cache ??= new Dictionary<string, int>();",
-          "calor": "§IF{id} (== _cache null)\n  §ASSIGN _cache §NEW{Dictionary<str, i32>}()\n§/I{id}"
+          "calor": "§IF{id} (== _cache null)\n  §ASSIGN _cache §NEW{Dictionary<str, i32>}()\n§/IF"
         }
       ]
     },
@@ -1154,11 +1154,11 @@
       "examples": [
         {
           "csharp": "(hour, minute) switch { (0, 0) => \"midnight\" }",
-          "calor": "§IF{id} (&& (== hour 0) (== minute 0))\n  §R STR:\"midnight\"\n§/I{id}"
+          "calor": "§IF{id} (&& (== hour 0) (== minute 0))\n  §R STR:\"midnight\"\n§/IF"
         },
         {
           "csharp": "obj switch { { Length: > 0 } => true }",
-          "calor": "§IF{id} (> obj.Length 0)\n  §R BOOL:true\n§/I{id}"
+          "calor": "§IF{id} (> obj.Length 0)\n  §R BOOL:true\n§/IF"
         }
       ]
     },

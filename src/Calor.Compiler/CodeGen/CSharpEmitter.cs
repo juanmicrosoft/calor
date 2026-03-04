@@ -1007,6 +1007,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "break;";
     }
 
+    public string Visit(GotoStatementNode node)
+    {
+        return $"goto {node.Label};";
+    }
+
+    public string Visit(LabelStatementNode node)
+    {
+        return $"{node.Label}:";
+    }
+
     public string Visit(YieldReturnStatementNode node)
     {
         if (node.Expression == null)

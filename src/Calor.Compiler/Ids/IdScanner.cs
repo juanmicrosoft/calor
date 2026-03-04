@@ -184,6 +184,8 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(UnaryOperationNode node) { }
     public void Visit(ContinueStatementNode node) { }
     public void Visit(BreakStatementNode node) { }
+    public void Visit(GotoStatementNode node) { }
+    public void Visit(LabelStatementNode node) { }
     public void Visit(PrintStatementNode node) { }
     public void Visit(RecordDefinitionNode node) { }
     public void Visit(UnionTypeDefinitionNode node) { }

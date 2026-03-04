@@ -41,6 +41,9 @@ public sealed class McpMessageHandler
         RegisterTool(new AssessTool());
         RegisterTool(new BatchConvertTool());
         RegisterTool(new CSharpMinimizeTool());
+        RegisterTool(new BatchAnalyzeTool());
+        RegisterTool(new RoundTripCheckTool());
+        RegisterTool(new GetExampleTool());
 
         // ── Syntax & documentation ──────────────────────────
         RegisterTool(new SyntaxLookupTool());
@@ -246,12 +249,15 @@ public sealed class McpMessageHandler
         }
 
         // Execute with timeout and cancellation
+        var timeout = tool is McpToolBase toolBase
+            ? TimeSpan.FromSeconds(toolBase.TimeoutSeconds)
+            : DefaultToolTimeout;
         var sw = Stopwatch.StartNew();
         McpToolResult result;
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(_serverCancellation);
-            cts.CancelAfter(DefaultToolTimeout);
+            cts.CancelAfter(timeout);
             result = await tool.ExecuteAsync(callParams.Arguments, cts.Token);
         }
         catch (OperationCanceledException)
@@ -259,7 +265,7 @@ public sealed class McpMessageHandler
             sw.Stop();
             Log($"Tool {callParams.Name} timed out after {sw.ElapsedMilliseconds}ms");
             return JsonRpcResponse.Success(request.Id,
-                McpToolResult.Error($"Tool '{callParams.Name}' timed out after {DefaultToolTimeout.TotalSeconds}s"));
+                McpToolResult.Error($"Tool '{callParams.Name}' timed out after {timeout.TotalSeconds}s"));
         }
 
         sw.Stop();

@@ -44,6 +44,11 @@ public abstract class McpToolBase : IMcpTool
     public abstract string Name { get; }
     public abstract string Description { get; }
 
+    /// <summary>
+    /// Maximum execution time in seconds. Override for heavy operations.
+    /// </summary>
+    public virtual int TimeoutSeconds => 60;
+
     /// <summary>Override to provide tool annotations (readOnlyHint, destructiveHint, etc.).</summary>
     public virtual McpToolAnnotations? Annotations => null;
 
@@ -107,6 +112,31 @@ public abstract class McpToolBase : IMcpTool
             return prop.GetInt32();
 
         return defaultValue;
+    }
+
+    /// <summary>
+    /// Helper to get an optional string array property from arguments.
+    /// </summary>
+    protected static List<string> GetStringArray(JsonElement? arguments, string propertyName)
+    {
+        var result = new List<string>();
+        if (arguments == null || arguments.Value.ValueKind != JsonValueKind.Object)
+            return result;
+
+        if (arguments.Value.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in prop.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    var s = item.GetString();
+                    if (!string.IsNullOrEmpty(s))
+                        result.Add(s);
+                }
+            }
+        }
+
+        return result;
     }
 
     /// <summary>

@@ -105,6 +105,8 @@ public sealed class Binder
             BindStatementNode bind => BindBindStatement(bind),
             BreakStatementNode breakStmt => new BoundBreakStatement(breakStmt.Span),
             ContinueStatementNode continueStmt => new BoundContinueStatement(continueStmt.Span),
+            GotoStatementNode gotoStmt => new BoundGotoStatement(gotoStmt.Span, gotoStmt.Label),
+            LabelStatementNode labelStmt => new BoundLabelStatement(labelStmt.Span, labelStmt.Label),
             TryStatementNode tryStmt => BindTryStatement(tryStmt),
             MatchStatementNode matchStmt => BindMatchStatement(matchStmt),
             ProofObligationNode proof => BindProofObligation(proof),

@@ -13,6 +13,8 @@ public sealed class BatchConvertTool : McpToolBase
 {
     public override string Name => "calor_batch_convert";
 
+    public override int TimeoutSeconds => 300;
+
     public override string Description =>
         "Convert an entire C# project to Calor in a single call. " +
         "Discovers .cs files, converts each to Calor, and writes output files. " +

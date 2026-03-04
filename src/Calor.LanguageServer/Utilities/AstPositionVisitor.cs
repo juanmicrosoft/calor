@@ -59,6 +59,8 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(UnaryOperationNode node) => DefaultVisit(node)!;
     public virtual T Visit(ContinueStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(BreakStatementNode node) => DefaultVisit(node)!;
+    public virtual T Visit(GotoStatementNode node) => DefaultVisit(node)!;
+    public virtual T Visit(LabelStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(PrintStatementNode node) => DefaultVisit(node)!;
 
     // Type system

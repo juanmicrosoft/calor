@@ -376,6 +376,24 @@ public sealed class BoundContinueStatement : BoundStatement
 }
 
 /// <summary>
+/// Bound goto statement (jumps to a label).
+/// </summary>
+public sealed class BoundGotoStatement : BoundStatement
+{
+    public string Label { get; }
+    public BoundGotoStatement(TextSpan span, string label) : base(span) { Label = label; }
+}
+
+/// <summary>
+/// Bound label statement (defines a label).
+/// </summary>
+public sealed class BoundLabelStatement : BoundStatement
+{
+    public string Label { get; }
+    public BoundLabelStatement(TextSpan span, string label) : base(span) { Label = label; }
+}
+
+/// <summary>
 /// Bound try statement with catch clauses and optional finally.
 /// </summary>
 public sealed class BoundTryStatement : BoundStatement

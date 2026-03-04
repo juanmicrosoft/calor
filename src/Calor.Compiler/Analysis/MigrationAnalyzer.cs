@@ -315,27 +315,7 @@ public sealed class MigrationAnalyzer
             });
         }
 
-        if (visitor.GotoStatementCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "goto",
-                Description = "Goto statements not supported",
-                Count = visitor.GotoStatementCount,
-                Examples = visitor.GotoStatementExamples
-            });
-        }
-
-        if (visitor.LabeledStatementCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "labeled-statement",
-                Description = "Labeled statements not supported",
-                Count = visitor.LabeledStatementCount,
-                Examples = visitor.LabeledStatementExamples
-            });
-        }
+        // goto and labeled statements are now supported — no longer blockers
 
         if (visitor.UnsafeBlockCount > 0)
         {
@@ -359,16 +339,7 @@ public sealed class MigrationAnalyzer
             });
         }
 
-        if (visitor.StackAllocCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "stackalloc",
-                Description = "stackalloc expressions not supported",
-                Count = visitor.StackAllocCount,
-                Examples = visitor.StackAllocExamples
-            });
-        }
+        // stackalloc is now fully supported via §SALLOC nodes
 
         if (visitor.FixedStatementCount > 0)
         {
@@ -381,29 +352,11 @@ public sealed class MigrationAnalyzer
             });
         }
 
-        if (visitor.VolatileFieldCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "volatile",
-                Description = "Volatile fields not supported",
-                Count = visitor.VolatileFieldCount,
-                Examples = visitor.VolatileFieldExamples
-            });
-        }
+        // volatile fields are now fully supported
 
         // operator-overload and implicit-conversion are now fully supported via §OP tags
 
-        if (visitor.ExtensionMethodCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "extension-method",
-                Description = "Extension methods require manual conversion to regular methods or traits",
-                Count = visitor.ExtensionMethodCount,
-                Examples = visitor.ExtensionMethodExamples
-            });
-        }
+        // extension methods are now fully supported via :this modifier
 
         // Phase 2 constructs
         if (visitor.InParameterCount > 0)
@@ -495,16 +448,7 @@ public sealed class MigrationAnalyzer
         }
 
         // Phase 3 constructs
-        if (visitor.LockStatementCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "lock-statement",
-                Description = "lock statements not yet supported",
-                Count = visitor.LockStatementCount,
-                Examples = visitor.LockStatementExamples
-            });
-        }
+        // lock statements are now fully supported
 
         if (visitor.AwaitForeachCount > 0)
         {
@@ -539,16 +483,7 @@ public sealed class MigrationAnalyzer
             });
         }
 
-        if (visitor.CollectionExpressionCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "collection-expression",
-                Description = "collection expressions [1, 2, 3] not yet supported",
-                Count = visitor.CollectionExpressionCount,
-                Examples = visitor.CollectionExpressionExamples
-            });
-        }
+        // collection expressions are now fully supported
 
         if (visitor.ReadonlyStructCount > 0)
         {

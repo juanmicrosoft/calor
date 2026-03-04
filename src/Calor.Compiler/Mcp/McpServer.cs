@@ -95,8 +95,16 @@ public sealed class McpServer
             }
             catch (Exception ex)
             {
+                // Catch-all: server must never become unresponsive
                 Log($"Error in message loop: {ex.Message}");
-                await SendErrorAsync(null, JsonRpcError.InternalError, $"Server error: {ex.Message}");
+                try
+                {
+                    await SendErrorAsync(null, JsonRpcError.InternalError, $"Server error: {ex.Message}");
+                }
+                catch (Exception sendEx)
+                {
+                    Log($"Failed to send error response: {sendEx.Message}");
+                }
             }
         }
 
