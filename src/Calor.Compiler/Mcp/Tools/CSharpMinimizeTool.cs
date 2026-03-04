@@ -33,6 +33,10 @@ public sealed class CSharpMinimizeTool : McpToolBase
                 "csharpCode": {
                     "type": "string",
                     "description": "Raw C# code from an interop block to analyze directly"
+                },
+                "filePath": {
+                    "type": "string",
+                    "description": "Path to a .calr file to analyze for §CSHARP blocks"
                 }
             },
 
@@ -44,6 +48,16 @@ public sealed class CSharpMinimizeTool : McpToolBase
     {
         var source = GetString(arguments, "source");
         var csharpCode = GetString(arguments, "csharpCode");
+        var filePath = GetString(arguments, "filePath");
+
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            if (!File.Exists(filePath))
+            {
+                return Task.FromResult(McpToolResult.Error($"File not found: {filePath}"));
+            }
+            source = File.ReadAllText(filePath);
+        }
 
         if (string.IsNullOrEmpty(source) && string.IsNullOrEmpty(csharpCode))
         {

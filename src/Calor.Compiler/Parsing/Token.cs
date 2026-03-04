@@ -82,6 +82,8 @@ public enum TokenKind
     EndDo,
     Break,
     Continue,
+    Goto,
+    Label,
     Bind,
 
     // Phase 3: Type System

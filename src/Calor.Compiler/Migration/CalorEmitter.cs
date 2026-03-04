@@ -941,6 +941,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(GotoStatementNode node)
+    {
+        AppendLine($"§GOTO{{{node.Label}}}");
+        return "";
+    }
+
+    public string Visit(LabelStatementNode node)
+    {
+        AppendLine($"§LABEL{{{node.Label}}}");
+        return "";
+    }
+
     public string Visit(YieldReturnStatementNode node)
     {
         if (node.Expression != null)

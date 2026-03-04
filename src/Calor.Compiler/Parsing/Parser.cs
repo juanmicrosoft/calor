@@ -985,6 +985,14 @@ public sealed class Parser
         {
             return ParseContinueStatement();
         }
+        else if (Check(TokenKind.Goto))
+        {
+            return ParseGotoStatement();
+        }
+        else if (Check(TokenKind.Label))
+        {
+            return ParseLabelStatement();
+        }
         else if (Check(TokenKind.Yield))
         {
             return ParseYieldReturnStatement();
@@ -6948,6 +6956,28 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.Continue);
         return new ContinueStatementNode(token.Span);
+    }
+
+    /// <summary>
+    /// Parses a goto statement.
+    /// §GOTO{labelName}
+    /// </summary>
+    private GotoStatementNode ParseGotoStatement()
+    {
+        var token = Expect(TokenKind.Goto);
+        var label = token.Value as string ?? "";
+        return new GotoStatementNode(token.Span, label);
+    }
+
+    /// <summary>
+    /// Parses a label statement.
+    /// §LABEL{labelName}
+    /// </summary>
+    private LabelStatementNode ParseLabelStatement()
+    {
+        var token = Expect(TokenKind.Label);
+        var label = token.Value as string ?? "";
+        return new LabelStatementNode(token.Span, label);
     }
 
     /// <summary>

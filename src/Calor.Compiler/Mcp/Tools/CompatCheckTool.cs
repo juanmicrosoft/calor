@@ -124,23 +124,6 @@ public sealed class CompatCheckTool : McpToolBase
         }
     }
 
-    private static List<string> GetStringArray(JsonElement? arguments, string propertyName)
-    {
-        if (arguments == null || arguments.Value.ValueKind != JsonValueKind.Object)
-            return new List<string>();
-
-        if (arguments.Value.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.Array)
-        {
-            return prop.EnumerateArray()
-                .Where(e => e.ValueKind == JsonValueKind.String)
-                .Select(e => e.GetString() ?? "")
-                .Where(s => !string.IsNullOrEmpty(s))
-                .ToList();
-        }
-
-        return new List<string>();
-    }
-
     private sealed class CompatCheckOutput
     {
         [JsonPropertyName("compatible")]

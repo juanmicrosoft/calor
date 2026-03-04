@@ -8,9 +8,9 @@ out files that use them.
 
 ### High Priority
 
-#### Switch Expressions (C# 8+)
+#### ~~Switch Expressions (C# 8+)~~ ✅ DONE
 ```csharp
-// Not supported:
+// NOW SUPPORTED:
 var result = gender switch
 {
     Gender.Male => "Mr.",
@@ -18,34 +18,23 @@ var result = gender switch
     _ => ""
 };
 ```
-**Workaround:** Use switch statements instead (fully supported).
+**Status:** Implemented. Switch expressions are converted to Calor `§MATCH` expressions via `MatchExpressionNode`. All arms, patterns, guards (when clauses) are preserved. MigrationAnalyzer confirms support.
 
-**Implementation Notes:** Requires Calor syntax for inline switch expressions, possibly:
-```calor
-§X{sw001:gender}
-  §WC Male => "Mr."
-  §WC Female => "Ms."
-  §WC _ => ""
-§/X{sw001}
-```
-
-#### Relational Patterns (C# 9+)
+#### ~~Relational Patterns (C# 9+)~~ ✅ DONE
 ```csharp
-// Not supported:
+// NOW SUPPORTED:
 if (value is > 1000 and < 2000) { ... }
 if (age is >= 18) { ... }
 ```
-**Workaround:** Use explicit comparison operators: `if (value > 1000 && value < 2000)`
+**Status:** Implemented. Relational patterns are converted to `§PREL{op}` nodes via `RelationalPatternNode`. Operators: `<`→"lt", `<=`→"lte", `>`→"gt", `>=`→"gte".
 
-**Implementation Notes:** Requires Calor pattern syntax for relational operators.
-
-#### Compound Patterns (C# 9+)
+#### ~~Compound Patterns (C# 9+)~~ ✅ DONE
 ```csharp
-// Not supported:
+// NOW SUPPORTED:
 if (obj is string { Length: > 0 } or int { } n when n > 0) { ... }
 if (value is > 0 and < 100) { ... }
 ```
-**Workaround:** Use explicit boolean expressions.
+**Status:** Implemented. Compound patterns use `OrPatternNode`/`AndPatternNode`. Parser handles `(or ...)`, `(and ...)`, `(not ...)` combinators.
 
 #### Target-Typed New (C# 9+)
 ```csharp
@@ -240,8 +229,8 @@ int[] combined = [..first, ..second];
 
 ## Implementation Roadmap
 
-1. **Phase 1:** Switch expressions - highest impact for real-world code
-2. **Phase 2:** Relational and compound patterns - common in validation logic
+1. ~~**Phase 1:** Switch expressions~~ ✅ DONE — MatchExpressionNode
+2. ~~**Phase 2:** Relational and compound patterns~~ ✅ DONE — RelationalPatternNode, OrPatternNode, AndPatternNode
 3. **Phase 3:** Range/Index expressions - useful but less critical
 4. **Phase 4:** C# 11+ features - as adoption increases
 

@@ -275,6 +275,32 @@ public sealed class BreakStatementNode : StatementNode
 }
 
 /// <summary>
+/// Represents a goto statement to jump to a label.
+/// §GOTO{labelName}
+/// </summary>
+public sealed class GotoStatementNode : StatementNode
+{
+    public string Label { get; }
+    public GotoStatementNode(TextSpan span, string label) : base(span) { Label = label; }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
+/// Represents a label definition.
+/// §LABEL{labelName}
+/// </summary>
+public sealed class LabelStatementNode : StatementNode
+{
+    public string Label { get; }
+    public LabelStatementNode(TextSpan span, string label) : base(span) { Label = label; }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a yield return statement.
 /// §YIELD expression
 /// </summary>

@@ -3583,6 +3583,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SwitchStatementSyntax switchStmt => ConvertSwitchStatement(switchStmt),
             BreakStatementSyntax breakStmt => ConvertBreakStatement(breakStmt),
             ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
+            GotoStatementSyntax gotoStmt => ConvertGotoStatement(gotoStmt),
+            LabeledStatementSyntax labeledStmt => ConvertLabeledStatement(labeledStmt),
             UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
             YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
             LockStatementSyntax lockStmt => ConvertLockStatement(lockStmt),
@@ -3638,6 +3640,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("break");
         _context.IncrementConverted();
         return new BreakStatementNode(GetTextSpan(node));
+    }
+
+    private StatementNode? ConvertGotoStatement(GotoStatementSyntax node)
+    {
+        // Only handle simple goto (not goto case/goto default)
+        if (node.CaseOrDefaultKeyword != default)
+        {
+            return CreateFallbackStatement(node, "goto-case");
+        }
+
+        _context.RecordFeatureUsage("goto");
+        _context.IncrementConverted();
+        var label = node.Expression?.ToString() ?? "";
+        return new GotoStatementNode(GetTextSpan(node), label);
+    }
+
+    private StatementNode? ConvertLabeledStatement(LabeledStatementSyntax node)
+    {
+        _context.RecordFeatureUsage("labeled-statement");
+        _context.IncrementConverted();
+        var label = node.Identifier.Text;
+        return new LabelStatementNode(GetTextSpan(node), label);
     }
 
     private StatementNode ConvertYieldStatement(YieldStatementSyntax node)
