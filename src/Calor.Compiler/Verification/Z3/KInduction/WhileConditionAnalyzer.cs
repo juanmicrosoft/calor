@@ -13,8 +13,8 @@ public static class WhileConditionAnalyzer
     /// </summary>
     public sealed record WhileLoopInfo(
         string? LoopVariable,
-        int? LowerBound,
-        int? UpperBound,
+        long? LowerBound,
+        long? UpperBound,
         bool IsDecrementing,
         string? ConditionOperator,
         BoundExpression? BoundValue)
@@ -31,7 +31,7 @@ public static class WhileConditionAnalyzer
     public sealed record TransitionInfo(
         string Variable,
         TransitionKind Kind,
-        int? Delta)
+        long? Delta)
     {
         /// <summary>
         /// Whether this is a well-understood transition.
@@ -308,7 +308,7 @@ public static class WhileConditionAnalyzer
         };
     }
 
-    private static int? GetIntValue(BoundExpression expr)
+    private static long? GetIntValue(BoundExpression expr)
     {
         return expr switch
         {

@@ -260,7 +260,7 @@ public static class BoundNodeHelpers
     /// <summary>
     /// Gets the integer value if the expression is an integer literal.
     /// </summary>
-    public static int? GetIntLiteralValue(BoundExpression? expression)
+    public static long? GetIntLiteralValue(BoundExpression? expression)
     {
         return expression is BoundIntLiteral intLit ? intLit.Value : null;
     }

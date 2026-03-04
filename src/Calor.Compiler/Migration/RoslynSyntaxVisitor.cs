@@ -5222,7 +5222,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is decimal decVal =>
                 new DecimalLiteralNode(GetTextSpan(literal), decVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is long longVal =>
-                new IntLiteralNode(GetTextSpan(literal), (int)longVal),
+                new IntLiteralNode(GetTextSpan(literal), longVal),
             SyntaxKind.StringLiteralExpression =>
                 new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText),
             SyntaxKind.CharacterLiteralExpression =>

@@ -253,7 +253,7 @@ public sealed class OverflowChecker : IBugPatternChecker
                Math.Abs(rightValue.Value) < SmallThreshold;
     }
 
-    private static int? GetConstantValue(BoundExpression expr)
+    private static long? GetConstantValue(BoundExpression expr)
     {
         return expr switch
         {
@@ -279,7 +279,7 @@ public sealed class OverflowChecker : IBugPatternChecker
                         BinaryOperator.Add => leftValue.Value + rightValue.Value,
                         BinaryOperator.Subtract => leftValue.Value - rightValue.Value,
                         BinaryOperator.Multiply => leftValue.Value * rightValue.Value,
-                        BinaryOperator.LeftShift => leftValue.Value << rightValue.Value,
+                        BinaryOperator.LeftShift => leftValue.Value << (int)rightValue.Value,
                         _ => 0
                     };
                 }

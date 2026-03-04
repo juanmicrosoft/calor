@@ -177,9 +177,17 @@ public sealed class BatchConvertTool : McpToolBase
                 DurationMs = (int)f.Duration.TotalMilliseconds,
                 ErrorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
                 WarningCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning),
-                Errors = f.Issues
-                    .Where(i => i.Severity == ConversionIssueSeverity.Error)
-                    .Select(i => i.Message)
+                Issues = f.Issues
+                    .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
+                    .Select(i => new BatchIssue
+                    {
+                        Severity = i.Severity == ConversionIssueSeverity.Error ? "error" : "warning",
+                        Message = i.Message,
+                        Line = i.Line,
+                        Column = i.Column,
+                        Category = i.Feature,
+                        Suggestion = i.Suggestion
+                    })
                     .ToList()
             }).ToList();
 
@@ -279,8 +287,33 @@ public sealed class BatchConvertTool : McpToolBase
         [JsonPropertyName("warningCount")]
         public int WarningCount { get; init; }
 
-        [JsonPropertyName("errors")]
+        [JsonPropertyName("issues")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? Errors { get; init; }
+        public List<BatchIssue>? Issues { get; init; }
+    }
+
+    private sealed class BatchIssue
+    {
+        [JsonPropertyName("severity")]
+        public required string Severity { get; init; }
+
+        [JsonPropertyName("message")]
+        public required string Message { get; init; }
+
+        [JsonPropertyName("line")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Line { get; init; }
+
+        [JsonPropertyName("column")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Column { get; init; }
+
+        [JsonPropertyName("category")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Category { get; init; }
+
+        [JsonPropertyName("suggestion")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Suggestion { get; init; }
     }
 }

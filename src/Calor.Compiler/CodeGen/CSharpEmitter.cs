@@ -601,6 +601,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(IntLiteralNode node)
     {
+        // Add L suffix for values outside int range to emit valid C# long literals
+        if (node.Value is > int.MaxValue or < int.MinValue)
+            return node.Value.ToString() + "L";
         return node.Value.ToString();
     }
 
