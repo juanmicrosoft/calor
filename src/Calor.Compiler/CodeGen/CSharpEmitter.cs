@@ -749,8 +749,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     /// <summary>
+    /// Returns the C# operator precedence level (higher = tighter binding).
+    /// </summary>
+    internal static int GetPrecedence(string op) => op switch
+    {
+        "*" or "/" or "%" => 13,
+        "+" or "-" => 12,
+        "<<" or ">>" => 11,
+        "<" or ">" or "<=" or ">=" => 10,
+        "==" or "!=" => 9,
+        "&" => 8,
+        "^" => 7,
+        "|" => 6,
+        "&&" => 5,
+        "||" => 4,
+        "??" => 3,
+        _ => 0
+    };
+
+    /// <summary>
     /// Converts Calor prefix notation in interpolation expressions to C# infix.
-    /// Handles (op left right) → left op right, with nesting support.
+    /// Handles (op left right) → left op right, with nesting support and correct parenthesization.
     /// </summary>
     internal static string ConvertPrefixToInfix(string expr)
     {
@@ -786,10 +805,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (csharpOp == null)
             return expr; // Not a known operator, pass through
 
-        // Unary operators
+        // Unary operators: wrap operand in parens if it's a compound expression
         if (csharpOp is "!" or "~")
         {
             var operand = ConvertPrefixToInfix(rest);
+            if (operand.Contains(' '))
+                operand = $"({operand})";
             return $"{csharpOp}{operand}";
         }
 
@@ -801,7 +822,44 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var leftConverted = ConvertPrefixToInfix(left);
         var rightConverted = ConvertPrefixToInfix(right);
 
+        var parentPrec = GetPrecedence(csharpOp);
+
+        // Wrap left child if it was a prefix expression and has lower precedence
+        if (left.StartsWith('(') && left.EndsWith(')'))
+        {
+            var leftPrec = GetChildPrecedence(left);
+            if (leftPrec > 0 && leftPrec < parentPrec)
+                leftConverted = $"({leftConverted})";
+        }
+
+        // Wrap right child if it was a prefix expression and has lower or equal precedence
+        if (right.StartsWith('(') && right.EndsWith(')'))
+        {
+            var rightPrec = GetChildPrecedence(right);
+            if (rightPrec > 0 && rightPrec < parentPrec)
+                rightConverted = $"({rightConverted})";
+        }
+
         return $"{leftConverted} {csharpOp} {rightConverted}";
+    }
+
+    /// <summary>
+    /// Extracts the precedence of the top-level operator from a prefix expression.
+    /// Returns 0 if not a recognized binary prefix expression.
+    /// </summary>
+    private static int GetChildPrecedence(string prefixExpr)
+    {
+        var trimmed = prefixExpr.Trim();
+        if (trimmed.Length < 5 || trimmed[0] != '(' || trimmed[^1] != ')')
+            return 0;
+        var inner = trimmed[1..^1].Trim();
+        var spaceIdx = inner.IndexOf(' ');
+        if (spaceIdx <= 0)
+            return 0;
+        var op = inner[..spaceIdx];
+        if (op is "!" or "~")
+            return 0; // unary, not binary
+        return GetPrecedence(op);
     }
 
     /// <summary>

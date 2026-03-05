@@ -697,6 +697,46 @@ public class CodegenBug3_5_6_Tests
         Assert.Equal("{number % 10}", converted);
     }
 
+    [Fact]
+    public void ConvertPrefixToInfix_MulOverAdd_ParenthesizesLowerPrecedence()
+    {
+        // (* a (+ b c)) → a * (b + c)
+        Assert.Equal("a * (b + c)", CSharpEmitter.ConvertPrefixToInfix("(* a (+ b c))"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_AddOverMul_NoExtraParens()
+    {
+        // (+ a (* b c)) → a + b * c
+        var result = CSharpEmitter.ConvertPrefixToInfix("(+ a (* b c))");
+        // Both "a + b * c" and "a + (b * c)" are valid — mul binds tighter
+        Assert.Contains("a + ", result);
+        Assert.Contains("b * c", result);
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_UnaryNot_WrapsCompound()
+    {
+        // (! (+ a b)) → !(a + b)
+        Assert.Equal("!(a + b)", CSharpEmitter.ConvertPrefixToInfix("(! (+ a b))"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_UnaryBitwiseNot_WrapsCompound()
+    {
+        // (~ (| a b)) → ~(a | b)
+        Assert.Equal("~(a | b)", CSharpEmitter.ConvertPrefixToInfix("(~ (| a b))"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_NestedSamePrecedence()
+    {
+        // (+ (+ a b) (+ c d)) — same precedence, right child gets parens
+        var result = CSharpEmitter.ConvertPrefixToInfix("(+ (+ a b) (+ c d))");
+        Assert.Contains("a + b", result);
+        Assert.Contains("c + d", result);
+    }
+
     #endregion
 
     #region Helpers

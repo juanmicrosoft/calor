@@ -22,11 +22,12 @@ public sealed class McpMessageHandler
     private static readonly int MaxConcurrentTools = Math.Max(2, Environment.ProcessorCount / 2);
     private readonly SemaphoreSlim _concurrencyLimiter = new(MaxConcurrentTools);
 
-    // Reject new heavy work when the process exceeds this memory threshold (default: 2 GB)
+    // Reject new heavy work when the process exceeds this memory threshold.
+    // Defaults to 50% of available physical memory (min 512 MB). Override with CALOR_MCP_MAX_MEMORY_MB.
     private static readonly long MemoryPressureThresholdBytes =
         long.TryParse(Environment.GetEnvironmentVariable("CALOR_MCP_MAX_MEMORY_MB"), out var mb)
             ? mb * 1024L * 1024L
-            : 2L * 1024L * 1024L * 1024L;
+            : Math.Max(512L * 1024L * 1024L, (long)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes * 0.5));
     private CancellationToken _serverCancellation;
 
     public McpMessageHandler(bool verbose = false, TextWriter? log = null)
@@ -245,7 +246,7 @@ public sealed class McpMessageHandler
         // Wait for memory pressure to subside before running heavy tools
         if (tool is BatchTool or ConvertTool or CompileTool or AnalyzeTool)
         {
-            var memoryUsed = GC.GetTotalMemory(forceFullCollection: false);
+            var memoryUsed = GetProcessMemory();
             if (memoryUsed > MemoryPressureThresholdBytes)
             {
                 var usedMb = memoryUsed / (1024 * 1024);
@@ -258,14 +259,15 @@ public sealed class McpMessageHandler
                 var waited = 0;
                 while (waited < maxWaitMs)
                 {
-                    memoryUsed = GC.GetTotalMemory(forceFullCollection: false);
+                    memoryUsed = GetProcessMemory();
                     if (memoryUsed <= MemoryPressureThresholdBytes)
                         break;
-                    await Task.Delay(pollIntervalMs, _serverCancellation);
-                    waited += pollIntervalMs;
+                    var jitter = Random.Shared.Next(0, 500); // 0-500ms random jitter to avoid thundering herd
+                    await Task.Delay(pollIntervalMs + jitter, _serverCancellation);
+                    waited += pollIntervalMs + jitter;
                 }
 
-                memoryUsed = GC.GetTotalMemory(forceFullCollection: false);
+                memoryUsed = GetProcessMemory();
                 if (memoryUsed > MemoryPressureThresholdBytes)
                 {
                     usedMb = memoryUsed / (1024 * 1024);
@@ -565,6 +567,20 @@ public sealed class McpMessageHandler
         if (_verbose && _log != null)
         {
             _log.WriteLine($"[MCP] {message}");
+        }
+    }
+
+    private static long GetProcessMemory()
+    {
+        try
+        {
+            using var proc = Process.GetCurrentProcess();
+            return proc.WorkingSet64;
+        }
+        catch
+        {
+            // Fallback to managed heap if process info unavailable
+            return GC.GetTotalMemory(forceFullCollection: false);
         }
     }
 }

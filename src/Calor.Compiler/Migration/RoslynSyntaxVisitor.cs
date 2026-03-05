@@ -3576,32 +3576,40 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.Stats.StatementsConverted++;
 
-        return statement switch
+        try
         {
-            ReturnStatementSyntax returnStmt => ConvertReturnStatement(returnStmt),
-            ExpressionStatementSyntax exprStmt => ConvertExpressionStatement(exprStmt),
-            LocalDeclarationStatementSyntax localDecl => ConvertLocalDeclaration(localDecl),
-            IfStatementSyntax ifStmt => ConvertIfStatement(ifStmt),
-            ForStatementSyntax forStmt => ConvertForStatement(forStmt),
-            ForEachStatementSyntax forEachStmt => ConvertForEachStatement(forEachStmt),
-            WhileStatementSyntax whileStmt => ConvertWhileStatement(whileStmt),
-            DoStatementSyntax doStmt => ConvertDoWhileStatement(doStmt),
-            TryStatementSyntax tryStmt => ConvertTryStatement(tryStmt),
-            ThrowStatementSyntax throwStmt => ConvertThrowStatement(throwStmt),
-            BlockSyntax blockStmt => ConvertBlockAsStatement(blockStmt),
-            SwitchStatementSyntax switchStmt => ConvertSwitchStatement(switchStmt),
-            BreakStatementSyntax breakStmt => ConvertBreakStatement(breakStmt),
-            ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
-            GotoStatementSyntax gotoStmt => ConvertGotoStatement(gotoStmt),
-            LabeledStatementSyntax labeledStmt => ConvertLabeledStatement(labeledStmt),
-            UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
-            YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
-            LockStatementSyntax lockStmt => ConvertLockStatement(lockStmt),
-            CheckedStatementSyntax checkedStmt => ConvertCheckedStatement(checkedStmt),
-            UnsafeStatementSyntax unsafeStmt => ConvertUnsafeStatement(unsafeStmt),
-            FixedStatementSyntax fixedStmt => ConvertFixedStatement(fixedStmt),
-            _ => HandleUnsupportedStatement(statement)
-        };
+            return statement switch
+            {
+                ReturnStatementSyntax returnStmt => ConvertReturnStatement(returnStmt),
+                ExpressionStatementSyntax exprStmt => ConvertExpressionStatement(exprStmt),
+                LocalDeclarationStatementSyntax localDecl => ConvertLocalDeclaration(localDecl),
+                IfStatementSyntax ifStmt => ConvertIfStatement(ifStmt),
+                ForStatementSyntax forStmt => ConvertForStatement(forStmt),
+                ForEachStatementSyntax forEachStmt => ConvertForEachStatement(forEachStmt),
+                WhileStatementSyntax whileStmt => ConvertWhileStatement(whileStmt),
+                DoStatementSyntax doStmt => ConvertDoWhileStatement(doStmt),
+                TryStatementSyntax tryStmt => ConvertTryStatement(tryStmt),
+                ThrowStatementSyntax throwStmt => ConvertThrowStatement(throwStmt),
+                BlockSyntax blockStmt => ConvertBlockAsStatement(blockStmt),
+                SwitchStatementSyntax switchStmt => ConvertSwitchStatement(switchStmt),
+                BreakStatementSyntax breakStmt => ConvertBreakStatement(breakStmt),
+                ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
+                GotoStatementSyntax gotoStmt => ConvertGotoStatement(gotoStmt),
+                LabeledStatementSyntax labeledStmt => ConvertLabeledStatement(labeledStmt),
+                UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
+                YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
+                LockStatementSyntax lockStmt => ConvertLockStatement(lockStmt),
+                CheckedStatementSyntax checkedStmt => ConvertCheckedStatement(checkedStmt),
+                UnsafeStatementSyntax unsafeStmt => ConvertUnsafeStatement(unsafeStmt),
+                FixedStatementSyntax fixedStmt => ConvertFixedStatement(fixedStmt),
+                _ => HandleUnsupportedStatement(statement)
+            };
+        }
+        catch (Exception) when (_context.ShouldPreserveCSharp)
+        {
+            _context.IncrementSkipped();
+            return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
+        }
     }
 
     private StatementNode? HandleUnsupportedStatement(StatementSyntax statement)
@@ -5206,55 +5214,63 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.Stats.ExpressionsConverted++;
 
-        return expression switch
+        try
         {
-            LiteralExpressionSyntax literal => ConvertLiteral(literal),
-            IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText),
-            BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
-            PrefixUnaryExpressionSyntax addrOf when addrOf.IsKind(SyntaxKind.AddressOfExpression) => ConvertAddressOfExpression(addrOf),
-            PrefixUnaryExpressionSyntax deref when deref.IsKind(SyntaxKind.PointerIndirectionExpression) => ConvertPointerDereferenceExpression(deref),
-            PrefixUnaryExpressionSyntax indexFromEnd when indexFromEnd.IsKind(SyntaxKind.IndexExpression) => ConvertIndexFromEndExpression(indexFromEnd),
-            PrefixUnaryExpressionSyntax prefix => ConvertPrefixUnaryExpression(prefix),
-            PostfixUnaryExpressionSyntax postfix => ConvertPostfixUnaryExpression(postfix),
-            ParenthesizedExpressionSyntax paren => ConvertExpression(paren.Expression),
-            InvocationExpressionSyntax invocation => ConvertInvocationExpression(invocation),
-            MemberAccessExpressionSyntax memberAccess => ConvertMemberAccessExpression(memberAccess),
-            ObjectCreationExpressionSyntax objCreation => ConvertObjectCreation(objCreation),
-            ThisExpressionSyntax => new ThisExpressionNode(GetTextSpan(expression)),
-            BaseExpressionSyntax => new BaseExpressionNode(GetTextSpan(expression)),
-            ConditionalExpressionSyntax conditional => ConvertConditionalExpression(conditional),
-            ArrayCreationExpressionSyntax arrayCreation => ConvertArrayCreation(arrayCreation),
-            ImplicitArrayCreationExpressionSyntax implicitArray => ConvertImplicitArrayCreation(implicitArray),
-            ElementAccessExpressionSyntax elementAccess => ConvertElementAccess(elementAccess),
-            LambdaExpressionSyntax lambda => ConvertLambdaExpression(lambda),
-            AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
-            InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
-            ConditionalAccessExpressionSyntax condAccess => ConvertConditionalAccess(condAccess),
-            CastExpressionSyntax cast => ConvertCastExpression(cast),
-            IsPatternExpressionSyntax isPattern => ConvertIsPatternExpression(isPattern),
-            CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
-            ImplicitObjectCreationExpressionSyntax implicitNew => ConvertImplicitObjectCreation(implicitNew),
-            SwitchExpressionSyntax switchExpr => ConvertSwitchExpression(switchExpr),
-            ThrowExpressionSyntax throwExpr => ConvertThrowExpression(throwExpr),
-            DefaultExpressionSyntax defaultExpr => ConvertDefaultExpression(defaultExpr),
-            AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
-            QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
-            InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
-            TypeOfExpressionSyntax typeOf => new TypeOfExpressionNode(GetTextSpan(typeOf), TypeMapper.CSharpToCalor(typeOf.Type.ToString())),
-            GenericNameSyntax generic => new ReferenceNode(GetTextSpan(generic),
-                $"{generic.Identifier.Text}<{string.Join(", ", generic.TypeArgumentList.Arguments.Select(a => TypeMapper.CSharpToCalor(a.ToString())))}>"),
-            PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
-            DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
-            AssignmentExpressionSyntax assignExpr => ConvertAssignmentExpression(assignExpr),
-            TupleExpressionSyntax tupleExpr => ConvertTupleExpression(tupleExpr),
-            StackAllocArrayCreationExpressionSyntax stackAlloc => ConvertStackAllocExpression(stackAlloc),
-            ImplicitStackAllocArrayCreationExpressionSyntax implicitStackAlloc => ConvertImplicitStackAllocExpression(implicitStackAlloc),
-            SizeOfExpressionSyntax sizeOf => ConvertSizeOfExpression(sizeOf),
-            RangeExpressionSyntax rangeExpr => ConvertRangeExpression(rangeExpr),
-            WithExpressionSyntax withExpr => ConvertWithExpression(withExpr),
-            CheckedExpressionSyntax checkedExpr => ConvertExpression(checkedExpr.Expression),
-            _ => CreateFallbackExpression(expression, "unknown-expression")
-        };
+            return expression switch
+            {
+                LiteralExpressionSyntax literal => ConvertLiteral(literal),
+                IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText),
+                BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
+                PrefixUnaryExpressionSyntax addrOf when addrOf.IsKind(SyntaxKind.AddressOfExpression) => ConvertAddressOfExpression(addrOf),
+                PrefixUnaryExpressionSyntax deref when deref.IsKind(SyntaxKind.PointerIndirectionExpression) => ConvertPointerDereferenceExpression(deref),
+                PrefixUnaryExpressionSyntax indexFromEnd when indexFromEnd.IsKind(SyntaxKind.IndexExpression) => ConvertIndexFromEndExpression(indexFromEnd),
+                PrefixUnaryExpressionSyntax prefix => ConvertPrefixUnaryExpression(prefix),
+                PostfixUnaryExpressionSyntax postfix => ConvertPostfixUnaryExpression(postfix),
+                ParenthesizedExpressionSyntax paren => ConvertExpression(paren.Expression),
+                InvocationExpressionSyntax invocation => ConvertInvocationExpression(invocation),
+                MemberAccessExpressionSyntax memberAccess => ConvertMemberAccessExpression(memberAccess),
+                ObjectCreationExpressionSyntax objCreation => ConvertObjectCreation(objCreation),
+                ThisExpressionSyntax => new ThisExpressionNode(GetTextSpan(expression)),
+                BaseExpressionSyntax => new BaseExpressionNode(GetTextSpan(expression)),
+                ConditionalExpressionSyntax conditional => ConvertConditionalExpression(conditional),
+                ArrayCreationExpressionSyntax arrayCreation => ConvertArrayCreation(arrayCreation),
+                ImplicitArrayCreationExpressionSyntax implicitArray => ConvertImplicitArrayCreation(implicitArray),
+                ElementAccessExpressionSyntax elementAccess => ConvertElementAccess(elementAccess),
+                LambdaExpressionSyntax lambda => ConvertLambdaExpression(lambda),
+                AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
+                InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
+                ConditionalAccessExpressionSyntax condAccess => ConvertConditionalAccess(condAccess),
+                CastExpressionSyntax cast => ConvertCastExpression(cast),
+                IsPatternExpressionSyntax isPattern => ConvertIsPatternExpression(isPattern),
+                CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
+                ImplicitObjectCreationExpressionSyntax implicitNew => ConvertImplicitObjectCreation(implicitNew),
+                SwitchExpressionSyntax switchExpr => ConvertSwitchExpression(switchExpr),
+                ThrowExpressionSyntax throwExpr => ConvertThrowExpression(throwExpr),
+                DefaultExpressionSyntax defaultExpr => ConvertDefaultExpression(defaultExpr),
+                AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
+                QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
+                InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
+                TypeOfExpressionSyntax typeOf => new TypeOfExpressionNode(GetTextSpan(typeOf), TypeMapper.CSharpToCalor(typeOf.Type.ToString())),
+                GenericNameSyntax generic => new ReferenceNode(GetTextSpan(generic),
+                    $"{generic.Identifier.Text}<{string.Join(", ", generic.TypeArgumentList.Arguments.Select(a => TypeMapper.CSharpToCalor(a.ToString())))}>"),
+                PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
+                DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
+                AssignmentExpressionSyntax assignExpr => ConvertAssignmentExpression(assignExpr),
+                TupleExpressionSyntax tupleExpr => ConvertTupleExpression(tupleExpr),
+                StackAllocArrayCreationExpressionSyntax stackAlloc => ConvertStackAllocExpression(stackAlloc),
+                ImplicitStackAllocArrayCreationExpressionSyntax implicitStackAlloc => ConvertImplicitStackAllocExpression(implicitStackAlloc),
+                SizeOfExpressionSyntax sizeOf => ConvertSizeOfExpression(sizeOf),
+                RangeExpressionSyntax rangeExpr => ConvertRangeExpression(rangeExpr),
+                WithExpressionSyntax withExpr => ConvertWithExpression(withExpr),
+                CheckedExpressionSyntax checkedExpr => ConvertExpression(checkedExpr.Expression),
+                _ => CreateFallbackExpression(expression, "unknown-expression")
+            };
+        }
+        catch (Exception) when (_context.ShouldPreserveCSharp)
+        {
+            _context.IncrementSkipped();
+            return new FallbackExpressionNode(GetTextSpan(expression), expression.ToFullString(), "conversion-error", null);
+        }
     }
 
     private ExpressionNode ConvertLiteral(LiteralExpressionSyntax literal)
