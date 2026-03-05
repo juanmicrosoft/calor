@@ -84,7 +84,7 @@ public sealed class MigrationPlanOptions
     public bool Parallel { get; set; } = true;
 
     /// <summary>Maximum degree of parallelism.</summary>
-    public int MaxParallelism { get; set; } = Environment.ProcessorCount;
+    public int MaxParallelism { get; set; } = Math.Min(4, Environment.ProcessorCount);
 
     /// <summary>Whether to include benchmark metrics.</summary>
     public bool IncludeBenchmark { get; set; } = false;

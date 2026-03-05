@@ -19,6 +19,8 @@ public sealed class McpMessageHandler
     private readonly Dictionary<string, McpPrompt> _prompts;
     private readonly bool _verbose;
     private readonly TextWriter? _log;
+    private readonly SemaphoreSlim _concurrencyLimiter = new(MaxConcurrentTools);
+    private const int MaxConcurrentTools = 4;
     private CancellationToken _serverCancellation;
 
     public McpMessageHandler(bool verbose = false, TextWriter? log = null)
@@ -227,7 +229,7 @@ public sealed class McpMessageHandler
                 $"Unknown tool: {callParams.Name}");
         }
 
-        // Execute with timeout and cancellation
+        // Execute with timeout, cancellation, and concurrency limiting
         var timeout = tool is McpToolBase toolBase
             ? TimeSpan.FromSeconds(toolBase.TimeoutSeconds)
             : DefaultToolTimeout;
@@ -237,7 +239,17 @@ public sealed class McpMessageHandler
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(_serverCancellation);
             cts.CancelAfter(timeout);
-            result = await tool.ExecuteAsync(callParams.Arguments, cts.Token);
+
+            // Limit concurrent tool executions to prevent runaway memory usage
+            await _concurrencyLimiter.WaitAsync(cts.Token);
+            try
+            {
+                result = await tool.ExecuteAsync(callParams.Arguments, cts.Token);
+            }
+            finally
+            {
+                _concurrencyLimiter.Release();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -249,6 +261,12 @@ public sealed class McpMessageHandler
 
         sw.Stop();
         Log($"Tool {callParams.Name} completed in {sw.ElapsedMilliseconds}ms (isError: {result.IsError})");
+
+        // Prompt GC to reclaim Roslyn/Z3 objects after memory-intensive operations
+        if (tool is BatchTool or ConvertTool or CompileTool or AnalyzeTool)
+        {
+            GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+        }
 
         return JsonRpcResponse.Success(request.Id, result);
     }

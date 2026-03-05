@@ -50,7 +50,7 @@ public sealed class BatchTool : McpToolBase
                 },
                 "parallel": {
                     "type": "boolean",
-                    "description": "Run conversions in parallel (default: true, convert only)"
+                    "description": "Run conversions in parallel (default: false to limit memory usage, convert only)"
                 },
                 "outputDirectory": {
                     "type": "string",
@@ -132,7 +132,7 @@ public sealed class BatchTool : McpToolBase
 
         var includeTests = GetBool(arguments, "includeTests", defaultValue: true);
         var dryRun = GetBool(arguments, "dryRun", defaultValue: false);
-        var parallel = GetBool(arguments, "parallel", defaultValue: true);
+        var parallel = GetBool(arguments, "parallel", defaultValue: false);
         var outputDirectory = GetString(arguments, "outputDirectory");
         var maxFiles = GetInt(arguments, "maxFiles", defaultValue: 0);
         var offset = GetInt(arguments, "offset", defaultValue: 0);
