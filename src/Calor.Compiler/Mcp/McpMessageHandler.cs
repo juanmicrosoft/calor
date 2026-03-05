@@ -21,6 +21,12 @@ public sealed class McpMessageHandler
     private readonly TextWriter? _log;
     private static readonly int MaxConcurrentTools = Math.Max(2, Environment.ProcessorCount / 2);
     private readonly SemaphoreSlim _concurrencyLimiter = new(MaxConcurrentTools);
+
+    // Reject new heavy work when the process exceeds this memory threshold (default: 2 GB)
+    private static readonly long MemoryPressureThresholdBytes =
+        long.TryParse(Environment.GetEnvironmentVariable("CALOR_MCP_MAX_MEMORY_MB"), out var mb)
+            ? mb * 1024L * 1024L
+            : 2L * 1024L * 1024L * 1024L;
     private CancellationToken _serverCancellation;
 
     public McpMessageHandler(bool verbose = false, TextWriter? log = null)
@@ -235,6 +241,22 @@ public sealed class McpMessageHandler
             : DefaultToolTimeout;
         var sw = Stopwatch.StartNew();
         McpToolResult result;
+
+        // Reject memory-intensive tools when process is already under pressure
+        if (tool is BatchTool or ConvertTool or CompileTool or AnalyzeTool)
+        {
+            var memoryUsed = GC.GetTotalMemory(forceFullCollection: false);
+            if (memoryUsed > MemoryPressureThresholdBytes)
+            {
+                var usedMb = memoryUsed / (1024 * 1024);
+                var thresholdMb = MemoryPressureThresholdBytes / (1024 * 1024);
+                Log($"Tool {callParams.Name} rejected: memory pressure ({usedMb} MB >= {thresholdMb} MB threshold)");
+                return JsonRpcResponse.Success(request.Id,
+                    McpToolResult.Error($"Server under memory pressure ({usedMb} MB used, {thresholdMb} MB threshold). " +
+                        "Retry after current operations complete. Set CALOR_MCP_MAX_MEMORY_MB to adjust."));
+            }
+        }
+
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(_serverCancellation);
@@ -254,9 +276,10 @@ public sealed class McpMessageHandler
         catch (OperationCanceledException)
         {
             sw.Stop();
-            Log($"Tool {callParams.Name} timed out after {sw.ElapsedMilliseconds}ms");
+            var queueOrExec = sw.ElapsedMilliseconds < 1000 ? "waiting for execution slot" : "during execution";
+            Log($"Tool {callParams.Name} cancelled {queueOrExec} after {sw.ElapsedMilliseconds}ms");
             return JsonRpcResponse.Success(request.Id,
-                McpToolResult.Error($"Tool '{callParams.Name}' timed out after {timeout.TotalSeconds}s"));
+                McpToolResult.Error($"Tool '{callParams.Name}' timed out after {timeout.TotalSeconds}s ({queueOrExec})"));
         }
 
         sw.Stop();
