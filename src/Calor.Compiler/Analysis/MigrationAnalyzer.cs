@@ -147,27 +147,9 @@ public sealed class MigrationAnalyzer
 
         // Switch expressions are now supported - no longer tracking as unsupported
 
-        if (visitor.RelationalPatternCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "relational-pattern",
-                Description = "Relational patterns (is > x, is < x) not yet supported",
-                Count = visitor.RelationalPatternCount,
-                Examples = visitor.RelationalPatternExamples
-            });
-        }
+        // Relational patterns (is > x, is < x) are now supported - no longer tracking as unsupported
 
-        if (visitor.CompoundPatternCount > 0)
-        {
-            result.Add(new UnsupportedConstruct
-            {
-                Name = "compound-pattern",
-                Description = "Compound patterns (and/or) not yet supported",
-                Count = visitor.CompoundPatternCount,
-                Examples = visitor.CompoundPatternExamples
-            });
-        }
+        // Compound patterns (and/or) are now supported - no longer tracking as unsupported
 
         if (visitor.RangeExpressionCount > 0)
         {

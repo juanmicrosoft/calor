@@ -676,7 +676,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_RelationalPattern_DetectedAsUnsupported()
+    public void AnalyzeSource_RelationalPattern_NoLongerUnsupported()
     {
         var source = """
             public class Service
@@ -690,9 +690,9 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "relational-pattern");
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "compound-pattern");
+        // Relational and compound patterns are now supported - they should NOT appear in unsupported constructs
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "relational-pattern");
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "compound-pattern");
     }
 
     [Fact]
@@ -937,14 +937,14 @@ public class MigrationAnalyzerTests
     [Fact]
     public void AnalyzeSource_MultipleUnsupportedConstructs_CompoundPenalty()
     {
-        // Note: switch expression is now supported, so we don't count it as unsupported
-        // This test uses: primary constructor, relational pattern, compound pattern, lambda
+        // Note: switch expression, relational pattern, and compound pattern are now supported
+        // This test uses: primary constructor (unsupported) only
         var source = """
             public class Service(string name)
             {
                 public bool IsInRange(int x)
                 {
-                    // Unsupported: relational + compound pattern
+                    // Supported: relational + compound pattern
                     return x is > 0 and < 10;
                 }
 
@@ -954,12 +954,11 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        // Multiple unsupported constructs should result in very low score
+        // Only primary constructor should be unsupported now
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.True(result.UnsupportedConstructs.Count >= 3,
-            $"Expected at least 3 unsupported constructs, got {result.UnsupportedConstructs.Count}");
-        Assert.True(result.TotalScore < 20,
-            $"Expected score < 20 with multiple unsupported constructs, got {result.TotalScore}");
+        Assert.True(result.UnsupportedConstructs.Count >= 1,
+            $"Expected at least 1 unsupported construct, got {result.UnsupportedConstructs.Count}");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "primary-constructor");
     }
 
     #endregion
