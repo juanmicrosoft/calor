@@ -2331,6 +2331,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             Visit(nestedEnum);
             AppendLine();
         }
+        foreach (var nestedDelegate in node.NestedDelegates)
+        {
+            Visit(nestedDelegate);
+            AppendLine();
+        }
 
         _currentClassName = null;
 

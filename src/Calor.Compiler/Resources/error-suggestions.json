@@ -141,6 +141,86 @@
       "wrongExample": "§IF{if016} (condition)\n  §/I{if017}   // ID mismatch!",
       "correctExample": "§IF{if016} (condition)\n  §/I{if016}   // IDs must match",
       "explanation": "Manually fix the closing ID to match the opening ID. Count the nesting levels to identify which §/I belongs to which §IF."
+    },
+    {
+      "id": "invalid-lisp-expression",
+      "title": "Invalid Lisp Expression",
+      "matchPatterns": ["Unexpected token in expression", "invalid expression argument", "invalid lisp"],
+      "matchCodes": ["Calor0114"],
+      "description": "The parser encountered an unexpected token inside a Lisp-style expression (parenthesized prefix notation). Common causes: nullable type in cast position (?T), unsupported operator, or malformed nested expression.",
+      "wrongExample": "(cast ?T value)          // ?T not recognized as type\n(+ a §IDX arr i)         // Can't nest § tags in Lisp expressions",
+      "correctExample": "(cast T? value)          // Use postfix nullable\n§B{_tmp} §IDX arr i      // Extract to binding first\n(+ a _tmp)",
+      "explanation": "Lisp expressions use prefix notation: (operator arg1 arg2). Types must be valid identifiers — use T? postfix notation for nullable types. Section markers (§) cannot appear inside parenthesized expressions."
+    },
+    {
+      "id": "mismatched-id",
+      "title": "Mismatched Block ID",
+      "matchPatterns": ["mismatched id", "does not match", "closing tag id", "opening id"],
+      "matchCodes": ["Calor0101"],
+      "description": "A closing tag's ID does not match the corresponding opening tag. This commonly happens with nested IF, LOOP, TRY, or MATCH blocks where copy-paste or converter output has incorrect IDs.",
+      "wrongExample": "§LOOP{loop1} (range 0 n)\n  §IF{if1} (condition)\n  §/I{if1}\n§/L{loop2}   // ERROR: loop2 != loop1",
+      "correctExample": "§LOOP{loop1} (range 0 n)\n  §IF{if1} (condition)\n  §/I{if1}\n§/L{loop1}   // IDs must match",
+      "explanation": "Every opening tag (§IF{id}, §LOOP{id}, §TRY{id}, §MATCH{id}) must have a closing tag with the same ID. Check nesting carefully — mismatched IDs usually indicate a copy-paste error or incorrect nesting."
+    },
+    {
+      "id": "expected-keyword",
+      "title": "Expected Keyword",
+      "matchPatterns": ["expected keyword", "expected 'module'", "expected 'fn'", "expected 'type'"],
+      "matchCodes": ["Calor0103"],
+      "description": "The parser expected a specific keyword (module, fn, type, etc.) but found something else. This usually means a structural syntax error.",
+      "wrongExample": "mymodule MyApp         // Missing 'module' keyword\n  function Add(a b)    // 'function' is not a Calor keyword",
+      "correctExample": "module MyApp\n  fn Add(a:i32 b:i32) -> i32",
+      "explanation": "Calor requires specific keywords: 'module' for module declarations, 'fn' for functions, 'type' for type definitions. Check spelling and ensure you're using Calor keywords, not C# keywords."
+    },
+    {
+      "id": "expected-closing-tag",
+      "title": "Expected Closing Tag",
+      "matchPatterns": ["expected closing tag", "unterminated block", "missing §/", "unclosed"],
+      "matchCodes": ["Calor0105"],
+      "description": "A block was opened with a section marker but never properly closed. Every §IF, §LOOP, §TRY, §MATCH, §NEW, §FOREACH must have a matching closing tag.",
+      "wrongExample": "§IF{if1} (> x 0)\n  §R x\n// Missing §/I{if1}",
+      "correctExample": "§IF{if1} (> x 0)\n  §R x\n§/I{if1}",
+      "explanation": "Block tags must be closed: §IF→§/I, §LOOP→§/L, §TRY→§/T, §MATCH→§/M, §NEW→§/NEW, §FOREACH→§/FE. The closing tag must include the same ID as the opening tag."
+    },
+    {
+      "id": "invalid-modifier",
+      "title": "Invalid Modifier",
+      "matchPatterns": ["invalid modifier", "unexpected modifier", "modifier not allowed"],
+      "matchCodes": ["Calor0107"],
+      "description": "A modifier keyword was used in an invalid position or an unrecognized modifier was applied to a declaration.",
+      "wrongExample": "static fn Helper() -> i32   // 'static' may not be valid here\npublic private fn Bad()     // Conflicting modifiers",
+      "correctExample": "fn Helper() -> i32\npub fn Good() -> i32",
+      "explanation": "Calor uses its own modifier keywords (pub, mut, etc.). C# modifiers like static, private, protected are not directly supported. Check the Calor language reference for valid modifiers."
+    },
+    {
+      "id": "type-parameter-not-found",
+      "title": "Type Parameter Not Found",
+      "matchPatterns": ["type parameter not found", "unknown type parameter", "undefined type param"],
+      "matchCodes": ["Calor0115"],
+      "description": "A reference to a generic type parameter (like T, K, V) was used but the parameter is not declared in the current scope.",
+      "wrongExample": "fn Identity(x:T) -> T      // T not declared as type param",
+      "correctExample": "fn Identity<T>(x:T) -> T   // T declared in angle brackets",
+      "explanation": "Generic type parameters must be declared in the function or type signature using angle brackets. Ensure the type parameter name matches exactly (case-sensitive)."
+    },
+    {
+      "id": "invalid-reference",
+      "title": "Invalid Reference",
+      "matchPatterns": ["invalid reference", "cannot reference", "reference not valid"],
+      "matchCodes": ["Calor0203"],
+      "description": "A reference to a variable, function, or type is invalid in the current context. This may be a scope issue or an attempt to use a binding before it is defined.",
+      "wrongExample": "§R (+ a b)      // 'a' or 'b' not accessible in this scope",
+      "correctExample": "§B{a} 1\n§B{b} 2\n§R (+ a b)      // Both bindings are in scope",
+      "explanation": "Ensure the referenced name is defined and accessible in the current scope. Bindings (§B) are only visible after their declaration point and within the same block."
+    },
+    {
+      "id": "missing-extension-self",
+      "title": "Missing Extension Self Parameter",
+      "matchPatterns": ["missing extension self", "extension method", "first parameter must be self"],
+      "matchCodes": ["Calor0204"],
+      "description": "An extension function is missing the required 'self' first parameter. Extension functions in Calor must declare the receiver type as the first parameter.",
+      "wrongExample": "ext fn ToUpper() -> str     // Missing self parameter",
+      "correctExample": "ext fn ToUpper(self:str) -> str",
+      "explanation": "Extension functions require a 'self' parameter as the first argument to specify the type being extended. This is equivalent to the 'this' parameter in C# extension methods."
     }
   ]
 }

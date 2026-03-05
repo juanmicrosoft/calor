@@ -1,9 +1,14 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
+using Calor.Compiler.Verification.Z3.Cache;
+using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -26,7 +31,9 @@ public sealed class BatchTool : McpToolBase
         "Module names are derived from C# namespace declarations. Use moduleNameOverride to force a specific namespace. " +
         "IMPORTANT: If results contain §CSHARP interop blocks, check calor_syntax_lookup or calor_feature_support. " +
         "action='analyze': Analyze convertibility of an entire C# project directory. " +
-        "Returns aggregate scores, tier breakdowns, and top blockers across the project.";
+        "Returns aggregate scores, tier breakdowns, and top blockers across the project. " +
+        "action='compile': Compile .calr files in batch. Discovers files via directory, explicit paths, or glob pattern. " +
+        "Returns per-file pass/fail with error summaries.";
 
     public override McpToolAnnotations? Annotations => new() { DestructiveHint = true };
 
@@ -36,7 +43,7 @@ public sealed class BatchTool : McpToolBase
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["convert", "analyze"],
+                    "enum": ["convert", "analyze", "compile"],
                     "description": "Batch operation to perform",
                     "default": "convert"
                 },
@@ -106,6 +113,23 @@ public sealed class BatchTool : McpToolBase
                 "passthroughOnError": {
                     "type": "boolean",
                     "description": "Wrap unsupported constructs in §CSHARP blocks instead of emitting broken Calor (default: false)"
+                },
+                "files": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Explicit list of .calr file paths to compile (compile only)"
+                },
+                "glob": {
+                    "type": "string",
+                    "description": "Glob pattern to match .calr files, e.g. '**/*.calr' (compile only, requires projectPath as base directory)"
+                },
+                "directory": {
+                    "type": "string",
+                    "description": "Path to directory containing .calr files to compile recursively (compile only, alternative to projectPath)"
+                },
+                "summary": {
+                    "type": "boolean",
+                    "description": "Return compact summary instead of full per-file details. Shows total/passed/failed counts, error categories, and only failed files with their top 3 errors. Default: false"
                 }
             },
             "required": ["projectPath"],
@@ -116,16 +140,18 @@ public sealed class BatchTool : McpToolBase
     public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var action = GetString(arguments, "action") ?? "convert";
+        var summaryMode = GetBool(arguments, "summary");
 
         return action switch
         {
-            "convert" => await HandleConvertAsync(arguments, cancellationToken),
-            "analyze" => HandleAnalyze(arguments, cancellationToken),
-            _ => McpToolResult.Error($"Unknown action: '{action}'. Must be 'convert' or 'analyze'.")
+            "convert" => await HandleConvertAsync(arguments, summaryMode, cancellationToken),
+            "analyze" => HandleAnalyze(arguments, summaryMode, cancellationToken),
+            "compile" => HandleCompile(arguments, summaryMode, cancellationToken),
+            _ => McpToolResult.Error($"Unknown action: '{action}'. Must be 'convert', 'analyze', or 'compile'.")
         };
     }
 
-    private async Task<McpToolResult> HandleConvertAsync(JsonElement? arguments, CancellationToken cancellationToken)
+    private async Task<McpToolResult> HandleConvertAsync(JsonElement? arguments, bool summaryMode, CancellationToken cancellationToken)
     {
         var projectPath = GetString(arguments, "projectPath");
         if (string.IsNullOrEmpty(projectPath))
@@ -240,6 +266,7 @@ public sealed class BatchTool : McpToolBase
                 DurationMs = (int)f.Duration.TotalMilliseconds,
                 ErrorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
                 WarningCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning),
+                CsharpBlockCount = CountCsharpBlocks(f.OutputPath),
                 Issues = f.Issues
                     .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
                     .Select(i => new ConvertIssue
@@ -265,6 +292,49 @@ public sealed class BatchTool : McpToolBase
                     "Use calor_syntax_lookup or calor_feature_support to check before leaving code in §CSHARP blocks.");
             }
 
+            var totalCsharpBlocks = fileResults.Sum(f => f.CsharpBlockCount);
+
+            if (summaryMode)
+            {
+                var errorCategories = fileResults
+                    .Where(f => f.Issues != null)
+                    .SelectMany(f => f.Issues!)
+                    .Where(i => i.Severity == "error")
+                    .GroupBy(i => i.Category ?? "unknown")
+                    .Select(g => new { code = g.Key, count = g.Count(), sample = g.First().Message })
+                    .OrderByDescending(x => x.count)
+                    .Take(10)
+                    .ToList();
+
+                var failedFiles = fileResults
+                    .Where(f => f.Status is "failed" or "timedout")
+                    .Select(f => new
+                    {
+                        file = f.SourcePath,
+                        errorCount = f.ErrorCount,
+                        topErrors = f.Issues?.Take(3).Select(i => $"{i.Category}: {i.Message}").ToList()
+                    })
+                    .ToList();
+
+                var compactSummary = new
+                {
+                    totalFiles = report.Summary.TotalFiles,
+                    successCount = report.Summary.SuccessfulFiles,
+                    partialCount = report.Summary.PartialFiles,
+                    failedCount = report.Summary.FailedFiles,
+                    skippedCount = report.Summary.SkippedFiles,
+                    timedOutCount = report.Summary.TimedOutFiles,
+                    successRate = report.Summary.SuccessRate,
+                    totalCsharpBlocks,
+                    totalDurationMs = (int)report.Summary.TotalDuration.TotalMilliseconds,
+                    errorCategories,
+                    failedFiles,
+                    recommendations
+                };
+
+                return McpToolResult.Json(compactSummary, isError: report.Summary.FailedFiles > 0);
+            }
+
             var output = new BatchConvertOutput
             {
                 Success = report.Summary.FailedFiles == 0 && report.Summary.TimedOutFiles == 0,
@@ -278,7 +348,8 @@ public sealed class BatchTool : McpToolBase
                     SkippedFiles = report.Summary.SkippedFiles,
                     TimedOutFiles = report.Summary.TimedOutFiles,
                     SuccessRate = report.Summary.SuccessRate,
-                    TotalDurationMs = (int)report.Summary.TotalDuration.TotalMilliseconds
+                    TotalDurationMs = (int)report.Summary.TotalDuration.TotalMilliseconds,
+                    TotalCsharpBlocks = totalCsharpBlocks
                 },
                 Files = fileResults,
                 Recommendations = recommendations
@@ -292,7 +363,7 @@ public sealed class BatchTool : McpToolBase
         }
     }
 
-    private McpToolResult HandleAnalyze(JsonElement? arguments, CancellationToken cancellationToken)
+    private McpToolResult HandleAnalyze(JsonElement? arguments, bool summaryMode, CancellationToken cancellationToken)
     {
         var projectPath = GetString(arguments, "projectPath");
         if (string.IsNullOrEmpty(projectPath))
@@ -433,6 +504,31 @@ public sealed class BatchTool : McpToolBase
                 })
                 .ToList();
 
+            if (summaryMode)
+            {
+                var compactAnalyze = new
+                {
+                    totalFiles = fileResults.Count,
+                    excludedFiles = excludedCount,
+                    overallScore = Math.Round(overallScore, 1),
+                    tiers = new
+                    {
+                        tier1_clean = fileResults.Count(f => f.Score >= 80),
+                        tier2_minor_issues = fileResults.Count(f => f.Score >= 50 && f.Score < 80),
+                        tier3_major_blockers = fileResults.Count(f => f.Score < 50)
+                    },
+                    topBlockers,
+                    filesWithBlockers = fileResults
+                        .Where(f => f.BlockerCount > 0)
+                        .OrderBy(f => f.Score)
+                        .Select(f => new { path = f.Path, score = f.Score, blockerCount = f.BlockerCount })
+                        .ToList(),
+                    durationMs = (int)sw.ElapsedMilliseconds
+                };
+
+                return McpToolResult.Json(compactAnalyze);
+            }
+
             var output = new BatchAnalyzeOutput
             {
                 TotalFiles = fileResults.Count,
@@ -455,6 +551,160 @@ public sealed class BatchTool : McpToolBase
         {
             return McpToolResult.Error($"Batch analysis failed: {ex.Message}");
         }
+    }
+
+    private static int CountCsharpBlocks(string? outputPath)
+    {
+        if (outputPath == null || !File.Exists(outputPath))
+            return 0;
+        var content = File.ReadAllText(outputPath);
+        return Regex.Matches(content, @"§CSHARP\s*\{").Count;
+    }
+
+    private McpToolResult HandleCompile(JsonElement? arguments, bool summaryMode, CancellationToken cancellationToken)
+    {
+        var projectPath = GetString(arguments, "projectPath");
+        var directory = GetString(arguments, "directory");
+        var globPattern = GetString(arguments, "glob");
+        var files = GetStringArray(arguments, "files");
+
+        // Collect file paths from all sources
+        var filePaths = new List<string>();
+
+        if (files.Count > 0)
+        {
+            filePaths.AddRange(files);
+        }
+
+        var baseDir = directory ?? projectPath;
+        if (!string.IsNullOrEmpty(baseDir) && Directory.Exists(baseDir))
+        {
+            if (!string.IsNullOrEmpty(globPattern))
+            {
+                var matcher = new Matcher();
+                matcher.AddInclude(globPattern);
+                var result = matcher.Execute(new DirectoryInfoWrapper(new DirectoryInfo(baseDir)));
+                filePaths.AddRange(result.Files.Select(f => Path.Combine(baseDir, f.Path)));
+            }
+            else
+            {
+                filePaths.AddRange(Directory.EnumerateFiles(baseDir, "*.calr", SearchOption.AllDirectories));
+            }
+        }
+
+        if (filePaths.Count == 0)
+        {
+            return McpToolResult.Error(
+                "No .calr files found. Provide 'directory', 'projectPath', 'files', or 'glob' to specify files to compile.");
+        }
+
+        var sw = Stopwatch.StartNew();
+        var fileResults = new List<CompileFileResult>();
+        var totalErrors = 0;
+        var errorCategories = new Dictionary<string, int>();
+
+        foreach (var path in filePaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    fileResults.Add(new CompileFileResult
+                    {
+                        FilePath = path,
+                        Success = false,
+                        ErrorCount = 1,
+                        Errors = ["File not found"]
+                    });
+                    totalErrors++;
+                    IncrementCategory(errorCategories, "file_not_found");
+                    continue;
+                }
+
+                var source = File.ReadAllText(path);
+                var compileOptions = new CompilationOptions
+                {
+                    ContractMode = ContractMode.Off,
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                    CancellationToken = cancellationToken
+                };
+
+                var compileResult = Program.Compile(source, path, compileOptions);
+
+                var errors = compileResult.Diagnostics
+                    .Where(d => d.IsError)
+                    .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
+                    .ToList();
+
+                foreach (var d in compileResult.Diagnostics.Where(d => d.IsError))
+                {
+                    IncrementCategory(errorCategories, d.Code.ToString());
+                }
+
+                fileResults.Add(new CompileFileResult
+                {
+                    FilePath = path,
+                    Success = !compileResult.HasErrors,
+                    ErrorCount = errors.Count,
+                    WarningCount = compileResult.Diagnostics.Count(d => !d.IsError),
+                    Errors = errors.Count > 0 ? errors : null
+                });
+
+                if (compileResult.HasErrors) totalErrors++;
+            }
+            catch (Exception ex)
+            {
+                fileResults.Add(new CompileFileResult
+                {
+                    FilePath = path,
+                    Success = false,
+                    ErrorCount = 1,
+                    Errors = [ex.Message]
+                });
+                totalErrors++;
+                IncrementCategory(errorCategories, "exception");
+            }
+        }
+
+        sw.Stop();
+
+        if (summaryMode)
+        {
+            var compact = new
+            {
+                success = totalErrors == 0,
+                totalFiles = filePaths.Count,
+                passedFiles = filePaths.Count - totalErrors,
+                failedFiles = totalErrors,
+                errorCategories = errorCategories.Count > 0 ? errorCategories : null,
+                failedDetails = fileResults
+                    .Where(f => !f.Success)
+                    .Select(f => new { filePath = f.FilePath, errors = f.Errors?.Take(3) })
+                    .ToList(),
+                durationMs = (int)sw.ElapsedMilliseconds
+            };
+            return McpToolResult.Json(compact, isError: totalErrors > 0);
+        }
+
+        var output = new BatchCompileOutput
+        {
+            Success = totalErrors == 0,
+            TotalFiles = filePaths.Count,
+            PassedFiles = filePaths.Count - totalErrors,
+            FailedFiles = totalErrors,
+            ErrorCategories = errorCategories.Count > 0 ? errorCategories : null,
+            Files = fileResults,
+            DurationMs = (int)sw.ElapsedMilliseconds
+        };
+
+        return McpToolResult.Json(output, isError: totalErrors > 0);
+    }
+
+    private static void IncrementCategory(Dictionary<string, int> categories, string key)
+    {
+        categories[key] = categories.GetValueOrDefault(key) + 1;
     }
 
     #region Convert DTOs
@@ -502,6 +752,9 @@ public sealed class BatchTool : McpToolBase
 
         [JsonPropertyName("totalDurationMs")]
         public int TotalDurationMs { get; init; }
+
+        [JsonPropertyName("totalCsharpBlocks")]
+        public int TotalCsharpBlocks { get; init; }
     }
 
     private sealed class ConvertFileResult
@@ -524,6 +777,9 @@ public sealed class BatchTool : McpToolBase
 
         [JsonPropertyName("warningCount")]
         public int WarningCount { get; init; }
+
+        [JsonPropertyName("csharpBlockCount")]
+        public int CsharpBlockCount { get; init; }
 
         [JsonPropertyName("issues")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -628,6 +884,54 @@ public sealed class BatchTool : McpToolBase
 
         [JsonPropertyName("blockerCount")]
         public int BlockerCount { get; init; }
+    }
+
+    #endregion
+
+    #region Compile DTOs
+
+    private sealed class BatchCompileOutput
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; init; }
+
+        [JsonPropertyName("totalFiles")]
+        public int TotalFiles { get; init; }
+
+        [JsonPropertyName("passedFiles")]
+        public int PassedFiles { get; init; }
+
+        [JsonPropertyName("failedFiles")]
+        public int FailedFiles { get; init; }
+
+        [JsonPropertyName("errorCategories")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<string, int>? ErrorCategories { get; init; }
+
+        [JsonPropertyName("files")]
+        public required List<CompileFileResult> Files { get; init; }
+
+        [JsonPropertyName("durationMs")]
+        public int DurationMs { get; init; }
+    }
+
+    private sealed class CompileFileResult
+    {
+        [JsonPropertyName("filePath")]
+        public required string FilePath { get; init; }
+
+        [JsonPropertyName("success")]
+        public bool Success { get; init; }
+
+        [JsonPropertyName("errorCount")]
+        public int ErrorCount { get; init; }
+
+        [JsonPropertyName("warningCount")]
+        public int WarningCount { get; init; }
+
+        [JsonPropertyName("errors")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? Errors { get; init; }
     }
 
     #endregion

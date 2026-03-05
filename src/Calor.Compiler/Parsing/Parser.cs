@@ -2228,6 +2228,14 @@ public sealed class Parser
     /// </summary>
     private string ParseLispTypeName()
     {
+        // Handle Calor nullable prefix syntax: ?Type → Type?
+        bool isNullablePrefix = false;
+        if (Check(TokenKind.Question))
+        {
+            isNullablePrefix = true;
+            Advance(); // consume '?'
+        }
+
         if (!Check(TokenKind.Identifier))
         {
             _diagnostics.ReportError(Current.Span, DiagnosticCode.ExpectedTypeName,
@@ -2337,6 +2345,12 @@ public sealed class Parser
                     Advance();
                 }
             }
+        }
+
+        // If we had a prefix '?', make the type nullable (append '?')
+        if (isNullablePrefix && !typeBuilder.ToString().EndsWith('?'))
+        {
+            typeBuilder.Append('?');
         }
 
         return typeBuilder.ToString();
@@ -5383,6 +5397,7 @@ public sealed class Parser
         var nestedClasses = new List<ClassDefinitionNode>();
         var nestedInterfaces = new List<InterfaceDefinitionNode>();
         var nestedEnums = new List<EnumDefinitionNode>();
+        var nestedDelegates = new List<DelegateDefinitionNode>();
 
         while (!IsAtEnd && !Check(TokenKind.EndClass))
         {
@@ -5462,9 +5477,13 @@ public sealed class Parser
             {
                 nestedEnums.Add(ParseEnumDefinition());
             }
+            else if (Check(TokenKind.Delegate))
+            {
+                nestedDelegates.Add(ParseDelegateDefinition());
+            }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, or END_CLASS", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS", Current.Kind);
                 Advance();
             }
         }
@@ -5486,7 +5505,8 @@ public sealed class Parser
             nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
             nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
-            indexers: indexers.Count > 0 ? indexers : null);
+            indexers: indexers.Count > 0 ? indexers : null,
+            nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null);
     }
 
     /// <summary>

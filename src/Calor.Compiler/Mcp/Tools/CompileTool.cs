@@ -17,7 +17,7 @@ public sealed class CompileTool : McpToolBase
     public override int TimeoutSeconds => 120;
 
     public override string Description =>
-        "Compile Calor source code to C#. Returns generated C# code and any compilation diagnostics.";
+        "Compile Calor source code to C#. Accepts inline 'source', a 'filePath' to a .calr file on disk, or batch modes via 'files'/'projectPath'. Returns generated C# code and any compilation diagnostics.";
 
     public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
 
@@ -41,7 +41,7 @@ public sealed class CompileTool : McpToolBase
                 },
                 "filePath": {
                     "type": "string",
-                    "description": "Optional file path for diagnostic messages (single file mode)"
+                    "description": "Path to a .calr file on disk. If 'source' is omitted, the file is read and compiled. Also used for diagnostic messages."
                 },
                 "options": {
                     "type": "object",
@@ -95,7 +95,7 @@ public sealed class CompileTool : McpToolBase
         }
         """;
 
-    public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
+    public override async Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
         var source = GetString(arguments, "source");
         var projectPath = GetString(arguments, "projectPath");
@@ -121,17 +121,28 @@ public sealed class CompileTool : McpToolBase
         // Batch mode: compile multiple files
         if (filePaths.Count > 0)
         {
-            return Task.FromResult(CompileBatch(filePaths, arguments, cancellationToken));
+            return CompileBatch(filePaths, arguments, cancellationToken);
+        }
+
+        // If filePath is provided without source, read the file from disk
+        var filePath = GetString(arguments, "filePath");
+        if (source == null && filePath != null)
+        {
+            if (!File.Exists(filePath))
+            {
+                return McpToolResult.Error($"File not found: {filePath}");
+            }
+            source = await File.ReadAllTextAsync(filePath, cancellationToken);
         }
 
         // Single-file mode
         if (string.IsNullOrEmpty(source))
         {
-            return Task.FromResult(McpToolResult.Error("Missing required parameter: provide 'source', 'files', or 'projectPath'"));
+            return McpToolResult.Error("Missing required parameter: provide 'source', 'files', or 'projectPath'");
         }
 
-        var filePath = GetString(arguments, "filePath") ?? "mcp-input.calr";
-        return Task.FromResult(CompileSingle(source, filePath, arguments, cancellationToken));
+        filePath ??= "mcp-input.calr";
+        return CompileSingle(source, filePath, arguments, cancellationToken);
     }
 
     private McpToolResult CompileSingle(string source, string filePath, JsonElement? arguments, CancellationToken cancellationToken)

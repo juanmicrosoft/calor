@@ -563,8 +563,7 @@ public static class ConversionCatalog
                 return x is not < 0;
             }
         }
-        """,
-        RoundTripSupported: false);
+        """);
 
     public static readonly ConversionSnippet InternalEnum = new(
         "11-02", "GapClosures", "Enum with non-public visibility",
