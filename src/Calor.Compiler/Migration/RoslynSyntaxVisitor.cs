@@ -667,6 +667,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var nestedClasses = new List<ClassDefinitionNode>();
         var nestedInterfaces = new List<InterfaceDefinitionNode>();
         var nestedEnums = new List<EnumDefinitionNode>();
+        var nestedDelegates = new List<DelegateDefinitionNode>();
 
         // Extract member-level preprocessor regions
         var ppRegions = ExtractMemberPreprocessorRegions(node);
@@ -816,6 +817,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 continue;
             }
+            if (member is DelegateDeclarationSyntax nestedDel)
+            {
+                try
+                {
+                    _context.RecordFeatureUsage("nested-type");
+                    var savedDelegates = _delegates.ToList();
+                    _delegates.Clear();
+                    VisitDelegateDeclaration(nestedDel);
+                    nestedDelegates.AddRange(_delegates);
+                    _delegates.Clear();
+                    _delegates.AddRange(savedDelegates);
+                }
+                catch (Exception) when (_context.ShouldPreserveCSharp)
+                {
+                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                }
+                continue;
+            }
 
             try
             {
@@ -862,7 +881,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
             nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
-            indexers: indexers.Count > 0 ? indexers : null);
+            indexers: indexers.Count > 0 ? indexers : null,
+            nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null);
     }
 
     private static HashSet<string> CollectExplicitMemberNames(SyntaxList<MemberDeclarationSyntax> members)
@@ -1097,6 +1117,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var nestedClasses = new List<ClassDefinitionNode>();
         var nestedInterfaces = new List<InterfaceDefinitionNode>();
         var nestedEnums = new List<EnumDefinitionNode>();
+        var nestedDelegates = new List<DelegateDefinitionNode>();
 
         // Extract member-level preprocessor regions
         var ppRegions = ExtractMemberPreprocessorRegions(node);
@@ -1197,6 +1218,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 catch (Exception) when (_context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
+            if (member is DelegateDeclarationSyntax nd)
+            {
+                try
+                {
+                    _context.RecordFeatureUsage("nested-type");
+                    var savedDelegates = _delegates.ToList();
+                    _delegates.Clear();
+                    VisitDelegateDeclaration(nd);
+                    nestedDelegates.AddRange(_delegates);
+                    _delegates.Clear();
+                    _delegates.AddRange(savedDelegates);
+                }
+                catch (Exception) when (_context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                continue;
+            }
 
             try
             {
@@ -1249,7 +1285,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
             nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
-            indexers: indexers.Count > 0 ? indexers : null);
+            indexers: indexers.Count > 0 ? indexers : null,
+            nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null);
     }
 
     private MethodSignatureNode ConvertMethodSignature(MethodDeclarationSyntax node)

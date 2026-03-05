@@ -353,6 +353,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// </summary>
     public IReadOnlyList<EnumDefinitionNode> NestedEnums { get; }
 
+    /// <summary>
+    /// Nested delegate declarations inside this type.
+    /// </summary>
+    public IReadOnlyList<DelegateDefinitionNode> NestedDelegates { get; }
+
     public ClassDefinitionNode(
         TextSpan span,
         string id,
@@ -486,7 +491,8 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<ClassDefinitionNode>? nestedClasses = null,
         IReadOnlyList<InterfaceDefinitionNode>? nestedInterfaces = null,
         IReadOnlyList<EnumDefinitionNode>? nestedEnums = null,
-        IReadOnlyList<IndexerNode>? indexers = null)
+        IReadOnlyList<IndexerNode>? indexers = null,
+        IReadOnlyList<DelegateDefinitionNode>? nestedDelegates = null)
         : base(span, id, name, attributes)
     {
         IsAbstract = isAbstract;
@@ -512,6 +518,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         NestedClasses = nestedClasses ?? Array.Empty<ClassDefinitionNode>();
         NestedInterfaces = nestedInterfaces ?? Array.Empty<InterfaceDefinitionNode>();
         NestedEnums = nestedEnums ?? Array.Empty<EnumDefinitionNode>();
+        NestedDelegates = nestedDelegates ?? Array.Empty<DelegateDefinitionNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

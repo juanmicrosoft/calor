@@ -400,6 +400,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Visit(nestedEnum);
             AppendLine();
         }
+        foreach (var nestedDelegate in node.NestedDelegates)
+        {
+            Visit(nestedDelegate);
+            AppendLine();
+        }
 
         Dedent();
         AppendLine($"§/CL{{{node.Id}}}");
