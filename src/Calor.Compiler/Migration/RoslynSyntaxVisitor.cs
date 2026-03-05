@@ -5744,7 +5744,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return null;
         }
 
-        // Case 3: Return statement in method — use method return type
+        // Case 3a: Throw statement — throw new("msg");
+        // Case 3b: Throw expression — x ?? throw new("msg")
+        if (parent is ThrowStatementSyntax or ThrowExpressionSyntax)
+        {
+            return "Exception";
+        }
+
+        // Case 4: Parameter default value — void Foo(Type x = new())
+        if (parent is EqualsValueClauseSyntax evc
+            && evc.Parent is ParameterSyntax parameter
+            && parameter.Type != null)
+        {
+            return TypeMapper.CSharpToCalor(parameter.Type.ToString());
+        }
+
+        // Case 5: Cast expression — (Type)new()
+        if (parent is CastExpressionSyntax cast)
+        {
+            return TypeMapper.CSharpToCalor(cast.Type.ToString());
+        }
+
+        // Case 6: Return statement in method — use method return type
         if (parent is ReturnStatementSyntax || parent is ArrowExpressionClauseSyntax)
         {
             // Walk up the syntax tree to find the enclosing member declaration.

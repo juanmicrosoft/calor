@@ -2027,4 +2027,94 @@ public class ConverterImprovementTests
     }
 
     #endregion
+
+    #region Target-Typed New in Throw / Parameter / Cast Contexts
+
+    [Fact]
+    public void Migration_TargetTypedNew_InThrowStatement_InfersException()
+    {
+        var csharp = """
+            using System;
+            public class Service
+            {
+                public void Validate(string? input)
+                {
+                    if (input == null) throw new("input is null");
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var emitted = new CalorFormatter().Format(result.Ast!);
+        Assert.DoesNotContain("NEW{object}", emitted);
+        Assert.Contains("NEW{Exception}", emitted);
+    }
+
+    [Fact]
+    public void Migration_TargetTypedNew_InThrowExpression_InfersException()
+    {
+        var csharp = """
+            using System;
+            public class Service
+            {
+                public string Process(string? input)
+                {
+                    var result = input ?? throw new("bad");
+                    return result;
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var emitted = new CalorFormatter().Format(result.Ast!);
+        Assert.DoesNotContain("NEW{object}", emitted);
+        Assert.Contains("NEW{Exception}", emitted);
+    }
+
+    [Fact]
+    public void Migration_TargetTypedNew_InCastExpression_InfersCastType()
+    {
+        var csharp = """
+            using System;
+            public class Service
+            {
+                public Exception GetError()
+                {
+                    return (ArgumentException)new("bad");
+                }
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var emitted = new CalorFormatter().Format(result.Ast!);
+        Assert.DoesNotContain("NEW{object}", emitted);
+        Assert.Contains("NEW{ArgumentException}", emitted);
+    }
+
+    [Fact]
+    public void Migration_TargetTypedNew_VariableDecl_InfersType()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            public class Foo
+            {
+                private List<int> _items = new();
+                public Dictionary<string, int> GetMap() => new();
+            }
+            """;
+
+        var result = _converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var emitted = new CalorFormatter().Format(result.Ast!);
+        Assert.DoesNotContain("NEW{object}", emitted);
+    }
+
+    #endregion
 }
