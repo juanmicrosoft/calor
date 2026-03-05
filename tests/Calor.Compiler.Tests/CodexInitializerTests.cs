@@ -29,8 +29,7 @@ public class CodexInitializerTests : IDisposable
         Assert.NotEmpty(content);
         Assert.Contains("Calor-First Project", content);
         Assert.Contains("{{VERSION}}", content);
-        Assert.Contains("calor_syntax_help", content);
-        Assert.Contains("calor_syntax_lookup", content);
+        Assert.Contains("calor_help", content);
         Assert.Contains("<!-- BEGIN CalorC SECTION - DO NOT EDIT -->", content);
         Assert.Contains("<!-- END CalorC SECTION -->", content);
     }
@@ -254,8 +253,7 @@ This should be preserved.
         var template = EmbeddedResourceHelper.ReadTemplate("AGENTS.md.template");
 
         // Should reference MCP tools
-        Assert.Contains("calor_syntax_help", template);
-        Assert.Contains("calor_syntax_lookup", template);
+        Assert.Contains("calor_help", template);
         Assert.Contains("calor_compile", template);
     }
 

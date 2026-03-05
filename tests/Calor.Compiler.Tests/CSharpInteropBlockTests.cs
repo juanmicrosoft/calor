@@ -424,9 +424,10 @@ public class CSharpInteropBlockTests
     [Fact]
     public async Task AnalyzeConvertibilityTool_ReturnsScore()
     {
-        var tool = new AnalyzeConvertibilityTool();
+        var tool = new ConvertTool();
         var args = JsonDocument.Parse("""
             {
+                "mode": "assess",
                 "source": "public class Calc { public int Add(int a, int b) => a + b; }"
             }
             """).RootElement;

@@ -4,14 +4,14 @@ using Xunit;
 
 namespace Calor.Compiler.Tests.Mcp;
 
-public class VerifyContractsToolTests
+public class VerifyToolTests
 {
-    private readonly VerifyContractsTool _tool = new();
+    private readonly VerifyTool _tool = new();
 
     [Fact]
-    public void Name_ReturnsCalorVerifyContracts()
+    public void Name_ReturnsCalorVerify()
     {
-        Assert.Equal("calor_verify_contracts", _tool.Name);
+        Assert.Equal("calor_verify", _tool.Name);
     }
 
     [Fact]
@@ -130,7 +130,6 @@ public class VerifyContractsToolTests
     [Fact]
     public async Task ExecuteAsync_ContractStatusValues()
     {
-        // Test that contract verification returns expected status values
         var args = JsonDocument.Parse("""
             {
                 "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n§/F{f001}\n§/M{m001}"
@@ -141,7 +140,6 @@ public class VerifyContractsToolTests
         var text = result.Content[0].Text!;
         var json = JsonDocument.Parse(text);
 
-        // Check summary contains expected fields
         var summary = json.RootElement.GetProperty("summary");
         Assert.True(summary.TryGetProperty("proven", out _));
         Assert.True(summary.TryGetProperty("unproven", out _));

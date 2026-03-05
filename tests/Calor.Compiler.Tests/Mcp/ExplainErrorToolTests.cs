@@ -9,12 +9,12 @@ namespace Calor.Compiler.Tests.Mcp;
 /// </summary>
 public class ExplainErrorToolTests
 {
-    private readonly ExplainErrorTool _tool = new();
+    private readonly HelpTool _tool = new();
 
     [Fact]
     public void Name_ReturnsExpectedToolName()
     {
-        Assert.Equal("calor_explain_error", _tool.Name);
+        Assert.Equal("calor_help", _tool.Name);
     }
 
     [Fact]
@@ -29,7 +29,7 @@ public class ExplainErrorToolTests
     [Fact]
     public async Task ExecuteAsync_WithMissingParameter_ReturnsError()
     {
-        var args = JsonDocument.Parse("""{}""").RootElement;
+        var args = JsonDocument.Parse("""{"action": "error"}""").RootElement;
         var result = await _tool.ExecuteAsync(args);
         Assert.True(result.IsError);
     }
@@ -37,7 +37,8 @@ public class ExplainErrorToolTests
     [Fact]
     public async Task ExecuteAsync_WithNullArguments_ReturnsError()
     {
-        var result = await _tool.ExecuteAsync(null);
+        var args = JsonDocument.Parse("""{"action": "error"}""").RootElement;
+        var result = await _tool.ExecuteAsync(args);
         Assert.True(result.IsError);
     }
 
@@ -46,6 +47,7 @@ public class ExplainErrorToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "error",
                 "error": "Variable 'k' already defined in this scope"
             }
             """).RootElement;
@@ -69,6 +71,7 @@ public class ExplainErrorToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "error",
                 "error": "NullReferenceException when calling (len arr)"
             }
             """).RootElement;
@@ -92,6 +95,7 @@ public class ExplainErrorToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "error",
                 "error": "Unexpected character '''"
             }
             """).RootElement;
@@ -112,6 +116,7 @@ public class ExplainErrorToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "error",
                 "error": "Calor0201"
             }
             """).RootElement;
@@ -132,6 +137,7 @@ public class ExplainErrorToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "error",
                 "error": "undefined function 'abs'"
             }
             """).RootElement;
@@ -152,6 +158,7 @@ public class ExplainErrorToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "error",
                 "error": "completely unrelated gibberish xyz123"
             }
             """).RootElement;
@@ -169,6 +176,7 @@ public class ExplainErrorToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "error",
                 "error": "already defined"
             }
             """).RootElement;
@@ -193,6 +201,7 @@ public class ExplainErrorToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "error",
                 "error": "i32[] is wrong type syntax"
             }
             """).RootElement;

@@ -6,22 +6,22 @@ namespace Calor.Compiler.Tests.Mcp;
 
 public class ValidateSnippetToolTests
 {
-    private readonly ValidateSnippetTool _tool = new();
+    private readonly CheckTool _tool = new();
 
     #region Basic Tests
 
     [Fact]
     public void Name_ReturnsCalorValidateSnippet()
     {
-        Assert.Equal("calor_validate_snippet", _tool.Name);
+        Assert.Equal("calor_check", _tool.Name);
     }
 
     [Fact]
     public void Description_ContainsValidateInfo()
     {
-        Assert.Contains("Validate", _tool.Description);
+        Assert.Contains("validation", _tool.Description.ToLower());
         Assert.Contains("Calor", _tool.Description);
-        Assert.Contains("fragment", _tool.Description.ToLower());
+        Assert.Contains("snippet", _tool.Description.ToLower());
     }
 
     [Fact]
@@ -31,9 +31,9 @@ public class ValidateSnippetToolTests
 
         Assert.Equal(JsonValueKind.Object, schema.ValueKind);
         Assert.True(schema.TryGetProperty("properties", out var props));
-        Assert.True(props.TryGetProperty("snippet", out _));
+        Assert.True(props.TryGetProperty("source", out _));
         Assert.True(props.TryGetProperty("context", out _));
-        Assert.True(props.TryGetProperty("options", out _));
+        Assert.True(props.TryGetProperty("action", out _));
     }
 
     #endregion
@@ -45,7 +45,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R 42"
+                "action": "validate",
+                "source": "§R 42"
             }
             """).RootElement;
 
@@ -62,7 +63,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{x} 10"
+                "action": "validate",
+                "source": "§B{x} 10"
             }
             """).RootElement;
 
@@ -78,7 +80,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R §SM 42",
+                "action": "validate",
+                "source": "§R §SM 42",
                 "context": {
                     "returnType": "Option<i32>"
                 }
@@ -97,7 +100,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R §NN",
+                "action": "validate",
+                "source": "§R §NN",
                 "context": {
                     "returnType": "Option<i32>"
                 }
@@ -116,7 +120,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{x} 10\n§B{y} 20\n§R (+ x y)"
+                "action": "validate",
+                "source": "§B{x} 10\n§B{y} 20\n§R (+ x y)"
             }
             """).RootElement;
 
@@ -137,7 +142,8 @@ public class ValidateSnippetToolTests
         // §R without expression returns unit, which is valid
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R"
+                "action": "validate",
+                "source": "§R"
             }
             """).RootElement;
 
@@ -153,7 +159,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R §§§"
+                "action": "validate",
+                "source": "§R §§§"
             }
             """).RootElement;
 
@@ -169,7 +176,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{x} STR:\"unterminated"
+                "action": "validate",
+                "source": "§B{x} STR:\"unterminated"
             }
             """).RootElement;
 
@@ -189,7 +197,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R (+ a b)",
+                "action": "validate",
+                "source": "§R (+ a b)",
                 "context": {
                     "returnType": "i32",
                     "parameters": [
@@ -212,7 +221,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R y",
+                "action": "validate",
+                "source": "§R y",
                 "context": {
                     "surroundingCode": "§B{y} (+ x 1)",
                     "parameters": [
@@ -234,7 +244,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "(+ 1 2)",
+                "action": "validate",
+                "source": "(+ 1 2)",
                 "context": {
                     "location": "expression"
                 }
@@ -253,7 +264,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§F{f001:Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n§/F{f001}",
+                "action": "validate",
+                "source": "§F{f001:Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n§/F{f001}",
                 "context": {
                     "location": "module_body"
                 }
@@ -276,10 +288,9 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{x} 10",
-                "options": {
-                    "lexerOnly": true
-                }
+                "action": "validate",
+                "source": "§B{x} 10",
+                "lexerOnly": true
             }
             """).RootElement;
 
@@ -296,10 +307,9 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{x} 10",
-                "options": {
-                    "showTokens": true
-                }
+                "action": "validate",
+                "source": "§B{x} 10",
+                "showTokens": true
             }
             """).RootElement;
 
@@ -316,11 +326,10 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R 42",
-                "options": {
-                    "lexerOnly": true,
-                    "showTokens": true
-                }
+                "action": "validate",
+                "source": "§R 42",
+                "lexerOnly": true,
+                "showTokens": true
             }
             """).RootElement;
 
@@ -341,7 +350,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": ""
+                "action": "validate",
+                "source": ""
             }
             """).RootElement;
 
@@ -360,7 +370,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "   \n   "
+                "action": "validate",
+                "source": "   \n   "
             }
             """).RootElement;
 
@@ -376,13 +387,13 @@ public class ValidateSnippetToolTests
     [Fact]
     public async Task ExecuteAsync_WithMissingSnippet_ReturnsError()
     {
-        var args = JsonDocument.Parse("""{}""").RootElement;
+        var args = JsonDocument.Parse("""{"action": "validate"}""").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
 
         Assert.True(result.IsError);
         var text = result.Content[0].Text!;
-        Assert.Contains("snippet", text.ToLower());
+        Assert.Contains("source", text.ToLower());
     }
 
     [Fact]
@@ -400,7 +411,8 @@ public class ValidateSnippetToolTests
         // Use an unclosed string to get an error
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{x} 10\n§B{y} STR:\"unterminated"
+                "action": "validate",
+                "source": "§B{x} 10\n§B{y} STR:\"unterminated"
             }
             """).RootElement;
 
@@ -431,7 +443,8 @@ public class ValidateSnippetToolTests
         // IF needs an ID in block form: §IF{id} condition
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§IF{_if1} (> x 0)\n  §R x\n§EL\n  §R (- 0 x)\n§/I{_if1}",
+                "action": "validate",
+                "source": "§IF{_if1} (> x 0)\n  §R x\n§EL\n  §R (- 0 x)\n§/I{_if1}",
                 "context": {
                     "parameters": [
                         { "name": "x", "type": "i32" }
@@ -454,7 +467,8 @@ public class ValidateSnippetToolTests
         // Match syntax: §W{id} expr
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§W{_w1} value\n  §K §SM x\n    §R x\n  §/K\n  §K §NN\n    §R 0\n  §/K\n§/W{_w1}",
+                "action": "validate",
+                "source": "§W{_w1} value\n  §K §SM x\n    §R x\n  §/K\n  §K §NN\n    §R 0\n  §/K\n§/W{_w1}",
                 "context": {
                     "parameters": [
                         { "name": "value", "type": "Option<i32>" }
@@ -477,7 +491,8 @@ public class ValidateSnippetToolTests
         // For loop syntax: §L{id:var:start:end:step} ... §/L{id}
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{sum} 0\n§L{l1:i:1:10:1}\n  §B{sum} (+ sum i)\n§/L{l1}\n§R sum",
+                "action": "validate",
+                "source": "§B{sum} 0\n§L{l1:i:1:10:1}\n  §B{sum} (+ sum i)\n§/L{l1}\n§R sum",
                 "context": {
                     "returnType": "i32"
                 }
@@ -502,8 +517,9 @@ public class ValidateSnippetToolTests
         // Token at original column 1 should report as column 1 after adjustment
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R 42",
-                "options": { "showTokens": true }
+                "action": "validate",
+                "source": "§R 42",
+                "showTokens": true
             }
             """).RootElement;
 
@@ -525,9 +541,10 @@ public class ValidateSnippetToolTests
         // Expression at original column 1 should report as column 1 after adjustment
         var args = JsonDocument.Parse("""
             {
-                "snippet": "(+ 1 2)",
+                "action": "validate",
+                "source": "(+ 1 2)",
                 "context": { "location": "expression" },
-                "options": { "showTokens": true }
+                "showTokens": true
             }
             """).RootElement;
 
@@ -547,8 +564,9 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{x} 10\n§R x",
-                "options": { "showTokens": true }
+                "action": "validate",
+                "source": "§B{x} 10\n§R x",
+                "showTokens": true
             }
             """).RootElement;
 
@@ -578,7 +596,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§F{f001:Test:pub}\n  §O{unit}\n  §R\n§/F{f001}",
+                "action": "validate",
+                "source": "§F{f001:Test:pub}\n  §O{unit}\n  §R\n§/F{f001}",
                 "context": {
                     "location": "module_body",
                     "parameters": [
@@ -602,7 +621,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§F{f001:Test:pub}\n  §O{unit}\n  §R\n§/F{f001}",
+                "action": "validate",
+                "source": "§F{f001:Test:pub}\n  §O{unit}\n  §R\n§/F{f001}",
                 "context": {
                     "location": "module_body",
                     "returnType": "i32"
@@ -625,7 +645,8 @@ public class ValidateSnippetToolTests
         // Statement location should use parameters, not warn
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R x",
+                "action": "validate",
+                "source": "§R x",
                 "context": {
                     "location": "statement",
                     "parameters": [
@@ -651,7 +672,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R 42",
+                "action": "validate",
+                "source": "§R 42",
                 "context": {
                     "location": "invalid_location"
                 }
@@ -671,7 +693,8 @@ public class ValidateSnippetToolTests
         // Parameters missing required fields should be silently ignored
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R 42",
+                "action": "validate",
+                "source": "§R 42",
                 "context": {
                     "parameters": [
                         { "name": "x" },
@@ -701,8 +724,8 @@ public class ValidateSnippetToolTests
         }
         lines.Append("§R x99");
 
-        var args = JsonDocument.Parse($@"{{
-            ""snippet"": {JsonSerializer.Serialize(lines.ToString())}
+        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
+            ""source"": {JsonSerializer.Serialize(lines.ToString())}
         }}").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
@@ -717,7 +740,8 @@ public class ValidateSnippetToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R 42",
+                "action": "validate",
+                "source": "§R 42",
                 "context": null
             }
             """).RootElement;
@@ -736,7 +760,8 @@ public class ValidateSnippetToolTests
         // An unterminated string starting at column 8 (after "§B{y} " which is 6 chars)
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{y} STR:\"unterminated"
+                "action": "validate",
+                "source": "§B{y} STR:\"unterminated"
             }
             """).RootElement;
 
@@ -763,7 +788,8 @@ public class ValidateSnippetToolTests
         // The expression "(+ 1\nSTR:\"bad)" has an unterminated string on line 2
         var args = JsonDocument.Parse("""
             {
-                "snippet": "(+ 1\nSTR:\"unterminated",
+                "action": "validate",
+                "source": "(+ 1\nSTR:\"unterminated",
                 "context": { "location": "expression" }
             }
             """).RootElement;
@@ -789,9 +815,10 @@ public class ValidateSnippetToolTests
         // Multi-line expression with tokens on multiple lines
         var args = JsonDocument.Parse("""
             {
-                "snippet": "(+\n  1\n  2)",
+                "action": "validate",
+                "source": "(+\n  1\n  2)",
                 "context": { "location": "expression" },
-                "options": { "showTokens": true }
+                "showTokens": true
             }
             """).RootElement;
 
@@ -823,7 +850,8 @@ public class ValidateSnippetToolTests
         // The error in surrounding code should NOT appear in diagnostics
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R 42",
+                "action": "validate",
+                "source": "§R 42",
                 "context": {
                     "surroundingCode": "§B{x} STR:\"unterminated"
                 }
@@ -851,7 +879,8 @@ public class ValidateSnippetToolTests
         // Only snippet error should be reported
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§R STR:\"unterminated",
+                "action": "validate",
+                "source": "§R STR:\"unterminated",
                 "context": {
                     "surroundingCode": "§B{x} 10"
                 }
@@ -875,8 +904,9 @@ public class ValidateSnippetToolTests
         // Snippet with unicode characters
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{name} STR:\"Hello, 世界! 🌍\"",
-                "options": { "showTokens": true }
+                "action": "validate",
+                "source": "§B{name} STR:\"Hello, 世界! 🌍\"",
+                "showTokens": true
             }
             """).RootElement;
 
@@ -899,8 +929,9 @@ public class ValidateSnippetToolTests
         // Some languages allow unicode identifiers
         var args = JsonDocument.Parse("""
             {
-                "snippet": "§B{変数} 42\n§R 変数",
-                "options": { "showTokens": true }
+                "action": "validate",
+                "source": "§B{変数} 42\n§R 変数",
+                "showTokens": true
             }
             """).RootElement;
 
@@ -919,8 +950,8 @@ public class ValidateSnippetToolTests
         var longExpr = string.Join(" ", Enumerable.Range(1, 200).Select(i => $"x{i}"));
         var snippet = $"§B{{result}} (+ {longExpr})";
 
-        var args = JsonDocument.Parse($@"{{
-            ""snippet"": {JsonSerializer.Serialize(snippet)}
+        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
+            ""source"": {JsonSerializer.Serialize(snippet)}
         }}").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
@@ -937,8 +968,8 @@ public class ValidateSnippetToolTests
         var padding = new string('x', 500);
         var snippet = $"§B{{val}} STR:\"{padding}";  // Unterminated string
 
-        var args = JsonDocument.Parse($@"{{
-            ""snippet"": {JsonSerializer.Serialize(snippet)}
+        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
+            ""source"": {JsonSerializer.Serialize(snippet)}
         }}").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
@@ -966,8 +997,8 @@ public class ValidateSnippetToolTests
         }
         lines.Append("§R x499");
 
-        var args = JsonDocument.Parse($@"{{
-            ""snippet"": {JsonSerializer.Serialize(lines.ToString())}
+        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
+            ""source"": {JsonSerializer.Serialize(lines.ToString())}
         }}").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
@@ -988,8 +1019,8 @@ public class ValidateSnippetToolTests
         }
         lines.Append("§R STR:\"unterminated");  // Line 101
 
-        var args = JsonDocument.Parse($@"{{
-            ""snippet"": {JsonSerializer.Serialize(lines.ToString())}
+        var args = JsonDocument.Parse($@"{{""action"": ""validate"",
+            ""source"": {JsonSerializer.Serialize(lines.ToString())}
         }}").RootElement;
 
         var result = await _tool.ExecuteAsync(args);

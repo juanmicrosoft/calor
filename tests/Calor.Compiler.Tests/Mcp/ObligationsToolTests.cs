@@ -5,50 +5,50 @@ using Xunit;
 namespace Calor.Compiler.Tests.Mcp;
 
 /// <summary>
-/// Tests for the calor_obligations and calor_suggest_fixes MCP tools (Milestone 1).
+/// Tests for the calor_refine MCP tool (obligations and fixes actions).
 /// </summary>
 public sealed class ObligationsToolTests
 {
-    private readonly ObligationsTool _obligationsTool = new();
-    private readonly SuggestFixesTool _suggestFixesTool = new();
+    private readonly RefineTool _tool = new();
 
-    // ───── ObligationsTool ─────
+    // ───── RefineTool: obligations action ─────
 
     [Fact]
-    public void ObligationsTool_Name_ReturnsCorrectName()
+    public void RefineTool_Name_ReturnsCorrectName()
     {
-        Assert.Equal("calor_obligations", _obligationsTool.Name);
+        Assert.Equal("calor_refine", _tool.Name);
     }
 
     [Fact]
-    public void ObligationsTool_GetInputSchema_ReturnsValidSchema()
+    public void RefineTool_GetInputSchema_ReturnsValidSchema()
     {
-        var schema = _obligationsTool.GetInputSchema();
+        var schema = _tool.GetInputSchema();
         Assert.Equal(JsonValueKind.Object, schema.ValueKind);
         Assert.True(schema.TryGetProperty("properties", out var props));
+        Assert.True(props.TryGetProperty("action", out _));
         Assert.True(props.TryGetProperty("source", out _));
         Assert.True(props.TryGetProperty("timeout", out _));
         Assert.True(props.TryGetProperty("function_id", out _));
     }
 
     [Fact]
-    public async Task ObligationsTool_WithMissingSource_ReturnsError()
+    public async Task RefineTool_Obligations_WithMissingSource_ReturnsError()
     {
-        var args = JsonDocument.Parse("{}").RootElement;
-        var result = await _obligationsTool.ExecuteAsync(args);
+        var args = JsonDocument.Parse("""{"action":"obligations"}""").RootElement;
+        var result = await _tool.ExecuteAsync(args);
 
         Assert.True(result.IsError);
     }
 
     [Fact]
-    public async Task ObligationsTool_WithNullArgs_ReturnsError()
+    public async Task RefineTool_WithNullArgs_ReturnsError()
     {
-        var result = await _obligationsTool.ExecuteAsync(null);
+        var result = await _tool.ExecuteAsync(null);
         Assert.True(result.IsError);
     }
 
     [Fact]
-    public async Task ObligationsTool_WithValidSource_ReturnsStructuredResult()
+    public async Task RefineTool_Obligations_WithValidSource_ReturnsStructuredResult()
     {
         var source = """
             §M{m001:Test}
@@ -63,11 +63,12 @@ public sealed class ObligationsToolTests
 
         var args = JsonDocument.Parse($$"""
             {
+                "action": "obligations",
                 "source": {{JsonSerializer.Serialize(source)}}
             }
             """).RootElement;
 
-        var result = await _obligationsTool.ExecuteAsync(args);
+        var result = await _tool.ExecuteAsync(args);
 
         Assert.NotEmpty(result.Content);
         var text = result.Content[0].Text;
@@ -93,7 +94,7 @@ public sealed class ObligationsToolTests
     }
 
     [Fact]
-    public async Task ObligationsTool_WithNoRefinements_ReturnsEmptyObligations()
+    public async Task RefineTool_Obligations_WithNoRefinements_ReturnsEmptyObligations()
     {
         var source = """
             §M{m001:Test}
@@ -106,11 +107,12 @@ public sealed class ObligationsToolTests
 
         var args = JsonDocument.Parse($$"""
             {
+                "action": "obligations",
                 "source": {{JsonSerializer.Serialize(source)}}
             }
             """).RootElement;
 
-        var result = await _obligationsTool.ExecuteAsync(args);
+        var result = await _tool.ExecuteAsync(args);
 
         Assert.NotEmpty(result.Content);
         var json = JsonDocument.Parse(result.Content[0].Text!);
@@ -120,7 +122,7 @@ public sealed class ObligationsToolTests
     }
 
     [Fact]
-    public async Task ObligationsTool_WithFunctionIdFilter_FiltersResults()
+    public async Task RefineTool_Obligations_WithFunctionIdFilter_FiltersResults()
     {
         var source = """
             §M{m001:Test}
@@ -137,12 +139,13 @@ public sealed class ObligationsToolTests
 
         var args = JsonDocument.Parse($$"""
             {
+                "action": "obligations",
                 "source": {{JsonSerializer.Serialize(source)}},
                 "function_id": "f001"
             }
             """).RootElement;
 
-        var result = await _obligationsTool.ExecuteAsync(args);
+        var result = await _tool.ExecuteAsync(args);
 
         Assert.NotEmpty(result.Content);
         var json = JsonDocument.Parse(result.Content[0].Text!);
@@ -154,34 +157,19 @@ public sealed class ObligationsToolTests
         }
     }
 
-    // ───── SuggestFixesTool ─────
+    // ───── RefineTool: fixes action ─────
 
     [Fact]
-    public void SuggestFixesTool_Name_ReturnsCorrectName()
+    public async Task RefineTool_Fixes_WithMissingSource_ReturnsError()
     {
-        Assert.Equal("calor_suggest_fixes", _suggestFixesTool.Name);
-    }
-
-    [Fact]
-    public void SuggestFixesTool_GetInputSchema_ReturnsValidSchema()
-    {
-        var schema = _suggestFixesTool.GetInputSchema();
-        Assert.Equal(JsonValueKind.Object, schema.ValueKind);
-        Assert.True(schema.TryGetProperty("properties", out var props));
-        Assert.True(props.TryGetProperty("source", out _));
-    }
-
-    [Fact]
-    public async Task SuggestFixesTool_WithMissingSource_ReturnsError()
-    {
-        var args = JsonDocument.Parse("{}").RootElement;
-        var result = await _suggestFixesTool.ExecuteAsync(args);
+        var args = JsonDocument.Parse("""{"action":"fixes"}""").RootElement;
+        var result = await _tool.ExecuteAsync(args);
 
         Assert.True(result.IsError);
     }
 
     [Fact]
-    public async Task SuggestFixesTool_WithValidSource_ReturnsFixSuggestions()
+    public async Task RefineTool_Fixes_WithValidSource_ReturnsFixSuggestions()
     {
         var source = """
             §M{m001:Test}
@@ -195,11 +183,12 @@ public sealed class ObligationsToolTests
 
         var args = JsonDocument.Parse($$"""
             {
+                "action": "fixes",
                 "source": {{JsonSerializer.Serialize(source)}}
             }
             """).RootElement;
 
-        var result = await _suggestFixesTool.ExecuteAsync(args);
+        var result = await _tool.ExecuteAsync(args);
 
         Assert.NotEmpty(result.Content);
         var json = JsonDocument.Parse(result.Content[0].Text!);

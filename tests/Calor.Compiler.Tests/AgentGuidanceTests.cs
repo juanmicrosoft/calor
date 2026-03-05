@@ -262,30 +262,30 @@ public sealed class AgentGuidanceTests
     // ───── MCP Tools ─────
 
     [Fact]
-    public void GuardDiscoveryTool_Name_IsCorrect()
+    public void RefineTool_Guards_Name_IsCorrect()
     {
-        var tool = new GuardDiscoveryTool();
-        Assert.Equal("calor_discover_guards", tool.Name);
+        var tool = new RefineTool();
+        Assert.Equal("calor_refine", tool.Name);
     }
 
     [Fact]
-    public void TypeSuggestionTool_Name_IsCorrect()
+    public void RefineTool_Types_Name_IsCorrect()
     {
-        var tool = new TypeSuggestionTool();
-        Assert.Equal("calor_suggest_types", tool.Name);
+        var tool = new RefineTool();
+        Assert.Equal("calor_refine", tool.Name);
     }
 
     [Fact]
-    public void DiagnoseRefinementTool_Name_IsCorrect()
+    public void RefineTool_Diagnose_Name_IsCorrect()
     {
-        var tool = new DiagnoseRefinementTool();
-        Assert.Equal("calor_diagnose_refinement", tool.Name);
+        var tool = new RefineTool();
+        Assert.Equal("calor_refine", tool.Name);
     }
 
     [Fact]
-    public async Task GuardDiscoveryTool_WithValidSource_ReturnsGuards()
+    public async Task RefineTool_Guards_WithValidSource_ReturnsGuards()
     {
-        var tool = new GuardDiscoveryTool();
+        var tool = new RefineTool();
         var source = """
             §M{m001:Test}
             §F{f001:Main:pub}
@@ -296,7 +296,7 @@ public sealed class AgentGuidanceTests
             """;
 
         var args = JsonDocument.Parse($$"""
-            { "source": {{JsonSerializer.Serialize(source)}} }
+            { "action": "guards", "source": {{JsonSerializer.Serialize(source)}} }
             """).RootElement;
 
         var result = await tool.ExecuteAsync(args);
@@ -307,9 +307,9 @@ public sealed class AgentGuidanceTests
     }
 
     [Fact]
-    public async Task TypeSuggestionTool_WithDivisor_SuggestsNonZero()
+    public async Task RefineTool_Types_WithDivisor_SuggestsNonZero()
     {
-        var tool = new TypeSuggestionTool();
+        var tool = new RefineTool();
         var source = """
             §M{m001:Test}
             §F{f001:Divide:pub}
@@ -322,7 +322,7 @@ public sealed class AgentGuidanceTests
             """;
 
         var args = JsonDocument.Parse($$"""
-            { "source": {{JsonSerializer.Serialize(source)}} }
+            { "action": "types", "source": {{JsonSerializer.Serialize(source)}} }
             """).RootElement;
 
         var result = await tool.ExecuteAsync(args);
@@ -335,9 +335,9 @@ public sealed class AgentGuidanceTests
     }
 
     [Fact]
-    public async Task DiagnoseRefinementTool_WithFailures_ReturnsPatches()
+    public async Task RefineTool_Diagnose_WithFailures_ReturnsPatches()
     {
-        var tool = new DiagnoseRefinementTool();
+        var tool = new RefineTool();
         var source = """
             §M{m001:Test}
             §F{f001:Main:pub}
@@ -351,7 +351,7 @@ public sealed class AgentGuidanceTests
             """;
 
         var args = JsonDocument.Parse($$"""
-            { "source": {{JsonSerializer.Serialize(source)}} }
+            { "action": "diagnose", "source": {{JsonSerializer.Serialize(source)}} }
             """).RootElement;
 
         var result = await tool.ExecuteAsync(args);
@@ -365,9 +365,9 @@ public sealed class AgentGuidanceTests
     }
 
     [Fact]
-    public async Task DiagnoseRefinementTool_WithStrictPolicy_SetsPolicy()
+    public async Task RefineTool_Diagnose_WithStrictPolicy_SetsPolicy()
     {
-        var tool = new DiagnoseRefinementTool();
+        var tool = new RefineTool();
         var source = """
             §M{m001:Test}
             §F{f001:Main:pub}
@@ -378,7 +378,7 @@ public sealed class AgentGuidanceTests
             """;
 
         var args = JsonDocument.Parse($$"""
-            { "source": {{JsonSerializer.Serialize(source)}}, "policy": "strict" }
+            { "action": "diagnose", "source": {{JsonSerializer.Serialize(source)}}, "policy": "strict" }
             """).RootElement;
 
         var result = await tool.ExecuteAsync(args);
@@ -387,43 +387,30 @@ public sealed class AgentGuidanceTests
     }
 
     [Fact]
-    public async Task AllMcpTools_WithMissingSource_ReturnError()
+    public async Task RefineTool_AllActions_WithMissingSource_ReturnError()
     {
-        var empty = JsonDocument.Parse("{}").RootElement;
+        var tool = new RefineTool();
 
-        var tools = new McpToolBase[]
-        {
-            new GuardDiscoveryTool(),
-            new TypeSuggestionTool(),
-            new DiagnoseRefinementTool()
-        };
+        var actions = new[] { "guards", "types", "diagnose", "obligations", "bounds", "fixes" };
 
-        foreach (var tool in tools)
+        foreach (var action in actions)
         {
-            var result = await tool.ExecuteAsync(empty);
-            Assert.True(result.IsError, $"{tool.Name} should error on missing source");
+            var args = JsonDocument.Parse($$"""{"action":"{{action}}"}""").RootElement;
+            var result = await tool.ExecuteAsync(args);
+            Assert.True(result.IsError, $"Action '{action}' should error on missing source");
         }
     }
 
     [Fact]
-    public void AllMcpTools_HaveValidSchema()
+    public void RefineTool_HasValidSchema()
     {
-        var tools = new McpToolBase[]
-        {
-            new GuardDiscoveryTool(),
-            new TypeSuggestionTool(),
-            new DiagnoseRefinementTool()
-        };
-
-        foreach (var tool in tools)
-        {
-            var schema = tool.GetInputSchema();
-            Assert.Equal(JsonValueKind.Object, schema.ValueKind);
-            Assert.True(schema.TryGetProperty("properties", out var props),
-                $"{tool.Name} schema missing properties");
-            Assert.True(props.TryGetProperty("source", out _),
-                $"{tool.Name} schema missing source property");
-        }
+        var tool = new RefineTool();
+        var schema = tool.GetInputSchema();
+        Assert.Equal(JsonValueKind.Object, schema.ValueKind);
+        Assert.True(schema.TryGetProperty("properties", out var props),
+            $"{tool.Name} schema missing properties");
+        Assert.True(props.TryGetProperty("source", out _),
+            $"{tool.Name} schema missing source property");
     }
 
     // ───── GuardDiscovery: Nested FormatCondition ─────

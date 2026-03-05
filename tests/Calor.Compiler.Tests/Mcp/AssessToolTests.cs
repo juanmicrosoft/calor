@@ -6,18 +6,18 @@ namespace Calor.Compiler.Tests.Mcp;
 
 public class AssessToolTests
 {
-    private readonly AssessTool _tool = new();
+    private readonly AnalyzeTool _tool = new();
 
     [Fact]
     public void Name_ReturnsCalorAssess()
     {
-        Assert.Equal("calor_assess", _tool.Name);
+        Assert.Equal("calor_analyze", _tool.Name);
     }
 
     [Fact]
     public void Description_ContainsAssessInfo()
     {
-        Assert.Contains("Assess", _tool.Description);
+        Assert.Contains("Analyze", _tool.Description);
         Assert.Contains("C#", _tool.Description);
         Assert.Contains("migration", _tool.Description);
     }
@@ -37,7 +37,7 @@ public class AssessToolTests
     [Fact]
     public async Task ExecuteAsync_WithMissingInput_ReturnsError()
     {
-        var args = JsonDocument.Parse("""{}""").RootElement;
+        var args = JsonDocument.Parse("""{"action": "assess"}""").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
 
@@ -51,6 +51,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Calculator { public int Add(int a, int b) => a + b; }"
             }
             """).RootElement;
@@ -70,6 +71,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Service { public async Task<int> GetValueAsync() { return await Task.FromResult(42); } }"
             }
             """).RootElement;
@@ -95,6 +97,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "using System.Linq; public class DataProcessor { public int[] Process(int[] data) { return data.Where(x => x > 0).Select(x => x * 2).ToArray(); } }"
             }
             """).RootElement;
@@ -119,6 +122,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Validator { public string? Name { get; set; } public bool IsValid() { return Name != null && Name.Length > 0; } }"
             }
             """).RootElement;
@@ -135,6 +139,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Parser { public int Parse(string s) { try { return int.Parse(s); } catch (Exception ex) { throw new InvalidOperationException(\"Failed\", ex); } } }"
             }
             """).RootElement;
@@ -152,6 +157,7 @@ public class AssessToolTests
         // Primary constructors are unsupported
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Point(int x, int y) { public int X => x; public int Y => y; }"
             }
             """).RootElement;
@@ -169,6 +175,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "files": [
                     { "path": "Calculator.cs", "source": "public class Calculator { public int Add(int a, int b) => a + b; }" },
                     { "path": "Validator.cs", "source": "public class Validator { public bool IsValid(string? s) => s != null; }" }
@@ -194,6 +201,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "files": [
                     { "path": "Simple.cs", "source": "public class Simple { }" },
                     { "path": "Complex.cs", "source": "public class Complex { public async Task<string?> ProcessAsync(string input) { if (input == null) throw new ArgumentNullException(nameof(input)); try { return await Task.FromResult(input.ToUpper()); } catch { return null; } } }" }
@@ -221,6 +229,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Service { public async Task<int> GetValueAsync() { return await Task.FromResult(42); } }"
             }
             """).RootElement;
@@ -241,6 +250,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Guard { public void Validate(int value) { if (value < 0) throw new ArgumentOutOfRangeException(nameof(value)); if (value > 100) throw new ArgumentException(\"Too large\", nameof(value)); } }"
             }
             """).RootElement;
@@ -264,6 +274,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Test { public void Method() { } }"
             }
             """).RootElement;
@@ -298,6 +309,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class Test { public void Method1() { } public void Method2() { } }"
             }
             """).RootElement;
@@ -325,6 +337,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": ""
             }
             """).RootElement;
@@ -340,6 +353,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "public class FromSource { }",
                 "files": [
                     { "path": "FromFiles.cs", "source": "public class FromFiles { }" }
@@ -364,6 +378,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "files": [
                     { "path": "Valid.cs", "source": "public class Valid { }" },
                     { "path": "Invalid.cs", "source": "public class { invalid syntax" }
@@ -388,6 +403,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "files": [
                     { "path": "Valid.cs", "source": "public class Valid { }" },
                     { "path": "Empty.cs", "source": "" }
@@ -411,6 +427,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "using System; public class Test { public void Run() { Func<Task> f = async () => await Task.Delay(1); } }"
             }
             """).RootElement;
@@ -432,6 +449,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "using System.Threading; public class Service { public void Process(CancellationToken token) { } }"
             }
             """).RootElement;
@@ -453,6 +471,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "using System.Threading.Tasks; public class Service { public async Task ProcessAsync() { await Task.Delay(1).ConfigureAwait(false); } }"
             }
             """).RootElement;
@@ -475,6 +494,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "using System.Linq; public class Query { public int[] Filter(int[] data) { return (from x in data where x > 0 select x * 2).ToArray(); } }"
             }
             """).RootElement;
@@ -497,6 +517,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "using System.Collections.Generic; public class Stream { public async IAsyncEnumerable<int> GetItemsAsync() { yield return 1; } }"
             }
             """).RootElement;
@@ -518,6 +539,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "using System.Collections.Generic; using System.Threading.Tasks; public class Processor { public async Task ProcessAsync(IAsyncEnumerable<int> items) { await foreach (var item in items) { } } }"
             }
             """).RootElement;
@@ -540,6 +562,7 @@ public class AssessToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "source": "using System; using System.Threading.Tasks; public class Resource { public async Task UseAsync() { await using var r = new AsyncRes(); } } public class AsyncRes : IAsyncDisposable { public ValueTask DisposeAsync() => default; }"
             }
             """).RootElement;
@@ -563,6 +586,7 @@ public class AssessToolTests
         // Create files with different complexity levels
         var args = JsonDocument.Parse("""
             {
+                "action": "assess",
                 "files": [
                     { "path": "Simple.cs", "source": "public class Simple { }" },
                     { "path": "Complex.cs", "source": "public class Complex { public async Task<string?> ProcessAsync(string input) { if (input == null) throw new ArgumentNullException(nameof(input)); try { return await Task.FromResult(input.ToUpper()); } catch { return null; } } }" },
