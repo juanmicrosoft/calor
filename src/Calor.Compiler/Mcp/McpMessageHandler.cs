@@ -19,8 +19,8 @@ public sealed class McpMessageHandler
     private readonly Dictionary<string, McpPrompt> _prompts;
     private readonly bool _verbose;
     private readonly TextWriter? _log;
+    private static readonly int MaxConcurrentTools = Math.Max(2, Environment.ProcessorCount / 2);
     private readonly SemaphoreSlim _concurrencyLimiter = new(MaxConcurrentTools);
-    private const int MaxConcurrentTools = 4;
     private CancellationToken _serverCancellation;
 
     public McpMessageHandler(bool verbose = false, TextWriter? log = null)
