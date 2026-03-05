@@ -50,7 +50,7 @@ public sealed class BatchTool : McpToolBase
                 },
                 "parallel": {
                     "type": "boolean",
-                    "description": "Run conversions in parallel (default: true, convert only)"
+                    "description": "Run conversions in parallel (default: false to limit memory usage, convert only)"
                 },
                 "outputDirectory": {
                     "type": "string",
@@ -98,6 +98,14 @@ public sealed class BatchTool : McpToolBase
                 "moduleNameOverride": {
                     "type": "string",
                     "description": "Override the module name for all converted files (convert only)"
+                },
+                "skipOnError": {
+                    "type": "boolean",
+                    "description": "Continue processing when a file fails (default: true)"
+                },
+                "passthroughOnError": {
+                    "type": "boolean",
+                    "description": "Wrap unsupported constructs in §CSHARP blocks instead of emitting broken Calor (default: false)"
                 }
             },
             "required": ["projectPath"],
@@ -132,7 +140,7 @@ public sealed class BatchTool : McpToolBase
 
         var includeTests = GetBool(arguments, "includeTests", defaultValue: true);
         var dryRun = GetBool(arguments, "dryRun", defaultValue: false);
-        var parallel = GetBool(arguments, "parallel", defaultValue: true);
+        var parallel = GetBool(arguments, "parallel", defaultValue: false);
         var outputDirectory = GetString(arguments, "outputDirectory");
         var maxFiles = GetInt(arguments, "maxFiles", defaultValue: 0);
         var offset = GetInt(arguments, "offset", defaultValue: 0);
@@ -140,6 +148,8 @@ public sealed class BatchTool : McpToolBase
         var skipConverted = GetBool(arguments, "skipConverted", defaultValue: false);
         var validate = GetBool(arguments, "validate", defaultValue: false);
         var moduleNameOverride = GetString(arguments, "moduleNameOverride");
+        var skipOnError = GetBool(arguments, "skipOnError", defaultValue: true);
+        var passthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false);
 
         try
         {
@@ -152,7 +162,8 @@ public sealed class BatchTool : McpToolBase
                 DirectoryFilter = directoryFilter,
                 SkipConverted = skipConverted,
                 ValidateOutput = validate,
-                ModuleNameOverride = moduleNameOverride
+                ModuleNameOverride = moduleNameOverride,
+                PassthroughOnError = passthroughOnError
             };
 
             var migrator = new ProjectMigrator(options);
@@ -208,6 +219,19 @@ public sealed class BatchTool : McpToolBase
                 ? await migrator.DryRunAsync(plan)
                 : await migrator.ExecuteAsync(plan);
 
+            // If skipOnError is false, check for any failures and abort early
+            if (!skipOnError)
+            {
+                var firstFailure = report.FileResults.FirstOrDefault(f =>
+                    f.Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut);
+                if (firstFailure != null)
+                {
+                    var errorMsg = firstFailure.Issues.FirstOrDefault()?.Message ?? "Unknown error";
+                    return McpToolResult.Error(
+                        $"Batch aborted (skipOnError=false): {Path.GetFileName(firstFailure.SourcePath)} — {errorMsg}");
+                }
+            }
+
             var fileResults = report.FileResults.Select(f => new ConvertFileResult
             {
                 SourcePath = f.SourcePath,
@@ -243,7 +267,7 @@ public sealed class BatchTool : McpToolBase
 
             var output = new BatchConvertOutput
             {
-                Success = report.Summary.FailedFiles == 0,
+                Success = report.Summary.FailedFiles == 0 && report.Summary.TimedOutFiles == 0,
                 DryRun = dryRun,
                 Summary = new ConvertSummary
                 {
@@ -251,6 +275,8 @@ public sealed class BatchTool : McpToolBase
                     SuccessfulFiles = report.Summary.SuccessfulFiles,
                     PartialFiles = report.Summary.PartialFiles,
                     FailedFiles = report.Summary.FailedFiles,
+                    SkippedFiles = report.Summary.SkippedFiles,
+                    TimedOutFiles = report.Summary.TimedOutFiles,
                     SuccessRate = report.Summary.SuccessRate,
                     TotalDurationMs = (int)report.Summary.TotalDuration.TotalMilliseconds
                 },
@@ -464,6 +490,12 @@ public sealed class BatchTool : McpToolBase
 
         [JsonPropertyName("failedFiles")]
         public int FailedFiles { get; init; }
+
+        [JsonPropertyName("skippedFiles")]
+        public int SkippedFiles { get; init; }
+
+        [JsonPropertyName("timedOutFiles")]
+        public int TimedOutFiles { get; init; }
 
         [JsonPropertyName("successRate")]
         public double SuccessRate { get; init; }

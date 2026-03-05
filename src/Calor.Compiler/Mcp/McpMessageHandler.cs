@@ -19,6 +19,15 @@ public sealed class McpMessageHandler
     private readonly Dictionary<string, McpPrompt> _prompts;
     private readonly bool _verbose;
     private readonly TextWriter? _log;
+    private static readonly int MaxConcurrentTools = Math.Max(2, Environment.ProcessorCount / 2);
+    private readonly SemaphoreSlim _concurrencyLimiter = new(MaxConcurrentTools);
+
+    // Reject new heavy work when the process exceeds this memory threshold.
+    // Defaults to 50% of available physical memory (min 512 MB). Override with CALOR_MCP_MAX_MEMORY_MB.
+    private static readonly long MemoryPressureThresholdBytes =
+        long.TryParse(Environment.GetEnvironmentVariable("CALOR_MCP_MAX_MEMORY_MB"), out var mb)
+            ? mb * 1024L * 1024L
+            : Math.Max(512L * 1024L * 1024L, (long)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes * 0.5));
     private CancellationToken _serverCancellation;
 
     public McpMessageHandler(bool verbose = false, TextWriter? log = null)
@@ -227,28 +236,86 @@ public sealed class McpMessageHandler
                 $"Unknown tool: {callParams.Name}");
         }
 
-        // Execute with timeout and cancellation
+        // Execute with timeout, cancellation, and concurrency limiting
         var timeout = tool is McpToolBase toolBase
             ? TimeSpan.FromSeconds(toolBase.TimeoutSeconds)
             : DefaultToolTimeout;
         var sw = Stopwatch.StartNew();
         McpToolResult result;
+
+        // Wait for memory pressure to subside before running heavy tools
+        if (tool is BatchTool or ConvertTool or CompileTool or AnalyzeTool)
+        {
+            var memoryUsed = GetProcessMemory();
+            if (memoryUsed > MemoryPressureThresholdBytes)
+            {
+                var usedMb = memoryUsed / (1024 * 1024);
+                Log($"Tool {callParams.Name} waiting for memory pressure to subside ({usedMb} MB used)");
+
+                // Try a GC and wait up to 30s for memory to drop
+                GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                const int maxWaitMs = 30_000;
+                const int pollIntervalMs = 2_000;
+                var waited = 0;
+                while (waited < maxWaitMs)
+                {
+                    memoryUsed = GetProcessMemory();
+                    if (memoryUsed <= MemoryPressureThresholdBytes)
+                        break;
+                    var jitter = Random.Shared.Next(0, 500); // 0-500ms random jitter to avoid thundering herd
+                    await Task.Delay(pollIntervalMs + jitter, _serverCancellation);
+                    waited += pollIntervalMs + jitter;
+                }
+
+                memoryUsed = GetProcessMemory();
+                if (memoryUsed > MemoryPressureThresholdBytes)
+                {
+                    usedMb = memoryUsed / (1024 * 1024);
+                    var thresholdMb = MemoryPressureThresholdBytes / (1024 * 1024);
+                    Log($"Tool {callParams.Name} rejected after waiting: memory still at {usedMb} MB");
+                    return JsonRpcResponse.Success(request.Id,
+                        McpToolResult.Error($"Server under memory pressure ({usedMb} MB used, {thresholdMb} MB threshold) " +
+                            "after waiting 30s. Wait for current operations to finish, then retry. " +
+                            "Set CALOR_MCP_MAX_MEMORY_MB to adjust the threshold."));
+                }
+
+                Log($"Tool {callParams.Name} proceeding after memory dropped to {memoryUsed / (1024 * 1024)} MB");
+            }
+        }
+
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(_serverCancellation);
             cts.CancelAfter(timeout);
-            result = await tool.ExecuteAsync(callParams.Arguments, cts.Token);
+
+            // Limit concurrent tool executions to prevent runaway memory usage
+            await _concurrencyLimiter.WaitAsync(cts.Token);
+            try
+            {
+                result = await tool.ExecuteAsync(callParams.Arguments, cts.Token);
+            }
+            finally
+            {
+                _concurrencyLimiter.Release();
+            }
         }
         catch (OperationCanceledException)
         {
             sw.Stop();
-            Log($"Tool {callParams.Name} timed out after {sw.ElapsedMilliseconds}ms");
+            var queueOrExec = sw.ElapsedMilliseconds < 1000 ? "waiting for execution slot" : "during execution";
+            Log($"Tool {callParams.Name} cancelled {queueOrExec} after {sw.ElapsedMilliseconds}ms");
             return JsonRpcResponse.Success(request.Id,
-                McpToolResult.Error($"Tool '{callParams.Name}' timed out after {timeout.TotalSeconds}s"));
+                McpToolResult.Error($"Tool '{callParams.Name}' timed out after {timeout.TotalSeconds}s ({queueOrExec})"));
         }
 
         sw.Stop();
         Log($"Tool {callParams.Name} completed in {sw.ElapsedMilliseconds}ms (isError: {result.IsError})");
+
+        // Prompt GC to reclaim Roslyn/Z3 objects after memory-intensive operations
+        if (tool is BatchTool or ConvertTool or CompileTool or AnalyzeTool)
+        {
+            GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+        }
 
         return JsonRpcResponse.Success(request.Id, result);
     }
@@ -500,6 +567,20 @@ public sealed class McpMessageHandler
         if (_verbose && _log != null)
         {
             _log.WriteLine($"[MCP] {message}");
+        }
+    }
+
+    private static long GetProcessMemory()
+    {
+        try
+        {
+            using var proc = Process.GetCurrentProcess();
+            return proc.WorkingSet64;
+        }
+        catch
+        {
+            // Fallback to managed heap if process info unavailable
+            return GC.GetTotalMemory(forceFullCollection: false);
         }
     }
 }

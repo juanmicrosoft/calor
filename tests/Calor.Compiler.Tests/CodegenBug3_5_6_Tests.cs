@@ -657,6 +657,88 @@ public class CodegenBug3_5_6_Tests
 
     #endregion
 
+    #region ConvertPrefixToInfix Tests
+
+    [Fact]
+    public void ConvertPrefixToInfix_SimpleBinary()
+    {
+        Assert.Equal("number % 10", CSharpEmitter.ConvertPrefixToInfix("(% number 10)"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_Nested()
+    {
+        Assert.Equal("a * b + c", CSharpEmitter.ConvertPrefixToInfix("(+ (* a b) c)"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_NonPrefix_PassThrough()
+    {
+        Assert.Equal("myVar.ToString()", CSharpEmitter.ConvertPrefixToInfix("myVar.ToString()"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_Unary_Not()
+    {
+        Assert.Equal("!flag", CSharpEmitter.ConvertPrefixToInfix("(! flag)"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_Comparison()
+    {
+        Assert.Equal("x > 0", CSharpEmitter.ConvertPrefixToInfix("(> x 0)"));
+    }
+
+    [Fact]
+    public void StringInterpolation_PrefixExpr_EmitsInfix()
+    {
+        var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("${(% number 10)}");
+        Assert.True(hasInterpolation);
+        Assert.Equal("{number % 10}", converted);
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_MulOverAdd_ParenthesizesLowerPrecedence()
+    {
+        // (* a (+ b c)) → a * (b + c)
+        Assert.Equal("a * (b + c)", CSharpEmitter.ConvertPrefixToInfix("(* a (+ b c))"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_AddOverMul_NoExtraParens()
+    {
+        // (+ a (* b c)) → a + b * c
+        var result = CSharpEmitter.ConvertPrefixToInfix("(+ a (* b c))");
+        // Both "a + b * c" and "a + (b * c)" are valid — mul binds tighter
+        Assert.Contains("a + ", result);
+        Assert.Contains("b * c", result);
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_UnaryNot_WrapsCompound()
+    {
+        // (! (+ a b)) → !(a + b)
+        Assert.Equal("!(a + b)", CSharpEmitter.ConvertPrefixToInfix("(! (+ a b))"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_UnaryBitwiseNot_WrapsCompound()
+    {
+        // (~ (| a b)) → ~(a | b)
+        Assert.Equal("~(a | b)", CSharpEmitter.ConvertPrefixToInfix("(~ (| a b))"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_NestedSamePrecedence()
+    {
+        // (+ (+ a b) (+ c d)) — same precedence, right child gets parens
+        var result = CSharpEmitter.ConvertPrefixToInfix("(+ (+ a b) (+ c d))");
+        Assert.Contains("a + b", result);
+        Assert.Contains("c + d", result);
+    }
+
+    #endregion
+
     #region Helpers
 
     private static Ast.ModuleNode ParseModule(string source)

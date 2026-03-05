@@ -931,6 +931,12 @@ public sealed class CallExpressionNode : ExpressionNode
     /// </summary>
     public IReadOnlyList<string?>? ArgumentNames { get; }
 
+    /// <summary>
+    /// Optional argument modifiers (ref/out/in), parallel to Arguments list.
+    /// Null entry means no modifier; non-null means "ref", "out", or "in".
+    /// </summary>
+    public IReadOnlyList<string?>? ArgumentModifiers { get; }
+
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments)
         : base(span)
     {
@@ -944,6 +950,15 @@ public sealed class CallExpressionNode : ExpressionNode
         Target = target ?? throw new ArgumentNullException(nameof(target));
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
         ArgumentNames = argumentNames;
+    }
+
+    public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers)
+        : base(span)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        ArgumentNames = argumentNames;
+        ArgumentModifiers = argumentModifiers;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

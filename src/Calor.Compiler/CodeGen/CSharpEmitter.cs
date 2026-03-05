@@ -577,6 +577,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         for (int i = 0; i < node.Arguments.Count; i++)
         {
             var argStr = node.Arguments[i].Accept(this);
+            if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count && node.ArgumentModifiers[i] != null)
+            {
+                argStr = $"{node.ArgumentModifiers[i]} {argStr}";
+            }
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
             {
                 argStr = $"{node.ArgumentNames[i]}: {argStr}";
@@ -601,10 +605,32 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(IntLiteralNode node)
     {
-        // Add L suffix for values outside int range to emit valid C# long literals
-        if (node.Value is > int.MaxValue or < int.MinValue)
-            return node.Value.ToString() + "L";
-        return node.Value.ToString();
+        var sb = new System.Text.StringBuilder();
+
+        if (node.IsUnsigned)
+        {
+            if (node.IsHex)
+                sb.Append($"0x{node.UnsignedValue:X}");
+            else
+                sb.Append(node.UnsignedValue);
+
+            if (node.UnsignedValue > uint.MaxValue)
+                sb.Append("UL");
+            else
+                sb.Append("U");
+        }
+        else
+        {
+            if (node.IsHex)
+                sb.Append($"0x{node.Value:X}");
+            else
+                sb.Append(node.Value);
+
+            if (node.Value is > int.MaxValue or < int.MinValue)
+                sb.Append("L");
+        }
+
+        return sb.ToString();
     }
 
     public string Visit(StringLiteralNode node)
@@ -696,9 +722,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     }
                     else
                     {
-                        // Convert to C# interpolation
+                        // Convert to C# interpolation, converting prefix notation to infix
                         sb.Append('{');
-                        sb.Append(expr);
+                        sb.Append(ConvertPrefixToInfix(expr));
                         sb.Append('}');
                         foundInterpolation = true;
                     }
@@ -720,6 +746,145 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         return (sb.ToString(), foundInterpolation);
+    }
+
+    /// <summary>
+    /// Returns the C# operator precedence level (higher = tighter binding).
+    /// </summary>
+    internal static int GetPrecedence(string op) => op switch
+    {
+        "*" or "/" or "%" => 13,
+        "+" or "-" => 12,
+        "<<" or ">>" => 11,
+        "<" or ">" or "<=" or ">=" => 10,
+        "==" or "!=" => 9,
+        "&" => 8,
+        "^" => 7,
+        "|" => 6,
+        "&&" => 5,
+        "||" => 4,
+        "??" => 3,
+        _ => 0
+    };
+
+    /// <summary>
+    /// Converts Calor prefix notation in interpolation expressions to C# infix.
+    /// Handles (op left right) → left op right, with nesting support and correct parenthesization.
+    /// </summary>
+    internal static string ConvertPrefixToInfix(string expr)
+    {
+        expr = expr.Trim();
+
+        // Must start with ( and end with )
+        if (expr.Length < 5 || expr[0] != '(' || expr[^1] != ')')
+            return expr;
+
+        var inner = expr[1..^1].Trim();
+
+        // Extract operator (first token)
+        var spaceIdx = inner.IndexOf(' ');
+        if (spaceIdx <= 0)
+            return expr;
+
+        var op = inner[..spaceIdx];
+        var rest = inner[(spaceIdx + 1)..].Trim();
+
+        // Map Calor operators to C# operators
+        var csharpOp = op switch
+        {
+            "+" or "-" or "*" or "/" or "%" => op,
+            "==" or "!=" or "<" or ">" or "<=" or ">=" => op,
+            "&&" or "||" or "&" or "|" or "^" => op,
+            "<<" or ">>" => op,
+            "??" => op,
+            "!" => op, // unary
+            "~" => op, // unary bitwise not
+            _ => null
+        };
+
+        if (csharpOp == null)
+            return expr; // Not a known operator, pass through
+
+        // Unary operators: wrap operand in parens if it's a compound expression
+        if (csharpOp is "!" or "~")
+        {
+            var operand = ConvertPrefixToInfix(rest);
+            if (operand.Contains(' '))
+                operand = $"({operand})";
+            return $"{csharpOp}{operand}";
+        }
+
+        // Split into left and right operands (respecting nesting)
+        var (left, right) = SplitOperands(rest);
+        if (left == null || right == null)
+            return expr; // Can't split, pass through
+
+        var leftConverted = ConvertPrefixToInfix(left);
+        var rightConverted = ConvertPrefixToInfix(right);
+
+        var parentPrec = GetPrecedence(csharpOp);
+
+        // Wrap left child if it was a prefix expression and has lower precedence
+        if (left.StartsWith('(') && left.EndsWith(')'))
+        {
+            var leftPrec = GetChildPrecedence(left);
+            if (leftPrec > 0 && leftPrec < parentPrec)
+                leftConverted = $"({leftConverted})";
+        }
+
+        // Wrap right child if it was a prefix expression and has lower or equal precedence
+        if (right.StartsWith('(') && right.EndsWith(')'))
+        {
+            var rightPrec = GetChildPrecedence(right);
+            if (rightPrec > 0 && rightPrec < parentPrec)
+                rightConverted = $"({rightConverted})";
+        }
+
+        return $"{leftConverted} {csharpOp} {rightConverted}";
+    }
+
+    /// <summary>
+    /// Extracts the precedence of the top-level operator from a prefix expression.
+    /// Returns 0 if not a recognized binary prefix expression.
+    /// </summary>
+    private static int GetChildPrecedence(string prefixExpr)
+    {
+        var trimmed = prefixExpr.Trim();
+        if (trimmed.Length < 5 || trimmed[0] != '(' || trimmed[^1] != ')')
+            return 0;
+        var inner = trimmed[1..^1].Trim();
+        var spaceIdx = inner.IndexOf(' ');
+        if (spaceIdx <= 0)
+            return 0;
+        var op = inner[..spaceIdx];
+        if (op is "!" or "~")
+            return 0; // unary, not binary
+        return GetPrecedence(op);
+    }
+
+    /// <summary>
+    /// Splits a string into two operands, respecting parentheses nesting.
+    /// </summary>
+    private static (string? left, string? right) SplitOperands(string text)
+    {
+        text = text.Trim();
+        int depth = 0;
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+            else if (c == ' ' && depth == 0)
+            {
+                var left = text[..i].Trim();
+                var right = text[(i + 1)..].Trim();
+                if (left.Length > 0 && right.Length > 0)
+                    return (left, right);
+            }
+        }
+
+        return (null, null);
     }
 
     public string Visit(BoolLiteralNode node)
@@ -1009,6 +1174,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(GotoStatementNode node)
     {
+        if (node.CaseLabel != null)
+            return $"goto case {node.CaseLabel.Accept(this)};";
+        if (node.IsDefault)
+            return "goto default;";
         return $"goto {node.Label};";
     }
 
@@ -2543,6 +2712,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         for (int i = 0; i < node.Arguments.Count; i++)
         {
             var argStr = node.Arguments[i].Accept(this);
+            if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count && node.ArgumentModifiers[i] != null)
+            {
+                argStr = $"{node.ArgumentModifiers[i]} {argStr}";
+            }
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
             {
                 argStr = $"{node.ArgumentNames[i]}: {argStr}";
@@ -2613,9 +2786,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Auto-property with default value
         if (node.IsAutoProperty)
         {
-            var accessors = node.Setter != null ? "get; set;" :
-                            node.Initer != null ? "get; init;" :
-                            "get;";
+            var getVis = FormatAccessorVisibility(node.Getter?.Visibility);
+            var accessors = "get;";
+            if (node.Setter != null)
+            {
+                var setVis = FormatAccessorVisibility(node.Setter.Visibility);
+                accessors = $"{getVis}get; {setVis}set;";
+            }
+            else if (node.Initer != null)
+            {
+                var initVis = FormatAccessorVisibility(node.Initer.Visibility);
+                accessors = $"{getVis}get; {initVis}init;";
+            }
             if (node.DefaultValue != null)
             {
                 var defaultVal = node.DefaultValue.Accept(this);
@@ -2684,9 +2866,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Auto-indexer
         if (node.IsAutoIndexer)
         {
-            var accessors = node.Setter != null ? "get; set;" :
-                            node.Initer != null ? "get; init;" :
-                            "get;";
+            var getVis = FormatAccessorVisibility(node.Getter?.Visibility);
+            var accessors = "get;";
+            if (node.Setter != null)
+            {
+                var setVis = FormatAccessorVisibility(node.Setter.Visibility);
+                accessors = $"{getVis}get; {setVis}set;";
+            }
+            else if (node.Initer != null)
+            {
+                var initVis = FormatAccessorVisibility(node.Initer.Visibility);
+                accessors = $"{getVis}get; {initVis}init;";
+            }
             AppendLine($"{modifierStr} {typeName} this[{paramList}] {{ {accessors} }}");
             return "";
         }
@@ -2716,6 +2907,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         return "";
     }
+
+    private static string FormatAccessorVisibility(Visibility? visibility) => visibility switch
+    {
+        Visibility.Private => "private ",
+        Visibility.ProtectedInternal => "protected internal ",
+        Visibility.Internal => "internal ",
+        Visibility.Protected => "protected ",
+        _ => ""
+    };
 
     public string Visit(PropertyAccessorNode node)
     {
@@ -3070,7 +3270,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         if (node.TypeName != null)
         {
-            return $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}";
+            var mappedType = MapTypeName(node.TypeName);
+            // A bare "?" with no base type (e.g., from unresolved nullable) produces invalid C#.
+            // Drop the type annotation and let C# infer it.
+            if (!string.IsNullOrEmpty(mappedType) && mappedType != "?")
+            {
+                return $"{mappedType} {SanitizeIdentifier(node.Name)}";
+            }
         }
         return SanitizeIdentifier(node.Name);
     }
@@ -3718,6 +3924,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private static string SanitizeIdentifier(string name)
     {
+        // Handle qualified names (e.g., TimeUnit.Day) by sanitizing each part
+        if (name.Contains('.'))
+        {
+            var parts = name.Split('.');
+            return string.Join(".", parts.Select(SanitizeSingleIdentifier));
+        }
+        return SanitizeSingleIdentifier(name);
+    }
+
+    private static string SanitizeSingleIdentifier(string name)
+    {
         // Replace any characters that aren't valid in C# identifiers
         var sb = new StringBuilder();
         for (int i = 0; i < name.Length; i++)
@@ -3726,10 +3943,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (char.IsLetterOrDigit(c) || c == '_')
             {
                 sb.Append(c);
-            }
-            else if (c == '.')
-            {
-                sb.Append('.');
             }
         }
 

@@ -304,7 +304,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.InterfacesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        catch (Exception) when (_context.ShouldPreserveCSharp)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "interface", InteropMemberKind.Class));
         }
@@ -386,7 +386,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        catch (Exception) when (_context.ShouldPreserveCSharp)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "class", InteropMemberKind.Class));
         }
@@ -418,7 +418,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        catch (Exception) when (_context.ShouldPreserveCSharp)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "record", InteropMemberKind.Class));
         }
@@ -450,7 +450,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        catch (Exception) when (_context.ShouldPreserveCSharp)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "struct", InteropMemberKind.Class));
         }
@@ -514,7 +514,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.EnumsConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        catch (Exception) when (_context.ShouldPreserveCSharp)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "enum", InteropMemberKind.Other));
         }
@@ -547,7 +547,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _delegates.Add(delegateNode);
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.Mode == ConversionMode.Interop)
+        catch (Exception) when (_context.ShouldPreserveCSharp)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "delegate", InteropMemberKind.Other));
         }
@@ -712,7 +712,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     {
                         ConvertClassMember(node.Members[bi], ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads);
                     }
-                    catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                    catch (Exception) when (_context.ShouldPreserveCSharp)
                     {
                         // Skip unconvertible members in PP blocks
                     }
@@ -740,7 +740,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedClasses.Add(ConvertClass(nestedClass));
                     _context.ExitType();
                 }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                catch (Exception) when (_context.ShouldPreserveCSharp)
                 {
                     _context.ExitType();
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
@@ -756,7 +756,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedClasses.Add(ConvertStruct(nestedStruct));
                     _context.ExitType();
                 }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                catch (Exception) when (_context.ShouldPreserveCSharp)
                 {
                     _context.ExitType();
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
@@ -772,7 +772,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedClasses.Add(ConvertRecord(nestedRecord));
                     _context.ExitType();
                 }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                catch (Exception) when (_context.ShouldPreserveCSharp)
                 {
                     _context.ExitType();
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
@@ -786,7 +786,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _context.RecordFeatureUsage("nested-type");
                     nestedInterfaces.Add(ConvertInterface(nestedIface));
                 }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                catch (Exception) when (_context.ShouldPreserveCSharp)
                 {
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
                 }
@@ -810,7 +810,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(nestedEnum), nestedId, nestedName,
                         nestedUnderlying, nestedMembers, new AttributeCollection(), nestedAttrs, nestedVis));
                 }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                catch (Exception) when (_context.ShouldPreserveCSharp)
                 {
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
                 }
@@ -821,7 +821,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads, indexers);
             }
-            catch (Exception) when (_context.Mode == ConversionMode.Interop)
+            catch (Exception) when (_context.ShouldPreserveCSharp)
             {
                 var kind = member switch
                 {
@@ -934,7 +934,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 VisitEnumDeclaration(nestedEnum);
                 break;
             default:
-                if (_context.Mode == ConversionMode.Interop)
+                if (_context.ShouldPreserveCSharp)
                 {
                     throw new NotSupportedException($"Unsupported member type: {member.Kind()}");
                 }
@@ -1139,7 +1139,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     {
                         ConvertClassMember(node.Members[bi], ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads);
                     }
-                    catch (Exception) when (_context.Mode == ConversionMode.Interop)
+                    catch (Exception) when (_context.ShouldPreserveCSharp)
                     {
                         // Skip unconvertible members in PP blocks
                     }
@@ -1161,19 +1161,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (member is ClassDeclarationSyntax nc)
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(nc.Identifier.Text); nestedClasses.Add(ConvertClass(nc)); _context.ExitType(); }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception) when (_context.ShouldPreserveCSharp) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
             if (member is StructDeclarationSyntax ns)
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(ns.Identifier.Text); nestedClasses.Add(ConvertStruct(ns)); _context.ExitType(); }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception) when (_context.ShouldPreserveCSharp) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
             if (member is InterfaceDeclarationSyntax ni)
             {
                 try { _context.RecordFeatureUsage("nested-type"); nestedInterfaces.Add(ConvertInterface(ni)); }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception) when (_context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
             if (member is EnumDeclarationSyntax ne)
@@ -1194,7 +1194,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(ne), nestedId, nestedName,
                         nestedUnderlying, nestedMembers, new AttributeCollection(), nestedAttrs, nestedVis));
                 }
-                catch (Exception) when (_context.Mode == ConversionMode.Interop) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception) when (_context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
 
@@ -1202,7 +1202,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads, indexers);
             }
-            catch (Exception) when (_context.Mode == ConversionMode.Interop)
+            catch (Exception) when (_context.ShouldPreserveCSharp)
             {
                 var kind = member switch
                 {
@@ -2306,7 +2306,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // If we can't parse the disabled text, emit it as a raw comment
             return new List<StatementNode>
             {
-                new FallbackCommentNode(TextSpan.Empty, disabledText.Trim(), "preprocessor-disabled", "Disabled preprocessor text could not be parsed")
+                _context.PassthroughOnError
+                    ? new RawCSharpNode(TextSpan.Empty, disabledText.Trim())
+                    : new FallbackCommentNode(TextSpan.Empty, disabledText.Trim(), "preprocessor-disabled", "Disabled preprocessor text could not be parsed")
             };
         }
     }
@@ -2698,8 +2700,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     var fallbackId = _context.GenerateId("m");
                     var fallbackBody = new List<StatementNode>
                     {
-                        new FallbackCommentNode(TextSpan.Empty, member.ToString().Trim(), "preprocessor-disabled",
-                            "Member in disabled preprocessor branch could not be converted")
+                        _context.PassthroughOnError
+                            ? new RawCSharpNode(TextSpan.Empty, member.ToString().Trim())
+                            : new FallbackCommentNode(TextSpan.Empty, member.ToString().Trim(), "preprocessor-disabled",
+                                "Member in disabled preprocessor branch could not be converted")
                     };
                     methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
                         Visibility.Private, MethodModifiers.None,
@@ -2715,8 +2719,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var fallbackId = _context.GenerateId("m");
             var fallbackBody = new List<StatementNode>
             {
-                new FallbackCommentNode(TextSpan.Empty, disabledText.Trim(), "preprocessor-disabled",
-                    "Disabled preprocessor text could not be parsed as class members")
+                _context.PassthroughOnError
+                    ? new RawCSharpNode(TextSpan.Empty, disabledText.Trim())
+                    : new FallbackCommentNode(TextSpan.Empty, disabledText.Trim(), "preprocessor-disabled",
+                        "Disabled preprocessor text could not be parsed as class members")
             };
             methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
                 Visibility.Private, MethodModifiers.None,
@@ -3570,32 +3576,40 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.Stats.StatementsConverted++;
 
-        return statement switch
+        try
         {
-            ReturnStatementSyntax returnStmt => ConvertReturnStatement(returnStmt),
-            ExpressionStatementSyntax exprStmt => ConvertExpressionStatement(exprStmt),
-            LocalDeclarationStatementSyntax localDecl => ConvertLocalDeclaration(localDecl),
-            IfStatementSyntax ifStmt => ConvertIfStatement(ifStmt),
-            ForStatementSyntax forStmt => ConvertForStatement(forStmt),
-            ForEachStatementSyntax forEachStmt => ConvertForEachStatement(forEachStmt),
-            WhileStatementSyntax whileStmt => ConvertWhileStatement(whileStmt),
-            DoStatementSyntax doStmt => ConvertDoWhileStatement(doStmt),
-            TryStatementSyntax tryStmt => ConvertTryStatement(tryStmt),
-            ThrowStatementSyntax throwStmt => ConvertThrowStatement(throwStmt),
-            BlockSyntax blockStmt => ConvertBlockAsStatement(blockStmt),
-            SwitchStatementSyntax switchStmt => ConvertSwitchStatement(switchStmt),
-            BreakStatementSyntax breakStmt => ConvertBreakStatement(breakStmt),
-            ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
-            GotoStatementSyntax gotoStmt => ConvertGotoStatement(gotoStmt),
-            LabeledStatementSyntax labeledStmt => ConvertLabeledStatement(labeledStmt),
-            UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
-            YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
-            LockStatementSyntax lockStmt => ConvertLockStatement(lockStmt),
-            CheckedStatementSyntax checkedStmt => ConvertCheckedStatement(checkedStmt),
-            UnsafeStatementSyntax unsafeStmt => ConvertUnsafeStatement(unsafeStmt),
-            FixedStatementSyntax fixedStmt => ConvertFixedStatement(fixedStmt),
-            _ => HandleUnsupportedStatement(statement)
-        };
+            return statement switch
+            {
+                ReturnStatementSyntax returnStmt => ConvertReturnStatement(returnStmt),
+                ExpressionStatementSyntax exprStmt => ConvertExpressionStatement(exprStmt),
+                LocalDeclarationStatementSyntax localDecl => ConvertLocalDeclaration(localDecl),
+                IfStatementSyntax ifStmt => ConvertIfStatement(ifStmt),
+                ForStatementSyntax forStmt => ConvertForStatement(forStmt),
+                ForEachStatementSyntax forEachStmt => ConvertForEachStatement(forEachStmt),
+                WhileStatementSyntax whileStmt => ConvertWhileStatement(whileStmt),
+                DoStatementSyntax doStmt => ConvertDoWhileStatement(doStmt),
+                TryStatementSyntax tryStmt => ConvertTryStatement(tryStmt),
+                ThrowStatementSyntax throwStmt => ConvertThrowStatement(throwStmt),
+                BlockSyntax blockStmt => ConvertBlockAsStatement(blockStmt),
+                SwitchStatementSyntax switchStmt => ConvertSwitchStatement(switchStmt),
+                BreakStatementSyntax breakStmt => ConvertBreakStatement(breakStmt),
+                ContinueStatementSyntax continueStmt => ConvertContinueStatement(continueStmt),
+                GotoStatementSyntax gotoStmt => ConvertGotoStatement(gotoStmt),
+                LabeledStatementSyntax labeledStmt => ConvertLabeledStatement(labeledStmt),
+                UsingStatementSyntax usingStmt => ConvertUsingStatement(usingStmt),
+                YieldStatementSyntax yieldStmt => ConvertYieldStatement(yieldStmt),
+                LockStatementSyntax lockStmt => ConvertLockStatement(lockStmt),
+                CheckedStatementSyntax checkedStmt => ConvertCheckedStatement(checkedStmt),
+                UnsafeStatementSyntax unsafeStmt => ConvertUnsafeStatement(unsafeStmt),
+                FixedStatementSyntax fixedStmt => ConvertFixedStatement(fixedStmt),
+                _ => HandleUnsupportedStatement(statement)
+            };
+        }
+        catch (Exception) when (_context.ShouldPreserveCSharp)
+        {
+            _context.IncrementSkipped();
+            return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
+        }
     }
 
     private StatementNode? HandleUnsupportedStatement(StatementSyntax statement)
@@ -3615,7 +3629,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.IncrementSkipped();
 
         // In Interop mode, preserve unsupported statements as raw C# passthrough
-        if (_context.Mode == ConversionMode.Interop)
+        if (_context.ShouldPreserveCSharp)
         {
             return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
         }
@@ -3647,14 +3661,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private StatementNode? ConvertGotoStatement(GotoStatementSyntax node)
     {
-        // Only handle simple goto (not goto case/goto default)
-        if (node.CaseOrDefaultKeyword != default)
-        {
-            return CreateFallbackStatement(node, "goto-case");
-        }
-
         _context.RecordFeatureUsage("goto");
         _context.IncrementConverted();
+
+        if (node.CaseOrDefaultKeyword.IsKind(SyntaxKind.DefaultKeyword))
+        {
+            return new GotoStatementNode(GetTextSpan(node), "") { IsDefault = true };
+        }
+
+        if (node.CaseOrDefaultKeyword.IsKind(SyntaxKind.CaseKeyword))
+        {
+            var caseExpr = ConvertExpression(node.Expression!);
+            return new GotoStatementNode(GetTextSpan(node), "") { CaseLabel = caseExpr };
+        }
+
         var label = node.Expression?.ToString() ?? "";
         return new GotoStatementNode(GetTextSpan(node), label);
     }
@@ -3717,6 +3737,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         // Comment first (correct semantic order: annotation before body)
         var keyword = node.IsKind(SyntaxKind.CheckedStatement) ? "checked" : "unchecked";
+        if (_context.PassthroughOnError)
+        {
+            result.Add(new RawCSharpNode(GetTextSpan(node), node.ToFullString()));
+            return result;
+        }
         result.Add(new FallbackCommentNode(GetTextSpan(node), keyword, "checked-block",
             "Checked/unchecked semantics stripped; handle overflow manually if needed"));
 
@@ -4027,6 +4052,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     .ToList()
                 : null;
 
+            var stmtArgModifiers = ExtractArgumentModifiers(invocation.ArgumentList.Arguments);
+
             // Check for Console.WriteLine as special case
             if (target == "Console.WriteLine" || target == "System.Console.WriteLine")
             {
@@ -4049,7 +4076,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 fallible: false,
                 args,
                 new AttributeCollection(),
-                stmtArgNames);
+                stmtArgNames,
+                stmtArgModifiers);
         }
 
         // Handle postfix increment/decrement as compound assignment statements
@@ -5186,54 +5214,63 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.Stats.ExpressionsConverted++;
 
-        return expression switch
+        try
         {
-            LiteralExpressionSyntax literal => ConvertLiteral(literal),
-            IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText),
-            BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
-            PrefixUnaryExpressionSyntax addrOf when addrOf.IsKind(SyntaxKind.AddressOfExpression) => ConvertAddressOfExpression(addrOf),
-            PrefixUnaryExpressionSyntax deref when deref.IsKind(SyntaxKind.PointerIndirectionExpression) => ConvertPointerDereferenceExpression(deref),
-            PrefixUnaryExpressionSyntax indexFromEnd when indexFromEnd.IsKind(SyntaxKind.IndexExpression) => ConvertIndexFromEndExpression(indexFromEnd),
-            PrefixUnaryExpressionSyntax prefix => ConvertPrefixUnaryExpression(prefix),
-            PostfixUnaryExpressionSyntax postfix => ConvertPostfixUnaryExpression(postfix),
-            ParenthesizedExpressionSyntax paren => ConvertExpression(paren.Expression),
-            InvocationExpressionSyntax invocation => ConvertInvocationExpression(invocation),
-            MemberAccessExpressionSyntax memberAccess => ConvertMemberAccessExpression(memberAccess),
-            ObjectCreationExpressionSyntax objCreation => ConvertObjectCreation(objCreation),
-            ThisExpressionSyntax => new ThisExpressionNode(GetTextSpan(expression)),
-            BaseExpressionSyntax => new BaseExpressionNode(GetTextSpan(expression)),
-            ConditionalExpressionSyntax conditional => ConvertConditionalExpression(conditional),
-            ArrayCreationExpressionSyntax arrayCreation => ConvertArrayCreation(arrayCreation),
-            ImplicitArrayCreationExpressionSyntax implicitArray => ConvertImplicitArrayCreation(implicitArray),
-            ElementAccessExpressionSyntax elementAccess => ConvertElementAccess(elementAccess),
-            LambdaExpressionSyntax lambda => ConvertLambdaExpression(lambda),
-            AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
-            InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
-            ConditionalAccessExpressionSyntax condAccess => ConvertConditionalAccess(condAccess),
-            CastExpressionSyntax cast => ConvertCastExpression(cast),
-            IsPatternExpressionSyntax isPattern => ConvertIsPatternExpression(isPattern),
-            CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
-            ImplicitObjectCreationExpressionSyntax implicitNew => ConvertImplicitObjectCreation(implicitNew),
-            SwitchExpressionSyntax switchExpr => ConvertSwitchExpression(switchExpr),
-            ThrowExpressionSyntax throwExpr => ConvertThrowExpression(throwExpr),
-            DefaultExpressionSyntax defaultExpr => ConvertDefaultExpression(defaultExpr),
-            AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
-            QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
-            InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
-            TypeOfExpressionSyntax typeOf => new TypeOfExpressionNode(GetTextSpan(typeOf), TypeMapper.CSharpToCalor(typeOf.Type.ToString())),
-            GenericNameSyntax generic => new ReferenceNode(GetTextSpan(generic),
-                $"{generic.Identifier.Text}<{string.Join(", ", generic.TypeArgumentList.Arguments.Select(a => TypeMapper.CSharpToCalor(a.ToString())))}>"),
-            PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
-            DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
-            AssignmentExpressionSyntax assignExpr => ConvertAssignmentExpression(assignExpr),
-            TupleExpressionSyntax tupleExpr => ConvertTupleExpression(tupleExpr),
-            StackAllocArrayCreationExpressionSyntax stackAlloc => ConvertStackAllocExpression(stackAlloc),
-            ImplicitStackAllocArrayCreationExpressionSyntax implicitStackAlloc => ConvertImplicitStackAllocExpression(implicitStackAlloc),
-            SizeOfExpressionSyntax sizeOf => ConvertSizeOfExpression(sizeOf),
-            RangeExpressionSyntax rangeExpr => ConvertRangeExpression(rangeExpr),
-            WithExpressionSyntax withExpr => ConvertWithExpression(withExpr),
-            _ => CreateFallbackExpression(expression, "unknown-expression")
-        };
+            return expression switch
+            {
+                LiteralExpressionSyntax literal => ConvertLiteral(literal),
+                IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText),
+                BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
+                PrefixUnaryExpressionSyntax addrOf when addrOf.IsKind(SyntaxKind.AddressOfExpression) => ConvertAddressOfExpression(addrOf),
+                PrefixUnaryExpressionSyntax deref when deref.IsKind(SyntaxKind.PointerIndirectionExpression) => ConvertPointerDereferenceExpression(deref),
+                PrefixUnaryExpressionSyntax indexFromEnd when indexFromEnd.IsKind(SyntaxKind.IndexExpression) => ConvertIndexFromEndExpression(indexFromEnd),
+                PrefixUnaryExpressionSyntax prefix => ConvertPrefixUnaryExpression(prefix),
+                PostfixUnaryExpressionSyntax postfix => ConvertPostfixUnaryExpression(postfix),
+                ParenthesizedExpressionSyntax paren => ConvertExpression(paren.Expression),
+                InvocationExpressionSyntax invocation => ConvertInvocationExpression(invocation),
+                MemberAccessExpressionSyntax memberAccess => ConvertMemberAccessExpression(memberAccess),
+                ObjectCreationExpressionSyntax objCreation => ConvertObjectCreation(objCreation),
+                ThisExpressionSyntax => new ThisExpressionNode(GetTextSpan(expression)),
+                BaseExpressionSyntax => new BaseExpressionNode(GetTextSpan(expression)),
+                ConditionalExpressionSyntax conditional => ConvertConditionalExpression(conditional),
+                ArrayCreationExpressionSyntax arrayCreation => ConvertArrayCreation(arrayCreation),
+                ImplicitArrayCreationExpressionSyntax implicitArray => ConvertImplicitArrayCreation(implicitArray),
+                ElementAccessExpressionSyntax elementAccess => ConvertElementAccess(elementAccess),
+                LambdaExpressionSyntax lambda => ConvertLambdaExpression(lambda),
+                AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
+                InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
+                ConditionalAccessExpressionSyntax condAccess => ConvertConditionalAccess(condAccess),
+                CastExpressionSyntax cast => ConvertCastExpression(cast),
+                IsPatternExpressionSyntax isPattern => ConvertIsPatternExpression(isPattern),
+                CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
+                ImplicitObjectCreationExpressionSyntax implicitNew => ConvertImplicitObjectCreation(implicitNew),
+                SwitchExpressionSyntax switchExpr => ConvertSwitchExpression(switchExpr),
+                ThrowExpressionSyntax throwExpr => ConvertThrowExpression(throwExpr),
+                DefaultExpressionSyntax defaultExpr => ConvertDefaultExpression(defaultExpr),
+                AnonymousObjectCreationExpressionSyntax anonObj => ConvertAnonymousObjectCreation(anonObj),
+                QueryExpressionSyntax queryExpr => ConvertQueryExpression(queryExpr),
+                InitializerExpressionSyntax initExpr => ConvertInitializerExpression(initExpr),
+                TypeOfExpressionSyntax typeOf => new TypeOfExpressionNode(GetTextSpan(typeOf), TypeMapper.CSharpToCalor(typeOf.Type.ToString())),
+                GenericNameSyntax generic => new ReferenceNode(GetTextSpan(generic),
+                    $"{generic.Identifier.Text}<{string.Join(", ", generic.TypeArgumentList.Arguments.Select(a => TypeMapper.CSharpToCalor(a.ToString())))}>"),
+                PredefinedTypeSyntax predefined => new ReferenceNode(GetTextSpan(predefined), predefined.Keyword.Text),
+                DeclarationExpressionSyntax declExpr => ConvertDeclarationExpression(declExpr),
+                AssignmentExpressionSyntax assignExpr => ConvertAssignmentExpression(assignExpr),
+                TupleExpressionSyntax tupleExpr => ConvertTupleExpression(tupleExpr),
+                StackAllocArrayCreationExpressionSyntax stackAlloc => ConvertStackAllocExpression(stackAlloc),
+                ImplicitStackAllocArrayCreationExpressionSyntax implicitStackAlloc => ConvertImplicitStackAllocExpression(implicitStackAlloc),
+                SizeOfExpressionSyntax sizeOf => ConvertSizeOfExpression(sizeOf),
+                RangeExpressionSyntax rangeExpr => ConvertRangeExpression(rangeExpr),
+                WithExpressionSyntax withExpr => ConvertWithExpression(withExpr),
+                CheckedExpressionSyntax checkedExpr => ConvertExpression(checkedExpr.Expression),
+                _ => CreateFallbackExpression(expression, "unknown-expression")
+            };
+        }
+        catch (Exception) when (_context.ShouldPreserveCSharp)
+        {
+            _context.IncrementSkipped();
+            return new FallbackExpressionNode(GetTextSpan(expression), expression.ToFullString(), "conversion-error", null);
+        }
     }
 
     private ExpressionNode ConvertLiteral(LiteralExpressionSyntax literal)
@@ -5241,7 +5278,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return literal.Kind() switch
         {
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is int intVal =>
-                new IntLiteralNode(GetTextSpan(literal), intVal),
+                CreateIntLiteralNode(literal, intVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is double doubleVal =>
                 new FloatLiteralNode(GetTextSpan(literal), doubleVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is float floatVal =>
@@ -5249,7 +5286,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is decimal decVal =>
                 new DecimalLiteralNode(GetTextSpan(literal), decVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is long longVal =>
-                new IntLiteralNode(GetTextSpan(literal), longVal),
+                CreateIntLiteralNode(literal, longVal),
+            SyntaxKind.NumericLiteralExpression when literal.Token.Value is uint uintVal =>
+                new IntLiteralNode(GetTextSpan(literal), uintVal,
+                    literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase),
+                    isUnsigned: true, uintVal),
+            SyntaxKind.NumericLiteralExpression when literal.Token.Value is ulong ulongVal =>
+                new IntLiteralNode(GetTextSpan(literal), unchecked((long)ulongVal),
+                    literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase),
+                    isUnsigned: true, ulongVal),
             SyntaxKind.StringLiteralExpression =>
                 new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText),
             SyntaxKind.CharacterLiteralExpression =>
@@ -5264,6 +5309,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new ReferenceNode(GetTextSpan(literal), "default"),
             _ => CreateFallbackExpression(literal, "unknown-literal")
         };
+    }
+
+    private IntLiteralNode CreateIntLiteralNode(LiteralExpressionSyntax literal, long value)
+    {
+        var isHex = literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
+        if (isHex)
+            return new IntLiteralNode(GetTextSpan(literal), value, isHex: true, isUnsigned: false, (ulong)value);
+        return new IntLiteralNode(GetTextSpan(literal), value);
     }
 
     private ExpressionNode ConvertBinaryExpression(BinaryExpressionSyntax binary)
@@ -5909,6 +5962,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
     }
 
+    private static IReadOnlyList<string?>? ExtractArgumentModifiers(SeparatedSyntaxList<ArgumentSyntax> arguments)
+    {
+        var modifiers = arguments
+            .Select(a => a.RefKindKeyword.IsKind(SyntaxKind.None) ? null : a.RefKindKeyword.ValueText)
+            .ToList();
+        return modifiers.Any(m => m != null) ? modifiers : null;
+    }
+
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
     {
         var target = invocation.Expression.ToString();
@@ -5925,6 +5986,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .Select(a => a.NameColon?.Name.Identifier.Text)
                 .ToList()
             : null;
+
+        var argModifiers = ExtractArgumentModifiers(invocation.ArgumentList.Arguments);
 
         // Try to convert common string methods to native StringOperationNode
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
@@ -6081,7 +6144,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new NameOfExpressionNode(GetTextSpan(invocation), argText);
         }
 
-        return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames);
+        return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers);
     }
 
     private StringOperationNode? TryGetRegexOperation(
@@ -7678,7 +7741,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// Creates a fallback comment node for unsupported statements.
     /// Records the unsupported feature for explanation output.
     /// </summary>
-    private FallbackCommentNode CreateFallbackStatement(SyntaxNode node, string featureName)
+    private StatementNode CreateFallbackStatement(SyntaxNode node, string featureName)
     {
         var lineSpan = node.GetLocation().GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
@@ -7692,6 +7755,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.AddWarning(
                 $"Unsupported feature [{featureName}] replaced with fallback: {(node.ToString().Length > 80 ? node.ToString().Substring(0, 77) + "..." : node.ToString())}",
                 feature: featureName, line: line, suggestion: suggestion);
+        }
+
+        // When PassthroughOnError is enabled, wrap in §CSHARP block instead of TODO comment
+        if (_context.PassthroughOnError)
+        {
+            return new RawCSharpNode(GetTextSpan(node), node.ToFullString());
         }
 
         return new FallbackCommentNode(GetTextSpan(node), node.ToString(), featureName, suggestion);

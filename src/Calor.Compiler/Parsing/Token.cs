@@ -385,3 +385,9 @@ public readonly struct Token : IEquatable<Token>
     public static bool operator ==(Token left, Token right) => left.Equals(right);
     public static bool operator !=(Token left, Token right) => !left.Equals(right);
 }
+
+/// <summary>
+/// Metadata for integer literal tokens that carry hex/unsigned information.
+/// Stored in <see cref="Token.Value"/> when the literal uses hex notation or unsigned types.
+/// </summary>
+internal readonly record struct IntLiteralInfo(long SignedValue, bool IsHex, bool IsUnsigned, ulong UnsignedValue);

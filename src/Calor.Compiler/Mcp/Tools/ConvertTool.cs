@@ -91,6 +91,14 @@ public sealed class ConvertTool : McpToolBase
                             "description": "Stage 1 only: static analysis without conversion attempt (faster, for assess mode)"
                         }
                     }
+                },
+                "stripPreprocessor": {
+                    "type": "boolean",
+                    "description": "Strip C# preprocessor directives (#if, #region, #pragma, etc.) before conversion to prevent hangs/OOM (default: true)"
+                },
+                "passthroughOnError": {
+                    "type": "boolean",
+                    "description": "Wrap unsupported constructs in §CSHARP blocks instead of emitting broken Calor (default: false)"
                 }
             },
             "additionalProperties": false
@@ -149,6 +157,8 @@ public sealed class ConvertTool : McpToolBase
         }
         var fallback = GetBool(arguments, "fallback", defaultValue: true);
         var explain = GetBool(arguments, "explain", defaultValue: false);
+        var stripPreprocessor = GetBool(arguments, "stripPreprocessor", defaultValue: true);
+        var passthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false);
         var conversionMode = ResolveConversionMode(arguments);
 
         try
@@ -160,7 +170,9 @@ public sealed class ConvertTool : McpToolBase
                 AutoGenerateIds = true,
                 GracefulFallback = fallback,
                 Explain = explain,
-                Mode = conversionMode
+                Mode = conversionMode,
+                StripPreprocessor = stripPreprocessor,
+                PassthroughOnError = passthroughOnError
             };
 
             var converter = new CSharpToCalorConverter(options);
@@ -408,7 +420,9 @@ public sealed class ConvertTool : McpToolBase
                 AutoGenerateIds = true,
                 GracefulFallback = true,
                 Explain = false,
-                Mode = conversionMode
+                Mode = conversionMode,
+                StripPreprocessor = GetBool(arguments, "stripPreprocessor", defaultValue: true),
+                PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false)
             };
 
             var converter = new CSharpToCalorConverter(options);
@@ -634,7 +648,8 @@ public sealed class ConvertTool : McpToolBase
                 PreserveComments = true,
                 AutoGenerateIds = true,
                 GracefulFallback = true,
-                Mode = ConversionMode.Interop
+                Mode = ConversionMode.Interop,
+                StripPreprocessor = GetBool(arguments, "stripPreprocessor", defaultValue: true)
             };
 
             var converter = new CSharpToCalorConverter(options);

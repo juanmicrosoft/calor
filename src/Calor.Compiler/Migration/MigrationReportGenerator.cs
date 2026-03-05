@@ -449,6 +449,8 @@ public sealed class MigrationReportBuilder
             SuccessfulFiles = _fileResults.Count(f => f.Status == FileMigrationStatus.Success),
             PartialFiles = _fileResults.Count(f => f.Status == FileMigrationStatus.Partial),
             FailedFiles = _fileResults.Count(f => f.Status == FileMigrationStatus.Failed),
+            SkippedFiles = _fileResults.Count(f => f.Status == FileMigrationStatus.Skipped),
+            TimedOutFiles = _fileResults.Count(f => f.Status == FileMigrationStatus.TimedOut),
             TotalErrors = allIssues.Count(i => i.Severity == ConversionIssueSeverity.Error),
             TotalWarnings = allIssues.Count(i => i.Severity == ConversionIssueSeverity.Warning),
             TotalDuration = TimeSpan.FromTicks(_fileResults.Sum(f => f.Duration.Ticks)),

@@ -2128,6 +2128,12 @@ public sealed class Parser
             case TokenKind.Some:
                 expr = ParseSomeExpression(); // §SM inside Lisp
                 break;
+            case TokenKind.This:
+                expr = ParseThisExpression(); // §THIS inside Lisp
+                break;
+            case TokenKind.Base:
+                expr = ParseBaseExpression(); // §BASE inside Lisp
+                break;
             default:
                 // Provide helpful message for unexpected tokens
                 var hint = Current.Kind switch
@@ -2456,6 +2462,10 @@ public sealed class Parser
     private IntLiteralNode ParseIntLiteral()
     {
         var token = Expect(TokenKind.IntLiteral);
+        if (token.Value is IntLiteralInfo info)
+        {
+            return new IntLiteralNode(token.Span, info.SignedValue, info.IsHex, info.IsUnsigned, info.UnsignedValue);
+        }
         var value = token.Value switch
         {
             int i => (long)i,

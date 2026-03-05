@@ -943,7 +943,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(GotoStatementNode node)
     {
-        AppendLine($"§GOTO{{{node.Label}}}");
+        if (node.CaseLabel != null)
+        {
+            AppendLine($"§CSHARP{{goto case {node.CaseLabel.Accept(this)};}}§/CSHARP");
+        }
+        else if (node.IsDefault)
+        {
+            AppendLine("§CSHARP{goto default;}§/CSHARP");
+        }
+        else
+        {
+            AppendLine($"§GOTO{{{node.Label}}}");
+        }
         return "";
     }
 
@@ -1575,6 +1586,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(IntLiteralNode node)
     {
+        if (node.IsHex)
+        {
+            if (node.IsUnsigned)
+                return $"0x{node.UnsignedValue:X}";
+            return $"0x{node.Value:X}";
+        }
         return node.Value.ToString();
     }
 

@@ -360,7 +360,8 @@ public class Test
 {
     void M()
     {
-        var x = checked(1 + 2);
+        int y = 0;
+        var x = __makeref(y);
     }
 }";
         var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });

@@ -88,6 +88,15 @@ public sealed class ConversionOptions
     /// Interop: wraps unsupported members in §CSHARP{...}§/CSHARP blocks.
     /// </summary>
     public ConversionMode Mode { get; set; } = ConversionMode.Standard;
+
+    /// <summary>
+    /// Whether to strip C# preprocessor directives (#if, #region, #pragma, etc.) before conversion.
+    /// Prevents infinite hangs and OOM from conditional compilation blocks.
+    /// </summary>
+    public bool StripPreprocessor { get; set; } = true;
+
+    /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
+    public bool PassthroughOnError { get; set; } = false;
 }
 
 /// <summary>
@@ -115,6 +124,12 @@ public sealed class CSharpToCalorConverter
 
         try
         {
+            // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM
+            if (_options.StripPreprocessor)
+            {
+                csharpSource = PreprocessorStripper.Strip(csharpSource);
+            }
+
             // Step 1: Parse C# with Roslyn
             var syntaxTree = CSharpSyntaxTree.ParseText(csharpSource);
             var root = syntaxTree.GetCompilationUnitRoot();
@@ -267,7 +282,8 @@ public sealed class CSharpToCalorConverter
             AutoGenerateIds = _options.AutoGenerateIds,
             ModuleName = _options.ModuleName,
             GracefulFallback = _options.GracefulFallback,
-            Mode = _options.Mode
+            Mode = _options.Mode,
+            PassthroughOnError = _options.PassthroughOnError
         };
     }
 
@@ -309,15 +325,15 @@ public sealed class CSharpToCalorConverter
 
     private static string DeriveModuleName(string? sourceFile, CompilationUnitSyntax root)
     {
-        // Try to get namespace from the source
-        var namespaceDecl = root.DescendantNodes()
-            .OfType<BaseNamespaceDeclarationSyntax>()
-            .FirstOrDefault();
+        // Try file-scoped namespace first (namespace X.Y.Z;)
+        var fileScopedNs = root.Members.OfType<FileScopedNamespaceDeclarationSyntax>().FirstOrDefault();
+        if (fileScopedNs != null)
+            return fileScopedNs.Name.ToString();
 
-        if (namespaceDecl != null)
-        {
-            return namespaceDecl.Name.ToString();
-        }
+        // Try block-scoped namespace (namespace X.Y.Z { ... })
+        var blockNs = root.Members.OfType<NamespaceDeclarationSyntax>().FirstOrDefault();
+        if (blockNs != null)
+            return blockNs.Name.ToString();
 
         // Fall back to file name
         if (!string.IsNullOrEmpty(sourceFile))

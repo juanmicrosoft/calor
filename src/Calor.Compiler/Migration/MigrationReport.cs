@@ -38,6 +38,8 @@ public sealed class MigrationSummary
     public int SuccessfulFiles { get; set; }
     public int PartialFiles { get; set; }
     public int FailedFiles { get; set; }
+    public int SkippedFiles { get; set; }
+    public int TimedOutFiles { get; set; }
     public int TotalErrors { get; set; }
     public int TotalWarnings { get; set; }
     public TimeSpan TotalDuration { get; set; }
@@ -70,7 +72,8 @@ public enum FileMigrationStatus
     Success,
     Partial,
     Failed,
-    Skipped
+    Skipped,
+    TimedOut
 }
 
 /// <summary>

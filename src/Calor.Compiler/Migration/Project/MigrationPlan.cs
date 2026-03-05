@@ -84,7 +84,7 @@ public sealed class MigrationPlanOptions
     public bool Parallel { get; set; } = true;
 
     /// <summary>Maximum degree of parallelism.</summary>
-    public int MaxParallelism { get; set; } = Environment.ProcessorCount;
+    public int MaxParallelism { get; set; } = Math.Min(4, Environment.ProcessorCount);
 
     /// <summary>Whether to include benchmark metrics.</summary>
     public bool IncludeBenchmark { get; set; } = false;
@@ -118,4 +118,10 @@ public sealed class MigrationPlanOptions
 
     /// <summary>Override the module name for all converted files. When null, module names are derived from C# namespace declarations.</summary>
     public string? ModuleNameOverride { get; set; }
+
+    /// <summary>Per-file timeout in seconds (default: 60).</summary>
+    public int PerFileTimeoutSeconds { get; set; } = 60;
+
+    /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
+    public bool PassthroughOnError { get; set; }
 }
