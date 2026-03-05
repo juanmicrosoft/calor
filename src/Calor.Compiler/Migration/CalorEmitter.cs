@@ -1575,6 +1575,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(IntLiteralNode node)
     {
+        if (node.IsHex)
+        {
+            if (node.IsUnsigned)
+                return $"0x{node.UnsignedValue:X}";
+            return $"0x{node.Value:X}";
+        }
         return node.Value.ToString();
     }
 

@@ -5241,7 +5241,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return literal.Kind() switch
         {
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is int intVal =>
-                new IntLiteralNode(GetTextSpan(literal), intVal),
+                CreateIntLiteralNode(literal, intVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is double doubleVal =>
                 new FloatLiteralNode(GetTextSpan(literal), doubleVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is float floatVal =>
@@ -5249,7 +5249,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is decimal decVal =>
                 new DecimalLiteralNode(GetTextSpan(literal), decVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is long longVal =>
-                new IntLiteralNode(GetTextSpan(literal), longVal),
+                CreateIntLiteralNode(literal, longVal),
+            SyntaxKind.NumericLiteralExpression when literal.Token.Value is uint uintVal =>
+                new IntLiteralNode(GetTextSpan(literal), uintVal,
+                    literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase),
+                    isUnsigned: true, uintVal),
+            SyntaxKind.NumericLiteralExpression when literal.Token.Value is ulong ulongVal =>
+                new IntLiteralNode(GetTextSpan(literal), unchecked((long)ulongVal),
+                    literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase),
+                    isUnsigned: true, ulongVal),
             SyntaxKind.StringLiteralExpression =>
                 new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText),
             SyntaxKind.CharacterLiteralExpression =>
@@ -5264,6 +5272,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new ReferenceNode(GetTextSpan(literal), "default"),
             _ => CreateFallbackExpression(literal, "unknown-literal")
         };
+    }
+
+    private IntLiteralNode CreateIntLiteralNode(LiteralExpressionSyntax literal, long value)
+    {
+        var isHex = literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
+        if (isHex)
+            return new IntLiteralNode(GetTextSpan(literal), value, isHex: true, isUnsigned: false, (ulong)value);
+        return new IntLiteralNode(GetTextSpan(literal), value);
     }
 
     private ExpressionNode ConvertBinaryExpression(BinaryExpressionSyntax binary)

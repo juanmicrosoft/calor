@@ -355,6 +355,17 @@ public class LambdaTests
         Assert.Contains("Click", emittedCSharp);
     }
 
+    [Fact]
+    public void LambdaParam_BareNullableType_OmitsType()
+    {
+        // Lambda with bare ? type should omit the type and let C# infer it
+        var param = new LambdaParameterNode(default, "match", "?");
+        var emitter = new CSharpEmitter();
+        var result = param.Accept(emitter);
+        Assert.Equal("match", result);
+        Assert.DoesNotContain("?", result);
+    }
+
     #endregion
 
     #region Parser Tests

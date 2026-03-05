@@ -17,10 +17,22 @@ public abstract class ExpressionNode : AstNode
 public sealed class IntLiteralNode : ExpressionNode
 {
     public long Value { get; }
+    public bool IsHex { get; }
+    public bool IsUnsigned { get; }
+    public ulong UnsignedValue { get; }
 
     public IntLiteralNode(TextSpan span, long value) : base(span)
     {
         Value = value;
+        UnsignedValue = (ulong)value;
+    }
+
+    public IntLiteralNode(TextSpan span, long value, bool isHex, bool isUnsigned, ulong unsignedValue) : base(span)
+    {
+        Value = value;
+        IsHex = isHex;
+        IsUnsigned = isUnsigned;
+        UnsignedValue = unsignedValue;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

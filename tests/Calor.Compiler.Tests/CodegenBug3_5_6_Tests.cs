@@ -657,6 +657,48 @@ public class CodegenBug3_5_6_Tests
 
     #endregion
 
+    #region ConvertPrefixToInfix Tests
+
+    [Fact]
+    public void ConvertPrefixToInfix_SimpleBinary()
+    {
+        Assert.Equal("number % 10", CSharpEmitter.ConvertPrefixToInfix("(% number 10)"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_Nested()
+    {
+        Assert.Equal("a * b + c", CSharpEmitter.ConvertPrefixToInfix("(+ (* a b) c)"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_NonPrefix_PassThrough()
+    {
+        Assert.Equal("myVar.ToString()", CSharpEmitter.ConvertPrefixToInfix("myVar.ToString()"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_Unary_Not()
+    {
+        Assert.Equal("!flag", CSharpEmitter.ConvertPrefixToInfix("(! flag)"));
+    }
+
+    [Fact]
+    public void ConvertPrefixToInfix_Comparison()
+    {
+        Assert.Equal("x > 0", CSharpEmitter.ConvertPrefixToInfix("(> x 0)"));
+    }
+
+    [Fact]
+    public void StringInterpolation_PrefixExpr_EmitsInfix()
+    {
+        var (converted, hasInterpolation) = CSharpEmitter.ConvertInlineInterpolation("${(% number 10)}");
+        Assert.True(hasInterpolation);
+        Assert.Equal("{number % 10}", converted);
+    }
+
+    #endregion
+
     #region Helpers
 
     private static Ast.ModuleNode ParseModule(string source)

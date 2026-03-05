@@ -1081,10 +1081,16 @@ public sealed class Lexer
             if (long.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var hexVal))
             {
-                // Store as int when it fits, long otherwise
-                if (hexVal is >= int.MinValue and <= int.MaxValue)
-                    return MakeToken(TokenKind.IntLiteral, (int)hexVal);
-                return MakeToken(TokenKind.IntLiteral, hexVal);
+                return MakeToken(TokenKind.IntLiteral,
+                    new IntLiteralInfo(hexVal, IsHex: true, IsUnsigned: false, (ulong)hexVal));
+            }
+
+            // Try ulong for values > long.MaxValue (e.g., 0xcccccccccccccccd)
+            if (ulong.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture, out var uhexVal))
+            {
+                return MakeToken(TokenKind.IntLiteral,
+                    new IntLiteralInfo(unchecked((long)uhexVal), IsHex: true, IsUnsigned: true, uhexVal));
             }
 
             _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
@@ -1418,15 +1424,39 @@ public sealed class Lexer
                 Advance();
             }
 
+            // Consume optional U/UL suffix on hex literals
+            bool hexUnsigned = false;
+            if (Current is 'U' or 'u')
+            {
+                hexUnsigned = true;
+                Advance();
+                if (Current is 'L' or 'l') Advance();
+            }
+            else if (Current is 'L' or 'l')
+            {
+                Advance();
+                if (Current is 'U' or 'u') { hexUnsigned = true; Advance(); }
+            }
+
             var hexText = CurrentText();
-            if (long.TryParse(hexText.AsSpan(hexText.IndexOf('x') + 1),
+            var hexPartStr = hexText.AsSpan(hexText.IndexOf('x') + 1);
+            // Trim any suffix characters from the hex part
+            hexPartStr = hexPartStr.TrimEnd("UuLl".AsSpan());
+            if (long.TryParse(hexPartStr,
                 System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var hexValue))
             {
-                // Store as int when it fits, long otherwise
-                if (hexValue is >= int.MinValue and <= int.MaxValue)
-                    return MakeToken(TokenKind.IntLiteral, (int)hexValue);
-                return MakeToken(TokenKind.IntLiteral, hexValue);
+                return MakeToken(TokenKind.IntLiteral,
+                    new IntLiteralInfo(hexValue, IsHex: true, hexUnsigned, (ulong)hexValue));
+            }
+
+            // Try ulong for values > long.MaxValue
+            if (ulong.TryParse(hexPartStr,
+                System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture, out var uhexValue))
+            {
+                return MakeToken(TokenKind.IntLiteral,
+                    new IntLiteralInfo(unchecked((long)uhexValue), IsHex: true, IsUnsigned: true, uhexValue));
             }
 
             _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "hex number");
@@ -1479,16 +1509,53 @@ public sealed class Lexer
             }
         }
 
-        var intText = CurrentText().Replace("_", "");
-        if (int.TryParse(intText, out var intValue))
+        // Check for unsigned/long suffix on integers (42U, 100UL, 50L, 50LU)
+        bool isUnsignedSuffix = false;
+        bool hasLongSuffix = false;
+        if (Current is 'U' or 'u')
         {
-            return MakeToken(TokenKind.IntLiteral, intValue);
+            isUnsignedSuffix = true;
+            Advance();
+            if (Current is 'L' or 'l') { hasLongSuffix = true; Advance(); }
+        }
+        else if (Current is 'L' or 'l')
+        {
+            hasLongSuffix = true;
+            Advance();
+            if (Current is 'U' or 'u') { isUnsignedSuffix = true; Advance(); }
         }
 
-        // Fall back to long for values outside int range
-        if (long.TryParse(intText, out var longValue))
+        var intText = CurrentText().Replace("_", "");
+        // Strip suffix characters for parsing
+        var numericText = intText.TrimEnd('U', 'u', 'L', 'l');
+
+        if (isUnsignedSuffix)
         {
-            return MakeToken(TokenKind.IntLiteral, longValue);
+            if (ulong.TryParse(numericText, out var ulVal))
+            {
+                return MakeToken(TokenKind.IntLiteral,
+                    new IntLiteralInfo(unchecked((long)ulVal), IsHex: false, IsUnsigned: true, ulVal));
+            }
+        }
+        else if (hasLongSuffix)
+        {
+            if (long.TryParse(numericText, out var lVal))
+            {
+                return MakeToken(TokenKind.IntLiteral, lVal);
+            }
+        }
+        else
+        {
+            if (int.TryParse(numericText, out var intValue))
+            {
+                return MakeToken(TokenKind.IntLiteral, intValue);
+            }
+
+            // Fall back to long for values outside int range
+            if (long.TryParse(numericText, out var longValue))
+            {
+                return MakeToken(TokenKind.IntLiteral, longValue);
+            }
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "number");
