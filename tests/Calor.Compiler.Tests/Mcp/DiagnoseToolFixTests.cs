@@ -9,13 +9,14 @@ namespace Calor.Compiler.Tests.Mcp;
 /// </summary>
 public class DiagnoseToolFixTests
 {
-    private readonly DiagnoseTool _tool = new();
+    private readonly CheckTool _tool = new();
 
     [Fact]
     public async Task ExecuteAsync_WithTypoOperator_IncludesSuggestion()
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
             }
             """).RootElement;
@@ -37,6 +38,7 @@ public class DiagnoseToolFixTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
             }
             """).RootElement;
@@ -66,6 +68,7 @@ public class DiagnoseToolFixTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x) §/F{f001} §/M{m001}"
             }
             """).RootElement;
@@ -83,6 +86,7 @@ public class DiagnoseToolFixTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F{f001} §/M{m001}"
             }
             """).RootElement;
@@ -101,6 +105,7 @@ public class DiagnoseToolFixTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42 §/F{f002} §/M{m001}"
             }
             """).RootElement;
@@ -135,6 +140,7 @@ public class DiagnoseToolFixTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§FUNC{f001:Test}"
             }
             """).RootElement;
@@ -157,6 +163,7 @@ public class DiagnoseToolFixTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
             }
             """).RootElement;

@@ -12,7 +12,7 @@ public class SyntaxLookupMcpIntegrationTests
     [Fact]
     public async Task McpServer_SyntaxLookup_ObjectInstantiation_ReturnsResult()
     {
-        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_syntax_lookup","arguments":{"query":"object instantiation"}}}""";
+        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_help","arguments":{"query":"object instantiation"}}}""";
 
         var response = await ExecuteMcpRequestAsync(request);
 
@@ -25,7 +25,7 @@ public class SyntaxLookupMcpIntegrationTests
     [Fact]
     public async Task McpServer_SyntaxLookup_ForLoop_ReturnsResult()
     {
-        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_syntax_lookup","arguments":{"query":"for loop"}}}""";
+        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_help","arguments":{"query":"for loop"}}}""";
 
         var response = await ExecuteMcpRequestAsync(request);
 
@@ -37,7 +37,7 @@ public class SyntaxLookupMcpIntegrationTests
     [Fact]
     public async Task McpServer_SyntaxLookup_AsyncAwait_ReturnsResult()
     {
-        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_syntax_lookup","arguments":{"query":"async await"}}}""";
+        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_help","arguments":{"query":"async await"}}}""";
 
         var response = await ExecuteMcpRequestAsync(request);
 
@@ -49,7 +49,7 @@ public class SyntaxLookupMcpIntegrationTests
     [Fact]
     public async Task McpServer_SyntaxLookup_TryCatch_ReturnsResult()
     {
-        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_syntax_lookup","arguments":{"query":"try catch"}}}""";
+        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_help","arguments":{"query":"try catch"}}}""";
 
         var response = await ExecuteMcpRequestAsync(request);
 
@@ -61,7 +61,7 @@ public class SyntaxLookupMcpIntegrationTests
     [Fact]
     public async Task McpServer_SyntaxLookup_Contracts_ReturnsResult()
     {
-        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_syntax_lookup","arguments":{"query":"precondition"}}}""";
+        var request = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_help","arguments":{"query":"precondition"}}}""";
 
         var response = await ExecuteMcpRequestAsync(request);
 
@@ -77,8 +77,7 @@ public class SyntaxLookupMcpIntegrationTests
 
         var response = await ExecuteMcpRequestAsync(request);
 
-        Assert.Contains("calor_syntax_lookup", response);
-        Assert.Contains("C#", response);
+        Assert.Contains("calor_help", response);
     }
 
     /// <summary>

@@ -8,20 +8,22 @@ This project uses **Calor**, a DSL that compiles to C# on .NET 10. The Calor MCP
 1. **All new code must be `.calr` files** — never create `.cs` files directly.
 2. **Convert before modifying** — convert any `.cs` file to `.calr` using `calor_convert` MCP tool before making changes.
 3. **Never edit `.g.cs` files** — they are auto-generated from `.calr` sources.
-4. **Validate after writing** — run `calor_diagnose` MCP tool after any `.calr` edit.
-5. **Look up syntax first** — use `calor_syntax_lookup` MCP tool before writing Calor code.
+4. **Validate after writing** — run `calor_check` MCP tool (action=diagnose) after any `.calr` edit.
+5. **Look up syntax first** — use `calor_help` MCP tool before writing Calor code.
 
 ### MCP Tools (available via `calor mcp --stdio`)
 
 | Category | Tools |
 |----------|-------|
-| **Compile & Verify** | `calor_compile`, `calor_verify`, `calor_analyze`, `calor_diagnose` |
-| **Convert** | `calor_convert`, `calor_assess`, `calor_batch_convert` |
-| **Navigate** | `calor_goto_definition`, `calor_find_references`, `calor_symbol_info`, `calor_document_outline`, `calor_find_symbol` |
-| **Syntax** | `calor_syntax_lookup`, `calor_explain_error`, `calor_feature_support` |
-| **Edit Support** | `calor_edit_preview`, `calor_impact_analysis`, `calor_lint`, `calor_format` |
-| **Refinement** | `calor_obligations`, `calor_suggest_fixes`, `calor_discover_guards`, `calor_bounds_check` |
-| **Migration** | `calor_batch_analyze`, `calor_roundtrip_check`, `calor_get_example`, `calor_csharp_minimize` |
+| **Compile & Verify** | `calor_compile` (+ checkCompat), `calor_verify`, `calor_analyze` (action: security/assess/minimize) |
+| **Convert** | `calor_convert` (mode: convert/validate/roundtrip/assess), `calor_batch` (action: convert/analyze) |
+| **Navigate** | `calor_navigate` (action: definition/references/find/info/scope) |
+| **Code Quality** | `calor_check` (action: diagnose/lint/typecheck/validate), `calor_format` (action: format/ids) |
+| **Structure** | `calor_structure` (action: outline/callgraph/impact) |
+| **Syntax & Help** | `calor_help` (action: syntax/features/error/example) |
+| **Edit Support** | `calor_edit_preview` |
+| **Refinement** | `calor_refine` (action: obligations/bounds/diagnose/guards/fixes/types) |
+| **Health** | `calor_self_test` |
 
 ### C# Feature Support for Conversion
 
@@ -33,7 +35,7 @@ Most C# features convert cleanly to Calor. Key supported features include:
 
 **Not yet supported**: list/slice patterns (`[a, ..rest]`), `ref struct`, `static abstract` interface members, `in` parameters, mixed collection spread (`[1, ..other]`).
 
-Use `calor_feature_support` to check specific features, or `calor_batch_analyze` to assess an entire project.
+Use `calor_help` with action=features to check specific features, or `calor_batch` with action=analyze to assess an entire project.
 
 ### Quick Syntax Reference
 

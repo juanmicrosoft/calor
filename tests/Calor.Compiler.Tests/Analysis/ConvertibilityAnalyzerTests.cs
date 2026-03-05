@@ -533,18 +533,19 @@ public class ConvertibilityAnalyzerTests
     [Fact]
     public async Task McpTool_ReturnsValidResult()
     {
-        var tool = new AnalyzeConvertibilityTool();
+        var tool = new ConvertTool();
 
-        Assert.Equal("calor_analyze_convertibility", tool.Name);
+        Assert.Equal("calor_convert", tool.Name);
         Assert.NotEmpty(tool.Description);
 
         // Verify input schema is valid JSON
         var schema = tool.GetInputSchema();
         Assert.Equal(JsonValueKind.Object, schema.ValueKind);
 
-        // Execute with simple source
+        // Execute with simple source in assess mode
         var args = JsonDocument.Parse("""
             {
+                "mode": "assess",
                 "source": "namespace Test; public class Foo { public int Bar() => 42; }"
             }
             """).RootElement;
@@ -570,10 +571,11 @@ public class ConvertibilityAnalyzerTests
     [Fact]
     public async Task McpTool_QuickMode_SkipsConversion()
     {
-        var tool = new AnalyzeConvertibilityTool();
+        var tool = new ConvertTool();
 
         var args = JsonDocument.Parse("""
             {
+                "mode": "assess",
                 "source": "namespace Test; public class Foo { }",
                 "options": { "quick": true }
             }
@@ -592,9 +594,9 @@ public class ConvertibilityAnalyzerTests
     [Fact]
     public async Task McpTool_MissingSource_ReturnsError()
     {
-        var tool = new AnalyzeConvertibilityTool();
+        var tool = new ConvertTool();
 
-        var args = JsonDocument.Parse("""{ }""").RootElement;
+        var args = JsonDocument.Parse("""{ "mode": "assess" }""").RootElement;
 
         var mcpResult = await tool.ExecuteAsync(args);
 
@@ -604,7 +606,7 @@ public class ConvertibilityAnalyzerTests
     [Fact]
     public async Task McpTool_NullArgs_ReturnsError()
     {
-        var tool = new AnalyzeConvertibilityTool();
+        var tool = new ConvertTool();
 
         var mcpResult = await tool.ExecuteAsync(null);
 

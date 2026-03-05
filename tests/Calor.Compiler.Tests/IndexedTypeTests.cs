@@ -487,13 +487,13 @@ public sealed class IndexedTypeTests
             §/M{m001}
             """;
 
-        var tool = new Calor.Compiler.Mcp.Tools.BoundsCheckTool();
+        var tool = new Calor.Compiler.Mcp.Tools.RefineTool();
 
         var argsJson = System.Text.Json.JsonDocument.Parse(
-            System.Text.Json.JsonSerializer.Serialize(new { source }));
+            System.Text.Json.JsonSerializer.Serialize(new { action = "bounds", source }));
 
         var result = await tool.ExecuteAsync(argsJson.RootElement);
-        Assert.False(result.IsError, "BoundsCheckTool returned error");
+        Assert.False(result.IsError, "RefineTool bounds action returned error");
     }
 
     // ───── Mixed: Indexed + Refinement Types ─────
@@ -736,9 +736,9 @@ public sealed class IndexedTypeTests
             §/M{m001}
             """;
 
-        var tool = new Calor.Compiler.Mcp.Tools.BoundsCheckTool();
+        var tool = new Calor.Compiler.Mcp.Tools.RefineTool();
         var argsJson = System.Text.Json.JsonDocument.Parse(
-            System.Text.Json.JsonSerializer.Serialize(new { source }));
+            System.Text.Json.JsonSerializer.Serialize(new { action = "bounds", source }));
 
         var result = await tool.ExecuteAsync(argsJson.RootElement);
         Assert.False(result.IsError);
@@ -760,9 +760,9 @@ public sealed class IndexedTypeTests
             §/M{m001}
             """;
 
-        var tool = new Calor.Compiler.Mcp.Tools.BoundsCheckTool();
+        var tool = new Calor.Compiler.Mcp.Tools.RefineTool();
         var argsJson = System.Text.Json.JsonDocument.Parse(
-            System.Text.Json.JsonSerializer.Serialize(new { source, function_id = "f001" }));
+            System.Text.Json.JsonSerializer.Serialize(new { action = "bounds", source, function_id = "f001" }));
 
         var result = await tool.ExecuteAsync(argsJson.RootElement);
         Assert.False(result.IsError);
@@ -775,8 +775,8 @@ public sealed class IndexedTypeTests
     [Fact]
     public async Task BoundsCheckTool_MissingSource_ReturnsError()
     {
-        var tool = new Calor.Compiler.Mcp.Tools.BoundsCheckTool();
-        var argsJson = System.Text.Json.JsonDocument.Parse("{}");
+        var tool = new Calor.Compiler.Mcp.Tools.RefineTool();
+        var argsJson = System.Text.Json.JsonDocument.Parse("""{"action":"bounds"}""");
 
         var result = await tool.ExecuteAsync(argsJson.RootElement);
         Assert.True(result.IsError);

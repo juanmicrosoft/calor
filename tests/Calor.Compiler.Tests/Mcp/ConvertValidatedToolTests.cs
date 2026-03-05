@@ -6,20 +6,12 @@ namespace Calor.Compiler.Tests.Mcp;
 
 public class ConvertValidatedToolTests
 {
-    private readonly ConvertValidatedTool _tool = new();
+    private readonly ConvertTool _tool = new();
 
     [Fact]
-    public void Name_ReturnsCalorConvertValidated()
+    public void Name_ReturnsCalorConvert()
     {
-        Assert.Equal("calor_convert_validated", _tool.Name);
-    }
-
-    [Fact]
-    public void Description_ContainsPipelineInfo()
-    {
-        Assert.Contains("pipeline", _tool.Description);
-        Assert.Contains("convert", _tool.Description, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("calor_syntax_lookup", _tool.Description);
+        Assert.Equal("calor_convert", _tool.Name);
     }
 
     [Fact]
@@ -38,7 +30,7 @@ public class ConvertValidatedToolTests
     [Fact]
     public async Task ExecuteAsync_WithMissingSource_ReturnsError()
     {
-        var args = JsonDocument.Parse("""{}""").RootElement;
+        var args = JsonDocument.Parse("""{"mode": "validate"}""").RootElement;
         var result = await _tool.ExecuteAsync(args);
         Assert.True(result.IsError);
     }
@@ -48,6 +40,7 @@ public class ConvertValidatedToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "mode": "validate",
                 "source": "public class Calculator { public int Add(int a, int b) => a + b; }"
             }
             """).RootElement;
@@ -71,6 +64,7 @@ public class ConvertValidatedToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "mode": "validate",
                 "source": "public class { invalid"
             }
             """).RootElement;
@@ -91,6 +85,7 @@ public class ConvertValidatedToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "mode": "validate",
                 "source": "public class Calculator { public int Add(int a, int b) => a + b; }",
                 "expectedPatterns": ["class Calculator"]
             }
@@ -111,6 +106,7 @@ public class ConvertValidatedToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "mode": "validate",
                 "source": "public class Calculator { public int Add(int a, int b) => a + b; }",
                 "forbiddenPatterns": ["class Calculator"]
             }
@@ -132,6 +128,7 @@ public class ConvertValidatedToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "mode": "validate",
                 "source": "public class Foo { public int Bar() => 42; }"
             }
             """).RootElement;
@@ -152,8 +149,9 @@ public class ConvertValidatedToolTests
     {
         var args = JsonDocument.Parse("""
             {
+                "mode": "validate",
                 "source": "public class Foo { public int Bar() => 42; }",
-                "mode": "interop"
+                "conversionMode": "interop"
             }
             """).RootElement;
 

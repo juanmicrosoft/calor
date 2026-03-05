@@ -11,7 +11,7 @@ namespace Calor.Compiler.Tests.Mcp;
 /// </summary>
 public class DiagnoseToolCommonMistakeTests
 {
-    private readonly DiagnoseTool _tool = new();
+    private readonly CheckTool _tool = new();
 
     [Fact]
     public async Task ExecuteAsync_WithUndefinedFunction_IncludesCommonMistake()
@@ -20,6 +20,7 @@ public class DiagnoseToolCommonMistakeTests
         // Unlike redeclaration, the compiler won't have a specific fix for this.
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Fn:pub} §I{i32:x} §O{i32} §R (abs x) §/F{f001} §/M{m001}"
             }
             """).RootElement;
@@ -71,6 +72,7 @@ public class DiagnoseToolCommonMistakeTests
     {
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Add:pub} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F{f001} §/M{m001}"
             }
             """).RootElement;
@@ -95,6 +97,7 @@ public class DiagnoseToolCommonMistakeTests
         // Use a typo operator that has a compiler fix suggestion
         var args = JsonDocument.Parse("""
             {
+                "action": "diagnose",
                 "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
             }
             """).RootElement;

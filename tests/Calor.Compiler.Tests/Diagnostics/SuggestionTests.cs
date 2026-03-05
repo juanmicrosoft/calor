@@ -752,8 +752,8 @@ public class SuggestionTests
         var source = "§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello\") §/F{f001} §/M{m001}";
 
         // Step 1: Call diagnose tool (simulated)
-        var tool = new Calor.Compiler.Mcp.Tools.DiagnoseTool();
-        var args = System.Text.Json.JsonDocument.Parse($"{{\"source\": {System.Text.Json.JsonSerializer.Serialize(source)}}}").RootElement;
+        var tool = new Calor.Compiler.Mcp.Tools.CheckTool();
+        var args = System.Text.Json.JsonDocument.Parse($"{{\"action\": \"diagnose\", \"source\": {System.Text.Json.JsonSerializer.Serialize(source)}}}").RootElement;
         var toolResult = await tool.ExecuteAsync(args);
 
         Assert.NotNull(toolResult.Content);
@@ -773,7 +773,7 @@ public class SuggestionTests
         var fixedSource = source.Replace("uper", newText!);
 
         // Step 4: Verify via diagnose tool
-        var fixedArgs = System.Text.Json.JsonDocument.Parse($"{{\"source\": {System.Text.Json.JsonSerializer.Serialize(fixedSource)}}}").RootElement;
+        var fixedArgs = System.Text.Json.JsonDocument.Parse($"{{\"action\": \"diagnose\", \"source\": {System.Text.Json.JsonSerializer.Serialize(fixedSource)}}}").RootElement;
         var fixedResult = await tool.ExecuteAsync(fixedArgs);
         var fixedJson = fixedResult.Content[0].Text!;
         var fixedDoc = System.Text.Json.JsonDocument.Parse(fixedJson);

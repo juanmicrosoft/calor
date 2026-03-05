@@ -7,13 +7,13 @@ namespace Calor.Compiler.Tests.Mcp.Tools;
 
 public class SyntaxLookupToolTests
 {
-    private readonly SyntaxLookupTool _tool = new();
+    private readonly HelpTool _tool = new();
 
     [Fact]
     public void EmbeddedResource_ExistsInAssembly()
     {
         // Verify the embedded resource can be loaded from the assembly
-        var assembly = typeof(SyntaxLookupTool).Assembly;
+        var assembly = typeof(HelpTool).Assembly;
         var resourceName = "Calor.Compiler.Resources.calor-syntax-documentation.json";
 
         using var stream = assembly.GetManifestResourceStream(resourceName);
@@ -25,7 +25,7 @@ public class SyntaxLookupToolTests
     [Fact]
     public void EmbeddedResource_ContainsValidJson()
     {
-        var assembly = typeof(SyntaxLookupTool).Assembly;
+        var assembly = typeof(HelpTool).Assembly;
         var resourceName = "Calor.Compiler.Resources.calor-syntax-documentation.json";
 
         using var stream = assembly.GetManifestResourceStream(resourceName);
@@ -45,13 +45,13 @@ public class SyntaxLookupToolTests
     [Fact]
     public void Name_ReturnsCorrectName()
     {
-        Assert.Equal("calor_syntax_lookup", _tool.Name);
+        Assert.Equal("calor_help", _tool.Name);
     }
 
     [Fact]
     public void Description_ContainsKeyInfo()
     {
-        Assert.Contains("C#", _tool.Description);
+        Assert.Contains("help", _tool.Description.ToLower());
         Assert.Contains("syntax", _tool.Description.ToLower());
     }
 

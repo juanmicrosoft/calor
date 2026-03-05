@@ -36,8 +36,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task GotoDefinition_FindsFunction()
     {
-        var tool = new GotoDefinitionTool();
-        var args = CreateArgs(SampleSource, line: 13, column: 15); // "greet" on function definition
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 13, column: 15, action: "definition"); // "greet" on function definition
 
         var result = await tool.ExecuteAsync(args);
 
@@ -51,8 +51,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task GotoDefinition_FindsParameter()
     {
-        var tool = new GotoDefinitionTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17); // "total" parameter
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "definition"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -66,8 +66,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task GotoDefinition_FindsClass()
     {
-        var tool = new GotoDefinitionTool();
-        var args = CreateArgs(SampleSource, line: 8, column: 15); // "Item" class
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 8, column: 15, action: "definition"); // "Item" class
 
         var result = await tool.ExecuteAsync(args);
 
@@ -81,8 +81,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task GotoDefinition_ReturnsNotFound_WhenNoSymbol()
     {
-        var tool = new GotoDefinitionTool();
-        var args = CreateArgs(SampleSource, line: 1, column: 1); // Start of file, on §
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 1, column: 1, action: "definition"); // Start of file, on §
 
         var result = await tool.ExecuteAsync(args);
 
@@ -94,8 +94,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task GotoDefinition_RequiresSourceOrFilePath()
     {
-        var tool = new GotoDefinitionTool();
-        var args = JsonDocument.Parse(@"{""line"": 1, ""column"": 1}").RootElement;
+        var tool = new NavigateTool();
+        var args = JsonDocument.Parse(@"{""action"": ""definition"", ""line"": 1, ""column"": 1}").RootElement;
 
         var result = await tool.ExecuteAsync(args);
 
@@ -109,8 +109,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task SymbolInfo_ReturnsFunctionInfo()
     {
-        var tool = new SymbolInfoTool();
-        var args = CreateArgs(SampleSource, line: 2, column: 15); // "calculateTotal"
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 2, column: 15, action: "info"); // "calculateTotal"
 
         var result = await tool.ExecuteAsync(args);
 
@@ -127,8 +127,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task SymbolInfo_ReturnsClassInfo()
     {
-        var tool = new SymbolInfoTool();
-        var args = CreateArgs(SampleSource, line: 8, column: 15); // "Item" class
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 8, column: 15, action: "info"); // "Item" class
 
         var result = await tool.ExecuteAsync(args);
 
@@ -143,8 +143,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task SymbolInfo_ReturnsFieldInfo()
     {
-        var tool = new SymbolInfoTool();
-        var args = CreateArgs(SampleSource, line: 9, column: 17); // "Price" field
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 9, column: 17, action: "info"); // "Price" field
 
         var result = await tool.ExecuteAsync(args);
 
@@ -165,8 +165,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task DocumentOutline_ReturnsStructure()
     {
-        var tool = new DocumentOutlineTool();
-        var args = CreateSourceArgs(SampleSource);
+        var tool = new StructureTool();
+        var args = CreateOutlineArgs(SampleSource);
 
         var result = await tool.ExecuteAsync(args);
 
@@ -186,8 +186,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task DocumentOutline_IncludesClassChildren()
     {
-        var tool = new DocumentOutlineTool();
-        var args = CreateSourceArgs(SampleSource);
+        var tool = new StructureTool();
+        var args = CreateOutlineArgs(SampleSource);
 
         var result = await tool.ExecuteAsync(args);
 
@@ -214,8 +214,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task DocumentOutline_WithoutDetails()
     {
-        var tool = new DocumentOutlineTool();
-        var args = CreateArgsWithOptions(SampleSource, ("includeDetails", "false"));
+        var tool = new StructureTool();
+        var args = CreateArgsWithOptions(SampleSource, ("action", "outline"), ("includeDetails", "false"));
 
         var result = await tool.ExecuteAsync(args);
 
@@ -242,7 +242,7 @@ public class LspMcpToolsTests
     [Fact]
     public async Task FindSymbol_FindsByName()
     {
-        var tool = new FindSymbolTool();
+        var tool = new NavigateTool();
         var args = CreateFindSymbolArgs(SampleSource, "calculate");
 
         var result = await tool.ExecuteAsync(args);
@@ -268,7 +268,7 @@ public class LspMcpToolsTests
     [Fact]
     public async Task FindSymbol_FiltersByKind()
     {
-        var tool = new FindSymbolTool();
+        var tool = new NavigateTool();
         var args = CreateFindSymbolArgsWithKind(SampleSource, "Item", "class");
 
         var result = await tool.ExecuteAsync(args);
@@ -287,7 +287,7 @@ public class LspMcpToolsTests
     [Fact]
     public async Task FindSymbol_RespectsLimit()
     {
-        var tool = new FindSymbolTool();
+        var tool = new NavigateTool();
         var args = CreateFindSymbolArgsWithLimit(SampleSource, "e", 2);
 
         var result = await tool.ExecuteAsync(args);
@@ -305,8 +305,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task FindReferences_FindsAllUsages()
     {
-        var tool = new FindReferencesTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17); // "total" parameter
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "references"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -323,8 +323,8 @@ public class LspMcpToolsTests
     [Fact]
     public async Task FindReferences_MarksDefinition()
     {
-        var tool = new FindReferencesTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17); // "total" parameter
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "references"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -348,7 +348,7 @@ public class LspMcpToolsTests
     [Fact]
     public async Task FindReferences_ExcludesDefinition_WhenRequested()
     {
-        var tool = new FindReferencesTool();
+        var tool = new NavigateTool();
         var args = CreateFindReferencesArgs(SampleSource, 3, 17, includeDefinition: false);
 
         var result = await tool.ExecuteAsync(args);
@@ -368,13 +368,26 @@ public class LspMcpToolsTests
 
     #region Helper Methods
 
-    private static JsonElement CreateArgs(string source, int line, int column)
+    private static JsonElement CreateArgs(string source, int line, int column, string? action = null)
     {
         var obj = new Dictionary<string, object>
         {
             ["source"] = source,
             ["line"] = line,
             ["column"] = column
+        };
+        if (action != null)
+            obj["action"] = action;
+        var json = JsonSerializer.Serialize(obj);
+        return JsonDocument.Parse(json).RootElement;
+    }
+
+    private static JsonElement CreateOutlineArgs(string source)
+    {
+        var obj = new Dictionary<string, object>
+        {
+            ["action"] = "outline",
+            ["source"] = source
         };
         var json = JsonSerializer.Serialize(obj);
         return JsonDocument.Parse(json).RootElement;
@@ -413,6 +426,7 @@ public class LspMcpToolsTests
     {
         var obj = new Dictionary<string, object>
         {
+            ["action"] = "find",
             ["source"] = source,
             ["query"] = query
         };
@@ -424,6 +438,7 @@ public class LspMcpToolsTests
     {
         var obj = new Dictionary<string, object>
         {
+            ["action"] = "find",
             ["source"] = source,
             ["query"] = query,
             ["kind"] = kind
@@ -436,6 +451,7 @@ public class LspMcpToolsTests
     {
         var obj = new Dictionary<string, object>
         {
+            ["action"] = "find",
             ["source"] = source,
             ["query"] = query,
             ["limit"] = limit
@@ -448,6 +464,7 @@ public class LspMcpToolsTests
     {
         var obj = new Dictionary<string, object>
         {
+            ["action"] = "references",
             ["source"] = source,
             ["line"] = line,
             ["column"] = column,

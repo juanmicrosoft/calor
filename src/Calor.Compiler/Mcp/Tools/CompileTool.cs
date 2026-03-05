@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
@@ -68,6 +69,25 @@ public sealed class CompileTool : McpToolBase
                             "description": "Effect enforcement mode: strict (errors for unknown calls), default (warnings), permissive (suppress all effect errors, for converted code)"
                         }
                     }
+                },
+                "checkCompat": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "After compilation, verify generated C# is API-compatible (namespace preservation, pattern checks)"
+                },
+                "expectedNamespace": {
+                    "type": "string",
+                    "description": "Expected namespace in generated code when checkCompat is true (e.g., 'Calor.Runtime')"
+                },
+                "expectedPatterns": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Patterns that must appear in generated code when checkCompat is true"
+                },
+                "forbiddenPatterns": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Patterns that must NOT appear in generated code when checkCompat is true"
                 }
             },
 
@@ -191,12 +211,66 @@ public sealed class CompileTool : McpToolBase
                 };
             }
 
+            // Run compat check if requested and compilation succeeded
+            if (!result.HasErrors && GetBool(arguments, "checkCompat"))
+            {
+                var compatResult = RunCompatCheck(
+                    result.GeneratedCode ?? "",
+                    GetString(arguments, "expectedNamespace"),
+                    GetStringArray(arguments, "expectedPatterns"),
+                    GetStringArray(arguments, "forbiddenPatterns"));
+
+                output.CompatCheck = compatResult;
+                if (!compatResult.Compatible)
+                    return McpToolResult.Json(output, isError: true);
+            }
+
             return McpToolResult.Json(output, isError: result.HasErrors);
         }
         catch (Exception ex)
         {
             return McpToolResult.Error($"Compilation failed: {ex.Message}");
         }
+    }
+
+    private static CompatCheckOutput RunCompatCheck(
+        string generatedCode,
+        string? expectedNamespace,
+        List<string> expectedPatterns,
+        List<string> forbiddenPatterns)
+    {
+        var issues = new List<string>();
+
+        if (!string.IsNullOrEmpty(expectedNamespace))
+        {
+            var namespacePattern = $@"namespace\s+{Regex.Escape(expectedNamespace)}\b";
+            if (!Regex.IsMatch(generatedCode, namespacePattern))
+            {
+                issues.Add($"Expected namespace '{expectedNamespace}' not found in generated code");
+            }
+        }
+
+        foreach (var pattern in expectedPatterns)
+        {
+            if (!generatedCode.Contains(pattern))
+            {
+                issues.Add($"Expected pattern '{pattern}' not found in generated code");
+            }
+        }
+
+        foreach (var pattern in forbiddenPatterns)
+        {
+            if (generatedCode.Contains(pattern))
+            {
+                issues.Add($"Forbidden pattern '{pattern}' found in generated code");
+            }
+        }
+
+        return new CompatCheckOutput
+        {
+            Compatible = issues.Count == 0,
+            Issues = issues
+        };
     }
 
     private static McpToolResult CompileBatch(List<string> filePaths, JsonElement? arguments, CancellationToken cancellationToken)
@@ -308,6 +382,10 @@ public sealed class CompileTool : McpToolBase
         [JsonPropertyName("analysisSummary")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public AnalysisSummaryOutput? AnalysisSummary { get; set; }
+
+        [JsonPropertyName("compatCheck")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public CompatCheckOutput? CompatCheck { get; set; }
     }
 
     private sealed class DiagnosticOutput
@@ -397,5 +475,14 @@ public sealed class CompileTool : McpToolBase
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? Errors { get; init; }
+    }
+
+    private sealed class CompatCheckOutput
+    {
+        [JsonPropertyName("compatible")]
+        public bool Compatible { get; init; }
+
+        [JsonPropertyName("issues")]
+        public required List<string> Issues { get; init; }
     }
 }

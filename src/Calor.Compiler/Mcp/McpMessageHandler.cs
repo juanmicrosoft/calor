@@ -33,46 +33,25 @@ public sealed class McpMessageHandler
         RegisterTool(new CompileTool());
         RegisterTool(new VerifyTool());
         RegisterTool(new AnalyzeTool());
-        RegisterTool(new DiagnoseTool());
+        RegisterTool(new CheckTool());
 
         // ── C# ↔ Calor conversion ──────────────────────────
         RegisterTool(new ConvertTool());
-        RegisterTool(new AnalyzeConvertibilityTool());
-        RegisterTool(new AssessTool());
-        RegisterTool(new BatchConvertTool());
-        RegisterTool(new CSharpMinimizeTool());
-        RegisterTool(new BatchAnalyzeTool());
-        RegisterTool(new RoundTripCheckTool());
-        RegisterTool(new GetExampleTool());
+        RegisterTool(new BatchTool());
 
         // ── Syntax & documentation ──────────────────────────
-        RegisterTool(new SyntaxLookupTool());
-        RegisterTool(new ExplainErrorTool());
-        RegisterTool(new FeatureSupportTool());
+        RegisterTool(new HelpTool());
 
         // ── Code navigation ─────────────────────────────────
-        RegisterTool(new GotoDefinitionTool());
-        RegisterTool(new FindReferencesTool());
-        RegisterTool(new SymbolInfoTool());
-        RegisterTool(new DocumentOutlineTool());
-        RegisterTool(new FindSymbolTool());
-        RegisterTool(new ScopeInfoTool());
+        RegisterTool(new NavigateTool());
+        RegisterTool(new StructureTool());
 
-        // ── Edit support & analysis ─────────────────────────
+        // ── Edit support & formatting ───────────────────────
         RegisterTool(new EditPreviewTool());
-        RegisterTool(new ImpactAnalysisTool());
-        RegisterTool(new CallGraphTool());
-        RegisterTool(new LintTool());
         RegisterTool(new FormatTool());
-        RegisterTool(new IdsTool());
 
         // ── Refinement types & obligations ──────────────────
-        RegisterTool(new ObligationsTool());
-        RegisterTool(new SuggestFixesTool());
-        RegisterTool(new GuardDiscoveryTool());
-        RegisterTool(new TypeSuggestionTool());
-        RegisterTool(new DiagnoseRefinementTool());
-        RegisterTool(new BoundsCheckTool());
+        RegisterTool(new RefineTool());
 
         // ── Testing ─────────────────────────────────────────
         RegisterTool(new SelfTestTool());
