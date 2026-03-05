@@ -1147,7 +1147,8 @@ public class CSharpToCalorConversionTests
             {
                 void M()
                 {
-                    var x = checked(1 + 2);
+                    int y = 0;
+                    var x = __makeref(y);
                 }
             }
             """;
@@ -1168,7 +1169,8 @@ public class CSharpToCalorConversionTests
             {
                 void M()
                 {
-                    var x = checked(1 + 2);
+                    int y = 0;
+                    var x = __makeref(y);
                 }
             }
             """;
@@ -1191,8 +1193,9 @@ public class CSharpToCalorConversionTests
             {
                 void M()
                 {
-                    var x = checked(1 + 2);
-                    var y = checked(3 + 4);
+                    int y = 0;
+                    var x = __makeref(y);
+                    var z = __makeref(y);
                 }
             }
             """;
@@ -4128,6 +4131,46 @@ public class CSharpToCalorConversionTests
         parser.Parse();
         Assert.False(diagnostics.HasErrors,
             $"Parse errors in converted Calor:\n{string.Join("\n", diagnostics.Select(d => d.Message))}\nCalor source:\n{result.CalorSource}");
+    }
+
+    #endregion
+
+    #region Namespace as Module Name Tests
+
+    [Fact]
+    public void Convert_FileScopedNamespace_UsesNamespaceAsModuleName()
+    {
+        var csharpSource = "namespace Humanizer.Configuration;\npublic class Configurator { }";
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Equal("Humanizer.Configuration", result.Ast.Name);
+    }
+
+    [Fact]
+    public void Convert_BlockScopedNamespace_UsesNamespaceAsModuleName()
+    {
+        var csharpSource = "namespace Humanizer.Localisation\n{\n    public class Resources { }\n}";
+
+        var result = _converter.Convert(csharpSource);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Equal("Humanizer.Localisation", result.Ast.Name);
+    }
+
+    [Fact]
+    public void Convert_NoNamespace_FallsBackToFilename()
+    {
+        var csharpSource = "public class Standalone { }";
+
+        var result = _converter.Convert(csharpSource, "MyFile.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.Ast);
+        Assert.Equal("MyFile", result.Ast.Name);
     }
 
     #endregion

@@ -214,6 +214,15 @@ public sealed class ConversionContext
     /// </summary>
     public ConversionMode Mode { get; set; } = ConversionMode.Standard;
 
+    /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
+    public bool PassthroughOnError { get; set; }
+
+    /// <summary>
+    /// Whether unsupported constructs should be preserved as C# passthrough blocks.
+    /// True when Mode is Interop or PassthroughOnError is enabled.
+    /// </summary>
+    public bool ShouldPreserveCSharp => Mode == ConversionMode.Interop || PassthroughOnError;
+
     /// <summary>
     /// Current namespace being processed.
     /// </summary>

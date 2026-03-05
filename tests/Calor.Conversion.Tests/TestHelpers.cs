@@ -23,7 +23,8 @@ public static class TestHelpers
         {
             ModuleName = moduleName,
             GracefulFallback = true,
-            AutoGenerateIds = true
+            AutoGenerateIds = true,
+            StripPreprocessor = false
         };
         var converter = new CSharpToCalorConverter(options);
         return converter.Convert(csharpSource);

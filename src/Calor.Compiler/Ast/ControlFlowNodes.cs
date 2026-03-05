@@ -275,12 +275,14 @@ public sealed class BreakStatementNode : StatementNode
 }
 
 /// <summary>
-/// Represents a goto statement to jump to a label.
+/// Represents a goto statement to jump to a label, case, or default.
 /// §GOTO{labelName}
 /// </summary>
 public sealed class GotoStatementNode : StatementNode
 {
     public string Label { get; }
+    public ExpressionNode? CaseLabel { get; init; }
+    public bool IsDefault { get; init; }
     public GotoStatementNode(TextSpan span, string label) : base(span) { Label = label; }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

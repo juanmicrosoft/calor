@@ -26,6 +26,12 @@ public sealed class CallStatementNode : StatementNode
     /// </summary>
     public IReadOnlyList<string?>? ArgumentNames { get; }
 
+    /// <summary>
+    /// Optional argument modifiers (ref/out/in), parallel to Arguments list.
+    /// Null entry means no modifier; non-null means "ref", "out", or "in".
+    /// </summary>
+    public IReadOnlyList<string?>? ArgumentModifiers { get; }
+
     public CallStatementNode(
         TextSpan span,
         string target,
@@ -50,6 +56,20 @@ public sealed class CallStatementNode : StatementNode
         : this(span, target, fallible, arguments, attributes)
     {
         ArgumentNames = argumentNames;
+    }
+
+    public CallStatementNode(
+        TextSpan span,
+        string target,
+        bool fallible,
+        IReadOnlyList<ExpressionNode> arguments,
+        AttributeCollection attributes,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers)
+        : this(span, target, fallible, arguments, attributes)
+    {
+        ArgumentNames = argumentNames;
+        ArgumentModifiers = argumentModifiers;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

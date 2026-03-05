@@ -1000,6 +1000,67 @@ public class SyntaxTests
         Assert.Equal(UnaryOperator.Not, unaryOp.Operator);
     }
 
+    [Fact]
+    public void Parser_ParsesThisInLispExpression()
+    {
+        var diagnostics = new DiagnosticBag();
+        var source = @"
+§M{m001:Test}
+§F{f001:Calc:i32:pub}
+  §BODY
+    §R (+ §THIS.Value INT:1)
+  §END_BODY
+§/F{f001}
+§/M{m001}";
+        var lexer = new Lexer(source, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        var returnStmt = module.Functions[0].Body[0] as ReturnStatementNode;
+        Assert.NotNull(returnStmt);
+        Assert.IsType<BinaryOperationNode>(returnStmt!.Expression);
+        var binOp = (BinaryOperationNode)returnStmt.Expression!;
+        Assert.Equal(BinaryOperator.Add, binOp.Operator);
+        // Left should be §THIS.Value → FieldAccessNode with ThisExpressionNode target
+        Assert.IsType<FieldAccessNode>(binOp.Left);
+        var memberAccess = (FieldAccessNode)binOp.Left;
+        Assert.IsType<ThisExpressionNode>(memberAccess.Target);
+        Assert.Equal("Value", memberAccess.FieldName);
+    }
+
+    [Fact]
+    public void Parser_ParsesBaseInLispExpression()
+    {
+        var diagnostics = new DiagnosticBag();
+        var source = @"
+§M{m001:Test}
+§F{f001:Calc:i32:pub}
+  §BODY
+    §R (+ §BASE.Value INT:1)
+  §END_BODY
+§/F{f001}
+§/M{m001}";
+        var lexer = new Lexer(source, diagnostics);
+        var tokens = lexer.TokenizeAll();
+        var parser = new Parser(tokens, diagnostics);
+
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        var returnStmt = module.Functions[0].Body[0] as ReturnStatementNode;
+        Assert.NotNull(returnStmt);
+        Assert.IsType<BinaryOperationNode>(returnStmt!.Expression);
+        var binOp = (BinaryOperationNode)returnStmt.Expression!;
+        Assert.Equal(BinaryOperator.Add, binOp.Operator);
+        Assert.IsType<FieldAccessNode>(binOp.Left);
+        var memberAccess = (FieldAccessNode)binOp.Left;
+        Assert.IsType<BaseExpressionNode>(memberAccess.Target);
+        Assert.Equal("Value", memberAccess.FieldName);
+    }
+
     #endregion
 
     #region Print Alias

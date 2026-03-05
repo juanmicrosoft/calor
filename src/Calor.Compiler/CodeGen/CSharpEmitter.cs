@@ -577,6 +577,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         for (int i = 0; i < node.Arguments.Count; i++)
         {
             var argStr = node.Arguments[i].Accept(this);
+            if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count && node.ArgumentModifiers[i] != null)
+            {
+                argStr = $"{node.ArgumentModifiers[i]} {argStr}";
+            }
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
             {
                 argStr = $"{node.ArgumentNames[i]}: {argStr}";
@@ -1112,6 +1116,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(GotoStatementNode node)
     {
+        if (node.CaseLabel != null)
+            return $"goto case {node.CaseLabel.Accept(this)};";
+        if (node.IsDefault)
+            return "goto default;";
         return $"goto {node.Label};";
     }
 
@@ -2646,6 +2654,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         for (int i = 0; i < node.Arguments.Count; i++)
         {
             var argStr = node.Arguments[i].Accept(this);
+            if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count && node.ArgumentModifiers[i] != null)
+            {
+                argStr = $"{node.ArgumentModifiers[i]} {argStr}";
+            }
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
             {
                 argStr = $"{node.ArgumentNames[i]}: {argStr}";
@@ -2716,9 +2728,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Auto-property with default value
         if (node.IsAutoProperty)
         {
-            var accessors = node.Setter != null ? "get; set;" :
-                            node.Initer != null ? "get; init;" :
-                            "get;";
+            var getVis = FormatAccessorVisibility(node.Getter?.Visibility);
+            var accessors = "get;";
+            if (node.Setter != null)
+            {
+                var setVis = FormatAccessorVisibility(node.Setter.Visibility);
+                accessors = $"{getVis}get; {setVis}set;";
+            }
+            else if (node.Initer != null)
+            {
+                var initVis = FormatAccessorVisibility(node.Initer.Visibility);
+                accessors = $"{getVis}get; {initVis}init;";
+            }
             if (node.DefaultValue != null)
             {
                 var defaultVal = node.DefaultValue.Accept(this);
@@ -2787,9 +2808,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Auto-indexer
         if (node.IsAutoIndexer)
         {
-            var accessors = node.Setter != null ? "get; set;" :
-                            node.Initer != null ? "get; init;" :
-                            "get;";
+            var getVis = FormatAccessorVisibility(node.Getter?.Visibility);
+            var accessors = "get;";
+            if (node.Setter != null)
+            {
+                var setVis = FormatAccessorVisibility(node.Setter.Visibility);
+                accessors = $"{getVis}get; {setVis}set;";
+            }
+            else if (node.Initer != null)
+            {
+                var initVis = FormatAccessorVisibility(node.Initer.Visibility);
+                accessors = $"{getVis}get; {initVis}init;";
+            }
             AppendLine($"{modifierStr} {typeName} this[{paramList}] {{ {accessors} }}");
             return "";
         }
@@ -2819,6 +2849,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         return "";
     }
+
+    private static string FormatAccessorVisibility(Visibility? visibility) => visibility switch
+    {
+        Visibility.Private => "private ",
+        Visibility.ProtectedInternal => "protected internal ",
+        Visibility.Internal => "internal ",
+        Visibility.Protected => "protected ",
+        _ => ""
+    };
 
     public string Visit(PropertyAccessorNode node)
     {
@@ -3827,6 +3866,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private static string SanitizeIdentifier(string name)
     {
+        // Handle qualified names (e.g., TimeUnit.Day) by sanitizing each part
+        if (name.Contains('.'))
+        {
+            var parts = name.Split('.');
+            return string.Join(".", parts.Select(SanitizeSingleIdentifier));
+        }
+        return SanitizeSingleIdentifier(name);
+    }
+
+    private static string SanitizeSingleIdentifier(string name)
+    {
         // Replace any characters that aren't valid in C# identifiers
         var sb = new StringBuilder();
         for (int i = 0; i < name.Length; i++)
@@ -3835,10 +3885,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (char.IsLetterOrDigit(c) || c == '_')
             {
                 sb.Append(c);
-            }
-            else if (c == '.')
-            {
-                sb.Append('.');
             }
         }
 

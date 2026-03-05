@@ -14,7 +14,7 @@ public class PreprocessorConversionTests
 {
     private static string ConvertToCalor(string csharpSource)
     {
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { StripPreprocessor = false });
         var result = converter.Convert(csharpSource);
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);

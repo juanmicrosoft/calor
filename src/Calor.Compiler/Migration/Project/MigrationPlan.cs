@@ -118,4 +118,10 @@ public sealed class MigrationPlanOptions
 
     /// <summary>Override the module name for all converted files. When null, module names are derived from C# namespace declarations.</summary>
     public string? ModuleNameOverride { get; set; }
+
+    /// <summary>Per-file timeout in seconds (default: 60).</summary>
+    public int PerFileTimeoutSeconds { get; set; } = 60;
+
+    /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
+    public bool PassthroughOnError { get; set; }
 }

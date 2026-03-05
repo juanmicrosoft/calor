@@ -199,16 +199,31 @@ public sealed class ProjectMigrator
     {
         var startTime = DateTime.UtcNow;
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_options.PerFileTimeoutSeconds));
         try
         {
             if (direction == MigrationDirection.CSharpToCalor)
             {
-                return await ProcessCSharpToCalorAsync(entry, dryRun, startTime);
+                return await ProcessCSharpToCalorAsync(entry, dryRun, startTime).WaitAsync(cts.Token);
             }
             else
             {
-                return await ProcessCalorToCSharpAsync(entry, dryRun, startTime);
+                return await ProcessCalorToCSharpAsync(entry, dryRun, startTime).WaitAsync(cts.Token);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            return new FileMigrationResult
+            {
+                SourcePath = entry.SourcePath,
+                OutputPath = null,
+                Status = FileMigrationStatus.TimedOut,
+                Duration = DateTime.UtcNow - startTime,
+                Issues = new List<ConversionIssue>
+                {
+                    new() { Severity = ConversionIssueSeverity.Error, Message = $"Timed out after {_options.PerFileTimeoutSeconds}s" }
+                }
+            };
         }
         catch (Exception ex)
         {
@@ -230,7 +245,8 @@ public sealed class ProjectMigrator
     {
         var conversionOptions = new ConversionOptions
         {
-            IncludeBenchmark = _options.IncludeBenchmark
+            IncludeBenchmark = _options.IncludeBenchmark,
+            PassthroughOnError = _options.PassthroughOnError
         };
 
         if (!string.IsNullOrEmpty(_options.ModuleNameOverride))

@@ -68,18 +68,14 @@ public class UnsupportedFeatureTelemetryTests
     [Fact]
     public void Converter_UnsupportedCode_RecordsFeature()
     {
+        // Use a pattern that hits the default/unsupported handler
         var csharp = """
             public class Test
             {
-                public void Method(int x)
+                public void Method()
                 {
-                    switch (x)
-                    {
-                        case 1:
-                            goto case 2;
-                        case 2:
-                            break;
-                    }
+                    int x = 42;
+                    var r = __makeref(x);
                 }
             }
             """;
@@ -93,7 +89,7 @@ public class UnsupportedFeatureTelemetryTests
         var explanation = result.Context.GetExplanation();
 
         Assert.True(explanation.TotalUnsupportedCount > 0,
-            "Expected at least one unsupported feature to be recorded for goto-case");
+            "Expected at least one unsupported feature to be recorded");
         Assert.True(explanation.GetFeatureCounts().Count > 0,
             "Expected GetFeatureCounts() to return at least one entry");
     }
@@ -103,24 +99,18 @@ public class UnsupportedFeatureTelemetryTests
     {
         var csharp = """
             using System;
-            public class GotoCaseExample
+            public class UnsupportedExample
             {
-                public void Run(int x)
+                public void Run()
                 {
-                    switch (x)
-                    {
-                        case 1: goto case 2;
-                        case 2: Console.WriteLine("done"); break;
-                    }
+                    int x = 1;
+                    var r = __makeref(x);
                 }
 
-                public void Another(int y)
+                public void Another()
                 {
-                    switch (y)
-                    {
-                        case 3: goto case 4;
-                        case 4: break;
-                    }
+                    int y = 2;
+                    var r2 = __makeref(y);
                 }
             }
             """;
@@ -421,21 +411,15 @@ public class UnsupportedFeatureTelemetryTests
         var csharp = """
             public class Test
             {
-                public void A(int x)
+                public void A()
                 {
-                    switch (x)
-                    {
-                        case 1: goto case 2;
-                        case 2: break;
-                    }
+                    int x = 1;
+                    var r = __makeref(x);
                 }
-                public void B(int y)
+                public void B()
                 {
-                    switch (y)
-                    {
-                        case 3: goto case 4;
-                        case 4: break;
-                    }
+                    int y = 2;
+                    var r2 = __makeref(y);
                 }
             }
             """;
