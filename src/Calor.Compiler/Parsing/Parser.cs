@@ -2228,6 +2228,14 @@ public sealed class Parser
     /// </summary>
     private string ParseLispTypeName()
     {
+        // Handle Calor nullable prefix syntax: ?Type → Type?
+        bool isNullablePrefix = false;
+        if (Check(TokenKind.Question))
+        {
+            isNullablePrefix = true;
+            Advance(); // consume '?'
+        }
+
         if (!Check(TokenKind.Identifier))
         {
             _diagnostics.ReportError(Current.Span, DiagnosticCode.ExpectedTypeName,
@@ -2337,6 +2345,12 @@ public sealed class Parser
                     Advance();
                 }
             }
+        }
+
+        // If we had a prefix '?', make the type nullable (append '?')
+        if (isNullablePrefix && !typeBuilder.ToString().EndsWith('?'))
+        {
+            typeBuilder.Append('?');
         }
 
         return typeBuilder.ToString();

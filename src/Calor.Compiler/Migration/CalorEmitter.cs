@@ -2780,11 +2780,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var operand = node.Operand.Accept(this);
         return node.Operation switch
         {
-            TypeOp.Cast => $"(cast {node.TargetType} {operand})",
+            TypeOp.Cast => $"(cast {NullablePrefixToPostfix(node.TargetType)} {operand})",
             TypeOp.Is => $"(is {operand} {node.TargetType})",
             TypeOp.As => $"(as {operand} {node.TargetType})",
             _ => throw new NotSupportedException($"Unknown type operation: {node.Operation}")
         };
+    }
+
+    /// <summary>
+    /// Converts Calor nullable prefix notation (?T) to postfix (T?) for cast expressions,
+    /// so the parser can handle it via the existing postfix nullable path.
+    /// </summary>
+    private static string NullablePrefixToPostfix(string typeName)
+    {
+        if (typeName.StartsWith('?'))
+        {
+            return typeName[1..] + "?";
+        }
+        return typeName;
     }
 
     public string Visit(IsPatternNode node)
