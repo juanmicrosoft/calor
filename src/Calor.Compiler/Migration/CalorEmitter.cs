@@ -2352,10 +2352,46 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EventDefinitionNode node)
     {
-        // Events are emitted as fields since the parser doesn't support §EVT in class bodies
         var visibility = GetVisibilityShorthand(node.Visibility);
         var delegateType = TypeMapper.CSharpToCalor(node.DelegateType);
-        AppendLine($"§FLD{{{delegateType}:{node.Name}:{visibility}}}");
+
+        if (node.HasAccessors)
+        {
+            AppendLine($"§EVT{{{node.Id}:{node.Name}:{visibility}:{delegateType}}}");
+            Indent();
+
+            if (node.AddBody != null)
+            {
+                AppendLine("§EADD");
+                Indent();
+                foreach (var stmt in node.AddBody)
+                {
+                    stmt.Accept(this);
+                }
+                Dedent();
+                AppendLine("§/EADD");
+            }
+
+            if (node.RemoveBody != null)
+            {
+                AppendLine("§EREM");
+                Indent();
+                foreach (var stmt in node.RemoveBody)
+                {
+                    stmt.Accept(this);
+                }
+                Dedent();
+                AppendLine("§/EREM");
+            }
+
+            Dedent();
+            AppendLine($"§/EVT{{{node.Id}}}");
+        }
+        else
+        {
+            AppendLine($"§EVT{{{node.Id}:{node.Name}:{visibility}:{delegateType}}}");
+        }
+
         return "";
     }
 

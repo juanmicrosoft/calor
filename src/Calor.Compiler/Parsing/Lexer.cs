@@ -168,6 +168,11 @@ public sealed class Lexer
         ["DEL"] = TokenKind.Delegate,
         ["/DEL"] = TokenKind.EndDelegate,
         ["EVT"] = TokenKind.Event,
+        ["/EVT"] = TokenKind.EndEvent,
+        ["EADD"] = TokenKind.EventAdd,
+        ["/EADD"] = TokenKind.EndEventAdd,
+        ["EREM"] = TokenKind.EventRemove,
+        ["/EREM"] = TokenKind.EndEventRemove,
         ["SUB"] = TokenKind.Subscribe,
         ["UNSUB"] = TokenKind.Unsubscribe,
 

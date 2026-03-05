@@ -3343,7 +3343,48 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var eventName = SanitizeIdentifier(node.Name);
         var delegateType = MapTypeName(node.DelegateType);
 
-        AppendLine($"{visibility} event {delegateType} {eventName};");
+        if (node.HasAccessors)
+        {
+            AppendLine($"{visibility} event {delegateType} {eventName}");
+            AppendLine("{");
+            Indent();
+
+            if (node.AddBody != null)
+            {
+                _declaredVariablesInCurrentScope.Clear();
+                AppendLine("add");
+                AppendLine("{");
+                Indent();
+                foreach (var stmt in node.AddBody)
+                {
+                    AppendLine(stmt.Accept(this));
+                }
+                Dedent();
+                AppendLine("}");
+            }
+
+            if (node.RemoveBody != null)
+            {
+                _declaredVariablesInCurrentScope.Clear();
+                AppendLine("remove");
+                AppendLine("{");
+                Indent();
+                foreach (var stmt in node.RemoveBody)
+                {
+                    AppendLine(stmt.Accept(this));
+                }
+                Dedent();
+                AppendLine("}");
+            }
+
+            Dedent();
+            AppendLine("}");
+        }
+        else
+        {
+            AppendLine($"{visibility} event {delegateType} {eventName};");
+        }
+
         return "";
     }
 

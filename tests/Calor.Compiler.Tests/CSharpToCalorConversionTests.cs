@@ -834,8 +834,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Events are emitted as fields since the parser doesn't support §EVT in class bodies
-        Assert.Contains("§FLD", result.CalorSource);
+        // Events are now emitted as proper §EVT tags with accessor support
+        Assert.Contains("§EVT", result.CalorSource);
         Assert.Contains("SpeakRequest", result.CalorSource);
     }
 

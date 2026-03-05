@@ -7498,7 +7498,68 @@ public sealed class Parser
 
         var visibility = ParseVisibility(visStr);
 
-        return new EventDefinitionNode(startToken.Span, id, name, visibility, delegateType, attrs);
+        // Check for accessor bodies (§EADD / §EREM ... §/EVT)
+        if (!Check(TokenKind.EventAdd) && !Check(TokenKind.EventRemove))
+        {
+            return new EventDefinitionNode(startToken.Span, id, name, visibility, delegateType, attrs);
+        }
+
+        List<StatementNode>? addBody = null;
+        List<StatementNode>? removeBody = null;
+
+        while (!IsAtEnd && !Check(TokenKind.EndEvent))
+        {
+            if (Check(TokenKind.EventAdd))
+            {
+                addBody = ParseEventAccessorBody(TokenKind.EventAdd, TokenKind.EndEventAdd);
+            }
+            else if (Check(TokenKind.EventRemove))
+            {
+                removeBody = ParseEventAccessorBody(TokenKind.EventRemove, TokenKind.EndEventRemove);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndEvent);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (ShouldReportMismatchedId(endId, id, endToken))
+        {
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EVT", id, "END_EVT", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new EventDefinitionNode(span, id, name, visibility, delegateType, attrs, addBody, removeBody);
+    }
+
+    private List<StatementNode> ParseEventAccessorBody(TokenKind startKind, TokenKind endKind)
+    {
+        Advance(); // consume §EADD or §EREM
+        ParseAttributes(); // consume any attributes
+
+        var body = new List<StatementNode>();
+
+        while (!IsAtEnd && !Check(endKind) && !Check(TokenKind.EventAdd) &&
+               !Check(TokenKind.EventRemove) && !Check(TokenKind.EndEvent))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null)
+            {
+                body.Add(stmt);
+            }
+        }
+
+        // Consume the closing token if present (§/EADD or §/EREM)
+        if (Check(endKind))
+        {
+            Advance();
+        }
+
+        return body;
     }
 
     // Phase 12: Async/Await
