@@ -242,18 +242,42 @@ public sealed class McpMessageHandler
         var sw = Stopwatch.StartNew();
         McpToolResult result;
 
-        // Reject memory-intensive tools when process is already under pressure
+        // Wait for memory pressure to subside before running heavy tools
         if (tool is BatchTool or ConvertTool or CompileTool or AnalyzeTool)
         {
             var memoryUsed = GC.GetTotalMemory(forceFullCollection: false);
             if (memoryUsed > MemoryPressureThresholdBytes)
             {
                 var usedMb = memoryUsed / (1024 * 1024);
-                var thresholdMb = MemoryPressureThresholdBytes / (1024 * 1024);
-                Log($"Tool {callParams.Name} rejected: memory pressure ({usedMb} MB >= {thresholdMb} MB threshold)");
-                return JsonRpcResponse.Success(request.Id,
-                    McpToolResult.Error($"Server under memory pressure ({usedMb} MB used, {thresholdMb} MB threshold). " +
-                        "Retry after current operations complete. Set CALOR_MCP_MAX_MEMORY_MB to adjust."));
+                Log($"Tool {callParams.Name} waiting for memory pressure to subside ({usedMb} MB used)");
+
+                // Try a GC and wait up to 30s for memory to drop
+                GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                const int maxWaitMs = 30_000;
+                const int pollIntervalMs = 2_000;
+                var waited = 0;
+                while (waited < maxWaitMs)
+                {
+                    memoryUsed = GC.GetTotalMemory(forceFullCollection: false);
+                    if (memoryUsed <= MemoryPressureThresholdBytes)
+                        break;
+                    await Task.Delay(pollIntervalMs, _serverCancellation);
+                    waited += pollIntervalMs;
+                }
+
+                memoryUsed = GC.GetTotalMemory(forceFullCollection: false);
+                if (memoryUsed > MemoryPressureThresholdBytes)
+                {
+                    usedMb = memoryUsed / (1024 * 1024);
+                    var thresholdMb = MemoryPressureThresholdBytes / (1024 * 1024);
+                    Log($"Tool {callParams.Name} rejected after waiting: memory still at {usedMb} MB");
+                    return JsonRpcResponse.Success(request.Id,
+                        McpToolResult.Error($"Server under memory pressure ({usedMb} MB used, {thresholdMb} MB threshold) " +
+                            "after waiting 30s. Wait for current operations to finish, then retry. " +
+                            "Set CALOR_MCP_MAX_MEMORY_MB to adjust the threshold."));
+                }
+
+                Log($"Tool {callParams.Name} proceeding after memory dropped to {memoryUsed / (1024 * 1024)} MB");
             }
         }
 
