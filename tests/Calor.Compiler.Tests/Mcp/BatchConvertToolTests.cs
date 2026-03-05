@@ -6,12 +6,12 @@ namespace Calor.Compiler.Tests.Mcp;
 
 public class BatchConvertToolTests
 {
-    private readonly BatchConvertTool _tool = new();
+    private readonly BatchTool _tool = new();
 
     [Fact]
     public void Name_ReturnsCalorBatchConvert()
     {
-        Assert.Equal("calor_batch_convert", _tool.Name);
+        Assert.Equal("calor_batch", _tool.Name);
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class BatchConvertToolTests
     [Fact]
     public async Task ExecuteAsync_MissingProjectPath_ReturnsError()
     {
-        var args = JsonDocument.Parse("""{}""").RootElement;
+        var args = JsonDocument.Parse("""{"action": "convert"}""").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
 
@@ -51,7 +51,7 @@ public class BatchConvertToolTests
     [Fact]
     public async Task ExecuteAsync_NonexistentPath_ReturnsError()
     {
-        var args = JsonDocument.Parse("""{"projectPath": "/nonexistent/path/to/project"}""").RootElement;
+        var args = JsonDocument.Parse("""{"action": "convert", "projectPath": "/nonexistent/path/to/project"}""").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
 
@@ -75,6 +75,7 @@ public class BatchConvertToolTests
 
             var args = JsonDocument.Parse($$"""
                 {
+                    "action": "convert",
                     "projectPath": "{{tempDir.Replace("\\", "\\\\")}}",
                     "moduleNameOverride": "OverriddenModule",
                     "dryRun": true

@@ -7,7 +7,7 @@ namespace Calor.Compiler.Tests.Mcp;
 
 /// <summary>
 /// Tests for new MCP tools that support edit precision:
-/// calor_impact_analysis, calor_call_graph, calor_edit_preview, calor_scope_info,
+/// calor_structure (impact/callgraph actions), calor_edit_preview, calor_scope_info,
 /// and enhanced calor_find_references.
 /// </summary>
 public class EditPrecisionMcpToolTests
@@ -68,8 +68,8 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ImpactAnalysis_FindsDirectCallers()
     {
-        var tool = new ImpactAnalysisTool();
-        var args = CreateArgsWithSymbolId(SampleSource, "f001"); // add function
+        var tool = new StructureTool();
+        var args = CreateImpactArgs(SampleSource, "f001"); // add function
 
         var result = await tool.ExecuteAsync(args);
 
@@ -82,9 +82,9 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ImpactAnalysis_WithPosition_ResolvesSymbol()
     {
-        var tool = new ImpactAnalysisTool();
+        var tool = new StructureTool();
         // Line 2 contains §F{f001:add:pub} — "add" starts at column 11
-        var args = CreateArgsWithPosition(SampleSource, 2, 11);
+        var args = CreateImpactArgsWithPosition(SampleSource, 2, 11);
 
         var result = await tool.ExecuteAsync(args);
 
@@ -100,8 +100,8 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ImpactAnalysis_ContractImpacts_DetectsContracts()
     {
-        var tool = new ImpactAnalysisTool();
-        var args = CreateArgsWithSymbolId(SampleSource, "f001");
+        var tool = new StructureTool();
+        var args = CreateImpactArgs(SampleSource, "f001");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -116,8 +116,8 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ImpactAnalysis_DepthLimiting()
     {
-        var tool = new ImpactAnalysisTool();
-        var args = CreateArgsWithSymbolIdAndDepth(SampleSource, "f001", 1);
+        var tool = new StructureTool();
+        var args = CreateImpactArgsWithDepth(SampleSource, "f001", 1);
 
         var result = await tool.ExecuteAsync(args);
 
@@ -132,8 +132,8 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ImpactAnalysis_ErrorOnMissingSource()
     {
-        var tool = new ImpactAnalysisTool();
-        var args = JsonDocument.Parse("""{"symbolId": "f001"}""").RootElement;
+        var tool = new StructureTool();
+        var args = JsonDocument.Parse("""{"action": "impact", "symbolId": "f001"}""").RootElement;
 
         var result = await tool.ExecuteAsync(args);
 
@@ -147,7 +147,7 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task CallGraph_FindsCallees()
     {
-        var tool = new CallGraphTool();
+        var tool = new StructureTool();
         var args = CreateCallGraphArgs(SampleSource, "f003", "callees");
 
         var result = await tool.ExecuteAsync(args);
@@ -167,7 +167,7 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task CallGraph_FindsCallers()
     {
-        var tool = new CallGraphTool();
+        var tool = new StructureTool();
         var args = CreateCallGraphArgs(SampleSource, "f001", "callers");
 
         var result = await tool.ExecuteAsync(args);
@@ -180,7 +180,7 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task CallGraph_BothDirections()
     {
-        var tool = new CallGraphTool();
+        var tool = new StructureTool();
         var args = CreateCallGraphArgs(SampleSource, "f003", "both");
 
         var result = await tool.ExecuteAsync(args);
@@ -193,7 +193,7 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task CallGraph_IncludesEffectAnnotations()
     {
-        var tool = new CallGraphTool();
+        var tool = new StructureTool();
         var args = CreateCallGraphArgs(SampleSourceWithEffects, "f012", "both", includeEffects: true);
 
         var result = await tool.ExecuteAsync(args);
@@ -210,7 +210,7 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task CallGraph_NoCyclesInSample()
     {
-        var tool = new CallGraphTool();
+        var tool = new StructureTool();
         var args = CreateCallGraphArgs(SampleSource, "f001", "both");
 
         var result = await tool.ExecuteAsync(args);
@@ -325,9 +325,9 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ScopeInfo_FindsEnclosingFunction()
     {
-        var tool = new ScopeInfoTool();
+        var tool = new NavigateTool();
         // Line 7 is §R (+ x y) — inside the "add" function body
-        var args = CreateArgs(SampleSource, 7, 5);
+        var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -339,8 +339,8 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ScopeInfo_ListsParameters()
     {
-        var tool = new ScopeInfoTool();
-        var args = CreateArgs(SampleSource, 7, 5);
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -360,8 +360,8 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ScopeInfo_ListsAvailableFunctions()
     {
-        var tool = new ScopeInfoTool();
-        var args = CreateArgs(SampleSource, 7, 5);
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -374,9 +374,9 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ScopeInfo_ShowsEnclosingModule()
     {
-        var tool = new ScopeInfoTool();
+        var tool = new NavigateTool();
         // Line 2: inside module but looking at module-level
-        var args = CreateArgs(SampleSource, 2, 3);
+        var args = CreateArgs(SampleSource, 2, 3, "scope");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -389,8 +389,8 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ScopeInfo_ReturnsValidInsertionPoints()
     {
-        var tool = new ScopeInfoTool();
-        var args = CreateArgs(SampleSource, 7, 5);
+        var tool = new NavigateTool();
+        var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -403,9 +403,9 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task ScopeInfo_IncludesActiveContracts()
     {
-        var tool = new ScopeInfoTool();
+        var tool = new NavigateTool();
         // Inside add function which has §Q and §S
-        var args = CreateArgs(SampleSource, 7, 5);
+        var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -422,7 +422,7 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task FindReferences_BySymbolName_Works()
     {
-        var tool = new FindReferencesTool();
+        var tool = new NavigateTool();
         var args = CreateFindRefsArgsWithName(SampleSource, "add");
 
         var result = await tool.ExecuteAsync(args);
@@ -437,7 +437,7 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task FindReferences_BySymbolId_Works()
     {
-        var tool = new FindReferencesTool();
+        var tool = new NavigateTool();
         var args = CreateFindRefsArgsWithId(SampleSource, "f001");
 
         var result = await tool.ExecuteAsync(args);
@@ -451,7 +451,7 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task FindReferences_GroupByKind_Works()
     {
-        var tool = new FindReferencesTool();
+        var tool = new NavigateTool();
         var args = CreateFindRefsArgsGrouped(SampleSource, "add");
 
         var result = await tool.ExecuteAsync(args);
@@ -465,9 +465,9 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task FindReferences_ByPosition_StillWorks()
     {
-        var tool = new FindReferencesTool();
+        var tool = new NavigateTool();
         // "add" on function definition line 2: §F{f001:add:pub}
-        var args = CreateArgs(SampleSource, 2, 11);
+        var args = CreateArgs(SampleSource, 2, 11, "references");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -479,8 +479,8 @@ public class EditPrecisionMcpToolTests
     [Fact]
     public async Task FindReferences_ErrorOnNoIdentifier()
     {
-        var tool = new FindReferencesTool();
-        var args = JsonDocument.Parse("""{"source": "test"}""").RootElement;
+        var tool = new NavigateTool();
+        var args = JsonDocument.Parse("""{"action": "references", "source": "test"}""").RootElement;
 
         var result = await tool.ExecuteAsync(args);
 
@@ -508,10 +508,9 @@ public class EditPrecisionMcpToolTests
         Assert.NotNull(response.Result);
 
         var resultJson = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
-        Assert.Contains("calor_impact_analysis", resultJson);
-        Assert.Contains("calor_call_graph", resultJson);
+        Assert.Contains("calor_structure", resultJson);
         Assert.Contains("calor_edit_preview", resultJson);
-        Assert.Contains("calor_scope_info", resultJson);
+        Assert.Contains("calor_navigate", resultJson);
     }
 
     #endregion
@@ -525,9 +524,10 @@ public class EditPrecisionMcpToolTests
 
         var callParams = JsonSerializer.Serialize(new Dictionary<string, object>
         {
-            ["name"] = "calor_impact_analysis",
+            ["name"] = "calor_structure",
             ["arguments"] = new Dictionary<string, object>
             {
+                ["action"] = "impact",
                 ["source"] = SampleSource,
                 ["symbolId"] = "f001"
             }
@@ -585,14 +585,17 @@ public class EditPrecisionMcpToolTests
 
     #region Helper Methods
 
-    private static JsonElement CreateArgs(string source, int line, int column)
+    private static JsonElement CreateArgs(string source, int line, int column, string? action = null)
     {
-        var json = JsonSerializer.Serialize(new Dictionary<string, object>
+        var dict = new Dictionary<string, object>
         {
             ["source"] = source,
             ["line"] = line,
             ["column"] = column
-        });
+        };
+        if (action != null)
+            dict["action"] = action;
+        var json = JsonSerializer.Serialize(dict);
         return JsonDocument.Parse(json).RootElement;
     }
 
@@ -626,10 +629,46 @@ public class EditPrecisionMcpToolTests
     {
         var json = JsonSerializer.Serialize(new Dictionary<string, object>
         {
+            ["action"] = "callgraph",
             ["source"] = source,
             ["symbolId"] = symbolId,
             ["direction"] = direction,
             ["includeEffects"] = includeEffects
+        });
+        return JsonDocument.Parse(json).RootElement;
+    }
+
+    private static JsonElement CreateImpactArgs(string source, string symbolId)
+    {
+        var json = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["action"] = "impact",
+            ["source"] = source,
+            ["symbolId"] = symbolId
+        });
+        return JsonDocument.Parse(json).RootElement;
+    }
+
+    private static JsonElement CreateImpactArgsWithPosition(string source, int line, int column)
+    {
+        var json = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["action"] = "impact",
+            ["source"] = source,
+            ["line"] = line,
+            ["column"] = column
+        });
+        return JsonDocument.Parse(json).RootElement;
+    }
+
+    private static JsonElement CreateImpactArgsWithDepth(string source, string symbolId, int depth)
+    {
+        var json = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["action"] = "impact",
+            ["source"] = source,
+            ["symbolId"] = symbolId,
+            ["depth"] = depth
         });
         return JsonDocument.Parse(json).RootElement;
     }
@@ -659,8 +698,9 @@ public class EditPrecisionMcpToolTests
     {
         var json = JsonSerializer.Serialize(new Dictionary<string, object>
         {
+            ["action"] = "references",
             ["source"] = source,
-            ["symbolName"] = symbolName
+            ["query"] = symbolName
         });
         return JsonDocument.Parse(json).RootElement;
     }
@@ -669,6 +709,7 @@ public class EditPrecisionMcpToolTests
     {
         var json = JsonSerializer.Serialize(new Dictionary<string, object>
         {
+            ["action"] = "references",
             ["source"] = source,
             ["symbolId"] = symbolId
         });
@@ -679,9 +720,10 @@ public class EditPrecisionMcpToolTests
     {
         var json = JsonSerializer.Serialize(new Dictionary<string, object>
         {
+            ["action"] = "references",
             ["source"] = source,
-            ["symbolName"] = symbolName,
-            ["groupByKind"] = true
+            ["query"] = symbolName,
+            ["includeDetails"] = true
         });
         return JsonDocument.Parse(json).RootElement;
     }

@@ -11,12 +11,12 @@ namespace Calor.Compiler.Tests.Mcp;
 
 public class SyntaxHelpToolTests
 {
-    private readonly SyntaxHelpTool _tool = new();
+    private readonly HelpTool _tool = new();
 
     [Fact]
     public void Name_ReturnsCalorSyntaxHelp()
     {
-        Assert.Equal("calor_syntax_help", _tool.Name);
+        Assert.Equal("calor_help", _tool.Name);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public class SyntaxHelpToolTests
 
         Assert.True(result.IsError);
         var text = result.Content[0].Text!;
-        Assert.Contains("feature", text.ToLower());
+        Assert.Contains("query", text.ToLower());
     }
 
     [Fact]
@@ -431,7 +431,7 @@ public class SyntaxHelpToolTests
     {
         // Create a custom skill file with many large sections that will trigger truncation
         var tempFile = Path.GetTempFileName();
-        var originalValue = Environment.GetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
 
         try
         {
@@ -440,10 +440,10 @@ public class SyntaxHelpToolTests
                 $"## BigSection {i}\nThis bigtopic section has bigtopic content.\n{new string('x', 2000)}\n"));
             File.WriteAllText(tempFile, content);
 
-            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, tempFile);
-            SyntaxHelpTool.ResetCacheForTesting();
+            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
+            HelpTool.ResetCacheForTesting();
 
-            var tool = new SyntaxHelpTool();
+            var tool = new HelpTool();
             var args = JsonDocument.Parse("""{"feature": "bigtopic"}""").RootElement;
 
             var result = await tool.ExecuteAsync(args);
@@ -456,8 +456,8 @@ public class SyntaxHelpToolTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, originalValue);
-            SyntaxHelpTool.ResetCacheForTesting();
+            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            HelpTool.ResetCacheForTesting();
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
         }
@@ -485,7 +485,7 @@ public class SyntaxHelpToolTests
     public void SkillFilePathEnvVar_IsDocumented()
     {
         // Verify the environment variable name is accessible
-        Assert.Equal("CALOR_SKILL_FILE", SyntaxHelpTool.SkillFilePathEnvVar);
+        Assert.Equal("CALOR_SKILL_FILE", HelpTool.SkillFilePathEnvVar);
     }
 
     [Fact]
@@ -598,19 +598,19 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
 ### Custom Syntax
 - §TEST: Test token for verification
 ";
-        var originalValue = Environment.GetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
 
         try
         {
             File.WriteAllText(tempFile, customContent);
 
             // Set the environment variable
-            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, tempFile);
+            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
 
             // Reset the cache so the env var is picked up
-            SyntaxHelpTool.ResetCacheForTesting();
+            HelpTool.ResetCacheForTesting();
 
-            var toolWithEnvVar = new SyntaxHelpTool();
+            var toolWithEnvVar = new HelpTool();
 
             var args = JsonDocument.Parse("""
                 {
@@ -629,8 +629,8 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
         finally
         {
             // Restore original environment variable and reset cache
-            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, originalValue);
-            SyntaxHelpTool.ResetCacheForTesting();
+            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            HelpTool.ResetCacheForTesting();
 
             // Clean up temp file
             if (File.Exists(tempFile))
@@ -662,23 +662,23 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
     {
         // Simulate the NuGet-installed scenario: env var points to a nonexistent file,
         // and no filesystem skill file is reachable. The embedded resource should kick in.
-        var originalValue = Environment.GetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
         var originalDir = Directory.GetCurrentDirectory();
 
         try
         {
             // Point env var to nonexistent file (disables path 1)
             Environment.SetEnvironmentVariable(
-                SyntaxHelpTool.SkillFilePathEnvVar, "/nonexistent/path/skill.md");
+                HelpTool.SkillFilePathEnvVar, "/nonexistent/path/skill.md");
 
             // Change working directory to temp (no Calor.sln or .git — disables path 2)
             var tempDir = Path.Combine(Path.GetTempPath(), $"calor-test-{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
             Directory.SetCurrentDirectory(tempDir);
 
-            SyntaxHelpTool.ResetCacheForTesting();
+            HelpTool.ResetCacheForTesting();
 
-            var tool = new SyntaxHelpTool();
+            var tool = new HelpTool();
             var args = JsonDocument.Parse("""{"feature": "contracts"}""").RootElement;
 
             var result = await tool.ExecuteAsync(args);
@@ -695,8 +695,8 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
         {
             // Restore environment
             Directory.SetCurrentDirectory(originalDir);
-            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, originalValue);
-            SyntaxHelpTool.ResetCacheForTesting();
+            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            HelpTool.ResetCacheForTesting();
         }
     }
 
@@ -704,7 +704,7 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
 }
 
 /// <summary>
-/// Telemetry integration tests for SyntaxHelpTool.
+/// Telemetry integration tests for HelpTool.
 /// Uses TelemetrySingleton collection to avoid parallel execution conflicts.
 /// </summary>
 [Collection("TelemetrySingleton")]
@@ -716,7 +716,7 @@ public class SyntaxHelpTelemetryTests
         var (telemetry, channel) = CreateTestTelemetry();
         using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
 
-        var tool = new SyntaxHelpTool();
+        var tool = new HelpTool();
         var args = JsonDocument.Parse("""{"feature": "contracts"}""").RootElement;
 
         await tool.ExecuteAsync(args);
@@ -736,7 +736,7 @@ public class SyntaxHelpTelemetryTests
         var (telemetry, channel) = CreateTestTelemetry();
         using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
 
-        var tool = new SyntaxHelpTool();
+        var tool = new HelpTool();
         var args = JsonDocument.Parse("""{"feature": "unknown_feature_xyz"}""").RootElement;
 
         await tool.ExecuteAsync(args);
@@ -756,7 +756,7 @@ public class SyntaxHelpTelemetryTests
         var (telemetry, channel) = CreateTestTelemetry();
         using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
 
-        var tool = new SyntaxHelpTool();
+        var tool = new HelpTool();
         // "await" is an alias for the "async" category
         var args = JsonDocument.Parse("""{"feature": "await"}""").RootElement;
 
@@ -813,7 +813,7 @@ public class SyntaxHelpTelemetryTests
     public async Task ExecuteAsync_ManyResults_CapsMatchedSectionsAtFive()
     {
         var tempFile = Path.GetTempFileName();
-        var originalValue = Environment.GetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
         var (telemetry, channel) = CreateTestTelemetry();
         using var _t = CalorTelemetry.SetInstanceForTesting(telemetry);
 
@@ -823,10 +823,10 @@ public class SyntaxHelpTelemetryTests
             var content = string.Join("\n", Enumerable.Range(1, 8).Select(i =>
                 $"## Section {i}\nThis testtopic section has testtopic content number {i}.\n"));
             File.WriteAllText(tempFile, content);
-            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, tempFile);
-            SyntaxHelpTool.ResetCacheForTesting();
+            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
+            HelpTool.ResetCacheForTesting();
 
-            var tool = new SyntaxHelpTool();
+            var tool = new HelpTool();
             var args = JsonDocument.Parse("""{"feature": "testtopic"}""").RootElement;
 
             await tool.ExecuteAsync(args);
@@ -839,8 +839,8 @@ public class SyntaxHelpTelemetryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable(SyntaxHelpTool.SkillFilePathEnvVar, originalValue);
-            SyntaxHelpTool.ResetCacheForTesting();
+            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            HelpTool.ResetCacheForTesting();
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
         }

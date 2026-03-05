@@ -128,9 +128,9 @@ public class McpServerTests
         Assert.Contains("calor_verify", json);
         Assert.Contains("calor_analyze", json);
         Assert.Contains("calor_convert", json);
-        Assert.Contains("calor_syntax_lookup", json);
-        Assert.Contains("calor_assess", json);
-        Assert.Contains("calor_diagnose", json);
+        Assert.Contains("calor_help", json);
+        Assert.Contains("calor_check", json);
+        Assert.Contains("calor_batch", json);
     }
 
     [Fact]
@@ -230,7 +230,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_syntax_lookup",
+                    "name": "calor_help",
                     "arguments": {
                         "query": "contracts"
                     }
@@ -258,7 +258,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_syntax_lookup",
+                    "name": "calor_help",
                     "arguments": {
                         "query": "for loop"
                     }
@@ -286,7 +286,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_syntax_lookup",
+                    "name": "calor_help",
                     "arguments": {
                         "query": "object instantiation"
                     }
@@ -318,7 +318,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_syntax_lookup",
+                    "name": "calor_help",
                     "arguments": {
                         "query": "for loop"
                     }
@@ -349,7 +349,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_syntax_lookup",
+                    "name": "calor_help",
                     "arguments": {
                         "query": "nonexistent xyz abc"
                     }
@@ -466,9 +466,9 @@ public class McpServerTests
         Assert.Contains("calor_verify", response);
         Assert.Contains("calor_analyze", response);
         Assert.Contains("calor_convert", response);
-        Assert.Contains("calor_syntax_lookup", response);
-        Assert.Contains("calor_assess", response);
-        Assert.Contains("calor_diagnose", response);
+        Assert.Contains("calor_help", response);
+        Assert.Contains("calor_check", response);
+        Assert.Contains("calor_batch", response);
     }
 
     [Fact]
@@ -505,8 +505,9 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_assess",
+                    "name": "calor_analyze",
                     "arguments": {
+                        "action": "assess",
                         "source": "public class Test { public async Task<int> GetValueAsync() { return await Task.FromResult(42); } }"
                     }
                 }
@@ -536,8 +537,9 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_assess",
+                    "name": "calor_analyze",
                     "arguments": {
+                        "action": "assess",
                         "files": [
                             { "path": "Service.cs", "source": "public class Service { public async Task RunAsync() { await Task.Delay(1); } }" },
                             { "path": "Query.cs", "source": "using System.Linq; public class Query { public int[] Filter(int[] data) => data.Where(x => x > 0).ToArray(); }" }
@@ -564,7 +566,7 @@ public class McpServerTests
     public async Task McpServer_ProcessMessage_AssessToolFlow()
     {
         // MCP uses newline-delimited JSON (NDJSON)
-        var inputMessage = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_assess","arguments":{"source":"public class Test { public void Method() { } }"}}}""" + "\n";
+        var inputMessage = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"calor_analyze","arguments":{"action":"assess","source":"public class Test { public void Method() { } }"}}}""" + "\n";
 
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(inputMessage));
         using var output = new MemoryStream();
@@ -594,7 +596,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_diagnose",
+                    "name": "calor_check",
                     "arguments": {
                         "source": "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
                     }
@@ -632,7 +634,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_diagnose",
+                    "name": "calor_check",
                     "arguments": {
                         "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x) §/F{f001} §/M{m001}"
                     }
@@ -663,7 +665,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_diagnose",
+                    "name": "calor_check",
                     "arguments": {
                         "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42 §/F{f002} §/M{m001}"
                     }
@@ -692,7 +694,7 @@ public class McpServerTests
         // MCP uses newline-delimited JSON (NDJSON)
         var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R (abss -5) §/F{f001} §/M{m001}";
         var jsonSource = JsonSerializer.Serialize(source); // Properly escape for JSON
-        var inputMessage = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"calor_diagnose\",\"arguments\":{{\"source\":{jsonSource}}}}}}}\n";
+        var inputMessage = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"calor_check\",\"arguments\":{{\"source\":{jsonSource}}}}}}}\n";
 
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(inputMessage));
         using var output = new MemoryStream();
@@ -718,7 +720,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_diagnose",
+                    "name": "calor_check",
                     "arguments": {
                         "source": "§FUNC{f001:Test}"
                     }
@@ -751,7 +753,7 @@ public class McpServerTests
             Method = "tools/call",
             Params = JsonDocument.Parse("""
                 {
-                    "name": "calor_diagnose",
+                    "name": "calor_check",
                     "arguments": {
                         "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F{f001} §/M{m001}"
                     }
