@@ -1443,7 +1443,87 @@ public sealed class Parser
             _position = savedPosition;
         }
 
+        // Check for tuple literal: (expr, expr, ...)
+        // Tuples contain commas at depth 0; Lisp expressions do not.
+        if (LookaheadIsTupleLiteral())
+        {
+            return ParseTupleLiteral();
+        }
+
         return ParseLispExpression();
+    }
+
+    /// <summary>
+    /// Looks ahead (without consuming tokens) to determine if the current position
+    /// starts a tuple literal. A tuple literal has commas at depth 0 inside parentheses.
+    /// Tracks generic angle brackets (&lt;&gt;) after identifiers to avoid false positives
+    /// with expressions like (typeof Dictionary&lt;string, List&lt;int&gt;&gt;).
+    /// Position must be at the opening '(' token.
+    /// </summary>
+    private bool LookaheadIsTupleLiteral()
+    {
+        var saved = _position;
+        Advance(); // skip (
+
+        var depth = 0;
+        var prevKind = TokenKind.OpenParen;
+        while (!IsAtEnd)
+        {
+            var kind = Current.Kind;
+            if (kind is TokenKind.OpenParen or TokenKind.OpenBracket or TokenKind.OpenBrace)
+                depth++;
+            else if (kind is TokenKind.CloseParen)
+            {
+                if (depth == 0)
+                    break; // reached the matching close paren
+                depth--;
+            }
+            else if (kind is TokenKind.CloseBracket or TokenKind.CloseBrace)
+            {
+                if (depth > 0) depth--;
+            }
+            else if (kind == TokenKind.Less && prevKind == TokenKind.Identifier)
+            {
+                // < after identifier is a generic bracket, not a comparison operator
+                depth++;
+            }
+            else if (kind == TokenKind.Greater && depth > 0)
+            {
+                depth--;
+            }
+            else if (kind == TokenKind.GreaterGreater && depth > 0)
+            {
+                depth = System.Math.Max(0, depth - 2);
+            }
+            else if (kind == TokenKind.Comma && depth == 0)
+            {
+                _position = saved;
+                return true;
+            }
+            prevKind = kind;
+            Advance();
+        }
+
+        _position = saved;
+        return false;
+    }
+
+    /// <summary>
+    /// Parses a tuple literal expression: (expr1, expr2, ...)
+    /// </summary>
+    private TupleLiteralNode ParseTupleLiteral()
+    {
+        var startToken = Expect(TokenKind.OpenParen);
+        var elements = new List<ExpressionNode>();
+
+        elements.Add(ParseExpression());
+        while (Match(TokenKind.Comma))
+        {
+            elements.Add(ParseExpression());
+        }
+
+        var endToken = Expect(TokenKind.CloseParen);
+        return new TupleLiteralNode(startToken.Span.Union(endToken.Span), elements);
     }
 
     /// <summary>
@@ -1576,6 +1656,25 @@ public sealed class Parser
         {
             _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                 $"Null-coalescing '??' requires exactly 2 operands, got {args.Count}");
+            return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
+        }
+
+        // Handle null-conditional access: (?. target "member")
+        if (opText == "?." && args.Count == 2)
+        {
+            // Second arg is the member name — either a string literal or reference
+            var memberName = args[1] switch
+            {
+                StringLiteralNode strNode => strNode.Value,
+                ReferenceNode refNode => refNode.Name,
+                _ => args[1].ToString() ?? ""
+            };
+            return new NullConditionalNode(span, args[0], memberName);
+        }
+        if (opText == "?.")
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
+                $"Null-conditional '?.' requires exactly 2 operands (target member), got {args.Count}");
             return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
         }
 
@@ -1904,6 +2003,9 @@ public sealed class Parser
             case TokenKind.NullCoalesce:
                 Advance();
                 return (TokenKind.NullCoalesce, "??", span);
+            case TokenKind.NullConditional:
+                Advance();
+                return (TokenKind.NullConditional, "?.", span);
             case TokenKind.Question:
                 Advance();
                 return (TokenKind.Question, "?", span);
@@ -9289,6 +9391,42 @@ public sealed class Parser
                 sb.Append(']');
                 Advance();
             }
+            return sb.ToString();
+        }
+
+        // Handle tuple type (T1, T2, ...) or (T1 Name1, T2 Name2, ...)
+        if (Check(TokenKind.OpenParen))
+        {
+            sb.Append('(');
+            Advance(); // consume (
+
+            sb.Append(ReadInlineTypeToken(ref pendingGreaters));
+            // Check for optional element name
+            if (Check(TokenKind.Identifier) && !Check(TokenKind.Comma) && !Check(TokenKind.CloseParen))
+            {
+                sb.Append(' ');
+                sb.Append(Advance().Text);
+            }
+
+            while (Check(TokenKind.Comma))
+            {
+                sb.Append(", ");
+                Advance(); // consume ,
+                sb.Append(ReadInlineTypeToken(ref pendingGreaters));
+                // Check for optional element name
+                if (Check(TokenKind.Identifier) && !Check(TokenKind.Comma) && !Check(TokenKind.CloseParen))
+                {
+                    sb.Append(' ');
+                    sb.Append(Advance().Text);
+                }
+            }
+
+            if (Check(TokenKind.CloseParen))
+            {
+                sb.Append(')');
+                Advance();
+            }
+
             return sb.ToString();
         }
 

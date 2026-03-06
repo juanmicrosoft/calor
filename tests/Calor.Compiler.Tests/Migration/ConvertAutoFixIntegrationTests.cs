@@ -149,28 +149,20 @@ public class ConvertAutoFixIntegrationTests
     }
 
     [Fact]
-    public void Converter_NullConditionalChain_ProducesParseFailure()
+    public void Converter_NullConditionalChain_ProducesValidCalor()
     {
-        // This C# pattern naturally produces parse-failing converter output.
-        // The converter leaks raw `s?.Trim()?.Length` into Calor source.
-        // This proves the fixer targets real converter bugs, not synthetic scenarios.
+        // Null-conditional chains now convert to valid Calor using (?. target "member") syntax
         var csharp = "public class Svc { public int? GetLen(string s) => s?.Trim()?.Length; }";
         var calor = ConvertCSharpToCalor(csharp);
         Assert.NotNull(calor);
         Assert.False(string.IsNullOrWhiteSpace(calor));
 
-        // Converter output should contain the leaked C# syntax
-        Assert.Contains("?.", calor);
+        // Converter output should contain the (?. ...) syntax
+        Assert.Contains("(?.", calor);
 
-        // This should fail to parse
+        // This should now parse successfully
         var parseResult = CalorSourceHelper.Parse(calor, "null-cond.calr");
-        Assert.False(parseResult.IsSuccess,
-            "Null-conditional chain should produce parse-failing converter output");
-
-        // The fixer may or may not be able to fix this specific pattern.
-        // The important thing is the converter produces it and the fixer doesn't crash.
-        var fixResult = _fixer.Fix(calor);
-        // No assertion on WasModified — the fixer may not have a rule for this yet
-        Assert.NotNull(fixResult.FixedSource);
+        Assert.True(parseResult.IsSuccess,
+            "Null-conditional chain should now produce valid Calor with (?. syntax)");
     }
 }

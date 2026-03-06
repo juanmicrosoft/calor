@@ -1066,8 +1066,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("?.Length", result.CalorSource);
-        Assert.DoesNotContain("?..Length", result.CalorSource);
+        Assert.Contains("(?.", result.CalorSource);
+        Assert.Contains("\"Length\"", result.CalorSource);
     }
 
     #endregion

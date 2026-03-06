@@ -5496,18 +5496,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return valueRef;
         }
 
-        // Handle null-coalescing operator: x ?? y → (if (== x null) y x)
+        // Handle null-coalescing operator: x ?? y → (?? x y)
         if (binary.IsKind(SyntaxKind.CoalesceExpression))
         {
             _context.RecordFeatureUsage("null-coalescing");
             var left = ConvertExpression(binary.Left);
             var right = ConvertExpression(binary.Right);
-            var nullCheck = new BinaryOperationNode(
-                GetTextSpan(binary),
-                BinaryOperator.Equal,
-                left,
-                new ReferenceNode(GetTextSpan(binary), "null"));
-            return new ConditionalExpressionNode(GetTextSpan(binary), nullCheck, right, left);
+
+            // If the left side is a NullConditionalNode (e.g., value?.Length.ToString()),
+            // hoist it to a temp bind to avoid emitting ?.  inside a Lisp expression,
+            // which the parser cannot handle.
+            if (left is NullConditionalNode)
+            {
+                var tempId = _context.GenerateId("_nc", "Tmp");
+                _pendingStatements.Add(new BindStatementNode(
+                    GetTextSpan(binary), tempId, null, false, left, new AttributeCollection()));
+                left = new ReferenceNode(GetTextSpan(binary), tempId);
+            }
+
+            return new NullCoalesceNode(GetTextSpan(binary), left, right);
         }
 
         var leftExpr = ConvertExpression(binary.Left);

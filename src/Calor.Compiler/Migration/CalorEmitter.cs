@@ -2053,7 +2053,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             if (part is InterpolatedStringTextNode textPart)
             {
-                parts.Append(textPart.Text);
+                // Escape special characters for Calor string syntax
+                var escaped = textPart.Text
+                    .Replace("\\", "\\\\")
+                    .Replace("\"", "\\\"")
+                    .Replace("\n", "\\n")
+                    .Replace("\r", "\\r")
+                    .Replace("\t", "\\t");
+                parts.Append(escaped);
             }
             else if (part is InterpolatedStringExpressionNode exprPart)
             {
@@ -2100,13 +2107,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var left = node.Left.Accept(this);
         var right = node.Right.Accept(this);
-        return $"({left} ?? {right})";
+        return $"(?? {left} {right})";
     }
 
     public string Visit(NullConditionalNode node)
     {
         var target = node.Target.Accept(this);
-        return $"{target}?.{node.MemberName}";
+        return $"(?. {target} \"{node.MemberName}\")";
     }
 
     // Pattern-related methods

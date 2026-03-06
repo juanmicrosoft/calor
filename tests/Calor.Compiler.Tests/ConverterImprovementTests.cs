@@ -130,10 +130,10 @@ public class ConverterImprovementTests
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
 
-        // Regular ?? should still produce a ConditionalExpressionNode (no hoisting)
+        // Regular ?? now produces NullCoalesceNode directly
         Assert.Single(method.Body);
         var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
-        Assert.IsType<ConditionalExpressionNode>(ret.Expression);
+        Assert.IsType<NullCoalesceNode>(ret.Expression);
     }
 
     [Fact]
