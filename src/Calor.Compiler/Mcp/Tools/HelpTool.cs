@@ -262,8 +262,8 @@ public sealed class HelpTool : McpToolBase
         ["effects"] = ["effect", "§E", "side effect", "cw", "cr", "fs:"],
         ["loops"] = ["loop", "for", "for loop", "foreach", "while", "§L{", "§WH{", "§DO{", "§BK", "§CN"],
         ["conditionals"] = ["if", "if statement", "if-else", "else", "conditional", "§IF{", "§EI", "§EL", "ternary"],
-        ["functions"] = ["function", "§F{", "§I{", "§O{", "§R", "return", "parameter"],
-        ["classes"] = ["class", "§CL{", "§EXT{", "§IMPL{", "inheritance", "interface"],
+        ["functions"] = ["function", "§F{", "§I{", "§O{", "§R", "return", "parameter", "extension method", "params", "default parameter", "ref", "out", "in"],
+        ["classes"] = ["class", "§CL{", "§EXT{", "§IMPL{", "inheritance", "interface", "static class"],
         ["generics"] = ["generic", "<T>", "§WHERE", "type parameter", "constraint"],
         ["collections"] = ["list", "dict", "array", "§LIST{", "§DICT{", "§ARR", "§IDX"],
         ["patterns"] = ["pattern", "match", "switch", "§W{", "§K", "§SW{", "is pattern", "combinator", "relational pattern", "positional", "property pattern"],
@@ -281,7 +281,7 @@ public sealed class HelpTool : McpToolBase
         ["linq"] = ["linq", "query", "select", "where", "orderby"],
         ["events"] = ["event", "§EV{", "§EVT{", "§EADD", "§EREM", "add accessor", "remove accessor", "event handler"],
         ["using"] = ["using", "§USE{", "dispose", "IDisposable"],
-        ["modifiers"] = ["static", "abstract", "sealed", "virtual", "override", "readonly", "partial"],
+        ["modifiers"] = ["static", "abstract", "sealed", "virtual", "override", "readonly", "partial", "volatile"],
         ["indexers"] = ["indexer", "§IXER{", "this[]", "this[int", "this[string"],
         ["yield"] = ["yield", "iterator", "IEnumerable"],
         ["tuples"] = ["tuple", "value tuple", "(,)", "pair", "triple", "deconstruct", "tuple literal", "tuple type"],
@@ -432,6 +432,12 @@ public sealed class HelpTool : McpToolBase
                 §B{name:type}             Immutable binding
                 §B{~name:type}            Mutable binding
                 §I{type:name}             Parameter
+                §I{type:name:this}        Extension method parameter (C# 'this' modifier)
+                §I{type:name:ref}         Ref parameter
+                §I{type:name:out}         Out parameter
+                §I{type:name:in}          In (readonly ref) parameter
+                §I{type:name:params}      Params array parameter
+                §I{type:name}=expr        Parameter with default value
                 §O{type}                  Return type
                 §R expr                   Return statement
                 §C{obj.Method} §A arg §/C Method call with argument
@@ -452,15 +458,21 @@ public sealed class HelpTool : McpToolBase
                 ### Types and Classes
                 ```
                 §CL{id:Name:vis}          Class (close: §/CL{id})
+                §CL{id:Name:vis:stat}     Static class
                 §IFACE{id:Name}           Interface (close: §/IFACE{id})
+                §ST{id:Name:vis}          Struct (close: §/ST{id})
                 §MT{id:name:vis}          Method (close: §/MT{id})
                 §CTOR{id:vis}             Constructor (close: §/CTOR{id})
+                §BASE arg1 arg2           Constructor chaining to base class
+                §THIS arg1 arg2           Constructor chaining to another constructor
                 §PROP{id:Name:type:vis}   Property (close: §/PROP{id})
                 §IXER{id:type:vis}        Indexer (close: §/IXER{id})
                 §FLD{type:name:vis}       Field
+                §FLD{type:name:vis:volatile} Volatile field
                 §EXT{BaseClass}           Extends
                 §IMPL{Interface}          Implements
                 §EN{id:Name}              Enum (close: §/EN{id})
+                §SYNC{id} expr ... §/SYNC{id}  Lock/synchronization block
                 ```
 
                 ### Properties and Indexers (compact forms)
@@ -534,7 +546,17 @@ public sealed class HelpTool : McpToolBase
                 ```
 
                 ### Visibility: pub, priv, prot, int, protint
-                ### Modifiers: stat, abs, virt, over, seal, req, partial
+                ### Modifiers: stat, abs, virt, over, seal, req, partial, volatile
+
+                ### Parameter Modifiers
+                ```
+                :this     Extension method (first param)
+                :ref      Ref parameter
+                :out      Out parameter
+                :in       In (readonly ref) parameter
+                :params   Params array
+                =expr     Default value (e.g., §I{i32:count}=INT:0)
+                ```
 
                 **Key rule**: If a C# construct has a Calor tag, use it natively. Only use §CSHARP for constructs without native support.
 

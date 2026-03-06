@@ -1323,9 +1323,36 @@
     },
     "§I": {
       "name": "Input Parameter",
-      "syntax": "§I{type:name} or §I{type:name:default}",
-      "description": "Defines an input parameter for a function or method.",
-      "csharpEquivalent": "Type name or Type name = default"
+      "syntax": "§I{type:name} or §I{type:name:modifier} or §I{type:name}=defaultExpr",
+      "description": "Defines an input parameter. Modifiers: 'this' (extension method), 'ref', 'out', 'in', 'params'. Default values use =expr after the closing brace.",
+      "csharpEquivalent": "Type name, this Type name, ref Type name, params Type[] name, Type name = default",
+      "examples": [
+        {
+          "name": "Extension Method Parameter",
+          "calor": "§I{str:value:this}",
+          "description": "Marks this as an extension method parameter (C# 'this' modifier)"
+        },
+        {
+          "name": "Params Array",
+          "calor": "§I{object[]:args:params}",
+          "description": "Params array parameter (C# 'params' keyword)"
+        },
+        {
+          "name": "Default Value",
+          "calor": "§I{i32:count}=INT:0",
+          "description": "Parameter with default value"
+        },
+        {
+          "name": "Ref Parameter",
+          "calor": "§I{i32:value:ref}",
+          "description": "Ref parameter (C# 'ref' keyword)"
+        },
+        {
+          "name": "Out Parameter",
+          "calor": "§I{i32:result:out}",
+          "description": "Out parameter (C# 'out' keyword)"
+        }
+      ]
     },
     "§O": {
       "name": "Output Type",
@@ -1902,6 +1929,13 @@
       "syntax": "§LK{object} body §/LK",
       "description": "Acquires a lock on an object for thread-safe access.",
       "csharpEquivalent": "lock (object) { body }"
+    },
+    "§SYNC": {
+      "name": "Synchronization Block",
+      "syntax": "§SYNC{id} lockExpr body §/SYNC{id}",
+      "description": "Lock/synchronization block. Preferred over §LK for converter output. Compiles to C# lock statement.",
+      "csharpEquivalent": "lock (lockExpr) { body }",
+      "tags": ["§SYNC", "lock", "synchronization", "thread-safety"]
     },
     "§PT": {
       "name": "Property Test",

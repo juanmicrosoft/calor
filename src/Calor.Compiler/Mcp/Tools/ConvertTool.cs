@@ -330,6 +330,12 @@ public sealed class ConvertTool : McpToolBase
             // Analyze interop blocks for features that have native Calor equivalents
             var featureHints = InteropHintAnalyzer.AnalyzeInteropBlocks(calorSourceForOutput);
 
+            // Surface native features successfully used (helps agents discover capabilities)
+            var nativeFeaturesUsed = result.Context.UsedFeatures
+                .Where(f => FeatureSupport.IsFullySupported(f))
+                .OrderBy(f => f)
+                .ToList();
+
             var output = new ConvertToolOutput
             {
                 Success = success,
@@ -350,7 +356,9 @@ public sealed class ConvertTool : McpToolBase
                 UnsupportedFeatureCount = unsupportedFeatureCount,
                 UnsupportedFeatureSummary = unsupportedFeatureSummary,
                 Explanation = explanationOutput,
-                FeatureHints = featureHints.Count > 0 ? featureHints : null
+                FeatureHints = featureHints.Count > 0 ? featureHints : null,
+                NativeFeaturesUsed = nativeFeaturesUsed.Count > 0 ? nativeFeaturesUsed : null,
+                Tip = "Use calor_help with feature='overview' to see all available Calor syntax before writing or editing .calr files."
             };
 
             return Task.FromResult(McpToolResult.Json(output, isError: !success));
@@ -898,6 +906,14 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("featureHints")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? FeatureHints { get; init; }
+
+        [JsonPropertyName("nativeFeaturesUsed")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? NativeFeaturesUsed { get; init; }
+
+        [JsonPropertyName("tip")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Tip { get; init; }
     }
 
     private sealed class ExplanationOutput
