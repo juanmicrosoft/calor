@@ -288,6 +288,7 @@ public sealed class HelpTool : McpToolBase
         ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
         ["synchronization"] = ["lock", "sync", "§SYNC", "monitor", "thread safety"],
         ["ranges"] = ["range", "slice", "..", "§RANGE", "§^", "index from end", "span", "array slice"],
+        ["goto"] = ["goto", "goto case", "goto default", "§GOTO", "jump", "label", "fallthrough"],
         ["limitations"] = ["limitation", "unsupported", "not supported", "workaround", "migration", "known issues", "pragma", "#pragma"],
         ["overview"] = ["overview", "all", "summary", "syntax", "reference", "cheatsheet", "cheat sheet"],
     };
@@ -443,6 +444,9 @@ public sealed class HelpTool : McpToolBase
                 §L{id:item:collection} ... §/L{id}                   Foreach loop
                 §WH{id} (cond) ... §/WH{id}                          While loop
                 §W{expr} §K{pattern} result §/W                      Match/Switch
+                §GOTO{label}                                          Goto label
+                §GOTO{CASE:expr}                                      Goto case expr
+                §GOTO{DEFAULT}                                        Goto default
                 ```
 
                 ### Types and Classes

@@ -1241,6 +1241,35 @@
           "calor": "§B{len} (?. text Length)"
         }
       ]
+    },
+    {
+      "id": "goto_case",
+      "csharpConstruct": "goto case / goto default",
+      "keywords": ["goto", "goto case", "goto default", "jump", "switch fallthrough"],
+      "calorSyntax": "§GOTO{CASE:expr} or §GOTO{DEFAULT}",
+      "description": "Jump to a specific case label or to the default case in a switch statement. For regular goto, use §GOTO{labelName}.",
+      "examples": [
+        {
+          "description": "goto case with integer constant",
+          "csharp": "goto case 1;",
+          "calor": "§GOTO{CASE:1}"
+        },
+        {
+          "description": "goto case with string constant",
+          "csharp": "goto case \"hello\";",
+          "calor": "§GOTO{CASE:hello}"
+        },
+        {
+          "description": "goto default",
+          "csharp": "goto default;",
+          "calor": "§GOTO{DEFAULT}"
+        },
+        {
+          "description": "goto label",
+          "csharp": "goto myLabel;",
+          "calor": "§GOTO{myLabel}"
+        }
+      ]
     }
   ],
   "tags": {
@@ -1405,6 +1434,12 @@
       "syntax": "§TH expression §/TH or §TH§/TH",
       "description": "Throws an exception. Empty form rethrows current exception.",
       "csharpEquivalent": "throw expression; or throw;"
+    },
+    "§GOTO": {
+      "name": "Goto",
+      "syntax": "§GOTO{label} or §GOTO{CASE:expr} or §GOTO{DEFAULT}",
+      "description": "Jump to a label, a switch case label, or the default case. Use CASE: prefix for goto case and DEFAULT for goto default.",
+      "csharpEquivalent": "goto label; or goto case expr; or goto default;"
     },
     "§E": {
       "name": "Effects",
