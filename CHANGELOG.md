@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-03-05
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Added
+- **§SYNC lock statement** — Native `§SYNC{id} (expr) ... §/SYNC{id}` syntax compiling to `lock(expr) { body }` with full round-trip support; follows complete AST node checklist (token, lexer, AST, 5 visitors, parser, converter)
+- **Verbatim identifier mapping** — C# `@keyword` identifiers mapped to backtick syntax (`` `keyword` ``) in Calor via `EscapeCalorIdentifier` helper at 8+ emission points; round-trips correctly to `@keyword` in C# output
+- **Conditional usings in §PP** — `§U` directives inside `§PP` preprocessor blocks at module level; `TypePreprocessorBlockNode` extended with `Usings` property for both active and disabled preprocessor branches
+- **MCP tool consolidation** — 34 MCP tools consolidated to 13 focused tools (`calor_help`, `calor_navigate`, `calor_structure`, `calor_check`, `calor_fix`, `calor_migrate`, `calor_refine`, `calor_batch`); improves discoverability and reduces tool selection confusion
+- **`calor_fix` auto-repair tool** — New MCP tool that diagnoses and auto-applies fixes for common Calor compilation errors
+- **`calor_migrate` tool** — Unified migration workflow combining convert, validate, and fix in a single tool
+- **Primary constructor synthesis** — Primary constructor parameters converted to fields with proper constructor initialization
+- **Tuple type and expression parsing** — Full support for C# tuple types `(int, string)` and tuple literals in converter
+- **Event accessor bodies** — `add`/`remove` accessor bodies in event definitions now converted and emitted correctly
+- **Nested delegate support** — `§DEL` delegate definitions inside class bodies
+- **Goto case/default** — `goto case` and `goto default` converted to `§GOTO{CASE:value}` / `§GOTO{DEFAULT}` with documentation in MCP
+
+### Fixed
+- **String interpolation lexing** — Brace-depth tracking prevents premature close on `{` inside interpolated strings
+- **Null coalescing operator** — `??` operator properly supported in converter and emitter
+- **Null-conditional access** — `?.` chains correctly decomposed during conversion
+- **Nullable lambda parameters** — `Func<int?>` and nullable types in lambda signatures emit correctly
+- **Unsigned numeric literals** — `0u`, `0UL` etc. parsed and emitted correctly
+- **Operator precedence** — Fixed parenthesization in complex expressions during conversion
+- **Target-typed new** — `new()` infers type from context instead of emitting `NEW{object}`
+- **MCP memory pressure** — Wait-and-retry with backoff instead of immediate rejection; concurrency scaled with CPU count
+- **Feature discoverability** — MCP tool output now includes feature support status and workarounds inline
+
 ## [0.3.7] - 2026-03-02
 
 ### Benchmark Results (Statistical: 30 runs)
