@@ -291,22 +291,20 @@ public static class TypeMapper
             return $"?{mappedInner}";
         }
 
-        // Handle arrays T[] -> [T]
+        // Handle arrays T[] -> T_mapped[]
         if (csharpType.EndsWith("[]"))
         {
             var elementType = csharpType[..^2];
             var mappedElement = CSharpToCalor(elementType);
-            return $"[{mappedElement}]";
+            return $"{mappedElement}[]";
         }
 
-        // Handle Calor-style array notation [T] (idempotent when double-mapped).
-        // Must be checked before the generic handler, since [GenericType<args>]
-        // would otherwise be misinterpreted as a generic with the wrong closing char.
+        // Handle Calor-style array notation [T] → T_mapped[] (normalize to postfix)
         if (csharpType.StartsWith("[") && csharpType.EndsWith("]"))
         {
             var elementType = csharpType[1..^1];
             var mappedElement = CSharpToCalor(elementType);
-            return $"[{mappedElement}]";
+            return $"{mappedElement}[]";
         }
 
         // Handle multi-dim arrays T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
@@ -435,13 +433,13 @@ public static class TypeMapper
             return $"{mappedElement}[]";
         }
 
-        // Handle multi-dim array types T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
+        // Handle array types T[] -> T_mapped[], T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
         {
             var bracketStart = calorType.IndexOf('[');
             if (bracketStart > 0 && calorType.EndsWith("]"))
             {
                 var suffix = calorType[bracketStart..];
-                if (suffix.Length >= 3 && suffix.All(c => c == '[' || c == ']' || c == ','))
+                if (suffix.All(c => c == '[' || c == ']' || c == ','))
                 {
                     var elementType = calorType[..bracketStart];
                     var mappedElement = CalorToCSharp(elementType);

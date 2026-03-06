@@ -1324,27 +1324,40 @@ public sealed class Lexer
             if (Current == '\\')
             {
                 Advance();
-                var escaped = Current switch
+                if (Current == 'u')
                 {
-                    'n' => '\n',
-                    'r' => '\r',
-                    't' => '\t',
-                    '0' => '\0',
-                    '\\' => '\\',
-                    '"' => '"',
-                    '$' => '$',
-                    _ => '\x01' // sentinel for invalid escape
-                };
-
-                if (escaped == '\x01')
-                {
-                    _diagnostics.ReportInvalidEscapeSequence(CurrentSpan(), Current);
+                    AppendUnicodeEscape(sb);
                 }
                 else
                 {
-                    sb.Append(escaped);
+                    var escaped = Current switch
+                    {
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        '0' => '\0',
+                        '\\' => '\\',
+                        '"' => '"',
+                        '$' => '$',
+                        '\'' => '\'',
+                        'a' => '\a',
+                        'b' => '\b',
+                        'f' => '\f',
+                        'v' => '\v',
+                        '/' => '/',
+                        _ => '\x01' // sentinel for invalid escape
+                    };
+
+                    if (escaped == '\x01')
+                    {
+                        _diagnostics.ReportInvalidEscapeSequence(CurrentSpan(), Current);
+                    }
+                    else
+                    {
+                        sb.Append(escaped);
+                    }
+                    Advance();
                 }
-                Advance();
             }
             else
             {
@@ -1357,6 +1370,38 @@ public sealed class Lexer
         return MakeToken(TokenKind.Error);
     }
 
+    /// <summary>
+    /// Parses a \uXXXX unicode escape sequence and appends the character to the builder.
+    /// Assumes the 'u' has already been detected but NOT consumed.
+    /// </summary>
+    private void AppendUnicodeEscape(System.Text.StringBuilder sb)
+    {
+        Advance(); // consume 'u'
+        var hex = new System.Text.StringBuilder(4);
+        for (int i = 0; i < 4 && !IsAtEnd; i++)
+        {
+            if (Uri.IsHexDigit(Current))
+            {
+                hex.Append(Current);
+                Advance();
+            }
+            else
+            {
+                break;
+            }
+        }
+        if (hex.Length == 4 && int.TryParse(hex.ToString(), System.Globalization.NumberStyles.HexNumber, null, out var codePoint))
+        {
+            sb.Append((char)codePoint);
+        }
+        else
+        {
+            // Emit the raw \uXXXX if we can't parse it
+            sb.Append("\\u");
+            sb.Append(hex);
+        }
+    }
+
     private Token ScanStringLiteralValue()
     {
         Advance(); // consume opening quote
@@ -1367,27 +1412,40 @@ public sealed class Lexer
             if (Current == '\\')
             {
                 Advance();
-                var escaped = Current switch
+                if (Current == 'u')
                 {
-                    'n' => '\n',
-                    'r' => '\r',
-                    't' => '\t',
-                    '0' => '\0',
-                    '\\' => '\\',
-                    '"' => '"',
-                    '$' => '$',
-                    _ => '\x01' // sentinel for invalid escape
-                };
-
-                if (escaped == '\x01')
-                {
-                    _diagnostics.ReportInvalidEscapeSequence(CurrentSpan(), Current);
+                    AppendUnicodeEscape(sb);
                 }
                 else
                 {
-                    sb.Append(escaped);
+                    var escaped = Current switch
+                    {
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        '0' => '\0',
+                        '\\' => '\\',
+                        '"' => '"',
+                        '$' => '$',
+                        '\'' => '\'',
+                        'a' => '\a',
+                        'b' => '\b',
+                        'f' => '\f',
+                        'v' => '\v',
+                        '/' => '/',
+                        _ => '\x01' // sentinel for invalid escape
+                    };
+
+                    if (escaped == '\x01')
+                    {
+                        _diagnostics.ReportInvalidEscapeSequence(CurrentSpan(), Current);
+                    }
+                    else
+                    {
+                        sb.Append(escaped);
+                    }
+                    Advance();
                 }
-                Advance();
             }
             else if (Current == '$' && Lookahead == '{')
             {

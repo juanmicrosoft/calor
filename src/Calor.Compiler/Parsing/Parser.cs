@@ -9510,6 +9510,32 @@ public sealed class Parser
             }
         }
 
+        // Handle array suffix: Type[] or Type[,]
+        if (Check(TokenKind.OpenBracket))
+        {
+            if (Peek(1).Kind == TokenKind.CloseBracket)
+            {
+                sb.Append("[]");
+                Advance(); // consume [
+                Advance(); // consume ]
+            }
+            else if (Peek(1).Kind == TokenKind.Comma)
+            {
+                sb.Append('[');
+                Advance(); // consume [
+                while (Check(TokenKind.Comma))
+                {
+                    sb.Append(',');
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBracket))
+                {
+                    sb.Append(']');
+                    Advance();
+                }
+            }
+        }
+
         return sb.ToString();
     }
 
