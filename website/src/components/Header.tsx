@@ -43,7 +43,7 @@ export function Header() {
                 height={32}
                 className="h-8 w-8"
               />
-              <span className="text-xl font-bold">Calor</span>
+              <span className="text-xl font-bold font-display">Calor</span>
             </Link>
           </div>
 
@@ -127,7 +127,7 @@ export function Header() {
                   height={32}
                   className="h-8 w-8"
                 />
-                <span className="text-xl font-bold">Calor</span>
+                <span className="text-xl font-bold font-display">Calor</span>
               </Link>
               <button
                 type="button"

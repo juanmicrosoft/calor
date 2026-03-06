@@ -3,6 +3,7 @@
 import { FileCode, Shield, Fingerprint, Layers, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { trackFeatureLearnMore } from '@/lib/analytics';
+import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 const features = [
   {
@@ -40,42 +41,49 @@ const features = [
 ];
 
 export function FeatureGrid() {
+  const sectionRef = useScrollReveal<HTMLDivElement>();
+  const gridRef = useScrollReveal<HTMLDivElement>({ staggerChildren: true, staggerDelay: 120 });
+
   return (
-    <section className="py-24 bg-muted/30">
+    <section className="relative py-24 overflow-hidden">
+      {/* Gradient mesh */}
+      <div className="gradient-mesh gradient-mesh-pink absolute top-10 right-0 w-[500px] h-[500px] -z-10" />
+      <div className="gradient-mesh gradient-mesh-salmon absolute bottom-10 left-10 w-[350px] h-[350px] -z-10" />
+
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
+        <div className="mx-auto max-w-2xl text-center" ref={sectionRef}>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
             Built for How AI Actually Writes Code
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
+          <p className="mt-4 text-lg text-muted-foreground font-body">
             Four features that make AI-generated code reliable
           </p>
         </div>
 
-        <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4" ref={gridRef}>
           {features.map((feature) => {
             const Icon = feature.icon;
             return (
               <div
                 key={feature.name}
-                className="relative rounded-lg border bg-background p-6 hover:border-calor-pink hover:shadow-md transition-all"
+                className="gradient-border relative rounded-xl border bg-background p-6 hover:shadow-xl transition-all duration-300"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-calor-navy/10 to-calor-cyan/10">
-                  <Icon className="h-5 w-5 text-calor-navy" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-calor-pink/10 to-calor-cyan/10 ring-1 ring-calor-pink/10">
+                  <Icon className="h-5 w-5 text-calor-pink" />
                 </div>
-                <h3 className="mt-4 font-semibold">{feature.name}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <h3 className="mt-4 font-semibold font-display text-lg">{feature.name}</h3>
+                <p className="mt-2 text-sm text-muted-foreground font-body leading-relaxed">
                   {feature.description}
                 </p>
-                <div className="mt-4 rounded bg-calor-navy p-3">
-                  <code className="text-xs text-calor-cyan whitespace-pre">
+                <div className="mt-4 rounded-lg bg-calor-navy p-3 shadow-inner">
+                  <code className="text-xs text-calor-cyan whitespace-pre font-mono">
                     {feature.code}
                   </code>
                 </div>
                 {'href' in feature && feature.href && (
                   <Link
                     href={feature.href}
-                    className="mt-4 inline-flex items-center text-sm text-calor-cyan hover:underline"
+                    className="mt-4 inline-flex items-center text-sm text-calor-pink hover:text-calor-salmon transition-colors font-body"
                     onClick={() => trackFeatureLearnMore(feature.name)}
                   >
                     Learn more

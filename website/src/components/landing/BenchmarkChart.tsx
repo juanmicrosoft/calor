@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Clock } from 'lucide-react';
 import { trackBenchmarkDetailClick } from '@/lib/analytics';
+import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 // Build-time import of benchmark data
 import benchmarkData from '../../../public/data/benchmark-results.json';
@@ -119,16 +121,13 @@ function transformMetrics(data: BenchmarkData): BenchmarkResult[] {
       };
     })
     .sort((a, b) => {
-      // Sort Calor-only metrics to the end, then by ratio descending
       if (a.isCalorOnly && !b.isCalorOnly) return 1;
       if (!a.isCalorOnly && b.isCalorOnly) return -1;
       return b.ratio - a.ratio;
     });
 }
 
-// Pre-computed at build time
 const results = transformMetrics(benchmarkData as BenchmarkData);
-const programCount = benchmarkData.summary.programCount;
 const lastUpdated = benchmarkData.timestamp;
 
 function formatRatio(ratio: number, isCalorOnly?: boolean): string {
@@ -137,7 +136,6 @@ function formatRatio(ratio: number, isCalorOnly?: boolean): string {
 }
 
 function getBarWidth(ratio: number): number {
-  // Normalize to 0-100 scale, where 1.0 = 50%
   if (ratio >= 1) {
     return Math.min(50 + (ratio - 1) * 50, 100);
   }
@@ -157,20 +155,68 @@ function formatDate(isoString: string): string {
   }
 }
 
-export function BenchmarkChart() {
+function AnimatedBar({ result }: { result: BenchmarkResult }) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.unobserve(el);
+        }
+      },
+      { threshold: 0.3 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const targetWidth = result.isCalorOnly ? 100 : getBarWidth(result.ratio);
+
   return (
-    <section className="py-24">
+    <div ref={barRef} className="relative h-8 bg-calor-navy/5 rounded-full overflow-hidden">
+      <div
+        className={cn(
+          'absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out',
+          result.isCalorOnly
+            ? 'bg-gradient-to-r from-calor-pink to-calor-salmon'
+            : result.winner === 'calor'
+              ? 'bg-gradient-to-r from-calor-pink to-calor-pink/70'
+              : result.winner === 'tie'
+                ? 'bg-gradient-to-r from-calor-salmon to-calor-salmon/70'
+                : 'bg-gradient-to-r from-calor-cerulean to-calor-cerulean/70'
+        )}
+        style={{ width: visible ? `${targetWidth}%` : '0%' }}
+      />
+      {!result.isCalorOnly && (
+        <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
+      )}
+    </div>
+  );
+}
+
+export function BenchmarkChart() {
+  const sectionRef = useScrollReveal<HTMLDivElement>();
+
+  return (
+    <section className="relative py-24 overflow-hidden">
+      <div className="gradient-mesh gradient-mesh-cyan absolute top-0 left-1/4 w-[500px] h-[500px] -z-10" />
+
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
+        <div className="mx-auto max-w-2xl text-center" ref={sectionRef}>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
             Measured Against Real AI Tasks
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            We tested how well AI agents work with Calor vs C#. Here's what we found.
+          <p className="mt-4 text-lg text-muted-foreground font-body">
+            We tested how well AI agents work with Calor vs C#. Here&apos;s what we found.
           </p>
           <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
-            <span>Last updated: {formatDate(lastUpdated)}</span>
+            <span className="font-body">Last updated: {formatDate(lastUpdated)}</span>
           </div>
         </div>
 
@@ -180,48 +226,30 @@ export function BenchmarkChart() {
               <div key={result.category} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="font-medium">{result.category}</span>
+                    <span className="font-medium font-display">{result.category}</span>
                     <span
                       className={cn(
-                        'text-xs px-2 py-0.5 rounded-full',
+                        'text-xs px-2 py-0.5 rounded-full font-body font-medium',
                         result.isCalorOnly
-                          ? 'bg-calor-pink/20 text-calor-pink'
+                          ? 'bg-calor-pink/15 text-calor-pink'
                           : result.winner === 'calor'
-                            ? 'bg-calor-pink/20 text-calor-pink'
+                            ? 'bg-calor-pink/15 text-calor-pink'
                             : result.winner === 'tie'
-                              ? 'bg-calor-salmon/20 text-calor-salmon'
-                              : 'bg-calor-cerulean/20 text-calor-cerulean'
+                              ? 'bg-calor-salmon/15 text-calor-salmon'
+                              : 'bg-calor-cerulean/15 text-calor-cerulean'
                       )}
                     >
                       {result.isCalorOnly ? 'Calor only' : result.winner === 'calor' ? 'Calor wins' : result.winner === 'tie' ? 'Tie' : 'C# wins'}
                     </span>
                   </div>
-                  <span className="font-mono font-bold">
+                  <span className="font-mono font-bold text-sm">
                     {formatRatio(result.ratio, result.isCalorOnly)}
                   </span>
                 </div>
 
-                <div className="relative h-8 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      'absolute inset-y-0 left-0 rounded-full transition-all duration-500',
-                      result.isCalorOnly
-                        ? 'bg-gradient-to-r from-calor-pink to-calor-pink/60'
-                        : result.winner === 'calor'
-                          ? 'bg-gradient-to-r from-calor-pink to-calor-pink/80'
-                          : result.winner === 'tie'
-                            ? 'bg-gradient-to-r from-calor-salmon to-calor-salmon/80'
-                            : 'bg-gradient-to-r from-calor-cerulean to-calor-cerulean/80'
-                    )}
-                    style={{ width: result.isCalorOnly ? '100%' : `${getBarWidth(result.ratio)}%` }}
-                  />
-                  {/* Center line at 1.0 - hide for Calor-only metrics */}
-                  {!result.isCalorOnly && (
-                    <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
-                  )}
-                </div>
+                <AnimatedBar result={result} />
 
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground font-body">
                   {result.interpretation}
                 </p>
               </div>
@@ -229,7 +257,7 @@ export function BenchmarkChart() {
           </div>
 
           {/* Legend */}
-          <div className="mt-8 flex items-center justify-center gap-8 text-sm text-muted-foreground">
+          <div className="mt-8 flex items-center justify-center gap-8 text-sm text-muted-foreground font-body">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-calor-pink" />
               <span>Calor better</span>
@@ -242,22 +270,22 @@ export function BenchmarkChart() {
               <div className="w-3 h-3 rounded-full bg-calor-cerulean" />
               <span>C# better</span>
             </div>
-            <span className="text-xs">|</span>
+            <span className="text-xs opacity-50">|</span>
             <span className="text-xs">Center line = 1.0x (equal)</span>
           </div>
 
           {/* Key finding */}
-          <div className="mt-12 p-6 rounded-lg border bg-muted/50">
-            <h3 className="font-semibold mb-2">The Bottom Line</h3>
-            <p className="text-muted-foreground">
-              <strong>Calor wins where bugs hurt most:</strong> AI understands code better, catches more errors, and makes safer changes.
-              <strong> C# wins on familiarity:</strong> AI has seen more C# code, so it generates it faster. But as AI learns Calor,
-              the familiarity gap shrinks—the safety advantage doesn't.
+          <div className="mt-12 p-6 rounded-xl border bg-gradient-to-br from-calor-pink/5 to-calor-salmon/5">
+            <h3 className="font-semibold mb-2 font-display">The Bottom Line</h3>
+            <p className="text-muted-foreground font-body leading-relaxed">
+              <strong className="text-foreground">Calor wins where bugs hurt most:</strong> AI understands code better, catches more errors, and makes safer changes.
+              <strong className="text-foreground"> C# wins on familiarity:</strong> AI has seen more C# code, so it generates it faster. But as AI learns Calor,
+              the familiarity gap shrinks—the safety advantage doesn&apos;t.
             </p>
           </div>
 
           <div className="mt-8 text-center">
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild className="font-body">
               <Link href="/docs/benchmarking/results/" onClick={() => trackBenchmarkDetailClick()}>
                 View detailed benchmarks
               </Link>
