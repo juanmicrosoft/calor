@@ -128,7 +128,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (node.Name != null)
         {
-            var namespaceName = node.Name.ToString();
+            var namespaceName = node.Name.ToString().Replace("@", "");
             var isStatic = node.StaticKeyword.IsKind(SyntaxKind.StaticKeyword);
             var alias = node.Alias?.Name.ToString();
 
@@ -241,15 +241,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 if (xmlNode is XmlElementSyntax element)
                 {
                     var tagName = element.StartTag.Name.ToString();
-                    var content = element.Content.ToString()
-                        .Replace("///", "")
-                        .Trim();
-                    // Clean up multi-line content
-                    var cleanLines = content
-                        .Split('\n')
-                        .Select(l => l.TrimStart().TrimStart('/').TrimStart())
-                        .Where(l => !string.IsNullOrWhiteSpace(l));
-                    var text = string.Join(" ", cleanLines).Trim();
+                    // Extract plain text from element content, stripping inline XML tags
+                    var text = ExtractPlainTextFromXml(element.Content);
                     if (!string.IsNullOrEmpty(text))
                     {
                         lines.Add(tagName switch
@@ -260,11 +253,32 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             "remarks" => $"@remarks {text}",
                             "exception" => $"@throws {GetXmlAttributeValue(element.StartTag, "cref")} — {text}",
                             "example" => $"@example {text}",
-                            "see" or "seealso" => $"@see {text}",
+                            "see" or "seealso" => $"@see {(string.IsNullOrEmpty(GetXmlAttributeValue(element.StartTag, "cref")) ? text : GetXmlAttributeValue(element.StartTag, "cref"))}",
                             "typeparam" => $"@typeparam {GetXmlAttributeValue(element.StartTag, "name")} — {text}",
                             "value" => $"@value {text}",
                             _ => $"@{tagName} {text}"
                         });
+                    }
+                }
+                else if (xmlNode is XmlEmptyElementSyntax emptyElem)
+                {
+                    // Self-closing tags like <see cref="X"/> at top level
+                    var tagName = emptyElem.Name.ToString();
+                    if (tagName is "see" or "seealso")
+                    {
+                        var cref = "";
+                        foreach (var attr in emptyElem.Attributes)
+                        {
+                            var attrStr = attr.ToString().Trim();
+                            var eqIdx = attrStr.IndexOf('=');
+                            if (eqIdx >= 0)
+                            {
+                                cref = attrStr.Substring(eqIdx + 1).Trim().Trim('"', '\'');
+                                break;
+                            }
+                        }
+                        if (!string.IsNullOrEmpty(cref))
+                            lines.Add($"@see {cref}");
                     }
                 }
             }
@@ -273,6 +287,46 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 return string.Join("\n", lines);
         }
         return null;
+    }
+
+    /// <summary>
+    /// Extracts plain text from XML content, stripping inline tags like see, c, paramref, typeparamref.
+    /// </summary>
+    private static string ExtractPlainTextFromXml(SyntaxList<XmlNodeSyntax> content)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var node in content)
+        {
+            switch (node)
+            {
+                case XmlTextSyntax text:
+                    sb.Append(text.ToString().Replace("///", ""));
+                    break;
+                case XmlElementSyntax elem:
+                    // Inline elements like <c>text</c>, <code>text</code>
+                    sb.Append(ExtractPlainTextFromXml(elem.Content));
+                    break;
+                case XmlEmptyElementSyntax empty:
+                    // Self-closing like <see cref="X"/>, <paramref name="x"/>
+                    foreach (var attr in empty.Attributes)
+                    {
+                        var str = attr.ToString().Trim();
+                        var eqIdx = str.IndexOf('=');
+                        if (eqIdx >= 0)
+                        {
+                            sb.Append(str.Substring(eqIdx + 1).Trim().Trim('"', '\''));
+                            break;
+                        }
+                    }
+                    break;
+            }
+        }
+        // Clean up: normalize whitespace
+        var cleaned = sb.ToString()
+            .Split('\n')
+            .Select(l => l.TrimStart().TrimStart('/').TrimStart())
+            .Where(l => !string.IsNullOrWhiteSpace(l));
+        return string.Join(" ", cleaned).Trim();
     }
 
     /// <summary>
@@ -307,14 +361,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitNamespaceDeclaration(NamespaceDeclarationSyntax node)
     {
-        _context.EnterNamespace(node.Name.ToString());
+        _context.EnterNamespace(node.Name.ToString().Replace("@", ""));
         base.VisitNamespaceDeclaration(node);
         _context.ExitNamespace();
     }
 
     public override void VisitFileScopedNamespaceDeclaration(FileScopedNamespaceDeclarationSyntax node)
     {
-        _context.EnterNamespace(node.Name.ToString());
+        _context.EnterNamespace(node.Name.ToString().Replace("@", ""));
         base.VisitFileScopedNamespaceDeclaration(node);
         _context.ExitNamespace();
     }

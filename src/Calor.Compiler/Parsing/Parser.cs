@@ -1317,8 +1317,20 @@ public sealed class Parser
             TokenKind.RawCSharpExpression => ParseRawCSharpExpression(),
             // Dependent Types: Self-reference in refinement predicates
             TokenKind.Hash => ParseSelfRef(),
-            _ => throw new InvalidOperationException($"Unexpected token {Current.Kind}")
+            _ => RecoverFromUnexpectedToken()
         };
+    }
+
+    /// <summary>
+    /// Recovers from an unexpected token in expression context by emitting a diagnostic,
+    /// skipping the token, and returning an error placeholder expression.
+    /// </summary>
+    private ExpressionNode RecoverFromUnexpectedToken()
+    {
+        var token = Current;
+        _diagnostics.ReportUnexpectedToken(token.Span, "expression", token.Kind);
+        Advance(); // skip the unexpected token
+        return new IntLiteralNode(token.Span, 0); // placeholder
     }
 
     /// <summary>
@@ -3536,7 +3548,16 @@ public sealed class Parser
         }
 
         // Parse the main value (identifier, literal, or compound identifier)
-        if (Check(TokenKind.Identifier))
+        // Handle @identifier (C# verbatim identifier prefix) — strip @ and use identifier
+        if (Check(TokenKind.At))
+        {
+            Advance(); // consume @
+            if (Check(TokenKind.Identifier) || Current.IsKeyword)
+            {
+                sb.Append(Advance().Text);
+            }
+        }
+        else if (Check(TokenKind.Identifier))
         {
             sb.Append(Advance().Text);
 
