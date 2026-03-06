@@ -1332,6 +1332,7 @@ public sealed class Lexer
                     '0' => '\0',
                     '\\' => '\\',
                     '"' => '"',
+                    '$' => '$',
                     _ => '\x01' // sentinel for invalid escape
                 };
 
@@ -1374,6 +1375,7 @@ public sealed class Lexer
                     '0' => '\0',
                     '\\' => '\\',
                     '"' => '"',
+                    '$' => '$',
                     _ => '\x01' // sentinel for invalid escape
                 };
 
@@ -1386,6 +1388,35 @@ public sealed class Lexer
                     sb.Append(escaped);
                 }
                 Advance();
+            }
+            else if (Current == '$' && Lookahead == '{')
+            {
+                // Interpolation: ${...} — scan until matching } with brace-depth tracking
+                sb.Append(Current); // $
+                Advance();
+                sb.Append(Current); // {
+                Advance();
+
+                int depth = 1;
+                while (!IsAtEnd && depth > 0)
+                {
+                    if (Current == '{')
+                        depth++;
+                    else if (Current == '}')
+                        depth--;
+
+                    if (depth > 0)
+                    {
+                        sb.Append(Current);
+                        Advance();
+                    }
+                }
+
+                if (!IsAtEnd)
+                {
+                    sb.Append(Current); // closing }
+                    Advance();
+                }
             }
             else if (Current == '\n')
             {
