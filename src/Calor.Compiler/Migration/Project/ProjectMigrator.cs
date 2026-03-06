@@ -34,7 +34,7 @@ public sealed class ProjectMigrator
     /// <summary>
     /// Executes a migration plan.
     /// </summary>
-    public async Task<MigrationReport> ExecuteAsync(MigrationPlan plan, bool dryRun = false, IProgress<MigrationProgress>? progress = null)
+    public async Task<MigrationReport> ExecuteAsync(MigrationPlan plan, bool dryRun = false, IProgress<MigrationProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         var reportBuilder = new MigrationReportBuilder()
             .SetDirection(plan.Direction)
@@ -52,10 +52,11 @@ public sealed class ProjectMigrator
             var semaphore = new SemaphoreSlim(_options.MaxParallelism);
             var tasks = entriesToProcess.Select(async entry =>
             {
-                await semaphore.WaitAsync();
+                await semaphore.WaitAsync(cancellationToken);
                 try
                 {
-                    var result = await ProcessEntryAsync(entry, plan.Direction, dryRun);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var result = await ProcessEntryAsync(entry, plan.Direction, dryRun, cancellationToken);
                     reportBuilder.AddFileResult(result);
 
                     Interlocked.Increment(ref processedCount);
@@ -75,13 +76,22 @@ public sealed class ProjectMigrator
                 }
             });
 
-            await Task.WhenAll(tasks);
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            catch (OperationCanceledException)
+            {
+                // Return partial results collected so far
+            }
         }
         else
         {
             foreach (var entry in entriesToProcess)
             {
-                var result = await ProcessEntryAsync(entry, plan.Direction, dryRun);
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+                var result = await ProcessEntryAsync(entry, plan.Direction, dryRun, cancellationToken);
                 reportBuilder.AddFileResult(result);
 
                 processedCount++;
@@ -129,9 +139,9 @@ public sealed class ProjectMigrator
     /// <summary>
     /// Performs a dry run showing what would be migrated.
     /// </summary>
-    public async Task<MigrationReport> DryRunAsync(MigrationPlan plan)
+    public async Task<MigrationReport> DryRunAsync(MigrationPlan plan, CancellationToken cancellationToken = default)
     {
-        return await ExecuteAsync(plan, dryRun: true);
+        return await ExecuteAsync(plan, dryRun: true, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -195,11 +205,12 @@ public sealed class ProjectMigrator
         }
     }
 
-    private async Task<FileMigrationResult> ProcessEntryAsync(MigrationPlanEntry entry, MigrationDirection direction, bool dryRun)
+    private async Task<FileMigrationResult> ProcessEntryAsync(MigrationPlanEntry entry, MigrationDirection direction, bool dryRun, CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.UtcNow;
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_options.PerFileTimeoutSeconds));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(_options.PerFileTimeoutSeconds));
         try
         {
             if (direction == MigrationDirection.CSharpToCalor)

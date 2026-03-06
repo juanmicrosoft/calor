@@ -156,7 +156,7 @@ public sealed class MigrateTool : McpToolBase
         ct.ThrowIfCancellationRequested();
         var plan = await migrator.CreatePlanAsync(projectPath, MigrationDirection.CSharpToCalor);
         ct.ThrowIfCancellationRequested();
-        var report = await migrator.ExecuteAsync(plan);
+        var report = await migrator.ExecuteAsync(plan, cancellationToken: ct);
 
         var perFile = report.FileResults.Select(f => new MigrateFileResult
         {
@@ -336,7 +336,7 @@ public sealed class MigrateTool : McpToolBase
         ct.ThrowIfCancellationRequested();
         var plan = await migrator.CreatePlanAsync(projectPath, MigrationDirection.CSharpToCalor);
         ct.ThrowIfCancellationRequested();
-        var report = await migrator.ExecuteAsync(plan);
+        var report = await migrator.ExecuteAsync(plan, cancellationToken: ct);
 
         foreach (var f in report.FileResults)
         {

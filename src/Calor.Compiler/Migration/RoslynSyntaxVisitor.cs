@@ -219,6 +219,92 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return false;
     }
 
+    /// <summary>
+    /// Extracts XML doc comment text from a Roslyn node's leading trivia.
+    /// Returns a cleaned multi-line string suitable for Calor line comments, or null.
+    /// </summary>
+    private static string? ExtractDocComment(SyntaxNode node)
+    {
+        foreach (var trivia in node.GetLeadingTrivia())
+        {
+            if (!trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) &&
+                !trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                continue;
+
+            var structure = trivia.GetStructure();
+            if (structure is not DocumentationCommentTriviaSyntax docComment)
+                continue;
+
+            var lines = new List<string>();
+            foreach (var xmlNode in docComment.Content)
+            {
+                if (xmlNode is XmlElementSyntax element)
+                {
+                    var tagName = element.StartTag.Name.ToString();
+                    var content = element.Content.ToString()
+                        .Replace("///", "")
+                        .Trim();
+                    // Clean up multi-line content
+                    var cleanLines = content
+                        .Split('\n')
+                        .Select(l => l.TrimStart().TrimStart('/').TrimStart())
+                        .Where(l => !string.IsNullOrWhiteSpace(l));
+                    var text = string.Join(" ", cleanLines).Trim();
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        lines.Add(tagName switch
+                        {
+                            "summary" => text,
+                            "param" => $"@param {GetXmlAttributeValue(element.StartTag, "name")} — {text}",
+                            "returns" => $"@returns {text}",
+                            "remarks" => $"@remarks {text}",
+                            "exception" => $"@throws {GetXmlAttributeValue(element.StartTag, "cref")} — {text}",
+                            "example" => $"@example {text}",
+                            "see" or "seealso" => $"@see {text}",
+                            "typeparam" => $"@typeparam {GetXmlAttributeValue(element.StartTag, "name")} — {text}",
+                            "value" => $"@value {text}",
+                            _ => $"@{tagName} {text}"
+                        });
+                    }
+                }
+            }
+
+            if (lines.Count > 0)
+                return string.Join("\n", lines);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts doc comment and attaches it to an AST node.
+    /// </summary>
+    private static void AttachDocComment(AstNode astNode, SyntaxNode roslynNode)
+    {
+        var doc = ExtractDocComment(roslynNode);
+        if (doc != null)
+            astNode.DocComment = doc;
+    }
+
+    /// <summary>
+    /// Gets the value of a named XML attribute from a start tag.
+    /// </summary>
+    private static string GetXmlAttributeValue(XmlElementStartTagSyntax startTag, string attrName)
+    {
+        foreach (var attr in startTag.Attributes)
+        {
+            var str = attr.ToString().Trim();
+            // Match patterns like: name="value" or cref="Type.Member"
+            if (str.StartsWith($"{attrName}=", StringComparison.OrdinalIgnoreCase) ||
+                str.StartsWith($"{attrName} =", StringComparison.OrdinalIgnoreCase))
+            {
+                var eqIdx = str.IndexOf('=');
+                if (eqIdx >= 0)
+                    return str.Substring(eqIdx + 1).Trim().Trim('"', '\'');
+            }
+        }
+        return "";
+    }
+
     public override void VisitNamespaceDeclaration(NamespaceDeclarationSyntax node)
     {
         _context.EnterNamespace(node.Name.ToString());
@@ -300,6 +386,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         try
         {
             var interfaceNode = ConvertInterface(node);
+            AttachDocComment(interfaceNode, node);
             _interfaces.Add(interfaceNode);
             _context.Stats.InterfacesConverted++;
             _context.IncrementConverted();
@@ -335,7 +422,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             else if (member is PropertyDeclarationSyntax propertySyntax)
             {
-                properties.Add(ConvertProperty(propertySyntax));
+                var propNode = ConvertProperty(propertySyntax);
+                AttachDocComment(propNode, propertySyntax);
+                properties.Add(propNode);
             }
             else if (member is IndexerDeclarationSyntax indexerSyntax)
             {
@@ -382,6 +471,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         try
         {
             var classNode = ConvertClass(node);
+            AttachDocComment(classNode, node);
             _classes.Add(classNode);
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
@@ -414,6 +504,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         try
         {
             var classNode = ConvertRecord(node);
+            AttachDocComment(classNode, node);
             _classes.Add(classNode);
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
@@ -446,6 +537,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         try
         {
             var classNode = ConvertStruct(node);
+            AttachDocComment(classNode, node);
             _classes.Add(classNode);
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
@@ -511,6 +603,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 visibility);
 
             _enums.Add(enumNode);
+            AttachDocComment(enumNode, node);
             _context.Stats.EnumsConverted++;
             _context.IncrementConverted();
         }
@@ -936,16 +1029,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 fields.AddRange(ConvertFields(fieldSyntax));
                 break;
             case PropertyDeclarationSyntax propertySyntax:
-                properties.Add(ConvertProperty(propertySyntax));
+                var propNode = ConvertProperty(propertySyntax);
+                AttachDocComment(propNode, propertySyntax);
+                properties.Add(propNode);
                 break;
             case IndexerDeclarationSyntax indexerSyntax:
                 indexers?.Add(ConvertIndexer(indexerSyntax));
                 break;
             case ConstructorDeclarationSyntax ctorSyntax:
-                constructors.Add(ConvertConstructor(ctorSyntax));
+                var ctorNode = ConvertConstructor(ctorSyntax);
+                AttachDocComment(ctorNode, ctorSyntax);
+                constructors.Add(ctorNode);
                 break;
             case MethodDeclarationSyntax methodSyntax:
-                methods.Add(ConvertMethod(methodSyntax));
+                var methodNode = ConvertMethod(methodSyntax);
+                AttachDocComment(methodNode, methodSyntax);
+                methods.Add(methodNode);
                 break;
             case OperatorDeclarationSyntax opSyntax:
                 operatorOverloads.Add(ConvertOperatorOverload(opSyntax));
@@ -1037,16 +1136,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     fields.AddRange(ConvertFields(fieldSyntax));
                     break;
                 case PropertyDeclarationSyntax propertySyntax:
-                    properties.Add(ConvertProperty(propertySyntax));
+                    var propNode2 = ConvertProperty(propertySyntax);
+                    AttachDocComment(propNode2, propertySyntax);
+                    properties.Add(propNode2);
                     break;
                 case IndexerDeclarationSyntax indexerSyntax:
                     indexers.Add(ConvertIndexer(indexerSyntax));
                     break;
                 case ConstructorDeclarationSyntax ctorSyntax:
-                    constructors.Add(ConvertConstructor(ctorSyntax));
+                    var ctorNode2 = ConvertConstructor(ctorSyntax);
+                    AttachDocComment(ctorNode2, ctorSyntax);
+                    constructors.Add(ctorNode2);
                     break;
                 case MethodDeclarationSyntax methodSyntax:
-                    methods.Add(ConvertMethod(methodSyntax));
+                    var methodNode2 = ConvertMethod(methodSyntax);
+                    AttachDocComment(methodNode2, methodSyntax);
+                    methods.Add(methodNode2);
                     break;
                 case OperatorDeclarationSyntax opSyntax:
                     operatorOverloads.Add(ConvertOperatorOverload(opSyntax));
@@ -8322,3 +8427,4 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return "";
     }
 }
+

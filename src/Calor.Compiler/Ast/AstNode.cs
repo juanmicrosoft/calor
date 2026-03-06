@@ -9,6 +9,12 @@ public abstract class AstNode
 {
     public TextSpan Span { get; }
 
+    /// <summary>
+    /// Optional XML doc comment extracted during C# → Calor conversion.
+    /// Emitted as line comments above the construct.
+    /// </summary>
+    public string? DocComment { get; set; }
+
     protected AstNode(TextSpan span)
     {
         Span = span;
