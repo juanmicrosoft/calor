@@ -50,6 +50,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void Dedent() => _indentLevel--;
 
     /// <summary>
+    /// Emits doc comment lines (if present) as Calor line comments before a construct.
+    /// </summary>
+    private void EmitDocComment(AstNode node)
+    {
+        if (node.DocComment == null)
+            return;
+        foreach (var line in node.DocComment.Split('\n'))
+        {
+            AppendLine($"// {line.Trim()}");
+        }
+    }
+
+    /// <summary>
     /// Captures statement output to a separate string instead of the main builder.
     /// Used for lambda statement bodies where we need to embed statements inline.
     /// </summary>
@@ -183,6 +196,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(InterfaceDefinitionNode node)
     {
+        EmitDocComment(node);
         var typeParams = node.TypeParameters.Count > 0
             ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
@@ -281,6 +295,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ClassDefinitionNode node)
     {
+        EmitDocComment(node);
         var modifiers = new List<string>();
         if (node.IsAbstract) modifiers.Add("abs");
         if (node.IsSealed) modifiers.Add("seal");
@@ -442,6 +457,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(PropertyNode node)
     {
+        EmitDocComment(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
@@ -686,6 +702,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(MethodNode node)
     {
+        EmitDocComment(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
         var modifiers = new List<string>();
 
@@ -2233,6 +2250,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EnumDefinitionNode node)
     {
+        EmitDocComment(node);
         // Format: §EN{id:Name:vis} or §EN{id:Name:vis:underlyingType}
         var vis = GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);

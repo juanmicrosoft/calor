@@ -242,8 +242,8 @@ public sealed class BatchTool : McpToolBase
 
             cancellationToken.ThrowIfCancellationRequested();
             var report = dryRun
-                ? await migrator.DryRunAsync(plan)
-                : await migrator.ExecuteAsync(plan);
+                ? await migrator.DryRunAsync(plan, cancellationToken)
+                : await migrator.ExecuteAsync(plan, cancellationToken: cancellationToken);
 
             // If skipOnError is false, check for any failures and abort early
             if (!skipOnError)
