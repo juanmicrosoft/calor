@@ -152,4 +152,119 @@ public class AnalyzeDirectoryTests
         Assert.Contains("success", text);
         Assert.Contains("summary", text);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_AssessDirectory_ScansCSFiles()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempDir, "Simple.cs"),
+                "public class Simple { public int Add(int a, int b) { return a + b; } }");
+            File.WriteAllText(Path.Combine(tempDir, "Other.cs"),
+                "public class Other { public string Greet(string name) { return \"Hello \" + name; } }");
+
+            var args = JsonDocument.Parse($$"""
+                {
+                    "action": "assess",
+                    "directoryPath": "{{tempDir.Replace("\\", "\\\\")}}"
+                }
+                """).RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.False(result.IsError);
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.True(json.GetProperty("success").GetBoolean());
+            Assert.True(json.GetProperty("summary").GetProperty("totalFiles").GetInt32() >= 1);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AssessDirectory_NonexistentDir_ReturnsError()
+    {
+        var args = JsonDocument.Parse("""
+            {
+                "action": "assess",
+                "directoryPath": "/nonexistent/assess/dir"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.True(result.IsError);
+        Assert.Contains("Directory not found", result.Content[0].Text!);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MinimizeDirectory_ScansCalrFiles()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempDir, "file1.calr"),
+                "§M{m001:Test1}\n§F{f001:Add:pub}\n§I{i32:a}\n§O{i32}\n§CSHARP\nreturn a + 1;\n§/CSHARP\n§/F{f001}\n§/M{m001}");
+
+            var args = JsonDocument.Parse($$"""
+                {
+                    "action": "minimize",
+                    "directoryPath": "{{tempDir.Replace("\\", "\\\\")}}"
+                }
+                """).RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.False(result.IsError);
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.True(json.GetProperty("success").GetBoolean());
+            Assert.Equal(1, json.GetProperty("summary").GetProperty("totalFiles").GetInt32());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SecurityDirectory_MaxFiles_LimitsResults()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                File.WriteAllText(Path.Combine(tempDir, $"file{i}.calr"),
+                    $"§M{{m{i:D3}:Test{i}}}\n§F{{f{i:D3}:Fn:pub}}\n§O{{i32}}\n§R {i}\n§/F{{f{i:D3}}}\n§/M{{m{i:D3}}}");
+            }
+
+            var args = JsonDocument.Parse($$"""
+                {
+                    "action": "security",
+                    "directoryPath": "{{tempDir.Replace("\\", "\\\\")}}",
+                    "maxFiles": 2
+                }
+                """).RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.False(result.IsError);
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.Equal(2, json.GetProperty("summary").GetProperty("totalFiles").GetInt32());
+            Assert.Equal(2, json.GetProperty("files").GetArrayLength());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
 }
