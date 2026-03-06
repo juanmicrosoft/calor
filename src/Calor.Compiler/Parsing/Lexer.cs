@@ -1345,6 +1345,8 @@ public sealed class Lexer
                         'f' => '\f',
                         'v' => '\v',
                         '/' => '/',
+                        '{' => '{',
+                        '}' => '}',
                         _ => '\x01' // sentinel for invalid escape
                     };
 
@@ -1433,6 +1435,8 @@ public sealed class Lexer
                         'f' => '\f',
                         'v' => '\v',
                         '/' => '/',
+                        '{' => '{',
+                        '}' => '}',
                         _ => '\x01' // sentinel for invalid escape
                     };
 
