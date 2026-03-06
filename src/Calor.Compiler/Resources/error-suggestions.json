@@ -221,6 +221,36 @@
       "wrongExample": "ext fn ToUpper() -> str     // Missing self parameter",
       "correctExample": "ext fn ToUpper(self:str) -> str",
       "explanation": "Extension functions require a 'self' parameter as the first argument to specify the type being extended. This is equivalent to the 'this' parameter in C# extension methods."
+    },
+    {
+      "id": "new-object-autofix",
+      "title": "Auto-Fixable: NEW{object} Placeholder",
+      "matchPatterns": ["§NEW{object}", "NEW{object}"],
+      "matchCodes": ["Calor0106", "Calor0200"],
+      "description": "The converter generated §NEW{object} where a concrete type is needed. Use calor_fix with error code 'new_object' to auto-replace from context (binding type, field type, throw → Exception, return type).",
+      "wrongExample": "§B{b1:result:List<int>} §NEW{object}§/NEW",
+      "correctExample": "§B{b1:result:List<int>} §NEW{List<int>}§/NEW",
+      "explanation": "The calor_fix tool infers the correct type from surrounding context: §B binding types, §FLD field types, §TH throw (→ Exception), or §O return types."
+    },
+    {
+      "id": "arrow-multi-statement-autofix",
+      "title": "Auto-Fixable: Arrow Body with Multiple Statements",
+      "matchPatterns": ["arrow", "→", "multiple statements", "single statement only"],
+      "matchCodes": ["Calor0106"],
+      "description": "Arrow syntax (→) only supports a single statement. Use calor_fix with error code 'arrow_multi_statement' to convert to block form automatically.",
+      "wrongExample": "§IF{if1} (condition) → §B{x} 1 §R x",
+      "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x\n§/I{if1}",
+      "explanation": "The calor_fix tool detects arrow bodies with multiple §-tagged statements and rewrites them as block bodies with proper closing tags."
+    },
+    {
+      "id": "id-conflicts-autofix",
+      "title": "Auto-Fixable: Duplicate Declaration IDs",
+      "matchPatterns": ["duplicate id", "id conflict", "already defined"],
+      "matchCodes": ["Calor0301", "Calor0302"],
+      "description": "Duplicate declaration IDs (e.g., two §F{f1:...}) cause compilation errors. Use calor_fix with error code 'id_conflicts' to renumber duplicates automatically.",
+      "wrongExample": "§F{f1:Foo:pub} ... §/F{f1}\n§F{f1:Bar:pub} ... §/F{f1}",
+      "correctExample": "§F{f1:Foo:pub} ... §/F{f1}\n§F{f2:Bar:pub} ... §/F{f2}",
+      "explanation": "The calor_fix tool scans for duplicate IDs and renumbers the second (and subsequent) occurrences while updating both opening and closing tags."
     }
   ]
 }
