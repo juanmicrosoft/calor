@@ -950,11 +950,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         if (node.CaseLabel != null)
         {
-            AppendLine($"§CSHARP{{goto case {node.CaseLabel.Accept(this)};}}§/CSHARP");
+            AppendLine($"§GOTO{{CASE:{node.CaseLabel.Accept(this)}}}");
         }
         else if (node.IsDefault)
         {
-            AppendLine("§CSHARP{goto default;}§/CSHARP");
+            AppendLine("§GOTO{DEFAULT}");
         }
         else
         {

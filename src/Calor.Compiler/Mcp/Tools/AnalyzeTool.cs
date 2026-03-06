@@ -81,6 +81,10 @@ public sealed class AnalyzeTool : McpToolBase
                 "filePath": {
                     "type": "string",
                     "description": "Path to a .calr file to analyze for §CSHARP blocks (minimize action)"
+                },
+                "directoryPath": {
+                    "type": "string",
+                    "description": "Path to a directory containing .calr files to analyze (security action, scans recursively)"
                 }
             },
 
@@ -105,10 +109,16 @@ public sealed class AnalyzeTool : McpToolBase
 
     private Task<McpToolResult> HandleSecurity(JsonElement? arguments, CancellationToken cancellationToken)
     {
+        var directoryPath = GetString(arguments, "directoryPath");
+        if (!string.IsNullOrEmpty(directoryPath))
+        {
+            return HandleDirectorySecurity(directoryPath, arguments, cancellationToken);
+        }
+
         var source = GetString(arguments, "source");
         if (string.IsNullOrEmpty(source))
         {
-            return Task.FromResult(McpToolResult.Error("Missing required parameter: source"));
+            return Task.FromResult(McpToolResult.Error("Missing required parameter: source (or directoryPath)"));
         }
 
         var options = GetOptions(arguments);
@@ -172,6 +182,110 @@ public sealed class AnalyzeTool : McpToolBase
         catch (Exception ex)
         {
             return Task.FromResult(McpToolResult.Error($"Analysis failed: {ex.Message}"));
+        }
+    }
+
+    // ── Directory security analysis ────────────────────────────────────
+
+    private Task<McpToolResult> HandleDirectorySecurity(string directoryPath, JsonElement? arguments, CancellationToken cancellationToken)
+    {
+        var pathError = ValidatePath(directoryPath, "directoryPath");
+        if (pathError != null)
+            return Task.FromResult(pathError);
+
+        if (!Directory.Exists(directoryPath))
+            return Task.FromResult(McpToolResult.Error($"Directory not found: {directoryPath}"));
+
+        var options = GetOptions(arguments);
+        var enableDataflow = GetBool(options, "enableDataflow", defaultValue: true);
+        var enableBugPatterns = GetBool(options, "enableBugPatterns", defaultValue: true);
+        var enableTaintAnalysis = GetBool(options, "enableTaintAnalysis", defaultValue: true);
+
+        try
+        {
+            var calrFiles = Directory.GetFiles(directoryPath, "*.calr", SearchOption.AllDirectories);
+            if (calrFiles.Length == 0)
+                return Task.FromResult(McpToolResult.Error($"No .calr files found in directory: {directoryPath}"));
+
+            var fileSummaries = new List<DirectoryFileResult>();
+            var allPatterns = new Dictionary<string, int>();
+            var totalIssues = 0;
+            var filesWithIssues = 0;
+
+            foreach (var filePath in calrFiles)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var source = File.ReadAllText(filePath);
+                var analysisOptions = new VerificationAnalysisOptions
+                {
+                    EnableDataflow = enableDataflow,
+                    EnableBugPatterns = enableBugPatterns,
+                    EnableTaintAnalysis = enableTaintAnalysis,
+                    EnableKInduction = false,
+                    UseZ3Verification = true
+                };
+
+                var compileOptions = new CompilationOptions
+                {
+                    EnableVerificationAnalyses = true,
+                    VerificationAnalysisOptions = analysisOptions,
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                    CancellationToken = cancellationToken
+                };
+
+                var result = Program.Compile(source, Path.GetFileName(filePath), compileOptions);
+                var analysisResult = compileOptions.VerificationAnalysisResult;
+
+                var issueCount = result.Diagnostics.Count;
+                totalIssues += issueCount;
+                if (issueCount > 0) filesWithIssues++;
+
+                // Aggregate pattern counts
+                foreach (var diag in result.Diagnostics)
+                {
+                    var category = CategorizeIssue(diag.Code.ToString());
+                    allPatterns.TryGetValue(category, out var count);
+                    allPatterns[category] = count + 1;
+                }
+
+                var relativePath = Path.GetRelativePath(directoryPath, filePath);
+                fileSummaries.Add(new DirectoryFileResult
+                {
+                    File = relativePath,
+                    Score = analysisResult?.FunctionsAnalyzed ?? 0,
+                    IssueCount = issueCount,
+                    HasErrors = result.HasErrors
+                });
+            }
+
+            var topPatterns = allPatterns
+                .OrderByDescending(kv => kv.Value)
+                .Select(kv => new PatternCount { Pattern = kv.Key, Count = kv.Value })
+                .ToList();
+
+            var output = new DirectoryAnalysisOutput
+            {
+                Success = true,
+                Summary = new DirectoryAnalysisSummary
+                {
+                    TotalFiles = calrFiles.Length,
+                    FilesWithIssues = filesWithIssues,
+                    TotalIssues = totalIssues,
+                    TopPatterns = topPatterns
+                },
+                Files = fileSummaries
+            };
+
+            return Task.FromResult(McpToolResult.Json(output));
+        }
+        catch (OperationCanceledException)
+        {
+            return Task.FromResult(McpToolResult.Error("Directory analysis was cancelled"));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(McpToolResult.Error($"Directory analysis failed: {ex.Message}"));
         }
     }
 
@@ -709,5 +823,58 @@ public sealed class AnalyzeTool : McpToolBase
         [JsonPropertyName("blockLine")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int BlockLine { get; set; }
+    }
+
+    // ── DTOs: Directory Analysis ───────────────────────────────────────
+
+    private sealed class DirectoryAnalysisOutput
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; init; }
+
+        [JsonPropertyName("summary")]
+        public required DirectoryAnalysisSummary Summary { get; init; }
+
+        [JsonPropertyName("files")]
+        public required List<DirectoryFileResult> Files { get; init; }
+    }
+
+    private sealed class DirectoryAnalysisSummary
+    {
+        [JsonPropertyName("totalFiles")]
+        public int TotalFiles { get; init; }
+
+        [JsonPropertyName("filesWithIssues")]
+        public int FilesWithIssues { get; init; }
+
+        [JsonPropertyName("totalIssues")]
+        public int TotalIssues { get; init; }
+
+        [JsonPropertyName("topPatterns")]
+        public required List<PatternCount> TopPatterns { get; init; }
+    }
+
+    private sealed class DirectoryFileResult
+    {
+        [JsonPropertyName("file")]
+        public required string File { get; init; }
+
+        [JsonPropertyName("score")]
+        public int Score { get; init; }
+
+        [JsonPropertyName("issueCount")]
+        public int IssueCount { get; init; }
+
+        [JsonPropertyName("hasErrors")]
+        public bool HasErrors { get; init; }
+    }
+
+    private sealed class PatternCount
+    {
+        [JsonPropertyName("pattern")]
+        public required string Pattern { get; init; }
+
+        [JsonPropertyName("count")]
+        public int Count { get; init; }
     }
 }

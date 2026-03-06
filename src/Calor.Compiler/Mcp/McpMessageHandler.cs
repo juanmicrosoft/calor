@@ -65,6 +65,9 @@ public sealed class McpMessageHandler
         // ── Auto-fix ─────────────────────────────────────────
         RegisterTool(new FixTool());
 
+        // ── Migration pipeline ──────────────────────────────
+        RegisterTool(new MigrateTool());
+
         // ── Testing ─────────────────────────────────────────
         RegisterTool(new SelfTestTool());
 

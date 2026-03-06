@@ -549,21 +549,21 @@
     {
       "id": "null_check",
       "csharpConstruct": "null check",
-      "keywords": ["null", "nullable", "?.", "??", "null check", "optional"],
-      "calorSyntax": "§?{expression}§/? for null-conditional, §??{default} for null-coalescing",
-      "description": "Handles nullable values. §? for null-conditional access, §?? for default values.",
+      "keywords": ["null", "nullable", "?.", "??", "null check", "optional", "null coalescing", "null conditional"],
+      "calorSyntax": "(?? left right) for null-coalescing, (?. target Member) for null-conditional",
+      "description": "Handles nullable values. (?? left right) returns left if non-null, else right. (?. target Member) accesses Member on target only if non-null. Both use Lisp-style prefix notation inside parentheses.",
       "examples": [
         {
-          "csharp": "user?.Name",
-          "calor": "§?{user.Name}§/?"
-        },
-        {
           "csharp": "name ?? \"default\"",
-          "calor": "name §??{\"default\"}"
+          "calor": "(?? name \"default\")"
         },
         {
-          "csharp": "user?.Address?.City ?? \"Unknown\"",
-          "calor": "§?{user.Address.City}§/? §??{\"Unknown\"}"
+          "csharp": "user?.Name",
+          "calor": "(?. user Name)"
+        },
+        {
+          "csharp": "GetValue() ?? fallback",
+          "calor": "(?? §C{GetValue}§/C fallback)"
         }
       ]
     },
@@ -868,17 +868,21 @@
     {
       "id": "event_definition",
       "csharpConstruct": "event definition",
-      "keywords": ["event", "delegate", "handler", "subscribe", "publish", "raise", "eventhandler"],
-      "calorSyntax": "§EV{id:name:visibility} §O{EventType} §/EV",
-      "description": "Defines an event that other objects can subscribe to.",
+      "keywords": ["event", "delegate", "handler", "subscribe", "publish", "raise", "eventhandler", "add", "remove", "accessor", "§EADD", "§EREM"],
+      "calorSyntax": "§EVT{id:name:visibility:delegateType} ... §/EVT{id}",
+      "description": "Defines an event. Simple form has no body. For custom add/remove accessors, use §EADD/§EREM blocks inside the event body, closed with §/EVT{id}.",
       "examples": [
         {
           "csharp": "public event EventHandler OnChanged;",
-          "calor": "§EV{1:OnChanged:pub}\n  §O{EventHandler}\n§/EV"
+          "calor": "§EVT{e1:OnChanged:pub:EventHandler}"
         },
         {
           "csharp": "public event Action<int> ValueUpdated;",
-          "calor": "§EV{1:ValueUpdated:pub}\n  §O{Action<i32>}\n§/EV"
+          "calor": "§EVT{e1:ValueUpdated:pub:Action<i32>}"
+        },
+        {
+          "csharp": "public event EventHandler Click { add { _click += value; } remove { _click -= value; } }",
+          "calor": "§EVT{e1:Click:pub:EventHandler}\n  §EADD\n    §ASSIGN _click (+ _click value)\n  §/EADD\n  §EREM\n    §ASSIGN _click (- _click value)\n  §/EREM\n§/EVT{e1}"
         }
       ]
     },
@@ -961,9 +965,9 @@
     {
       "id": "delegate_definition",
       "csharpConstruct": "delegate definition",
-      "keywords": ["delegate", "callback", "function pointer", "multicast", "action", "func", "predicate"],
+      "keywords": ["delegate", "callback", "function pointer", "multicast", "action", "func", "predicate", "nested delegate"],
       "calorSyntax": "§DEL{id:name:visibility} §I{type:param}... §O{returnType} §/DEL",
-      "description": "Defines a delegate type (function signature). Use for callbacks, event handlers, and function references.",
+      "description": "Defines a delegate type (function signature). Use for callbacks, event handlers, and function references. §DEL can appear at the top level or nested inside §CL class bodies.",
       "examples": [
         {
           "csharp": "public delegate void EventCallback(string message);",
@@ -972,6 +976,10 @@
         {
           "csharp": "public delegate int Transformer(int value);",
           "calor": "§DEL{1:Transformer:pub}\n  §I{i32:value}\n  §O{i32}\n§/DEL"
+        },
+        {
+          "csharp": "public class MyClass { public delegate void Handler(int x); }",
+          "calor": "§CL{1:MyClass:pub}\n  §DEL{d1:Handler:pub}\n    §I{i32:x}\n    §O{void}\n  §/DEL\n§/CL"
         }
       ]
     },
@@ -1176,6 +1184,61 @@
         {
           "csharp": "#pragma warning restore 1591",
           "calor": "§CSHARP{#pragma warning restore 1591}§/CSHARP"
+        }
+      ]
+    },
+    {
+      "id": "tuple_type",
+      "csharpConstruct": "tuple type and tuple literal",
+      "keywords": ["tuple", "value tuple", "pair", "triple", "deconstruct", "(,)", "tuple literal", "tuple type"],
+      "calorSyntax": "(Type1, Type2) for types; (expr1, expr2) for literals",
+      "description": "Tuple types use parenthesized comma-separated types: (i32, str). Tuple literals use parenthesized comma-separated expressions: (1, \"hello\"). Named tuple elements are supported: (i32 X, i32 Y). Tuples are distinguished from Lisp expressions by the presence of commas.",
+      "examples": [
+        {
+          "csharp": "(int, string) pair = (1, \"hello\");",
+          "calor": "§B{pair:(i32, str)} (1, \"hello\")"
+        },
+        {
+          "csharp": "(int X, int Y) point = (10, 20);",
+          "calor": "§B{point:(i32 X, i32 Y)} (10, 20)"
+        },
+        {
+          "csharp": "return (a + b, a - b);",
+          "calor": "§R ((+ a b), (- a b))"
+        }
+      ]
+    },
+    {
+      "id": "null_coalescing_operator",
+      "csharpConstruct": "null coalescing operator",
+      "keywords": ["??", "null coalescing", "null-coalescing", "default value", "fallback", "coalesce"],
+      "calorSyntax": "(?? left right)",
+      "description": "Null-coalescing operator in Lisp-style prefix notation. Returns left if non-null, otherwise returns right. Use inside parentheses: (?? expr default).",
+      "examples": [
+        {
+          "csharp": "var result = value ?? \"default\";",
+          "calor": "§B{result} (?? value \"default\")"
+        },
+        {
+          "csharp": "return name ?? \"Anonymous\";",
+          "calor": "§R (?? name \"Anonymous\")"
+        }
+      ]
+    },
+    {
+      "id": "null_conditional_operator",
+      "csharpConstruct": "null conditional operator",
+      "keywords": ["?.", "null conditional", "null-conditional", "safe navigation", "optional chaining", "null propagation"],
+      "calorSyntax": "(?. target MemberName)",
+      "description": "Null-conditional member access in Lisp-style prefix notation. Accesses MemberName on target only if target is non-null, otherwise returns null. The member name is an unquoted identifier.",
+      "examples": [
+        {
+          "csharp": "var name = user?.Name;",
+          "calor": "§B{name} (?. user Name)"
+        },
+        {
+          "csharp": "var len = text?.Length;",
+          "calor": "§B{len} (?. text Length)"
         }
       ]
     }
@@ -1433,6 +1496,24 @@
       "description": "Defines an enum member.",
       "csharpEquivalent": "Name or Name = value"
     },
+    "§EVT": {
+      "name": "Event",
+      "syntax": "§EVT{id:name:visibility:delegateType} [§EADD...§/EADD §EREM...§/EREM] §/EVT{id}",
+      "description": "Defines an event. Positional attributes: id, name, visibility, delegateType. Simple form (no body) for field-like events. With §EADD/§EREM accessor blocks for custom add/remove logic.",
+      "csharpEquivalent": "public event DelegateType Name; or event with add/remove accessors"
+    },
+    "§EADD": {
+      "name": "Event Add Accessor",
+      "syntax": "§EADD body §/EADD",
+      "description": "Custom add accessor body inside an event definition (§EVT). Contains statements executed when a handler is subscribed.",
+      "csharpEquivalent": "add { body }"
+    },
+    "§EREM": {
+      "name": "Event Remove Accessor",
+      "syntax": "§EREM body §/EREM",
+      "description": "Custom remove accessor body inside an event definition (§EVT). Contains statements executed when a handler is unsubscribed.",
+      "csharpEquivalent": "remove { body }"
+    },
     "§LAM": {
       "name": "Lambda",
       "syntax": "§LAM{id} body §/LAM  —or—  (param) → expr",
@@ -1488,16 +1569,22 @@
       "csharpEquivalent": "where T : constraint"
     },
     "§?": {
-      "name": "Null-Conditional",
+      "name": "Null-Conditional (Legacy)",
       "syntax": "§?{expression}§/?",
-      "description": "Null-conditional access.",
+      "description": "Legacy null-conditional syntax. Prefer Lisp-style (?. target Member) for null-conditional access.",
       "csharpEquivalent": "expression?."
     },
     "§??": {
-      "name": "Null-Coalescing",
+      "name": "Null-Coalescing (Legacy)",
       "syntax": "expression §??{default}",
-      "description": "Provides default value if null.",
+      "description": "Legacy null-coalescing syntax. Prefer Lisp-style (?? left right) for null-coalescing.",
       "csharpEquivalent": "expression ?? default"
+    },
+    "§?.": {
+      "name": "Null-Conditional Access",
+      "syntax": "(?. target Member)",
+      "description": "Null-conditional member access in Lisp prefix notation. Returns null if target is null, otherwise accesses Member.",
+      "csharpEquivalent": "target?.Member"
     },
     "§D": {
       "name": "Data/Record",
