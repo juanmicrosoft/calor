@@ -805,7 +805,7 @@ public class TypeSystemTests
     public void CSharpToCalor_GenericArrayType_MapsCorrectly()
     {
         var result = Migration.TypeMapper.CSharpToCalor("KeyValuePair<string, long>[]");
-        Assert.Equal("[KeyValuePair<str, i64>]", result);
+        Assert.Equal("KeyValuePair<str, i64>[]", result);
     }
 
     [Fact]

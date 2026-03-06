@@ -4250,6 +4250,54 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
+        // Handle null-conditional expression statements (e.g., _writer?.Close(), handler?.Invoke(args))
+        if (expr is ConditionalAccessExpressionSyntax condAccess)
+        {
+            _context.RecordFeatureUsage("null-conditional");
+            var targetExpr = condAccess.Expression.ToString();
+
+            // Decompose into: §IF{id} (!= target null)  §C{target.Method} §A args §/C  §/I{id}
+            var condId = _context.GenerateId("if", "nullcond");
+
+            // Build the non-null call
+            string callTarget;
+            var callArgs = new List<ExpressionNode>();
+            if (condAccess.WhenNotNull is InvocationExpressionSyntax inv
+                && inv.Expression is MemberBindingExpressionSyntax mb)
+            {
+                callTarget = $"{targetExpr}.{mb.Name.Identifier.Text}";
+                callArgs = inv.ArgumentList.Arguments
+                    .Select(a => ConvertExpression(a.Expression))
+                    .ToList();
+            }
+            else
+            {
+                var memberName = condAccess.WhenNotNull.ToString().TrimStart('.');
+                callTarget = $"{targetExpr}.{memberName}";
+            }
+
+            var nullCheck = new IfStatementNode(
+                GetTextSpan(node),
+                condId,
+                new BinaryOperationNode(GetTextSpan(node), BinaryOperator.NotEqual,
+                    new ReferenceNode(GetTextSpan(node), targetExpr),
+                    new ReferenceNode(GetTextSpan(node), "null")),
+                new StatementNode[]
+                {
+                    new CallStatementNode(
+                        GetTextSpan(node),
+                        callTarget,
+                        fallible: false,
+                        callArgs,
+                        new AttributeCollection())
+                },
+                Array.Empty<ElseIfClauseNode>(),
+                null,
+                new AttributeCollection());
+
+            return nullCheck;
+        }
+
         // Default: wrap as call statement
         return new CallStatementNode(
             GetTextSpan(node),
@@ -4644,6 +4692,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("if");
         var condition = ConvertExpression(node.Condition);
 
+        // Hoist CallExpressionNode instances from conditions to temp bindings.
+        // §C{...}§/C tags are block-level and can't appear inside expression contexts (IF conditions).
+        condition = HoistCallsFromCondition(condition);
+
         // Separate pending statements into two categories:
         // 1. Chain bindings (_chain*, _cast*) → must go BEFORE the if (condition depends on them)
         // 2. Pattern variable bindings (from `is` patterns) → go inside then-body
@@ -4859,12 +4911,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return result;
         }
 
+        // Hoist complex from/to/step expressions to temp bindings.
+        // The §L{...} header is colon-delimited — nested section markers (§IDX, §C, §NEW) would break parsing.
+        from ??= new IntLiteralNode(TextSpan.Empty, 0);
+        to ??= new IntLiteralNode(TextSpan.Empty, 10);
+        if (ContainsNestedMarker(from))
+        {
+            var tempFrom = _context.GenerateId("_from");
+            result.Add(new BindStatementNode(span, tempFrom, null, false, from, new AttributeCollection()));
+            from = new ReferenceNode(span, tempFrom);
+        }
+        if (ContainsNestedMarker(to))
+        {
+            var tempTo = _context.GenerateId("_to");
+            result.Add(new BindStatementNode(span, tempTo, null, false, to, new AttributeCollection()));
+            to = new ReferenceNode(span, tempTo);
+        }
+
         result.Add(new ForStatementNode(
             span,
             id,
             varName ?? "i",
-            from ?? new IntLiteralNode(TextSpan.Empty, 0),
-            to ?? new IntLiteralNode(TextSpan.Empty, 10),
+            from,
+            to,
             step,
             body,
             new AttributeCollection()));
@@ -6122,6 +6191,58 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return modifiers.Any(m => m != null) ? modifiers : null;
     }
 
+    /// <summary>
+    /// Hoists CallExpressionNode instances out of IF conditions to temp bindings.
+    /// §C{...}§/C tags are block-level constructs that cannot appear inside expression contexts.
+    /// Recursively walks the condition tree and replaces calls with references to pre-computed values.
+    /// </summary>
+    private ExpressionNode HoistCallsFromCondition(ExpressionNode condition)
+    {
+        if (condition is CallExpressionNode call)
+        {
+            var tempName = _context.GenerateId("_pre", call.Target.Split('.').Last());
+            _pendingStatements.Add(new BindStatementNode(
+                call.Span, tempName, null, false, call, new AttributeCollection()));
+            return new ReferenceNode(call.Span, tempName);
+        }
+
+        if (condition is BinaryOperationNode binOp)
+        {
+            var newLeft = HoistCallsFromCondition(binOp.Left);
+            var newRight = HoistCallsFromCondition(binOp.Right);
+            if (!ReferenceEquals(newLeft, binOp.Left) || !ReferenceEquals(newRight, binOp.Right))
+            {
+                return new BinaryOperationNode(binOp.Span, binOp.Operator, newLeft, newRight);
+            }
+        }
+
+        if (condition is UnaryOperationNode unaryOp)
+        {
+            var newOperand = HoistCallsFromCondition(unaryOp.Operand);
+            if (!ReferenceEquals(newOperand, unaryOp.Operand))
+            {
+                return new UnaryOperationNode(unaryOp.Span, unaryOp.Operator, newOperand);
+            }
+        }
+
+        return condition;
+    }
+
+    /// <summary>
+    /// Checks if an expression contains nodes that emit section markers (§IDX, §C, §NEW, etc.)
+    /// which cannot appear inside §L{...} header attributes.
+    /// </summary>
+    private static bool ContainsNestedMarker(ExpressionNode expr)
+    {
+        return expr is ArrayAccessNode
+            or CallExpressionNode
+            or NewExpressionNode
+            or ArrayCreationNode
+            or LambdaExpressionNode
+            || (expr is BinaryOperationNode bin && (ContainsNestedMarker(bin.Left) || ContainsNestedMarker(bin.Right)))
+            || (expr is UnaryOperationNode un && ContainsNestedMarker(un.Operand));
+    }
+
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
     {
         var target = invocation.Expression.ToString();
@@ -6608,6 +6729,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var args = objCreation.ArgumentList?.Arguments
             .Select(a => ConvertExpression(a.Expression))
             .ToList() ?? new List<ExpressionNode>();
+
+        // Hoist §NEW arguments to temp bindings — parser cannot handle §NEW nested inside §NEW
+        HoistComplexArguments(args);
 
         // Convert StringBuilder to native operations
         if (typeName == "StringBuilder" || typeName == "System.Text.StringBuilder")

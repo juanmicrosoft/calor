@@ -160,7 +160,7 @@ public class Program
 
             try
             {
-                await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze);
             }
             catch (Exception ex)
             {
@@ -170,12 +170,12 @@ public class Program
             finally
             {
                 sw.Stop();
-                telemetry?.TrackCommand("compile", Environment.ExitCode, new Dictionary<string, string>
+                telemetry?.TrackCommand("compile", ctx.ExitCode, new Dictionary<string, string>
                 {
                     ["durationMs"] = sw.ElapsedMilliseconds.ToString()
                 });
 
-                if (Environment.ExitCode != 0)
+                if (ctx.ExitCode != 0)
                 {
                     IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "compile",
                         "Compilation failed (see errors above)");
@@ -226,7 +226,7 @@ public class Program
         return result;
     }
 
-    private static async Task CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze)
+    private static async Task<int> CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze)
     {
         try
         {
@@ -260,14 +260,13 @@ public class Program
                 Console.WriteLine("  --clear-cache     Clear verification cache before compiling");
                 Console.WriteLine();
                 Console.WriteLine("Run 'calor --help' for more information.");
-                return;
+                return 0;
             }
 
             if (!input.Exists)
             {
                 Console.Error.WriteLine($"Error: Input file not found: {input.FullName}");
-                Environment.ExitCode = 1;
-                return;
+                return 1;
             }
 
             if (verbose)
@@ -311,8 +310,7 @@ public class Program
                 {
                     Console.Error.WriteLine(diagnostic);
                 }
-                Environment.ExitCode = 1;
-                return;
+                return 1;
             }
 
             // Determine output path
@@ -334,11 +332,12 @@ public class Program
             }
 
             Console.WriteLine($"Compilation successful: {outputPath}");
+            return 0;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
-            Environment.ExitCode = 1;
+            return 1;
         }
     }
 

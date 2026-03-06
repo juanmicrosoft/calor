@@ -4,7 +4,7 @@
       §R (str value)
     §/MT{m002}
 
-    §MT{m003:Describe:pub} (i32:x, [str]:labels) -> str
+    §MT{m003:Describe:pub} (i32:x, str[]:labels) -> str
       §R "The value is ${Format(x)} with label ${labels[0]}"
     §/MT{m003}
 

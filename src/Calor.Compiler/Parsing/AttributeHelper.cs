@@ -160,9 +160,11 @@ public static class AttributeHelper
         if (string.IsNullOrEmpty(value))
             return false;
 
-        // Array types start with '[' e.g., [i32], [str]
+        // Array types: [i32], [str] (prefix) or i32[], str[] (postfix)
         if (value.StartsWith('['))
             return true;
+        if (value.EndsWith("[]"))
+            return IsLikelyType(value[..^2]);
 
         // Pointer types: i32*, void**, etc.
         if (value.EndsWith('*'))

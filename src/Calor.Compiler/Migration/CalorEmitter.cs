@@ -172,7 +172,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else if (node.Alias != null)
         {
-            AppendLine($"§U{{{node.Alias}={node.Namespace}}}");
+            AppendLine($"§U{{{node.Alias}:{node.Namespace}}}");
         }
         else
         {
