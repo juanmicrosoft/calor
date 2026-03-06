@@ -606,15 +606,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var operatorOverloads = new List<OperatorOverloadNode>();
 
         // Convert C# 12 primary constructor parameters to readonly fields
+        // and synthesize a constructor that assigns them.
         if (node.ParameterList != null)
         {
             _context.RecordFeatureUsage("primary-constructor");
             var explicitNames = CollectExplicitMemberNames(node.Members);
+            var synthesizedFieldNames = new List<string>();
             foreach (var param in node.ParameterList.Parameters)
             {
                 var fieldName = param.Identifier.Text;
                 if (explicitNames.Contains(fieldName))
                     continue;
+                synthesizedFieldNames.Add(fieldName);
                 var fieldTypeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
                 var fieldCsharpAttrs = ConvertAttributes(param.AttributeLists);
 
@@ -624,42 +627,54 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     fieldTypeName,
                     Visibility.Private,
                     MethodModifiers.Readonly,
-                    param.Default != null ? ConvertExpression(param.Default.Value) : null,
+                    defaultValue: null,
                     new AttributeCollection(),
                     fieldCsharpAttrs));
             }
 
-            // Synthesize constructor for primary constructor with base class call
+            // Synthesize constructor that assigns primary ctor params to fields
+            var ctorId = _context.GenerateId("ctor");
+            var ctorParams = ConvertParameters(node.ParameterList);
+            var ctorBody = new List<StatementNode>();
+            foreach (var fieldName in synthesizedFieldNames)
+            {
+                var span = GetTextSpan(node.ParameterList);
+                ctorBody.Add(new AssignmentStatementNode(
+                    span,
+                    new FieldAccessNode(span, new ThisExpressionNode(span), fieldName),
+                    new ReferenceNode(span, fieldName)));
+            }
+
+            ConstructorInitializerNode? initializer = null;
             if (node.BaseList != null)
             {
                 foreach (var baseType in node.BaseList.Types)
                 {
                     if (baseType is PrimaryConstructorBaseTypeSyntax primaryBase)
                     {
-                        var ctorId = _context.GenerateId("ctor");
-                        var ctorParams = ConvertParameters(node.ParameterList);
                         var baseArgs = primaryBase.ArgumentList.Arguments
                             .Select(a => ConvertExpression(a.Expression))
                             .ToList();
-                        var initializer = new ConstructorInitializerNode(
+                        initializer = new ConstructorInitializerNode(
                             GetTextSpan(primaryBase),
                             isBaseCall: true,
                             baseArgs);
-                        constructors.Add(new ConstructorNode(
-                            GetTextSpan(node.ParameterList),
-                            ctorId,
-                            visibility,
-                            ctorParams,
-                            preconditions: Array.Empty<RequiresNode>(),
-                            initializer,
-                            Array.Empty<StatementNode>(),
-                            new AttributeCollection(),
-                            Array.Empty<CalorAttributeNode>(),
-                            isStatic: false));
-                        break; // only one base class
+                        break;
                     }
                 }
             }
+
+            constructors.Add(new ConstructorNode(
+                GetTextSpan(node.ParameterList),
+                ctorId,
+                visibility,
+                ctorParams,
+                preconditions: Array.Empty<RequiresNode>(),
+                initializer,
+                ctorBody,
+                new AttributeCollection(),
+                Array.Empty<CalorAttributeNode>(),
+                isStatic: false));
         }
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
@@ -1096,11 +1111,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             _context.RecordFeatureUsage("primary-constructor");
             var explicitNames = CollectExplicitMemberNames(node.Members);
+            var synthesizedFieldNames = new List<string>();
             foreach (var param in node.ParameterList.Parameters)
             {
                 var fieldName = param.Identifier.Text;
                 if (explicitNames.Contains(fieldName))
                     continue;
+                synthesizedFieldNames.Add(fieldName);
                 var fieldTypeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
                 var fieldCsharpAttrs = ConvertAttributes(param.AttributeLists);
 
@@ -1110,10 +1127,35 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     fieldTypeName,
                     Visibility.Private,
                     MethodModifiers.Readonly,
-                    param.Default != null ? ConvertExpression(param.Default.Value) : null,
+                    defaultValue: null,
                     new AttributeCollection(),
                     fieldCsharpAttrs));
             }
+
+            // Synthesize constructor that assigns primary ctor params to fields
+            var ctorId = _context.GenerateId("ctor");
+            var ctorParams = ConvertParameters(node.ParameterList);
+            var ctorBody = new List<StatementNode>();
+            foreach (var fieldName in synthesizedFieldNames)
+            {
+                var span = GetTextSpan(node.ParameterList);
+                ctorBody.Add(new AssignmentStatementNode(
+                    span,
+                    new FieldAccessNode(span, new ThisExpressionNode(span), fieldName),
+                    new ReferenceNode(span, fieldName)));
+            }
+
+            constructors.Add(new ConstructorNode(
+                GetTextSpan(node.ParameterList),
+                ctorId,
+                visibility,
+                ctorParams,
+                preconditions: Array.Empty<RequiresNode>(),
+                initializer: null,
+                ctorBody,
+                new AttributeCollection(),
+                Array.Empty<CalorAttributeNode>(),
+                isStatic: false));
         }
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
