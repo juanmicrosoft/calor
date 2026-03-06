@@ -2113,7 +2113,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(NullConditionalNode node)
     {
         var target = node.Target.Accept(this);
-        return $"{target}?.{node.MemberName}";
+        return $"(?. {target} \"{node.MemberName}\")";
     }
 
     // Pattern-related methods

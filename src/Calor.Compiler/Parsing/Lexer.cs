@@ -1398,7 +1398,7 @@ public sealed class Lexer
                 Advance();
 
                 int depth = 1;
-                while (!IsAtEnd && depth > 0)
+                while (!IsAtEnd && depth > 0 && Current != '"')
                 {
                     if (Current == '{')
                         depth++;
@@ -1412,11 +1412,12 @@ public sealed class Lexer
                     }
                 }
 
-                if (!IsAtEnd)
+                if (!IsAtEnd && Current == '}')
                 {
                     sb.Append(Current); // closing }
                     Advance();
                 }
+                // If we hit " before closing }, the ${...} was unmatched — already appended as literal
             }
             else if (Current == '\n')
             {

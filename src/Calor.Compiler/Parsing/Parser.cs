@@ -1659,6 +1659,25 @@ public sealed class Parser
             return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
         }
 
+        // Handle null-conditional access: (?. target "member")
+        if (opText == "?." && args.Count == 2)
+        {
+            // Second arg is the member name — either a string literal or reference
+            var memberName = args[1] switch
+            {
+                StringLiteralNode strNode => strNode.Value,
+                ReferenceNode refNode => refNode.Name,
+                _ => args[1].ToString() ?? ""
+            };
+            return new NullConditionalNode(span, args[0], memberName);
+        }
+        if (opText == "?.")
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
+                $"Null-conditional '?.' requires exactly 2 operands (target member), got {args.Count}");
+            return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
+        }
+
         // Determine if this is unary or binary based on argument count and operator
         if (args.Count == 1 && IsUnaryOperator(opKind))
         {
@@ -1984,6 +2003,9 @@ public sealed class Parser
             case TokenKind.NullCoalesce:
                 Advance();
                 return (TokenKind.NullCoalesce, "??", span);
+            case TokenKind.NullConditional:
+                Advance();
+                return (TokenKind.NullConditional, "?.", span);
             case TokenKind.Question:
                 Advance();
                 return (TokenKind.Question, "?", span);
