@@ -84,7 +84,11 @@ public sealed class AnalyzeTool : McpToolBase
                 },
                 "directoryPath": {
                     "type": "string",
-                    "description": "Path to a directory containing .calr files to analyze (security action, scans recursively)"
+                    "description": "Path to a directory to analyze recursively. For 'security'/'minimize' scans .calr files; for 'assess' scans .cs files."
+                },
+                "maxFiles": {
+                    "type": "integer",
+                    "description": "Maximum number of files to analyze when using directoryPath (default: no limit)"
                 }
             },
 
@@ -112,7 +116,8 @@ public sealed class AnalyzeTool : McpToolBase
         var directoryPath = GetString(arguments, "directoryPath");
         if (!string.IsNullOrEmpty(directoryPath))
         {
-            return HandleDirectorySecurity(directoryPath, arguments, cancellationToken);
+            var maxFiles = GetInt(arguments, "maxFiles", 0);
+            return HandleDirectorySecurity(directoryPath, maxFiles, arguments, cancellationToken);
         }
 
         var source = GetString(arguments, "source");
@@ -187,7 +192,7 @@ public sealed class AnalyzeTool : McpToolBase
 
     // ── Directory security analysis ────────────────────────────────────
 
-    private Task<McpToolResult> HandleDirectorySecurity(string directoryPath, JsonElement? arguments, CancellationToken cancellationToken)
+    private Task<McpToolResult> HandleDirectorySecurity(string directoryPath, int maxFiles, JsonElement? arguments, CancellationToken cancellationToken)
     {
         var pathError = ValidatePath(directoryPath, "directoryPath");
         if (pathError != null)
@@ -206,6 +211,9 @@ public sealed class AnalyzeTool : McpToolBase
             var calrFiles = Directory.GetFiles(directoryPath, "*.calr", SearchOption.AllDirectories);
             if (calrFiles.Length == 0)
                 return Task.FromResult(McpToolResult.Error($"No .calr files found in directory: {directoryPath}"));
+
+            if (maxFiles > 0)
+                calrFiles = calrFiles.Take(maxFiles).ToArray();
 
             var fileSummaries = new List<DirectoryFileResult>();
             var allPatterns = new Dictionary<string, int>();
@@ -307,19 +315,180 @@ public sealed class AnalyzeTool : McpToolBase
         return "other";
     }
 
+    // ── Directory assess (C# convertibility) ─────────────────────────────
+
+    private Task<McpToolResult> HandleDirectoryAssess(string directoryPath, int threshold, int maxFiles)
+    {
+        var pathError = ValidatePath(directoryPath, "directoryPath");
+        if (pathError != null)
+            return Task.FromResult(pathError);
+
+        if (!Directory.Exists(directoryPath))
+            return Task.FromResult(McpToolResult.Error($"Directory not found: {directoryPath}"));
+
+        try
+        {
+            var csFiles = Directory.GetFiles(directoryPath, "*.cs", SearchOption.AllDirectories)
+                .Where(f => !IsExcludedPath(f))
+                .ToArray();
+
+            if (csFiles.Length == 0)
+                return Task.FromResult(McpToolResult.Error($"No .cs files found in directory: {directoryPath}"));
+
+            if (maxFiles > 0)
+                csFiles = csFiles.Take(maxFiles).ToArray();
+
+            var analyzer = new MigrationAnalyzer();
+            var files = new List<AssessFileResult>();
+
+            foreach (var file in csFiles)
+            {
+                try
+                {
+                    var source = File.ReadAllText(file);
+                    var relativePath = Path.GetRelativePath(directoryPath, file);
+                    var result = analyzer.AnalyzeSource(source, relativePath, relativePath);
+                    if (!result.WasSkipped && result.TotalScore >= threshold)
+                    {
+                        files.Add(CreateFileResult(result));
+                    }
+                }
+                catch
+                {
+                    // Skip files that can't be read
+                }
+            }
+
+            files.Sort((a, b) => b.Score.CompareTo(a.Score));
+
+            var summary = new AssessSummary
+            {
+                TotalFiles = files.Count,
+                AverageScore = files.Count > 0 ? Math.Round(files.Average(f => f.Score), 1) : 0,
+                PriorityBreakdown = new PriorityBreakdown
+                {
+                    Critical = files.Count(f => f.Priority == "critical"),
+                    High = files.Count(f => f.Priority == "high"),
+                    Medium = files.Count(f => f.Priority == "medium"),
+                    Low = files.Count(f => f.Priority == "low")
+                }
+            };
+
+            return Task.FromResult(McpToolResult.Json(new AssessOutput
+            {
+                Success = true,
+                Summary = summary,
+                Files = files
+            }));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(McpToolResult.Error($"Directory assessment failed: {ex.Message}"));
+        }
+    }
+
+    // ── Directory minimize (§CSHARP block analysis) ────────────────────
+
+    private Task<McpToolResult> HandleDirectoryMinimize(string directoryPath, int maxFiles)
+    {
+        var pathError = ValidatePath(directoryPath, "directoryPath");
+        if (pathError != null)
+            return Task.FromResult(pathError);
+
+        if (!Directory.Exists(directoryPath))
+            return Task.FromResult(McpToolResult.Error($"Directory not found: {directoryPath}"));
+
+        try
+        {
+            var calrFiles = Directory.GetFiles(directoryPath, "*.calr", SearchOption.AllDirectories);
+            if (calrFiles.Length == 0)
+                return Task.FromResult(McpToolResult.Error($"No .calr files found in directory: {directoryPath}"));
+
+            if (maxFiles > 0)
+                calrFiles = calrFiles.Take(maxFiles).ToArray();
+
+            var fileSummaries = new List<DirectoryFileResult>();
+            var totalBlocks = 0;
+            var totalConvertible = 0;
+
+            foreach (var file in calrFiles)
+            {
+                try
+                {
+                    var source = File.ReadAllText(file);
+                    var blocks = ExtractCSharpBlocks(source);
+                    var suggestions = new List<MinimizeSuggestion>();
+                    foreach (var block in blocks)
+                    {
+                        suggestions.AddRange(AnalyzeCSharpCode(block.Code));
+                    }
+
+                    var convertible = suggestions.Count(s => s.Confidence == "high");
+                    totalBlocks += blocks.Count;
+                    totalConvertible += convertible;
+
+                    var relativePath = Path.GetRelativePath(directoryPath, file);
+                    fileSummaries.Add(new DirectoryFileResult
+                    {
+                        File = relativePath,
+                        Score = blocks.Count,
+                        IssueCount = convertible,
+                        HasErrors = false
+                    });
+                }
+                catch
+                {
+                    // Skip unreadable files
+                }
+            }
+
+            var output = new DirectoryAnalysisOutput
+            {
+                Success = true,
+                Summary = new DirectoryAnalysisSummary
+                {
+                    TotalFiles = calrFiles.Length,
+                    FilesWithIssues = fileSummaries.Count(f => f.Score > 0),
+                    TotalIssues = totalBlocks,
+                    TopPatterns = [new PatternCount { Pattern = "convertible_constructs", Count = totalConvertible }]
+                },
+                Files = fileSummaries
+            };
+
+            return Task.FromResult(McpToolResult.Json(output));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(McpToolResult.Error($"Directory minimize analysis failed: {ex.Message}"));
+        }
+    }
+
+    private static bool IsExcludedPath(string path)
+    {
+        var parts = path.Replace('\\', '/').Split('/');
+        return parts.Any(p => p is "bin" or "obj" or ".calor" or "node_modules");
+    }
+
     // ── Assess (migration scoring) ─────────────────────────────────────
 
     private Task<McpToolResult> HandleAssess(JsonElement? arguments)
     {
         var source = GetString(arguments, "source");
         var filesElement = GetArray(arguments, "files");
+        var directoryPath = GetString(arguments, "directoryPath");
         var options = GetOptions(arguments);
         var threshold = GetInt(options, "threshold", 0);
+        var maxFiles = GetInt(arguments, "maxFiles", 0);
+
+        if (!string.IsNullOrEmpty(directoryPath))
+        {
+            return HandleDirectoryAssess(directoryPath, threshold, maxFiles);
+        }
 
         if (string.IsNullOrEmpty(source) && filesElement == null)
         {
             return Task.FromResult(McpToolResult.Error(
-                "Missing required parameter: provide either 'source' (single file) or 'files' (multi-file)"));
+                "Missing required parameter: provide 'source', 'files', or 'directoryPath'"));
         }
 
         try
@@ -436,6 +605,13 @@ public sealed class AnalyzeTool : McpToolBase
         var source = GetString(arguments, "source");
         var csharpCode = GetString(arguments, "csharpCode");
         var filePath = GetString(arguments, "filePath");
+        var directoryPath = GetString(arguments, "directoryPath");
+        var maxFiles = GetInt(arguments, "maxFiles", 0);
+
+        if (!string.IsNullOrEmpty(directoryPath))
+        {
+            return HandleDirectoryMinimize(directoryPath, maxFiles);
+        }
 
         if (!string.IsNullOrEmpty(filePath))
         {
