@@ -6092,6 +6092,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var argModifiers = ExtractArgumentModifiers(invocation.ArgumentList.Arguments);
 
+        // Extract explicit generic type arguments from the invocation.
+        // For member access like list.Cast<int>(), the Name is GenericNameSyntax.
+        // For direct calls like GenericMethod<int>(), the expression itself is GenericNameSyntax.
+        List<string>? typeArguments = null;
+        if (invocation.Expression is MemberAccessExpressionSyntax ma && ma.Name is GenericNameSyntax genericMethodName)
+        {
+            typeArguments = genericMethodName.TypeArgumentList.Arguments
+                .Select(a => TypeMapper.CSharpToCalor(a.ToString()))
+                .ToList();
+            // Rebuild target without the type arguments (e.g., "list.Cast" instead of "list.Cast<int>")
+            target = ma.Expression + "." + genericMethodName.Identifier.Text;
+        }
+        else if (invocation.Expression is GenericNameSyntax directGenericName)
+        {
+            typeArguments = directGenericName.TypeArgumentList.Arguments
+                .Select(a => TypeMapper.CSharpToCalor(a.ToString()))
+                .ToList();
+            target = directGenericName.Identifier.Text;
+        }
+
         // Try to convert common string methods to native StringOperationNode
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
         {
@@ -6138,7 +6158,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_cast", castTypeHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, castConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
 
             // Handle chained method calls (e.g., products.GroupBy(...).Select(...))
@@ -6161,7 +6181,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_chain", innerMethodHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, innerConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
 
             // Handle indexer-then-call pattern: words[0].Method(...)
@@ -6172,7 +6192,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_elem");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, elementConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
 
             // Handle new-then-call pattern: new Foo(...).Method(...)
@@ -6185,7 +6205,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_new", newTypeHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, newConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
         }
 
@@ -6250,7 +6270,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new NameOfExpressionNode(GetTextSpan(invocation), argText);
         }
 
-        return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers);
+        return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers, typeArguments);
     }
 
     private StringOperationNode? TryGetRegexOperation(
@@ -6921,12 +6941,85 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return ConvertExpression(conditional.WhenFalse);
         }
 
+        // Deeply nested ternaries (depth > 2) → decompose into if/else with a result variable
+        if (CountConditionalDepth(conditional) > 2)
+        {
+            _context.RecordFeatureUsage("ternary-decompose");
+            _context.IncrementConverted();
+            var resultName = _context.GenerateId("_tern", "Result");
+
+            _pendingStatements.Add(new BindStatementNode(
+                span, resultName, null, true, null, new AttributeCollection()));
+
+            EmitConditionalAsIfElse(conditional, span, resultName);
+
+            return new ReferenceNode(span, resultName);
+        }
+
         // Standard ternary: (? cond then else)
         var cond = ConvertExpression(conditional.Condition);
         var whenTrue = ConvertExpression(conditional.WhenTrue);
         var whenFalse = ConvertExpression(conditional.WhenFalse);
 
         return new ConditionalExpressionNode(span, cond, whenTrue, whenFalse);
+    }
+
+    private static ExpressionSyntax UnwrapParens(ExpressionSyntax expr)
+    {
+        while (expr is ParenthesizedExpressionSyntax paren)
+            expr = paren.Expression;
+        return expr;
+    }
+
+    private static int CountConditionalDepth(ConditionalExpressionSyntax node)
+    {
+        var trueDepth = UnwrapParens(node.WhenTrue) is ConditionalExpressionSyntax trueChild
+            ? CountConditionalDepth(trueChild) : 0;
+        var falseDepth = UnwrapParens(node.WhenFalse) is ConditionalExpressionSyntax falseChild
+            ? CountConditionalDepth(falseChild) : 0;
+        return 1 + Math.Max(trueDepth, falseDepth);
+    }
+
+    private void EmitConditionalAsIfElse(ConditionalExpressionSyntax node, TextSpan span, string resultName)
+    {
+        var condition = ConvertExpression(node.Condition);
+        var thenBody = BuildConditionalBranch(UnwrapParens(node.WhenTrue), span, resultName);
+        var elseBody = BuildConditionalBranch(UnwrapParens(node.WhenFalse), span, resultName);
+
+        _pendingStatements.Add(new IfStatementNode(
+            span,
+            _context.GenerateId("if"),
+            condition,
+            thenBody,
+            Array.Empty<ElseIfClauseNode>(),
+            elseBody,
+            new AttributeCollection()));
+    }
+
+    private List<StatementNode> BuildConditionalBranch(ExpressionSyntax branch, TextSpan span, string resultName)
+    {
+        if (UnwrapParens(branch) is ConditionalExpressionSyntax nested)
+        {
+            var nestedCondition = ConvertExpression(nested.Condition);
+            var nestedThen = new List<StatementNode>
+            {
+                new AssignmentStatementNode(span, new ReferenceNode(span, resultName), ConvertExpression(nested.WhenTrue))
+            };
+            var nestedElse = new List<StatementNode>
+            {
+                new AssignmentStatementNode(span, new ReferenceNode(span, resultName), ConvertExpression(nested.WhenFalse))
+            };
+            return new List<StatementNode>
+            {
+                new IfStatementNode(span, _context.GenerateId("if"), nestedCondition, nestedThen,
+                    Array.Empty<ElseIfClauseNode>(), nestedElse, new AttributeCollection())
+            };
+        }
+
+        return new List<StatementNode>
+        {
+            new AssignmentStatementNode(span, new ReferenceNode(span, resultName), ConvertExpression(branch))
+        };
     }
 
     private ExpressionNode ConvertCastExpression(CastExpressionSyntax cast)

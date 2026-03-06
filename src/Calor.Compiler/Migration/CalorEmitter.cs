@@ -1728,26 +1728,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CallExpressionNode node)
     {
+        // Build type arguments suffix for generic method calls
+        var typeArgsSuffix = node.TypeArguments is { Count: > 0 }
+            ? $"<{string.Join(", ", node.TypeArguments)}>"
+            : "";
+
         // Inside interpolation expressions, section markers (§C, §A, §/C) would be
         // treated as literal text by the parser. Use function-call syntax instead.
         if (_inInterpolation)
         {
             if (node.Arguments.Count == 0)
-                return $"{node.Target}()";
+                return $"{node.Target}{typeArgsSuffix}()";
 
             var inlineArgs = node.Arguments.Select(a => a.Accept(this));
-            return $"{node.Target}({string.Join(", ", inlineArgs)})";
+            return $"{node.Target}{typeArgsSuffix}({string.Join(", ", inlineArgs)})";
         }
 
         // Escape braces in target to avoid conflicts with Calor tag syntax,
         // but preserve braces inside quoted string portions (e.g. "text {0}".FormatWith)
         var escapedTarget = EscapeBracesInIdentifier(node.Target);
+        var fullTarget = escapedTarget + typeArgsSuffix;
 
         if (node.Arguments.Count == 0)
-            return $"§C{{{escapedTarget}}} §/C";
+            return $"§C{{{fullTarget}}} §/C";
 
         var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
-        return $"§C{{{escapedTarget}}} {string.Join(" ", args)} §/C";
+        return $"§C{{{fullTarget}}} {string.Join(" ", args)} §/C";
     }
 
     /// <summary>

@@ -2713,6 +2713,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // A leading dot (e.g., §C{.Method}) means implicit this — prepend "this"
         if (target.StartsWith("."))
             target = "this" + target;
+
+        // Append explicit generic type arguments: target<T1, T2>(args)
+        if (node.TypeArguments is { Count: > 0 })
+        {
+            var typeArgs = string.Join(", ", node.TypeArguments.Select(MapTypeName));
+            target += $"<{typeArgs}>";
+        }
+
         var argStrings = new List<string>();
         for (int i = 0; i < node.Arguments.Count; i++)
         {
