@@ -7118,13 +7118,43 @@ public sealed class Parser
 
     /// <summary>
     /// Parses a goto statement.
-    /// §GOTO{labelName}
+    /// §GOTO{labelName}       — goto label;
+    /// §GOTO{CASE:expression} — goto case expression;
+    /// §GOTO{DEFAULT}         — goto default;
     /// </summary>
     private GotoStatementNode ParseGotoStatement()
     {
         var token = Expect(TokenKind.Goto);
         var label = token.Value as string ?? "";
+
+        if (label == "DEFAULT")
+        {
+            return new GotoStatementNode(token.Span, "") { IsDefault = true };
+        }
+
+        if (label.StartsWith("CASE:", StringComparison.Ordinal))
+        {
+            var caseValue = label.Substring(5);
+            var caseExpr = ParseGotoCaseValue(caseValue, token.Span);
+            return new GotoStatementNode(token.Span, "") { CaseLabel = caseExpr };
+        }
+
         return new GotoStatementNode(token.Span, label);
+    }
+
+    /// <summary>
+    /// Parses the constant expression value from a §GOTO{CASE:value} token.
+    /// </summary>
+    private ExpressionNode ParseGotoCaseValue(string value, TextSpan span)
+    {
+        if (long.TryParse(value, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var intVal))
+            return new IntLiteralNode(span, intVal);
+
+        if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
+            return new StringLiteralNode(span, value[1..^1]);
+
+        return new ReferenceNode(span, value);
     }
 
     /// <summary>

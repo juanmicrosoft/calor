@@ -268,7 +268,7 @@ public sealed class HelpTool : McpToolBase
         ["collections"] = ["list", "dict", "array", "§LIST{", "§DICT{", "§ARR", "§IDX"],
         ["patterns"] = ["pattern", "match", "switch", "§W{", "§K", "§SW{", "is pattern", "combinator", "relational pattern", "positional", "property pattern"],
         ["exceptions"] = ["try", "catch", "throw", "exception", "§TR{", "§CA", "§TH"],
-        ["lambdas"] = ["lambda", "delegate", "§LAM{", "§DEL{"],
+        ["lambdas"] = ["lambda", "delegate", "§LAM{", "§DEL{", "nested delegate"],
         ["strings"] = ["string", "str", "concat", "substr", "interpolation"],
         ["types"] = ["type", "i32", "i64", "f32", "f64", "bool", "void"],
         ["records"] = ["record", "§D{", "union", "§T{", "§V{"],
@@ -277,13 +277,14 @@ public sealed class HelpTool : McpToolBase
         ["properties"] = ["property", "§PROP{", "§GET", "§SET", "field", "§FLD{"],
         ["structs"] = ["struct", "§ST{", "value type"],
         ["operators"] = ["operator", "§OP{", "overload", "arithmetic"],
-        ["nullable"] = ["nullable", "null", "§?", "§??", "null check", "null coalescing"],
+        ["nullable"] = ["nullable", "null", "§?", "§??", "§?.", "null check", "null coalescing", "null conditional", "null-conditional", "null-coalescing", "coalesce"],
         ["linq"] = ["linq", "query", "select", "where", "orderby"],
-        ["events"] = ["event", "§EV{", "§EVT{"],
+        ["events"] = ["event", "§EV{", "§EVT{", "§EADD", "§EREM", "add accessor", "remove accessor", "event handler"],
         ["using"] = ["using", "§USE{", "dispose", "IDisposable"],
         ["modifiers"] = ["static", "abstract", "sealed", "virtual", "override", "readonly", "partial"],
         ["indexers"] = ["indexer", "§IXER{", "this[]", "this[int", "this[string"],
         ["yield"] = ["yield", "iterator", "IEnumerable"],
+        ["tuples"] = ["tuple", "value tuple", "(,)", "pair", "triple", "deconstruct", "tuple literal", "tuple type"],
         ["preprocessor"] = ["preprocessor", "#if", "#else", "#endif", "§PP", "§PPE", "conditional compilation"],
         ["synchronization"] = ["lock", "sync", "§SYNC", "monitor", "thread safety"],
         ["ranges"] = ["range", "slice", "..", "§RANGE", "§^", "index from end", "span", "array slice"],
@@ -488,9 +489,19 @@ public sealed class HelpTool : McpToolBase
                 ### Lambdas, Delegates, Events
                 ```
                 §LAM{id:param:type} body §/LAM{id}   Lambda expression
-                §DEL{id:Name:vis}                     Delegate type
-                §EVT{id:Name:vis}                     Event
+                §DEL{id:Name:vis}                     Delegate type (also inside §CL)
+                §EVT{id:Name:vis:type}                Event
+                §EADD body §/EADD                     Event add accessor
+                §EREM body §/EREM                     Event remove accessor
                 §OP{id:operator:vis}                  Operator overload
+                ```
+
+                ### Tuples and Null Operators
+                ```
+                (Type1, Type2)            Tuple type
+                (expr1, expr2)            Tuple literal
+                (?? left right)           Null-coalescing (left ?? right)
+                (?. target Member)        Null-conditional (target?.Member)
                 ```
 
                 ### Collections

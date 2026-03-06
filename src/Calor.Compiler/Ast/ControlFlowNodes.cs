@@ -276,7 +276,9 @@ public sealed class BreakStatementNode : StatementNode
 
 /// <summary>
 /// Represents a goto statement to jump to a label, case, or default.
-/// §GOTO{labelName}
+/// §GOTO{labelName}       — goto label;
+/// §GOTO{CASE:expression} — goto case expression;
+/// §GOTO{DEFAULT}         — goto default;
 /// </summary>
 public sealed class GotoStatementNode : StatementNode
 {
