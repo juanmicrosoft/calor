@@ -709,8 +709,8 @@ class Test
         // Must NOT produce (+ input "default") — that's arithmetic addition
         Assert.DoesNotContain("(+ input", calor);
 
-        // Should produce a conditional: (if (== input null) "default" input)
-        Assert.Contains("== input null", calor);
+        // Should produce null-coalescing: (?? input "default")
+        Assert.Contains("??", calor);
         Assert.Contains("\"default\"", calor);
     }
 

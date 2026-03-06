@@ -5496,18 +5496,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return valueRef;
         }
 
-        // Handle null-coalescing operator: x ?? y → (if (== x null) y x)
+        // Handle null-coalescing operator: x ?? y → (?? x y)
         if (binary.IsKind(SyntaxKind.CoalesceExpression))
         {
             _context.RecordFeatureUsage("null-coalescing");
             var left = ConvertExpression(binary.Left);
             var right = ConvertExpression(binary.Right);
-            var nullCheck = new BinaryOperationNode(
-                GetTextSpan(binary),
-                BinaryOperator.Equal,
-                left,
-                new ReferenceNode(GetTextSpan(binary), "null"));
-            return new ConditionalExpressionNode(GetTextSpan(binary), nullCheck, right, left);
+            return new NullCoalesceNode(GetTextSpan(binary), left, right);
         }
 
         var leftExpr = ConvertExpression(binary.Left);
