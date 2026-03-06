@@ -380,13 +380,13 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void Lexer_InvalidEscapeSequence_ReportsDiagnostic()
+    public void Lexer_InvalidEscapeSequence_ToleratesAndEmitsLiteral()
     {
-        Tokenize("STR:\"bad\\xescape\"", out var diagnostics);
+        var tokens = Tokenize("STR:\"bad\\xescape\"", out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics.Errors,
-            d => d.Code == DiagnosticCode.InvalidEscapeSequence);
+        // Unknown escapes are now tolerated — the literal character is emitted
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal("badxescape", tokens[0].Value);
     }
 
     [Fact]

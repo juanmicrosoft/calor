@@ -1352,7 +1352,9 @@ public sealed class Lexer
 
                     if (escaped == '\x01')
                     {
-                        _diagnostics.ReportInvalidEscapeSequence(CurrentSpan(), Current);
+                        // Tolerate unknown escape sequences in triple-quoted strings —
+                        // emit the literal character. Converted strings may contain \S, \N, etc.
+                        sb.Append(Current);
                     }
                     else
                     {
@@ -1442,7 +1444,9 @@ public sealed class Lexer
 
                     if (escaped == '\x01')
                     {
-                        _diagnostics.ReportInvalidEscapeSequence(CurrentSpan(), Current);
+                        // Tolerate unknown escape sequences — emit the literal character.
+                        // Converted strings may contain \S, \N, etc. from doc comments.
+                        sb.Append(Current);
                     }
                     else
                     {

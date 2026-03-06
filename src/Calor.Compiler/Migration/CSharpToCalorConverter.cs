@@ -328,12 +328,12 @@ public sealed class CSharpToCalorConverter
         // Try file-scoped namespace first (namespace X.Y.Z;)
         var fileScopedNs = root.Members.OfType<FileScopedNamespaceDeclarationSyntax>().FirstOrDefault();
         if (fileScopedNs != null)
-            return fileScopedNs.Name.ToString();
+            return StripVerbatimPrefix(fileScopedNs.Name.ToString());
 
         // Try block-scoped namespace (namespace X.Y.Z { ... })
         var blockNs = root.Members.OfType<NamespaceDeclarationSyntax>().FirstOrDefault();
         if (blockNs != null)
-            return blockNs.Name.ToString();
+            return StripVerbatimPrefix(blockNs.Name.ToString());
 
         // Fall back to file name
         if (!string.IsNullOrEmpty(sourceFile))
@@ -343,6 +343,13 @@ public sealed class CSharpToCalorConverter
 
         return "ConvertedModule";
     }
+
+    /// <summary>
+    /// Strips C# verbatim identifier prefix (@) from namespace names.
+    /// In C#, @is means "use 'is' as an identifier". Calor doesn't need this escape.
+    /// </summary>
+    private static string StripVerbatimPrefix(string name)
+        => name.Replace("@", "");
 }
 
 /// <summary>
