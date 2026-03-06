@@ -104,7 +104,12 @@ public sealed class DelegateDefinitionNode : TypeDefinitionNode
 
 /// <summary>
 /// Represents an event definition.
-/// §EVT[e001:Click:pub:EventHandler]
+/// Simple field: §EVT[e001:Click:pub:EventHandler]
+/// With accessors:
+///   §EVT[e001:Click:pub:EventHandler]
+///     §EADD ... §/EADD
+///     §EREM ... §/EREM
+///   §/EVT[e001]
 /// </summary>
 public sealed class EventDefinitionNode : AstNode
 {
@@ -114,6 +119,15 @@ public sealed class EventDefinitionNode : AstNode
     public string DelegateType { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>Optional body for the add accessor.</summary>
+    public IReadOnlyList<StatementNode>? AddBody { get; }
+
+    /// <summary>Optional body for the remove accessor.</summary>
+    public IReadOnlyList<StatementNode>? RemoveBody { get; }
+
+    /// <summary>True when this event has explicit add/remove accessor bodies.</summary>
+    public bool HasAccessors => AddBody != null || RemoveBody != null;
+
     public EventDefinitionNode(
         TextSpan span,
         string id,
@@ -121,6 +135,19 @@ public sealed class EventDefinitionNode : AstNode
         Visibility visibility,
         string delegateType,
         AttributeCollection attributes)
+        : this(span, id, name, visibility, delegateType, attributes, null, null)
+    {
+    }
+
+    public EventDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        Visibility visibility,
+        string delegateType,
+        AttributeCollection attributes,
+        IReadOnlyList<StatementNode>? addBody,
+        IReadOnlyList<StatementNode>? removeBody)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -128,6 +155,8 @@ public sealed class EventDefinitionNode : AstNode
         Visibility = visibility;
         DelegateType = delegateType ?? throw new ArgumentNullException(nameof(delegateType));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+        AddBody = addBody;
+        RemoveBody = removeBody;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

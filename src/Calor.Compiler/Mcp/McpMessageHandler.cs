@@ -62,6 +62,9 @@ public sealed class McpMessageHandler
         // ── Refinement types & obligations ──────────────────
         RegisterTool(new RefineTool());
 
+        // ── Auto-fix ─────────────────────────────────────────
+        RegisterTool(new FixTool());
+
         // ── Testing ─────────────────────────────────────────
         RegisterTool(new SelfTestTool());
 

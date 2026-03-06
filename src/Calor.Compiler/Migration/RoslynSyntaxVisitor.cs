@@ -606,15 +606,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var operatorOverloads = new List<OperatorOverloadNode>();
 
         // Convert C# 12 primary constructor parameters to readonly fields
+        // and synthesize a constructor that assigns them.
         if (node.ParameterList != null)
         {
             _context.RecordFeatureUsage("primary-constructor");
             var explicitNames = CollectExplicitMemberNames(node.Members);
+            var synthesizedFieldNames = new List<string>();
             foreach (var param in node.ParameterList.Parameters)
             {
                 var fieldName = param.Identifier.Text;
                 if (explicitNames.Contains(fieldName))
                     continue;
+                synthesizedFieldNames.Add(fieldName);
                 var fieldTypeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
                 var fieldCsharpAttrs = ConvertAttributes(param.AttributeLists);
 
@@ -624,42 +627,54 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     fieldTypeName,
                     Visibility.Private,
                     MethodModifiers.Readonly,
-                    param.Default != null ? ConvertExpression(param.Default.Value) : null,
+                    defaultValue: null,
                     new AttributeCollection(),
                     fieldCsharpAttrs));
             }
 
-            // Synthesize constructor for primary constructor with base class call
+            // Synthesize constructor that assigns primary ctor params to fields
+            var ctorId = _context.GenerateId("ctor");
+            var ctorParams = ConvertParameters(node.ParameterList);
+            var ctorBody = new List<StatementNode>();
+            foreach (var fieldName in synthesizedFieldNames)
+            {
+                var span = GetTextSpan(node.ParameterList);
+                ctorBody.Add(new AssignmentStatementNode(
+                    span,
+                    new FieldAccessNode(span, new ThisExpressionNode(span), fieldName),
+                    new ReferenceNode(span, fieldName)));
+            }
+
+            ConstructorInitializerNode? initializer = null;
             if (node.BaseList != null)
             {
                 foreach (var baseType in node.BaseList.Types)
                 {
                     if (baseType is PrimaryConstructorBaseTypeSyntax primaryBase)
                     {
-                        var ctorId = _context.GenerateId("ctor");
-                        var ctorParams = ConvertParameters(node.ParameterList);
                         var baseArgs = primaryBase.ArgumentList.Arguments
                             .Select(a => ConvertExpression(a.Expression))
                             .ToList();
-                        var initializer = new ConstructorInitializerNode(
+                        initializer = new ConstructorInitializerNode(
                             GetTextSpan(primaryBase),
                             isBaseCall: true,
                             baseArgs);
-                        constructors.Add(new ConstructorNode(
-                            GetTextSpan(node.ParameterList),
-                            ctorId,
-                            visibility,
-                            ctorParams,
-                            preconditions: Array.Empty<RequiresNode>(),
-                            initializer,
-                            Array.Empty<StatementNode>(),
-                            new AttributeCollection(),
-                            Array.Empty<CalorAttributeNode>(),
-                            isStatic: false));
-                        break; // only one base class
+                        break;
                     }
                 }
             }
+
+            constructors.Add(new ConstructorNode(
+                GetTextSpan(node.ParameterList),
+                ctorId,
+                visibility,
+                ctorParams,
+                preconditions: Array.Empty<RequiresNode>(),
+                initializer,
+                ctorBody,
+                new AttributeCollection(),
+                Array.Empty<CalorAttributeNode>(),
+                isStatic: false));
         }
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
@@ -850,6 +865,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     FieldDeclarationSyntax => InteropMemberKind.Field,
                     ConstructorDeclarationSyntax => InteropMemberKind.Constructor,
                     EventFieldDeclarationSyntax => InteropMemberKind.Event,
+                    EventDeclarationSyntax => InteropMemberKind.Event,
                     _ => InteropMemberKind.Other
                 };
                 interopBlocks.Add(CreateInteropBlock(member, null, kind));
@@ -939,6 +955,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 break;
             case EventFieldDeclarationSyntax eventSyntax:
                 events.AddRange(ConvertEventFields(eventSyntax));
+                break;
+            case EventDeclarationSyntax eventDeclSyntax:
+                events.Add(ConvertEventDeclaration(eventDeclSyntax));
                 break;
             case ClassDeclarationSyntax nestedClass:
                 _classes.Add(ConvertClass(nestedClass));
@@ -1092,11 +1111,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             _context.RecordFeatureUsage("primary-constructor");
             var explicitNames = CollectExplicitMemberNames(node.Members);
+            var synthesizedFieldNames = new List<string>();
             foreach (var param in node.ParameterList.Parameters)
             {
                 var fieldName = param.Identifier.Text;
                 if (explicitNames.Contains(fieldName))
                     continue;
+                synthesizedFieldNames.Add(fieldName);
                 var fieldTypeName = TypeMapper.CSharpToCalor(param.Type?.ToString() ?? "any");
                 var fieldCsharpAttrs = ConvertAttributes(param.AttributeLists);
 
@@ -1106,10 +1127,35 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     fieldTypeName,
                     Visibility.Private,
                     MethodModifiers.Readonly,
-                    param.Default != null ? ConvertExpression(param.Default.Value) : null,
+                    defaultValue: null,
                     new AttributeCollection(),
                     fieldCsharpAttrs));
             }
+
+            // Synthesize constructor that assigns primary ctor params to fields
+            var ctorId = _context.GenerateId("ctor");
+            var ctorParams = ConvertParameters(node.ParameterList);
+            var ctorBody = new List<StatementNode>();
+            foreach (var fieldName in synthesizedFieldNames)
+            {
+                var span = GetTextSpan(node.ParameterList);
+                ctorBody.Add(new AssignmentStatementNode(
+                    span,
+                    new FieldAccessNode(span, new ThisExpressionNode(span), fieldName),
+                    new ReferenceNode(span, fieldName)));
+            }
+
+            constructors.Add(new ConstructorNode(
+                GetTextSpan(node.ParameterList),
+                ctorId,
+                visibility,
+                ctorParams,
+                preconditions: Array.Empty<RequiresNode>(),
+                initializer: null,
+                ctorBody,
+                new AttributeCollection(),
+                Array.Empty<CalorAttributeNode>(),
+                isStatic: false));
         }
 
         var interopBlocks = new List<CSharpInteropBlockNode>();
@@ -1248,6 +1294,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     FieldDeclarationSyntax => InteropMemberKind.Field,
                     ConstructorDeclarationSyntax => InteropMemberKind.Constructor,
                     EventFieldDeclarationSyntax => InteropMemberKind.Event,
+                    EventDeclarationSyntax => InteropMemberKind.Event,
                     _ => InteropMemberKind.Other
                 };
                 interopBlocks.Add(CreateInteropBlock(member, null, kind));
@@ -1652,6 +1699,46 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return events;
+    }
+
+    private EventDefinitionNode ConvertEventDeclaration(EventDeclarationSyntax node)
+    {
+        _context.RecordFeatureUsage("event-definition");
+
+        var id = _context.GenerateId("evt");
+        var name = node.Identifier.ValueText;
+        var visibility = GetVisibility(node.Modifiers);
+        var delegateType = TypeMapper.CSharpToCalor(node.Type.ToString());
+
+        IReadOnlyList<StatementNode>? addBody = null;
+        IReadOnlyList<StatementNode>? removeBody = null;
+
+        if (node.AccessorList != null)
+        {
+            foreach (var accessor in node.AccessorList.Accessors)
+            {
+                if (accessor.Keyword.IsKind(SyntaxKind.AddKeyword))
+                {
+                    addBody = ConvertAccessorBody(accessor);
+                }
+                else if (accessor.Keyword.IsKind(SyntaxKind.RemoveKeyword))
+                {
+                    removeBody = ConvertAccessorBody(accessor);
+                }
+            }
+        }
+
+        _context.IncrementConverted();
+
+        return new EventDefinitionNode(
+            GetTextSpan(node),
+            id,
+            name,
+            visibility,
+            delegateType,
+            new AttributeCollection(),
+            addBody,
+            removeBody);
     }
 
     private PropertyNode ConvertProperty(PropertyDeclarationSyntax node)
@@ -4073,9 +4160,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Hoist §NEW arguments to temp bindings — the parser cannot handle §NEW nested inside §C
             for (int i = 0; i < args.Count; i++)
             {
-                if (args[i] is NewExpressionNode)
+                if (args[i] is NewExpressionNode newNode)
                 {
-                    var tempName = _context.GenerateId("_new");
+                    var tempName = _context.GenerateId("_new", newNode.TypeName);
                     _pendingStatements.Add(new BindStatementNode(
                         args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                     args[i] = new ReferenceNode(args[i].Span, tempName);
@@ -4336,8 +4423,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 if (args[i] is LambdaExpressionNode)
                 {
-                    var tempName = _context.GenerateId("_lam");
-                    _pendingStatements.Add(new BindStatementNode(
+                    var tempName = _context.GenerateId("_lam", methodName);                    _pendingStatements.Add(new BindStatementNode(
                         span, tempName, null, false, args[i], new AttributeCollection()));
                     args[i] = new ReferenceNode(args[i].Span, tempName);
                 }
@@ -4358,7 +4444,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     || memberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
                 {
                     var newConverted = ConvertExpression(memberAccess.Expression);
-                    var tempName = _context.GenerateId("_new");
+                    var newTypeHint = ExtractTypeHint(memberAccess.Expression);
+                    var tempName = _context.GenerateId("_new", newTypeHint);
                     _pendingStatements.Add(new BindStatementNode(
                         span, tempName, null, false, newConverted, new AttributeCollection()));
                     steps.Add((tempName, methodName, args, span));
@@ -4431,7 +4518,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var step = steps[i];
             var target = i == 0 ? step.baseTarget! : prevTempName!;
-            var tempName = _context.GenerateId("_chain");
+            var tempName = _context.GenerateId("_chain", step.methodName);
 
             var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
             results.Add(new BindStatementNode(span, tempName, null, false, callExpr, new AttributeCollection()));
@@ -4481,7 +4568,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var step = steps[i];
             var target = i == 0 ? step.baseTarget! : prevTempName!;
-            var tempName = _context.GenerateId("_chain");
+            var tempName = _context.GenerateId("_chain", step.methodName);
 
             var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
             results.Add(new BindStatementNode(span, tempName, null, false, callExpr, new AttributeCollection()));
@@ -4539,7 +4626,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             else
             {
                 // Intermediate step uses a generated temp name with no type
-                var tempName = _context.GenerateId("_chain");
+                var tempName = _context.GenerateId("_chain", step.methodName);
                 results.Add(new BindStatementNode(
                     statementSpan, tempName, null, false, callExpr, new AttributeCollection()));
                 prevTempName = tempName;
@@ -5996,9 +6083,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         for (int i = 0; i < args.Count; i++)
         {
-            if (args[i] is NewExpressionNode)
+            if (args[i] is NewExpressionNode newNode)
             {
-                var tempName = _context.GenerateId("_new");
+                var tempName = _context.GenerateId("_new", newNode.TypeName);
                 _pendingStatements.Add(new BindStatementNode(
                     args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                 args[i] = new ReferenceNode(args[i].Span, tempName);
@@ -6010,9 +6097,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                 args[i] = new ReferenceNode(args[i].Span, tempName);
             }
-            else if (args[i] is ArrayCreationNode)
+            else if (args[i] is ArrayCreationNode arrNode)
             {
-                var tempName = _context.GenerateId("_arr");
+                var tempName = _context.GenerateId("_arr", arrNode.ElementType);
                 _pendingStatements.Add(new BindStatementNode(
                     args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                 args[i] = new ReferenceNode(args[i].Span, tempName);
@@ -6046,6 +6133,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             : null;
 
         var argModifiers = ExtractArgumentModifiers(invocation.ArgumentList.Arguments);
+
+        // Extract explicit generic type arguments from the invocation.
+        // For member access like list.Cast<int>(), the Name is GenericNameSyntax.
+        // For direct calls like GenericMethod<int>(), the expression itself is GenericNameSyntax.
+        List<string>? typeArguments = null;
+        if (invocation.Expression is MemberAccessExpressionSyntax ma && ma.Name is GenericNameSyntax genericMethodName)
+        {
+            typeArguments = genericMethodName.TypeArgumentList.Arguments
+                .Select(a => TypeMapper.CSharpToCalor(a.ToString()))
+                .ToList();
+            // Rebuild target without the type arguments (e.g., "list.Cast" instead of "list.Cast<int>")
+            target = ma.Expression + "." + genericMethodName.Identifier.Text;
+        }
+        else if (invocation.Expression is GenericNameSyntax directGenericName)
+        {
+            typeArguments = directGenericName.TypeArgumentList.Arguments
+                .Select(a => TypeMapper.CSharpToCalor(a.ToString()))
+                .ToList();
+            target = directGenericName.Identifier.Text;
+        }
 
         // Try to convert common string methods to native StringOperationNode
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
@@ -6089,10 +6196,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     && parenExpr.Expression is CastExpressionSyntax))
             {
                 var castConverted = targetExpr; // already converted via ConvertExpression above
-                var tempName = _context.GenerateId("_cast");
+                var castTypeHint = ExtractCastTypeHint(memberAccess.Expression);
+                var tempName = _context.GenerateId("_cast", castTypeHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, castConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
 
             // Handle chained method calls (e.g., products.GroupBy(...).Select(...))
@@ -6111,10 +6219,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 _context.RecordFeatureUsage("linq-method");
                 var innerConverted = ConvertInvocationExpression(innerInvocation);
-                var tempName = _context.GenerateId("_chain");
+                var innerMethodHint = ExtractInnerMethodName(innerInvocation);
+                var tempName = _context.GenerateId("_chain", innerMethodHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, innerConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
 
             // Handle indexer-then-call pattern: words[0].Method(...)
@@ -6125,7 +6234,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_elem");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, elementConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
 
             // Handle new-then-call pattern: new Foo(...).Method(...)
@@ -6134,10 +6243,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 || memberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
             {
                 var newConverted = targetExpr; // already converted via ConvertExpression above
-                var tempName = _context.GenerateId("_new");
+                var newTypeHint = ExtractTypeHint(memberAccess.Expression);
+                var tempName = _context.GenerateId("_new", newTypeHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, newConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
         }
 
@@ -6202,7 +6312,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new NameOfExpressionNode(GetTextSpan(invocation), argText);
         }
 
-        return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers);
+        return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers, typeArguments);
     }
 
     private StringOperationNode? TryGetRegexOperation(
@@ -6873,12 +6983,85 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return ConvertExpression(conditional.WhenFalse);
         }
 
+        // Deeply nested ternaries (depth > 2) → decompose into if/else with a result variable
+        if (CountConditionalDepth(conditional) > 2)
+        {
+            _context.RecordFeatureUsage("ternary-decompose");
+            _context.IncrementConverted();
+            var resultName = _context.GenerateId("_tern", "Result");
+
+            _pendingStatements.Add(new BindStatementNode(
+                span, resultName, null, true, null, new AttributeCollection()));
+
+            EmitConditionalAsIfElse(conditional, span, resultName);
+
+            return new ReferenceNode(span, resultName);
+        }
+
         // Standard ternary: (? cond then else)
         var cond = ConvertExpression(conditional.Condition);
         var whenTrue = ConvertExpression(conditional.WhenTrue);
         var whenFalse = ConvertExpression(conditional.WhenFalse);
 
         return new ConditionalExpressionNode(span, cond, whenTrue, whenFalse);
+    }
+
+    private static ExpressionSyntax UnwrapParens(ExpressionSyntax expr)
+    {
+        while (expr is ParenthesizedExpressionSyntax paren)
+            expr = paren.Expression;
+        return expr;
+    }
+
+    private static int CountConditionalDepth(ConditionalExpressionSyntax node)
+    {
+        var trueDepth = UnwrapParens(node.WhenTrue) is ConditionalExpressionSyntax trueChild
+            ? CountConditionalDepth(trueChild) : 0;
+        var falseDepth = UnwrapParens(node.WhenFalse) is ConditionalExpressionSyntax falseChild
+            ? CountConditionalDepth(falseChild) : 0;
+        return 1 + Math.Max(trueDepth, falseDepth);
+    }
+
+    private void EmitConditionalAsIfElse(ConditionalExpressionSyntax node, TextSpan span, string resultName)
+    {
+        var condition = ConvertExpression(node.Condition);
+        var thenBody = BuildConditionalBranch(UnwrapParens(node.WhenTrue), span, resultName);
+        var elseBody = BuildConditionalBranch(UnwrapParens(node.WhenFalse), span, resultName);
+
+        _pendingStatements.Add(new IfStatementNode(
+            span,
+            _context.GenerateId("if"),
+            condition,
+            thenBody,
+            Array.Empty<ElseIfClauseNode>(),
+            elseBody,
+            new AttributeCollection()));
+    }
+
+    private List<StatementNode> BuildConditionalBranch(ExpressionSyntax branch, TextSpan span, string resultName)
+    {
+        if (UnwrapParens(branch) is ConditionalExpressionSyntax nested)
+        {
+            var nestedCondition = ConvertExpression(nested.Condition);
+            var nestedThen = new List<StatementNode>
+            {
+                new AssignmentStatementNode(span, new ReferenceNode(span, resultName), ConvertExpression(nested.WhenTrue))
+            };
+            var nestedElse = new List<StatementNode>
+            {
+                new AssignmentStatementNode(span, new ReferenceNode(span, resultName), ConvertExpression(nested.WhenFalse))
+            };
+            return new List<StatementNode>
+            {
+                new IfStatementNode(span, _context.GenerateId("if"), nestedCondition, nestedThen,
+                    Array.Empty<ElseIfClauseNode>(), nestedElse, new AttributeCollection())
+            };
+        }
+
+        return new List<StatementNode>
+        {
+            new AssignmentStatementNode(span, new ReferenceNode(span, resultName), ConvertExpression(branch))
+        };
     }
 
     private ExpressionNode ConvertCastExpression(CastExpressionSyntax cast)
@@ -6977,9 +7160,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        var id = _context.GenerateId("arr");
-        var name = _context.GenerateId("arr");
         var elementType = TypeMapper.CSharpToCalor(arrayCreation.Type.ElementType.ToString());
+        var id = _context.GenerateId("arr", elementType);
+        var name = _context.GenerateId("arr", elementType);
 
         ExpressionNode? size = null;
         var initializer = new List<ExpressionNode>();
@@ -7969,5 +8152,42 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var left = ConvertAttributeValue(binary.Left);
         var right = ConvertAttributeValue(binary.Right);
         return new BitwiseBinaryExpression(left, op, right);
+    }
+
+    /// <summary>
+    /// Extracts the type name from an object creation expression for use as a naming hint.
+    /// </summary>
+    private static string ExtractTypeHint(ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            ObjectCreationExpressionSyntax objCreation => objCreation.Type.ToString().Split('.').Last().Split('<').First(),
+            ImplicitObjectCreationExpressionSyntax => "",
+            _ => ""
+        };
+    }
+
+    /// <summary>
+    /// Extracts the target type from a cast expression for use as a naming hint.
+    /// </summary>
+    private static string ExtractCastTypeHint(ExpressionSyntax expression)
+    {
+        if (expression is CastExpressionSyntax cast)
+            return cast.Type.ToString().Split('.').Last().Split('<').First();
+        if (expression is ParenthesizedExpressionSyntax paren && paren.Expression is CastExpressionSyntax innerCast)
+            return innerCast.Type.ToString().Split('.').Last().Split('<').First();
+        return "";
+    }
+
+    /// <summary>
+    /// Extracts the method name from an invocation expression for use as a naming hint.
+    /// </summary>
+    private static string ExtractInnerMethodName(InvocationExpressionSyntax invocation)
+    {
+        if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
+            return memberAccess.Name.Identifier.Text;
+        if (invocation.Expression is IdentifierNameSyntax identifier)
+            return identifier.Identifier.Text;
+        return "";
     }
 }

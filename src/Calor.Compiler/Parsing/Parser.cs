@@ -6116,7 +6116,33 @@ public sealed class Parser
 
         var endToken = Expect(TokenKind.EndCall);
         var span = startToken.Span.Union(endToken.Span);
-        ExpressionNode expr = new CallExpressionNode(span, target, arguments);
+
+        // Extract trailing generic type arguments from call target.
+        // e.g., "items.Cast<i32>" → target = "items.Cast", typeArgs = ["i32"]
+        // This preserves generic types in the middle: "EqualityComparer<i32>.GetHashCode" is unchanged.
+        List<string>? typeArguments = null;
+        if (target.EndsWith(">"))
+        {
+            var depth = 0;
+            var openIdx = -1;
+            for (int i = target.Length - 1; i >= 0; i--)
+            {
+                if (target[i] == '>') depth++;
+                else if (target[i] == '<')
+                {
+                    depth--;
+                    if (depth == 0) { openIdx = i; break; }
+                }
+            }
+            if (openIdx > 0)
+            {
+                var typeArgsStr = target.Substring(openIdx + 1, target.Length - openIdx - 2);
+                typeArguments = typeArgsStr.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+                target = target.Substring(0, openIdx);
+            }
+        }
+
+        ExpressionNode expr = new CallExpressionNode(span, target, arguments, null, null, typeArguments);
 
         // Handle trailing member access (e.g., §C[Method]§/C.Property)
         return ParseTrailingMemberAccess(expr);
@@ -7498,7 +7524,68 @@ public sealed class Parser
 
         var visibility = ParseVisibility(visStr);
 
-        return new EventDefinitionNode(startToken.Span, id, name, visibility, delegateType, attrs);
+        // Check for accessor bodies (§EADD / §EREM ... §/EVT)
+        if (!Check(TokenKind.EventAdd) && !Check(TokenKind.EventRemove))
+        {
+            return new EventDefinitionNode(startToken.Span, id, name, visibility, delegateType, attrs);
+        }
+
+        List<StatementNode>? addBody = null;
+        List<StatementNode>? removeBody = null;
+
+        while (!IsAtEnd && !Check(TokenKind.EndEvent))
+        {
+            if (Check(TokenKind.EventAdd))
+            {
+                addBody = ParseEventAccessorBody(TokenKind.EventAdd, TokenKind.EndEventAdd);
+            }
+            else if (Check(TokenKind.EventRemove))
+            {
+                removeBody = ParseEventAccessorBody(TokenKind.EventRemove, TokenKind.EndEventRemove);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        var endToken = Expect(TokenKind.EndEvent);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+
+        if (ShouldReportMismatchedId(endId, id, endToken))
+        {
+            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EVT", id, "END_EVT", endId);
+        }
+
+        var span = startToken.Span.Union(endToken.Span);
+        return new EventDefinitionNode(span, id, name, visibility, delegateType, attrs, addBody, removeBody);
+    }
+
+    private List<StatementNode> ParseEventAccessorBody(TokenKind startKind, TokenKind endKind)
+    {
+        Advance(); // consume §EADD or §EREM
+        ParseAttributes(); // consume any attributes
+
+        var body = new List<StatementNode>();
+
+        while (!IsAtEnd && !Check(endKind) && !Check(TokenKind.EventAdd) &&
+               !Check(TokenKind.EventRemove) && !Check(TokenKind.EndEvent))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null)
+            {
+                body.Add(stmt);
+            }
+        }
+
+        // Consume the closing token if present (§/EADD or §/EREM)
+        if (Check(endKind))
+        {
+            Advance();
+        }
+
+        return body;
     }
 
     // Phase 12: Async/Await

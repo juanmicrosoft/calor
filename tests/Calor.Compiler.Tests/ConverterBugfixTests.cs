@@ -1065,10 +1065,15 @@ public class Test
             }
             """;
 
-        var output = ConvertAndRoundTrip(csharp);
-        Assert.Contains("score >= 90", output);
-        Assert.Contains("? 4 :", output);
-        Assert.Contains("? 3 :", output);
+        // Depth > 2 ternary chains are decomposed into if/else with a result variable
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+        Assert.True(result.Success, GetErrorMessage(result));
+        var emitter = new CalorEmitter();
+        var calor = emitter.Emit(result.Ast!);
+        Assert.Contains(">= score 90", calor);
+        Assert.Contains("§IF", calor);
+        Assert.Contains("_ternResult", calor);
     }
 
     [Fact]

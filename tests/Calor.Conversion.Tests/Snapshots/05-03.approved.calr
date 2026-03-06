@@ -4,13 +4,13 @@
 
   §CL{c001:Transform:pub}
     §MT{m002:GetNames:pub} (List<str>:items) -> List<str>
-      §B{_lam004} §LAM{lam003:s:str} s §/LAM{lam003}
-      §B{_lam006} §LAM{lam005:s:str} (upper s) §/LAM{lam005}
-      §B{_lam008} §LAM{lam007:s:str} (> (len s) 0) §/LAM{lam007}
-      §B{_chain009} §C{items.Where} §A _lam008 §/C
-      §B{_chain010} §C{_chain009.Select} §A _lam006 §/C
-      §B{_chain011} §C{_chain010.OrderBy} §A _lam004 §/C
-      §R §C{_chain011.ToList} §/C
+      §B{_lamOrderBy004} §LAM{lam003:s:str} s §/LAM{lam003}
+      §B{_lamSelect006} §LAM{lam005:s:str} (upper s) §/LAM{lam005}
+      §B{_lamWhere008} §LAM{lam007:s:str} (> (len s) 0) §/LAM{lam007}
+      §B{_chainWhere009} §C{items.Where} §A _lamWhere008 §/C
+      §B{_chainSelect010} §C{_chainWhere009.Select} §A _lamSelect006 §/C
+      §B{_chainOrderBy011} §C{_chainSelect010.OrderBy} §A _lamOrderBy004 §/C
+      §R §C{_chainOrderBy011.ToList} §/C
     §/MT{m002}
 
   §/CL{c001}

@@ -2713,6 +2713,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // A leading dot (e.g., §C{.Method}) means implicit this — prepend "this"
         if (target.StartsWith("."))
             target = "this" + target;
+
+        // Append explicit generic type arguments: target<T1, T2>(args)
+        if (node.TypeArguments is { Count: > 0 })
+        {
+            var typeArgs = string.Join(", ", node.TypeArguments.Select(MapTypeName));
+            target += $"<{typeArgs}>";
+        }
+
         var argStrings = new List<string>();
         for (int i = 0; i < node.Arguments.Count; i++)
         {
@@ -3343,7 +3351,48 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var eventName = SanitizeIdentifier(node.Name);
         var delegateType = MapTypeName(node.DelegateType);
 
-        AppendLine($"{visibility} event {delegateType} {eventName};");
+        if (node.HasAccessors)
+        {
+            AppendLine($"{visibility} event {delegateType} {eventName}");
+            AppendLine("{");
+            Indent();
+
+            if (node.AddBody != null)
+            {
+                _declaredVariablesInCurrentScope.Clear();
+                AppendLine("add");
+                AppendLine("{");
+                Indent();
+                foreach (var stmt in node.AddBody)
+                {
+                    AppendLine(stmt.Accept(this));
+                }
+                Dedent();
+                AppendLine("}");
+            }
+
+            if (node.RemoveBody != null)
+            {
+                _declaredVariablesInCurrentScope.Clear();
+                AppendLine("remove");
+                AppendLine("{");
+                Indent();
+                foreach (var stmt in node.RemoveBody)
+                {
+                    AppendLine(stmt.Accept(this));
+                }
+                Dedent();
+                AppendLine("}");
+            }
+
+            Dedent();
+            AppendLine("}");
+        }
+        else
+        {
+            AppendLine($"{visibility} event {delegateType} {eventName};");
+        }
+
         return "";
     }
 

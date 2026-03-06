@@ -202,6 +202,11 @@ public enum TokenKind
     Delegate,
     EndDelegate,
     Event,
+    EndEvent,
+    EventAdd,
+    EndEventAdd,
+    EventRemove,
+    EndEventRemove,
     Subscribe,
     Unsubscribe,
 

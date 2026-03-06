@@ -270,11 +270,37 @@ public sealed class ConversionContext
 
     /// <summary>
     /// Generates a unique ID for Calor elements.
+    /// When a hint is provided and valid, it is appended to the prefix for readability
+    /// (e.g., prefix="_chain", hint="Where" → "_chainWhere001").
     /// </summary>
-    public string GenerateId(string prefix = "")
+    public string GenerateId(string prefix = "", string hint = "")
     {
         _idCounter++;
-        return string.IsNullOrEmpty(prefix) ? $"id{_idCounter:D3}" : $"{prefix}{_idCounter:D3}";
+        var sanitized = SanitizeHint(hint);
+        var effectivePrefix = string.IsNullOrEmpty(sanitized) ? prefix : $"{prefix}{sanitized}";
+        return string.IsNullOrEmpty(effectivePrefix) ? $"id{_idCounter:D3}" : $"{effectivePrefix}{_idCounter:D3}";
+    }
+
+    /// <summary>
+    /// Sanitizes a hint string to be a valid C# identifier fragment.
+    /// Strips invalid characters, capitalizes the first letter, and truncates to 20 chars.
+    /// </summary>
+    internal static string SanitizeHint(string? hint)
+    {
+        if (string.IsNullOrWhiteSpace(hint))
+            return "";
+
+        // Keep only letters and digits
+        var chars = hint.Where(c => char.IsLetterOrDigit(c)).ToArray();
+        if (chars.Length == 0)
+            return "";
+
+        // Capitalize first letter for camelCase readability
+        chars[0] = char.ToUpperInvariant(chars[0]);
+
+        // Truncate to 20 characters
+        var length = Math.Min(chars.Length, 20);
+        return new string(chars, 0, length);
     }
 
     /// <summary>

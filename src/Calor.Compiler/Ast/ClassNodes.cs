@@ -944,6 +944,13 @@ public sealed class CallExpressionNode : ExpressionNode
     /// </summary>
     public IReadOnlyList<string?>? ArgumentModifiers { get; }
 
+    /// <summary>
+    /// Optional explicit generic type arguments for the method being called.
+    /// E.g., for list.Cast&lt;int&gt;(), this would be ["int"].
+    /// Only present when the original source had explicit type arguments.
+    /// </summary>
+    public IReadOnlyList<string>? TypeArguments { get; }
+
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments)
         : base(span)
     {
@@ -966,6 +973,16 @@ public sealed class CallExpressionNode : ExpressionNode
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
         ArgumentNames = argumentNames;
         ArgumentModifiers = argumentModifiers;
+    }
+
+    public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers, IReadOnlyList<string>? typeArguments)
+        : base(span)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        ArgumentNames = argumentNames;
+        ArgumentModifiers = argumentModifiers;
+        TypeArguments = typeArguments;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

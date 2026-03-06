@@ -4,9 +4,9 @@
 
   §CL{c001:Filter:pub}
     §MT{m002:GetPositive:pub} (List<i32>:items) -> List<i32>
-      §B{_lam004} §LAM{lam003:x:i32} (> x 0) §/LAM{lam003}
-      §B{_chain005} §C{items.Where} §A _lam004 §/C
-      §R §C{_chain005.ToList} §/C
+      §B{_lamWhere004} §LAM{lam003:x:i32} (> x 0) §/LAM{lam003}
+      §B{_chainWhere005} §C{items.Where} §A _lamWhere004 §/C
+      §R §C{_chainWhere005.ToList} §/C
     §/MT{m002}
 
   §/CL{c001}
