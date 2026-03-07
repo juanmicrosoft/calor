@@ -1137,11 +1137,13 @@ public sealed class Parser
         }
 
         // Standard format with explicit §A and §/C
+        var argumentNames = new List<string?>();
         while (!IsAtEnd && !Check(TokenKind.EndCall))
         {
             if (Check(TokenKind.Arg))
             {
-                arguments.Add(ParseArgument());
+                arguments.Add(ParseArgument(out var argName));
+                argumentNames.Add(argName);
             }
             else
             {
@@ -1152,12 +1154,33 @@ public sealed class Parser
         var endToken = Expect(TokenKind.EndCall);
         var span2 = startToken.Span.Union(endToken.Span);
 
-        return new CallStatementNode(span2, target, fallible, arguments, attrs);
+        // Only pass argument names if any are non-null
+        var hasNames = argumentNames.Any(n => n != null);
+        return new CallStatementNode(span2, target, fallible, arguments, attrs,
+            hasNames ? argumentNames : null);
     }
 
     private ExpressionNode ParseArgument()
     {
+        return ParseArgument(out _);
+    }
+
+    private ExpressionNode ParseArgument(out string? argumentName)
+    {
         Expect(TokenKind.Arg);
+        argumentName = null;
+
+        // Check for named argument syntax: §A[name] value
+        if (Check(TokenKind.OpenBracket))
+        {
+            Advance(); // consume '['
+            if (Check(TokenKind.Identifier))
+            {
+                argumentName = Current.Text;
+                Advance(); // consume name
+            }
+            Expect(TokenKind.CloseBracket);
+        }
 
         var saved = _insideArgContext;
         _insideArgContext = true;
@@ -6218,18 +6241,21 @@ public sealed class Parser
         }
 
         var arguments = new List<ExpressionNode>();
+        var argumentNames = new List<string?>();
 
         // Parse arguments until we hit EndCall
         while (!IsAtEnd && !Check(TokenKind.EndCall))
         {
             if (Check(TokenKind.Arg))
             {
-                arguments.Add(ParseArgument());
+                arguments.Add(ParseArgument(out var argName));
+                argumentNames.Add(argName);
             }
             else if (IsExpressionStart())
             {
                 // Single expression argument without §A prefix
                 arguments.Add(ParseExpression());
+                argumentNames.Add(null);
             }
             else
             {
@@ -6265,7 +6291,9 @@ public sealed class Parser
             }
         }
 
-        ExpressionNode expr = new CallExpressionNode(span, target, arguments, null, null, typeArguments);
+        // Only pass argument names if any are non-null
+        var hasNames = argumentNames.Any(n => n != null);
+        ExpressionNode expr = new CallExpressionNode(span, target, arguments, hasNames ? argumentNames : null, null, typeArguments);
 
         // Handle trailing member access (e.g., §C[Method]§/C.Property)
         return ParseTrailingMemberAccess(expr);

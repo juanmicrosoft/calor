@@ -1158,7 +1158,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§ERR{\"TODO: unknown-expression", result.CalorSource);
+        Assert.Contains("§ERR \"TODO: unknown-expression", result.CalorSource);
     }
 
     [Fact]

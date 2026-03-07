@@ -936,8 +936,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CallStatementNode node)
     {
-        // Arguments need §A prefix and call needs §/C closing tag
-        var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
+        // Emit named argument labels as §A[name] value when present
+        var args = node.Arguments.Select((a, i) =>
+        {
+            var argValue = a.Accept(this);
+            if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
+                return $"§A[{node.ArgumentNames[i]}] {argValue}";
+            return $"§A {argValue}";
+        });
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
         AppendLine($"§C{{{node.Target}}}{argsStr} §/C");
         return "";
@@ -1757,7 +1763,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (node.Arguments.Count == 0)
                 return $"{node.Target}{typeArgsSuffix}()";
 
-            var inlineArgs = node.Arguments.Select(a => a.Accept(this));
+            var inlineArgs = node.Arguments.Select((a, i) =>
+            {
+                var argValue = a.Accept(this);
+                if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
+                    return $"{node.ArgumentNames[i]}: {argValue}";
+                return argValue;
+            });
             return $"{node.Target}{typeArgsSuffix}({string.Join(", ", inlineArgs)})";
         }
 
@@ -1769,7 +1781,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Arguments.Count == 0)
             return $"§C{{{fullTarget}}} §/C";
 
-        var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
+        // Emit named argument labels as §A[name] value when present
+        var args = node.Arguments.Select((a, i) =>
+        {
+            var argValue = a.Accept(this);
+            if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
+                return $"§A[{node.ArgumentNames[i]}] {argValue}";
+            return $"§A {argValue}";
+        });
         return $"§C{{{fullTarget}}} {string.Join(" ", args)} §/C";
     }
 
@@ -2884,12 +2903,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FallbackExpressionNode node)
     {
-        // Emit as §ERR{"TODO: feature -- original: code"}
-        // Note: Cannot use /* */ comments inline as Calor parser doesn't support them in expressions
+        // Emit as §ERR "TODO: feature -- C#: code"
+        // Uses §ERR followed by a string literal so the parser handles it
+        // as ErrExpressionNode(StringLiteralNode) without cascading parse errors.
         var escapedCode = node.OriginalCSharp
-            .Replace("\"", "'")  // Escape double quotes since we're inside a string
-            .Replace("\n", " ")  // Collapse newlines
-            .Replace("\r", "");  // Remove carriage returns
+            .Replace("\\", "\\\\")  // Escape backslashes first
+            .Replace("\"", "'")     // Replace double quotes
+            .Replace("\n", " ")     // Collapse newlines
+            .Replace("\r", "");     // Remove carriage returns
 
         // Truncate very long code to avoid overly long error messages
         if (escapedCode.Length > 100)
@@ -2897,7 +2918,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             escapedCode = escapedCode.Substring(0, 97) + "...";
         }
 
-        return $"§ERR{{\"TODO: {node.FeatureName} -- C#: {escapedCode}\"}}";
+        return $"§ERR \"TODO: {node.FeatureName} -- C#: {escapedCode}\"";
     }
 
     public string Visit(ExpressionStatementNode node)

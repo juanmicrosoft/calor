@@ -1328,6 +1328,10 @@ public sealed class Lexer
                 {
                     AppendUnicodeEscape(sb);
                 }
+                else if (Current == 'U')
+                {
+                    AppendLongUnicodeEscape(sb);
+                }
                 else
                 {
                     var escaped = Current switch
@@ -1406,6 +1410,39 @@ public sealed class Lexer
         }
     }
 
+    /// <summary>
+    /// Parses a \UXXXXXXXX (8-digit) unicode escape sequence and appends the character to the builder.
+    /// Assumes the 'U' has already been detected but NOT consumed.
+    /// </summary>
+    private void AppendLongUnicodeEscape(System.Text.StringBuilder sb)
+    {
+        Advance(); // consume 'U'
+        var hex = new System.Text.StringBuilder(8);
+        for (int i = 0; i < 8 && !IsAtEnd; i++)
+        {
+            if (Uri.IsHexDigit(Current))
+            {
+                hex.Append(Current);
+                Advance();
+            }
+            else
+            {
+                break;
+            }
+        }
+        if (hex.Length == 8 && long.TryParse(hex.ToString(), System.Globalization.NumberStyles.HexNumber, null, out var codePoint)
+            && codePoint <= 0x10FFFF)
+        {
+            sb.Append(char.ConvertFromUtf32((int)codePoint));
+        }
+        else
+        {
+            // Emit the raw \UXXXXXXXX if we can't parse it
+            sb.Append("\\U");
+            sb.Append(hex);
+        }
+    }
+
     private Token ScanStringLiteralValue()
     {
         Advance(); // consume opening quote
@@ -1419,6 +1456,10 @@ public sealed class Lexer
                 if (Current == 'u')
                 {
                     AppendUnicodeEscape(sb);
+                }
+                else if (Current == 'U')
+                {
+                    AppendLongUnicodeEscape(sb);
                 }
                 else
                 {
