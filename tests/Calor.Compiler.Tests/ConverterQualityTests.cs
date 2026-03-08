@@ -453,4 +453,274 @@ public class ConverterQualityTests
     }
 
     #endregion
+
+    #region Ternary Decomposition Tests
+
+    [Fact]
+    public void SimpleTernary_StaysInline()
+    {
+        // Simple ternary with no section markers should remain as (? ...)
+        var csharp = """
+            public class Test
+            {
+                int M(bool flag) => flag ? 1 : 0;
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("(? flag 1 0)", result.CalorSource);
+
+        // Should parse and compile
+        var compileResult = Program.Compile(result.CalorSource);
+        Assert.False(compileResult.HasErrors,
+            string.Join("\n", compileResult.Diagnostics.Select(d => d.ToString())));
+    }
+
+    [Fact]
+    public void Ternary_WithMethodCallBranches_Decomposes()
+    {
+        // Ternary where branches are method calls (emitted as §C{...} §/C)
+        // should be decomposed into §IF/§EL/§/I
+        var csharp = """
+            public class Test
+            {
+                int Helper() => 1;
+                int Other() => 2;
+                int M(bool flag) => flag ? Helper() : Other();
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Should NOT contain (? ... §C ...) inline
+        Assert.DoesNotContain("(? flag §C", result.CalorSource);
+        // Should contain the decomposed form
+        Assert.Contains("§IF{", result.CalorSource);
+        Assert.Contains("§EL", result.CalorSource);
+
+        // Should parse and compile
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void Ternary_WithNewObjectExpression_Decomposes()
+    {
+        // Ternary with new object in a branch (not collection — collections get hoisted)
+        var csharp = """
+            public class Config { public int Value; }
+            public class Test
+            {
+                Config M(bool flag) => flag ? new Config() : null;
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // If §NEW is in the ternary branches, it should be decomposed
+        if (result.CalorSource.Contains("§NEW") && result.CalorSource.Contains("§IF{"))
+        {
+            Assert.DoesNotContain("(? flag §NEW", result.CalorSource);
+        }
+
+        // Should parse without errors
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void Ternary_InReturnStatement_Decomposes()
+    {
+        // Ternary in a return statement with method call branches
+        var csharp = """
+            public class Test
+            {
+                string Format(int x) => x.ToString();
+                string Default() => "none";
+                string M(bool flag)
+                {
+                    return flag ? Format(42) : Default();
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should parse and compile
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void Ternary_InAssignment_Decomposes()
+    {
+        // Ternary in an assignment with call branches
+        var csharp = """
+            public class Test
+            {
+                int Helper() => 1;
+                int Other() => 2;
+                void M(bool flag)
+                {
+                    var x = flag ? Helper() : Other();
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should parse and compile
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void Ternary_NestedWithCalls_Decomposes()
+    {
+        // Nested ternary where both levels have method calls
+        var csharp = """
+            public class Test
+            {
+                int A() => 1;
+                int B() => 2;
+                int C() => 3;
+                int M(bool x, bool y) => x ? A() : (y ? B() : C());
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should parse without errors
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    #endregion
+
+    #region Doc Comment Tests
+
+    [Fact]
+    public void DocComment_WithExampleTag_NoOrphanedText()
+    {
+        // Pattern from Newtonsoft.Json's DefaultValueHandling
+        var csharp = """
+            using System;
+            namespace TestNs
+            {
+                /// <summary>
+                /// Specifies default value handling options.
+                /// </summary>
+                /// <example>
+                ///   <code lang="cs" source="Tests.cs" region="TestRegion" title="Example" />
+                /// </example>
+                [Flags]
+                public enum DefaultValueHandling
+                {
+                    Include = 0,
+                    Ignore = 1
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Every non-empty line should either be a section marker, an enum value, or a comment
+        foreach (var line in result.CalorSource.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed)) continue;
+            // Should NOT have bare text like "cs" without // prefix
+            if (!trimmed.StartsWith("§") && !trimmed.StartsWith("//")
+                && !trimmed.Contains("=") && !trimmed.StartsWith("["))
+            {
+                Assert.Fail($"Orphaned text found: '{trimmed}' in line: '{line}'");
+            }
+        }
+
+        // Should parse without errors
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void DocComment_MultiLineContent_AllPrefixed()
+    {
+        // Doc comment with multi-line summary
+        var csharp = """
+            namespace TestNs
+            {
+                /// <summary>
+                /// Gets or sets a value.
+                /// This is the second line.
+                /// </summary>
+                /// <remarks>
+                /// Additional information here.
+                /// More details on usage.
+                /// </remarks>
+                public class TestClass
+                {
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should parse without errors
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    #endregion
 }

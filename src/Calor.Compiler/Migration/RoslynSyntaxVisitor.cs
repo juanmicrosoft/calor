@@ -321,8 +321,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     break;
             }
         }
-        // Clean up: normalize whitespace
+        // Clean up: normalize whitespace and strip embedded carriage returns
         var cleaned = sb.ToString()
+            .Replace("\r", "")
             .Split('\n')
             .Select(l => l.TrimStart().TrimStart('/').TrimStart())
             .Where(l => !string.IsNullOrWhiteSpace(l));

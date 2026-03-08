@@ -14,6 +14,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private int _indentLevel;
     private readonly ConversionContext? _context;
     private bool _inInterpolation;
+    private readonly List<string> _pendingHoistedLines = new();
+    private int _ternaryCounter;
 
     public CalorEmitter(ConversionContext? context = null)
     {
@@ -24,12 +26,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         _builder.Clear();
         _indentLevel = 0;
+        _pendingHoistedLines.Clear();
+        _ternaryCounter = 0;
         Visit(module);
         return _builder.ToString();
     }
 
+    private void FlushHoistedLines()
+    {
+        if (_pendingHoistedLines.Count == 0) return;
+        var lines = new List<string>(_pendingHoistedLines);
+        _pendingHoistedLines.Clear();
+        foreach (var line in lines)
+        {
+            _builder.Append(new string(' ', _indentLevel * 2));
+            _builder.AppendLine(line);
+        }
+    }
+
     private void AppendLine(string line = "")
     {
+        FlushHoistedLines();
         if (string.IsNullOrEmpty(line))
         {
             _builder.AppendLine();
@@ -56,7 +73,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         if (node.DocComment == null)
             return;
-        foreach (var line in node.DocComment.Split('\n'))
+        // Normalize \r\n and \r to \n to avoid orphaned text from embedded carriage returns
+        var normalized = node.DocComment.Replace("\r\n", "\n").Replace("\r", "");
+        foreach (var line in normalized.Split('\n'))
         {
             AppendLine($"// {line.Trim()}");
         }
@@ -1662,7 +1681,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var condition = node.Condition.Accept(this);
         var whenTrue = node.WhenTrue.Accept(this);
         var whenFalse = node.WhenFalse.Accept(this);
+
+        // If either branch contains section markers (§C, §NEW, §LAM, etc.),
+        // decompose into §IF/§EL/§/I expression form. Section markers
+        // are invalid inside Lisp (?) expressions but valid in §IF expression branches.
+        if (ContainsSectionMarker(whenTrue) || ContainsSectionMarker(whenFalse))
+        {
+            var id = $"tern{_ternaryCounter++:D3}";
+            return $"§IF{{{id}}} {condition} → {whenTrue} §EL → {whenFalse} §/I{{{id}}}";
+        }
+
         return $"(? {condition} {whenTrue} {whenFalse})";
+    }
+
+    private static bool ContainsSectionMarker(string expr)
+    {
+        return expr.Contains('§');
     }
 
     public string Visit(ReferenceNode node)
