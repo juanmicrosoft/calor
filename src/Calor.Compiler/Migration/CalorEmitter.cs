@@ -16,6 +16,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private bool _inInterpolation;
     private readonly List<string> _pendingHoistedLines = new();
     private int _ternaryCounter;
+    private int _hoistCounter;
 
     public CalorEmitter(ConversionContext? context = null)
     {
@@ -28,6 +29,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _indentLevel = 0;
         _pendingHoistedLines.Clear();
         _ternaryCounter = 0;
+        _hoistCounter = 0;
         Visit(module);
         return _builder.ToString();
     }
@@ -1187,7 +1189,40 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(AssignmentStatementNode node)
     {
         var target = node.Target.Accept(this);
+
+        // Handle collection initializers specially - emit as collection block with target name
+        if (node.Value is ListCreationNode listNode)
+        {
+            EmitListCreationWithName(listNode, target);
+            return "";
+        }
+        if (node.Value is DictionaryCreationNode dictNode)
+        {
+            EmitDictionaryCreationWithName(dictNode, target);
+            return "";
+        }
+        if (node.Value is SetCreationNode setNode)
+        {
+            EmitSetCreationWithName(setNode, target);
+            return "";
+        }
+        if (node.Value is ArrayCreationNode arrNode)
+        {
+            EmitArrayCreationWithName(arrNode, target);
+            return "";
+        }
+        if (node.Value is MultiDimArrayCreationNode mdArrNode)
+        {
+            EmitMultiDimArrayCreationWithName(mdArrNode, target, null);
+            return "";
+        }
+
         var value = node.Value.Accept(this);
+
+        // Skip empty assigns (can happen when value was hoisted as a side effect)
+        if (string.IsNullOrWhiteSpace(value))
+            return "";
+
         // Parser expects: §ASSIGN <target> <value>
         AppendLine($"§ASSIGN {target} {value}");
         return "";
@@ -1699,6 +1734,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return expr.Contains('§');
     }
 
+    /// <summary>
+    /// Hoists an expression containing section markers to a temp variable.
+    /// Adds a §B{~tempVar} expr line to _pendingHoistedLines and returns the temp var name.
+    /// This prevents § markers from appearing inside Lisp (op ...) expressions.
+    /// </summary>
+    private string HoistToTempVar(string expr)
+    {
+        var varName = $"_hoist{_hoistCounter++:D3}";
+        _pendingHoistedLines.Add($"§B{{~{varName}}} {expr}");
+        return varName;
+    }
+
     public string Visit(ReferenceNode node)
     {
         return EscapeCalorIdentifier(node.Name);
@@ -1710,7 +1757,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var right = node.Right.Accept(this);
         var opSymbol = GetCalorOperatorSymbol(node.Operator);
 
-        // Use Lisp-style prefix notation: (op left right)
+        // Hoist operands containing section markers out of Lisp expression.
+        // § markers are invalid inside (op ...) expressions.
+        if (ContainsSectionMarker(left))
+            left = HoistToTempVar(left);
+        if (ContainsSectionMarker(right))
+            right = HoistToTempVar(right);
+
         return $"({opSymbol} {left} {right})";
     }
 
@@ -1724,6 +1777,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             UnaryOperator.BitwiseNot => "~",
             _ => "-"
         };
+
+        if (ContainsSectionMarker(operand))
+            operand = HoistToTempVar(operand);
 
         return $"({opSymbol} {operand})";
     }

@@ -723,4 +723,241 @@ public class ConverterQualityTests
     }
 
     #endregion
+
+    #region Hoisting § from Lisp Expressions (Round 3)
+
+    [Fact]
+    public void BinaryOp_WithCallOperand_HoistsToTempVar()
+    {
+        // x + SomeMethod() should hoist the call when it produces §C markers
+        var csharp = """
+            public class Test
+            {
+                int GetValue() => 42;
+                void M()
+                {
+                    int result = 1 + GetValue();
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void BinaryOp_WithBothCallOperands_HoistsBoth()
+    {
+        // A() + B() — both operands produce §C, both should be hoisted
+        var csharp = """
+            public class Test
+            {
+                int A() => 1;
+                int B() => 2;
+                void M()
+                {
+                    int result = A() + B();
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void BinaryOp_WithTernaryOperand_HoistsTernary()
+    {
+        // x + (cond ? a : b) — ternary in binary op
+        var csharp = """
+            public class Test
+            {
+                void M(bool flag)
+                {
+                    int result = 10 + (flag ? 1 : 2);
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void UnaryOp_WithCallOperand_HoistsToTempVar()
+    {
+        // -GetValue() — unary negation of call result
+        var csharp = """
+            public class Test
+            {
+                int GetValue() => 42;
+                void M()
+                {
+                    int result = -GetValue();
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void NestedBinaryOps_WithMultipleCalls_HoistsAllLevels()
+    {
+        // A() + B() * C() — nested binary ops with multiple calls
+        var csharp = """
+            public class Test
+            {
+                int A() => 1;
+                int B() => 2;
+                int C() => 3;
+                void M()
+                {
+                    int result = A() + B() * C();
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    #endregion
+
+    #region Empty §ASSIGN Fix (Round 3)
+
+    [Fact]
+    public void Assignment_ListCreation_EmitsCollectionBlock()
+    {
+        // _list = new List<int>() — should emit §LIST block, not empty §ASSIGN
+        var csharp = """
+            using System.Collections.Generic;
+            public class Test
+            {
+                void M()
+                {
+                    List<int> items = new List<int>();
+                    items = new List<int> { 1, 2, 3 };
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        // Should NOT have empty §ASSIGN
+        Assert.DoesNotContain("§ASSIGN items \n", result.CalorSource);
+
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void Assignment_DictionaryCreation_EmitsCollectionBlock()
+    {
+        var csharp = """
+            using System.Collections.Generic;
+            public class Test
+            {
+                void M()
+                {
+                    Dictionary<string, int> map = new Dictionary<string, int>();
+                    map = new Dictionary<string, int> { { "a", 1 } };
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    [Fact]
+    public void Assignment_ArrayCreation_EmitsArrayBlock()
+    {
+        var csharp = """
+            public class Test
+            {
+                void M()
+                {
+                    int[] arr = new int[5];
+                    arr = new int[] { 10, 20, 30 };
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+
+        var compileResult = Program.Compile(result.CalorSource);
+        var parseErrors = compileResult.Diagnostics
+            .Where(d => d.Code.StartsWith("Calor"))
+            .ToList();
+        Assert.Empty(parseErrors);
+    }
+
+    #endregion
 }
