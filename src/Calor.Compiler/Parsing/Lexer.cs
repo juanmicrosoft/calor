@@ -1621,6 +1621,20 @@ public sealed class Lexer
                 Advance();
             }
 
+            // Check for scientific notation (e.g., 2.22E-16, 1.5e+10)
+            if (Current is 'E' or 'e')
+            {
+                Advance(); // consume E/e
+                if (Current is '+' or '-')
+                {
+                    Advance(); // consume sign
+                }
+                while (char.IsDigit(Current))
+                {
+                    Advance();
+                }
+            }
+
             // Check for decimal suffix (M/m) on float
             if (Current is 'M' or 'm')
             {

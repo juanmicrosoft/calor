@@ -94,8 +94,10 @@ public class Foo
         Assert.True(result.Success, "Conversion should succeed");
         Assert.NotNull(result.CalorSource);
         Assert.True(result.CalorSource!.Length > 0);
-        // Converter should emit postfix notation (i32?) not prefix (?i32) in cast position
-        Assert.Contains("cast i32?", result.CalorSource);
+        // Converter should strip nullable annotation from cast types to avoid parser errors
+        // from ? tokens inside Lisp expressions. (cast i32 value) instead of (cast i32? value).
+        Assert.Contains("cast i32", result.CalorSource);
         Assert.DoesNotContain("cast ?i32", result.CalorSource);
+        Assert.DoesNotContain("cast i32?", result.CalorSource);
     }
 }
