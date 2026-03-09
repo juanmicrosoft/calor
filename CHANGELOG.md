@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-09
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Added
+- **Copilot instructions** — Ported Claude `/confidence` and `/create-release` skills to `.github/instructions/` for GitHub Copilot compatibility
+- **MCP cancellation token propagation** — All MCP tool `ExecuteAsync` methods now accept and propagate `CancellationToken` for proper request cancellation
+
+### Fixed
+- **§ERR fallback emission** — Unsupported C# constructs now emit parseable `§ERR "TODO: ..."` tokens instead of unparseable `§ERR{...}` brace format
+- **Named argument round-trip** — Named arguments in converter output now use correct `name: value` syntax that parses back cleanly
+- **Unicode escape sequences** — `\Uxxxxxxxx` 8-digit Unicode escapes now handled correctly in string literals
+- **Ternary decomposition** — Ternary expressions (`a ? b : c`) now decompose to `§IF` expression form instead of statement form, fixing 26+ Calor0104 errors across real-world codebases
+- **Doc comment carriage return leaks** — `\r` characters stripped from XML doc comments during conversion, preventing broken `//` comment prefixes
+- **§ markers in Lisp expressions** — Binary/unary operations with §-containing operands (calls, ternaries) now hoist to temp vars, preventing Calor0114 parse errors inside `(op arg1 arg2)` expressions
+- **Empty §ASSIGN for collections** — Collection creation (List, Dict, Set, Array) as assignment RHS now emits the collection block with the target name directly, instead of empty `§ASSIGN` statements
+
+### Converter Quality Improvements
+- **Newtonsoft.Json**: 54.0% → **100%** compile rate (240 files)
+- **Humanizer**: 86.1% → **99%** compile rate (100-file sample)
+- **PowerShell**: All 14 reported blockers resolved; 200-file sample at **100%** clean conversion
+
 ## [0.3.8] - 2026-03-05
 
 ### Benchmark Results (Statistical: 30 runs)
