@@ -1038,4 +1038,91 @@ public class ConverterQualityTests
     }
 
     #endregion
+
+    #region Round 5: Newtonsoft.Json converter fixes
+
+    [Fact]
+    public void UninitializedDeclaration_EmitsDefault()
+    {
+        var csharp = @"
+public class Foo
+{
+    public int Bar()
+    {
+        int result;
+        result = 42;
+        return result;
+    }
+}";
+        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var result = converter.Convert(csharp, "Test.cs");
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("default", result.CalorSource);
+        // Should compile without Calor0104 errors
+        var diag = new DiagnosticBag();
+        var tokens = new Lexer(result.CalorSource!, diag).TokenizeAll();
+        new Parser(tokens, diag).Parse();
+        Assert.False(diag.HasErrors, "Should parse without errors");
+    }
+
+    [Fact]
+    public void ScientificNotation_ParsesCorrectly()
+    {
+        var source = "§M{m1:Test}\n  §CL{c1:Foo:pub}\n    §MT{m1:Foo:pub} () -> f64\n      §B{f64:epsilon} 2.2204460492503131E-16\n      §R epsilon\n    §/MT{m1}\n  §/CL{c1}\n§/M{m1}";
+        var diag = new DiagnosticBag();
+        var tokens = new Lexer(source, diag).TokenizeAll();
+        // Check lexer recognized the scientific notation as a float literal
+        Assert.Contains(tokens, t => t.Kind == TokenKind.FloatLiteral);
+        Assert.DoesNotContain(tokens, t => t.Kind == TokenKind.Identifier && t.Text == "E");
+    }
+
+    [Fact]
+    public void NewInCallArgument_IsHoisted()
+    {
+        var csharp = @"
+public class Foo
+{
+    public void Bar(object value)
+    {
+        AddToken(value == null ? ""empty"" : new System.Text.StringBuilder(""hello"").ToString());
+    }
+    private void AddToken(string s) { }
+}";
+        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var result = converter.Convert(csharp, "Test.cs");
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // §NEW should NOT appear inside §C...§/C on the same line
+        var lines = result.CalorSource!.Split('\n');
+        foreach (var line in lines)
+        {
+            if (line.Contains("§C{") && line.Contains("§/C"))
+            {
+                Assert.DoesNotContain("§NEW{", line);
+            }
+        }
+    }
+
+    [Fact]
+    public void NullableCast_StripsAnnotation()
+    {
+        var csharp = @"
+public class Foo
+{
+    public byte[]? Bar(object value)
+    {
+        return (byte[]?)value;
+    }
+}";
+        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var result = converter.Convert(csharp, "Test.cs");
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        // Should contain cast without ? annotation
+        Assert.Contains("cast u8[]", result.CalorSource);
+        Assert.DoesNotContain("u8[]?", result.CalorSource);
+    }
+
+    #endregion
 }

@@ -4317,17 +4317,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .Select(a => ConvertExpression(a.Expression))
                 .ToList();
 
-            // Hoist §NEW arguments to temp bindings — the parser cannot handle §NEW nested inside §C
-            for (int i = 0; i < args.Count; i++)
-            {
-                if (args[i] is NewExpressionNode newNode)
-                {
-                    var tempName = _context.GenerateId("_new", newNode.TypeName);
-                    _pendingStatements.Add(new BindStatementNode(
-                        args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
-                    args[i] = new ReferenceNode(args[i].Span, tempName);
-                }
-            }
+            // Hoist complex arguments (§NEW, §ARR, ternaries with §NEW) to temp bindings
+            HoistComplexArguments(args);
 
             var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
             var stmtArgNames = hasNamedArgs
@@ -4502,9 +4493,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ? null
             : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
         var isMutable = _reassignedVariables.Contains(name);
+        // Emit `default` for uninitialized declarations to prevent the parser from
+        // consuming the next statement as the binding's value expression (Calor0104).
         var initializer = variable.Initializer != null
             ? ConvertExpression(variable.Initializer.Value)
-            : null;
+            : new ReferenceNode(GetTextSpan(node), "default");
 
         return new BindStatementNode(
             GetTextSpan(node),
@@ -4529,7 +4522,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var isMutable = _reassignedVariables.Contains(name);
             var initializer = variable.Initializer != null
                 ? ConvertExpression(variable.Initializer.Value)
-                : null;
+                : new ReferenceNode(GetTextSpan(node), "default");
 
             results.Add(new BindStatementNode(
                 GetTextSpan(node),
@@ -4626,12 +4619,35 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .ToList();
             var span = GetTextSpan(current);
 
-            // Hoist lambda arguments to temp bindings — prevents §LAM nesting inside §C
+            // Hoist complex arguments — prevents §LAM/§NEW nesting inside §C
             for (int i = 0; i < args.Count; i++)
             {
                 if (args[i] is LambdaExpressionNode)
                 {
-                    var tempName = _context.GenerateId("_lam", methodName);                    _pendingStatements.Add(new BindStatementNode(
+                    var tempName = _context.GenerateId("_lam", methodName);
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, tempName, null, false, args[i], new AttributeCollection()));
+                    args[i] = new ReferenceNode(args[i].Span, tempName);
+                }
+                else if (args[i] is NewExpressionNode newNode)
+                {
+                    var tempName = _context.GenerateId("_new", newNode.TypeName);
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, tempName, null, false, args[i], new AttributeCollection()));
+                    args[i] = new ReferenceNode(args[i].Span, tempName);
+                }
+                else if (args[i] is ArrayCreationNode arrNode)
+                {
+                    var tempName = _context.GenerateId("_arr", arrNode.ElementType);
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, tempName, null, false, args[i], new AttributeCollection()));
+                    args[i] = new ReferenceNode(args[i].Span, tempName);
+                }
+                else if (args[i] is ConditionalExpressionNode condNode
+                    && ContainsComplexNode(condNode))
+                {
+                    var tempName = _context.GenerateId("_tern");
+                    _pendingStatements.Add(new BindStatementNode(
                         span, tempName, null, false, args[i], new AttributeCollection()));
                     args[i] = new ReferenceNode(args[i].Span, tempName);
                 }
@@ -4822,6 +4838,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var step = steps[i];
             var target = i == 0 ? step.baseTarget! : prevTempName!;
             var isLast = i == steps.Count - 1;
+
+            // Hoist complex arguments (§NEW, ternaries with §NEW) from chain step args
+            HoistComplexArguments(step.args);
+            if (_pendingStatements.Count > 0)
+            {
+                results.AddRange(_pendingStatements);
+                _pendingStatements.Clear();
+            }
 
             var callExpr = new CallExpressionNode(step.span, $"{target}.{step.methodName}", step.args);
 
@@ -6568,7 +6592,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                 args[i] = new ReferenceNode(args[i].Span, tempName);
             }
+            else if (args[i] is ConditionalExpressionNode condNode)
+            {
+                // Hoist §NEW/§ARR from ternary branches — parser can't handle
+                // §NEW nested inside §CALL through a ternary expression.
+                var needsHoist = ContainsComplexNode(condNode.WhenTrue)
+                    || ContainsComplexNode(condNode.WhenFalse);
+                if (needsHoist)
+                {
+                    var tempName = _context.GenerateId("_tern");
+                    _pendingStatements.Add(new BindStatementNode(
+                        args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                    args[i] = new ReferenceNode(args[i].Span, tempName);
+                }
+            }
         }
+    }
+
+    private static bool ContainsComplexNode(ExpressionNode node)
+    {
+        return node is NewExpressionNode or ArrayCreationNode or LambdaExpressionNode
+            || (node is ConditionalExpressionNode cond
+                && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
     }
 
     private static IReadOnlyList<string?>? ExtractArgumentModifiers(SeparatedSyntaxList<ArgumentSyntax> arguments)

@@ -2961,11 +2961,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var operand = node.Operand.Accept(this);
         return node.Operation switch
         {
-            TypeOp.Cast => $"(cast {NullablePrefixToPostfix(node.TargetType)} {operand})",
+            TypeOp.Cast => $"(cast {StripNullableAnnotation(node.TargetType)} {operand})",
             TypeOp.Is => $"(is {operand} {node.TargetType})",
             TypeOp.As => $"(as {operand} {node.TargetType})",
             _ => throw new NotSupportedException($"Unknown type operation: {node.Operation}")
         };
+    }
+
+    /// <summary>
+    /// Strips nullable annotation from cast types. For reference types (arrays, classes),
+    /// the nullable `?` is a compile-time annotation with no runtime effect. Removing it
+    /// prevents parser errors from `?` tokens inside Lisp expressions.
+    /// </summary>
+    private static string StripNullableAnnotation(string typeName)
+    {
+        if (typeName.StartsWith('?'))
+            return typeName[1..];
+        if (typeName.EndsWith('?'))
+            return typeName[..^1];
+        return typeName;
     }
 
     /// <summary>
