@@ -960,4 +960,82 @@ public class ConverterQualityTests
     }
 
     #endregion
+
+    #region Target-Typed New Type Inference (Round 4)
+
+    [Fact]
+    public void TargetTypedNew_CollectionExpression_InfersElementType()
+    {
+        // new() inside collection expression [ ... ] should infer element type from declaration
+        var csharp = """
+            using System.Collections.Generic;
+            public class Test
+            {
+                static readonly KeyValuePair<string, int>[] Items =
+                [
+                    new("A", 1),
+                    new("B", 2),
+                ];
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§NEW{object}", result.CalorSource);
+        Assert.Contains("§NEW{KeyValuePair<str, i32>}", result.CalorSource);
+    }
+
+    [Fact]
+    public void TargetTypedNew_ArrayInitializer_InfersElementType()
+    {
+        // new() inside new Type[] { ... } should infer element type
+        var csharp = """
+            public class Point
+            {
+                public int X { get; }
+                public int Y { get; }
+                public Point(int x, int y) { X = x; Y = y; }
+            }
+            public class Test
+            {
+                static Point[] points = new Point[] { new(1, 2), new(3, 4) };
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§NEW{object}", result.CalorSource);
+    }
+
+    [Fact]
+    public void TargetTypedNew_VariableDeclaration_InfersType()
+    {
+        // List<T> x = new() should infer List<T>
+        var csharp = """
+            using System.Collections.Generic;
+            public class Test
+            {
+                void M()
+                {
+                    List<string> items = new();
+                    Dictionary<string, int> map = new();
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter();
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§NEW{object}", result.CalorSource);
+    }
+
+    #endregion
 }

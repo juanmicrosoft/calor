@@ -6079,6 +6079,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private string? InferTargetType(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
+        // First, try to use the semantic model for precise type inference
+        var semanticType = TryInferTypeFromSemanticModel(implicitNew);
+        if (semanticType != null)
+            return semanticType;
+
         var parent = implicitNew.Parent;
 
         // Case 1: Variable declaration: Type x = new();
@@ -6098,10 +6103,39 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // Case 2: Assignment: x = new();
-        if (parent is AssignmentExpressionSyntax)
+        if (parent is AssignmentExpressionSyntax assignment)
         {
-            // Can't infer type from assignment without semantic model
+            // Try to get the left-hand side type from the semantic model
+            if (_semanticModel != null)
+            {
+                try
+                {
+                    var lhsType = _semanticModel.GetTypeInfo(assignment.Left).Type;
+                    if (lhsType != null && lhsType.SpecialType != SpecialType.System_Object && lhsType.TypeKind != TypeKind.Error)
+                        return TypeMapper.CSharpToCalor(lhsType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+                }
+                catch { /* fall through */ }
+            }
             return null;
+        }
+
+        // Case 2b: Inside initializer expression (array, collection, or object initializer)
+        // e.g., new[] { new("M", 1000), ... } or List<T> { new(), ... }
+        if (parent is InitializerExpressionSyntax)
+        {
+            var elementType = InferElementTypeFromInitializer(implicitNew);
+            if (elementType != null)
+                return elementType;
+        }
+
+        // Case 2c: Inside collection expression — [ new("M", 1000), ... ]
+        // Parent is ExpressionElementSyntax, grandparent is CollectionExpressionSyntax
+        if (parent is ExpressionElementSyntax expressionElement
+            && expressionElement.Parent is CollectionExpressionSyntax collectionExpr)
+        {
+            var elementType = InferElementTypeFromCollectionExpression(collectionExpr);
+            if (elementType != null)
+                return elementType;
         }
 
         // Case 3a: Throw statement — throw new("msg");
@@ -6167,6 +6201,200 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Uses the Roslyn SemanticModel to infer the converted type of an implicit
+    /// object creation expression (target-typed new). Falls back to null if the
+    /// semantic model is unavailable or the type cannot be resolved.
+    /// </summary>
+    private string? TryInferTypeFromSemanticModel(ImplicitObjectCreationExpressionSyntax implicitNew)
+    {
+        if (_semanticModel == null)
+            return null;
+
+        try
+        {
+            var typeInfo = _semanticModel.GetTypeInfo(implicitNew);
+            var type = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (type != null
+                && type.SpecialType != SpecialType.System_Object
+                && type.TypeKind != TypeKind.Error)
+            {
+                var displayString = type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                if (!string.IsNullOrEmpty(displayString) && displayString != "?" && displayString != "object")
+                    return TypeMapper.CSharpToCalor(displayString);
+            }
+        }
+        catch
+        {
+            // Semantic model queries can fail if compilation has errors; fall through
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Infers the element type for a target-typed new() inside an initializer expression
+    /// (e.g., array initializer, collection initializer) by walking up the syntax tree
+    /// to find the declaring type and extracting its element type.
+    /// </summary>
+    private string? InferElementTypeFromInitializer(ImplicitObjectCreationExpressionSyntax implicitNew)
+    {
+        // Walk up through nested initializers to find the creation expression or declaration
+        SyntaxNode? current = implicitNew.Parent;
+        while (current is InitializerExpressionSyntax)
+            current = current.Parent;
+
+        // Case A: Inside explicit array creation — new Type[] { new(), ... }
+        if (current is ArrayCreationExpressionSyntax arrayCreation)
+        {
+            var elementType = arrayCreation.Type.ElementType.ToString();
+            return TypeMapper.CSharpToCalor(elementType);
+        }
+
+        // Case B: Inside implicit array creation — new[] { new(), ... }
+        // Walk further up to find the declaration that provides the array element type
+        if (current is ImplicitArrayCreationExpressionSyntax)
+        {
+            var outerParent = current.Parent;
+            if (outerParent is EqualsValueClauseSyntax evc2)
+            {
+                if (evc2.Parent is VariableDeclaratorSyntax vd2
+                    && vd2.Parent is VariableDeclarationSyntax decl2
+                    && !decl2.Type.IsVar)
+                {
+                    var typeStr = decl2.Type.ToString().TrimEnd('[', ']');
+                    if (!string.IsNullOrEmpty(typeStr))
+                        return TypeMapper.CSharpToCalor(typeStr);
+                }
+                if (evc2.Parent is PropertyDeclarationSyntax prop2)
+                {
+                    var typeStr = prop2.Type.ToString().TrimEnd('[', ']');
+                    if (!string.IsNullOrEmpty(typeStr))
+                        return TypeMapper.CSharpToCalor(typeStr);
+                }
+            }
+        }
+
+        // Case C: Inside explicit object creation with collection initializer
+        // e.g., new List<T> { new(), new() }
+        if (current is ObjectCreationExpressionSyntax objCreation)
+        {
+            var typeStr = objCreation.Type.ToString();
+            var elementType = ExtractGenericTypeArgument(typeStr);
+            if (elementType != null)
+                return TypeMapper.CSharpToCalor(elementType);
+        }
+
+        // Case D: Field/variable declaration with array type, reached via EqualsValueClause
+        if (current is EqualsValueClauseSyntax evc3)
+        {
+            if (evc3.Parent is VariableDeclaratorSyntax vd3
+                && vd3.Parent is VariableDeclarationSyntax decl3
+                && !decl3.Type.IsVar)
+            {
+                var typeStr = decl3.Type.ToString();
+                if (typeStr.EndsWith("[]"))
+                {
+                    var elementType = typeStr[..^2];
+                    return TypeMapper.CSharpToCalor(elementType);
+                }
+                var genericArg = ExtractGenericTypeArgument(typeStr);
+                if (genericArg != null)
+                    return TypeMapper.CSharpToCalor(genericArg);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Infers the element type for a target-typed new() inside a C# 12 collection expression
+    /// (e.g., [new("M", 1000), ...]) by walking up to the declaring variable/property.
+    /// </summary>
+    private string? InferElementTypeFromCollectionExpression(CollectionExpressionSyntax collectionExpr)
+    {
+        var parent = collectionExpr.Parent;
+
+        // Collection expression as field/variable initializer: Type[] x = [ new(), ... ]
+        if (parent is EqualsValueClauseSyntax evc)
+        {
+            if (evc.Parent is VariableDeclaratorSyntax vd
+                && vd.Parent is VariableDeclarationSyntax decl
+                && !decl.Type.IsVar)
+            {
+                return ExtractElementTypeFromDeclarationType(decl.Type.ToString());
+            }
+            if (evc.Parent is PropertyDeclarationSyntax prop)
+            {
+                return ExtractElementTypeFromDeclarationType(prop.Type.ToString());
+            }
+        }
+
+        // Collection expression as return value — walk up to method
+        if (parent is ReturnStatementSyntax or ArrowExpressionClauseSyntax)
+        {
+            var ancestor = parent;
+            while (ancestor != null)
+            {
+                if (ancestor is MethodDeclarationSyntax method)
+                {
+                    return ExtractElementTypeFromDeclarationType(method.ReturnType.ToString());
+                }
+                if (ancestor is PropertyDeclarationSyntax prop)
+                {
+                    return ExtractElementTypeFromDeclarationType(prop.Type.ToString());
+                }
+                ancestor = ancestor.Parent;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts the element type from a declaration type string.
+    /// Handles arrays (T[]) and single-type-argument generics (List&lt;T&gt;).
+    /// </summary>
+    private string? ExtractElementTypeFromDeclarationType(string typeStr)
+    {
+        // Array type: T[] → T
+        if (typeStr.EndsWith("[]"))
+        {
+            var elementType = typeStr[..^2];
+            if (!string.IsNullOrEmpty(elementType))
+                return TypeMapper.CSharpToCalor(elementType);
+        }
+        // Generic type: List<T> → T, IEnumerable<T> → T
+        var genericArg = ExtractGenericTypeArgument(typeStr);
+        if (genericArg != null)
+            return TypeMapper.CSharpToCalor(genericArg);
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts the first generic type argument from a type string.
+    /// e.g., "List&lt;string&gt;" → "string", "Dictionary&lt;string, int&gt;" → null (multi-arg).
+    /// Returns null if the type is not a single-argument generic or cannot be parsed.
+    /// </summary>
+    private static string? ExtractGenericTypeArgument(string typeStr)
+    {
+        var openAngle = typeStr.IndexOf('<');
+        if (openAngle < 0) return null;
+        var closeAngle = typeStr.LastIndexOf('>');
+        if (closeAngle <= openAngle) return null;
+        var inner = typeStr[(openAngle + 1)..closeAngle].Trim();
+        // Only return for single-type-argument generics (no commas at top level)
+        // Count angle bracket depth to avoid splitting on commas inside nested generics
+        var depth = 0;
+        foreach (var ch in inner)
+        {
+            if (ch == '<') depth++;
+            else if (ch == '>') depth--;
+            else if (ch == ',' && depth == 0) return inner; // multi-arg: return the full inner as the type
+        }
+        return inner;
     }
 
     private ExpressionNode ConvertThrowExpression(ThrowExpressionSyntax throwExpr)
