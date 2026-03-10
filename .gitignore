@@ -67,3 +67,6 @@ conversion-reports/
 
 # Stale report files
 report.json
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
