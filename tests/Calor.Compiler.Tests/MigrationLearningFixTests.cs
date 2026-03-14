@@ -874,4 +874,117 @@ public class MigrationLearningFixTests
     }
 
     #endregion
+
+    #region Fix 8: UTF-8 String Literal Emission
+
+    [Fact]
+    public void CSharpEmitter_Utf8StringLiteral_EmitsU8Suffix()
+    {
+        var node = new StringLiteralNode(Span, "hello") { IsUtf8 = true };
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+
+        Assert.Equal("\"hello\"u8", result);
+    }
+
+    [Fact]
+    public void CSharpEmitter_RegularStringLiteral_NoU8Suffix()
+    {
+        var node = new StringLiteralNode(Span, "hello");
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+
+        Assert.Equal("\"hello\"", result);
+    }
+
+    #endregion
+
+    #region Fix 9: List Pattern Slice Position
+
+    [Fact]
+    public void CSharpEmitter_ListPattern_SliceAtEnd()
+    {
+        // [var a, var b, ..var rest]
+        var node = new ListPatternNode(
+            Span,
+            new PatternNode[] { new VarPatternNode(Span, "a"), new VarPatternNode(Span, "b") },
+            new VarPatternNode(Span, "rest"),
+            sliceIndex: 2); // after both patterns = end
+
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+        Assert.Equal("[var a, var b, ..var rest]", result);
+    }
+
+    [Fact]
+    public void CSharpEmitter_ListPattern_SliceAtStart()
+    {
+        // [..var rest, var a, var b]
+        var node = new ListPatternNode(
+            Span,
+            new PatternNode[] { new VarPatternNode(Span, "a"), new VarPatternNode(Span, "b") },
+            new VarPatternNode(Span, "rest"),
+            sliceIndex: 0); // before all patterns = start
+
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+        Assert.Equal("[..var rest, var a, var b]", result);
+    }
+
+    [Fact]
+    public void CSharpEmitter_ListPattern_SliceInMiddle()
+    {
+        // [var first, .., var last] — discard slice emits bare ..
+        var node = new ListPatternNode(
+            Span,
+            new PatternNode[] { new VarPatternNode(Span, "first"), new VarPatternNode(Span, "last") },
+            new VarPatternNode(Span, "_"),
+            sliceIndex: 1); // between first and last
+
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+        Assert.Equal("[var first, .., var last]", result);
+    }
+
+    [Fact]
+    public void CSharpEmitter_ListPattern_NoSlice()
+    {
+        // [var a, var b, var c]
+        var node = new ListPatternNode(
+            Span,
+            new PatternNode[] { new VarPatternNode(Span, "a"), new VarPatternNode(Span, "b"), new VarPatternNode(Span, "c") },
+            null);
+
+        var emitter = new CSharpEmitter();
+        var result = node.Accept(emitter);
+        Assert.Equal("[var a, var b, var c]", result);
+    }
+
+    [Fact]
+    public void RoundTrip_ListPattern_SlicePositionPreserved()
+    {
+        // C# with middle slice: [var first, .., var last]
+        var csharp = @"public class Test { public bool M(int[] arr) => arr is [var first, .., var last]; }";
+        var result = _converter.Convert(csharp, "test");
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+
+        // Re-emit to C# and verify slice is in the middle
+        var emitter = new CSharpEmitter();
+        var output = emitter.Emit(result.Ast!);
+        Assert.Contains("[var first, .., var last]", output);
+    }
+
+    [Fact]
+    public void RoundTrip_ListPattern_SliceAtStartPreserved()
+    {
+        var csharp = @"public class Test { public bool M(int[] arr) => arr is [.. var rest, var a, var b]; }";
+        var result = _converter.Convert(csharp, "test");
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+
+        var emitter = new CSharpEmitter();
+        var output = emitter.Emit(result.Ast!);
+        Assert.Contains("[..var rest, var a, var b]", output);
+    }
+
+    #endregion
 }

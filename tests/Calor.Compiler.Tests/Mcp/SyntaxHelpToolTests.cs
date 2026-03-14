@@ -688,8 +688,8 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
             Assert.Contains("feature", text);
             Assert.Contains("contracts", text.ToLower());
 
-            // Cleanup temp dir
-            Directory.Delete(tempDir, true);
+            // Cleanup temp dir (may fail on Windows due to file locks)
+            try { Directory.Delete(tempDir, true); } catch (IOException) when (OperatingSystem.IsWindows()) { }
         }
         finally
         {

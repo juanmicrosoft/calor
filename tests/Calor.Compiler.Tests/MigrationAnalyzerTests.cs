@@ -696,7 +696,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_PrimaryConstructor_DetectedAsUnsupported()
+    public void AnalyzeSource_PrimaryConstructor_NowFullySupported()
     {
         var source = """
             public class Service(string name)
@@ -707,8 +707,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "primary-constructor");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "primary-constructor");
     }
 
     [Fact]
@@ -769,7 +769,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_GenericTypeConstraint_DetectedAsUnsupported()
+    public void AnalyzeSource_GenericTypeConstraint_NowFullySupported()
     {
         var source = """
             public class Repository<T> where T : class, new()
@@ -780,12 +780,12 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "generic-type-constraint");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "generic-type-constraint");
     }
 
     [Fact]
-    public void AnalyzeSource_DeclarationPattern_DetectedAsUnsupported()
+    public void AnalyzeSource_DeclarationPattern_NowFullySupported()
     {
         var source = """
             public class Service
@@ -802,8 +802,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "declaration-pattern");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "declaration-pattern");
     }
 
     [Fact]
@@ -827,7 +827,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_NestedGenericType_DetectedAsUnsupported()
+    public void AnalyzeSource_NestedGenericType_NowFullySupported()
     {
         var source = """
             using System;
@@ -840,12 +840,12 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "nested-generic-type");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "nested-generic-type");
     }
 
     [Fact]
-    public void AnalyzeSource_RangeExpression_DetectedAsUnsupported()
+    public void AnalyzeSource_RangeExpression_NowFullySupported()
     {
         var source = """
             public class Service
@@ -859,8 +859,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "range-expression");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "range-expression");
     }
 
     [Fact]
@@ -889,21 +889,18 @@ public class MigrationAnalyzerTests
     [Fact]
     public void AnalyzeSource_UnsupportedConstructs_ReduceScore()
     {
-        // Code with potential for high score but has unsupported constructs
+        // Code with unsupported construct (await-foreach, still NotSupported)
         var sourceWithUnsupported = """
+            using System.Collections.Generic;
             public class Service
             {
                 public string? Name { get; set; }
 
-                public void Process(string input)
+                public async void Process(IAsyncEnumerable<string> items)
                 {
-                    if (input == null)
-                        throw new ArgumentNullException(nameof(input));
-
-                    // Unsupported: out parameter (not inside coalesce/ternary)
-                    if (int.TryParse(input, out var result))
+                    await foreach (var item in items)
                     {
-                        Name = result.ToString();
+                        Name = item;
                     }
                 }
             }
@@ -937,28 +934,32 @@ public class MigrationAnalyzerTests
     [Fact]
     public void AnalyzeSource_MultipleUnsupportedConstructs_CompoundPenalty()
     {
-        // Note: switch expression, relational pattern, and compound pattern are now supported
-        // This test uses: primary constructor (unsupported) only
+        // Uses await-foreach and await-using (both still NotSupported)
         var source = """
-            public class Service(string name)
+            using System;
+            using System.Collections.Generic;
+            public class Service
             {
-                public bool IsInRange(int x)
+                public async void Process(IAsyncEnumerable<IAsyncDisposable> items)
                 {
-                    // Supported: relational + compound pattern
-                    return x is > 0 and < 10;
+                    await foreach (var item in items)
+                    {
+                        await using (item)
+                        {
+                        }
+                    }
                 }
-
-                public Func<int, int> Doubler => x => x * 2;
             }
             """;
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        // Only primary constructor should be unsupported now
+        Assert.False(result.WasSkipped, "Analysis should not skip this source");
         Assert.True(result.HasUnsupportedConstructs);
-        Assert.True(result.UnsupportedConstructs.Count >= 1,
-            $"Expected at least 1 unsupported construct, got {result.UnsupportedConstructs.Count}");
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "primary-constructor");
+        Assert.True(result.UnsupportedConstructs.Count >= 2,
+            $"Expected at least 2 unsupported constructs (await-foreach + await-using), got {result.UnsupportedConstructs.Count}");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "await-foreach");
+        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "await-using");
     }
 
     #endregion
@@ -982,8 +983,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "yield-return");
+        // yield-return is now fully supported
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "yield-return");
     }
 
     [Fact]
@@ -1004,13 +1005,14 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
+        Assert.False(result.WasSkipped);
         // goto and labeled-statement are now fully supported
         Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "goto");
         Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "labeled-statement");
     }
 
     [Fact]
-    public void AnalyzeSource_UnsafeCode_DetectedAsUnsupported()
+    public void AnalyzeSource_UnsafeCode_NowFullySupported()
     {
         var source = """
             public class UnsafeService
@@ -1025,9 +1027,10 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "unsafe");
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "pointer");
+        Assert.False(result.WasSkipped);
+        // unsafe and pointer are now fully supported
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "unsafe");
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "pointer");
     }
 
     [Fact]
@@ -1042,6 +1045,7 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
+        Assert.False(result.WasSkipped);
         // Volatile fields are now fully supported
         Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "volatile");
     }
@@ -1062,6 +1066,7 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
+        Assert.False(result.WasSkipped);
         // Operator overloads are now fully supported via §OP tags
         Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "operator-overload");
     }
@@ -1079,6 +1084,7 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
+        Assert.False(result.WasSkipped);
         // Implicit conversions are now fully supported via §OP tags
         Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "implicit-conversion");
     }
@@ -1098,12 +1104,13 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
+        Assert.False(result.WasSkipped);
         // Extension methods are now fully supported via :this modifier
         Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "extension-method");
     }
 
     [Fact]
-    public void AnalyzeSource_InParameter_DetectedAsUnsupported()
+    public void AnalyzeSource_InParameter_NowFullySupported()
     {
         var source = """
             public class Service
@@ -1117,12 +1124,12 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "in-parameter");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "in-parameter");
     }
 
     [Fact]
-    public void AnalyzeSource_CheckedBlock_DetectedAsUnsupported()
+    public void AnalyzeSource_CheckedBlock_NowFullySupported()
     {
         var source = """
             public class Calculator
@@ -1139,12 +1146,12 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "checked-block");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "checked-block");
     }
 
     [Fact]
-    public void AnalyzeSource_WithExpression_DetectedAsUnsupported()
+    public void AnalyzeSource_WithExpression_NowFullySupported()
     {
         var source = """
             public record Person(string Name, int Age);
@@ -1159,12 +1166,12 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "with-expression");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "with-expression");
     }
 
     [Fact]
-    public void AnalyzeSource_InitAccessor_DetectedAsUnsupported()
+    public void AnalyzeSource_InitAccessor_NowFullySupported()
     {
         var source = """
             public class Config
@@ -1175,12 +1182,12 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "init-accessor");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "init-accessor");
     }
 
     [Fact]
-    public void AnalyzeSource_RequiredMember_DetectedAsUnsupported()
+    public void AnalyzeSource_RequiredMember_NowFullySupported()
     {
         var source = """
             public class Person
@@ -1191,12 +1198,12 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "required-member");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "required-member");
     }
 
     [Fact]
-    public void AnalyzeSource_ListPattern_DetectedAsUnsupported()
+    public void AnalyzeSource_ListPattern_NowFullySupported()
     {
         var source = """
             public class Matcher
@@ -1210,8 +1217,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "list-pattern");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "list-pattern");
     }
 
     [Fact]
@@ -1340,8 +1347,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "scoped-parameter");
+        // scoped-parameter is now fully supported
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "scoped-parameter");
     }
 
     [Fact]
@@ -1360,12 +1367,13 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
+        Assert.False(result.WasSkipped);
         // Collection expressions are now fully supported
         Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "collection-expression");
     }
 
     [Fact]
-    public void AnalyzeSource_ReadonlyStruct_DetectedAsUnsupported()
+    public void AnalyzeSource_ReadonlyStruct_NowFullySupported()
     {
         var source = """
             public readonly struct Point
@@ -1383,8 +1391,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "readonly-struct");
+        Assert.False(result.WasSkipped);
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "readonly-struct");
     }
 
     #endregion
@@ -1428,7 +1436,7 @@ public class MigrationAnalyzerTests
     }
 
     [Fact]
-    public void AnalyzeSource_Utf8StringLiteral_DetectedAsUnsupported()
+    public void AnalyzeSource_Utf8StringLiteral_NotDetectedAsUnsupported_WhenFullySupported()
     {
         var source = """
             public class Service
@@ -1442,8 +1450,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        Assert.True(result.HasUnsupportedConstructs);
-        Assert.Contains(result.UnsupportedConstructs, c => c.Name == "utf8-string-literal");
+        // UTF-8 string literals are now fully supported, so they should not appear as unsupported
+        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "utf8-string-literal");
     }
 
     [Fact]

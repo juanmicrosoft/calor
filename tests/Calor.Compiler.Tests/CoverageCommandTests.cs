@@ -85,14 +85,18 @@ public class CoverageCommandTests : IDisposable
     [Fact]
     public async Task Coverage_MultipleBlockers_ReducesScoreSignificantly()
     {
-        // Use genuinely unsupported constructs: primary ctor + unsafe + stackalloc
+        // Use genuinely unsupported constructs: ref/out params + await-foreach
         var source = """
-            public unsafe class Service(string name)
+            using System;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            public class Service
             {
-                public void Process()
+                public void Swap(ref int a, ref int b) { int t = a; a = b; b = t; }
+                public bool TryGet(string key, out int result) { result = 0; return false; }
+                public async Task ProcessAsync(IAsyncEnumerable<int> items)
                 {
-                    Span<int> buf = stackalloc int[10];
-                    fixed (int* p = &buf[0]) { *p = 1; }
+                    await foreach (var item in items) { Console.WriteLine(item); }
                 }
             }
             """;
@@ -233,22 +237,22 @@ public class CoverageCommandTests : IDisposable
     #region Blocker Detection
 
     [Fact]
-    public async Task Coverage_AllPhase1Blockers_Detected()
+    public async Task Coverage_AllPhase1Blockers_NowFullySupported()
     {
-        // Test yield-return
+        // yield-return and unsafe are now fully supported — should not appear as unsupported
         var yieldSource = """
             using System.Collections.Generic;
             public class Gen { public IEnumerable<int> Get() { yield return 1; } }
             """;
         var yieldResult = await _analyzer.AnalyzeFileAsync(CreateTestFile("yield.cs", yieldSource));
-        Assert.Contains(yieldResult.UnsupportedConstructs, c => c.Name == "yield-return");
+        Assert.DoesNotContain(yieldResult.UnsupportedConstructs, c => c.Name == "yield-return");
 
-        // Test unsafe (goto is now supported)
         var unsafeSource = """
             public class U { public unsafe void M() { int x = 1; int* p = &x; } }
             """;
         var unsafeResult = await _analyzer.AnalyzeFileAsync(CreateTestFile("unsafe.cs", unsafeSource));
-        Assert.Contains(unsafeResult.UnsupportedConstructs, c => c.Name == "unsafe");
+        Assert.DoesNotContain(unsafeResult.UnsupportedConstructs, c => c.Name == "unsafe");
+        Assert.DoesNotContain(unsafeResult.UnsupportedConstructs, c => c.Name == "pointer");
     }
 
     [Fact]
@@ -259,12 +263,12 @@ public class CoverageCommandTests : IDisposable
         var fileResult = await _analyzer.AnalyzeFileAsync(CreateTestFile("file.cs", fileSource));
         Assert.Contains(fileResult.UnsupportedConstructs, c => c.Name == "file-scoped-type");
 
-        // Test UTF-8 string literal
+        // Test UTF-8 string literal — now fully supported, should NOT appear as unsupported
         var utf8Source = """
             public class U { public ReadOnlySpan<byte> Get() => "hello"u8; }
             """;
         var utf8Result = await _analyzer.AnalyzeFileAsync(CreateTestFile("utf8.cs", utf8Source));
-        Assert.Contains(utf8Result.UnsupportedConstructs, c => c.Name == "utf8-string-literal");
+        Assert.DoesNotContain(utf8Result.UnsupportedConstructs, c => c.Name == "utf8-string-literal");
     }
 
     #endregion

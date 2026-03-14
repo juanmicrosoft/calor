@@ -98,7 +98,10 @@ public class SolutionInitializationIntegrationTests : IDisposable
             return;
         }
 
-        var aiInitializer = new ClaudeInitializer();
+        var aiInitializer = new ClaudeInitializer
+        {
+            ClaudeJsonPathOverride = Path.Combine(Path.GetTempPath(), $"calor-claude-{Guid.NewGuid():N}.json")
+        };
 
         // Act
         var result = await _initializer.InitializeAsync(
@@ -163,7 +166,10 @@ public class SolutionInitializationIntegrationTests : IDisposable
             SetupMockSolution(testDir, projectCount: 3);
 
             var slnPath = Path.Combine(testDir, "MockSolution.sln");
-            var aiInitializer = new ClaudeInitializer();
+            var aiInitializer = new ClaudeInitializer
+        {
+            ClaudeJsonPathOverride = Path.Combine(Path.GetTempPath(), $"calor-claude-{Guid.NewGuid():N}.json")
+        };
 
             // Act
             var result = await _initializer.InitializeAsync(slnPath, force: false, aiInitializer);

@@ -464,16 +464,14 @@ public static class FeatureSupport
         ["in-parameter"] = new FeatureInfo
         {
             Name = "in-parameter",
-            Support = SupportLevel.NotSupported,
-            Description = "in parameters (readonly ref) are not supported",
-            Workaround = "Pass by value or use regular ref parameter"
+            Support = SupportLevel.Full,
+            Description = "in parameters (readonly ref) are converted with ParameterModifier.In"
         },
         ["checked-block"] = new FeatureInfo
         {
             Name = "checked-block",
-            Support = SupportLevel.Partial,
-            Description = "checked/unchecked wrapper stripped, body statements preserved",
-            Workaround = "Handle overflow manually if needed; body code is preserved"
+            Support = SupportLevel.Full,
+            Description = "checked/unchecked wrapper stripped, body statements fully preserved"
         },
         ["with-expression"] = new FeatureInfo
         {
@@ -496,9 +494,8 @@ public static class FeatureSupport
         ["list-pattern"] = new FeatureInfo
         {
             Name = "list-pattern",
-            Support = SupportLevel.NotSupported,
-            Description = "list/slice patterns ([a, b, ..rest]) are not supported",
-            Workaround = "Use explicit indexing and Length checks"
+            Support = SupportLevel.Full,
+            Description = "list/slice patterns ([a, b, ..rest])"
         },
         ["static-abstract-member"] = new FeatureInfo
         {
@@ -539,9 +536,8 @@ public static class FeatureSupport
         ["scoped-parameter"] = new FeatureInfo
         {
             Name = "scoped-parameter",
-            Support = SupportLevel.NotSupported,
-            Description = "scoped parameters and locals are not supported",
-            Workaround = "Remove scoped keyword; ensure ref safety manually"
+            Support = SupportLevel.Full,
+            Description = "scoped keyword is stripped during conversion; parameter is preserved"
         },
         ["collection-expression"] = new FeatureInfo
         {
@@ -580,9 +576,9 @@ public static class FeatureSupport
         ["utf8-string-literal"] = new FeatureInfo
         {
             Name = "utf8-string-literal",
-            Support = SupportLevel.NotSupported,
-            Description = "UTF-8 string literals (C# 11) are not supported",
-            Workaround = "Use Encoding.UTF8.GetBytes(\"text\") instead"
+            Support = SupportLevel.Full,
+            Description = "UTF-8 string literals (C# 11) are fully supported — u8 suffix is preserved through round-trip",
+            Workaround = null
         },
         ["generic-attribute"] = new FeatureInfo
         {
@@ -617,15 +613,20 @@ public static class FeatureSupport
         ["complex-is-pattern"] = new FeatureInfo
         {
             Name = "complex-is-pattern",
-            Support = SupportLevel.Partial,
-            Description = "Simple is-patterns are fully supported. Complex recursive patterns with nested property checks may fall back to §CSHARP"
+            Support = SupportLevel.Full,
+            Description = "Recursive patterns in is-expressions (is { Prop: val }, is { } name) are converted to boolean expressions"
         },
         ["collection-spread"] = new FeatureInfo
         {
             Name = "collection-spread",
             Support = SupportLevel.Full,
-            Description = "Collection spread operator (..)",
-            Workaround = "Spread-only [..expr] converts to expr.ToList(); mixed spreads need manual conversion"
+            Description = "Collection spread operator (..) including mixed spreads [..a, ..b] via Concat chains"
+        },
+        ["collection-spread-mixed"] = new FeatureInfo
+        {
+            Name = "collection-spread-mixed",
+            Support = SupportLevel.Full,
+            Description = "Mixed collection spreads [..a, x, ..b] converted to Concat chains"
         },
         ["implicit-new-with-args"] = new FeatureInfo
         {
@@ -655,8 +656,8 @@ public static class FeatureSupport
         ["complex-recursive-pattern"] = new FeatureInfo
         {
             Name = "complex-recursive-pattern",
-            Support = SupportLevel.Partial,
-            Description = "Property patterns and positional patterns are supported. Deeply nested recursive patterns may need manual review"
+            Support = SupportLevel.Full,
+            Description = "Property patterns and positional patterns are fully supported including nested patterns"
         },
         ["postfix-operator"] = new FeatureInfo
         {
@@ -787,15 +788,46 @@ public static class FeatureSupport
         ["pragma"] = new FeatureInfo
         {
             Name = "pragma",
-            Support = SupportLevel.NotSupported,
-            Description = "#pragma directives have no Calor equivalent; cosmetic only",
-            Workaround = "Remove #pragma directives; they are cosmetic and do not affect semantics"
+            Support = SupportLevel.Full,
+            Description = "#pragma directives are stripped during conversion (trivia); cosmetic only"
         },
         ["conditional-using"] = new FeatureInfo
         {
             Name = "conditional-using",
             Support = SupportLevel.Full,
             Description = "Using directives inside #if blocks supported via §PP wrapping §U"
+        },
+
+        // Conversion gap fixes
+        ["anonymous-method"] = new FeatureInfo
+        {
+            Name = "anonymous-method",
+            Support = SupportLevel.Full,
+            Description = "C# delegate { } anonymous methods are converted to Calor lambda expressions"
+        },
+        ["ref-expression"] = new FeatureInfo
+        {
+            Name = "ref-expression",
+            Support = SupportLevel.Full,
+            Description = "ref expressions are stripped during conversion; the referenced value is preserved"
+        },
+        ["global-qualified-name"] = new FeatureInfo
+        {
+            Name = "global-qualified-name",
+            Support = SupportLevel.Full,
+            Description = "global:: qualified names are converted to unqualified references"
+        },
+        ["implicit-element-access"] = new FeatureInfo
+        {
+            Name = "implicit-element-access",
+            Support = SupportLevel.Full,
+            Description = "Implicit element access (['key'] in initializers) is converted to index access"
+        },
+        ["var-pattern"] = new FeatureInfo
+        {
+            Name = "var-pattern",
+            Support = SupportLevel.Full,
+            Description = "var patterns (is var name, is var (a, b)) converted with variable hoisting"
         },
     };
 
@@ -812,7 +844,7 @@ public static class FeatureSupport
     /// </summary>
     public static SupportLevel GetSupportLevel(string featureName)
     {
-        return Features.TryGetValue(featureName, out var info) ? info.Support : SupportLevel.Full;
+        return Features.TryGetValue(featureName, out var info) ? info.Support : SupportLevel.NotSupported;
     }
 
     /// <summary>

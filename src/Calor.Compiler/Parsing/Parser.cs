@@ -2630,9 +2630,16 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.StrLiteral);
         var value = token.Value as string ?? "";
+        var isUtf8 = token.Text.EndsWith("u8");
+        if (isUtf8 && value.EndsWith("u8"))
+        {
+            // Strip the u8 suffix from the value if the lexer included it
+            value = value[..^2];
+        }
         return new StringLiteralNode(token.Span, value)
         {
-            IsMultiline = token.Text.StartsWith("\"\"\"")
+            IsMultiline = token.Text.StartsWith("\"\"\""),
+            IsUtf8 = isUtf8
         };
     }
 
@@ -2888,6 +2895,24 @@ public sealed class Parser
                         : new AndPatternNode(span, left, right);
                 }
             }
+        }
+
+        // Handle §PLIST pattern
+        if (Check(TokenKind.ListPattern))
+        {
+            return ParseListPattern();
+        }
+
+        // Handle §PPOS pattern
+        if (Check(TokenKind.PositionalPattern))
+        {
+            return ParsePositionalPattern();
+        }
+
+        // Handle §PPROP pattern
+        if (Check(TokenKind.PropertyPattern))
+        {
+            return ParsePropertyPattern();
         }
 
         // Handle §VAR{name} pattern
@@ -8036,11 +8061,13 @@ public sealed class Parser
 
         var patterns = new List<PatternNode>();
         VarPatternNode? slicePattern = null;
+        int sliceIndex = -1;
 
         while (!IsAtEnd && (IsPatternStart() || Check(TokenKind.Rest)))
         {
             if (Check(TokenKind.Rest))
             {
+                sliceIndex = patterns.Count;
                 var restToken = Expect(TokenKind.Rest);
                 var restAttrs = ParseAttributes();
                 var restName = restAttrs["_pos0"] ?? "_";
@@ -8057,7 +8084,7 @@ public sealed class Parser
             : patterns.Count > 0
                 ? startToken.Span.Union(patterns[^1].Span)
                 : startToken.Span;
-        return new ListPatternNode(span, patterns, slicePattern);
+        return new ListPatternNode(span, patterns, slicePattern, sliceIndex);
     }
 
     /// <summary>

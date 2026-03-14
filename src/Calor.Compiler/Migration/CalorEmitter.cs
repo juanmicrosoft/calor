@@ -1694,7 +1694,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Multiline strings round-trip as triple-quote
         if (node.IsMultiline && node.Value.Contains('\n'))
         {
-            return $"\"\"\"\n{node.Value}\"\"\"";
+            var multilineSuffix = node.IsUtf8 ? "u8" : "";
+            return $"\"\"\"\n{node.Value}\"\"\"{multilineSuffix}";
         }
 
         var escaped = node.Value
@@ -1703,7 +1704,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             .Replace("\n", "\\n")
             .Replace("\r", "\\r")
             .Replace("\t", "\\t");
-        return $"\"{escaped}\"";
+        var suffix = node.IsUtf8 ? "u8" : "";
+        return $"\"{escaped}\"{suffix}";
     }
 
     public string Visit(BoolLiteralNode node)
@@ -2326,9 +2328,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ListPatternNode node)
     {
-        var patterns = string.Join(", ", node.Patterns.Select(EmitPattern));
-        var slice = node.SlicePattern != null ? $", ..{EmitPattern(node.SlicePattern)}" : "";
-        return $"{{{patterns}{slice}}}";
+        var parts = new List<string>();
+        for (int i = 0; i < node.Patterns.Count; i++)
+        {
+            if (node.SlicePattern != null && i == node.SliceIndex)
+            {
+                parts.Add($"§REST{{{node.SlicePattern.Name}}}");
+            }
+            parts.Add(EmitPattern(node.Patterns[i]));
+        }
+        // Slice at end (or no non-slice patterns before it)
+        if (node.SlicePattern != null && node.SliceIndex >= node.Patterns.Count)
+        {
+            parts.Add($"§REST{{{node.SlicePattern.Name}}}");
+        }
+        return $"§PLIST {string.Join(" ", parts)}";
     }
 
     // Type system nodes

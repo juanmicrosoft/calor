@@ -534,6 +534,10 @@ public sealed class MigrationAnalyzer
             });
         }
 
+        // Filter out constructs whose features are now fully supported in the conversion pipeline.
+        // The visitor still detects them (for usage counting), but they are no longer blockers.
+        result.RemoveAll(c => Migration.FeatureSupport.IsFullySupported(c.Name));
+
         return result;
     }
 

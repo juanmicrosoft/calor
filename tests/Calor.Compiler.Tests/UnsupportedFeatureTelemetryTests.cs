@@ -362,15 +362,14 @@ public class UnsupportedFeatureTelemetryTests
     public void EndToEnd_ConversionIssuesPreserveFeature()
     {
         // Verifies the full pipeline: converter → ConversionResult.Issues → Feature property
-        // Uses mixed spread expressions which are unsupported and generate Feature-tagged issues
+        // Uses __makeref which is unsupported and generates Feature-tagged issues
         var csharp = """
-            using System.Collections.Generic;
             public class Test
             {
-                public List<int> Method(List<int> other)
+                public void Method()
                 {
-                    List<int> result = [1, 2, ..other];
-                    return result;
+                    int x = 1;
+                    var r = __makeref(x);
                 }
             }
             """;

@@ -53,6 +53,12 @@ public sealed class StringLiteralNode : ExpressionNode
     /// </summary>
     public bool IsMultiline { get; init; }
 
+    /// <summary>
+    /// True if this string is a UTF-8 string literal (e.g., "hello"u8 in C#).
+    /// When emitting C#, the u8 suffix is appended.
+    /// </summary>
+    public bool IsUtf8 { get; init; }
+
     public StringLiteralNode(TextSpan span, string value) : base(span)
     {
         Value = value ?? throw new ArgumentNullException(nameof(value));

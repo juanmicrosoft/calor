@@ -106,11 +106,12 @@ public sealed class PostConversionFixer
     private static (string Result, bool Changed) FixOrphanedClosingTags(string source)
     {
         // Match lines that consist solely of an orphaned closing tag (with optional whitespace)
-        var pattern = @"^[ \t]*§/(?:NEW|C)\{[^}]*\}[ \t]*$";
+        // Note: \r? needed for Windows line endings where $ matches before \n but after \r
+        var pattern = @"^[ \t]*§/(?:NEW|C)\{[^}]*\}[ \t]*\r?$";
         var result = Regex.Replace(source, pattern, "", RegexOptions.Multiline);
 
         // Clean up resulting blank lines (collapse multiple blank lines to one)
-        result = Regex.Replace(result, @"\n{3,}", "\n\n");
+        result = Regex.Replace(result, @"(\r?\n){3,}", "\n\n");
 
         return (result, result != source);
     }

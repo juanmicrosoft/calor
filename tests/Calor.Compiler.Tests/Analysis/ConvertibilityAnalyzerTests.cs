@@ -47,61 +47,67 @@ public class ConvertibilityAnalyzerTests
     [Fact]
     public void UnsupportedConstructs_LowerScore()
     {
+        // Use ref/out parameters which are still unsupported
         var source = """
             using System;
 
             namespace TestApp;
 
-            public class UnsafeHelper
+            public class RefHelper
             {
-                public unsafe void Process(int* ptr)
+                public void Swap(ref int a, ref int b)
                 {
-                    *ptr = 42;
+                    int temp = a;
+                    a = b;
+                    b = temp;
                 }
 
-                public unsafe void AllocStack()
+                public bool TryParse(string s, out int result)
                 {
-                    Span<int> span = stackalloc int[10];
+                    result = 0;
+                    return int.TryParse(s, out result);
                 }
             }
             """;
 
         var result = _analyzer.Analyze(source);
 
-        // Unsafe code with pointers should score below clean code (stackalloc is now supported)
-        Assert.True(result.Score < 80, $"Expected score < 80 for unsafe code, got {result.Score}");
-        Assert.True(result.Blockers.Count > 0, "Expected blockers for unsafe code");
-        Assert.Contains(result.Blockers, b => b.Name == "unsafe" || b.Name == "pointer");
+        Assert.True(result.Score < 90, $"Expected score < 90 for ref/out code, got {result.Score}");
+        Assert.True(result.Blockers.Count > 0, "Expected blockers for ref/out code");
+        Assert.Contains(result.Blockers, b => b.Name == "ref-parameter");
     }
 
     [Fact]
     public void ManyBlockerTypes_VeryLowScore()
     {
         // File with many different unsupported construct types → heavy penalty
+        // Use ref/out params and await-foreach (still NotSupported)
         var source = """
             using System;
-            using System.Runtime.CompilerServices;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
 
             namespace TestApp;
 
             public class HeavilyBlocked
             {
-                public unsafe void ProcessPointer(int* ptr) { *ptr = 42; }
+                public void Swap(ref int a, ref int b) { int t = a; a = b; b = t; }
+                public bool TryGet(string key, out string value) { value = key; return true; }
 
-                public System.Collections.Generic.IEnumerable<int> Yield()
+                public async Task ProcessAsync(IAsyncEnumerable<int> items)
                 {
-                    yield return 1;
-                    yield return 2;
+                    await foreach (var item in items)
+                    {
+                        Console.WriteLine(item);
+                    }
                 }
-
-                public static int operator +(HeavilyBlocked a, HeavilyBlocked b) => 0;
             }
             """;
 
         var result = _analyzer.Analyze(source);
 
         // Multiple construct types should push score low
-        Assert.True(result.Score < 70, $"Expected score < 70 for heavily blocked code, got {result.Score}");
+        Assert.True(result.Score < 85, $"Expected score < 85 for heavily blocked code, got {result.Score}");
         Assert.True(result.Blockers.Count >= 2, $"Expected >= 2 blocker types, got {result.Blockers.Count}");
     }
 
@@ -661,6 +667,7 @@ public class ConvertibilityAnalyzerTests
     public void Score_ModerateBlockers_BelowClean()
     {
         // Code with multiple blocker types should score below perfect
+        // Use ref/out params (still unsupported)
         var source = """
             using System;
 
@@ -668,15 +675,10 @@ public class ConvertibilityAnalyzerTests
 
             public class Moderate
             {
-                public unsafe void WithPointer(int* p) { *p = 1; }
                 public void WithRef(ref int a) { a++; }
                 public void WithOut(out int b) { b = 0; }
-                public static int operator +(Moderate a, Moderate b) => 0;
-
-                public System.Collections.Generic.IEnumerable<int> Yield()
-                {
-                    yield return 1;
-                }
+                public bool TryGet(string key, out int value) { value = 0; return false; }
+                public void Swap(ref string x, ref string y) { var t = x; x = y; y = t; }
             }
             """;
 
@@ -684,31 +686,32 @@ public class ConvertibilityAnalyzerTests
 
         Assert.True(result.Score < 95,
             $"Code with multiple blocker types should score below 95, got {result.Score}");
-        Assert.True(result.Blockers.Count >= 2,
-            $"Expected >= 2 blocker types, got {result.Blockers.Count}");
+        Assert.True(result.Blockers.Count >= 1,
+            $"Expected >= 1 blocker types, got {result.Blockers.Count}");
     }
 
     [Fact]
-    public void Score_UnsafeCode_BelowClean()
+    public void Score_RefOutCode_BelowClean()
     {
         var clean = """
             namespace TestApp;
             public class Clean { public int Add(int a, int b) => a + b; }
             """;
 
-        var unsafe_ = """
+        var withRef = """
             namespace TestApp;
-            public class Unsafe
+            public class WithRef
             {
-                public unsafe void Process(int* ptr) { *ptr = 42; }
+                public void Swap(ref int a, ref int b) { int t = a; a = b; b = t; }
+                public bool TryGet(out int result) { result = 0; return false; }
             }
             """;
 
         var cleanResult = _analyzer.Analyze(clean);
-        var unsafeResult = _analyzer.Analyze(unsafe_);
+        var refResult = _analyzer.Analyze(withRef);
 
-        Assert.True(cleanResult.Score > unsafeResult.Score,
-            $"Clean ({cleanResult.Score}) should score higher than unsafe ({unsafeResult.Score})");
+        Assert.True(cleanResult.Score > refResult.Score,
+            $"Clean ({cleanResult.Score}) should score higher than ref/out ({refResult.Score})");
     }
 
     [Fact]

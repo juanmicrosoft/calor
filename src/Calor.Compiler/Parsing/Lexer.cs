@@ -1318,6 +1318,14 @@ public sealed class Lexer
                 Advance(); // consume first "
                 Advance(); // consume second "
                 Advance(); // consume third "
+
+                // Check for u8 suffix (UTF-8 string literal round-trip)
+                if (!IsAtEnd && Current == 'u' && Lookahead == '8')
+                {
+                    Advance(); // consume 'u'
+                    Advance(); // consume '8'
+                }
+
                 return MakeToken(TokenKind.StrLiteral, sb.ToString());
             }
 
@@ -1545,6 +1553,14 @@ public sealed class Lexer
         }
 
         Advance(); // consume closing quote
+
+        // Check for u8 suffix (UTF-8 string literal round-trip)
+        if (!IsAtEnd && Current == 'u' && Lookahead == '8')
+        {
+            Advance(); // consume 'u'
+            Advance(); // consume '8'
+        }
+
         return MakeToken(TokenKind.StrLiteral, sb.ToString());
     }
 

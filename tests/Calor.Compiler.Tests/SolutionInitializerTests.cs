@@ -75,7 +75,10 @@ public class SolutionInitializerTests : IDisposable
         // Arrange
         SetupSolutionWithProjects();
         var slnPath = Path.Combine(_testDir, "Test.sln");
-        var aiInitializer = new ClaudeInitializer();
+        var aiInitializer = new ClaudeInitializer
+        {
+            ClaudeJsonPathOverride = Path.Combine(_testDir, ".claude.json")
+        };
 
         // Act
         var result = await _initializer.InitializeAsync(slnPath, force: false, aiInitializer);

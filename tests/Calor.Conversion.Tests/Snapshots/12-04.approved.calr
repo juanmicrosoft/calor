@@ -1,0 +1,15 @@
+§M{m001:Test_12_04}
+  §U{System}
+
+  §CL{c001:Utf8Example:pub}
+    §MT{m002:GetGreeting:pub} () -> ReadOnlySpan<u8>
+      §R "hello"u8
+    §/MT{m002}
+
+    §MT{m003:GetHeader:pub} () -> ReadOnlySpan<u8>
+      §R "Content-Type"u8
+    §/MT{m003}
+
+  §/CL{c001}
+
+§/M{m001}
