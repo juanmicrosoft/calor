@@ -22,6 +22,9 @@ public class HookCommandTests : IDisposable
         }
     }
 
+    private ClaudeInitializer CreateClaudeInitializer() =>
+        new() { ClaudeJsonPathOverride = Path.Combine(_testDirectory, ".claude.json") };
+
     [Fact]
     public void ValidateWrite_AllowsCalorFiles()
     {
@@ -169,7 +172,7 @@ public class HookCommandTests : IDisposable
     [Fact]
     public async Task ClaudeInitializer_ConfiguresHooks()
     {
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateClaudeInitializer();
 
         await initializer.InitializeAsync(_testDirectory, force: false);
 
@@ -199,7 +202,7 @@ public class HookCommandTests : IDisposable
             """;
         await File.WriteAllTextAsync(settingsPath, existingSettings);
 
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateClaudeInitializer();
         await initializer.InitializeAsync(_testDirectory, force: false);
 
         var content = await File.ReadAllTextAsync(settingsPath);
@@ -211,7 +214,7 @@ public class HookCommandTests : IDisposable
     [Fact]
     public async Task ClaudeInitializer_DoesNotDuplicateHooks()
     {
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateClaudeInitializer();
 
         // Run init twice
         await initializer.InitializeAsync(_testDirectory, force: false);
@@ -228,7 +231,7 @@ public class HookCommandTests : IDisposable
     [Fact]
     public async Task ClaudeInitializer_ReportsSettingsFileAsCreated()
     {
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateClaudeInitializer();
 
         var result = await initializer.InitializeAsync(_testDirectory, force: false);
 
@@ -245,7 +248,7 @@ public class HookCommandTests : IDisposable
         var settingsPath = Path.Combine(claudeDir, "settings.json");
         await File.WriteAllTextAsync(settingsPath, "{}");
 
-        var initializer = new ClaudeInitializer();
+        var initializer = CreateClaudeInitializer();
         var result = await initializer.InitializeAsync(_testDirectory, force: false);
 
         Assert.Contains(settingsPath, result.UpdatedFiles);

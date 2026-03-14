@@ -361,11 +361,19 @@ public sealed class ListPatternNode : PatternNode
     /// </summary>
     public VarPatternNode? SlicePattern { get; }
 
-    public ListPatternNode(TextSpan span, IReadOnlyList<PatternNode> patterns, VarPatternNode? slicePattern)
+    /// <summary>
+    /// The index within the patterns list where the slice belongs.
+    /// Defaults to Patterns.Count (end). For [var first, .., var last], this would be 1.
+    /// For [.., var a, var b], this would be 0.
+    /// </summary>
+    public int SliceIndex { get; }
+
+    public ListPatternNode(TextSpan span, IReadOnlyList<PatternNode> patterns, VarPatternNode? slicePattern, int sliceIndex = -1)
         : base(span)
     {
         Patterns = patterns ?? throw new ArgumentNullException(nameof(patterns));
         SlicePattern = slicePattern;
+        SliceIndex = sliceIndex >= 0 ? sliceIndex : patterns.Count;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

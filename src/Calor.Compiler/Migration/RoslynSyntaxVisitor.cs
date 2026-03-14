@@ -5454,6 +5454,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Parenthesized pattern: (pattern)
             ParenthesizedPatternSyntax parenPattern => ConvertPattern(parenPattern.Pattern),
 
+            // List pattern: [a, b, ..rest]
+            ListPatternSyntax listPattern => ConvertListPattern(listPattern),
+
             // Default fallback: use wildcard to ensure valid Calor
             _ => HandleUnsupportedPattern(pattern, "unknown-pattern")
         };
@@ -5489,6 +5492,82 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.AndKeyword => new AndPatternNode(span, left, right),
             _ => HandleUnsupportedPattern(binaryPattern, $"binary pattern ({binaryPattern.OperatorToken.Text})")
         };
+    }
+
+    private ListPatternNode ConvertListPattern(ListPatternSyntax listPattern)
+    {
+        var span = GetTextSpan(listPattern);
+        var patterns = new List<PatternNode>();
+        VarPatternNode? slicePattern = null;
+        int sliceIndex = -1;
+
+        foreach (var subPattern in listPattern.Patterns)
+        {
+            if (subPattern is SlicePatternSyntax slice)
+            {
+                // Record the position where the slice appears among non-slice patterns
+                sliceIndex = patterns.Count;
+
+                // ..var rest or just ..
+                if (slice.Pattern != null)
+                {
+                    var sliceSpan = GetTextSpan(slice);
+                    if (slice.Pattern is VarPatternSyntax varPat &&
+                        varPat.Designation is SingleVariableDesignationSyntax singleVar)
+                    {
+                        slicePattern = new VarPatternNode(sliceSpan, singleVar.Identifier.Text);
+                    }
+                    else if (slice.Pattern is DeclarationPatternSyntax declPat &&
+                             declPat.Designation is SingleVariableDesignationSyntax singleDecl)
+                    {
+                        slicePattern = new VarPatternNode(sliceSpan, singleDecl.Identifier.Text);
+                    }
+                    else
+                    {
+                        // Bare slice with unsupported inner pattern — use discard
+                        slicePattern = new VarPatternNode(GetTextSpan(slice), "_");
+                    }
+                }
+                else
+                {
+                    // Bare .. (no binding)
+                    slicePattern = new VarPatternNode(GetTextSpan(slice), "_");
+                }
+            }
+            else
+            {
+                patterns.Add(ConvertPattern(subPattern));
+            }
+        }
+
+        return new ListPatternNode(span, patterns, slicePattern, sliceIndex);
+    }
+
+    /// <summary>
+    /// Converts "expr is [pattern]" into a match expression: expr switch { [pattern] => true, _ => false }.
+    /// </summary>
+    private ExpressionNode ConvertListPatternIsExpression(
+        IsPatternExpressionSyntax isPattern, ExpressionNode left, ListPatternSyntax listPat)
+    {
+        var span = GetTextSpan(isPattern);
+        _context.RecordFeatureUsage("list-pattern");
+        return ConvertListPatternToMatchExpression(listPat, left);
+    }
+
+    /// <summary>
+    /// Wraps a list pattern as a match expression: subject switch { [pattern] => true, _ => false }.
+    /// </summary>
+    private ExpressionNode ConvertListPatternToMatchExpression(PatternSyntax listPat, ExpressionNode subject)
+    {
+        var span = GetTextSpan(listPat);
+        var id = _context.GenerateId("lp");
+        var listPatternNode = ConvertListPattern((ListPatternSyntax)listPat);
+        var trueCase = new MatchCaseNode(span, listPatternNode, null,
+            new StatementNode[] { new ReturnStatementNode(span, new BoolLiteralNode(span, true)) });
+        var falseCase = new MatchCaseNode(span, new WildcardPatternNode(span), null,
+            new StatementNode[] { new ReturnStatementNode(span, new BoolLiteralNode(span, false)) });
+        return new MatchExpressionNode(span, id, subject,
+            new[] { trueCase, falseCase }, new AttributeCollection());
     }
 
     private PatternNode ConvertRecursivePattern(RecursivePatternSyntax pattern)
@@ -5615,6 +5694,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 RangeExpressionSyntax rangeExpr => ConvertRangeExpression(rangeExpr),
                 WithExpressionSyntax withExpr => ConvertWithExpression(withExpr),
                 CheckedExpressionSyntax checkedExpr => ConvertExpression(checkedExpr.Expression),
+                AnonymousMethodExpressionSyntax anonMethod => ConvertAnonymousMethodExpression(anonMethod),
+                RefExpressionSyntax refExpr => ConvertExpression(refExpr.Expression),
+                AliasQualifiedNameSyntax aliasName => new ReferenceNode(GetTextSpan(aliasName), aliasName.Name.ToString()),
+                QualifiedNameSyntax qualifiedName => new ReferenceNode(GetTextSpan(qualifiedName), qualifiedName.ToString()),
+                ImplicitElementAccessSyntax implicitElement =>
+                    new ArrayAccessNode(GetTextSpan(implicitElement),
+                        new ThisExpressionNode(GetTextSpan(implicitElement)),
+                        ConvertExpression(implicitElement.ArgumentList.Arguments[0].Expression)),
                 _ => CreateFallbackExpression(expression, "unknown-expression")
             };
         }
@@ -5649,6 +5736,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     isUnsigned: true, ulongVal),
             SyntaxKind.StringLiteralExpression =>
                 new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText),
+            SyntaxKind.Utf8StringLiteralExpression =>
+                new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText) { IsUtf8 = true },
             SyntaxKind.CharacterLiteralExpression =>
                 new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText),
             SyntaxKind.TrueLiteralExpression =>
@@ -5792,9 +5881,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             BinaryPatternSyntax binaryPattern =>
                 // "x is > 5 or < 3" → "(|| (> x 5) (< x 3))"
                 ConvertPatternToExpression(binaryPattern, left),
+            UnaryPatternSyntax { OperatorToken.Text: "not", Pattern: DeclarationPatternSyntax notDecl } =>
+                // "x is not SomeType name" → negate the type check with variable hoisting
+                new UnaryOperationNode(GetTextSpan(isPattern), UnaryOperator.Not,
+                    ConvertDeclarationPattern(isPattern, left, notDecl)),
+            UnaryPatternSyntax { OperatorToken.Text: "not", Pattern: RecursivePatternSyntax notRecursive } =>
+                // "x is not { Prop: val }" → negate the recursive pattern check
+                new UnaryOperationNode(GetTextSpan(isPattern), UnaryOperator.Not,
+                    ConvertRecursiveIsPattern(isPattern, left, notRecursive)),
             UnaryPatternSyntax { OperatorToken.Text: "not" } unaryPattern =>
                 // "x is not > 5" → "(! (> x 5))"
                 ConvertPatternToExpression(unaryPattern, left),
+            RecursivePatternSyntax recursivePattern =>
+                ConvertRecursiveIsPattern(isPattern, left, recursivePattern),
+            VarPatternSyntax varPattern =>
+                ConvertVarIsPattern(isPattern, left, varPattern),
+            ListPatternSyntax listPat =>
+                ConvertListPatternIsExpression(isPattern, left, listPat),
             _ =>
                 // For other patterns, create a fallback expression
                 CreateFallbackExpression(isPattern, "complex-is-pattern")
@@ -5845,9 +5948,89 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     ConvertExpression(constant.Expression)),
             ParenthesizedPatternSyntax parenPattern =>
                 ConvertPatternToExpression(parenPattern.Pattern, subject),
+            TypePatternSyntax typePattern =>
+                new TypeOperationNode(GetTextSpan(typePattern), TypeOp.Is, subject,
+                    TypeMapper.CSharpToCalor(typePattern.Type.ToString())),
+            DeclarationPatternSyntax declPattern =>
+                new TypeOperationNode(GetTextSpan(declPattern), TypeOp.Is, subject,
+                    TypeMapper.CSharpToCalor(declPattern.Type.ToString())),
+            RecursivePatternSyntax recursivePattern =>
+                ConvertRecursivePatternToExpression(recursivePattern, subject),
+            VarPatternSyntax varPattern =>
+                ConvertVarPatternToExpression(varPattern, subject),
+            ListPatternSyntax listPat =>
+                ConvertListPatternToMatchExpression(listPat, subject),
             _ =>
                 CreateFallbackExpression(pattern, "complex-is-pattern")
         };
+    }
+
+    /// <summary>
+    /// Converts a var pattern (always matches) to a boolean expression with variable hoisting.
+    /// </summary>
+    private ExpressionNode ConvertVarPatternToExpression(VarPatternSyntax varPattern, ExpressionNode subject)
+    {
+        var span = GetTextSpan(varPattern);
+        switch (varPattern.Designation)
+        {
+            case SingleVariableDesignationSyntax singleVar:
+                _pendingStatements.Add(new BindStatementNode(
+                    span, singleVar.Identifier.Text, "object", isMutable: false, subject, new AttributeCollection()));
+                return new BoolLiteralNode(span, true);
+
+            case ParenthesizedVariableDesignationSyntax parenVar:
+                for (var i = 0; i < parenVar.Variables.Count; i++)
+                {
+                    if (parenVar.Variables[i] is SingleVariableDesignationSyntax sv)
+                    {
+                        var itemAccess = new FieldAccessNode(span, subject, $"Item{i + 1}");
+                        _pendingStatements.Add(new BindStatementNode(
+                            span, sv.Identifier.Text, "object", isMutable: false, itemAccess, new AttributeCollection()));
+                    }
+                }
+                return new BoolLiteralNode(span, true);
+
+            default:
+                return new BoolLiteralNode(span, true);
+        }
+    }
+
+    /// <summary>
+    /// Converts a RecursivePatternSyntax inside a binary/compound pattern context
+    /// to a boolean expression (type check + property checks).
+    /// </summary>
+    private ExpressionNode ConvertRecursivePatternToExpression(
+        RecursivePatternSyntax pattern, ExpressionNode subject)
+    {
+        var span = GetTextSpan(pattern);
+
+        ExpressionNode result;
+        if (pattern.Type != null)
+        {
+            result = new TypeOperationNode(span, TypeOp.Is, subject,
+                TypeMapper.CSharpToCalor(pattern.Type.ToString()));
+        }
+        else
+        {
+            result = new BinaryOperationNode(span, BinaryOperator.NotEqual, subject,
+                new ReferenceNode(span, "null"));
+        }
+
+        if (pattern.PropertyPatternClause != null)
+        {
+            foreach (var subpattern in pattern.PropertyPatternClause.Subpatterns)
+            {
+                if (subpattern.NameColon != null)
+                {
+                    var propName = subpattern.NameColon.Name.Identifier.Text;
+                    var propAccess = new FieldAccessNode(GetTextSpan(subpattern), subject, propName);
+                    var propCheck = ConvertSubpatternToExpression(subpattern.Pattern, propAccess);
+                    result = new BinaryOperationNode(span, BinaryOperator.And, result, propCheck);
+                }
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -5940,6 +6123,209 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new TypeOperationNode(GetTextSpan(isPattern), TypeOp.Is, left, calorType);
     }
 
+    /// <summary>
+    /// Converts <c>x is var name</c> or <c>x is var (a, b)</c> patterns.
+    /// var patterns always match; they just bind the value to a variable.
+    /// </summary>
+    private ExpressionNode ConvertVarIsPattern(
+        IsPatternExpressionSyntax isPattern,
+        ExpressionNode left,
+        VarPatternSyntax varPattern)
+    {
+        var span = GetTextSpan(isPattern);
+
+        switch (varPattern.Designation)
+        {
+            case SingleVariableDesignationSyntax singleVar:
+            {
+                // "x is var name" → hoist binding, return true (always matches)
+                var varName = singleVar.Identifier.Text;
+                _pendingStatements.Add(new BindStatementNode(
+                    span, varName, "object", isMutable: false, left, new AttributeCollection()));
+                return new BoolLiteralNode(span, true);
+            }
+
+            case ParenthesizedVariableDesignationSyntax parenVar:
+            {
+                // "x is var (a, b)" → tuple deconstruction
+                // Hoist each variable, return true
+                for (var i = 0; i < parenVar.Variables.Count; i++)
+                {
+                    if (parenVar.Variables[i] is SingleVariableDesignationSyntax sv)
+                    {
+                        var varName = sv.Identifier.Text;
+                        // Access tuple member via Item1, Item2, etc.
+                        var itemAccess = new FieldAccessNode(span, left, $"Item{i + 1}");
+                        _pendingStatements.Add(new BindStatementNode(
+                            span, varName, "object", isMutable: false, itemAccess, new AttributeCollection()));
+                    }
+                }
+                return new BoolLiteralNode(span, true);
+            }
+
+            default:
+                return CreateFallbackExpression(isPattern, "complex-is-pattern");
+        }
+    }
+
+    /// <summary>
+    /// Converts <c>x is { Prop: val } name</c> (recursive pattern in is-expression context)
+    /// into equivalent boolean expressions with optional variable hoisting.
+    /// </summary>
+    private ExpressionNode ConvertRecursiveIsPattern(
+        IsPatternExpressionSyntax isPattern,
+        ExpressionNode left,
+        RecursivePatternSyntax recursivePattern)
+    {
+        var span = GetTextSpan(isPattern);
+        _context.RecordFeatureUsage("complex-is-pattern");
+
+        // Determine the type name (if any)
+        var typeName = recursivePattern.Type?.ToString();
+
+        // Start with a type check or null check
+        ExpressionNode result;
+        if (typeName != null)
+        {
+            var calorType = TypeMapper.CSharpToCalor(typeName);
+            result = new TypeOperationNode(span, TypeOp.Is, left, calorType);
+        }
+        else
+        {
+            // "x is { }" is a null check → x != null
+            result = new BinaryOperationNode(span, BinaryOperator.NotEqual, left,
+                new ReferenceNode(span, "null"));
+        }
+
+        // If there's a designation, hoist the variable binding
+        ExpressionNode subject = left;
+        if (recursivePattern.Designation is SingleVariableDesignationSyntax singleVar)
+        {
+            var varName = singleVar.Identifier.Text;
+            var varType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : "object";
+            var castExpr = typeName != null
+                ? new TypeOperationNode(span, TypeOp.Cast, left, varType)
+                : left;
+            _pendingStatements.Add(new BindStatementNode(
+                span, varName, varType, isMutable: false, castExpr, new AttributeCollection()));
+            subject = new ReferenceNode(span, varName);
+        }
+
+        // Add property checks: x is { Prop: val } → (x != null) && (x.Prop == val)
+        if (recursivePattern.PropertyPatternClause != null)
+        {
+            foreach (var subpattern in recursivePattern.PropertyPatternClause.Subpatterns)
+            {
+                if (subpattern.NameColon != null)
+                {
+                    var propName = subpattern.NameColon.Name.Identifier.Text;
+                    var propAccess = new FieldAccessNode(GetTextSpan(subpattern), subject, propName);
+                    var propCheck = ConvertSubpatternToExpression(subpattern.Pattern, propAccess);
+                    result = new BinaryOperationNode(span, BinaryOperator.And, result, propCheck);
+                }
+            }
+        }
+
+        // Handle positional patterns: x is (a, b) → type check + deconstruction
+        if (recursivePattern.PositionalPatternClause != null && typeName != null)
+        {
+            // For positional patterns in is-expressions, keep the type check
+            // and add a TODO for the deconstruction (complex to inline)
+            var calorType = TypeMapper.CSharpToCalor(typeName);
+            foreach (var (sp, i) in recursivePattern.PositionalPatternClause.Subpatterns.Select((s, i) => (s, i)))
+            {
+                if (sp.Pattern is DeclarationPatternSyntax decl &&
+                    decl.Designation is SingleVariableDesignationSyntax posVar)
+                {
+                    // Hoist positional variable
+                    var posVarName = posVar.Identifier.Text;
+                    _pendingStatements.Add(new BindStatementNode(
+                        span, posVarName, TypeMapper.CSharpToCalor(decl.Type.ToString()),
+                        isMutable: false,
+                        new ReferenceNode(span, $"/* positional[{i}] */"),
+                        new AttributeCollection()));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Converts a subpattern in a property pattern to a boolean expression.
+    /// </summary>
+    private ExpressionNode ConvertSubpatternToExpression(PatternSyntax pattern, ExpressionNode subject)
+    {
+        var span = GetTextSpan(pattern);
+        return pattern switch
+        {
+            ConstantPatternSyntax constant =>
+                new BinaryOperationNode(span, BinaryOperator.Equal, subject,
+                    ConvertExpression(constant.Expression)),
+            RelationalPatternSyntax rel =>
+                ConvertPatternToExpression(rel, subject),
+            BinaryPatternSyntax binary =>
+                ConvertPatternToExpression(binary, subject),
+            UnaryPatternSyntax { OperatorToken.Text: "not" } unary =>
+                new UnaryOperationNode(span, UnaryOperator.Not,
+                    ConvertSubpatternToExpression(unary.Pattern, subject)),
+            TypePatternSyntax typePattern =>
+                new TypeOperationNode(span, TypeOp.Is, subject,
+                    TypeMapper.CSharpToCalor(typePattern.Type.ToString())),
+            DeclarationPatternSyntax declPattern =>
+                new TypeOperationNode(span, TypeOp.Is, subject,
+                    TypeMapper.CSharpToCalor(declPattern.Type.ToString())),
+            RecursivePatternSyntax recursive =>
+                ConvertRecursiveSubpatternToExpression(recursive, subject),
+            VarPatternSyntax =>
+                // var pattern always matches (just binds) → true
+                new BoolLiteralNode(span, true),
+            DiscardPatternSyntax =>
+                // discard always matches → true
+                new BoolLiteralNode(span, true),
+            ListPatternSyntax listPat =>
+                ConvertListPatternToMatchExpression(listPat, subject),
+            _ => CreateFallbackExpression(pattern, "complex-is-pattern")
+        };
+    }
+
+    /// <summary>
+    /// Handles nested recursive patterns within property checks.
+    /// </summary>
+    private ExpressionNode ConvertRecursiveSubpatternToExpression(
+        RecursivePatternSyntax pattern, ExpressionNode subject)
+    {
+        var span = GetTextSpan(pattern);
+        ExpressionNode result;
+
+        if (pattern.Type != null)
+        {
+            result = new TypeOperationNode(span, TypeOp.Is, subject,
+                TypeMapper.CSharpToCalor(pattern.Type.ToString()));
+        }
+        else
+        {
+            result = new BinaryOperationNode(span, BinaryOperator.NotEqual, subject,
+                new ReferenceNode(span, "null"));
+        }
+
+        if (pattern.PropertyPatternClause != null)
+        {
+            foreach (var subpattern in pattern.PropertyPatternClause.Subpatterns)
+            {
+                if (subpattern.NameColon != null)
+                {
+                    var propName = subpattern.NameColon.Name.Identifier.Text;
+                    var propAccess = new FieldAccessNode(GetTextSpan(subpattern), subject, propName);
+                    var propCheck = ConvertSubpatternToExpression(subpattern.Pattern, propAccess);
+                    result = new BinaryOperationNode(span, BinaryOperator.And, result, propCheck);
+                }
+            }
+        }
+
+        return result;
+    }
+
     private ExpressionNode ConvertCollectionExpression(CollectionExpressionSyntax collection)
     {
         // Convert C# 12 collection expressions: [] or [1, 2, 3]
@@ -5989,8 +6375,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     return new CallExpressionNode(GetTextSpan(collection),
                         $"{spreadTarget}.ToList", Array.Empty<ExpressionNode>());
                 }
-                // Mixed spread [1, 2, ..expr] — not yet supported
-                return CreateFallbackExpression(collection, "collection-spread-mixed");
+                // Mixed spread [..a, ..b] or [1, ..a] — convert to Concat chain
+                _context.RecordFeatureUsage("collection-spread");
+                return ConvertMixedSpreadCollection(collection);
             }
         }
 
@@ -6005,6 +6392,68 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             null, // no explicit size
             initializer,
             new AttributeCollection());
+    }
+
+    /// <summary>
+    /// Converts a mixed spread collection expression like [..a, ..b] or [1, ..a]
+    /// to a Concat chain: a.Concat(b).ToList() or new[] { 1 }.Concat(a).ToList()
+    /// </summary>
+    private ExpressionNode ConvertMixedSpreadCollection(CollectionExpressionSyntax collection)
+    {
+        var span = GetTextSpan(collection);
+
+        // Group consecutive non-spread elements into arrays, keep spreads as-is
+        // Build a list of "chunks" — each is either a spread reference or an array of literals
+        var chunks = new List<ExpressionNode>();
+        var currentItems = new List<ExpressionNode>();
+
+        foreach (var element in collection.Elements)
+        {
+            if (element is SpreadElementSyntax spread)
+            {
+                // Flush accumulated non-spread items as an array
+                if (currentItems.Count > 0)
+                {
+                    var arrId = _context.GenerateId("arr");
+                    var elementType = InferElementType(currentItems);
+                    chunks.Add(new ArrayCreationNode(span, arrId, arrId, elementType, null,
+                        new List<ExpressionNode>(currentItems), new AttributeCollection()));
+                    currentItems.Clear();
+                }
+                chunks.Add(ConvertExpression(spread.Expression));
+            }
+            else if (element is ExpressionElementSyntax exprElement)
+            {
+                currentItems.Add(ConvertExpression(exprElement.Expression));
+            }
+        }
+
+        // Flush any remaining items
+        if (currentItems.Count > 0)
+        {
+            var arrId = _context.GenerateId("arr");
+            var elementType = InferElementType(currentItems);
+            chunks.Add(new ArrayCreationNode(span, arrId, arrId, elementType, null,
+                currentItems, new AttributeCollection()));
+        }
+
+        if (chunks.Count == 0)
+            return new ListCreationNode(span, _context.GenerateId("list"),
+                _context.GenerateId("list"), "object", Array.Empty<ExpressionNode>(), new AttributeCollection());
+
+        // Chain: first.Concat(second).Concat(third)...ToList()
+        ExpressionNode result = chunks[0];
+        for (var i = 1; i < chunks.Count; i++)
+        {
+            result = new CallExpressionNode(span, "Enumerable.Concat",
+                new ExpressionNode[] { result, chunks[i] });
+        }
+
+        // .ToList() at the end
+        result = new CallExpressionNode(span, result.ToString() + ".ToList",
+            Array.Empty<ExpressionNode>());
+
+        return result;
     }
 
     private string? InferTypeFromExpression(ExpressionSyntax expr)
@@ -7492,20 +7941,62 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertInitializerExpression(InitializerExpressionSyntax initExpr)
     {
-        if (initExpr.Kind() != SyntaxKind.ArrayInitializerExpression)
-            return CreateFallbackExpression(initExpr, "unsupported-initializer");
+        switch (initExpr.Kind())
+        {
+            case SyntaxKind.ArrayInitializerExpression:
+            {
+                _context.RecordFeatureUsage("array-initializer");
+                var id = _context.GenerateId("arr");
+                var initializer = initExpr.Expressions
+                    .Select(ConvertExpression)
+                    .ToList();
+                var elementType = TryGetDeclaredArrayElementType(initExpr) ?? InferElementType(initializer);
+                return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType, null, initializer, new AttributeCollection());
+            }
 
-        _context.RecordFeatureUsage("array-initializer");
+            case SyntaxKind.CollectionInitializerExpression:
+            {
+                // { item1, item2, ... } — convert to list creation
+                _context.RecordFeatureUsage("list-initializer");
+                var id = _context.GenerateId("list");
+                var items = initExpr.Expressions
+                    .Select(ConvertExpression)
+                    .ToList();
+                var elementType = InferElementType(items);
+                return new ListCreationNode(GetTextSpan(initExpr), id, id, elementType, items, new AttributeCollection());
+            }
 
-        var id = _context.GenerateId("arr");
-        var initializer = initExpr.Expressions
-            .Select(ConvertExpression)
-            .ToList();
+            case SyntaxKind.ObjectInitializerExpression:
+            {
+                // { Name = value, ... } — convert to list of assignment expressions
+                // Since this is a standalone initializer (not part of new()), emit as array of assignments
+                _context.RecordFeatureUsage("object-initializer");
+                var items = initExpr.Expressions
+                    .Select(ConvertExpression)
+                    .ToList();
+                if (items.Count == 0)
+                    return new ReferenceNode(GetTextSpan(initExpr), "default");
+                // Wrap in an array node as a collection of property assignments
+                var id = _context.GenerateId("init");
+                return new ArrayCreationNode(GetTextSpan(initExpr), id, id, "object", null, items, new AttributeCollection());
+            }
 
-        // Try declared type first, fall back to inferring from first element
-        var elementType = TryGetDeclaredArrayElementType(initExpr) ?? InferElementType(initializer);
+            case SyntaxKind.ComplexElementInitializerExpression:
+            {
+                // { key, value } or { single } — convert elements to array
+                var items = initExpr.Expressions
+                    .Select(ConvertExpression)
+                    .ToList();
+                if (items.Count == 1)
+                    return items[0];
+                var id = _context.GenerateId("arr");
+                var elementType = InferElementType(items);
+                return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType, null, items, new AttributeCollection());
+            }
 
-        return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType, null, initializer, new AttributeCollection());
+            default:
+                return CreateFallbackExpression(initExpr, "unsupported-initializer");
+        }
     }
 
     /// <summary>
@@ -7684,6 +8175,48 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             stmtBody,
             new AttributeCollection(),
             isStatic);
+    }
+
+    /// <summary>
+    /// Converts a C# <c>delegate { ... }</c> anonymous method expression to a Calor lambda.
+    /// </summary>
+    private ExpressionNode ConvertAnonymousMethodExpression(AnonymousMethodExpressionSyntax anonMethod)
+    {
+        var span = GetTextSpan(anonMethod);
+        var id = _context.GenerateId("lam");
+        var isAsync = anonMethod.AsyncKeyword != default;
+        var parameters = new List<LambdaParameterNode>();
+
+        if (anonMethod.ParameterList != null)
+        {
+            foreach (var param in anonMethod.ParameterList.Parameters)
+            {
+                var typeName = param.Type != null
+                    ? TypeMapper.CSharpToCalor(param.Type.ToString())
+                    : "object";
+                parameters.Add(new LambdaParameterNode(
+                    GetTextSpan(param),
+                    param.Identifier.Text,
+                    typeName));
+            }
+        }
+
+        List<StatementNode>? stmtBody = null;
+        if (anonMethod.Body is BlockSyntax block)
+        {
+            stmtBody = ConvertBlock(block).ToList();
+        }
+
+        return new LambdaExpressionNode(
+            span,
+            id,
+            parameters,
+            effects: null,
+            isAsync,
+            expressionBody: null,
+            stmtBody,
+            new AttributeCollection(),
+            isStatic: false);
     }
 
     private AwaitExpressionNode ConvertAwaitExpression(AwaitExpressionSyntax awaitExpr)

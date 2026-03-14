@@ -25,6 +25,14 @@ public class InitCommandE2ETests : IDisposable
         return new ClaudeInitializer { ClaudeJsonPathOverride = _claudeJsonPath };
     }
 
+    private IAiInitializer CreateInitializer(string agent)
+    {
+        var initializer = AiInitializerFactory.Create(agent);
+        if (initializer is ClaudeInitializer claude)
+            claude.ClaudeJsonPathOverride = _claudeJsonPath;
+        return initializer;
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_testDirectory))
@@ -295,7 +303,7 @@ public class InitCommandE2ETests : IDisposable
 
         foreach (var agent in AiInitializerFactory.SupportedAgents)
         {
-            var initializer = AiInitializerFactory.Create(agent);
+            var initializer = CreateInitializer(agent);
             var result = await initializer.InitializeAsync(_testDirectory, force: false);
             Assert.True(result.Success, $"Init failed for {agent}: {string.Join(", ", result.Warnings)}");
         }
@@ -335,7 +343,7 @@ public class InitCommandE2ETests : IDisposable
         // Arrange
         await CreateTestCsproj();
 
-        var initializer = AiInitializerFactory.Create(agent);
+        var initializer = CreateInitializer(agent);
 
         // Act - Run init 3 times
         var result1 = await initializer.InitializeAsync(_testDirectory, force: false);

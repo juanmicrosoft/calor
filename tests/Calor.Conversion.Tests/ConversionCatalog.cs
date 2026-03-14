@@ -452,18 +452,29 @@ public static class ConversionCatalog
         }
         """);
 
-    public static readonly ConversionSnippet GapListPatterns = new(
-        "09-03", "KnownGaps", "List patterns (C# 11+)",
+    public static readonly ConversionSnippet ListPatterns = new(
+        "09-03", "GapClosures", "List patterns (C# 11+)",
         """
         public class ListPatternDemo
         {
+            public string Classify(int[] list)
+            {
+                return list switch
+                {
+                    [] => "empty",
+                    [var single] => $"one: {single}",
+                    [var first, .. var rest] => $"starts with {first}",
+                    [1, 2, ..] => "starts with 1,2",
+                };
+            }
+
             public bool IsFirstAndLast(int[] list)
             {
                 return list is [var first, .., var last];
             }
         }
         """,
-        IsKnownGap: true);
+        RoundTripSupported: false);
 
     public static readonly ConversionSnippet GapRawStringLiterals = new(
         "09-04", "KnownGaps", "Raw string literals (C# 11+)",
@@ -681,6 +692,24 @@ public static class ConversionCatalog
         }
         """);
 
+    public static readonly ConversionSnippet Utf8StringLiteral = new(
+        "12-04", "GapClosures", "UTF-8 string literals with u8 suffix",
+        """
+        using System;
+        public class Utf8Example
+        {
+            public ReadOnlySpan<byte> GetGreeting()
+            {
+                return "hello"u8;
+            }
+            public ReadOnlySpan<byte> GetHeader()
+            {
+                return "Content-Type"u8;
+            }
+        }
+        """,
+        RoundTripSupported: true);
+
     /// <summary>
     /// All snippets that should successfully convert.
     /// </summary>
@@ -728,6 +757,8 @@ public static class ConversionCatalog
         InterpolationWithMethodCall,
         RefOutParameters,
         OperatorOverloadWithModifiers,
+        Utf8StringLiteral,
+        ListPatterns,
     };
 
     /// <summary>
@@ -735,7 +766,6 @@ public static class ConversionCatalog
     /// </summary>
     public static IReadOnlyList<ConversionSnippet> KnownGapSnippets { get; } = new[]
     {
-        GapListPatterns,
         GapRawStringLiterals,
         GapCollectionSpread,
         GapThrowExpression,

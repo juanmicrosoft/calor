@@ -58,7 +58,6 @@ public class FeatureCheckCommandTests
     [Theory]
     [InlineData("await-foreach", SupportLevel.NotSupported)]
     [InlineData("file-scoped-type", SupportLevel.NotSupported)]
-    [InlineData("utf8-string-literal", SupportLevel.NotSupported)]
     public void FeatureCheck_NotSupported_ReturnsNotSupportedLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -95,12 +94,12 @@ public class FeatureCheckCommandTests
     }
 
     [Fact]
-    public void FeatureCheck_UnknownFeature_DefaultsToFullSupport()
+    public void FeatureCheck_UnknownFeature_DefaultsToNotSupported()
     {
-        // Unknown features default to Full support (assume basic C# works)
+        // Unknown features default to NotSupported to prevent silent suppression of blockers
         var level = FeatureSupport.GetSupportLevel("unknown-feature");
 
-        Assert.Equal(SupportLevel.Full, level);
+        Assert.Equal(SupportLevel.NotSupported, level);
     }
 
     #endregion

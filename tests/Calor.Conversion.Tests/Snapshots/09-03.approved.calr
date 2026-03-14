@@ -1,0 +1,21 @@
+§M{m001:Test_09_03}
+  §CL{c001:ListPatternDemo:pub}
+    §MT{m002:Classify:pub} (i32[]:list) -> str
+      §W{match003:expr} list
+        §K §PLIST  → "empty"
+        §K §PLIST §VAR{single} → "one: ${single}"
+        §K §PLIST §VAR{first} §REST{rest} → "starts with ${first}"
+        §K §PLIST 1 2 §REST{_} → "starts with 1,2"
+      §/W{match003}
+    §/MT{m002}
+
+    §MT{m004:IsFirstAndLast:pub} (i32[]:list) -> bool
+      §W{lp005:expr} list
+        §K §PLIST §VAR{first} §REST{_} §VAR{last} → true
+        §K _ → false
+      §/W{lp005}
+    §/MT{m004}
+
+  §/CL{c001}
+
+§/M{m001}

@@ -81,7 +81,7 @@ public class InitCommandIntegrationTests : IDisposable
         // Act - Initialize with Claude (simulating calor init --ai claude)
         var detector = new ProjectDetector();
         var csprojInitializer = new CsprojInitializer(detector);
-        var claudeInitializer = new ClaudeInitializer();
+        var claudeInitializer = CreateClaudeInitializer();
 
         var claudeResult = await claudeInitializer.InitializeAsync(_testDirectory, force: false);
         var csprojResult = await csprojInitializer.InitializeAsync(csprojPath);
@@ -112,7 +112,7 @@ public class InitCommandIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_testDirectory, "CLAUDE.md")));
 
         // Act - Second: Initialize Claude
-        var claudeInitializer = new ClaudeInitializer();
+        var claudeInitializer = CreateClaudeInitializer();
         var claudeResult = await claudeInitializer.InitializeAsync(_testDirectory, force: false);
 
         // Assert - Claude files should now exist
@@ -142,7 +142,7 @@ public class InitCommandIntegrationTests : IDisposable
         await File.WriteAllTextAsync(claudeMdPath, existingContent);
 
         // Act
-        var claudeInitializer = new ClaudeInitializer();
+        var claudeInitializer = CreateClaudeInitializer();
         var result = await claudeInitializer.InitializeAsync(_testDirectory, force: false);
 
         // Assert
@@ -187,7 +187,7 @@ public class InitCommandIntegrationTests : IDisposable
         await File.WriteAllTextAsync(claudeMdPath, existingContent);
 
         // Act
-        var claudeInitializer = new ClaudeInitializer();
+        var claudeInitializer = CreateClaudeInitializer();
         var result = await claudeInitializer.InitializeAsync(_testDirectory, force: false);
 
         // Assert
@@ -219,7 +219,7 @@ public class InitCommandIntegrationTests : IDisposable
         await CreateTestCsproj();
         var claudeMdPath = Path.Combine(_testDirectory, "CLAUDE.md");
 
-        var claudeInitializer = new ClaudeInitializer();
+        var claudeInitializer = CreateClaudeInitializer();
 
         // Act - Run init 3 times
         await claudeInitializer.InitializeAsync(_testDirectory, force: false);

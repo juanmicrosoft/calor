@@ -71,7 +71,9 @@ public sealed class SelfTestRunner
                 VerifyContracts = false
             };
 
-            var result = Program.Compile(scenario.Input, scenario.Name + ".calr", options);
+            // Normalize input line endings so span offsets are consistent across platforms
+            var normalizedInput = scenario.Input.Replace("\r\n", "\n");
+            var result = Program.Compile(normalizedInput, scenario.Name + ".calr", options);
 
             if (result.HasErrors)
             {

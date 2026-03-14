@@ -154,11 +154,11 @@ public class AssessToolTests
     [Fact]
     public async Task ExecuteAsync_WithUnsupportedConstructs_ReportsConstruct()
     {
-        // Primary constructors are unsupported
+        // ref parameters are unsupported
         var args = JsonDocument.Parse("""
             {
                 "action": "assess",
-                "source": "public class Point(int x, int y) { public int X => x; public int Y => y; }"
+                "source": "public class Helper { public void Swap(ref int a, ref int b) { int t = a; a = b; b = t; } }"
             }
             """).RootElement;
 
@@ -167,7 +167,7 @@ public class AssessToolTests
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
         Assert.Contains("unsupportedConstructs", text);
-        Assert.Contains("primary-constructor", text);
+        Assert.Contains("ref-parameter", text);
     }
 
     [Fact]

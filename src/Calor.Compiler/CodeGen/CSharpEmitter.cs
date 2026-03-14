@@ -656,7 +656,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.IsMultiline && node.Value.Contains('\n'))
         {
             var verbatimValue = node.Value.Replace("\"", "\"\"");
-            return $"@\"{verbatimValue}\"";
+            var multilineSuffix = node.IsUtf8 ? "u8" : "";
+            return $"@\"{verbatimValue}\"{multilineSuffix}";
         }
 
         // Escape the string for C#
@@ -667,7 +668,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             .Replace("\r", "\\r")
             .Replace("\t", "\\t");
 
-        return $"\"{escapedValue}\"";
+        var suffix = node.IsUtf8 ? "u8" : "";
+        return $"\"{escapedValue}\"{suffix}";
     }
 
     /// <summary>
@@ -3560,13 +3562,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ListPatternNode node)
     {
         var parts = new List<string>();
-        foreach (var pattern in node.Patterns)
+        var sliceText = node.SlicePattern == null ? null
+            : node.SlicePattern.Name == "_" ? ".."
+            : $"..{node.SlicePattern.Accept(this)}";
+
+        for (int i = 0; i < node.Patterns.Count; i++)
         {
-            parts.Add(pattern.Accept(this));
+            if (sliceText != null && i == node.SliceIndex)
+            {
+                parts.Add(sliceText);
+            }
+            parts.Add(node.Patterns[i].Accept(this));
         }
-        if (node.SlicePattern != null)
+        // Slice at end (or no non-slice patterns before it)
+        if (sliceText != null && node.SliceIndex >= node.Patterns.Count)
         {
-            parts.Add($"..{node.SlicePattern.Accept(this)}");
+            parts.Add(sliceText);
         }
         return $"[{string.Join(", ", parts)}]";
     }
