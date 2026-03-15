@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-03-15
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Added
+- **List pattern conversion** — Full C# → Calor round-trip support for list/slice patterns (`[var a, ..var rest, var b]`) with correct slice position tracking (start/middle/end) via `SliceIndex` on `ListPatternNode`
+- **UTF-8 string literals** — Round-trip support for `"hello"u8` via `IsUtf8` property on `StringLiteralNode`, with lexer/parser/emitter changes
+
+### Fixed
+- **Slice position correctness** — `[var first, .., var last]` now correctly preserves the slice position instead of always appending at end; bare `..` emits without spurious `var _` binding
+- **Unknown feature default** — `FeatureSupport.GetSupportLevel` now returns `NotSupported` for unregistered features, preventing silent suppression of blockers in `MigrationAnalyzer`
+- **PostConversionFixer CRLF handling** — Orphaned closing tag regex now handles Windows `\r\n` line endings correctly
+- **SelfTest span offset consistency** — Input line endings normalized before compilation so span offsets match golden files across platforms
+- **ClaudeInitializer test isolation** — All test instances now use `ClaudeJsonPathOverride` to prevent race conditions writing to `~/.claude.json`
+- **Parser u8 stripping** — Defensive stripping of `u8` suffix from string literal values if lexer includes it
+
 ## [0.4.0] - 2026-03-09
 
 ### Benchmark Results (Statistical: 30 runs)
