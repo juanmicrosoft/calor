@@ -1027,6 +1027,12 @@ public sealed class Parser
         {
             return ParseArrayCreationStatement();
         }
+        else if (Check(TokenKind.Array2D))
+        {
+            // §ARR2D as statement — wrap the expression as an expression statement
+            var expr = ParseMultiDimArrayCreation();
+            return new ExpressionStatementNode(expr.Span, expr);
+        }
         else if (Check(TokenKind.Push) || Check(TokenKind.Add))
         {
             return ParseCollectionPush();
@@ -1186,6 +1192,13 @@ public sealed class Parser
         _insideArgContext = true;
         try
         {
+            // Handle empty arguments: §A followed immediately by a closing tag
+            if (Check(TokenKind.EndCall) || Check(TokenKind.EndNew) || Check(TokenKind.EndList)
+                || Check(TokenKind.EndThis) || Check(TokenKind.EndBase) || Check(TokenKind.EndBaseCall)
+                || Check(TokenKind.Arg) || IsAtEnd)
+            {
+                return new ReferenceNode(Current.Span, "null");
+            }
             return ParseExpression();
         }
         finally
@@ -1270,12 +1283,14 @@ public sealed class Parser
             // Inline raw C# expression
             or TokenKind.RawCSharpExpression
             // Dependent Types: Self-reference in refinement predicates
-            or TokenKind.Hash;
+            or TokenKind.Hash
+            // Verbatim identifiers: @keyword
+            or TokenKind.At;
     }
 
     private ExpressionNode ParseExpression()
     {
-        return Current.Kind switch
+        var expr = Current.Kind switch
         {
             TokenKind.IntLiteral => ParseIntLiteral(),
             TokenKind.StrLiteral => ParseStringLiteral(),
@@ -1340,8 +1355,15 @@ public sealed class Parser
             TokenKind.RawCSharpExpression => ParseRawCSharpExpression(),
             // Dependent Types: Self-reference in refinement predicates
             TokenKind.Hash => ParseSelfRef(),
+            // Verbatim identifiers: @keyword (strip @ and treat as identifier)
+            TokenKind.At => ParseVerbatimIdentifier(),
             _ => RecoverFromUnexpectedToken()
         };
+
+        // Handle trailing member access (e.g., (typeof X).Name, result.Property)
+        expr = ParseTrailingMemberAccess(expr);
+
+        return expr;
     }
 
     /// <summary>
@@ -1517,9 +1539,9 @@ public sealed class Parser
             {
                 if (depth > 0) depth--;
             }
-            else if (kind == TokenKind.Less && prevKind == TokenKind.Identifier)
+            else if (kind == TokenKind.Less && prevKind is TokenKind.Identifier or TokenKind.Star or TokenKind.StarStar or TokenKind.CloseBracket)
             {
-                // < after identifier is a generic bracket, not a comparison operator
+                // < after identifier, * (function pointers), or ] (calling convention) is a generic bracket
                 depth++;
             }
             else if (kind == TokenKind.Greater && depth > 0)
@@ -1641,12 +1663,39 @@ public sealed class Parser
             }
             var name = nameToken.Text;
             Advance();
+            // Handle alias-qualified names: global::System.Namespace
+            if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+            {
+                name += "::";
+                Advance(); // first :
+                Advance(); // second :
+                if (Check(TokenKind.Identifier) || Current.IsKeyword)
+                {
+                    name += Current.Text;
+                    Advance();
+                }
+            }
             while (Check(TokenKind.Dot))
             {
                 Advance();
                 var partToken = Current;
                 name += "." + partToken.Text;
                 Advance();
+            }
+            // Handle generic type arguments: nameof(GroupUpdate<object>)
+            if (Check(TokenKind.Less))
+            {
+                name += "<";
+                Advance();
+                var gDepth = 1;
+                while (!IsAtEnd && gDepth > 0)
+                {
+                    if (Check(TokenKind.Less)) { gDepth++; name += "<"; Advance(); }
+                    else if (Check(TokenKind.Greater)) { gDepth--; if (gDepth > 0) name += ">"; Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { gDepth -= 2; name += ">>"; Advance(); }
+                    else { name += Current.Text; Advance(); }
+                }
+                name += ">";
             }
             var nameofEnd = Expect(TokenKind.CloseParen);
             return new NameOfExpressionNode(startToken.Span.Union(nameofEnd.Span), name);
@@ -1687,6 +1736,11 @@ public sealed class Parser
         {
             return new NullCoalesceNode(span, args[0], args[1]);
         }
+        if (opText == "??" && args.Count == 1)
+        {
+            // Tolerate single-operand ?? from converter output — treat as identity
+            return args[0];
+        }
         if (opText == "??")
         {
             _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
@@ -1705,6 +1759,22 @@ public sealed class Parser
                 _ => args[1].ToString() ?? ""
             };
             return new NullConditionalNode(span, args[0], memberName);
+        }
+        if (opText == "?." && args.Count > 2)
+        {
+            // Chain multi-level null-conditional: (?. a "b" "c") => (?. (?. a "b") "c")
+            var result = args[0];
+            for (int i = 1; i < args.Count; i++)
+            {
+                var memberName = args[i] switch
+                {
+                    StringLiteralNode strNode => strNode.Value,
+                    ReferenceNode refNode => refNode.Name,
+                    _ => args[i].ToString() ?? ""
+                };
+                result = new NullConditionalNode(span, result, memberName);
+            }
+            return result;
         }
         if (opText == "?.")
         {
@@ -1931,6 +2001,34 @@ public sealed class Parser
             };
             var callArgs = args.Skip(1).ToList();
             return new CallExpressionNode(span, target, callArgs);
+        }
+
+        // Fallback: if the "operator" is a complex expression like (expr as Type),
+        // reinterpret — the converter may have emitted C#-style cast syntax
+        if (args.Count >= 1)
+        {
+            for (int i = 0; i < args.Count; i++)
+            {
+                if (args[i] is ReferenceNode rn && rn.Name == "as" && i + 1 < args.Count)
+                {
+                    // Reinterpret: (expr as Type) where expr = opText + args[0..i-1], Type = args[i+1..]
+                    var exprParts = new List<string> { opText };
+                    for (int j = 0; j < i; j++)
+                    {
+                        exprParts.Add(args[j] switch { ReferenceNode r => r.Name, _ => args[j].ToString() ?? "" });
+                    }
+                    var exprName = string.Join(".", exprParts);
+                    var typeName = args[i + 1] switch { ReferenceNode r2 => r2.Name, _ => args[i + 1].ToString() ?? "" };
+                    return new TypeOperationNode(span, TypeOp.As,
+                        new ReferenceNode(span, exprName), typeName);
+                }
+            }
+        }
+
+        // Fallback: treat unknown operator with args as a method call on first arg
+        if (opText.Contains('.') && args.Count >= 0)
+        {
+            return new CallExpressionNode(span, opText, args);
         }
 
         // Unknown operator - provide helpful suggestions
@@ -2271,6 +2369,55 @@ public sealed class Parser
             case TokenKind.Base:
                 expr = ParseBaseExpression(); // §BASE inside Lisp
                 break;
+            case TokenKind.Lambda:
+                expr = ParseLambdaExpression(); // §LAM inside Lisp
+                break;
+            case TokenKind.Array:
+                expr = ParseArrayCreation(); // §ARR inside Lisp
+                break;
+            case TokenKind.List:
+                expr = ParseListCreation(); // §LIST inside Lisp
+                break;
+            case TokenKind.Dict:
+                expr = ParseDictionaryCreation(); // §DICT inside Lisp
+                break;
+            case TokenKind.HashSet:
+                expr = ParseSetCreation(); // §SET inside Lisp
+                break;
+            case TokenKind.Interpolate:
+                expr = ParseInterpolatedString(); // §INTERP inside Lisp
+                break;
+            case TokenKind.NullCoalesce:
+                expr = ParseNullCoalesce(); // §NC inside Lisp
+                break;
+            case TokenKind.If:
+                expr = ParseIfExpression(); // §IF inside Lisp (conditional expression)
+                break;
+            case TokenKind.RawCSharpExpression:
+                expr = ParseRawCSharpExpression(); // §CS inside Lisp
+                break;
+            case TokenKind.Throw:
+                expr = ParseThrowExpression(); // §TH inside Lisp
+                break;
+            case TokenKind.AddressOf:
+                expr = ParseAddressOf(); // §ADDR inside Lisp
+                break;
+            case TokenKind.SizeOf:
+                expr = ParseSizeOf(); // §SIZEOF inside Lisp
+                break;
+            case TokenKind.Deref:
+                expr = ParsePointerDereference(); // §DEREF inside Lisp
+                break;
+            case TokenKind.Index2D:
+                expr = ParseMultiDimArrayAccess(); // §IDX2D inside Lisp
+                break;
+            case TokenKind.Match:
+                expr = ParseMatchExpression(); // §W inside Lisp
+                break;
+            case TokenKind.Tilde:
+                Advance(); // consume ~ (used for binding targets in converter output)
+                expr = Check(TokenKind.Identifier) ? ParseBareReference() : new IntLiteralNode(Current.Span, 0);
+                break;
             default:
                 // Provide helpful message for unexpected tokens
                 var hint = Current.Kind switch
@@ -2373,7 +2520,68 @@ public sealed class Parser
             Advance(); // consume '?'
         }
 
-        if (!Check(TokenKind.Identifier))
+        // Handle tuple types: (Type1 Name1, Type2 Name2)
+        if (Check(TokenKind.OpenParen))
+        {
+            var sb = new System.Text.StringBuilder("(");
+            Advance(); // consume (
+            var depth = 1;
+            while (!IsAtEnd && depth > 0)
+            {
+                if (Check(TokenKind.OpenParen)) { depth++; sb.Append('('); Advance(); }
+                else if (Check(TokenKind.CloseParen)) { depth--; if (depth > 0) sb.Append(')'); Advance(); }
+                else { sb.Append(Current.Text); Advance(); if (depth > 0 && !Check(TokenKind.CloseParen)) sb.Append(' '); }
+            }
+            sb.Append(')');
+            var tupleType = sb.ToString().Replace("  ", " ").Replace(" )", ")").Replace(" ,", ",");
+            return isNullablePrefix ? $"{tupleType}?" : tupleType;
+        }
+
+        // Handle function pointer types: delegate*<T, void> or delegate* unmanaged[Cdecl]<T, void>
+        // (delegate is a keyword, not an identifier)
+        if (Check(TokenKind.Delegate) && (Peek(1).Kind == TokenKind.Star || Peek(1).Kind == TokenKind.StarStar))
+        {
+            var fpBuilder = new System.Text.StringBuilder("delegate");
+            Advance(); // consume delegate
+            fpBuilder.Append(Check(TokenKind.StarStar) ? "**" : "*");
+            Advance(); // consume * or **
+            // Optional calling convention: unmanaged, unmanaged[Cdecl], etc.
+            if (Check(TokenKind.Identifier))
+            {
+                fpBuilder.Append(' ');
+                fpBuilder.Append(Advance().Text);
+                if (Check(TokenKind.OpenBracket))
+                {
+                    fpBuilder.Append('[');
+                    Advance();
+                    while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+                    {
+                        fpBuilder.Append(Current.Text);
+                        Advance();
+                    }
+                    if (Check(TokenKind.CloseBracket)) { fpBuilder.Append(']'); Advance(); }
+                }
+            }
+            // Parse generic parameters <T, U, void>
+            if (Check(TokenKind.Less))
+            {
+                fpBuilder.Append('<');
+                Advance();
+                var depth = 1;
+                while (!IsAtEnd && depth > 0)
+                {
+                    if (Check(TokenKind.Less)) { depth++; fpBuilder.Append('<'); Advance(); }
+                    else if (Check(TokenKind.Greater)) { depth--; if (depth > 0) fpBuilder.Append('>'); Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { depth -= 2; fpBuilder.Append(">>"); Advance(); }
+                    else { fpBuilder.Append(Current.Text); if (Check(TokenKind.Comma)) fpBuilder.Append(' '); Advance(); }
+                }
+                if (depth == 0 && !fpBuilder.ToString().EndsWith('>'))
+                    fpBuilder.Append('>');
+            }
+            return isNullablePrefix ? $"?{fpBuilder}" : fpBuilder.ToString();
+        }
+
+        if (!Check(TokenKind.Identifier) && !Current.IsKeyword)
         {
             _diagnostics.ReportError(Current.Span, DiagnosticCode.ExpectedTypeName,
                 $"Expected type name, found '{Current.Text}'");
@@ -2383,6 +2591,45 @@ public sealed class Parser
         var typeBuilder = new System.Text.StringBuilder();
         typeBuilder.Append(Current.Text);
         Advance();
+
+        // Handle function pointer types: delegate*<T, void> (when delegate is an identifier)
+        if (typeBuilder.ToString() == "delegate" && (Check(TokenKind.Star) || Check(TokenKind.StarStar)))
+        {
+            typeBuilder.Append(Check(TokenKind.StarStar) ? "**" : "*");
+            Advance();
+            // Optional calling convention: unmanaged, unmanaged[Cdecl], etc.
+            if (Check(TokenKind.Identifier))
+            {
+                typeBuilder.Append(' ');
+                typeBuilder.Append(Advance().Text);
+                // Optional [Convention]
+                if (Check(TokenKind.OpenBracket))
+                {
+                    typeBuilder.Append('[');
+                    Advance();
+                    while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+                    {
+                        typeBuilder.Append(Current.Text);
+                        Advance();
+                    }
+                    if (Check(TokenKind.CloseBracket)) { typeBuilder.Append(']'); Advance(); }
+                }
+            }
+            // Fall through to generic <T, U> parsing below
+        }
+
+        // Handle alias-qualified names: global::System.Type
+        if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+        {
+            typeBuilder.Append("::");
+            Advance(); // consume first :
+            Advance(); // consume second :
+            if (Check(TokenKind.Identifier) || Current.IsKeyword)
+            {
+                typeBuilder.Append(Current.Text);
+                Advance();
+            }
+        }
 
         // Handle qualified names (Namespace.Type) and generic types (Type<T>)
         while (Check(TokenKind.Dot) || Check(TokenKind.Less))
@@ -2421,10 +2668,7 @@ public sealed class Parser
                     else if (Check(TokenKind.Greater))
                     {
                         depth--;
-                        if (depth > 0)
-                        {
-                            typeBuilder.Append('>');
-                        }
+                        typeBuilder.Append('>');
                         Advance(); // consume '>'
                     }
                     else if (depth > 0)
@@ -2452,14 +2696,15 @@ public sealed class Parser
         }
 
         // Handle pointer types: Type*, Type**
-        while (Check(TokenKind.Star))
+        while (Check(TokenKind.Star) || Check(TokenKind.StarStar))
         {
+            if (Check(TokenKind.StarStar)) { typeBuilder.Append("**"); Advance(); continue; }
             typeBuilder.Append('*');
             Advance();
         }
 
-        // Handle array types: Type[] or multi-dim Type[,], Type[,,], etc.
-        if (Check(TokenKind.OpenBracket))
+        // Handle array types: Type[], Type[,], Type[,][,,], etc.
+        while (Check(TokenKind.OpenBracket))
         {
             if (Peek(1).Kind == TokenKind.CloseBracket)
             {
@@ -2482,6 +2727,14 @@ public sealed class Parser
                     Advance();
                 }
             }
+            else break;
+        }
+
+        // Handle nullable suffix after array brackets: Type[]?
+        if (Check(TokenKind.Question))
+        {
+            typeBuilder.Append('?');
+            Advance();
         }
 
         // If we had a prefix '?', make the type nullable (append '?')
@@ -2607,7 +2860,81 @@ public sealed class Parser
     private ReferenceNode ParseBareReference()
     {
         var token = Expect(TokenKind.Identifier);
-        return new ReferenceNode(token.Span, token.Text);
+        var name = token.Text;
+
+        // Handle alias-qualified names: global::Namespace.Type
+        if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+        {
+            name += "::";
+            Advance(); // first :
+            Advance(); // second :
+            if (Check(TokenKind.Identifier) || Current.IsKeyword)
+                name += Advance().Text;
+        }
+
+        // Handle dot-qualified names: Namespace.Type or obj.Property
+        while (Check(TokenKind.Dot) && (Peek(1).Kind == TokenKind.Identifier || Peek(1).IsKeyword))
+        {
+            Advance(); // consume .
+            name += "." + Advance().Text;
+        }
+
+        // Handle generic type references: Type<T> or Type<T1, T2>
+        // In Calor's Lisp syntax, comparisons use (< a b), so Identifier< at
+        // statement/expression level is always a generic type, not a comparison.
+        if (Check(TokenKind.Less) && IsGenericTypeBracket())
+        {
+            var sb = new System.Text.StringBuilder(name);
+            sb.Append('<');
+            Advance(); // consume <
+            var depth = 1;
+            while (!IsAtEnd && depth > 0)
+            {
+                if (Check(TokenKind.Less)) { sb.Append('<'); depth++; Advance(); }
+                else if (Check(TokenKind.Greater)) { sb.Append('>'); depth--; Advance(); }
+                else if (Check(TokenKind.GreaterGreater)) { sb.Append(">>"); depth -= 2; Advance(); }
+                else { sb.Append(Current.Text); Advance(); }
+            }
+            name = sb.ToString();
+
+            // Handle dot-qualified access after generic: Type<T>.Property
+            while (Check(TokenKind.Dot) && Peek(1).Kind == TokenKind.Identifier)
+            {
+                Advance(); // consume .
+                name += "." + Advance().Text;
+            }
+        }
+
+        return new ReferenceNode(token.Span, name);
+    }
+
+    /// <summary>
+    /// Determines if a '<' token after an identifier is a generic type bracket (Type&lt;T&gt;)
+    /// rather than a less-than operator. Uses lookahead to check if the token sequence
+    /// matches a valid generic type pattern (identifiers, commas, dots, nested generics)
+    /// terminated by matching '>'.
+    /// </summary>
+    private bool IsGenericTypeBracket()
+    {
+        // Lookahead: scan tokens after '<' for a matching '>' that forms a valid generic
+        var depth = 1;
+        var i = _position + 1; // past the '<'
+        while (i < _tokens.Count && depth > 0)
+        {
+            var kind = _tokens[i].Kind;
+            if (kind == TokenKind.Less) depth++;
+            else if (kind == TokenKind.Greater) depth--;
+            else if (kind == TokenKind.GreaterGreater) depth -= 2;
+            else if (kind == TokenKind.Identifier || kind == TokenKind.Comma
+                || kind == TokenKind.Question || kind == TokenKind.OpenBracket
+                || kind == TokenKind.CloseBracket || kind == TokenKind.OpenParen
+                || kind == TokenKind.CloseParen) { /* valid in generic args */ }
+            else if (_tokens[i].Text == ".") { /* qualified name */ }
+            else if (kind == TokenKind.Colon && i + 1 < _tokens.Count && _tokens[i + 1].Kind == TokenKind.Colon) { i++; /* :: */ }
+            else return false; // not a valid generic type pattern
+            i++;
+        }
+        return depth <= 0;
     }
 
     private IntLiteralNode ParseIntLiteral()
@@ -2664,10 +2991,43 @@ public sealed class Parser
         return new DecimalLiteralNode(token.Span, value);
     }
 
+    private ExpressionNode ParseVerbatimIdentifier()
+    {
+        Advance(); // consume @
+        // The next token should be an identifier or keyword used as an identifier
+        if (Check(TokenKind.Identifier) || Current.IsKeyword)
+        {
+            return ParseReference();
+        }
+        // Fallback: treat @ as ignored prefix
+        return RecoverFromUnexpectedToken();
+    }
+
     private ExpressionNode ParseReference()
     {
         var token = Expect(TokenKind.Identifier);
-        ExpressionNode expr = new ReferenceNode(token.Span, token.Text);
+        var name = token.Text;
+
+        // Handle generic type references: Type<T> or Type<T1, T2>
+        // In Calor's Lisp syntax, comparisons use (< a b), so Identifier< at
+        // expression level is always a generic type, not a comparison.
+        if (Check(TokenKind.Less) && IsGenericTypeBracket())
+        {
+            var sb = new System.Text.StringBuilder(name);
+            sb.Append('<');
+            Advance(); // consume <
+            var depth = 1;
+            while (!IsAtEnd && depth > 0)
+            {
+                if (Check(TokenKind.Less)) { sb.Append('<'); depth++; Advance(); }
+                else if (Check(TokenKind.Greater)) { sb.Append('>'); depth--; Advance(); }
+                else if (Check(TokenKind.GreaterGreater)) { sb.Append(">>"); depth -= 2; Advance(); }
+                else { sb.Append(Current.Text); Advance(); }
+            }
+            name = sb.ToString();
+        }
+
+        ExpressionNode expr = new ReferenceNode(token.Span, name);
 
         // Handle trailing member access (e.g., _startOptions?.Agenda or obj.Property)
         while (Check(TokenKind.Dot) || Check(TokenKind.NullConditional))
@@ -2675,14 +3035,33 @@ public sealed class Parser
             var isNullConditional = Check(TokenKind.NullConditional);
             Advance(); // consume '.' or '?.'
             var memberToken = Expect(TokenKind.Identifier);
+
+            // Handle generic type after member access: Type<T>.Member<U>
+            var memberName = memberToken.Text;
+            if (Check(TokenKind.Less) && IsGenericTypeBracket())
+            {
+                var sb = new System.Text.StringBuilder(memberName);
+                sb.Append('<');
+                Advance();
+                var depth = 1;
+                while (!IsAtEnd && depth > 0)
+                {
+                    if (Check(TokenKind.Less)) { sb.Append('<'); depth++; Advance(); }
+                    else if (Check(TokenKind.Greater)) { sb.Append('>'); depth--; Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { sb.Append(">>"); depth -= 2; Advance(); }
+                    else { sb.Append(Current.Text); Advance(); }
+                }
+                memberName = sb.ToString();
+            }
+
             var span = expr.Span.Union(memberToken.Span);
             if (isNullConditional)
             {
-                expr = new NullConditionalNode(span, expr, memberToken.Text);
+                expr = new NullConditionalNode(span, expr, memberName);
             }
             else
             {
-                expr = new FieldAccessNode(span, expr, memberToken.Text);
+                expr = new FieldAccessNode(span, expr, memberName);
             }
         }
 
@@ -2915,6 +3294,28 @@ public sealed class Parser
             return ParsePropertyPattern();
         }
 
+        // Handle raw { } property pattern from converter output
+        if (Check(TokenKind.OpenBrace))
+        {
+            var braceStart = Advance(); // consume {
+            // Consume any content until matching closing brace (track nesting)
+            int braceDepth = 1;
+            while (!IsAtEnd && braceDepth > 0)
+            {
+                if (Check(TokenKind.OpenBrace))
+                    braceDepth++;
+                else if (Check(TokenKind.CloseBrace))
+                    braceDepth--;
+                if (braceDepth > 0)
+                    Advance();
+            }
+            if (Check(TokenKind.CloseBrace))
+            {
+                Advance(); // consume }
+            }
+            return new WildcardPatternNode(braceStart.Span);
+        }
+
         // Handle §VAR{name} pattern
         if (Check(TokenKind.Var))
         {
@@ -2999,6 +3400,34 @@ public sealed class Parser
                 return new ConstantPatternNode(token.Span, new ReferenceNode(token.Span, name));
             }
 
+            // Handle type pattern with property sub-pattern: TypeName { Prop: value }
+            if (Check(TokenKind.OpenBrace))
+            {
+                // Consume { ... } property pattern (treat as type pattern with property check)
+                var braceStart = Advance(); // consume {
+                var depth = 1;
+                while (!IsAtEnd && depth > 0)
+                {
+                    if (Check(TokenKind.OpenBrace)) depth++;
+                    else if (Check(TokenKind.CloseBrace)) { depth--; if (depth == 0) break; }
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBrace)) Advance(); // consume }
+                // Check for optional variable binding after property pattern: Type { ... } varName
+                string? varName = null;
+                if (Check(TokenKind.Identifier) && Current.Text != "_"
+                    && Peek(1).Kind != TokenKind.Arrow && Peek(1).Kind != TokenKind.Case
+                    && Peek(1).Kind != TokenKind.EndMatch && Peek(1).Kind != TokenKind.EndCase)
+                {
+                    varName = Current.Text;
+                    Advance();
+                }
+                // Return as a variable pattern with the type name (property patterns are opaque to Calor)
+                return varName != null
+                    ? new VarPatternNode(token.Span, varName)
+                    : new VariablePatternNode(token.Span, token.Text);
+            }
+
             return new VariablePatternNode(token.Span, token.Text);
         }
 
@@ -3035,6 +3464,36 @@ public sealed class Parser
             var startToken = Expect(TokenKind.Err);
             var innerPattern = ParsePattern();
             return new ErrPatternNode(startToken.Span.Union(innerPattern.Span), innerPattern);
+        }
+
+        // Handle parenthesized patterns: (nameof x), (§PREL{gte} 5, _, _), (cast Type x), etc.
+        if (Check(TokenKind.OpenParen))
+        {
+            // Check if content looks like a pattern (contains §PREL, §VAR, commas for tuple patterns, etc.)
+            // In that case, consume the balanced parens as an opaque pattern
+            var saved = _position;
+            Advance(); // consume (
+            // Check if first token inside is a pattern token
+            if (Check(TokenKind.RelationalPattern) || Check(TokenKind.Var) || Check(TokenKind.ListPattern)
+                || Check(TokenKind.PropertyPattern) || Check(TokenKind.PositionalPattern))
+            {
+                // This is a parenthesized pattern group — consume balanced parens
+                _position = saved;
+                var openParen = Advance(); // consume (
+                var depth = 1;
+                while (!IsAtEnd && depth > 0)
+                {
+                    if (Check(TokenKind.OpenParen)) depth++;
+                    else if (Check(TokenKind.CloseParen)) { depth--; if (depth == 0) break; }
+                    Advance();
+                }
+                if (Check(TokenKind.CloseParen)) Advance();
+                return new WildcardPatternNode(openParen.Span);
+            }
+            // Otherwise, parse as expression pattern
+            _position = saved;
+            var expr = ParseExpression();
+            return new ConstantPatternNode(expr.Span, expr);
         }
 
         // Default: wildcard
@@ -3408,15 +3867,71 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "BIND", "name");
         }
 
-        // Parse optional initializer expression
+        // Parse optional initializer expression.
+        // Don't consume a following §IF as the initializer when it's a block IF statement
+        // (no → arrow after the condition). Block IFs are separate statements.
         ExpressionNode? initializer = null;
         if (IsExpressionStart())
         {
-            initializer = ParseExpression();
+            if (Check(TokenKind.If) && !IsExpressionIfAhead())
+            {
+                // Block IF — leave for statement parser
+            }
+            else
+            {
+                initializer = ParseExpression();
+            }
         }
 
         var span = initializer != null ? startToken.Span.Union(initializer.Span) : startToken.Span;
         return new BindStatementNode(span, name, typeName, isMutable, initializer, attrs);
+    }
+
+    /// <summary>
+    /// Peeks ahead from a §IF token to determine if it's an expression IF (has →)
+    /// or a block IF (no →). Scans forward looking for an Arrow token before
+    /// encountering statement-level tokens that would indicate a block IF body.
+    /// </summary>
+    private bool IsExpressionIfAhead()
+    {
+        // Save position and scan forward
+        var saved = _position;
+        try
+        {
+            Advance(); // skip §IF
+            // Skip attributes {...}
+            while (!IsAtEnd && Check(TokenKind.OpenBrace))
+            {
+                var depth = 0;
+                do
+                {
+                    if (Check(TokenKind.OpenBrace)) depth++;
+                    else if (Check(TokenKind.CloseBrace)) depth--;
+                    Advance();
+                } while (!IsAtEnd && depth > 0);
+            }
+            // Now skip the condition expression — look for → before any block-level tokens
+            var parenDepth = 0;
+            for (int i = 0; i < 200 && !IsAtEnd; i++)
+            {
+                if (Check(TokenKind.Arrow) && parenDepth == 0)
+                    return true;
+                // Block-level tokens that indicate this is a block IF, not expression IF
+                if (parenDepth == 0 && (Check(TokenKind.Bind) || Check(TokenKind.Assign)
+                    || Check(TokenKind.For) || Check(TokenKind.Foreach)
+                    || Check(TokenKind.While) || Check(TokenKind.Throw)
+                    || Check(TokenKind.Return) || Check(TokenKind.EndIf)))
+                    return false;
+                if (Check(TokenKind.OpenParen)) parenDepth++;
+                else if (Check(TokenKind.CloseParen)) { if (parenDepth > 0) parenDepth--; }
+                Advance();
+            }
+            return false; // No arrow found — treat as block IF
+        }
+        finally
+        {
+            _position = saved;
+        }
     }
 
     private List<StatementNode> ParseStatementBlock(params TokenKind[] terminators)
@@ -3535,10 +4050,55 @@ public sealed class Parser
                 depth++;
             }
 
-            // Parse the element type
-            if (Check(TokenKind.Identifier))
+            // Parse the element type (may have ? prefix for nullable: [?SKPath])
+            if (Check(TokenKind.Question))
+            {
+                sb.Append('?');
+                Advance();
+            }
+            // Handle tuple types inside array brackets: [(T1, T2)]
+            if (Check(TokenKind.OpenParen))
+            {
+                sb.Append('(');
+                Advance();
+                var parenDepth = 1;
+                while (!IsAtEnd && parenDepth > 0)
+                {
+                    if (Check(TokenKind.OpenParen)) { sb.Append('('); parenDepth++; Advance(); }
+                    else if (Check(TokenKind.CloseParen)) { parenDepth--; if (parenDepth > 0) { sb.Append(')'); Advance(); } }
+                    else { sb.Append(Current.Text); Advance(); }
+                }
+                if (Check(TokenKind.CloseParen))
+                {
+                    sb.Append(')');
+                    Advance();
+                }
+            }
+            else if (Check(TokenKind.Identifier))
             {
                 sb.Append(Advance().Text);
+
+                // Handle alias-qualified names: [global::System.Type]
+                if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+                {
+                    sb.Append("::");
+                    Advance(); // consume first :
+                    Advance(); // consume second :
+                    if (Check(TokenKind.Identifier) || Current.IsKeyword)
+                    {
+                        sb.Append(Advance().Text);
+                    }
+                }
+
+                // Handle compound element types: [System.IO.Stream], [Riok.Models.TestObj]
+                while (Current.Text == "." && Peek(1).Kind != TokenKind.CloseBracket)
+                {
+                    sb.Append(Advance().Text); // consume '.'
+                    if (Check(TokenKind.Identifier) || Current.IsKeyword)
+                    {
+                        sb.Append(Advance().Text);
+                    }
+                }
 
                 // Handle generic element types like [List<int>]
                 if (Check(TokenKind.Less))
@@ -3609,6 +4169,19 @@ public sealed class Parser
         {
             sb.Append(Advance().Text);
 
+            // Handle alias-qualified names: global::System.Namespace.Type
+            if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+            {
+                sb.Append("::");
+                Advance(); // consume first :
+                Advance(); // consume second :
+                if (Check(TokenKind.Identifier) || Current.IsKeyword)
+                {
+                    sb.Append(Advance().Text);
+                }
+                // Continue to handle dot-separated parts and generics below
+            }
+
             // Handle generic types like ILogger<MeetingModeratorService> or List<string>
             if (Check(TokenKind.Less))
             {
@@ -3661,6 +4234,90 @@ public sealed class Parser
                         lastWasIdentifier = false;
                         Advance();
                     }
+                    else if (Check(TokenKind.OpenParen))
+                    {
+                        // Handle tuple types in generic arguments: Dict<(Type, int), string>
+                        sb.Append('(');
+                        lastWasIdentifier = false;
+                        Advance();
+                        var parenDepth = 1;
+                        while (!IsAtEnd && parenDepth > 0)
+                        {
+                            if (Check(TokenKind.OpenParen))
+                            {
+                                sb.Append('(');
+                                parenDepth++;
+                                Advance();
+                            }
+                            else if (Check(TokenKind.CloseParen))
+                            {
+                                parenDepth--;
+                                if (parenDepth > 0)
+                                    sb.Append(')');
+                                Advance();
+                            }
+                            else
+                            {
+                                if (Check(TokenKind.Comma))
+                                    lastWasIdentifier = false;
+                                else if (Check(TokenKind.Identifier))
+                                {
+                                    if (lastWasIdentifier) sb.Append(' ');
+                                    lastWasIdentifier = true;
+                                }
+                                else
+                                    lastWasIdentifier = false;
+                                sb.Append(Current.Text);
+                                Advance();
+                            }
+                        }
+                        sb.Append(')');
+                        lastWasIdentifier = false;
+                    }
+                    else if (Check(TokenKind.OpenBracket))
+                    {
+                        // Handle array/attribute types in generic arguments with depth tracking
+                        // Supports nested brackets: OPTION[inner=INT[bits=8][signed=false][]]
+                        sb.Append('[');
+                        lastWasIdentifier = false;
+                        Advance();
+                        var bracketDepth = 1;
+                        while (!IsAtEnd && bracketDepth > 0)
+                        {
+                            if (Check(TokenKind.OpenBracket))
+                            {
+                                bracketDepth++;
+                                sb.Append('[');
+                                Advance();
+                            }
+                            else if (Check(TokenKind.CloseBracket))
+                            {
+                                bracketDepth--;
+                                if (bracketDepth > 0)
+                                {
+                                    sb.Append(']');
+                                    Advance();
+                                }
+                            }
+                            else
+                            {
+                                sb.Append(Current.Text);
+                                Advance();
+                            }
+                        }
+                        if (Check(TokenKind.CloseBracket))
+                        {
+                            sb.Append(']');
+                            Advance();
+                        }
+                    }
+                    else if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+                    {
+                        sb.Append("::");
+                        lastWasIdentifier = false;
+                        Advance(); // consume first :
+                        Advance(); // consume second :
+                    }
                     else if (Current.Text == ".")
                     {
                         sb.Append('.');
@@ -3686,13 +4343,21 @@ public sealed class Parser
             }
 
             // Handle pointer type suffix: i32* or i32**
-            while (Check(TokenKind.Star))
+            while (Check(TokenKind.Star) || Check(TokenKind.StarStar))
             {
-                sb.Append('*');
-                Advance();
+                if (Check(TokenKind.StarStar))
+                {
+                    sb.Append("**");
+                    Advance();
+                }
+                else
+                {
+                    sb.Append('*');
+                    Advance();
+                }
             }
 
-            // Handle array suffix: i32[] or int[,] or int[,,]
+            // Handle array suffix or attribute brackets: i32[], int[,], OPTION[inner=Type]
             if (Check(TokenKind.OpenBracket))
             {
                 if (Peek(1).Kind == TokenKind.CloseBracket)
@@ -3718,6 +4383,33 @@ public sealed class Parser
                         Advance();
                     }
                 }
+                else
+                {
+                    // Bracket-delimited attribute: [key=value] or [inner=Type[nested=X]]
+                    sb.Append('[');
+                    Advance(); // consume [
+                    var bracketDepth = 1;
+                    while (!IsAtEnd && bracketDepth > 0)
+                    {
+                        if (Check(TokenKind.OpenBracket)) bracketDepth++;
+                        else if (Check(TokenKind.CloseBracket)) { bracketDepth--; if (bracketDepth == 0) break; }
+                        sb.Append(Current.Text);
+                        Advance();
+                    }
+                    if (Check(TokenKind.CloseBracket))
+                    {
+                        sb.Append(']');
+                        Advance();
+                    }
+                }
+            }
+
+            // Handle pointer type suffix: Type*, Type**
+            while (Check(TokenKind.Star) || Check(TokenKind.StarStar))
+            {
+                if (Check(TokenKind.StarStar)) { sb.Append("**"); Advance(); continue; }
+                sb.Append('*');
+                Advance();
             }
 
             // Handle hyphenated identifiers like prot-int (protected internal)
@@ -3765,8 +4457,17 @@ public sealed class Parser
 
         // Handle complex expressions that may contain escaped braces and other tokens
         // Continue parsing until we hit a colon (separator) or unescaped close brace (end of attributes)
-        while (!IsAtEnd && !Check(TokenKind.Colon) && !Check(TokenKind.CloseBrace))
+        // Note: :: (double colon) for namespace aliases is NOT a separator
+        while (!IsAtEnd && !(Check(TokenKind.Colon) && Peek(1).Kind != TokenKind.Colon) && !Check(TokenKind.CloseBrace))
         {
+            // Handle :: namespace alias qualifier (global::System etc.)
+            if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+            {
+                sb.Append("::");
+                Advance(); // consume first :
+                Advance(); // consume second :
+                continue;
+            }
             // Handle escaped braces: \{ and \}
             var escapedBrace = TryParseEscapedBrace();
             if (escapedBrace.HasValue)
@@ -3814,6 +4515,16 @@ public sealed class Parser
             else if (Check(TokenKind.Greater))
             {
                 sb.Append('>');
+                Advance();
+            }
+            else if (Check(TokenKind.GreaterGreater))
+            {
+                sb.Append(">>");
+                Advance();
+            }
+            else if (Check(TokenKind.LessLess))
+            {
+                sb.Append("<<");
                 Advance();
             }
             else if (Check(TokenKind.IntLiteral))
@@ -3928,6 +4639,83 @@ public sealed class Parser
                 sb.Append(" ^ ");
                 Advance();
             }
+            else if (Check(TokenKind.OpenBracket))
+            {
+                // Handle array suffix after tuple or other types: (int, string)[], int[]
+                sb.Append('[');
+                Advance();
+                while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+                {
+                    sb.Append(Current.Text);
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBracket))
+                {
+                    sb.Append(']');
+                    Advance();
+                }
+            }
+            else if (Check(TokenKind.OpenBrace))
+            {
+                // Handle nested braces from raw C# in converter output: { ... }
+                sb.Append('{');
+                Advance();
+                var braceDepth = 1;
+                while (!IsAtEnd && braceDepth > 0)
+                {
+                    if (Check(TokenKind.OpenBrace)) braceDepth++;
+                    else if (Check(TokenKind.CloseBrace)) { braceDepth--; if (braceDepth == 0) break; }
+                    sb.Append(Current.Text);
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBrace))
+                {
+                    sb.Append('}');
+                    Advance();
+                }
+            }
+            else if (Check(TokenKind.Question))
+            {
+                // Handle nullable suffix: Type?
+                sb.Append('?');
+                Advance();
+            }
+            else if (Check(TokenKind.Hash))
+            {
+                // Handle # in identifiers (e.g., source generator snapshot filenames)
+                sb.Append('#');
+                Advance();
+            }
+            else if (Check(TokenKind.NullCoalesce))
+            {
+                sb.Append(" ?? ");
+                Advance();
+            }
+            else if (Check(TokenKind.NullConditional))
+            {
+                sb.Append("?.");
+                Advance();
+            }
+            else if (Check(TokenKind.Equals))
+            {
+                sb.Append('=');
+                Advance();
+            }
+            else if (Check(TokenKind.Slash))
+            {
+                sb.Append('/');
+                Advance();
+            }
+            else if (Check(TokenKind.At))
+            {
+                sb.Append('@');
+                Advance();
+            }
+            else if (Check(TokenKind.Backslash))
+            {
+                sb.Append('\\');
+                Advance();
+            }
             else
             {
                 // Unknown token, stop parsing this value
@@ -3940,7 +4728,8 @@ public sealed class Parser
 
     private bool MatchColon()
     {
-        if (Check(TokenKind.Colon))
+        // Don't match single ':' if followed by another ':' — that's '::' (alias qualifier)
+        if (Check(TokenKind.Colon) && Peek(1).Kind != TokenKind.Colon)
         {
             Advance();
             return true;
@@ -3965,8 +4754,10 @@ public sealed class Parser
             // Parse optional target prefix: [@target:Name(args)]
             // Accept any identifier before ':' as a target, matching C# grammar.
             // The identifier after ':' must also be present (the attribute name).
+            // Exclude '::' (alias-qualified names like global::System...) — only match single ':'.
             string? target = null;
             if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Colon
+                && Peek(2).Kind != TokenKind.Colon
                 && Peek(2).Kind == TokenKind.Identifier)
             {
                 target = Current.Text;
@@ -3993,6 +4784,18 @@ public sealed class Parser
             var nameToken = Advance();
             var name = nameToken.Text;
 
+            // Handle alias-qualified names like global::System.ComponentModel.Description
+            if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+            {
+                Advance(); // consume first :
+                Advance(); // consume second :
+                name += "::";
+                if (Check(TokenKind.Identifier))
+                {
+                    name += Advance().Text;
+                }
+            }
+
             // Handle qualified names like System.ComponentModel.Description
             while (Current.Text == ".")
             {
@@ -4000,6 +4803,21 @@ public sealed class Parser
                 if (Check(TokenKind.Identifier))
                 {
                     name += "." + Advance().Text;
+                }
+            }
+
+            // Handle generic type arguments: [@JSMarshalAs<JSType.Number>]
+            if (Check(TokenKind.Less))
+            {
+                name += "<";
+                Advance(); // consume <
+                var genDepth = 1;
+                while (!IsAtEnd && genDepth > 0)
+                {
+                    if (Check(TokenKind.Less)) { genDepth++; name += "<"; Advance(); }
+                    else if (Check(TokenKind.Greater)) { genDepth--; name += ">"; Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { genDepth -= 2; name += ">>"; Advance(); }
+                    else { name += Current.Text; Advance(); }
                 }
             }
 
@@ -4156,6 +4974,18 @@ public sealed class Parser
         {
             var text = Advance().Text;
 
+            // Handle alias-qualified names: global::System.Type
+            if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+            {
+                text += "::";
+                Advance(); // consume first :
+                Advance(); // consume second :
+                if (Check(TokenKind.Identifier) || Current.IsKeyword)
+                {
+                    text += Advance().Text;
+                }
+            }
+
             // Handle typeof(TypeName)
             if (text == "typeof" && Check(TokenKind.OpenParen))
             {
@@ -4257,7 +5087,9 @@ public sealed class Parser
 
         // Detect format: {type:id:size} vs {id:type:size}
         // If pos0 looks like a type and pos1 doesn't, it's {type:id:size}
-        if (AttributeHelper.IsLikelyType(rawPos0) && !AttributeHelper.IsLikelyType(rawPos1))
+        // Exception: dotted names like "Selector.ItemsSource" are property paths (IDs), not types
+        var pos0IsDottedName = rawPos0.Contains('.') && !rawPos0.Contains("::") && !rawPos0.Contains('<');
+        if (!pos0IsDottedName && AttributeHelper.IsLikelyType(rawPos0) && !AttributeHelper.IsLikelyType(rawPos1))
         {
             elementType = rawPos0;
             id = rawPos1;
@@ -5106,6 +5938,26 @@ public sealed class Parser
 
         sb.Append(Advance().Text);
 
+        // Handle alias-qualified names: global::System.Type
+        if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+        {
+            sb.Append("::");
+            Advance(); // consume first :
+            Advance(); // consume second :
+            if (Check(TokenKind.Identifier) || Current.IsKeyword)
+            {
+                sb.Append(Advance().Text);
+            }
+        }
+
+        // Handle dot-qualified names: Namespace.Type
+        while (Check(TokenKind.Dot) && (Peek(1).Kind == TokenKind.Identifier || Peek(1).IsKeyword))
+        {
+            sb.Append('.');
+            Advance(); // consume .
+            sb.Append(Advance().Text);
+        }
+
         // Handle generic type arguments: <T, U>
         if (Check(TokenKind.Less))
         {
@@ -5127,10 +5979,28 @@ public sealed class Parser
                     depth--;
                     Advance();
                 }
+                else if (Check(TokenKind.GreaterGreater))
+                {
+                    // >> closes two generic levels at once (e.g., List<Task<int>>)
+                    sb.Append(">>");
+                    depth -= 2;
+                    Advance();
+                }
                 else if (Check(TokenKind.Comma))
                 {
                     // Comma inside <> is a type argument separator
                     sb.Append(", ");
+                    Advance();
+                }
+                else if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+                {
+                    sb.Append("::");
+                    Advance(); // consume first :
+                    Advance(); // consume second :
+                }
+                else if (Check(TokenKind.Dot))
+                {
+                    sb.Append('.');
                     Advance();
                 }
                 else if (Check(TokenKind.Identifier))
@@ -5144,6 +6014,21 @@ public sealed class Parser
                     break;
                 }
             }
+        }
+
+        // Handle nullable suffix: IEffect?, Nullable<T>?
+        if (Check(TokenKind.Question))
+        {
+            sb.Append('?');
+            Advance();
+        }
+
+        // Handle array suffix: T[]
+        if (Check(TokenKind.OpenBracket) && Peek(1).Kind == TokenKind.CloseBracket)
+        {
+            sb.Append("[]");
+            Advance();
+            Advance();
         }
 
         return sb.ToString();
@@ -5652,6 +6537,11 @@ public sealed class Parser
             {
                 nestedDelegates.Add(ParseDelegateDefinition());
             }
+            else if (Check(TokenKind.List) || Check(TokenKind.Dict) || Check(TokenKind.Set))
+            {
+                // Skip orphaned collection literals at class level (converter artifact)
+                SkipCollectionLiteral();
+            }
             else
             {
                 _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS", Current.Kind);
@@ -6094,10 +6984,25 @@ public sealed class Parser
             }
         }
 
-        // Parse arguments — only when not inside an argument context
-        // (avoids stealing §A tokens that belong to the enclosing §C)
+        // Parse constructor arguments.
+        // When inside an argument context, only consume §A tokens if a §/NEW exists
+        // between here and the next §/C (indicating these args belong to this §NEW).
         var arguments = new List<ExpressionNode>();
-        if (!_insideArgContext)
+        if (_insideArgContext)
+        {
+            // Peek ahead: is there a §/NEW before §/C?
+            if (HasEndNewBeforeEndCall())
+            {
+                var savedArgContext = _insideArgContext;
+                _insideArgContext = false;
+                while (Check(TokenKind.Arg))
+                {
+                    arguments.Add(ParseArgument());
+                }
+                _insideArgContext = savedArgContext;
+            }
+        }
+        else
         {
             while (Check(TokenKind.Arg))
             {
@@ -6117,22 +7022,57 @@ public sealed class Parser
             var value = ParseExpression();
             initializers.Add(new ObjectInitializerAssignment(propName, value));
         }
-        while (!IsAtEnd && !Check(TokenKind.EndNew) && Check(TokenKind.Identifier))
+        while (!IsAtEnd && !Check(TokenKind.EndNew) && (Check(TokenKind.Identifier) || Check(TokenKind.OpenBracket)))
         {
-            // Peek ahead to check for "Identifier =" pattern
-            var saved = _position;
-            var identToken = Advance();
-            if (Check(TokenKind.Equals))
+            if (Check(TokenKind.OpenBracket))
             {
-                Advance(); // consume '='
-                var value = ParseExpression();
-                initializers.Add(new ObjectInitializerAssignment(identToken.Text, value));
+                // Attached property/indexer syntax: [key] = value, [typeof(byte[])] = value
+                Advance(); // consume '['
+                var propNameParts = new System.Text.StringBuilder();
+                var innerDepth = 0; // track () depth to handle typeof(byte[])
+                while (!IsAtEnd && !(Check(TokenKind.CloseBracket) && innerDepth == 0))
+                {
+                    if (Check(TokenKind.OpenParen)) innerDepth++;
+                    else if (Check(TokenKind.CloseParen)) innerDepth--;
+                    propNameParts.Append(Current.Text);
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBracket)) Advance();
+                if (Check(TokenKind.Equals))
+                {
+                    Advance();
+                    var value = ParseExpression();
+                    initializers.Add(new ObjectInitializerAssignment($"[{propNameParts}]", value));
+                }
+                else break;
             }
             else
             {
-                // Not an initializer — backtrack
-                _position = saved;
-                break;
+                // Peek ahead to check for "Identifier =" pattern
+                var saved = _position;
+                var identToken = Advance();
+                if (Check(TokenKind.Equals))
+                {
+                    Advance(); // consume '='
+                    // Handle empty initializer values: "Prop = " followed by §/NEW or next property
+                    if (Check(TokenKind.EndNew) || (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals))
+                    {
+                        // Empty value — use null as placeholder
+                        initializers.Add(new ObjectInitializerAssignment(identToken.Text,
+                            new ReferenceNode(identToken.Span, "null")));
+                    }
+                    else
+                    {
+                        var value = ParseExpression();
+                        initializers.Add(new ObjectInitializerAssignment(identToken.Text, value));
+                    }
+                }
+                else
+                {
+                    // Not an initializer — backtrack
+                    _position = saved;
+                    break;
+                }
             }
         }
 
@@ -6657,14 +7597,16 @@ public sealed class Parser
         {
             PropertyAccessorNode.AccessorKind.Get => TokenKind.EndGet,
             PropertyAccessorNode.AccessorKind.Set => TokenKind.EndSet,
-            _ => TokenKind.EndProperty // Init doesn't have its own end token
+            PropertyAccessorNode.AccessorKind.Init => TokenKind.EndInit,
+            _ => TokenKind.EndProperty
         };
 
         // Parse optional preconditions and body (for non-auto properties/indexers)
         // Also stop at Equals for property default values, next accessor, or end tokens
         while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
                !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.EndIndexer) &&
-               !Check(TokenKind.Equals) && !Check(TokenKind.EndGet) && !Check(TokenKind.EndSet))
+               !Check(TokenKind.Equals) && !Check(TokenKind.EndGet) && !Check(TokenKind.EndSet) &&
+               !Check(TokenKind.EndInit))
         {
             if (Check(TokenKind.Requires))
             {
@@ -7112,11 +8054,16 @@ public sealed class Parser
         var exceptionType = attrs["_pos0"];
         var variableName = attrs["_pos1"];
 
-        // Check for when filter
+        // Check for when filter (§WHEN or bare "when" from legacy converter output)
         ExpressionNode? filter = null;
         if (Check(TokenKind.When))
         {
             Expect(TokenKind.When);
+            filter = ParseExpression();
+        }
+        else if (Check(TokenKind.Identifier) && Current.Text.Equals("when", StringComparison.OrdinalIgnoreCase))
+        {
+            Advance(); // consume bare "when"
             filter = ParseExpression();
         }
 
@@ -7577,7 +8524,67 @@ public sealed class Parser
         ExpressionNode? expressionBody = null;
         List<StatementNode>? statementBody = null;
 
-        if (IsExpressionStart() && !Check(TokenKind.EndLambda))
+        // §IF is both an expression start (ternary: §IF cond → expr §EL → expr)
+        // and a statement start (block: §IF cond ... §/I). Inside lambda bodies,
+        // prefer statement parsing for §IF since block IFs are more common in
+        // converted code and expression IFs would require → after the condition.
+        // EXCEPTION: If this is a single-line lambda with no §/LAM on a separate line,
+        // treat §IF as expression (ternary) since it's likely §IF cond → expr §EL → expr.
+        // Similarly, §B, §C, §ASSIGN, etc. are statements, not expressions here.
+        var ifIsStatement = Check(TokenKind.If);
+        if (ifIsStatement && Check(TokenKind.If))
+        {
+            // Look ahead: if we find §/I{...} followed by §/LAM on the same token stream,
+            // this is a block IF. But if the IF has arrow syntax, check if there's §EL → (ternary).
+            // Simple heuristic: scan forward to see if there's a §EL after the condition+arrow.
+            var savedPos = _position;
+            var ifToken = Advance(); // consume §IF
+            ParseAttributes(); // skip {id}
+            // Skip condition tokens until arrow or end-of-lambda
+            // Track paren/call depth to handle (condition) and §C...§/C in conditions
+            int pDepth = 0;
+            int callDepth = 0;
+            while (!IsAtEnd && !Check(TokenKind.EndLambda))
+            {
+                // Only stop at Arrow when not inside a nested call or paren
+                if (Check(TokenKind.Arrow) && pDepth == 0 && callDepth == 0) break;
+                if (Check(TokenKind.Call)) callDepth++;
+                else if (Check(TokenKind.EndCall)) callDepth = Math.Max(0, callDepth - 1);
+                // Stop at statement tokens outside calls — indicates block IF, not ternary
+                if (callDepth == 0 && pDepth == 0 &&
+                    (Check(TokenKind.Bind) || Check(TokenKind.Assign) || Check(TokenKind.Return) || Check(TokenKind.Foreach)))
+                    break;
+                if (Check(TokenKind.OpenParen)) pDepth++;
+                else if (Check(TokenKind.CloseParen)) pDepth = Math.Max(0, pDepth - 1);
+                Advance();
+            }
+            if (Check(TokenKind.Arrow))
+            {
+                // Arrow found — this might be a ternary. Check if §EL appears before §/I
+                ifIsStatement = true; // default to statement
+                var scanPos = _position;
+                while (scanPos < _tokens.Count && _tokens[scanPos].Kind != TokenKind.EndIf && _tokens[scanPos].Kind != TokenKind.EndLambda)
+                {
+                    if (_tokens[scanPos].Kind == TokenKind.Else)
+                    {
+                        // Found §EL — this is a ternary expression
+                        ifIsStatement = false;
+                        break;
+                    }
+                    scanPos++;
+                }
+            }
+            _position = savedPos; // restore
+        }
+        var isStatementToken = ifIsStatement || Check(TokenKind.Bind) || Check(TokenKind.Call)
+            || Check(TokenKind.Assign) || Check(TokenKind.Return) || Check(TokenKind.For)
+            || Check(TokenKind.Foreach) || Check(TokenKind.While) || Check(TokenKind.Do)
+            || Check(TokenKind.Match) || Check(TokenKind.Try) || Check(TokenKind.Throw)
+            || Check(TokenKind.Break) || Check(TokenKind.Continue) || Check(TokenKind.Print)
+            || Check(TokenKind.Subscribe) || Check(TokenKind.Unsubscribe)
+            || Check(TokenKind.Using);
+
+        if (IsExpressionStart() && !Check(TokenKind.EndLambda) && !isStatementToken)
         {
             expressionBody = ParseExpression();
         }
@@ -7618,6 +8625,12 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Subscribe);
 
         var @event = ParseExpression();
+        // Tolerate legacy converter output: §SUB event += handler
+        if (Check(TokenKind.Plus) || Check(TokenKind.Minus))
+        {
+            Advance();
+            if (Check(TokenKind.Equals)) Advance();
+        }
         var handler = ParseExpression();
 
         var span = startToken.Span.Union(handler.Span);
@@ -7633,6 +8646,12 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Unsubscribe);
 
         var @event = ParseExpression();
+        // Tolerate legacy converter output: §UNSUB event -= handler
+        if (Check(TokenKind.Plus) || Check(TokenKind.Minus))
+        {
+            Advance();
+            if (Check(TokenKind.Equals)) Advance();
+        }
         var handler = ParseExpression();
 
         var span = startToken.Span.Union(handler.Span);
@@ -7914,14 +8933,14 @@ public sealed class Parser
         ExpressionNode? start = null;
         ExpressionNode? end = null;
 
-        // Parse start if present
-        if (IsExpressionStart())
+        // Parse start if present — only accept lightweight expressions (not §IF, §C, etc.)
+        if (IsRangeOperandStart())
         {
             start = ParseExpression();
         }
 
         // Parse end if present
-        if (IsExpressionStart())
+        if (IsRangeOperandStart())
         {
             end = ParseExpression();
         }
@@ -7930,6 +8949,20 @@ public sealed class Parser
                  : start != null ? startToken.Span.Union(start.Span)
                  : startToken.Span;
         return new RangeExpressionNode(span, start, end);
+    }
+
+    /// <summary>
+    /// Returns true if the current token can start a range operand expression.
+    /// More restrictive than IsExpressionStart — excludes section markers like §IF, §C, etc.
+    /// Also excludes identifiers followed by '=' (property assignments in §NEW initializers).
+    /// </summary>
+    private bool IsRangeOperandStart()
+    {
+        if (Current.Kind == TokenKind.Identifier && Peek(1).Kind == TokenKind.Equals)
+            return false; // Don't consume property assignments as range operands
+        return Current.Kind is TokenKind.IntLiteral or TokenKind.FloatLiteral
+            or TokenKind.DecimalLiteral or TokenKind.StrLiteral
+            or TokenKind.Identifier or TokenKind.OpenParen or TokenKind.IndexEnd;
     }
 
     /// <summary>
@@ -8118,6 +9151,7 @@ public sealed class Parser
             or TokenKind.ListPattern
             or TokenKind.Var
             or TokenKind.RelationalPattern
+            or TokenKind.OpenBrace  // Property pattern: { Prop: value }
             || IsExpressionStart();
     }
 
@@ -8833,7 +9867,16 @@ public sealed class Parser
             var memberAttrs = ParseCSharpAttributes();
 
             // Each enum member is an identifier optionally followed by = value
-            if (Check(TokenKind.Identifier))
+            // Handle @keyword enum members (e.g., @decimal, @event) and /Name members
+            if (Check(TokenKind.At))
+            {
+                Advance(); // consume @
+            }
+            if (Check(TokenKind.Slash))
+            {
+                Advance(); // consume / (some enums have /MemberName format)
+            }
+            if (Check(TokenKind.Identifier) || Current.IsKeyword)
             {
                 var memberStartToken = Current;
                 var memberName = Advance().Text;
@@ -8879,9 +9922,10 @@ public sealed class Parser
         if (value == null)
             return null;
 
-        // Extend with binary operators: |, &, ^, <<, >>
+        // Extend with binary operators: |, &, ^, <<, >>, +, -
         while (Check(TokenKind.Pipe) || Check(TokenKind.Amp) || Check(TokenKind.Caret) ||
-               Check(TokenKind.LessLess) || Check(TokenKind.GreaterGreater))
+               Check(TokenKind.LessLess) || Check(TokenKind.GreaterGreater) ||
+               Check(TokenKind.Plus) || Check(TokenKind.Minus))
         {
             var op = Advance().Text;
             var rhs = ParseEnumOperand();
@@ -8903,6 +9947,11 @@ public sealed class Parser
         if (Check(TokenKind.IntLiteral))
         {
             return Advance().Text;
+        }
+        if (Check(TokenKind.StrLiteral))
+        {
+            var val = Advance().Value as string ?? "";
+            return $"'{val}'";
         }
         if (Check(TokenKind.Identifier))
         {
@@ -8942,7 +9991,14 @@ public sealed class Parser
             {
                 Advance(); // consume )
                 // Check if this is a cast: (type)operand — if next token can be an operand
-                if (IsEnumOperandStart())
+                // Only treat as cast if inner looks like a type name (no operators like <<, |, etc.)
+                var looksLikeCast = IsEnumOperandStart()
+                    && inner != null
+                    && !inner.Contains("<<") && !inner.Contains(">>")
+                    && !inner.Contains("|") && !inner.Contains("&")
+                    && !inner.Contains("^") && !inner.Contains("+")
+                    && !inner.Contains("-") && !inner.Contains("~");
+                if (looksLikeCast)
                 {
                     var castTarget = ParseEnumOperand();
                     return castTarget != null ? $"({inner}){castTarget}" : $"({inner})";
@@ -9175,6 +10231,46 @@ public sealed class Parser
     /// When the open tag used an auto-generated ID (compact syntax), the closing tag
     /// is allowed to have an empty ID without triggering an error.
     /// </summary>
+    /// <summary>
+    /// Looks ahead to check if there's a §/NEW before the next §/C.
+    /// Used to determine if §A tokens between §NEW and §/NEW belong to the §NEW.
+    /// </summary>
+    private bool HasEndNewBeforeEndCall()
+    {
+        for (int i = _position; i < _tokens.Count; i++)
+        {
+            if (_tokens[i].Kind == TokenKind.EndNew) return true;
+            if (_tokens[i].Kind == TokenKind.EndCall) return false;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Skips a collection literal (§LIST, §DICT, §SET) by consuming tokens until the matching end tag.
+    /// Used to tolerate orphaned collection literals at class member level from converter output.
+    /// </summary>
+    private void SkipCollectionLiteral()
+    {
+        var endKind = Current.Kind switch
+        {
+            TokenKind.List => TokenKind.EndList,
+            TokenKind.Dict => TokenKind.EndDict,
+            TokenKind.Set => TokenKind.EndSet,
+            _ => TokenKind.EndList
+        };
+        Advance(); // consume §LIST/§DICT/§SET
+        ParseAttributes(); // consume attributes
+        while (!IsAtEnd && !Check(endKind))
+        {
+            Advance();
+        }
+        if (Check(endKind))
+        {
+            Advance();
+            ParseAttributes(); // consume end tag attributes
+        }
+    }
+
     private static bool ShouldReportMismatchedId(string endId, string openId, Token endToken)
     {
         // If both are the same, no mismatch
@@ -9455,7 +10551,20 @@ public sealed class Parser
         if (Check(TokenKind.Arrow))
         {
             Advance(); // consume ->
-            var returnType = ReadInlineTypeToken();
+            // Handle ref/in/out return type modifiers
+            var prefix = "";
+            if (Check(TokenKind.Identifier) && Current.Text is "ref" or "in" or "out" or "scoped")
+            {
+                prefix = Current.Text + " ";
+                Advance();
+                // Handle 'ref readonly'
+                if (prefix == "ref " && Check(TokenKind.Identifier) && Current.Text == "readonly")
+                {
+                    prefix = "ref readonly ";
+                    Advance();
+                }
+            }
+            var returnType = prefix + ReadInlineTypeToken();
             output = new OutputNode(span, returnType);
         }
     }
@@ -9479,11 +10588,32 @@ public sealed class Parser
     {
         var sb = new System.Text.StringBuilder();
 
-        // Handle nullable prefix
-        if (Check(TokenKind.Question))
+        // Handle nullable prefix (may be doubled: ??Type for Nullable<Nullable<T>> from converter)
+        // ?? is lexed as NullCoalesce token, so check for that too
+        if (Check(TokenKind.NullCoalesce))
         {
-            sb.Append('?');
+            sb.Append("??");
             Advance();
+        }
+        else
+        {
+            while (Check(TokenKind.Question))
+            {
+                sb.Append('?');
+                Advance();
+            }
+        }
+
+        // Handle ref/in/out/scoped modifiers (e.g., ?ref T, ref readonly T)
+        if (Check(TokenKind.Identifier) && Current.Text is "ref" or "in" or "out" or "scoped")
+        {
+            sb.Append(Advance().Text);
+            sb.Append(' ');
+            if (Check(TokenKind.Identifier) && Current.Text == "readonly")
+            {
+                sb.Append(Advance().Text);
+                sb.Append(' ');
+            }
         }
 
         // Handle array type [T]
@@ -9507,8 +10637,8 @@ public sealed class Parser
             Advance(); // consume (
 
             sb.Append(ReadInlineTypeToken(ref pendingGreaters));
-            // Check for optional element name
-            if (Check(TokenKind.Identifier) && !Check(TokenKind.Comma) && !Check(TokenKind.CloseParen))
+            // Check for optional element name (may be a keyword like 'delegate')
+            if ((Check(TokenKind.Identifier) || Current.IsKeyword) && !Check(TokenKind.Comma) && !Check(TokenKind.CloseParen))
             {
                 sb.Append(' ');
                 sb.Append(Advance().Text);
@@ -9519,8 +10649,8 @@ public sealed class Parser
                 sb.Append(", ");
                 Advance(); // consume ,
                 sb.Append(ReadInlineTypeToken(ref pendingGreaters));
-                // Check for optional element name
-                if (Check(TokenKind.Identifier) && !Check(TokenKind.Comma) && !Check(TokenKind.CloseParen))
+                // Check for optional element name (may be a keyword like 'delegate')
+                if ((Check(TokenKind.Identifier) || Current.IsKeyword) && !Check(TokenKind.Comma) && !Check(TokenKind.CloseParen))
                 {
                     sb.Append(' ');
                     sb.Append(Advance().Text);
@@ -9530,6 +10660,32 @@ public sealed class Parser
             if (Check(TokenKind.CloseParen))
             {
                 sb.Append(')');
+                Advance();
+            }
+
+            // Handle array suffix after tuple: (T1, T2)[]
+            while (Check(TokenKind.OpenBracket))
+            {
+                if (Peek(1).Kind == TokenKind.CloseBracket)
+                {
+                    sb.Append("[]");
+                    Advance(); // [
+                    Advance(); // ]
+                }
+                else if (Peek(1).Kind == TokenKind.Comma)
+                {
+                    sb.Append('[');
+                    Advance();
+                    while (Check(TokenKind.Comma)) { sb.Append(','); Advance(); }
+                    if (Check(TokenKind.CloseBracket)) { sb.Append(']'); Advance(); }
+                }
+                else break;
+            }
+
+            // Handle nullable suffix after tuple: (T1, T2)?
+            if (Check(TokenKind.Question))
+            {
+                sb.Append('?');
                 Advance();
             }
 
@@ -9545,6 +10701,60 @@ public sealed class Parser
         {
             // For types like "i32", "f64" that might lex as identifier
             sb.Append(Advance().Text);
+        }
+
+        // Handle alias-qualified names: global::System.Namespace.Type
+        if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+        {
+            sb.Append("::");
+            Advance(); // consume first :
+            Advance(); // consume second :
+            if (Check(TokenKind.Identifier) || Current.IsKeyword)
+            {
+                sb.Append(Advance().Text);
+            }
+        }
+
+        // Handle dot-separated qualified names: System.Threading.CancellationToken
+        while (Check(TokenKind.Dot) && (Peek(1).Kind == TokenKind.Identifier || Peek(1).IsKeyword))
+        {
+            sb.Append('.');
+            Advance(); // consume .
+            sb.Append(Advance().Text);
+        }
+
+        // Handle pointer suffix: Type*, Type**
+        while (Check(TokenKind.Star) || Check(TokenKind.StarStar))
+        {
+            if (Check(TokenKind.StarStar)) { sb.Append("**"); Advance(); continue; }
+            sb.Append('*');
+            Advance();
+        }
+
+        // Handle function pointer calling convention: delegate* unmanaged<T, void>
+        // or delegate* unmanaged[Cdecl]<T, void>
+        if (sb.Length > 0 && sb.ToString().EndsWith('*')
+            && Check(TokenKind.Identifier) && (Peek(1).Kind == TokenKind.Less || Peek(1).Kind == TokenKind.OpenBracket))
+        {
+            sb.Append(' ');
+            sb.Append(Advance().Text); // consume calling convention identifier (e.g., "unmanaged")
+            // Handle optional [CallingConvention, ...] list
+            if (Check(TokenKind.OpenBracket))
+            {
+                sb.Append('[');
+                Advance();
+                while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+                {
+                    sb.Append(Current.Text);
+                    Advance();
+                }
+                if (Check(TokenKind.CloseBracket))
+                {
+                    sb.Append(']');
+                    Advance();
+                }
+            }
+            // Fall through to generic parameter handling below
         }
 
         // Handle nullable suffix
@@ -9586,8 +10796,52 @@ public sealed class Parser
             }
         }
 
-        // Handle array suffix: Type[] or Type[,]
-        if (Check(TokenKind.OpenBracket))
+        // Handle nullable suffix after generic close: Task<T>?, Action<T>?
+        if (Check(TokenKind.Question))
+        {
+            sb.Append('?');
+            Advance();
+        }
+
+        // Handle nested type suffix after generic close: List<T>.Enumerator
+        while (Check(TokenKind.Dot) && (Peek(1).Kind == TokenKind.Identifier || Peek(1).IsKeyword))
+        {
+            sb.Append('.');
+            Advance(); // consume .
+            sb.Append(Advance().Text);
+            // The nested type might itself be generic: Outer<T>.Inner<U>
+            if (Check(TokenKind.Less))
+            {
+                sb.Append('<');
+                Advance();
+                sb.Append(ReadInlineTypeToken(ref pendingGreaters));
+                while (Check(TokenKind.Comma))
+                {
+                    sb.Append(", ");
+                    Advance();
+                    sb.Append(ReadInlineTypeToken(ref pendingGreaters));
+                }
+                if (pendingGreaters > 0)
+                {
+                    sb.Append('>');
+                    pendingGreaters--;
+                }
+                else if (Check(TokenKind.Greater))
+                {
+                    sb.Append('>');
+                    Advance();
+                }
+                else if (Check(TokenKind.GreaterGreater))
+                {
+                    sb.Append('>');
+                    Advance();
+                    pendingGreaters++;
+                }
+            }
+        }
+
+        // Handle array suffix: Type[], Type[,], Type[][,], etc.
+        while (Check(TokenKind.OpenBracket))
         {
             if (Peek(1).Kind == TokenKind.CloseBracket)
             {
@@ -9610,6 +10864,14 @@ public sealed class Parser
                     Advance();
                 }
             }
+            else break;
+        }
+
+        // Handle nullable suffix after array brackets: string[]?, int[,]?
+        if (Check(TokenKind.Question))
+        {
+            sb.Append('?');
+            Advance();
         }
 
         return sb.ToString();
@@ -9750,15 +11012,20 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Parses §IDX2D array index1 index2
+    /// Parses §IDX2D array index1 index2 or §IDX2D{N} array index1 ... indexN
     /// </summary>
     private MultiDimArrayAccessNode ParseMultiDimArrayAccess()
     {
         var startToken = Expect(TokenKind.Index2D);
+        var attrs = ParseAttributes();
+        var dimCountStr = attrs["_pos0"];
+        var dimCount = 2; // default: 2D
+        if (dimCountStr != null && int.TryParse(dimCountStr, out var parsed))
+            dimCount = parsed;
+
         var array = ParseExpression();
         var indices = new List<ExpressionNode>();
-        // Parse remaining index expressions (at least one more)
-        while (!IsAtEnd && IsExpressionStart())
+        for (int i = 0; i < dimCount && !IsAtEnd && IsExpressionStart(); i++)
         {
             indices.Add(ParseExpression());
         }

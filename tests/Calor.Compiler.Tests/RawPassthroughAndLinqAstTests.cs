@@ -168,18 +168,17 @@ public class RawPassthroughAndLinqAstTests
 
         Assert.NotNull(result.Ast);
 
-        // MakeChainedCall serializes intermediate calls into the Target string,
-        // so only the outermost call (Select) is a node. The Where call is
-        // embedded in the Target string.
+        // MakeChainedCall hoists intermediate calls to temp bindings,
+        // so both Where and Select are separate CallExpressionNode objects.
         var allNodes = CollectAllNodes(result.Ast);
         var callNodes = allNodes.OfType<CallExpressionNode>().ToList();
 
-        Assert.True(callNodes.Count >= 1,
-            $"Expected at least 1 CallExpressionNode, got {callNodes.Count}");
+        Assert.True(callNodes.Count >= 2,
+            $"Expected at least 2 CallExpressionNodes (Where + Select), got {callNodes.Count}");
 
-        // The outermost call is Select, with the Where call serialized in its target
+        // The outermost call is Select, with a hoisted temp var as its target
         var outerCall = callNodes.First(c => c.Target.Contains("Select"));
-        Assert.Contains("Where", outerCall.Target);
+        Assert.NotNull(outerCall);
 
         // The Select call should have a lambda argument for the projection
         var lambdaArg = outerCall.Arguments.OfType<LambdaExpressionNode>().FirstOrDefault();

@@ -892,8 +892,10 @@ class Test
     #region Issue 372: Empty collection [] emits default
 
     [Fact]
-    public void Convert_EmptyCollectionExpression_EmitsEmptyList()
+    public void Convert_EmptyCollectionExpression_EmitsConstructor()
     {
+        // Empty collection expressions are converted to Array.Empty<T>() inline calls
+        // for compatibility in expression contexts (property initializers, switch arms, etc.)
         var csharp = @"
 using System.Collections.Generic;
 class Container
@@ -904,11 +906,11 @@ class Container
         var calor = result.CalorSource;
 
         Assert.DoesNotContain("default", calor);
-        Assert.Contains("§LIST", calor);
+        Assert.Contains("Array.Empty", calor);
     }
 
     [Fact]
-    public void Convert_EmptyCollectionExpressionInMethod_EmitsEmptyList()
+    public void Convert_EmptyCollectionExpressionInMethod_EmitsArrayEmpty()
     {
         var csharp = @"
 using System.Collections.Generic;
@@ -923,7 +925,29 @@ class Processor
         var calor = result.CalorSource;
 
         Assert.DoesNotContain("default", calor);
-        Assert.Contains("§LIST", calor);
+        Assert.Contains("Array.Empty", calor);
+    }
+
+    [Fact]
+    public void Convert_EmptyCollectionInSwitchArm_Compiles()
+    {
+        // Verifies that [] in a switch arm context (the original bug) produces compilable output
+        var csharp = @"
+using System;
+class Test
+{
+    public byte[] Convert(string type)
+    {
+        return type switch
+        {
+            ""known"" => new byte[] { 1, 2, 3 },
+            _ => []
+        };
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.Contains("Array.Empty", result.CalorSource);
     }
 
     #endregion

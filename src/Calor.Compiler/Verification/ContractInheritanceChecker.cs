@@ -58,8 +58,10 @@ public sealed class ContractInheritanceChecker : IDisposable
         var results = new List<ClassInheritanceResult>();
         var inheritedContracts = new Dictionary<(string ClassName, string MethodName), InheritedContractInfo>();
 
-        // Build a lookup of interfaces by name
-        var interfaces = module.Interfaces.ToDictionary(i => i.Name, StringComparer.Ordinal);
+        // Build a lookup of interfaces by name (use last-wins for generic overloads like IFoo and IFoo<T>)
+        var interfaces = new Dictionary<string, InterfaceDefinitionNode>(StringComparer.Ordinal);
+        foreach (var iface in module.Interfaces)
+            interfaces[iface.Name] = iface;
 
         foreach (var classNode in module.Classes)
         {

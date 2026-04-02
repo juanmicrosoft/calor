@@ -326,15 +326,18 @@ public static class StringOpExtensions
             StringOp.TrimStart or
             StringOp.TrimEnd or
             StringOp.IsNullOrEmpty or
-            StringOp.IsNullOrWhiteSpace or
-            StringOp.ToString => 1,
+            StringOp.IsNullOrWhiteSpace => 1,
 
-            // Two argument operations
+            // ToString allows extra args for complex sub-expressions (e.g., indexer+range)
+            StringOp.ToString => 4,
+
+            // Two argument operations (some allow extra args for complex sub-expressions)
             StringOp.Contains or
             StringOp.StartsWith or
             StringOp.EndsWith or
             StringOp.IndexOf or
-            StringOp.Equals or
+            StringOp.Equals => 4,
+
             StringOp.SubstringFrom or
             StringOp.Split or
             StringOp.Join or

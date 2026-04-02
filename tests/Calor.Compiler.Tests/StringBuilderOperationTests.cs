@@ -254,11 +254,11 @@ public class StringBuilderOperationTests
     [Fact]
     public void Parse_SbNew_TooManyArgs_ReportsError()
     {
-        var source = WrapInFunction("§R (sb-new \"a\" \"b\")");
+        var source = WrapInFunction("§R (sb-new \"a\" \"b\" \"c\")");
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("accepts at most 1 argument"));
+        Assert.Contains(diagnostics, d => d.Message.Contains("accepts at most 2 argument"));
     }
 
     #endregion
@@ -303,7 +303,7 @@ public class StringBuilderOperationTests
     }
 
     [Theory]
-    [InlineData(StringBuilderOp.New, 0, 1)]
+    [InlineData(StringBuilderOp.New, 0, 2)]
     [InlineData(StringBuilderOp.Append, 2, 2)]
     [InlineData(StringBuilderOp.AppendLine, 2, 2)]
     [InlineData(StringBuilderOp.Insert, 3, 3)]

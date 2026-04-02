@@ -275,6 +275,17 @@ public static class TypeMapper
         if (string.IsNullOrEmpty(csharpType))
             return csharpType;
 
+        // Strip C# verbatim identifier prefix @ (e.g., @operator in tuple types)
+        if (csharpType.Contains('@'))
+            csharpType = csharpType.Replace("@", "");
+
+        // Strip C-style block comments /* ... */ from Roslyn trivia
+        if (csharpType.Contains("/*"))
+        {
+            csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"\s*/\*.*?\*/\s*", " ");
+            csharpType = csharpType.Replace("  ", " ").Trim();
+        }
+
         // Handle nullable types T? -> ?T
         if (csharpType.EndsWith("?"))
         {
@@ -283,12 +294,16 @@ public static class TypeMapper
             return $"?{mappedInner}";
         }
 
-        // Handle Nullable<T> -> ?T
+        // Handle Nullable<T> -> ?T (but not open generic Nullable<>)
         if (csharpType.StartsWith("Nullable<") && csharpType.EndsWith(">"))
         {
             var innerType = csharpType["Nullable<".Length..^1];
-            var mappedInner = CSharpToCalor(innerType);
-            return $"?{mappedInner}";
+            if (!string.IsNullOrEmpty(innerType))
+            {
+                var mappedInner = CSharpToCalor(innerType);
+                return $"?{mappedInner}";
+            }
+            // Nullable<> (open generic) — keep as-is
         }
 
         // Handle arrays T[] -> T_mapped[]
@@ -341,10 +356,13 @@ public static class TypeMapper
         if (genericIndex > 0)
         {
             var baseName = csharpType[..genericIndex];
-            var typeArgs = csharpType[(genericIndex + 1)..^1];
+            // Find the matching closing '>' by tracking bracket depth
+            var closingIndex = FindMatchingCloseBracket(csharpType, genericIndex);
+            var typeArgs = csharpType[(genericIndex + 1)..closingIndex];
+            var suffix = closingIndex + 1 < csharpType.Length ? csharpType[(closingIndex + 1)..] : "";
             var mappedBase = CSharpToCalorMap.TryGetValue(baseName, out var calorBase) ? calorBase : baseName;
             var mappedArgs = MapGenericArguments(typeArgs, CSharpToCalor);
-            return $"{mappedBase}<{mappedArgs}>";
+            return $"{mappedBase}<{mappedArgs}>{suffix}";
         }
 
         // Direct mapping
@@ -467,10 +485,12 @@ public static class TypeMapper
         if (genericIndex > 0)
         {
             var baseName = calorType[..genericIndex];
-            var typeArgs = calorType[(genericIndex + 1)..^1];
+            var closingIndex = FindMatchingCloseBracket(calorType, genericIndex);
+            var typeArgs = calorType[(genericIndex + 1)..closingIndex];
+            var suffix = closingIndex + 1 < calorType.Length ? calorType[(closingIndex + 1)..] : "";
             var mappedBase = CalorToCSharpMap.TryGetValue(baseName, out var csharpBase) ? csharpBase : baseName;
             var mappedArgs = MapGenericArguments(typeArgs, CalorToCSharp);
-            return $"{mappedBase}<{mappedArgs}>";
+            return $"{mappedBase}<{mappedArgs}>{suffix}";
         }
 
         // Direct mapping
@@ -491,6 +511,25 @@ public static class TypeMapper
     public static string CalorOperatorToCSharpOp(string calorKind)
     {
         return CalorOperatorToCSharp.TryGetValue(calorKind, out var result) ? result : calorKind;
+    }
+
+    /// <summary>
+    /// Finds the matching closing '>' for an opening '<' at the given index, tracking nesting depth.
+    /// </summary>
+    private static int FindMatchingCloseBracket(string type, int openIndex)
+    {
+        var depth = 1;
+        for (var i = openIndex + 1; i < type.Length; i++)
+        {
+            if (type[i] == '<') depth++;
+            else if (type[i] == '>')
+            {
+                depth--;
+                if (depth == 0) return i;
+            }
+        }
+        // Fallback: assume last char is the closing bracket
+        return type.Length - 1;
     }
 
     /// <summary>

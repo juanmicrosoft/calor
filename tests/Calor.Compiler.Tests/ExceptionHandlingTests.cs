@@ -493,8 +493,10 @@ public class ExceptionHandlingTests
     }
 
     [Fact]
-    public void Parse_WhenFilterWithInvalidExpression_ReportsError()
+    public void Parse_WhenFilterWithInvalidExpression_ParsesWithFallback()
     {
+        // The parser now has a fallback for unknown Lisp operators (treats them as calls),
+        // so (invalid.operator x) parses without errors.
         var source = @"
 §M{m1:Test}
 §F{f1:Bad:pub}
@@ -511,7 +513,7 @@ public class ExceptionHandlingTests
 
         var module = Parse(source, out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
     }
 
     [Fact]

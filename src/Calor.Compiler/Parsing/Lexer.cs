@@ -146,6 +146,7 @@ public sealed class Lexer
         ["SET"] = TokenKind.Set,
         ["/SET"] = TokenKind.EndSet,
         ["INIT"] = TokenKind.Init,
+        ["/INIT"] = TokenKind.EndInit,
         ["CTOR"] = TokenKind.Constructor,
         ["/CTOR"] = TokenKind.EndConstructor,
         ["OP"] = TokenKind.OperatorOverload,
@@ -161,6 +162,7 @@ public sealed class Lexer
         ["TH"] = TokenKind.Throw,           // §TH = Throw
         ["RT"] = TokenKind.Rethrow,         // §RT = Rethrow
         ["WHEN"] = TokenKind.When,
+        ["when"] = TokenKind.When,       // Accept lowercase from legacy converter output
 
         // Lambdas, Delegates, Events
         ["LAM"] = TokenKind.Lambda,
@@ -407,6 +409,8 @@ public sealed class Lexer
             '∃' => ScanUnicodeQuantifier("exists"),
             '`' => ScanBacktickIdentifier(),
             '\'' => ScanCharLiteralOrSkip(),
+            '$' => ScanDollarString(),
+            ';' => ScanSkipSemicolon(),
             _ when char.IsLetter(Current) || Current == '_' => ScanIdentifierOrTypedLiteral(),
             _ when char.IsDigit(Current) => ScanNumber(),
             _ => ScanError()
@@ -1009,7 +1013,10 @@ public sealed class Lexer
 
         // Check for typed literals (INT:42, STR:"hello", BOOL:true, FLOAT:3.14)
         // Only treat as typed literal if the following value looks like a valid literal
-        if (Current == ':')
+        // Skip typed literal detection inside attribute blocks ({...}) where colon is a separator
+        // e.g., §SALLOC{dec:4} should parse as type=dec, size=4, not as DECIMAL literal 4
+        var prevChar = _tokenStart > 0 ? _source[_tokenStart - 1] : '\0';
+        if (Current == ':' && prevChar != '{' && prevChar != ':')
         {
             var upperText = text.ToUpperInvariant();
             var lookahead = Peek(1);
@@ -1513,8 +1520,77 @@ public sealed class Lexer
                 Advance();
 
                 int depth = 1;
-                while (!IsAtEnd && depth > 0 && Current != '"')
+                while (!IsAtEnd && depth > 0)
                 {
+                    if (Current == '\\' && _position + 1 < _source.Length && _source[_position + 1] == '"')
+                    {
+                        // Escaped quote inside interpolation (e.g., ${name.TrimStart(\"x\")})
+                        // Treat \" as a literal escaped character, don't start a nested string
+                        sb.Append(Current); // backslash
+                        Advance();
+                        sb.Append(Current); // quote
+                        Advance();
+                        continue;
+                    }
+                    if (Current == '"')
+                    {
+                        // Potential string literal inside interpolation.
+                        // Save state and try scanning as nested string; if we can then
+                        // find the closing } of the interpolation, it was a nested string.
+                        // Otherwise, this " ends the outer string (unmatched ${).
+                        var savedPos = _position;
+                        var savedSbLen = sb.Length;
+                        sb.Append(Current); // opening "
+                        Advance();
+                        while (!IsAtEnd && Current != '"')
+                        {
+                            if (Current == '\\')
+                            {
+                                sb.Append(Current);
+                                Advance();
+                                if (!IsAtEnd) { sb.Append(Current); Advance(); }
+                            }
+                            else { sb.Append(Current); Advance(); }
+                        }
+                        if (!IsAtEnd && Current == '"')
+                        {
+                            sb.Append(Current); // closing "
+                            Advance();
+                            // Check if we can still find closing } — scan ahead without modifying state
+                            // by looking at remaining chars. If the interpolation can still close, keep it.
+                            var canClose = false;
+                            var tempDepth = depth;
+                            var tempPos = _position;
+                            var maxLookahead = Math.Min(_source.Length, _position + 10_000);
+                            while (tempPos < maxLookahead && tempDepth > 0)
+                            {
+                                var ch = _source[tempPos];
+                                if (ch == '"')
+                                {
+                                    // Skip nested strings in lookahead
+                                    tempPos++;
+                                    while (tempPos < _source.Length && _source[tempPos] != '"')
+                                    {
+                                        if (_source[tempPos] == '\\') tempPos++;
+                                        tempPos++;
+                                    }
+                                    if (tempPos < _source.Length) tempPos++; // closing "
+                                    continue;
+                                }
+                                if (ch == '{') tempDepth++;
+                                else if (ch == '}') tempDepth--;
+                                if (tempDepth == 0) { canClose = true; break; }
+                                tempPos++;
+                            }
+                            if (canClose)
+                                continue; // nested string was valid, keep scanning interpolation
+                        }
+                        // Backtrack — the " was not a nested string, it ends the outer string
+                        _position = savedPos;
+                        sb.Length = savedSbLen;
+                        break; // exit interpolation loop; " will be consumed as outer string close
+                    }
+
                     if (Current == '{')
                         depth++;
                     else if (Current == '}')
@@ -1532,12 +1608,17 @@ public sealed class Lexer
                     sb.Append(Current); // closing }
                     Advance();
                 }
-                // If we hit " before closing }, the ${...} was unmatched — already appended as literal
             }
             else if (Current == '\n')
             {
-                _diagnostics.ReportUnterminatedString(CurrentSpan());
-                return MakeToken(TokenKind.Error);
+                // Allow multi-line strings from converter output (collapsed to single line)
+                sb.Append(' ');
+                Advance();
+                // Skip leading whitespace on continuation line
+                while (!IsAtEnd && Current != '"' && (Current == ' ' || Current == '\t'))
+                    Advance();
+                if (IsAtEnd || Current == '"')
+                    continue;
             }
             else
             {
@@ -1626,6 +1707,26 @@ public sealed class Lexer
         while (char.IsDigit(Current) || Current == '_')
         {
             Advance();
+        }
+
+        // Check for scientific notation without decimal point (e.g., 1E-06, 2E+10)
+        if (Current is 'E' or 'e' && Lookahead is '+' or '-' or (>= '0' and <= '9'))
+        {
+            Advance(); // consume E/e
+            if (Current is '+' or '-')
+            {
+                Advance(); // consume sign
+            }
+            while (char.IsDigit(Current))
+            {
+                Advance();
+            }
+            var sciText = CurrentText().Replace("_", "");
+            if (double.TryParse(sciText, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var sciValue))
+            {
+                return MakeToken(TokenKind.FloatLiteral, sciValue);
+            }
         }
 
         // Check for float
@@ -1755,8 +1856,50 @@ public sealed class Lexer
         return MakeToken(TokenKind.Newline);
     }
 
+    /// <summary>
+    /// Handles C# interpolated strings ($"...") that weren't fully converted.
+    /// Treats $" as a regular string opening.
+    /// </summary>
+    private Token ScanDollarString()
+    {
+        Advance(); // consume '$'
+        if (Current == '"')
+        {
+            return ScanStringLiteralValue();
+        }
+        // Bare $ — skip it
+        return MakeToken(TokenKind.Identifier, "$");
+    }
+
+    /// <summary>
+    /// Skips semicolons from raw C# that leaked into converter output.
+    /// </summary>
+    private Token ScanSkipSemicolon()
+    {
+        Advance(); // consume ';'
+        return NextToken(); // skip and return next real token
+    }
+
     private Token ScanError()
     {
+        // For high Unicode characters (surrogate pairs, private-use, CJK, etc.),
+        // consume them as identifiers rather than reporting errors.
+        // Converter output may embed icon glyphs in attributes.
+        // Only tolerate chars above U+00FF (high-plane) to preserve error reporting
+        // for common ASCII-adjacent symbols like ©, ®, etc.
+        if (Current > '\u00FF' || char.IsHighSurrogate(Current) ||
+            char.GetUnicodeCategory(Current) is System.Globalization.UnicodeCategory.PrivateUse)
+        {
+            var sb = new System.Text.StringBuilder();
+            while (!IsAtEnd && (Current > '\u00FF' || char.IsHighSurrogate(Current) ||
+                char.IsLowSurrogate(Current) ||
+                char.GetUnicodeCategory(Current) is System.Globalization.UnicodeCategory.PrivateUse))
+            {
+                sb.Append(Current);
+                Advance();
+            }
+            return MakeToken(TokenKind.Identifier, sb.ToString());
+        }
         _diagnostics.ReportUnexpectedCharacter(CurrentSpan(), Current);
         Advance();
         return MakeToken(TokenKind.Error);
