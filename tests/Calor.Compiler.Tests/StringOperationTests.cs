@@ -1084,11 +1084,11 @@ public class StringOperationTests
     [InlineData(StringOp.TrimEnd, 1, 1)]
     [InlineData(StringOp.IsNullOrEmpty, 1, 1)]
     [InlineData(StringOp.IsNullOrWhiteSpace, 1, 1)]
-    [InlineData(StringOp.ToString, 1, 1)]
-    [InlineData(StringOp.Contains, 2, 2)]
-    [InlineData(StringOp.StartsWith, 2, 2)]
-    [InlineData(StringOp.EndsWith, 2, 2)]
-    [InlineData(StringOp.IndexOf, 2, 2)]
+    [InlineData(StringOp.ToString, 1, 4)]
+    [InlineData(StringOp.Contains, 2, 4)]
+    [InlineData(StringOp.StartsWith, 2, 4)]
+    [InlineData(StringOp.EndsWith, 2, 4)]
+    [InlineData(StringOp.IndexOf, 2, 4)]
     [InlineData(StringOp.SubstringFrom, 2, 2)]
     [InlineData(StringOp.Split, 2, 2)]
     [InlineData(StringOp.Join, 2, 2)]
@@ -1375,7 +1375,7 @@ public class StringOperationTests
     }
 
     [Theory]
-    [InlineData(StringOp.Equals, 2, 2)]
+    [InlineData(StringOp.Equals, 2, 4)]
     public void ArgCount_Equals_HasCorrectBounds(StringOp op, int expectedMin, int expectedMax)
     {
         Assert.Equal(expectedMin, op.GetMinArgCount());

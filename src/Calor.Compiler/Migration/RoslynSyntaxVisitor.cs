@@ -1817,6 +1817,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ? ConvertExpression(variable.Initializer.Value)
                 : null;
 
+            // Block-level collections (§LIST, §DICT, §ARR, §SET) can't appear inline in
+            // §FLD{...} = ... format. Convert to §NEW{Type} constructor call instead.
+            if (defaultValue != null && IsBlockLevelCollection(defaultValue))
+            {
+                defaultValue = ConvertBlockLevelCollectionToNew(defaultValue, typeName);
+            }
+
             fields.Add(new ClassFieldNode(
                 GetTextSpan(variable),
                 variable.Identifier.ValueText,
@@ -1983,6 +1990,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ? ConvertExpression(node.Initializer.Value)
             : null;
 
+        // Block-level collections (§LIST, §DICT, §ARR, §SET) can't appear inline in
+        // §PROP{...} = ... format. Convert to §NEW{Type} constructor call instead.
+        if (defaultValue != null && IsBlockLevelCollection(defaultValue))
+        {
+            defaultValue = ConvertBlockLevelCollectionToNew(defaultValue, typeName);
+        }
+
         _context.Stats.PropertiesConverted++;
         _context.IncrementConverted();
 
@@ -2026,10 +2040,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     defaultValue = ConvertExpression(p.Default.Value);
                 }
                 var paramAttrs = ConvertAttributes(p.AttributeLists);
+                var typeStr = p.Type?.ToString()?.Replace("@", "") ?? "any";
                 return new ParameterNode(
                     GetTextSpan(p),
                     p.Identifier.ValueText,
-                    TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
+                    TypeMapper.CSharpToCalor(typeStr),
                     modifier,
                     new AttributeCollection(),
                     paramAttrs,
@@ -3886,6 +3901,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 CheckedStatementSyntax checkedStmt => ConvertCheckedStatement(checkedStmt),
                 UnsafeStatementSyntax unsafeStmt => ConvertUnsafeStatement(unsafeStmt),
                 FixedStatementSyntax fixedStmt => ConvertFixedStatement(fixedStmt),
+                EmptyStatementSyntax => null, // C# empty statement (;) — skip
                 _ => HandleUnsupportedStatement(statement)
             };
         }
@@ -4114,6 +4130,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     var indexOrKey = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
                     var value = ConvertExpression(assignment.Right);
+                    // Hoist block-level values that can't appear inline in §PUT/§SETIDX
+                    if (IsBlockLevelCollection(value))
+                    {
+                        var tempName = _context.GenerateId("_putVal");
+                        _pendingStatements.Add(new BindStatementNode(
+                            GetTextSpan(assignment), tempName, null, false, value, new AttributeCollection()));
+                        value = new ReferenceNode(GetTextSpan(assignment), tempName);
+                    }
 
                     // Determine if this is a list (numeric index) or dictionary (key-based)
                     var firstArg = elementAccess.ArgumentList.Arguments[0].Expression;
@@ -4345,6 +4369,89 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
 
+            // Handle complex targets that need hoisting (element access, chained calls, new-then-call)
+            if (invocation.Expression is MemberAccessExpressionSyntax stmtMemberAccess)
+            {
+                var stmtMethodName = stmtMemberAccess.Name.Identifier.Text;
+                var stmtSpan = GetTextSpan(node);
+
+                // Hoist indexer-then-call: dict["key"].Method() → temp = dict["key"]; temp.Method()
+                if (stmtMemberAccess.Expression is ElementAccessExpressionSyntax stmtElemAccess)
+                {
+                    var elemConverted = ConvertExpression(stmtElemAccess);
+                    var tempName = _context.GenerateId("_elem");
+                    _pendingStatements.Add(new BindStatementNode(
+                        stmtSpan, tempName, null, false, elemConverted, new AttributeCollection()));
+                    target = $"{tempName}.{stmtMethodName}";
+                }
+                // Hoist new-then-call: new Foo().Method() → temp = new Foo(); temp.Method()
+                else if (stmtMemberAccess.Expression is ObjectCreationExpressionSyntax
+                    || stmtMemberAccess.Expression is ImplicitObjectCreationExpressionSyntax)
+                {
+                    var newConverted = ConvertExpression(stmtMemberAccess.Expression);
+                    var newTypeHint = ExtractTypeHint(stmtMemberAccess.Expression);
+                    var tempName = _context.GenerateId("_new", newTypeHint);
+                    _pendingStatements.Add(new BindStatementNode(
+                        stmtSpan, tempName, null, false, newConverted, new AttributeCollection()));
+                    target = $"{tempName}.{stmtMethodName}";
+                }
+                // Hoist chained call: foo.Bar().Baz() → temp = foo.Bar(); temp.Baz()
+                else if (stmtMemberAccess.Expression is InvocationExpressionSyntax stmtInnerInvocation)
+                {
+                    var innerConverted = ConvertInvocationExpression(stmtInnerInvocation);
+                    var innerMethodHint = ExtractInnerMethodName(stmtInnerInvocation);
+                    var tempName = _context.GenerateId("_chain", innerMethodHint);
+                    _pendingStatements.Add(new BindStatementNode(
+                        stmtSpan, tempName, null, false, innerConverted, new AttributeCollection()));
+                    target = $"{tempName}.{stmtMethodName}";
+                }
+                // Hoist member access chains containing indexers (e.g., boxes[0].Instance.Method())
+                else if (stmtMemberAccess.Expression is MemberAccessExpressionSyntax && ContainsElementAccess(stmtMemberAccess.Expression))
+                {
+                    var chainConverted = ConvertExpression(stmtMemberAccess.Expression);
+                    var tempName = _context.GenerateId("_idx");
+                    _pendingStatements.Add(new BindStatementNode(
+                        stmtSpan, tempName, null, false, chainConverted, new AttributeCollection()));
+                    target = $"{tempName}.{stmtMethodName}";
+                }
+                // Hoist typeof-then-call and other complex targets
+                else if (stmtMemberAccess.Expression is not IdentifierNameSyntax
+                    && stmtMemberAccess.Expression is not MemberAccessExpressionSyntax
+                    && stmtMemberAccess.Expression is not ThisExpressionSyntax
+                    && stmtMemberAccess.Expression is not BaseExpressionSyntax
+                    && stmtMemberAccess.Expression is not PredefinedTypeSyntax)
+                {
+                    var complexConverted = ConvertExpression(stmtMemberAccess.Expression);
+                    var tempName = _context.GenerateId("_expr");
+                    _pendingStatements.Add(new BindStatementNode(
+                        stmtSpan, tempName, null, false, complexConverted, new AttributeCollection()));
+                    target = $"{tempName}.{stmtMethodName}";
+                }
+            }
+
+            // Safety net: if the target still contains characters that ParseValue() can't handle
+            // (indexers, method calls with args, string literals), the parser will fail.
+            // Fall back to ConvertInvocationExpression which does more aggressive hoisting.
+            if (target.Contains('[') || target.Contains('(') || target.Contains('"'))
+            {
+                var exprResult = ConvertInvocationExpression(invocation);
+                if (exprResult is CallExpressionNode callExpr)
+                {
+                    return new CallStatementNode(
+                        GetTextSpan(node),
+                        callExpr.Target,
+                        fallible: false,
+                        callExpr.Arguments.ToList(),
+                        new AttributeCollection(),
+                        stmtArgNames,
+                        stmtArgModifiers);
+                }
+                // If ConvertInvocationExpression returns a non-call (e.g., StringOp, native op),
+                // wrap it in a discard bind: §B{_} expr
+                return new BindStatementNode(
+                    GetTextSpan(node), "_", null, false, exprResult, new AttributeCollection());
+            }
+
             return new CallStatementNode(
                 GetTextSpan(node),
                 target,
@@ -4406,6 +4513,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             _context.RecordFeatureUsage("null-conditional");
             var targetExpr = condAccess.Expression.ToString();
+            var targetSpan = GetTextSpan(node);
+
+            // If the target contains indexers, method calls, or other complex expressions,
+            // hoist to temp binding so the condition and call target are simple references.
+            // Method calls like this.GetLayoutManager() have parentheses that break Lisp expressions.
+            string conditionRef = targetExpr;
+            if (ContainsElementAccess(condAccess.Expression)
+                || condAccess.Expression is InvocationExpressionSyntax
+                || targetExpr.Contains('(') || targetExpr.Contains('['))
+            {
+                var convertedTarget = ConvertExpression(condAccess.Expression);
+                var tempName = _context.GenerateId("_nullcond");
+                _pendingStatements.Add(new BindStatementNode(
+                    targetSpan, tempName, null, false, convertedTarget, new AttributeCollection()));
+                conditionRef = tempName;
+            }
 
             // Decompose into: §IF{id} (!= target null)  §C{target.Method} §A args §/C  §/I{id}
             var condId = _context.GenerateId("if", "nullcond");
@@ -4416,7 +4539,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (condAccess.WhenNotNull is InvocationExpressionSyntax inv
                 && inv.Expression is MemberBindingExpressionSyntax mb)
             {
-                callTarget = $"{targetExpr}.{mb.Name.Identifier.Text}";
+                callTarget = $"{conditionRef}.{mb.Name.Identifier.Text}";
                 callArgs = inv.ArgumentList.Arguments
                     .Select(a => ConvertExpression(a.Expression))
                     .ToList();
@@ -4424,14 +4547,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             else
             {
                 var memberName = condAccess.WhenNotNull.ToString().TrimStart('.');
-                callTarget = $"{targetExpr}.{memberName}";
+                callTarget = $"{conditionRef}.{memberName}";
             }
+
+            // Hoist complex arguments (§NEW, §LAM, etc.) that the parser can't handle nested inside §C
+            HoistComplexArguments(callArgs);
 
             var nullCheck = new IfStatementNode(
                 GetTextSpan(node),
                 condId,
                 new BinaryOperationNode(GetTextSpan(node), BinaryOperator.NotEqual,
-                    new ReferenceNode(GetTextSpan(node), targetExpr),
+                    new ReferenceNode(GetTextSpan(node), conditionRef),
                     new ReferenceNode(GetTextSpan(node), "null")),
                 new StatementNode[]
                 {
@@ -4889,7 +5015,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             foreach (var stmt in _pendingStatements)
             {
-                if (stmt is BindStatementNode bind && (bind.Name.StartsWith("_chain") || bind.Name.StartsWith("_cast") || bind.Name.StartsWith("_pre")))
+                if (stmt is BindStatementNode bind && (bind.Name.StartsWith("_chain") || bind.Name.StartsWith("_cast") || bind.Name.StartsWith("_pre")
+                    || bind.Name.StartsWith("_idx") || bind.Name.StartsWith("_elem") || bind.Name.StartsWith("_new")
+                    || bind.Name.StartsWith("_typeof") || bind.Name.StartsWith("_expr")))
                     chainBindings.Add(stmt);
                 else
                     patternBindings.Add(stmt);
@@ -5133,6 +5261,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var varType = TypeMapper.CSharpToCalor(node.Type.ToString());
         var varName = node.Identifier.Text;
         var collection = ConvertExpression(node.Expression);
+
+        // Convert block-level collections to inline §NEW for foreach collection
+        if (collection is ListCreationNode or DictionaryCreationNode or SetCreationNode)
+        {
+            collection = ConvertBlockLevelCollectionToNew(collection, TypeMapper.CSharpToCalor(node.Type.ToString()));
+        }
+
         var body = node.Statement is BlockSyntax block
             ? ConvertBlock(block)
             : new List<StatementNode> { ConvertStatement(node.Statement)! };
@@ -5359,10 +5494,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ? ConvertExpression(arm.WhenClause.Condition)
                 : null;
 
-            var body = new List<StatementNode>
-            {
-                new ReturnStatementNode(GetTextSpan(arm.Expression), ConvertExpression(arm.Expression))
-            };
+            // Save/restore _pendingStatements so hoisted bindings from the arm expression
+            // stay inside the arm body, not leaking before the match arms
+            var savedPending = new List<StatementNode>(_pendingStatements);
+            _pendingStatements.Clear();
+
+            var armExpr = ConvertExpression(arm.Expression);
+            // Hoist block-level nodes (§ARR, §LIST, §NEW with initializers) from arm expression
+            // so they become bindings in the arm body rather than inline constructs
+            armExpr = HoistIfComplex(armExpr, GetTextSpan(arm.Expression));
+            var body = new List<StatementNode>(_pendingStatements);
+            body.Add(new ReturnStatementNode(GetTextSpan(arm.Expression), armExpr));
+
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(savedPending);
 
             cases.Add(new MatchCaseNode(GetTextSpan(arm), pattern, guard, body));
         }
@@ -5727,6 +5872,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     new ArrayAccessNode(GetTextSpan(implicitElement),
                         new ThisExpressionNode(GetTextSpan(implicitElement)),
                         ConvertExpression(implicitElement.ArgumentList.Arguments[0].Expression)),
+                MakeRefExpressionSyntax makeRef => new RawCSharpExpressionNode(GetTextSpan(makeRef), makeRef.ToString()),
+                RefValueExpressionSyntax refValue => new RawCSharpExpressionNode(GetTextSpan(refValue), refValue.ToString()),
+                RefTypeExpressionSyntax refType => new RawCSharpExpressionNode(GetTextSpan(refType), refType.ToString()),
                 _ => CreateFallbackExpression(expression, "unknown-expression")
             };
         }
@@ -5773,6 +5921,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new ReferenceNode(GetTextSpan(literal), "null"),
             SyntaxKind.DefaultLiteralExpression =>
                 new ReferenceNode(GetTextSpan(literal), "default"),
+            SyntaxKind.ArgListExpression =>
+                new RawCSharpExpressionNode(GetTextSpan(literal), "__arglist"),
             _ => CreateFallbackExpression(literal, "unknown-literal")
         };
     }
@@ -5791,6 +5941,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             _context.RecordFeatureUsage("as");
             var left = ConvertExpression(binary.Left);
+            // Convert block-level collections to inline for as/is operands
+            if (IsBlockLevelCollection(left))
+                left = ConvertBlockLevelCollectionToNew(left, ExtractTypeHint(binary.Left));
             var typeName = TypeMapper.CSharpToCalor(binary.Right.ToString());
             return new TypeOperationNode(GetTextSpan(binary), TypeOp.As, left, typeName);
         }
@@ -5923,6 +6076,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ConvertVarIsPattern(isPattern, left, varPattern),
             ListPatternSyntax listPat =>
                 ConvertListPatternIsExpression(isPattern, left, listPat),
+            ParenthesizedPatternSyntax parens =>
+                ConvertIsPatternExpression(isPattern.WithPattern(parens.Pattern)),
             _ =>
                 // For other patterns, create a fallback expression
                 CreateFallbackExpression(isPattern, "complex-is-pattern")
@@ -6310,6 +6465,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new BoolLiteralNode(span, true),
             ListPatternSyntax listPat =>
                 ConvertListPatternToMatchExpression(listPat, subject),
+            ParenthesizedPatternSyntax parenPattern =>
+                ConvertSubpatternToExpression(parenPattern.Pattern, subject),
             _ => CreateFallbackExpression(pattern, "complex-is-pattern")
         };
     }
@@ -6354,19 +6511,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode ConvertCollectionExpression(CollectionExpressionSyntax collection)
     {
         // Convert C# 12 collection expressions: [] or [1, 2, 3]
-        // Empty collection: output as empty list creation
-        // Using "default" was wrong because default for reference types is null, not empty collection
+        // Empty collection: use Array.Empty<T>() for inline compatibility
+        // (block-level §LIST with 0 elements causes issues in expression contexts like switch arms)
         if (collection.Elements.Count == 0)
         {
-            var emptyId = _context.GenerateId("list");
-            var emptyName = _context.GenerateId("list");
-            return new ListCreationNode(
+            // Try to infer element type from semantic model
+            var elemType = "object";
+            if (_semanticModel != null)
+            {
+                var typeInfo = _semanticModel.GetTypeInfo(collection);
+                if (typeInfo.ConvertedType is IArrayTypeSymbol arrayType)
+                    elemType = TypeMapper.CSharpToCalor(arrayType.ElementType.ToDisplayString());
+                else if (typeInfo.ConvertedType is INamedTypeSymbol namedType && namedType.TypeArguments.Length > 0)
+                    elemType = TypeMapper.CSharpToCalor(namedType.TypeArguments[0].ToDisplayString());
+            }
+            // Emit as Array.Empty<T>() — a simple inline call expression
+            return new CallExpressionNode(
                 GetTextSpan(collection),
-                emptyId,
-                emptyName,
-                "object",
-                Array.Empty<ExpressionNode>(),
-                new AttributeCollection());
+                $"Array.Empty<{elemType}>",
+                new List<ExpressionNode>(),
+                new List<string>());
         }
 
         // Convert collection expression to ArrayCreationNode
@@ -6519,8 +6683,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     foreach (var expr in implicitNew.Initializer.Expressions)
                     {
                         if (expr is AssignmentExpressionSyntax assignment)
+                        {
+                            var val = ConvertExpression(assignment.Right);
+                            // Convert block-level collections to inline for initializer values
+                            if (IsBlockLevelCollection(val))
+                                val = ConvertBlockLevelCollectionToNew(val, ExtractTypeHint(assignment.Right));
                             inits.Add(new ObjectInitializerAssignment(
-                                assignment.Left.ToString(), ConvertExpression(assignment.Right)));
+                                assignment.Left.ToString(), val));
+                        }
                     }
                 }
                 return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits);
@@ -6532,15 +6702,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.IncrementConverted();
         var typeName = inferredType ?? "object";
         var args = implicitNew.ArgumentList.Arguments
-            .Select(a => ConvertExpression(a.Expression)).ToList();
+            .Select(a =>
+            {
+                var expr = ConvertExpression(a.Expression);
+                // Convert block-level collections to inline for constructor args
+                if (IsBlockLevelCollection(expr))
+                    expr = ConvertBlockLevelCollectionToNew(expr, ExtractTypeHint(a.Expression));
+                return expr;
+            }).ToList();
         var initializers = new List<ObjectInitializerAssignment>();
         if (implicitNew.Initializer != null)
         {
             foreach (var expr in implicitNew.Initializer.Expressions)
             {
                 if (expr is AssignmentExpressionSyntax assignment)
+                {
+                    var val = ConvertExpression(assignment.Right);
+                    // Convert block-level collections to inline for initializer values
+                    if (IsBlockLevelCollection(val))
+                        val = ConvertBlockLevelCollectionToNew(val, ExtractTypeHint(assignment.Right));
                     initializers.Add(new ObjectInitializerAssignment(
-                        assignment.Left.ToString(), ConvertExpression(assignment.Right)));
+                        assignment.Left.ToString(), val));
+                }
             }
         }
         return new NewExpressionNode(GetTextSpan(implicitNew), typeName, new List<string>(), args, initializers);
@@ -6898,7 +7081,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("tuple-literal");
         _context.IncrementConverted();
         var elements = tuple.Arguments
-            .Select(a => ConvertExpression(a.Expression))
+            .Select(a =>
+            {
+                var expr = ConvertExpression(a.Expression);
+                // Convert block-level collections to inline §NEW for tuple elements
+                if (IsBlockLevelCollection(expr))
+                {
+                    var typeName = ExtractTypeHint(a.Expression);
+                    expr = ConvertBlockLevelCollectionToNew(expr, typeName);
+                }
+                return expr;
+            })
             .ToList();
         return new TupleLiteralNode(GetTextSpan(tuple), elements);
     }
@@ -6957,6 +7150,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 var propName = assignment.Left.ToString();
                 var value = ConvertExpression(assignment.Right);
+                // Convert block-level collections to inline for §SET values
+                if (IsBlockLevelCollection(value))
+                {
+                    var typeName = ExtractTypeHint(assignment.Right);
+                    value = ConvertBlockLevelCollectionToNew(value, typeName);
+                }
                 assignments.Add(new WithPropertyAssignmentNode(GetTextSpan(expr), propName, value));
             }
             else
@@ -7041,6 +7240,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
                 args[i] = new ReferenceNode(args[i].Span, tempName);
             }
+            else if (args[i] is ListCreationNode listNode)
+            {
+                var tempName = _context.GenerateId("_list", listNode.ElementType);
+                _pendingStatements.Add(new BindStatementNode(
+                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                args[i] = new ReferenceNode(args[i].Span, tempName);
+            }
+            else if (args[i] is DictionaryCreationNode dictNode)
+            {
+                var tempName = _context.GenerateId("_dict");
+                _pendingStatements.Add(new BindStatementNode(
+                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                args[i] = new ReferenceNode(args[i].Span, tempName);
+            }
+            else if (args[i] is SetCreationNode setNode)
+            {
+                var tempName = _context.GenerateId("_set", setNode.ElementType);
+                _pendingStatements.Add(new BindStatementNode(
+                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+                args[i] = new ReferenceNode(args[i].Span, tempName);
+            }
             else if (args[i] is ConditionalExpressionNode condNode)
             {
                 // Hoist §NEW/§ARR from ternary branches — parser can't handle
@@ -7061,8 +7281,121 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private static bool ContainsComplexNode(ExpressionNode node)
     {
         return node is NewExpressionNode or ArrayCreationNode or LambdaExpressionNode
+            or ListCreationNode or DictionaryCreationNode or SetCreationNode
             || (node is ConditionalExpressionNode cond
                 && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
+    }
+
+    /// <summary>
+    /// Hoists complex expression nodes (§NEW with initializers, §LIST, §DICT, §LAM, etc.)
+    /// to temp bindings when they would break inline expression contexts.
+    /// </summary>
+    private ExpressionNode HoistIfComplex(ExpressionNode node, TextSpan span)
+    {
+        if (node is NewExpressionNode newNode && (newNode.Initializers.Count > 0 || newNode.Arguments.Count > 0))
+        {
+            var tempName = _context.GenerateId("_new", newNode.TypeName);
+            _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
+            return new ReferenceNode(span, tempName);
+        }
+        if (node is ListCreationNode listNode)
+        {
+            var tempName = _context.GenerateId("_list", listNode.ElementType);
+            _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
+            return new ReferenceNode(span, tempName);
+        }
+        if (node is DictionaryCreationNode)
+        {
+            var tempName = _context.GenerateId("_dict");
+            _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
+            return new ReferenceNode(span, tempName);
+        }
+        if (node is ArrayCreationNode arrNode && arrNode.Initializer.Count > 0)
+        {
+            var tempName = _context.GenerateId("_arr", arrNode.ElementType);
+            _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
+            return new ReferenceNode(span, tempName);
+        }
+        if (node is LambdaExpressionNode)
+        {
+            var tempName = _context.GenerateId("_lam");
+            _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
+            return new ReferenceNode(span, tempName);
+        }
+        if (node is SetCreationNode setNode)
+        {
+            var tempName = _context.GenerateId("_set", setNode.ElementType);
+            _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
+            return new ReferenceNode(span, tempName);
+        }
+        return node;
+    }
+
+    private static bool IsEmptyBlockLevelCollection(ExpressionNode? node)
+    {
+        return node switch
+        {
+            ListCreationNode list => list.Elements.Count == 0,
+            DictionaryCreationNode dict => dict.Entries.Count == 0,
+            SetCreationNode set => set.Elements.Count == 0,
+            ArrayCreationNode arr => arr.Initializer.Count == 0,
+            _ => false
+        };
+    }
+
+    private static bool IsBlockLevelCollection(ExpressionNode? node)
+    {
+        // ListCreationNode, DictionaryCreationNode, SetCreationNode emit block-level
+        // §LIST/§DICT/§SET that can't appear inline. ArrayCreationNode emits inline
+        // §ARR{...} so it's OK as a property/field default.
+        // §ARR2D is block-level and can't appear inline.
+        return node is ListCreationNode or DictionaryCreationNode or SetCreationNode
+            or MultiDimArrayCreationNode;
+    }
+
+    /// <summary>
+    /// Converts a block-level collection (§LIST, §DICT, §ARR, §SET) to a §NEW{Type} constructor
+    /// call, so it can appear inline in property/field default values.
+    /// For non-empty collections, elements are passed as constructor arguments.
+    /// </summary>
+    private static ExpressionNode ConvertBlockLevelCollectionToNew(ExpressionNode node, string typeName)
+    {
+        // For empty collections, use the property/field type name directly
+        // since the collection's ElementType might be inferred as 'object'
+        switch (node)
+        {
+            case ListCreationNode list when list.Elements.Count > 0:
+                return new NewExpressionNode(
+                    node.Span, $"List<{list.ElementType}>", new List<string>(),
+                    list.Elements, new List<ObjectInitializerAssignment>());
+            case DictionaryCreationNode dict when dict.Entries.Count > 0:
+                // Dictionary entries can't safely be expressed as ObjectInitializerAssignment
+                // (keys like "+" become invalid property names). Use empty constructor.
+                return new NewExpressionNode(
+                    node.Span, $"Dictionary<{dict.KeyType},{dict.ValueType}>", new List<string>(),
+                    new List<ExpressionNode>(), new List<ObjectInitializerAssignment>());
+            case SetCreationNode set when set.Elements.Count > 0:
+                return new NewExpressionNode(
+                    node.Span, $"HashSet<{set.ElementType}>", new List<string>(),
+                    set.Elements, new List<ObjectInitializerAssignment>());
+            default:
+                // Empty collections or unknown types — use property/field type
+                return new NewExpressionNode(
+                    node.Span, typeName, new List<string>(),
+                    new List<ExpressionNode>(), new List<ObjectInitializerAssignment>());
+        }
+    }
+
+    /// <summary>
+    /// Checks if a C# expression tree contains any string literal tokens.
+    /// Used to detect when interpolation expressions would produce nested quotes.
+    /// </summary>
+    private static bool ContainsStringLiteral(ExpressionSyntax expression)
+    {
+        return expression.DescendantTokens().Any(t =>
+            t.IsKind(SyntaxKind.StringLiteralToken)
+            || t.IsKind(SyntaxKind.SingleLineRawStringLiteralToken)
+            || t.IsKind(SyntaxKind.Utf8StringLiteralToken));
     }
 
     private static IReadOnlyList<string?>? ExtractArgumentModifiers(SeparatedSyntaxList<ArgumentSyntax> arguments)
@@ -7259,6 +7592,46 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     span, tempName, null, false, newConverted, new AttributeCollection()));
                 return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
             }
+
+            // Handle typeof-then-call pattern: typeof(T).Method(...)
+            // Hoist the typeof to a temp bind so the method call has a clean target.
+            if (memberAccess.Expression is TypeOfExpressionSyntax
+                || (memberAccess.Expression is ParenthesizedExpressionSyntax pe
+                    && pe.Expression is TypeOfExpressionSyntax))
+            {
+                var typeofConverted = targetExpr;
+                var tempName = _context.GenerateId("_typeof");
+                _pendingStatements.Add(new BindStatementNode(
+                    span, tempName, null, false, typeofConverted, new AttributeCollection()));
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+            }
+
+            // Handle member access chains that contain indexers (e.g., boxes[0].Instance.Method())
+            // The direct expression may be MemberAccessExpressionSyntax, but an indexer deeper in
+            // the chain would produce [0] in the §C{} target string which the parser can't handle.
+            if (memberAccess.Expression is MemberAccessExpressionSyntax && ContainsElementAccess(memberAccess.Expression))
+            {
+                var chainConverted = targetExpr;
+                var tempName = _context.GenerateId("_idx");
+                _pendingStatements.Add(new BindStatementNode(
+                    span, tempName, null, false, chainConverted, new AttributeCollection()));
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+            }
+
+            // Handle conditional-access-then-call and other complex patterns
+            // Fall through to use the raw target string for any remaining complex expression patterns
+            if (memberAccess.Expression is not IdentifierNameSyntax
+                && memberAccess.Expression is not MemberAccessExpressionSyntax
+                && memberAccess.Expression is not ThisExpressionSyntax
+                && memberAccess.Expression is not BaseExpressionSyntax
+                && memberAccess.Expression is not PredefinedTypeSyntax)
+            {
+                var complexConverted = targetExpr;
+                var tempName = _context.GenerateId("_expr");
+                _pendingStatements.Add(new BindStatementNode(
+                    span, tempName, null, false, complexConverted, new AttributeCollection()));
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+            }
         }
 
         // Check for static string methods like string.IsNullOrEmpty
@@ -7319,7 +7692,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.RecordFeatureUsage("nameof");
             _context.IncrementConverted();
             var argText = invocation.ArgumentList.Arguments[0].Expression.ToString();
+            // Strip C# verbatim identifier prefix @ (e.g., @event → event)
+            if (argText.StartsWith("@"))
+                argText = argText[1..];
             return new NameOfExpressionNode(GetTextSpan(invocation), argText);
+        }
+
+        // Safety net: if the target still contains characters that ParseValue() can't handle,
+        // hoist the entire member access chain to a temp binding.
+        if (target.Contains('[') || target.Contains('(') || target.Contains('"'))
+        {
+            if (invocation.Expression is MemberAccessExpressionSyntax finalMa)
+            {
+                var finalMethodName = finalMa.Name.Identifier.Text;
+                var finalConverted = ConvertExpression(finalMa.Expression);
+                var tempName = _context.GenerateId("_expr");
+                _pendingStatements.Add(new BindStatementNode(
+                    GetTextSpan(invocation), tempName, null, false, finalConverted, new AttributeCollection()));
+                return new CallExpressionNode(GetTextSpan(invocation), $"{tempName}.{finalMethodName}", args, argNames, argModifiers, typeArguments);
+            }
         }
 
         return new CallExpressionNode(GetTextSpan(invocation), target, args, argNames, argModifiers, typeArguments);
@@ -7420,6 +7811,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         allArgs.AddRange(regularArgs);
 
+        // Don't convert collection methods to string operations
+        if (target is ListCreationNode or SetCreationNode or DictionaryCreationNode
+            or ArrayCreationNode or NewExpressionNode)
+            return null;
+
         return methodName switch
         {
             // Query operations (with optional comparison mode)
@@ -7506,7 +7902,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode ConvertMemberAccessExpression(MemberAccessExpressionSyntax memberAccess)
     {
         var target = ConvertExpression(memberAccess.Expression);
-        var memberName = memberAccess.Name.Identifier.Text;
+        // Convert block-level collections to inline for member access targets
+        // (e.g., new List<int>{1,2,3}.Count → inline §NEW.Count)
+        if (IsBlockLevelCollection(target))
+            target = ConvertBlockLevelCollectionToNew(target, ExtractTypeHint(memberAccess.Expression));
+        // Use ValueText to strip @ prefix from verbatim identifiers (e.g., @decimal → decimal)
+        var memberName = memberAccess.Name.Identifier.ValueText;
         var span = GetTextSpan(memberAccess);
 
         // Convert string.Empty and System.String.Empty to empty string literal ""
@@ -7594,22 +7995,32 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // as they only handle initializer elements and would drop the arguments.
             var hasCtorArgs = objCreation.ArgumentList?.Arguments.Count > 0;
 
-            if (typeName == "List" && typeArgs.Count == 1 && !hasCtorArgs)
+            // Only convert to block-level collection nodes if there ARE initializer elements.
+            // Empty collections (new List<T>(), new HashSet<T>()) should stay as §NEW for inline use.
+            var hasInitializer = objCreation.Initializer?.Expressions.Count > 0;
+            if (typeName == "List" && typeArgs.Count == 1 && !hasCtorArgs && hasInitializer == true)
             {
                 return ConvertListCreation(objCreation, typeArgs[0]);
             }
-            else if (IsDictionaryType(typeName) && typeArgs.Count == 2 && !hasCtorArgs)
+            else if (IsDictionaryType(typeName) && typeArgs.Count == 2 && !hasCtorArgs && hasInitializer == true)
             {
                 return ConvertDictionaryCreation(objCreation, typeArgs[0], typeArgs[1]);
             }
-            else if (typeName == "HashSet" && typeArgs.Count == 1 && !hasCtorArgs)
+            else if (typeName == "HashSet" && typeArgs.Count == 1 && !hasCtorArgs && hasInitializer == true)
             {
                 return ConvertHashSetCreation(objCreation, typeArgs[0]);
             }
         }
 
         var args = objCreation.ArgumentList?.Arguments
-            .Select(a => ConvertExpression(a.Expression))
+            .Select(a =>
+            {
+                var expr = ConvertExpression(a.Expression);
+                // Convert block-level collections to inline for constructor args
+                if (IsBlockLevelCollection(expr))
+                    expr = ConvertBlockLevelCollectionToNew(expr, ExtractTypeHint(a.Expression));
+                return expr;
+            })
             .ToList() ?? new List<ExpressionNode>();
 
         // Hoist §NEW arguments to temp bindings — parser cannot handle §NEW nested inside §NEW
@@ -7631,9 +8042,35 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 if (expr is AssignmentExpressionSyntax assignment)
                 {
-                    var propName = assignment.Left.ToString();
-                    var value = ConvertExpression(assignment.Right);
+                    // Use ValueText to strip @ prefix from verbatim identifiers (e.g., @public → public)
+                    var propName = assignment.Left is IdentifierNameSyntax idName
+                        ? idName.Identifier.ValueText
+                        : assignment.Left.ToString();
+                    ExpressionNode value;
+                    // Handle nested collection initializers: Prop = { item1, item2 }
+                    if (assignment.Right is InitializerExpressionSyntax nestedInit)
+                    {
+                        value = ConvertInitializerExpression(nestedInit);
+                        // Hoist collection to temp var since §LIST/§ARR can't appear inline in §NEW
+                        value = HoistIfComplex(value, GetTextSpan(assignment));
+                    }
+                    else
+                    {
+                        value = ConvertExpression(assignment.Right);
+                        // Hoist block-level values (§LIST, §DICT, §SET) that can't appear inline
+                        if (IsBlockLevelCollection(value))
+                        {
+                            value = HoistIfComplex(value, GetTextSpan(assignment));
+                        }
+                    }
                     initializers.Add(new ObjectInitializerAssignment(propName, value));
+                }
+                else
+                {
+                    // Non-assignment expressions in initializer (e.g., collection add: { item1, item2 })
+                    // Convert and add as unnamed initializer entry
+                    var value = ConvertExpression(expr);
+                    initializers.Add(new ObjectInitializerAssignment($"_item{initializers.Count}", value));
                 }
             }
         }
@@ -7650,6 +8087,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var name = init.NameEquals?.Name.Identifier.Text ?? init.Expression.ToString();
             var value = ConvertExpression(init.Expression);
+            // Hoist block-level values (§LIST, §DICT, §SET) that can't appear inline
+            if (IsBlockLevelCollection(value))
+            {
+                var tempName = _context.GenerateId("_anonProp");
+                _pendingStatements.Add(new BindStatementNode(
+                    GetTextSpan(init), tempName, null, false, value, new AttributeCollection()));
+                value = new ReferenceNode(GetTextSpan(init), tempName);
+            }
             initializers.Add(new ObjectInitializerAssignment(name, value));
         }
 
@@ -7843,9 +8288,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private CallExpressionNode MakeChainedCall(TextSpan span, ExpressionNode receiver, string methodName, IReadOnlyList<ExpressionNode> arguments)
     {
-        var receiverCalor = receiver.Accept(new CalorEmitter());
-        var target = $"({receiverCalor}).{methodName}";
-        return new CallExpressionNode(span, target, arguments);
+        // Hoist complex receivers to temp bindings instead of embedding raw Calor
+        // in the target string — section markers (§C, §NEW, etc.) break the parser
+        // when they appear inside §C{...} target braces.
+        if (receiver is ReferenceNode refNode)
+        {
+            return new CallExpressionNode(span, $"{refNode.Name}.{methodName}", arguments);
+        }
+        var tempName = _context.GenerateId("_chain", methodName);
+        _pendingStatements.Add(new BindStatementNode(
+            span, tempName, null, false, receiver, new AttributeCollection()));
+        return new CallExpressionNode(span, $"{tempName}.{methodName}", arguments);
     }
 
     private ListCreationNode ConvertListCreation(ObjectCreationExpressionSyntax objCreation, string elementType)
@@ -7891,6 +8344,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     // { key, value } syntax
                     var key = ConvertExpression(kvInit.Expressions[0]);
                     var value = ConvertExpression(kvInit.Expressions[1]);
+                    // Convert block-level collections to inline for dict values
+                    if (IsBlockLevelCollection(value))
+                        value = ConvertBlockLevelCollectionToNew(value, ExtractTypeHint(kvInit.Expressions[1]));
                     entries.Add(new KeyValuePairNode(GetTextSpan(expr), key, value));
                 }
                 else if (expr is AssignmentExpressionSyntax assignment)
@@ -7907,6 +8363,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         key = ConvertExpression(assignment.Left);
                     }
                     var value = ConvertExpression(assignment.Right);
+                    // Convert block-level collections to inline for dict values
+                    if (IsBlockLevelCollection(value))
+                        value = ConvertBlockLevelCollectionToNew(value, ExtractTypeHint(assignment.Right));
                     entries.Add(new KeyValuePairNode(GetTextSpan(expr), key, value));
                 }
             }
@@ -8016,6 +8475,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var whenTrue = ConvertExpression(conditional.WhenTrue);
         var whenFalse = ConvertExpression(conditional.WhenFalse);
 
+        // Hoist §NEW with initializers from ternary branches — multi-line §NEW
+        // breaks parsing when embedded inside an inline §IF expression
+        whenTrue = HoistIfComplex(whenTrue, span);
+        whenFalse = HoistIfComplex(whenFalse, span);
+
         return new ConditionalExpressionNode(span, cond, whenTrue, whenFalse);
     }
 
@@ -8082,6 +8546,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("cast");
         var targetType = cast.Type.ToString();
         var innerExpr = ConvertExpression(cast.Expression);
+        // Convert block-level collections to inline for cast operands
+        if (IsBlockLevelCollection(innerExpr))
+            innerExpr = ConvertBlockLevelCollectionToNew(innerExpr, ExtractTypeHint(cast.Expression));
         var span = GetTextSpan(cast);
 
         // Convert char casts to native char operations
@@ -8518,9 +8985,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case InterpolationSyntax interp:
                     var formatSpec = interp.FormatClause?.FormatStringToken.Text;
                     var alignmentClause = interp.AlignmentClause?.Value.ToString();
+                    var interpExpr = ConvertExpression(interp.Expression);
+                    // If the expression contains string literals (quotes), hoist to temp variable
+                    // to avoid nested quote conflicts inside the interpolated string
+                    if (ContainsStringLiteral(interp.Expression))
+                    {
+                        var tempName = _context.GenerateId("_interp");
+                        _pendingStatements.Add(new BindStatementNode(
+                            GetTextSpan(interp), tempName, null, false, interpExpr, new AttributeCollection()));
+                        interpExpr = new ReferenceNode(GetTextSpan(interp), tempName);
+                    }
                     parts.Add(new InterpolatedStringExpressionNode(
                         GetTextSpan(interp),
-                        ConvertExpression(interp.Expression),
+                        interpExpr,
                         formatSpec,
                         alignmentClause));
                     break;
@@ -8547,18 +9024,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .Select(a => ConvertExpression(a.Expression));
             var csharpEmitter = new CSharpEmitter();
             var argsStr = string.Join(", ", convertedArgs.Select(a => a.Accept(csharpEmitter)));
-            return new NullConditionalNode(GetTextSpan(condAccess), target, $"{methodName}({argsStr})");
+            // Escape inner double quotes so the member string doesn't break the lexer
+            var escapedArgsStr = argsStr.Replace("\"", "\\\"");
+            return new NullConditionalNode(GetTextSpan(condAccess), target, $"{methodName}({escapedArgsStr})");
         }
 
-        // WhenNotNull is a MemberBindingExpression which starts with '.' (e.g., ".Status")
-        // We need to strip the leading dot since the emitter adds its own "?."
-        var memberName = condAccess.WhenNotNull.ToString();
-        if (memberName.StartsWith("."))
+        // When WhenNotNull is a chained access with method calls containing string args,
+        // use Roslyn's ToString() but escape inner double quotes
+        var memberStr = condAccess.WhenNotNull.ToString();
+        if (memberStr.StartsWith("."))
         {
-            memberName = memberName.Substring(1);
+            memberStr = memberStr.Substring(1);
         }
+        // Escape any inner double quotes to prevent unterminated string literals
+        memberStr = memberStr.Replace("\"", "\\\"");
 
-        return new NullConditionalNode(GetTextSpan(condAccess), target, memberName);
+        return new NullConditionalNode(GetTextSpan(condAccess), target, memberStr);
     }
 
     private IReadOnlyList<TypeParameterNode> ConvertTypeParameters(
@@ -8864,6 +9345,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 _ => "unknown"
             };
             AddEffect(effects, category, effectInfo.Value);
+        }
+        else if (target.Contains('.'))
+        {
+            // Unknown external call — add wildcard effect so the enforcement pass
+            // won't reject the converted code. §E{*} means "any effects allowed".
+            AddEffect(effects, "Unknown", "*");
         }
     }
 
@@ -9178,7 +9665,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             foreach (var attr in attrList.Attributes)
             {
-                var name = attr.Name.ToString();
+                // Strip C# verbatim identifier @ prefix from attribute names
+                // e.g., @My → My, Namespace.@MyOther → Namespace.MyOther
+                var name = attr.Name.ToString().Replace("@", "");
                 var args = new List<CalorAttributeArgument>();
 
                 if (attr.ArgumentList != null)
@@ -9274,6 +9763,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (expression is ParenthesizedExpressionSyntax paren && paren.Expression is CastExpressionSyntax innerCast)
             return innerCast.Type.ToString().Split('.').Last().Split('<').First();
         return "";
+    }
+
+    /// <summary>
+    /// Checks if an expression chain contains an ElementAccessExpressionSyntax (indexer like [0])
+    /// at any depth. Used to detect chains like boxes[0].Instance.Property that would
+    /// produce [0] in §C{} targets which the parser can't handle.
+    /// </summary>
+    private static bool ContainsElementAccess(ExpressionSyntax expr)
+    {
+        var current = expr;
+        while (current != null)
+        {
+            if (current is ElementAccessExpressionSyntax)
+                return true;
+            if (current is MemberAccessExpressionSyntax ma)
+                current = ma.Expression;
+            else if (current is InvocationExpressionSyntax inv)
+                current = inv.Expression;
+            else if (current is ConditionalAccessExpressionSyntax ca)
+                current = ca.Expression;
+            else
+                break;
+        }
+        return false;
     }
 
     /// <summary>

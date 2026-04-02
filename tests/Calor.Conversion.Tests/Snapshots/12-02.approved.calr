@@ -1,6 +1,7 @@
 §M{m001:Test_12_02}
   §CL{c001:Parser:pub}
     §MT{m002:TryParse:pub} (str:input, i32:result:out) -> bool
+      §E{*}
       §ASSIGN result 0
       §IF{if003} (isempty input)
         §R false

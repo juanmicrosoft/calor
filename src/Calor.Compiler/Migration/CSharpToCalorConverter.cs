@@ -237,7 +237,10 @@ public sealed class CSharpToCalorConverter
             return new ConversionResult { Success = false, Context = context };
         }
 
-        var source = await File.ReadAllTextAsync(csharpFilePath);
+        // Use replacement fallback to handle files with unpaired surrogates
+        // (e.g., regex patterns containing \uD800-\uDBFF in string literals)
+        var encoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+        var source = await File.ReadAllTextAsync(csharpFilePath, encoding);
         return Convert(source, csharpFilePath);
     }
 
@@ -251,7 +254,8 @@ public sealed class CSharpToCalorConverter
         if (result.Success && result.CalorSource != null)
         {
             var calorPath = outputPath ?? Path.ChangeExtension(csharpFilePath, ".calr");
-            await File.WriteAllTextAsync(calorPath, result.CalorSource);
+            var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+            await File.WriteAllTextAsync(calorPath, result.CalorSource, writeEncoding);
         }
 
         return result;
@@ -338,7 +342,9 @@ public sealed class CSharpToCalorConverter
         // Fall back to file name
         if (!string.IsNullOrEmpty(sourceFile))
         {
-            return Path.GetFileNameWithoutExtension(sourceFile);
+            // Sanitize characters that are not valid in Calor module names
+            // (e.g., '#' from Verify snapshot filenames like "TestName#HintName.verified.cs")
+            return Path.GetFileNameWithoutExtension(sourceFile).Replace('#', '_');
         }
 
         return "ConvertedModule";

@@ -287,7 +287,9 @@ public sealed class ProjectMigrator
 
         if (!dryRun && result.Success && result.CalorSource != null)
         {
-            await File.WriteAllTextAsync(entry.OutputPath, result.CalorSource);
+            // Use replacement fallback for files with unpairable surrogates (e.g., regex patterns with \uD800)
+            var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+            await File.WriteAllTextAsync(entry.OutputPath, result.CalorSource, writeEncoding);
         }
 
         var status = result.Success

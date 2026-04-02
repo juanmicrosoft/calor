@@ -210,8 +210,9 @@ public static class ConvertCommand
             return result;
         }
 
-        // Write output
-        await File.WriteAllTextAsync(outputPath, result.CalorSource);
+        // Write output (use replacement fallback for files containing unpairable surrogates)
+        var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+        await File.WriteAllTextAsync(outputPath, result.CalorSource, writeEncoding);
 
         // Validate generated Calor by parsing it
         if (validate && result.CalorSource != null)

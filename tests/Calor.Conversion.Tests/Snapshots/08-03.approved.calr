@@ -2,9 +2,7 @@
   §U{System.Collections.Generic}
 
   §CL{c001:Container:pub}
-    §LIST{list002:any}
-    §/LIST{list002}
-    §PROP{p004:Items:List<str>:pub:get,set} = 
+    §PROP{p002:Items:List<str>:pub:get,set} = §C{Array.Empty<str>} §/C
 
   §/CL{c001}
 

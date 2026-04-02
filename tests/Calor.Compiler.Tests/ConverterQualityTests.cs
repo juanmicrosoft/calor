@@ -27,9 +27,9 @@ public class ConverterQualityTests
     #region §ERR Fallback Emission Tests
 
     [Fact]
-    public void FallbackExpression_EmitsParseableErrToken()
+    public void MakeRefExpression_ConvertsAsRawCSharp()
     {
-        // C# with truly unsupported construct (__makeref) should produce §ERR "TODO: ..."
+        // __makeref is now supported — converted as raw C# pass-through
         var csharp = """
             public class Test
             {
@@ -46,10 +46,9 @@ public class ConverterQualityTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // New format: §ERR "TODO: ..." (space, no braces)
-        Assert.Contains("§ERR \"TODO:", result.CalorSource);
-        // Old format should NOT appear
-        Assert.DoesNotContain("§ERR{\"TODO:", result.CalorSource);
+        // __makeref is now a supported expression, no fallback
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("__makeref(x)", result.CalorSource);
     }
 
     [Fact]

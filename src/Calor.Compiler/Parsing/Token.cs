@@ -178,6 +178,7 @@ public enum TokenKind
     Set,
     EndSet,
     Init,
+    EndInit,
     Constructor,
     EndConstructor,
     OperatorOverload,       // §OP

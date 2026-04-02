@@ -45,8 +45,8 @@ public class Program
 
         var enforceEffectsOption = new Option<bool>(
             aliases: ["--enforce-effects"],
-            description: "Enforce effect declarations (default: true)",
-            getDefaultValue: () => true);
+            description: "Enforce effect declarations (default: false; opt in for strict checking)",
+            getDefaultValue: () => false);
 
         var strictEffectsOption = new Option<bool>(
             aliases: ["--strict-effects"],
@@ -249,7 +249,7 @@ public class Program
                 Console.WriteLine("Strictness options:");
                 Console.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
                 Console.WriteLine("  --require-docs    Require documentation on public functions");
-                Console.WriteLine("  --enforce-effects Enforce effect declarations (default: true)");
+                Console.WriteLine("  --enforce-effects Enforce effect declarations (default: false)");
                 Console.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
                 Console.WriteLine("  --permissive-effects  Permissive mode for converted code (suppress effect errors)");
                 Console.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
@@ -766,9 +766,9 @@ public sealed class CompilationOptions
 
     /// <summary>
     /// Enable effect enforcement checking.
-    /// Enabled by default to catch missing effect annotations early.
+    /// Disabled by default; opt in with --enforce-effects for strict checking.
     /// </summary>
-    public bool EnforceEffects { get; init; } = true;
+    public bool EnforceEffects { get; init; } = false;
 
     /// <summary>
     /// Policy for handling unknown external calls.

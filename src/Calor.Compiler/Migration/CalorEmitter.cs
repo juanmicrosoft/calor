@@ -17,6 +17,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private readonly List<string> _pendingHoistedLines = new();
     private int _ternaryCounter;
     private int _hoistCounter;
+    private int _memberBodyDepth;
 
     public CalorEmitter(ConversionContext? context = null)
     {
@@ -30,6 +31,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _pendingHoistedLines.Clear();
         _ternaryCounter = 0;
         _hoistCounter = 0;
+        _memberBodyDepth = 0;
         Visit(module);
         return _builder.ToString();
     }
@@ -609,10 +611,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // Full body: §GET ... §/GET
             AppendLine($"§{keyword}{visStr}");
             Indent();
+            _memberBodyDepth++;
             foreach (var stmt in node.Body)
             {
                 stmt.Accept(this);
             }
+            _memberBodyDepth--;
             Dedent();
             AppendLine($"§/{keyword}");
         }
@@ -645,22 +649,33 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Emit constructor initializer (base/this call)
         if (node.Initializer != null)
         {
+            // Pre-evaluate args to collect any hoisted bindings BEFORE the §THIS/§BASE block
+            var evalArgs = new List<string>();
+            foreach (var arg in node.Initializer.Arguments)
+            {
+                var argExpr = arg.Accept(this);
+                // Flush any hoisted lines before the block
+                FlushHoistedLines();
+                evalArgs.Add(argExpr);
+            }
             var initKeyword = node.Initializer.IsBaseCall ? "§BASE" : "§THIS";
             AppendLine(initKeyword);
             Indent();
-            foreach (var arg in node.Initializer.Arguments)
+            foreach (var argExpr in evalArgs)
             {
-                AppendLine($"§A {arg.Accept(this)}");
+                AppendLine($"§A {argExpr}");
             }
             Dedent();
             AppendLine(node.Initializer.IsBaseCall ? "§/BASE" : "§/THIS");
         }
 
         // Emit body statements
+        _memberBodyDepth++;
         foreach (var stmt in node.Body)
         {
             stmt.Accept(this);
         }
+        _memberBodyDepth--;
 
         Dedent();
         AppendLine($"§/CTOR{{{node.Id}}}");
@@ -703,10 +718,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Emit body statements
+        _memberBodyDepth++;
         foreach (var stmt in node.Body)
         {
             stmt.Accept(this);
         }
+        _memberBodyDepth--;
 
         Dedent();
         AppendLine($"§/OP{{{node.Id}}}");
@@ -787,10 +804,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Body (only for non-abstract/non-extern methods)
         if (!node.IsAbstract && !node.IsExtern)
         {
+            _memberBodyDepth++;
             foreach (var stmt in node.Body)
             {
                 stmt.Accept(this);
             }
+            _memberBodyDepth--;
         }
 
         Dedent();
@@ -848,10 +867,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Body
+        _memberBodyDepth++;
         foreach (var stmt in node.Body)
         {
             stmt.Accept(this);
         }
+        _memberBodyDepth--;
 
         Dedent();
         AppendLine($"§/{funcTag}{{{node.Id}}}");
@@ -966,7 +987,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return $"§A {argValue}";
         });
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
-        AppendLine($"§C{{{node.Target}}}{argsStr} §/C");
+        var target = ConvertVerbatimStringsInTarget(node.Target.Replace("->", "."));
+        AppendLine($"§C{{{target}}}{argsStr} §/C");
         return "";
     }
 
@@ -1084,16 +1106,41 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
 
+        // Sanitize variable names containing section markers
+        var originalTarget = variableName;
+        if (ContainsSectionMarker(variableName))
+            variableName = $"_hoist{_hoistCounter++:D3}";
+
+        // Pre-evaluate all elements to collect hoisted bindings before the list block
+        var evaluatedElements = new List<string>();
+        var allHoisted = new List<string>();
+        foreach (var element in node.Elements)
+        {
+            var val = element.Accept(this);
+            if (_pendingHoistedLines.Count > 0)
+            {
+                allHoisted.AddRange(_pendingHoistedLines);
+                _pendingHoistedLines.Clear();
+            }
+            evaluatedElements.Add(val);
+        }
+
+        // Emit hoisted bindings before the list
+        foreach (var hoisted in allHoisted)
+            AppendLine(hoisted);
+
         AppendLine($"§LIST{{{variableName}:{elementType}}}");
         Indent();
 
-        foreach (var element in node.Elements)
+        foreach (var val in evaluatedElements)
         {
-            AppendLine(element.Accept(this));
+            AppendLine(val);
         }
 
         Dedent();
         AppendLine($"§/LIST{{{variableName}}}");
+        if (originalTarget != variableName)
+            AppendLine($"§ASSIGN {originalTarget} {variableName}");
     }
 
     private void EmitDictionaryCreationWithName(DictionaryCreationNode node, string variableName)
@@ -1101,13 +1148,30 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var keyType = TypeMapper.CSharpToCalor(node.KeyType);
         var valueType = TypeMapper.CSharpToCalor(node.ValueType);
 
-        AppendLine($"§DICT{{{variableName}:{keyType}:{valueType}}}");
-        Indent();
-
+        // Pre-evaluate entries to collect hoisted bindings before the dict block
+        var evaluatedEntries = new List<(string Key, string Value)>();
+        var allHoisted = new List<string>();
         foreach (var entry in node.Entries)
         {
             var key = entry.Key.Accept(this);
             var value = entry.Value.Accept(this);
+            if (_pendingHoistedLines.Count > 0)
+            {
+                allHoisted.AddRange(_pendingHoistedLines);
+                _pendingHoistedLines.Clear();
+            }
+            evaluatedEntries.Add((key, value));
+        }
+
+        // Emit hoisted bindings before the dict
+        foreach (var hoisted in allHoisted)
+            AppendLine(hoisted);
+
+        AppendLine($"§DICT{{{variableName}:{keyType}:{valueType}}}");
+        Indent();
+
+        foreach (var (key, value) in evaluatedEntries)
+        {
             AppendLine($"§KV {key} {value}");
         }
 
@@ -1135,25 +1199,54 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
 
+        // Sanitize variable names containing section markers (e.g., §IDX §THIS §C{GetInt} §/C)
+        // These can't appear inside {…} attribute blocks. Use a hoisted temp var instead.
+        var originalTarget = variableName;
+        if (ContainsSectionMarker(variableName))
+        {
+            variableName = $"_hoist{_hoistCounter++:D3}";
+        }
+
         if (node.Initializer.Count > 0)
         {
-            AppendLine($"§ARR{{{variableName}:{elementType}}}");
-            Indent();
+            // Pre-evaluate elements to flush hoisted bindings before the §ARR block
+            var evalElements = new List<string>();
             foreach (var element in node.Initializer)
             {
-                AppendLine(element.Accept(this));
+                var val = element.Accept(this);
+                FlushHoistedLines();
+                if (ContainsSectionMarker(val))
+                    val = HoistToTempVar(val);
+                evalElements.Add(val);
+            }
+            AppendLine($"§ARR{{{variableName}:{elementType}}}");
+            Indent();
+            foreach (var val in evalElements)
+            {
+                AppendLine(val);
             }
             Dedent();
             AppendLine($"§/ARR{{{variableName}}}");
+            // If we sanitized the name, assign the result to the original target
+            if (originalTarget != variableName)
+                AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
         else if (node.Size != null)
         {
             var size = node.Size.Accept(this);
+            // Hoist complex size expressions out of the attribute braces
+            // (§C calls, parenthesized expressions, commas break attribute parsing)
+            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(','))
+                size = HoistToTempVar(size);
             AppendLine($"§B{{[{elementType}]:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
+            if (originalTarget != variableName)
+                AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
         else
         {
             AppendLine($"§ARR{{{elementType}:{variableName}}}");
+            if (originalTarget != variableName)
+                AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
     }
 
@@ -1162,10 +1255,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
         var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : $"{elementType}[{new string(',', node.Rank - 1)}]";
 
+        // Sanitize variable names containing section markers
+        var originalTarget = variableName;
+        if (ContainsSectionMarker(variableName))
+            variableName = $"_hoist{_hoistCounter++:D3}";
+
         if (node.DimensionSizes.Count > 0)
         {
             var dims = string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)));
             AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
+            if (originalTarget != variableName)
+                AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
         else if (node.Initializer.Count > 0)
         {
@@ -1329,6 +1429,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var to = node.To.Accept(this);
         var step = node.Step?.Accept(this) ?? "1";
 
+        // Hoist loop bounds that contain section markers or hex literals out of the braces
+        // (hex literals like 0x100 break the ParseValue fallback inside attribute blocks)
+        if (ContainsSectionMarker(from) || from.Contains("0x"))
+            from = HoistToTempVar(from);
+        if (ContainsSectionMarker(to) || to.Contains("0x"))
+            to = HoistToTempVar(to);
+        if (ContainsSectionMarker(step) || step.Contains("0x"))
+            step = HoistToTempVar(step);
+
         AppendLine($"§L{{{node.Id}:{node.VariableName}:{from}:{to}:{step}}}");
         Indent();
 
@@ -1402,12 +1511,33 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
 
+        // Evaluate all elements first, collecting any hoisted bindings before the list
+        var evaluatedElements = new List<string>();
+        var allHoisted = new List<string>();
+        foreach (var element in node.Elements)
+        {
+            var val = element.Accept(this);
+            // Collect any hoisted lines generated during element evaluation
+            if (_pendingHoistedLines.Count > 0)
+            {
+                allHoisted.AddRange(_pendingHoistedLines);
+                _pendingHoistedLines.Clear();
+            }
+            evaluatedElements.Add(val);
+        }
+
+        // Emit hoisted bindings before the list
+        foreach (var hoisted in allHoisted)
+        {
+            AppendLine(hoisted);
+        }
+
         AppendLine($"§LIST{{{node.Id}:{elementType}}}");
         Indent();
 
-        foreach (var element in node.Elements)
+        foreach (var val in evaluatedElements)
         {
-            AppendLine(element.Accept(this));
+            AppendLine(val);
         }
 
         Dedent();
@@ -1575,7 +1705,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var exType = node.ExceptionType ?? "Exception";
         var varPart = node.VariableName != null ? $":{node.VariableName}" : "";
-        var filterPart = node.Filter != null ? $" when {node.Filter.Accept(this)}" : "";
+        var filterPart = node.Filter != null ? $" WHEN {node.Filter.Accept(this)}" : "";
 
         AppendLine($"§CA{{{exType}{varPart}}}{filterPart}");
         Indent();
@@ -1639,12 +1769,55 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var pattern = EmitPattern(node.Pattern);
         var guard = node.Guard != null ? $" §WHEN {node.Guard.Accept(this)}" : "";
 
+        // Collect any hoisted lines from guard evaluation before emitting the case
+        var guardHoisted = new List<string>();
+        if (_pendingHoistedLines.Count > 0)
+        {
+            guardHoisted.AddRange(_pendingHoistedLines);
+            _pendingHoistedLines.Clear();
+        }
+
+        // If guard produced hoisted bindings, always use block syntax
+        if (guardHoisted.Count > 0)
+        {
+            AppendLine($"§K {pattern}{guard}");
+            Indent();
+            foreach (var h in guardHoisted)
+                AppendLine(h);
+            foreach (var stmt in node.Body)
+                stmt.Accept(this);
+            Dedent();
+            AppendLine("§/K");
+            return "";
+        }
+
         // Check if this is a single-return case suitable for arrow syntax
         if (node.Body.Count == 1 && node.Body[0] is ReturnStatementNode returnStmt && returnStmt.Expression != null)
         {
-            // Use arrow syntax: §K pattern → expression
+            // Evaluate the expression first — this may generate hoisted bindings
+            // (e.g., §C calls inside Lisp expressions get hoisted to §B temp vars)
             var expr = returnStmt.Expression.Accept(this);
-            AppendLine($"§K {pattern}{guard} → {expr}");
+
+            if (_pendingHoistedLines.Count == 0)
+            {
+                // Use arrow syntax: §K pattern → expression
+                AppendLine($"§K {pattern}{guard} → {expr}");
+            }
+            else
+            {
+                // Hoisted bindings exist — must use block syntax so they appear inside the arm
+                var hoisted = new List<string>(_pendingHoistedLines);
+                _pendingHoistedLines.Clear();
+                AppendLine($"§K {pattern}{guard}");
+                Indent();
+                foreach (var line in hoisted)
+                {
+                    AppendLine(line);
+                }
+                AppendLine($"§R {expr}");
+                Dedent();
+                AppendLine("§/K");
+            }
         }
         else
         {
@@ -1719,10 +1892,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var whenTrue = node.WhenTrue.Accept(this);
         var whenFalse = node.WhenFalse.Accept(this);
 
-        // If either branch contains section markers (§C, §NEW, §LAM, etc.),
-        // decompose into §IF/§EL/§/I expression form. Section markers
-        // are invalid inside Lisp (?) expressions but valid in §IF expression branches.
-        if (ContainsSectionMarker(whenTrue) || ContainsSectionMarker(whenFalse))
+        // If either branch contains section markers (§C, §NEW, §LAM, etc.) or commas
+        // (tuple literals), decompose into §IF/§EL/§/I expression form.
+        // Section markers and commas are invalid inside Lisp (?) expressions
+        // but valid in §IF expression branches.
+        if (ContainsSectionMarker(whenTrue) || ContainsSectionMarker(whenFalse)
+            || whenTrue.Contains(',') || whenFalse.Contains(','))
         {
             var id = $"tern{_ternaryCounter++:D3}";
             return $"§IF{{{id}}} {condition} → {whenTrue} §EL → {whenFalse} §/I{{{id}}}";
@@ -1743,6 +1918,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// </summary>
     private string HoistToTempVar(string expr)
     {
+        // Don't hoist outside of executable bodies (methods, ctors, operators, property accessors).
+        // Hoisting at class/module scope would leak §B bindings between members.
+        if (_memberBodyDepth == 0)
+            return expr;
+
         var varName = $"_hoist{_hoistCounter++:D3}";
         _pendingHoistedLines.Add($"§B{{~{varName}}} {expr}");
         return varName;
@@ -1759,11 +1939,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var right = node.Right.Accept(this);
         var opSymbol = GetCalorOperatorSymbol(node.Operator);
 
-        // Hoist operands containing section markers out of Lisp expression.
-        // § markers are invalid inside (op ...) expressions.
-        if (ContainsSectionMarker(left))
+        // Hoist operands containing section markers or commas (tuples) out of Lisp expression.
+        // § markers and commas are invalid inside (op ...) expressions.
+        if (ContainsSectionMarker(left) || left.Contains(','))
             left = HoistToTempVar(left);
-        if (ContainsSectionMarker(right))
+        if (ContainsSectionMarker(right) || right.Contains(','))
             right = HoistToTempVar(right);
 
         return $"({opSymbol} {left} {right})";
@@ -1793,6 +1973,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             target = "this";
         else if (node.Target is BaseExpressionNode)
             target = "base";
+        // Hoist call results that contain section markers (e.g., §C{method} §/C.Property)
+        // Only hoist when inside an executable body (method, ctor, etc.)
+        else if (ContainsSectionMarker(target) && _memberBodyDepth > 0)
+            target = HoistToTempVar(target);
         return $"{target}.{node.FieldName}";
     }
 
@@ -1810,19 +1994,36 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Arguments need §A prefix for parser to recognize them
-        var args = node.Arguments.Select(a => $"§A {a.Accept(this)}");
+        // Hoist arguments containing section markers (e.g., §C calls) to avoid nested §A conflicts
+        var args = node.Arguments.Select(a =>
+        {
+            var val = a.Accept(this);
+            if (ContainsSectionMarker(val))
+                val = HoistToTempVar(val);
+            return $"§A {val}";
+        });
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
         // Handle object initializers (multi-line block format)
         if (node.Initializers.Count > 0)
         {
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}");
+            // Pre-evaluate initializer values to collect hoisted bindings
+            var evalInits = new List<(string PropName, string Value)>();
             foreach (var init in node.Initializers)
             {
-                sb.Append($"\n  {init.PropertyName} = {init.Value.Accept(this)}");
+                var valueStr = init.Value.Accept(this);
+                if (!string.IsNullOrWhiteSpace(valueStr))
+                    evalInits.Add((init.PropertyName, valueStr));
             }
-            sb.Append("\n§/NEW");
+
+            var indent = new string(' ', _indentLevel * 2);
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}");
+            foreach (var (propName, valueStr) in evalInits)
+            {
+                sb.Append($"\n{indent}  {propName} = {valueStr}");
+            }
+            sb.Append($"\n{indent}§/NEW");
             return sb.ToString();
         }
 
@@ -1831,13 +2032,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(AnonymousObjectCreationNode node)
     {
+        var indent = new string(' ', _indentLevel * 2);
         var sb = new System.Text.StringBuilder();
         sb.Append("§ANON");
         foreach (var init in node.Initializers)
         {
-            sb.Append($"\n  {init.PropertyName} = {init.Value.Accept(this)}");
+            var value = init.Value.Accept(this);
+            // Hoist values containing section markers
+            if (ContainsSectionMarker(value))
+                value = HoistToTempVar(value);
+            sb.Append($"\n{indent}  {init.PropertyName} = {value}");
         }
-        sb.Append("\n§/ANON");
+        sb.Append($"\n{indent}§/ANON");
         return sb.ToString();
     }
 
@@ -1867,7 +2073,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         // Escape braces in target to avoid conflicts with Calor tag syntax,
         // but preserve braces inside quoted string portions (e.g. "text {0}".FormatWith)
-        var escapedTarget = EscapeBracesInIdentifier(node.Target);
+        var escapedTarget = EscapeBracesInIdentifier(node.Target.Replace("->", "."));
         var fullTarget = escapedTarget + typeArgsSuffix;
 
         if (node.Arguments.Count == 0)
@@ -1992,8 +2198,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(TupleLiteralNode node)
     {
-        var elements = string.Join(", ", node.Elements.Select(e => e.Accept(this)));
-        return $"({elements})";
+        var evalElements = new List<string>();
+        foreach (var e in node.Elements)
+        {
+            var val = e.Accept(this);
+            // Hoist elements that start with '(' to avoid tuple/lisp ambiguity
+            // e.g., ((> a b), (== c d)) would be misparse as nested lisp
+            if (val.StartsWith("(") || ContainsSectionMarker(val))
+                val = HoistToTempVar(val);
+            evalElements.Add(val);
+        }
+        return $"({string.Join(", ", evalElements)})";
     }
 
     public string Visit(MatchExpressionNode node)
@@ -2067,6 +2282,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else if (node.Size != null)
         {
             var size = node.Size.Accept(this);
+            // Hoist complex size expressions out of the attribute braces
+            // (§C calls, parenthesized expressions, commas break attribute parsing)
+            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(','))
+                size = HoistToTempVar(size);
             return $"§ARR{{{elementType}:{node.Name}:{size}}}";
         }
         else
@@ -2241,7 +2460,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(NullConditionalNode node)
     {
         var target = node.Target.Accept(this);
-        return $"(?. {target} \"{node.MemberName}\")";
+        // Sanitize member name: collapse whitespace/newlines to single space
+        // (multi-line C# chains from converter can produce newlines in member names)
+        var memberName = System.Text.RegularExpressions.Regex.Replace(node.MemberName, @"\s+", " ").Trim();
+
+        // Inside interpolation, use C# syntax to avoid nested quote conflicts
+        if (_inInterpolation)
+        {
+            return $"{target}?.{memberName}";
+        }
+
+        // Escape quotes and backslashes in member name for safe embedding in string literal
+        var escaped = memberName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        return $"(?. {target} \"{escaped}\")";
     }
 
     // Pattern-related methods
@@ -2398,8 +2629,31 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
         if (attrs.Length > 0)
             AppendLine(attrs);
-        var line = node.Value != null
-            ? $"{node.Name} = {node.Value}"
+        var value = node.Value;
+        // Strip C-style block comments from enum values (e.g., /*| StructureCollapse*/)
+        if (value != null && value.Contains("/*"))
+        {
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"/\*.*?\*/", "").Trim();
+            // Clean up double spaces left by comment removal
+            value = System.Text.RegularExpressions.Regex.Replace(value, @"\s+", " ").Trim();
+        }
+        // Convert char literal values (e.g., '\uE900') to hex integer format
+        // since Calor lexer doesn't support single-quoted char literals
+        if (value != null && value.StartsWith("'") && value.EndsWith("'") && value.Length > 2)
+        {
+            var charContent = value[1..^1];
+            if (charContent.StartsWith("\\u") && charContent.Length == 6
+                && int.TryParse(charContent[2..], System.Globalization.NumberStyles.HexNumber, null, out var charVal))
+            {
+                value = $"0x{charVal:X4}";
+            }
+            else if (charContent.Length == 1)
+            {
+                value = $"0x{(int)charContent[0]:X4}";
+            }
+        }
+        var line = value != null
+            ? $"{node.Name} = {value}"
             : node.Name;
         AppendLine(line);
         return "";
@@ -2553,7 +2807,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var evt = node.Event.Accept(this);
         var handler = node.Handler.Accept(this);
-        AppendLine($"§SUB {evt} += {handler}");
+        AppendLine($"§SUB {evt} {handler}");
         return "";
     }
 
@@ -2561,7 +2815,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var evt = node.Event.Accept(this);
         var handler = node.Handler.Accept(this);
-        AppendLine($"§UNSUB {evt} -= {handler}");
+        AppendLine($"§UNSUB {evt} {handler}");
         return "";
     }
 
@@ -2570,15 +2824,28 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var parts = new List<string> { "§RANGE" };
         if (node.Start != null)
-            parts.Add(node.Start.Accept(this));
+        {
+            var start = node.Start.Accept(this);
+            if (ContainsSectionMarker(start))
+                start = HoistToTempVar(start);
+            parts.Add(start);
+        }
         if (node.End != null)
-            parts.Add(node.End.Accept(this));
+        {
+            var end = node.End.Accept(this);
+            // Don't hoist §^ expressions — they're lightweight range operands
+            if (ContainsSectionMarker(end) && !end.StartsWith("§^"))
+                end = HoistToTempVar(end);
+            parts.Add(end);
+        }
         return string.Join(" ", parts);
     }
 
     public string Visit(IndexFromEndNode node)
     {
         var offset = node.Offset.Accept(this);
+        if (ContainsSectionMarker(offset))
+            offset = HoistToTempVar(offset);
         return $"§^ {offset}";
     }
 
@@ -2785,6 +3052,29 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// This is the inverse of CSharpEmitter.SanitizeIdentifier which adds @ prefix.
     /// Handles both bare names ("class") and @-prefixed names ("@class") from Roslyn.
     /// </summary>
+    /// <summary>
+    /// Converts C# verbatim string literals (@"...") in raw passthrough targets
+    /// to properly escaped regular string literals for Calor.
+    /// </summary>
+    private static string ConvertVerbatimStringsInTarget(string target)
+    {
+        // Find @"..." patterns and convert them
+        var result = System.Text.RegularExpressions.Regex.Replace(target, @"@""((?:""""|[^""])*)""", match =>
+        {
+            // Decode verbatim string: "" → " and everything else is literal
+            var content = match.Groups[1].Value.Replace("\"\"", "\"");
+            // Re-escape for Calor regular strings
+            content = content
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
+            return $"\"{content}\"";
+        });
+        return result;
+    }
+
     private static string EscapeCalorIdentifier(string name)
     {
         // Strip @ prefix if present (Roslyn's Identifier.Text includes it for verbatim identifiers)
@@ -2942,7 +3232,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(StringOperationNode node)
     {
         var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a => a.Accept(this));
+        var args = node.Arguments.Select(a =>
+        {
+            var val = a.Accept(this);
+            // Hoist values with section markers or unquoted commas (tuples)
+            if (ContainsSectionMarker(val))
+                val = HoistToTempVar(val);
+            else if (val.Contains(',') && !val.StartsWith("\""))
+                val = HoistToTempVar(val);
+            return val;
+        });
         var argsStr = string.Join(" ", args);
 
         // Append comparison mode keyword if present
@@ -3075,7 +3374,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(NameOfExpressionNode node)
     {
-        return $"(nameof {node.Name})";
+        var name = node.Name;
+        // If the name contains generic brackets (e.g., AvaloniaList<object>.Count),
+        // extract just the last identifier since nameof always evaluates to the simple name
+        if (name.Contains('<') || name.Contains('>'))
+        {
+            var lastDot = name.LastIndexOf('.');
+            if (lastDot >= 0)
+                name = name[(lastDot + 1)..];
+        }
+        return $"(nameof {name})";
     }
 
     public string Visit(ExpressionCallNode node)
@@ -3184,6 +3492,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Size != null)
         {
             var size = node.Size.Accept(this);
+            if (ContainsSectionMarker(size))
+                size = HoistToTempVar(size);
             return $"§SALLOC{{{elementType}:{size}}}";
         }
         else if (node.Initializer.Count > 0)
@@ -3221,6 +3531,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var pointerType = TypeMapper.CSharpToCalor(node.PointerType);
         var init = node.Initializer.Accept(this);
+        // Hoist complex initializers (e.g., §ADDR, §IDX) out of the braces
+        if (ContainsSectionMarker(init))
+            init = HoistToTempVar(init);
         AppendLine($"§FIXED{{{node.Id}:{node.PointerName}:{pointerType}:{init}}}");
         Indent();
         foreach (var stmt in node.Body)
@@ -3282,6 +3595,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var array = node.Array.Accept(this);
         var indices = string.Join(" ", node.Indices.Select(i => i.Accept(this)));
+        // For 3D+ arrays, the parser can't distinguish index count from surrounding args.
+        // Encode dimension count in attributes: §IDX2D{3} for 3D access.
+        if (node.Indices.Count > 2)
+            return $"§IDX2D{{{node.Indices.Count}}} {array} {indices}";
         return $"§IDX2D {array} {indices}";
     }
 

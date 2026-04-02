@@ -104,8 +104,8 @@ public class DiagnosticCodeClassificationTests
     [Fact]
     public void StringOp_TooManyArgs_ProducesCalor0110()
     {
-        // contains accepts at most 2 args
-        var source = WrapInFunction("""§R (contains x "a" "b" "c")""");
+        // contains accepts at most 4 args
+        var source = WrapInFunction("""§R (contains x "a" "b" "c" "d")""");
         Parse(source, out var diagnostics);
 
         var error = Assert.Single(diagnostics.Errors, d => d.Code == DiagnosticCode.OperatorArgumentCount);
