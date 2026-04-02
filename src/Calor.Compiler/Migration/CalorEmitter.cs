@@ -32,6 +32,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _ternaryCounter = 0;
         _hoistCounter = 0;
         _memberBodyDepth = 0;
+        _inInterpolation = false;
         Visit(module);
         return _builder.ToString();
     }

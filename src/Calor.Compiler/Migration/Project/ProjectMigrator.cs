@@ -47,6 +47,8 @@ public sealed class ProjectMigrator
         var processedCount = 0;
         var totalCount = entriesToProcess.Count;
 
+        var wasCancelled = false;
+
         if (_options.Parallel && !dryRun)
         {
             var semaphore = new SemaphoreSlim(_options.MaxParallelism);
@@ -57,13 +59,12 @@ public sealed class ProjectMigrator
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var result = await ProcessEntryAsync(entry, plan.Direction, dryRun, cancellationToken);
-                    reportBuilder.AddFileResult(result);
 
-                    Interlocked.Increment(ref processedCount);
+                    var newCount = Interlocked.Increment(ref processedCount);
                     progress?.Report(new MigrationProgress
                     {
                         CurrentFile = Path.GetFileName(entry.SourcePath),
-                        ProcessedFiles = processedCount,
+                        ProcessedFiles = newCount,
                         TotalFiles = totalCount,
                         Status = result.Status
                     });
@@ -74,15 +75,20 @@ public sealed class ProjectMigrator
                 {
                     semaphore.Release();
                 }
-            });
+            }).ToList();
 
             try
             {
-                await Task.WhenAll(tasks);
+                var results = await Task.WhenAll(tasks);
+                foreach (var result in results)
+                    reportBuilder.AddFileResult(result);
             }
             catch (OperationCanceledException)
             {
-                // Return partial results collected so far
+                wasCancelled = true;
+                // Collect partial results from completed tasks
+                foreach (var task in tasks.Where(t => t.IsCompletedSuccessfully))
+                    reportBuilder.AddFileResult(task.Result);
             }
         }
         else
@@ -126,6 +132,7 @@ public sealed class ProjectMigrator
         AddRecommendations(reportBuilder, plan);
 
         var report = reportBuilder.Build();
+        report.Summary.WasCancelled = wasCancelled;
 
         // Post-conversion: merge partial classes if enabled
         if (_options.MergePartialClasses && !dryRun && plan.Direction == MigrationDirection.CSharpToCalor)

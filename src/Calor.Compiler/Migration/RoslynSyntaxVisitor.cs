@@ -5499,15 +5499,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var savedPending = new List<StatementNode>(_pendingStatements);
             _pendingStatements.Clear();
 
-            var armExpr = ConvertExpression(arm.Expression);
-            // Hoist block-level nodes (§ARR, §LIST, §NEW with initializers) from arm expression
-            // so they become bindings in the arm body rather than inline constructs
-            armExpr = HoistIfComplex(armExpr, GetTextSpan(arm.Expression));
-            var body = new List<StatementNode>(_pendingStatements);
-            body.Add(new ReturnStatementNode(GetTextSpan(arm.Expression), armExpr));
-
-            _pendingStatements.Clear();
-            _pendingStatements.AddRange(savedPending);
+            List<StatementNode> body;
+            try
+            {
+                var armExpr = ConvertExpression(arm.Expression);
+                // Hoist block-level nodes (§ARR, §LIST, §NEW with initializers) from arm expression
+                // so they become bindings in the arm body rather than inline constructs
+                armExpr = HoistIfComplex(armExpr, GetTextSpan(arm.Expression));
+                body = new List<StatementNode>(_pendingStatements);
+                body.Add(new ReturnStatementNode(GetTextSpan(arm.Expression), armExpr));
+            }
+            finally
+            {
+                _pendingStatements.Clear();
+                _pendingStatements.AddRange(savedPending);
+            }
 
             cases.Add(new MatchCaseNode(GetTextSpan(arm), pattern, guard, body));
         }
@@ -6638,9 +6644,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new ExpressionNode[] { result, chunks[i] });
         }
 
-        // .ToList() at the end
-        result = new CallExpressionNode(span, result.ToString() + ".ToList",
-            Array.Empty<ExpressionNode>());
+        // .ToList() at the end — wrap the Concat chain in a member access
+        result = new CallExpressionNode(span, "Enumerable.ToList",
+            new ExpressionNode[] { result });
 
         return result;
     }
@@ -6770,7 +6776,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     if (lhsType != null && lhsType.SpecialType != SpecialType.System_Object && lhsType.TypeKind != TypeKind.Error)
                         return TypeMapper.CSharpToCalor(lhsType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
                 }
-                catch { /* fall through */ }
+                catch (Exception) { /* fall through — semantic model queries can fail */ }
             }
             return null;
         }
@@ -6882,7 +6888,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     return TypeMapper.CSharpToCalor(displayString);
             }
         }
-        catch
+        catch (Exception)
         {
             // Semantic model queries can fail if compilation has errors; fall through
         }
@@ -7048,7 +7054,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             if (ch == '<') depth++;
             else if (ch == '>') depth--;
-            else if (ch == ',' && depth == 0) return inner; // multi-arg: return the full inner as the type
+            else if (ch == ',' && depth == 0) return null; // multi-arg: cannot extract single element type
         }
         return inner;
     }
@@ -8885,20 +8891,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 // don't hoist temp binds outside the lambda scope.
                 var savedPending = new List<StatementNode>(_pendingStatements);
                 _pendingStatements.Clear();
-
-                exprBody = ConvertExpression(lambda.ExpressionBody);
-
-                // If the expression body produced pending statements (e.g., chain hoisting),
-                // convert the expression body to a statement body with those binds prepended.
-                if (_pendingStatements.Count > 0)
+                try
                 {
-                    stmtBody = new List<StatementNode>(_pendingStatements);
-                    stmtBody.Add(new ReturnStatementNode(exprBody.Span, exprBody));
-                    exprBody = null;
-                }
+                    exprBody = ConvertExpression(lambda.ExpressionBody);
 
-                _pendingStatements.Clear();
-                _pendingStatements.AddRange(savedPending);
+                    // If the expression body produced pending statements (e.g., chain hoisting),
+                    // convert the expression body to a statement body with those binds prepended.
+                    if (_pendingStatements.Count > 0)
+                    {
+                        stmtBody = new List<StatementNode>(_pendingStatements);
+                        stmtBody.Add(new ReturnStatementNode(exprBody.Span, exprBody));
+                        exprBody = null;
+                    }
+                }
+                finally
+                {
+                    _pendingStatements.Clear();
+                    _pendingStatements.AddRange(savedPending);
+                }
             }
         }
         else if (lambda.Body is BlockSyntax block)

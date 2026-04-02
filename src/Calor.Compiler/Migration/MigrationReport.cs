@@ -43,6 +43,7 @@ public sealed class MigrationSummary
     public int TotalErrors { get; set; }
     public int TotalWarnings { get; set; }
     public TimeSpan TotalDuration { get; set; }
+    public bool WasCancelled { get; set; }
     public double SuccessRate => TotalFiles > 0 ? (double)SuccessfulFiles / TotalFiles * 100 : 0;
 
     public List<string> MostCommonIssues { get; init; } = new();

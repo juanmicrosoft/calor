@@ -1561,7 +1561,8 @@ public sealed class Lexer
                             var canClose = false;
                             var tempDepth = depth;
                             var tempPos = _position;
-                            while (tempPos < _source.Length && tempDepth > 0)
+                            var maxLookahead = Math.Min(_source.Length, _position + 10_000);
+                            while (tempPos < maxLookahead && tempDepth > 0)
                             {
                                 var ch = _source[tempPos];
                                 if (ch == '"')
