@@ -76,7 +76,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSEg6UrkgvWLQHZuze\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi1en5R5AuFXuJEercP\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -88,7 +88,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:07.8894252+00:00"
+          "timestamp": "2026-04-02T22:09:02.7802171+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -100,7 +100,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSQaezTxuXdXeHBrDD\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi1pSW79SyiAbZ455RU\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -112,7 +112,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:10.2175432+00:00"
+          "timestamp": "2026-04-02T22:09:05.0323554+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -210,7 +210,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSaSV82ctXzwx2oU25\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi1z6B7RMKgyQdbQ1s1\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -222,7 +222,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:12.5276974+00:00"
+          "timestamp": "2026-04-02T22:09:07.4645903+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -234,7 +234,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSkQGZwKQmhJkCtDuL\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi2AnryScpgvk81EJkX\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -246,7 +246,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:14.8791166+00:00"
+          "timestamp": "2026-04-02T22:09:09.7981872+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -362,7 +362,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSvWjPwPcdNKr6wPxA\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi2Ly3SdXYccn2HCGrJ\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -374,7 +374,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:17.2048074+00:00"
+          "timestamp": "2026-04-02T22:09:12.2364239+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -386,7 +386,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpT62y7nUYcYV1CWViw\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi2WrMdYqVQxfih9zgc\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -398,7 +398,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:19.4356413+00:00"
+          "timestamp": "2026-04-02T22:09:14.4815048+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -502,7 +502,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTFoqdvm4MV6Hr5TyE\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi2gfxFqPaEKjbJa6XJ\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -514,7 +514,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:21.7216559+00:00"
+          "timestamp": "2026-04-02T22:09:16.784109+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -526,7 +526,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTRR3GAZMRko1TRnZy\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi2sHgAq6Fmgm8MKyXw\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -538,7 +538,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:23.9685901+00:00"
+          "timestamp": "2026-04-02T22:09:19.2725428+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -627,7 +627,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTbLLvk4F5duSMEsTP\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi337moE5PA6RYeZqvV\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -639,7 +639,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:26.2894605+00:00"
+          "timestamp": "2026-04-02T22:09:21.5916255+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -651,7 +651,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTkqLs2A4uHKrR6xea\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi3DNR9fXdABNcPBDss\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -663,7 +663,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:28.5363602+00:00"
+          "timestamp": "2026-04-02T22:09:23.9638917+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -766,7 +766,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTvgfxHfsiKecKDA9G\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi3PKx6C8G8kkRoxrQS\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -778,7 +778,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:30.8141697+00:00"
+          "timestamp": "2026-04-02T22:09:26.3159256+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -790,7 +790,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpU67DKdjUvBiFXRMGK\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi3Z5ppkohQgSU5UKdf\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -802,7 +802,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:33.0175505+00:00"
+          "timestamp": "2026-04-02T22:09:28.5987433+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -899,7 +899,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpUFuKd6sDJTdaoKHta\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi3iqDEer5DH66CboiM\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -911,7 +911,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:35.3057617+00:00"
+          "timestamp": "2026-04-02T22:09:30.853077+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -923,7 +923,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpURKcYu9WRCAXoK7ap\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi3tVdkhRqMzF76t6Tq\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -935,7 +935,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:37.5109133+00:00"
+          "timestamp": "2026-04-02T22:09:33.1193265+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1032,7 +1032,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpUbG9s3rphZb8XP9uz\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi44FWkVkqfDuDbtj1t\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1044,7 +1044,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:39.8517512+00:00"
+          "timestamp": "2026-04-02T22:09:35.396531+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1056,7 +1056,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpUkoPCw2HauU26gXvu\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi4Edr3tkzWhiVhJXFz\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1068,7 +1068,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:42.0884972+00:00"
+          "timestamp": "2026-04-02T22:09:37.8217949+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1165,7 +1165,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpUvfiJdd5DH3LzB8on\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi4QbNwH6qzqRrkzFZU\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1177,7 +1177,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:44.3742753+00:00"
+          "timestamp": "2026-04-02T22:09:40.1540891+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1189,7 +1189,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpV69UDHuQT5mMi41Tf\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi4aeNHEQ31hqHSTnRN\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1201,7 +1201,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:46.5958424+00:00"
+          "timestamp": "2026-04-02T22:09:42.7799342+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1297,7 +1297,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVFya2U7ypWdVDnoVk\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi4mwGSGng3hPTt1L8U\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1309,7 +1309,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:48.8928804+00:00"
+          "timestamp": "2026-04-02T22:09:45.1465076+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1321,7 +1321,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVRUZn2pHQbZgjU1ZQ\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi4wfujVcDhLdGtuvZL\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1333,7 +1333,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:51.121684+00:00"
+          "timestamp": "2026-04-02T22:09:47.4362533+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1429,7 +1429,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVbHRFPDu4m6bpyWZt\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi57fvX9G9pzAxQuQ8E\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1441,7 +1441,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:53.4091904+00:00"
+          "timestamp": "2026-04-02T22:09:49.7661205+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1453,7 +1453,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVkjCXJMDkYn8zLVGR\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi5HVGicD48o7Vz1MzE\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1465,7 +1465,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:55.6187152+00:00"
+          "timestamp": "2026-04-02T22:09:52.1259703+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1561,7 +1561,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVvkx56pdtnxxghPPu\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi5TiB9bNbSzBCXsQYb\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1573,7 +1573,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:57.960734+00:00"
+          "timestamp": "2026-04-02T22:09:54.4491833+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1585,7 +1585,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpW6Fhj6jjHRbx8R2uD\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi5dpPfd3qY7HEmVxof\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1597,7 +1597,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:00.1793655+00:00"
+          "timestamp": "2026-04-02T22:09:56.8380752+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1693,7 +1693,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWG15nVWCk4RpFQuBW\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi5oz5YBpaaLq5hxgzM\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1705,7 +1705,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:02.463376+00:00"
+          "timestamp": "2026-04-02T22:09:59.1905458+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1717,7 +1717,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWRWaKYrf2JZrKuEzm\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi5yofzCexuLUkJJ9oA\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1729,7 +1729,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:04.6892817+00:00"
+          "timestamp": "2026-04-02T22:10:01.4957006+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1826,7 +1826,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWbKS8gkxcokBZNAtz\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi69hjTavTsmN6mcp9U\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1838,7 +1838,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:07.0080042+00:00"
+          "timestamp": "2026-04-02T22:10:03.8611135+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1850,7 +1850,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWm9ms93wB8Pm2snEV\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi6L6K7dbhKykyu75Mm\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1862,7 +1862,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:09.2906311+00:00"
+          "timestamp": "2026-04-02T22:10:06.243723+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1959,7 +1959,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWvvtvRJqUZ5BkLPz6\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi6WCXnimjD4omiw21B\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1971,7 +1971,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:11.5846357+00:00"
+          "timestamp": "2026-04-02T22:10:08.6255463+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1983,7 +1983,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpX6UNaDCxZGipjymLe\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi6fxAEB5NXEZ7dLDwE\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1995,7 +1995,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:13.8042185+00:00"
+          "timestamp": "2026-04-02T22:10:10.8782178+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2089,7 +2089,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXGE14VGmvf1AYhsQx\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi6r9LM1pFsrBGmRQYS\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2101,7 +2101,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:16.0832223+00:00"
+          "timestamp": "2026-04-02T22:10:13.2611493+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2113,7 +2113,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXRoDWxmE75eMAAAek\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi72UwEqpBbTUZWwsba\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2125,7 +2125,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:18.3153925+00:00"
+          "timestamp": "2026-04-02T22:10:15.6794226+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2223,7 +2223,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXc2NopUTu5VcQriio\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi7CRUjx8Ytd3Ca4NYa\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2235,7 +2235,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:20.7306074+00:00"
+          "timestamp": "2026-04-02T22:10:18.0462269+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2247,7 +2247,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXmcLVihSBWL5p1RcN\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi7NYS8fmH7a8p3v26s\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2259,7 +2259,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:22.9505472+00:00"
+          "timestamp": "2026-04-02T22:10:20.3788944+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2352,7 +2352,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXwSBTv32M9AH48gf6\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi7YF6EywKh3igZTPLx\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2364,7 +2364,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:25.2492677+00:00"
+          "timestamp": "2026-04-02T22:10:22.6666293+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2376,7 +2376,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpY6riYtqx6tBfHZ2EK\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi7iKpGUeUEV2TTTrhH\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2388,7 +2388,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:27.4682085+00:00"
+          "timestamp": "2026-04-02T22:10:24.998789+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2481,7 +2481,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYHCZtrbP2TcWvVpTW\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi7tYiesJPu597xV3GW\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2493,7 +2493,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:29.8810511+00:00"
+          "timestamp": "2026-04-02T22:10:27.3899589+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2505,7 +2505,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYSvTtqvwkPAEWzbWt\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi84Auq7fXwndapRrZr\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2517,7 +2517,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:32.1433807+00:00"
+          "timestamp": "2026-04-02T22:10:29.6392524+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2610,7 +2610,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYcyTNwezqbqmeXBir\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi8DobXNNgMWpb9XgAq\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2622,7 +2622,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:34.5005694+00:00"
+          "timestamp": "2026-04-02T22:10:31.8998158+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2634,7 +2634,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYnYRU2qZyP3M85MyT\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi8PS36rDbi8k2MLmiH\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2646,7 +2646,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:36.73922+00:00"
+          "timestamp": "2026-04-02T22:10:34.1459544+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2755,7 +2755,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYxTE1Tp9x9gVs4diB\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi8ZRJkWYA1uZGyLhWM\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2767,7 +2767,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:39.184796+00:00"
+          "timestamp": "2026-04-02T22:10:36.4818573+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2779,7 +2779,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZ8S15JN72NM1YU37w\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi8jyoiKuPVHW2LmccT\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2791,7 +2791,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:41.3921806+00:00"
+          "timestamp": "2026-04-02T22:10:38.983896+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2884,7 +2884,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZJB8hEaEK7ewCiiYU\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi8uy5HnXwDB5thsjzR\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2896,7 +2896,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:43.6945467+00:00"
+          "timestamp": "2026-04-02T22:10:41.2973567+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2908,7 +2908,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZThsRoX2WZ2syf3sK\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi95hDRcrRFZUm2mkwk\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2920,7 +2920,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:45.8966094+00:00"
+          "timestamp": "2026-04-02T22:10:43.561943+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3008,7 +3008,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZdTkLCphfCJuvDwhJ\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi9FW5NjWSgeCDBno73\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3020,7 +3020,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:48.1835546+00:00"
+          "timestamp": "2026-04-02T22:10:45.891219+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3032,7 +3032,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZnx1aWbRgyk8noqD2\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi9RWqDGkv1EZ9GGxiB\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3044,7 +3044,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:50.39739+00:00"
+          "timestamp": "2026-04-02T22:10:48.1950245+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3137,7 +3137,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZxeupFC2aeVH6bNUz\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi9bPu9iM8fe9nZJqzj\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3149,7 +3149,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:52.6665684+00:00"
+          "timestamp": "2026-04-02T22:10:50.5346696+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3161,7 +3161,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpa87gSbh5KyYtBQft6\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi9mKhce1yCAPcdZHvM\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3173,7 +3173,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:54.9103596+00:00"
+          "timestamp": "2026-04-02T22:10:52.8432112+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3260,7 +3260,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpaJ2VEw64ynTje1EoA\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfi9w4qP4dvCcbLrYwSQ\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3272,7 +3272,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:57.2417488+00:00"
+          "timestamp": "2026-04-02T22:10:55.1098954+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3284,7 +3284,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpaTn7hhSihkkQcr9NY\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiA6swHcMZoUcZM2Zof\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3296,7 +3296,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:59.4875269+00:00"
+          "timestamp": "2026-04-02T22:10:57.4077002+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3389,7 +3389,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpadZEayGGB4qSW9ogd\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiAH47kZJPsYuAdi5cN\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3401,7 +3401,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:01.7630444+00:00"
+          "timestamp": "2026-04-02T22:10:59.8174463+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3413,7 +3413,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpao2VfaRQumhQ8B6sT\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiASsU5geZ25qaRjULL\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3425,7 +3425,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:04.0030991+00:00"
+          "timestamp": "2026-04-02T22:11:02.1068258+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3518,7 +3518,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpayjvbF7Zp9NTZqPm5\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiAcxC9xNV7UdjPCgxD\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3530,7 +3530,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:06.4891418+00:00"
+          "timestamp": "2026-04-02T22:11:04.4469012+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3542,7 +3542,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbA7kqYRNZHnyn5QWR\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiAndc3GNpzL3UcNwUQ\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3554,7 +3554,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:08.9829129+00:00"
+          "timestamp": "2026-04-02T22:11:06.7275305+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3647,7 +3647,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbLEDi1t2diEQzzkxq\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiAxMFhsR8d1U5QXaFC\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3659,7 +3659,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:11.2784037+00:00"
+          "timestamp": "2026-04-02T22:11:08.9764327+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3671,7 +3671,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbVe1SxgPZdbELpDY8\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiB7xwzHzzZhYt3v8W1\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3683,7 +3683,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:13.4824625+00:00"
+          "timestamp": "2026-04-02T22:11:11.2249544+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3775,7 +3775,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbfSNWREN581XPgK2q\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiBHo3b5zK2GAydZh2d\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3787,7 +3787,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:15.7920812+00:00"
+          "timestamp": "2026-04-02T22:11:13.5550655+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3799,7 +3799,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbq6JMtgCfEvjCZvDs\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiBThc1SLSNPsyaREqf\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3811,7 +3811,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:18.0340832+00:00"
+          "timestamp": "2026-04-02T22:11:15.8433837+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3903,7 +3903,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbzwPM7LmbqrwnQzuP\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiBdwVqRJXkDpUQf42M\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3915,7 +3915,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:20.3344039+00:00"
+          "timestamp": "2026-04-02T22:11:18.2662004+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3927,7 +3927,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcAWMLvpfmxNx5rUSu\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiBq6xdo5k2MD682Q4q\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3939,7 +3939,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:22.5831026+00:00"
+          "timestamp": "2026-04-02T22:11:20.8461912+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4031,7 +4031,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcLHy85BRXVWA8tetM\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiC1YWyWsYX9qm2t2r9\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4043,7 +4043,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:24.874347+00:00"
+          "timestamp": "2026-04-02T22:11:23.3161992+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4055,7 +4055,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcVzcrEdBmv5pPR2cd\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiCBgiMzj3UDcB5kXBq\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4067,7 +4067,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:27.1300003+00:00"
+          "timestamp": "2026-04-02T22:11:25.6595392+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4154,7 +4154,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcg7phs9YmU8UgFA2T\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiCMPNL7BUPqThJ8vbG\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4166,7 +4166,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:29.5197221+00:00"
+          "timestamp": "2026-04-02T22:11:27.9561115+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4178,7 +4178,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcqojhehkPtrQVeAGx\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiCXFCiYEpkPGpQVeTz\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4190,7 +4190,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:31.7666117+00:00"
+          "timestamp": "2026-04-02T22:11:30.2360034+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4277,7 +4277,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpd1ZNVydMvUuxMVumT\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiCgusMKSbn6aH2wd1Q\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4289,7 +4289,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:34.0412063+00:00"
+          "timestamp": "2026-04-02T22:11:32.4968822+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4301,7 +4301,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdB2doGBo1bGeCCV9Z\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiCsikRcUbWqTTkGJ8B\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4313,7 +4313,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:36.3331032+00:00"
+          "timestamp": "2026-04-02T22:11:35.0717477+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4400,7 +4400,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdMB5GpecN5DreFk3S\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiD4cLmmx3gqr417CPm\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4412,7 +4412,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:38.6330436+00:00"
+          "timestamp": "2026-04-02T22:11:37.6136884+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4424,7 +4424,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdWtyDaQUkrdxPJp83\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiDFHng2q9YYb6CBHWe\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4436,7 +4436,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:40.9063484+00:00"
+          "timestamp": "2026-04-02T22:11:40.0694894+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4534,7 +4534,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdgdrrACwcVaftgjrH\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiDRXgtCWyY4M6LRb6b\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4546,7 +4546,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:43.2030771+00:00"
+          "timestamp": "2026-04-02T22:11:42.4665614+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4558,7 +4558,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdr978mYvwVBYj3B1M\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiDbKYcFm1EPtN1Laia\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4570,7 +4570,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:45.4217333+00:00"
+          "timestamp": "2026-04-02T22:11:44.7813371+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4640,7 +4640,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpe1wDPy9bqpjAbzwM2\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiDmKK9puwsW3gsdDqW\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4652,7 +4652,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:47.6965101+00:00"
+          "timestamp": "2026-04-02T22:11:47.1984909+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4664,7 +4664,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpeBMzuMEC1fLfYRizE\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiDxPKRsgeKBcUesWpV\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4676,7 +4676,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:49.9208493+00:00"
+          "timestamp": "2026-04-02T22:11:49.6825275+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4764,7 +4764,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpeMSyTY4ocQuQEWNVh\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiE8Agfku354dhTZT2u\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4776,7 +4776,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:52.2830199+00:00"
+          "timestamp": "2026-04-02T22:11:51.9712131+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4788,7 +4788,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpeWzTBVUC88xby8Smg\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiEHmtHS5KYgSTnG5LL\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4800,7 +4800,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:54.5146812+00:00"
+          "timestamp": "2026-04-02T22:11:54.2178431+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4893,7 +4893,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpegjqTEHhbTJnKYRLq\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiETW2p97eh7haJ5qFB\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4905,7 +4905,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:56.7881518+00:00"
+          "timestamp": "2026-04-02T22:11:56.5246914+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4917,7 +4917,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMperFqHrC2sK1ntLoHJ\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiEdTZgu7tYBKGKH8Yj\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4929,7 +4929,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:59.0101151+00:00"
+          "timestamp": "2026-04-02T22:11:58.8197868+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5022,7 +5022,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpf25vezgsRAuEYcaAn\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiEo9E23ruLBUnJ6C4e\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5034,7 +5034,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:01.3024212+00:00"
+          "timestamp": "2026-04-02T22:12:01.0911458+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5046,7 +5046,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfC5gkRS9yNd8Tqhcu\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiEyb2fcqdVatedZZNg\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5058,7 +5058,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:03.641712+00:00"
+          "timestamp": "2026-04-02T22:12:03.527179+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5128,7 +5128,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfNfvg4ZX9XxVKmcJs\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiF9QNrXtsu97q2B9XY\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5140,7 +5140,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:06.1093248+00:00"
+          "timestamp": "2026-04-02T22:12:05.8512962+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5152,7 +5152,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfYTY32C2CBu7nLDC2\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiFKJBwewySWQHgNDMG\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5164,7 +5164,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:08.4209187+00:00"
+          "timestamp": "2026-04-02T22:12:08.1381248+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5257,7 +5257,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfiEf9UqmYHzB9JiiW\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiFV5ZFHoRx4wPfYR1t\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5269,7 +5269,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:10.6963948+00:00"
+          "timestamp": "2026-04-02T22:12:10.4432761+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5281,7 +5281,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfsgvpBf4nSkRVvwM3\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiFexdcGtx7HNLR9TqZ\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5293,7 +5293,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:12.9406604+00:00"
+          "timestamp": "2026-04-02T22:12:12.7621404+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5386,7 +5386,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpg3dibFAcJihXBV8d7\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiFqMTNPpTtBerkfxsd\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5398,7 +5398,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:15.2594392+00:00"
+          "timestamp": "2026-04-02T22:12:15.1713185+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5410,7 +5410,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgDJPjc8XPY7RuLReH\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiG1DHU1UZkYi8qxw96\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5422,7 +5422,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:17.5200617+00:00"
+          "timestamp": "2026-04-02T22:12:17.4755746+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5515,7 +5515,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgPDwXWxQ1UdpS2RJr\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiGAvST5tQF8zMMBmcv\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5527,7 +5527,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:19.829078+00:00"
+          "timestamp": "2026-04-02T22:12:19.7472998+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5539,7 +5539,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgZDTg5CXZ9PhrzpYH\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiGLkHb25tvUQXHB1uU\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5551,7 +5551,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:22.1688152+00:00"
+          "timestamp": "2026-04-02T22:12:22.0437825+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5644,7 +5644,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgj3JPyW9zPG7SjxTZ\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiGWbs2od2skquzcxZt\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5656,7 +5656,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:24.4497277+00:00"
+          "timestamp": "2026-04-02T22:12:24.3752677+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5668,7 +5668,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgtjU2CcYV7aGRqa4T\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiGgVBW3FY5rfzZe4MW\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5680,7 +5680,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:26.709994+00:00"
+          "timestamp": "2026-04-02T22:12:26.6637507+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5773,7 +5773,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMph4UMMV4X2hy1VNxDE\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiGvW3oHam5uacA64dp\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5785,7 +5785,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:28.9930686+00:00"
+          "timestamp": "2026-04-02T22:12:30.7163191+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5797,7 +5797,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphDvNfotB8VDdP94nx\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiH9yRERptTZAgvgQ1H\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5809,7 +5809,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:31.2028163+00:00"
+          "timestamp": "2026-04-02T22:12:33.1171877+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5912,7 +5912,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphPkiRLPQAWbaq6Pg8\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiHLEJYWknjQFqyWAmE\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5924,7 +5924,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:33.5231812+00:00"
+          "timestamp": "2026-04-02T22:12:35.4896682+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5936,7 +5936,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphZLBJMKWXWjZvuDAF\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiHWLmQcjQiR8E61qY4\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5948,7 +5948,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:35.7375231+00:00"
+          "timestamp": "2026-04-02T22:12:37.8534773+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6041,7 +6041,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphj45NJHZuxBfyvdwD\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiHgTE3wWqhkdCFCvVd\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6053,7 +6053,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:38.0119892+00:00"
+          "timestamp": "2026-04-02T22:12:40.2456087+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6065,7 +6065,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphtgWuQjSKVoSghqRW\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiHrHKeD3f1JL28RbGs\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6077,7 +6077,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:40.2633789+00:00"
+          "timestamp": "2026-04-02T22:12:42.5221005+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6170,7 +6170,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpi4UNhvtxmWZyN98JZ\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiJ2G6fYLXDSni9zAAU\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6182,7 +6182,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:42.5583619+00:00"
+          "timestamp": "2026-04-02T22:12:44.8530659+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6194,7 +6194,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpiDwPxKm9P98aLAZyb\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiJBs3tShBUsEEe5y24\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6206,7 +6206,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:44.7786451+00:00"
+          "timestamp": "2026-04-02T22:12:47.0991221+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6299,7 +6299,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpiPoiaZxj5MbYrNEkZ\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiJUgL2bDdJFuha2DAT\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6311,7 +6311,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:47.0907764+00:00"
+          "timestamp": "2026-04-02T22:12:51.0591971+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6323,7 +6323,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpiZW8PpYEScP1B3rqr\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiJeWBPZG5BEBibbVxX\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6335,7 +6335,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:49.4020178+00:00"
+          "timestamp": "2026-04-02T22:12:53.3277272+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6428,7 +6428,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpijWtJ66KgMUPsAbnn\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiJpE5GNHeq9LgBYpZc\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6440,7 +6440,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:51.6915042+00:00"
+          "timestamp": "2026-04-02T22:12:55.6376098+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6452,7 +6452,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpiuLyaAj7WtBUYDWW4\u0022}"
+          "API error: BadRequest - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022invalid_request_error\u0022,\u0022message\u0022:\u0022Your credit balance is too low to access the Anthropic API. Please go to Plans \u0026 Billing to upgrade or purchase credits.\u0022},\u0022request_id\u0022:\u0022req_011CZfiJzLnVT62GCwk8YDw8\u0022}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6464,7 +6464,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:54.0021765+00:00"
+          "timestamp": "2026-04-02T22:12:57.9805058+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6522,7 +6522,7 @@
     }
   },
   "totalCost": 0,
-  "timestamp": "2026-02-21T20:08:05.26803+00:00",
+  "timestamp": "2026-04-02T22:09:00.3426557+00:00",
   "provider": "claude",
   "isDryRun": false
 }
