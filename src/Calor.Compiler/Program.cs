@@ -766,9 +766,9 @@ public sealed class CompilationOptions
 
     /// <summary>
     /// Enable effect enforcement checking.
-    /// Disabled by default; opt in with --enforce-effects for strict checking.
+    /// Enabled by default; tests and analysis passes rely on this.
     /// </summary>
-    public bool EnforceEffects { get; init; } = false;
+    public bool EnforceEffects { get; init; } = true;
 
     /// <summary>
     /// Policy for handling unknown external calls.
