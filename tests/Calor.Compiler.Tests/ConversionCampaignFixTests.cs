@@ -928,6 +928,28 @@ class Processor
         Assert.Contains("Array.Empty", calor);
     }
 
+    [Fact]
+    public void Convert_EmptyCollectionInSwitchArm_Compiles()
+    {
+        // Verifies that [] in a switch arm context (the original bug) produces compilable output
+        var csharp = @"
+using System;
+class Test
+{
+    public byte[] Convert(string type)
+    {
+        return type switch
+        {
+            ""known"" => new byte[] { 1, 2, 3 },
+            _ => []
+        };
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.Contains("Array.Empty", result.CalorSource);
+    }
+
     #endregion
 
     #region Issue 374: PredefinedTypeSyntax (int.MaxValue, string.Empty)

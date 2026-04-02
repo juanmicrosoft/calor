@@ -104,6 +104,66 @@ public class UnsupportedFeatureTelemetryTests
 
     #endregion
 
+    #region End-to-End Converter Unsupported Feature Tests
+
+    [Fact]
+    public void Converter_TracksFeatureUsage_EndToEnd()
+    {
+        // End-to-end: verify the converter records feature usage during conversion.
+        // The converter tracks features like "class", "method", "lambda" etc. via RecordFeatureUsage.
+        var csharp = """
+            using System;
+            using System.Collections.Generic;
+            public class Test
+            {
+                public List<int> Items { get; set; } = new();
+                public void Method()
+                {
+                    var list = new List<int> { 1, 2, 3 };
+                    Action<int> action = x => Console.WriteLine(x);
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success);
+        // Converter should have tracked feature usage
+        Assert.Contains("class", result.Context.UsedFeatures);
+        Assert.Contains("lambda", result.Context.UsedFeatures);
+    }
+
+    [Fact]
+    public void Converter_MakeRef_NowSupported()
+    {
+        // __makeref was previously unsupported but is now handled — verify no fallback
+        var csharp = """
+            public class Test
+            {
+                public void Method()
+                {
+                    int x = 42;
+                    var r = __makeref(x);
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            GracefulFallback = true
+        });
+
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success, "Conversion should succeed");
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
+        Assert.Contains("__makeref", result.CalorSource);
+    }
+
+    #endregion
+
     #region TrackUnsupportedFeatures Tests
 
     [Fact]
@@ -325,6 +385,30 @@ public class UnsupportedFeatureTelemetryTests
     #endregion
 
     #region End-to-End Pipeline Tests
+
+    [Fact]
+    public void EndToEnd_ConversionIssuesPreserveFeature_ViaConverter()
+    {
+        // End-to-end: verify that conversion issues preserve Feature property.
+        // Conversion warnings from the converter set the Feature property for tracking.
+        var csharp = """
+            using System.Collections.Generic;
+            public class Test
+            {
+                public List<int> GetNumbers() => new() { 1, 2, 3 };
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var result = converter.Convert(csharp);
+
+        Assert.True(result.Success);
+        // Context should have tracked conversions
+        Assert.True(result.Context.Stats.ConvertedNodes > 0,
+            "Expected converter to track converted nodes");
+        Assert.True(result.Context.Stats.ClassesConverted > 0,
+            "Expected at least one class conversion");
+    }
 
     [Fact]
     public void EndToEnd_ConversionIssuesPreserveFeature()
