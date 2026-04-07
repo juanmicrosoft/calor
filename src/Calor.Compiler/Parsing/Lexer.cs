@@ -1089,7 +1089,9 @@ public sealed class Lexer
             }
 
             var hexValueText = _source[valueStart.._position];
-            var hexPart = hexValueText.AsSpan(hexValueText.IndexOf('x') + 1);
+            var hexXIdx = hexValueText.IndexOf('x');
+            if (hexXIdx < 0) hexXIdx = hexValueText.IndexOf('X');
+            var hexPart = hexValueText.AsSpan(hexXIdx + 1);
             if (long.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var hexVal))
             {
@@ -1680,7 +1682,9 @@ public sealed class Lexer
             }
 
             var hexText = CurrentText();
-            var hexPartStr = hexText.AsSpan(hexText.IndexOf('x') + 1);
+            var xIdx = hexText.IndexOf('x');
+            if (xIdx < 0) xIdx = hexText.IndexOf('X');
+            var hexPartStr = hexText.AsSpan(xIdx + 1);
             // Trim any suffix characters from the hex part
             hexPartStr = hexPartStr.TrimEnd("UuLl".AsSpan());
             if (long.TryParse(hexPartStr,

@@ -4412,6 +4412,13 @@ public sealed class Parser
                 Advance();
             }
 
+            // Handle nullable type suffix: Type?, List<int>?, int[]?
+            if (Check(TokenKind.Question))
+            {
+                sb.Append('?');
+                Advance();
+            }
+
             // Handle hyphenated identifiers like prot-int (protected internal)
             while (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.Identifier)
             {

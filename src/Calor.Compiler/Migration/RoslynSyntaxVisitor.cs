@@ -4347,7 +4347,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
             var stmtArgNames = hasNamedArgs
                 ? invocation.ArgumentList.Arguments
-                    .Select(a => a.NameColon?.Name.Identifier.Text)
+                    .Select(a => a.NameColon?.Name.Identifier.ValueText)
                     .ToList()
                 : null;
 
@@ -7477,7 +7477,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
         var argNames = hasNamedArgs
             ? invocation.ArgumentList.Arguments
-                .Select(a => a.NameColon?.Name.Identifier.Text)
+                .Select(a => a.NameColon?.Name.Identifier.ValueText)
                 .ToList()
             : null;
 
