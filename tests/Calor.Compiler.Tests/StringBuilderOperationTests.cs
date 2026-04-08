@@ -254,11 +254,12 @@ public class StringBuilderOperationTests
     [Fact]
     public void Parse_SbNew_TooManyArgs_ReportsError()
     {
-        var source = WrapInFunction("§R (sb-new \"a\" \"b\" \"c\")");
+        // sb-new accepts up to 4 args: StringBuilder(string, int, int, int)
+        var source = WrapInFunction("§R (sb-new \"a\" INT:1 INT:2 INT:3 INT:4)");
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("accepts at most 2 argument"));
+        Assert.Contains(diagnostics, d => d.Message.Contains("accepts at most 4 argument"));
     }
 
     #endregion
@@ -303,7 +304,7 @@ public class StringBuilderOperationTests
     }
 
     [Theory]
-    [InlineData(StringBuilderOp.New, 0, 2)]
+    [InlineData(StringBuilderOp.New, 0, 4)]
     [InlineData(StringBuilderOp.Append, 2, 2)]
     [InlineData(StringBuilderOp.AppendLine, 2, 2)]
     [InlineData(StringBuilderOp.Insert, 3, 3)]

@@ -9929,10 +9929,11 @@ public sealed class Parser
         if (value == null)
             return null;
 
-        // Extend with binary operators: |, &, ^, <<, >>, +, -
+        // Extend with binary operators: |, &, ^, <<, >>, +, -, *, /
         while (Check(TokenKind.Pipe) || Check(TokenKind.Amp) || Check(TokenKind.Caret) ||
                Check(TokenKind.LessLess) || Check(TokenKind.GreaterGreater) ||
-               Check(TokenKind.Plus) || Check(TokenKind.Minus))
+               Check(TokenKind.Plus) || Check(TokenKind.Minus) ||
+               Check(TokenKind.Star) || Check(TokenKind.Slash))
         {
             var op = Advance().Text;
             var rhs = ParseEnumOperand();
@@ -9998,9 +9999,10 @@ public sealed class Parser
             {
                 Advance(); // consume )
                 // Check if this is a cast: (type)operand — if next token can be an operand
-                // Only treat as cast if inner looks like a type name (no operators like <<, |, etc.)
+                // Only treat as cast if inner looks like a type name (no operators, not a number)
                 var looksLikeCast = IsEnumOperandStart()
                     && inner != null
+                    && !char.IsDigit(inner[0]) && !inner.StartsWith("0x") && !inner.StartsWith("0X")
                     && !inner.Contains("<<") && !inner.Contains(">>")
                     && !inner.Contains("|") && !inner.Contains("&")
                     && !inner.Contains("^") && !inner.Contains("+")

@@ -496,23 +496,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
         // Compact auto-property shorthand
+        // If default value is multi-line (e.g., §NEW with initializers), fall through to full syntax
         if (node.IsAutoProperty && (node.Getter != null || node.Setter != null || node.Initer != null))
         {
-            var accessors = new List<string>();
-            if (node.Getter != null)
-                accessors.Add(node.Getter.Visibility == Visibility.Private ? "priget" :
-                              node.Getter.Visibility == Visibility.Internal ? "intget" :
-                              node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
-            if (node.Setter != null)
-                accessors.Add(node.Setter.Visibility == Visibility.Private ? "priset" :
-                              node.Setter.Visibility == Visibility.Internal ? "intset" :
-                              node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
-            if (node.Initer != null)
-                accessors.Add("init");
-            var accessorStr = string.Join(",", accessors);
-            var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
-            AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{defaultVal}");
-            return "";
+            // Pre-check: if default value would be multi-line, use full syntax instead
+            if (node.DefaultValue is NewExpressionNode newExpr && newExpr.Initializers.Count > 0)
+            {
+                // Fall through to full property syntax below
+            }
+            else
+            {
+                var accessors = new List<string>();
+                if (node.Getter != null)
+                    accessors.Add(node.Getter.Visibility == Visibility.Private ? "priget" :
+                                  node.Getter.Visibility == Visibility.Internal ? "intget" :
+                                  node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
+                if (node.Setter != null)
+                    accessors.Add(node.Setter.Visibility == Visibility.Private ? "priset" :
+                                  node.Setter.Visibility == Visibility.Internal ? "intset" :
+                                  node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
+                if (node.Initer != null)
+                    accessors.Add("init");
+                var accessorStr = string.Join(",", accessors);
+                var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
+                AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{defaultVal}");
+                return "";
+            }
         }
 
         // Full property syntax with body and closing tag
@@ -806,6 +815,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (!node.IsAbstract && !node.IsExtern)
         {
             _memberBodyDepth++;
+            if (node.Body.Count == 0)
+            {
+                // Empty method body — emit a void return placeholder so the parser
+                // doesn't see EndMethod immediately after the opening tag
+                AppendLine("§R");
+            }
             foreach (var stmt in node.Body)
             {
                 stmt.Accept(this);
@@ -869,6 +884,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         // Body
         _memberBodyDepth++;
+        if (node.Body.Count == 0)
+        {
+            AppendLine("§R");
+        }
         foreach (var stmt in node.Body)
         {
             stmt.Accept(this);
@@ -980,9 +999,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(CallStatementNode node)
     {
         // Emit named argument labels as §A[name] value when present
+        // Hoist arguments containing section markers (e.g., §NEW with initializers)
+        // to avoid nested markers or raw '=' breaking the call parser
         var args = node.Arguments.Select((a, i) =>
         {
             var argValue = a.Accept(this);
+            if (ContainsSectionMarker(argValue))
+                argValue = HoistToTempVar(argValue);
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
                 return $"§A[{node.ArgumentNames[i]}] {argValue}";
             return $"§A {argValue}";
@@ -1237,7 +1260,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var size = node.Size.Accept(this);
             // Hoist complex size expressions out of the attribute braces
             // (§C calls, parenthesized expressions, commas break attribute parsing)
-            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(','))
+            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':'))
                 size = HoistToTempVar(size);
             AppendLine($"§B{{[{elementType}]:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
             if (originalTarget != variableName)
@@ -1263,7 +1286,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.DimensionSizes.Count > 0)
         {
-            var dims = string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)));
+            // Hoist dimension sizes that contain section markers, parens, colons, or commas
+            var evalDims = node.DimensionSizes.Select(d =>
+            {
+                var val = d.Accept(this);
+                if (ContainsSectionMarker(val) || val.Contains('(') || val.Contains(',') || val.Contains(':'))
+                    val = HoistToTempVar(val);
+                return val;
+            }).ToList();
+            var dims = string.Join(":", evalDims);
             AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
@@ -1432,11 +1463,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         // Hoist loop bounds that contain section markers or hex literals out of the braces
         // (hex literals like 0x100 break the ParseValue fallback inside attribute blocks)
-        if (ContainsSectionMarker(from) || from.Contains("0x"))
+        if (ContainsSectionMarker(from) || from.Contains("0x") || from.Contains(':'))
             from = HoistToTempVar(from);
-        if (ContainsSectionMarker(to) || to.Contains("0x"))
+        if (ContainsSectionMarker(to) || to.Contains("0x") || to.Contains(':'))
             to = HoistToTempVar(to);
-        if (ContainsSectionMarker(step) || step.Contains("0x"))
+        if (ContainsSectionMarker(step) || step.Contains("0x") || step.Contains(':'))
             step = HoistToTempVar(step);
 
         AppendLine($"§L{{{node.Id}:{node.VariableName}:{from}:{to}:{step}}}");
@@ -1551,12 +1582,33 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var keyType = TypeMapper.CSharpToCalor(node.KeyType);
         var valueType = TypeMapper.CSharpToCalor(node.ValueType);
 
+        // Pre-evaluate entries to flush hoisted bindings before the §DICT block
+        var evaluatedEntries = new List<(string key, string value)>();
+        var allHoisted = new List<string>();
+        foreach (var entry in node.Entries)
+        {
+            var key = entry.Key.Accept(this);
+            var value = entry.Value.Accept(this);
+            if (_pendingHoistedLines.Count > 0)
+            {
+                allHoisted.AddRange(_pendingHoistedLines);
+                _pendingHoistedLines.Clear();
+            }
+            evaluatedEntries.Add((key, value));
+        }
+
+        // Emit hoisted bindings before the dict
+        foreach (var hoisted in allHoisted)
+        {
+            AppendLine(hoisted);
+        }
+
         AppendLine($"§DICT{{{node.Id}:{keyType}:{valueType}}}");
         Indent();
 
-        foreach (var entry in node.Entries)
+        foreach (var (key, value) in evaluatedEntries)
         {
-            entry.Accept(this);
+            AppendLine($"§KV {key} {value}");
         }
 
         Dedent();
@@ -1792,8 +1844,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return "";
         }
 
-        // Check if this is a single-return case suitable for arrow syntax
-        if (node.Body.Count == 1 && node.Body[0] is ReturnStatementNode returnStmt && returnStmt.Expression != null)
+        // Check if this is a single-return case suitable for arrow syntax.
+        // Block-level collection nodes (List, Dict, Set) emit via AppendLine and return "",
+        // so they must use block syntax to avoid empty arrow expressions.
+        if (node.Body.Count == 1 && node.Body[0] is ReturnStatementNode returnStmt && returnStmt.Expression != null
+            && returnStmt.Expression is not ListCreationNode
+            && returnStmt.Expression is not DictionaryCreationNode
+            && returnStmt.Expression is not SetCreationNode)
         {
             // Evaluate the expression first — this may generate hoisted bindings
             // (e.g., §C calls inside Lisp expressions get hoisted to §B temp vars)
@@ -2271,12 +2328,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ArrayCreationNode node)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+        var id = string.IsNullOrEmpty(node.Name) ? "_arr" : node.Name;
 
         if (node.Initializer.Count > 0)
         {
             // Return inline format so this works in expression context (return, call args, etc.)
             // Multi-line format is handled by EmitArrayCreationWithName for bind-statement context.
-            var id = string.IsNullOrEmpty(node.Name) ? "_arr" : node.Name;
             var elements = string.Join(" ", node.Initializer.Select(e => e.Accept(this)));
             return $"§ARR{{{id}:{elementType}}} {elements} §/ARR{{{id}}}";
         }
@@ -2285,13 +2342,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var size = node.Size.Accept(this);
             // Hoist complex size expressions out of the attribute braces
             // (§C calls, parenthesized expressions, commas break attribute parsing)
-            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(','))
+            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':'))
                 size = HoistToTempVar(size);
-            return $"§ARR{{{elementType}:{node.Name}:{size}}}";
+            return $"§ARR{{{elementType}:{id}:{size}}}";
         }
         else
         {
-            return $"§ARR{{{elementType}:{node.Name}}}";
+            return $"§ARR{{{elementType}:{id}}}";
         }
     }
 
@@ -3493,7 +3550,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Size != null)
         {
             var size = node.Size.Accept(this);
-            if (ContainsSectionMarker(size))
+            if (ContainsSectionMarker(size) || size.Contains(':'))
                 size = HoistToTempVar(size);
             return $"§SALLOC{{{elementType}:{size}}}";
         }
@@ -3533,7 +3590,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var pointerType = TypeMapper.CSharpToCalor(node.PointerType);
         var init = node.Initializer.Accept(this);
         // Hoist complex initializers (e.g., §ADDR, §IDX) out of the braces
-        if (ContainsSectionMarker(init))
+        if (ContainsSectionMarker(init) || init.Contains(':'))
             init = HoistToTempVar(init);
         AppendLine($"§FIXED{{{node.Id}:{node.PointerName}:{pointerType}:{init}}}");
         Indent();
@@ -3568,7 +3625,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.DimensionSizes.Count > 0)
         {
-            var dims = string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)));
+            var evalDims = node.DimensionSizes.Select(d =>
+            {
+                var val = d.Accept(this);
+                if (ContainsSectionMarker(val) || val.Contains('(') || val.Contains(',') || val.Contains(':'))
+                    val = HoistToTempVar(val);
+                return val;
+            }).ToList();
+            var dims = string.Join(":", evalDims);
             return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{dims}}}";
         }
         else if (node.Initializer.Count > 0)
