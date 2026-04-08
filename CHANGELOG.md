@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-04-08
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Fixed
+- **51-project conversion campaign** — Phase 3-5 fixes addressing ~80 additional conversion failures across array ID mismatches, dictionary hoisting, enum parsing, empty method bodies, generic calls in statement position, and §ARR2D dimension hoisting
+- **Enum cast/paren ambiguity** — Parenthesized hex enum values like `(0x0001)` no longer misinterpreted as type casts
+- **Collection nodes in match arms** — List, dictionary, and set creation in switch expression arms now use block syntax
+- **Call statement argument hoisting** — Complex arguments with section markers are hoisted in statement-level calls
+
 ## [0.4.2] - 2026-04-02
 
 ### Benchmark Results (Statistical: 30 runs)
