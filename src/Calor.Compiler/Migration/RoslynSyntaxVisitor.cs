@@ -4347,7 +4347,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
             var stmtArgNames = hasNamedArgs
                 ? invocation.ArgumentList.Arguments
-                    .Select(a => a.NameColon?.Name.Identifier.Text)
+                    .Select(a => a.NameColon?.Name.Identifier.ValueText)
                     .ToList()
                 : null;
 
@@ -4430,9 +4430,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
 
             // Safety net: if the target still contains characters that ParseValue() can't handle
-            // (indexers, method calls with args, string literals), the parser will fail.
+            // (indexers, method calls with args, string literals, generic type args), the parser will fail.
             // Fall back to ConvertInvocationExpression which does more aggressive hoisting.
-            if (target.Contains('[') || target.Contains('(') || target.Contains('"'))
+            if (target.Contains('[') || target.Contains('(') || target.Contains('"') || target.Contains('<'))
             {
                 var exprResult = ConvertInvocationExpression(invocation);
                 if (exprResult is CallExpressionNode callExpr)
@@ -7477,7 +7477,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
         var argNames = hasNamedArgs
             ? invocation.ArgumentList.Arguments
-                .Select(a => a.NameColon?.Name.Identifier.Text)
+                .Select(a => a.NameColon?.Name.Identifier.ValueText)
                 .ToList()
             : null;
 
@@ -8648,7 +8648,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var elementType = TypeMapper.CSharpToCalor(arrayCreation.Type.ElementType.ToString());
         var id = _context.GenerateId("arr", elementType);
-        var name = _context.GenerateId("arr", elementType);
+        var name = id;
 
         ExpressionNode? size = null;
         var initializer = new List<ExpressionNode>();

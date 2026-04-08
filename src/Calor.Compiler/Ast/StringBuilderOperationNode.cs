@@ -126,8 +126,8 @@ public static class StringBuilderOpExtensions
     {
         return op switch
         {
-            // Zero to two arguments (optional initial string, optional capacity)
-            StringBuilderOp.New => 2,
+            // Zero to four arguments: StringBuilder(string, int, int, int) constructor
+            StringBuilderOp.New => 4,
 
             // Single argument operations
             StringBuilderOp.Clear or

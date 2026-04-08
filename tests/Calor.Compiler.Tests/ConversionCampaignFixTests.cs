@@ -2510,4 +2510,154 @@ public class Demo
     }
 
     #endregion
+
+    #region Phase 4: Complex attrs, generic calls, empty methods, enum special chars
+
+    [Fact]
+    public void Convert_EmptyMethodBody_EmitsReturnPlaceholder()
+    {
+        // Fix 4.4: Empty method body should emit §R placeholder
+        var csharp = @"
+public class Foo {
+    public void DoNothing() { }
+    public void AlsoEmpty() { }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.NotNull(result.CalorSource);
+
+        var compiled = Compile(result.CalorSource);
+        Assert.NotNull(compiled);
+    }
+
+    [Fact]
+    public void Convert_GenericMethodStatement_Compiles()
+    {
+        // Fix 4.2: Generic method calls in statement position
+        var csharp = @"
+using System.Collections.Generic;
+using System.Linq;
+public class Foo {
+    public void Bar() {
+        var list = new List<object> { 1, ""two"", 3 };
+        list.OfType<int>().ToList();
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.NotNull(result.CalorSource);
+
+        var compiled = Compile(result.CalorSource);
+        Assert.NotNull(compiled);
+    }
+
+    [Fact]
+    public void Convert_EnumWithMultiplyOperator_Compiles()
+    {
+        // Fix 4.7: Enum values with * operator
+        var csharp = @"
+public enum Sizes {
+    Small = 1,
+    Medium = 2 * 1024,
+    Large = 4 * 1024
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.NotNull(result.CalorSource);
+
+        var compiled = Compile(result.CalorSource);
+        Assert.NotNull(compiled);
+    }
+
+    #endregion
+
+    #region Phase 3: Array ID consistency, Dict hoisting, List in match arms, Colon in attributes
+
+    [Fact]
+    public void Convert_ArrayCreation_ConsistentId()
+    {
+        // Fix 3.1: Array ID should be same for open/close tags
+        var csharp = @"
+public class Foo {
+    public int[] GetItems() {
+        return new int[] { 1, 2, 3 };
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.NotNull(result.CalorSource);
+
+        // Should compile without ID mismatch errors
+        var compiled = Compile(result.CalorSource);
+        Assert.NotNull(compiled);
+    }
+
+    [Fact]
+    public void Convert_DictionaryWithComplexValues_Compiles()
+    {
+        // Fix 3.4: Dictionary creation should hoist complex values
+        var csharp = @"
+using System.Collections.Generic;
+public class Foo {
+    public void Bar() {
+        var dict = new Dictionary<string, int> {
+            { ""a"", GetValue(1) },
+            { ""b"", GetValue(2) }
+        };
+    }
+    private int GetValue(int x) => x * 2;
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.NotNull(result.CalorSource);
+
+        var compiled = Compile(result.CalorSource);
+        Assert.NotNull(compiled);
+    }
+
+    [Fact]
+    public void Convert_ListInMatchArm_UsesBlockSyntax()
+    {
+        // Fix 3.6: List creation in match arm should use block syntax, not arrow
+        var csharp = @"
+using System.Collections.Generic;
+public class Foo {
+    public List<int> Transform(int x) {
+        return x switch {
+            1 => new List<int> { 10, 20 },
+            2 => new List<int> { 30, 40 },
+            _ => new List<int>()
+        };
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.NotNull(result.CalorSource);
+
+        var compiled = Compile(result.CalorSource);
+        Assert.NotNull(compiled);
+    }
+
+    [Fact]
+    public void Convert_CallStatementWithComplexArg_HoistsArg()
+    {
+        // Fix 3.3: Call statement should hoist complex arguments
+        var csharp = @"
+public class Foo {
+    public void Bar() {
+        Process(new Config { Name = ""test"", Value = 42 });
+    }
+    private void Process(Config c) { }
+}
+public class Config { public string Name { get; set; } public int Value { get; set; } }
+";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
+        Assert.NotNull(result.CalorSource);
+
+        var compiled = Compile(result.CalorSource);
+        Assert.NotNull(compiled);
+    }
+
+    #endregion
 }
