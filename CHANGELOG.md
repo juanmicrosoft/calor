@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-04-10
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Fixed
+- **Phase 6A — WHERE constraints** — Normalize multiline Roslyn type names in WHERE constraints; add `?`, `*`, `[]`, `.` handling in ParseValue generic loops; strip `@` from ANON/NEW property names; strip `!` null-forgiving from target strings; sanitize backtick from module names
+- **Phase 6B+C — WHERE dot-nested** — Handle `Type<T>.NestedType` in WHERE constraint parser; fix ANON implicit property names; strip `global::` from enum values; add HSET hoisting
+- **Phase 6D — ulong literals** — Add ulong fallback for integers > long.MaxValue; fix `§VAR{}` detection in tuple pattern arms
+- **Phase 6E — array ID mismatch** — Empty arrays emit with explicit size 0; fix match expression multi-line indentation; simplify `delegate*` types to `nint` in attribute blocks
+
 ## [0.4.3] - 2026-04-08
 
 ### Benchmark Results (Statistical: 30 runs)
