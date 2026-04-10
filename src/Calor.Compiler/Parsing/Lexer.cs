@@ -1835,6 +1835,13 @@ public sealed class Lexer
             {
                 return MakeToken(TokenKind.IntLiteral, longValue);
             }
+
+            // Fall back to ulong for values outside long range (e.g., UInt64.MaxValue)
+            if (ulong.TryParse(numericText, out var ulongValue))
+            {
+                return MakeToken(TokenKind.IntLiteral,
+                    new IntLiteralInfo(unchecked((long)ulongValue), IsHex: false, IsUnsigned: true, ulongValue));
+            }
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "number");
