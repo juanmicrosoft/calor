@@ -8094,7 +8094,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         foreach (var init in anonObj.Initializers)
         {
-            var name = init.NameEquals?.Name.Identifier.Text ?? init.Expression.ToString();
+            // Use explicit name if present; otherwise infer from the last simple identifier.
+            // Complex expressions (indexers, invocations) get a generated safe name.
+            var name = init.NameEquals?.Name.Identifier.Text
+                ?? (init.Expression is IdentifierNameSyntax id ? id.Identifier.ValueText
+                    : init.Expression is MemberAccessExpressionSyntax m ? m.Name.Identifier.ValueText
+                    : $"_prop{_context.GenerateId("p")}");
             var value = ConvertExpression(init.Expression);
             // Hoist block-level values (§LIST, §DICT, §SET) that can't appear inline
             if (IsBlockLevelCollection(value))
@@ -9183,7 +9188,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return literal.Token.Text;
 
         // For compound expressions (bitwise OR, shifts, etc.), use ToString()
-        return equalsValue.Value.ToString();
+        // Strip global:: prefix which the parser doesn't handle
+        return equalsValue.Value.ToString().Replace("global::", "");
     }
 
     private static Visibility GetVisibility(SyntaxTokenList modifiers)

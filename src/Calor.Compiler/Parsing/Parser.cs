@@ -6035,15 +6035,61 @@ public sealed class Parser
                     sb.Append('.');
                     Advance();
                 }
-                else if (Check(TokenKind.Identifier))
+                else if (Check(TokenKind.Identifier) || Current.IsKeyword)
                 {
                     sb.Append(Current.Text);
+                    Advance();
+                }
+                else if (Check(TokenKind.Question))
+                {
+                    sb.Append('?');
+                    Advance();
+                }
+                else if (Check(TokenKind.Star))
+                {
+                    sb.Append('*');
+                    Advance();
+                }
+                else if (Check(TokenKind.OpenBracket))
+                {
+                    sb.Append('[');
+                    Advance();
+                }
+                else if (Check(TokenKind.CloseBracket))
+                {
+                    sb.Append(']');
                     Advance();
                 }
                 else
                 {
                     // Unknown token - stop parsing
                     break;
+                }
+            }
+        }
+
+        // Handle dot-qualified nested types after generics: Type<T>.NestedType
+        while (Check(TokenKind.Dot) && (Peek(1).Kind == TokenKind.Identifier || Peek(1).IsKeyword))
+        {
+            sb.Append('.');
+            Advance(); // consume .
+            sb.Append(Advance().Text);
+            // Handle another generic level on the nested type: Outer<T>.Inner<U>
+            if (Check(TokenKind.Less))
+            {
+                sb.Append('<');
+                Advance();
+                var innerDepth = 1;
+                while (!IsAtEnd && innerDepth > 0)
+                {
+                    if (Check(TokenKind.Less)) { sb.Append('<'); innerDepth++; Advance(); }
+                    else if (Check(TokenKind.Greater)) { sb.Append('>'); innerDepth--; Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { sb.Append(">>"); innerDepth -= 2; Advance(); }
+                    else if (Check(TokenKind.Comma)) { sb.Append(", "); Advance(); }
+                    else if (Check(TokenKind.Dot)) { sb.Append('.'); Advance(); }
+                    else if (Check(TokenKind.Identifier)) { sb.Append(Current.Text); Advance(); }
+                    else if (Check(TokenKind.Question)) { sb.Append('?'); Advance(); }
+                    else break;
                 }
             }
         }
