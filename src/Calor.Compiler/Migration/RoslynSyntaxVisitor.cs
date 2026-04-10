@@ -54,6 +54,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     public ModuleNode Convert(CompilationUnitSyntax root, string moduleName)
     {
+        // Sanitize module name: strip backtick (C# generic arity indicator e.g. MyType`2)
+        // and @ prefix to avoid lexer conflicts
+        moduleName = moduleName.Replace("`", "").Replace("@", "");
         _usings.Clear();
         _interfaces.Clear();
         _classes.Clear();
@@ -4336,7 +4339,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Handle invocation expressions (method calls)
         if (expr is InvocationExpressionSyntax invocation)
         {
-            var target = invocation.Expression.ToString();
+            var target = invocation.Expression.ToString().Replace("!", "");
             var args = invocation.ArgumentList.Arguments
                 .Select(a => ConvertExpression(a.Expression))
                 .ToList();
@@ -4512,7 +4515,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (expr is ConditionalAccessExpressionSyntax condAccess)
         {
             _context.RecordFeatureUsage("null-conditional");
-            var targetExpr = condAccess.Expression.ToString();
+            var targetExpr = condAccess.Expression.ToString().Replace("!", "");
             var targetSpan = GetTextSpan(node);
 
             // If the target contains indexers, method calls, or other complex expressions,
@@ -7466,7 +7469,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertInvocationExpression(InvocationExpressionSyntax invocation)
     {
-        var target = invocation.Expression.ToString();
+        var target = invocation.Expression.ToString().Replace("!", "");
         var args = invocation.ArgumentList.Arguments
             .Select(a => ConvertExpression(a.Expression))
             .ToList();
@@ -9124,7 +9127,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new TypeConstraintNode(span, TypeConstraintKind.NotNull),
 
             TypeConstraintSyntax typeConstraint =>
-                new TypeConstraintNode(span, TypeConstraintKind.TypeName, typeConstraint.Type.ToString()),
+                new TypeConstraintNode(span, TypeConstraintKind.TypeName,
+                    System.Text.RegularExpressions.Regex.Replace(
+                        typeConstraint.Type.ToString(), @"\s+", " ").Trim()),
 
             DefaultConstraintSyntax =>
                 // 'default' constraint (C# 9+) - no direct Calor equivalent, skip
