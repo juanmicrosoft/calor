@@ -1111,16 +1111,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Parser expects: §B[type:name] expression (no = sign)
         var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
 
+        // Simplify function pointer types (delegate* unmanaged[...]<...>) that break attribute parsing
+        var mappedType = node.TypeName != null ? TypeMapper.CSharpToCalor(node.TypeName) : null;
+        if (mappedType != null && mappedType.Contains("delegate*"))
+            mappedType = "nint"; // function pointers are pointer-sized; use nint as safe placeholder
+
         if (node.IsMutable)
         {
             // Mutable: {~name} or {~name:type}
-            var typePostfix = node.TypeName != null ? $":{TypeMapper.CSharpToCalor(node.TypeName)}" : "";
+            var typePostfix = mappedType != null ? $":{mappedType}" : "";
             AppendLine($"§B{{~{EscapeCalorIdentifier(node.Name)}{typePostfix}}}{initPart}");
         }
         else
         {
             // Immutable: {name} or {type:name}
-            var typePrefix = node.TypeName != null ? $"{TypeMapper.CSharpToCalor(node.TypeName)}:" : "";
+            var typePrefix = mappedType != null ? $"{mappedType}:" : "";
             AppendLine($"§B{{{typePrefix}{EscapeCalorIdentifier(node.Name)}}}{initPart}");
         }
         return "";
@@ -1268,7 +1273,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            AppendLine($"§ARR{{{elementType}:{variableName}}}");
+            AppendLine($"§ARR{{{elementType}:{variableName}:0}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
@@ -2314,9 +2319,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 var stmtStr = CaptureStatementOutput(stmt);
                 if (!string.IsNullOrWhiteSpace(stmtStr))
                 {
-                    sb.AppendLine($"    {stmtStr.Trim()}");
+                    // Indent ALL lines of multi-line statements (e.g., §LIST blocks)
+                    var trimmed = stmtStr.Trim();
+                    var lines = trimmed.Split('\n');
+                    foreach (var line in lines)
+                    {
+                        sb.AppendLine($"    {line.TrimEnd()}");
+                    }
                 }
             }
+            sb.AppendLine("  §/K");
         }
 
         sb.Append($"§/W{{{id}}}");
@@ -2370,7 +2382,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            return $"§ARR{{{elementType}:{id}}}";
+            // Emit with explicit size 0 so the parser treats this as size-specified (3 positionals)
+            // and doesn't look for §/ARR closing tag. Without the :0, the 2-positional form
+            // §ARR{type:id} is parsed as an initialized array that expects §/ARR.
+            return $"§ARR{{{elementType}:{id}:0}}";
         }
     }
 
