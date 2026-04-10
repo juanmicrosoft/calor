@@ -2079,7 +2079,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             sb.Append($"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}");
             foreach (var (propName, valueStr) in evalInits)
             {
-                sb.Append($"\n{indent}  {propName} = {valueStr}");
+                var safeName = propName.StartsWith("@") ? propName[1..] : propName;
+                sb.Append($"\n{indent}  {safeName} = {valueStr}");
             }
             sb.Append($"\n{indent}§/NEW");
             return sb.ToString();
@@ -2099,7 +2100,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // Hoist values containing section markers
             if (ContainsSectionMarker(value))
                 value = HoistToTempVar(value);
-            sb.Append($"\n{indent}  {init.PropertyName} = {value}");
+            // Strip @ prefix from verbatim C# identifiers (e.g., @class, @checked, @Version)
+            var propName = init.PropertyName.StartsWith("@") ? init.PropertyName[1..] : init.PropertyName;
+            sb.Append($"\n{indent}  {propName} = {value}");
         }
         sb.Append($"\n{indent}§/ANON");
         return sb.ToString();

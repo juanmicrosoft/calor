@@ -4127,13 +4127,38 @@ public sealed class Parser
                             genericDepth -= 2;
                             Advance();
                         }
-                        else if (Check(TokenKind.Identifier))
+                        else if (Check(TokenKind.Identifier) || Current.IsKeyword)
                         {
                             sb.Append(Advance().Text);
                         }
                         else if (Check(TokenKind.Comma))
                         {
                             sb.Append(',');
+                            Advance();
+                        }
+                        else if (Check(TokenKind.Question))
+                        {
+                            sb.Append('?');
+                            Advance();
+                        }
+                        else if (Check(TokenKind.Star))
+                        {
+                            sb.Append('*');
+                            Advance();
+                        }
+                        else if (Check(TokenKind.OpenBracket))
+                        {
+                            sb.Append('[');
+                            Advance();
+                        }
+                        else if (Check(TokenKind.CloseBracket))
+                        {
+                            sb.Append(']');
+                            Advance();
+                        }
+                        else if (Check(TokenKind.Dot))
+                        {
+                            sb.Append('.');
                             Advance();
                         }
                         else
