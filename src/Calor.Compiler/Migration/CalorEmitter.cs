@@ -1628,12 +1628,31 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
 
+        // Pre-evaluate elements to flush hoisted bindings before the §HSET block
+        var evaluatedElements = new List<string>();
+        var allHoisted = new List<string>();
+        foreach (var element in node.Elements)
+        {
+            var val = element.Accept(this);
+            if (_pendingHoistedLines.Count > 0)
+            {
+                allHoisted.AddRange(_pendingHoistedLines);
+                _pendingHoistedLines.Clear();
+            }
+            evaluatedElements.Add(val);
+        }
+
+        foreach (var hoisted in allHoisted)
+        {
+            AppendLine(hoisted);
+        }
+
         AppendLine($"§HSET{{{node.Id}:{elementType}}}");
         Indent();
 
-        foreach (var element in node.Elements)
+        foreach (var val in evaluatedElements)
         {
-            AppendLine(element.Accept(this));
+            AppendLine(val);
         }
 
         Dedent();
