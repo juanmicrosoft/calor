@@ -3469,13 +3469,27 @@ public sealed class Parser
         // Handle parenthesized patterns: (nameof x), (§PREL{gte} 5, _, _), (cast Type x), etc.
         if (Check(TokenKind.OpenParen))
         {
-            // Check if content looks like a pattern (contains §PREL, §VAR, commas for tuple patterns, etc.)
-            // In that case, consume the balanced parens as an opaque pattern
+            // Check if content looks like a pattern (contains §VAR, §PREL, etc. anywhere inside)
+            // Scan ahead through balanced parens to detect pattern tokens
             var saved = _position;
             Advance(); // consume (
-            // Check if first token inside is a pattern token
-            if (Check(TokenKind.RelationalPattern) || Check(TokenKind.Var) || Check(TokenKind.ListPattern)
-                || Check(TokenKind.PropertyPattern) || Check(TokenKind.PositionalPattern))
+            var scanDepth = 1;
+            var containsPatternToken = false;
+            while (!IsAtEnd && scanDepth > 0)
+            {
+                if (Check(TokenKind.OpenParen)) scanDepth++;
+                else if (Check(TokenKind.CloseParen)) { scanDepth--; if (scanDepth == 0) break; }
+                else if (Check(TokenKind.RelationalPattern) || Check(TokenKind.Var)
+                    || Check(TokenKind.ListPattern) || Check(TokenKind.PropertyPattern)
+                    || Check(TokenKind.PositionalPattern))
+                {
+                    containsPatternToken = true;
+                    break;
+                }
+                Advance();
+            }
+
+            if (containsPatternToken)
             {
                 // This is a parenthesized pattern group — consume balanced parens
                 _position = saved;
