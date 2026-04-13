@@ -229,7 +229,8 @@ public class LinqSupportTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§ARR{i32:", result.CalorSource);
+        // Empty arrays use Array.Empty<T>() to avoid nested array parsing issues
+        Assert.Contains("Array.Empty<i32>", result.CalorSource);
     }
 
     [Fact]
