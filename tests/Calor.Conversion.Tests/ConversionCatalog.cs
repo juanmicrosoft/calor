@@ -515,6 +515,228 @@ public static class ConversionCatalog
 
     // ── 10: Unsafe/Low-Level Features ──
 
+    // ── 13: Phase 6-8 Regression Coverage ──
+
+    public static readonly ConversionSnippet WhereConstraintMultiline = new(
+        "13-01", "Phase6Regression", "WHERE constraint with generic nested type",
+        """
+        using System.Collections.Generic;
+
+        public class Container<TFixture> where TFixture : BaseClass<TFixture>.FixtureBase, new()
+        {
+            public TFixture Create() => new TFixture();
+        }
+
+        public class BaseClass<T>
+        {
+            public class FixtureBase { }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet VerbatimIdentifiers = new(
+        "13-02", "Phase6Regression", "Verbatim identifiers (@class, @object, this.@field)",
+        """
+        public class VerbatimDemo
+        {
+            private int @object;
+            private string @class;
+
+            public VerbatimDemo(int @object, string @class)
+            {
+                this.@object = @object;
+                this.@class = @class;
+            }
+
+            public void Process(string @namespace, int @event)
+            {
+                var result = @namespace + @event.ToString();
+            }
+        }
+        """,
+        RoundTripSupported: true);
+
+    public static readonly ConversionSnippet NullableGenericsInArrayType = new(
+        "13-03", "Phase6Regression", "Nullable types inside generic array-bracket notation",
+        """
+        using System;
+        using System.Collections.Generic;
+
+        public class NullableGenericDemo
+        {
+            public KeyValuePair<string, object?>[] GetPairs()
+            {
+                return new KeyValuePair<string, object?>[]
+                {
+                    new("key", null),
+                    new("key2", "value")
+                };
+            }
+
+            public Func<object?, object?, bool> GetComparer()
+            {
+                return (a, b) => Equals(a, b);
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet GenericTypePatternInSwitch = new(
+        "13-04", "Phase6Regression", "Generic type patterns in switch expression arms",
+        """
+        public abstract class Result<T> { }
+        public class Ok<T> : Result<T>
+        {
+            public T Value { get; }
+            public Ok(T value) { Value = value; }
+        }
+        public class Error<T> : Result<T>
+        {
+            public string Message { get; }
+            public Error(string message) { Message = message; }
+        }
+
+        public static class ResultExtensions
+        {
+            public static string Describe<T>(Result<T> result)
+            {
+                return result switch
+                {
+                    Ok<T> ok => $"Success: {ok.Value}",
+                    Error<T> err => $"Error: {err.Message}",
+                    _ => "Unknown"
+                };
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet PropertyPatternInOr = new(
+        "13-05", "Phase6Regression", "Property patterns inside or/and pattern combinators",
+        """
+        public class PatternDemo
+        {
+            public string Classify(object obj)
+            {
+                return obj switch
+                {
+                    string { Length: 0 } => "empty string",
+                    string { Length: > 100 } => "long string",
+                    int n when n > 0 => "positive",
+                    _ => "other"
+                };
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet EnumWithOperatorsAndHex = new(
+        "13-06", "Phase6Regression", "Enum with hex values, multiply, parenthesized expressions",
+        """
+        using System;
+
+        [Flags]
+        public enum ThreadAccess : uint
+        {
+            TERMINATE = (0x0001),
+            SUSPEND_RESUME = (0x0002),
+            GET_CONTEXT = (0x0008),
+            ALL_ACCESS = (0xFFFF),
+            MEDIUM = 2 * 1024,
+            LARGE = 4 * 1024
+        }
+        """,
+        RoundTripSupported: true);
+
+    public static readonly ConversionSnippet EmptyMethodBody = new(
+        "13-07", "Phase6Regression", "Empty method bodies with no statements",
+        """
+        public class EmptyMethods
+        {
+            public void DoNothing() { }
+            public virtual void VirtualEmpty() { }
+            public static void StaticEmpty() { }
+        }
+        """,
+        RoundTripSupported: true);
+
+    public static readonly ConversionSnippet DictionaryAndSetHoisting = new(
+        "13-08", "Phase6Regression", "Dictionary and HashSet with complex initializers requiring hoisting",
+        """
+        using System.Collections.Generic;
+
+        public class CollectionHoistDemo
+        {
+            public Dictionary<string, int> GetValues()
+            {
+                return new Dictionary<string, int>
+                {
+                    { "a", Compute(1) },
+                    { "b", Compute(2) }
+                };
+            }
+
+            public HashSet<string> GetNames()
+            {
+                return new HashSet<string> { Format("x"), Format("y") };
+            }
+
+            private int Compute(int x) => x * 2;
+            private string Format(string s) => s.ToUpper();
+        }
+        """,
+        RoundTripSupported: true);
+
+    public static readonly ConversionSnippet AnonObjectVerbatimProps = new(
+        "13-09", "Phase6Regression", "Anonymous objects with verbatim keyword properties",
+        """
+        public class AnonDemo
+        {
+            public object GetHtmlAttributes()
+            {
+                return new { @class = "container", id = "main" };
+            }
+
+            public object GetConfig(string name)
+            {
+                return new { name, value = 42 };
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet MatchWithCollectionReturn = new(
+        "13-10", "Phase6Regression", "Switch expression returning list creation in default arm",
+        """
+        using System.Collections.Generic;
+
+        public class MatchListDemo
+        {
+            public List<string> GetItems(int category)
+            {
+                return category switch
+                {
+                    1 => new List<string> { "a", "b" },
+                    2 => new List<string> { "c", "d", "e" },
+                    _ => new List<string>()
+                };
+            }
+        }
+        """,
+        RoundTripSupported: false);
+
+    public static readonly ConversionSnippet SizeOnlyAndNestedArrays = new(
+        "13-11", "Phase6Regression", "Size-only arrays and nested array expressions",
+        """
+        public class ArrayDemo
+        {
+            public int[] CreateSized(int n) => new int[n];
+            public string[] CreateEmpty() => new string[0];
+            public object[] Wrap(string value) => new object[] { value, new int[] { 1, 2 } };
+        }
+        """,
+        RoundTripSupported: false);
+
     public static readonly ConversionSnippet SizeOfExpression = new(
         "10-01", "UnsafeLowLevel", "sizeof expression",
         """
@@ -759,6 +981,17 @@ public static class ConversionCatalog
         OperatorOverloadWithModifiers,
         Utf8StringLiteral,
         ListPatterns,
+        WhereConstraintMultiline,
+        VerbatimIdentifiers,
+        NullableGenericsInArrayType,
+        GenericTypePatternInSwitch,
+        PropertyPatternInOr,
+        EnumWithOperatorsAndHex,
+        EmptyMethodBody,
+        DictionaryAndSetHoisting,
+        AnonObjectVerbatimProps,
+        MatchWithCollectionReturn,
+        SizeOnlyAndNestedArrays,
     };
 
     /// <summary>
