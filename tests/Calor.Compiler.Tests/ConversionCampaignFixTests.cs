@@ -2660,4 +2660,72 @@ public class Config { public string Name { get; set; } public int Value { get; s
     }
 
     #endregion
+
+    #region Phase 9: Named args @, ANON ValueText, BOOL boundary, rank guard
+
+    [Fact]
+    public void Parser_NamedArg_AcceptsAtKeyword()
+    {
+        // Fix 9.1: §A[@default] should parse — @ is skipped in named arg brackets
+        var source = @"
+§M{m001:Test}
+§F{f001:Foo:pub}
+§I{str:name}
+§O{str}
+§R §C{Bar} §A[name] name §A[@default] null §/C
+§/F{f001}
+§/M{m001}";
+        var compiled = Compile(source);
+        Assert.NotNull(compiled);
+    }
+
+    [Fact]
+    public void Convert_AnonVerbatimProperty_StripsAt()
+    {
+        // Fix 9.2: new { @class = "x" } should strip @ from property name
+        var csharp = @"
+public class Foo {
+    public object GetAttrs() {
+        return new { @class = ""container"", id = ""main"" };
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success);
+        Assert.NotNull(result.CalorSource);
+        Assert.DoesNotContain("@class", result.CalorSource);
+        Assert.Contains("class =", result.CalorSource);
+    }
+
+    [Fact]
+    public void Lexer_BoolPrefixNotGreedy()
+    {
+        // Fix 9.4: bool:trueTestPermits should NOT be parsed as BOOL:true literal
+        var source = @"
+§M{m001:Test}
+§CL{c001:Foo:pub}
+§MT{m002:Bar:pub} (bool:trueTest, bool:falseAlarm) -> bool
+  §R trueTest
+§/MT{m002}
+§/CL{c001}
+§/M{m001}";
+        var compiled = Compile(source);
+        Assert.NotNull(compiled);
+    }
+
+    [Fact]
+    public void Convert_MultiDimArray_RankZeroNoCrash()
+    {
+        // Fix 9.3: Rank-0 multi-dim array should not crash with negative string length
+        var csharp = @"
+public class Foo {
+    public int[,] Get() => new int[3, 3];
+    public int[,,] Get3D() => new int[2, 2, 2];
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success);
+        var compiled = Compile(result.CalorSource!);
+        Assert.NotNull(compiled);
+    }
+
+    #endregion
 }

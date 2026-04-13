@@ -1180,7 +1180,9 @@ public sealed class Parser
         if (Check(TokenKind.OpenBracket))
         {
             Advance(); // consume '['
-            if (Check(TokenKind.Identifier))
+            // Skip optional @ prefix on verbatim keyword names like @default, @object
+            if (Check(TokenKind.At)) Advance();
+            if (Check(TokenKind.Identifier) || Current.IsKeyword)
             {
                 argumentName = Current.Text;
                 Advance(); // consume name

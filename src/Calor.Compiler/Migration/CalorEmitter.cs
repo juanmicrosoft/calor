@@ -115,8 +115,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ModuleNode node)
     {
-        // Module header
-        AppendLine($"§M{{{node.Id}:{node.Name}}}");
+        // Module header — sanitize backtick (C# generic arity) and @ from name
+        var moduleName = node.Name.Replace("`", "").Replace("@", "");
+        AppendLine($"§M{{{node.Id}:{moduleName}}}");
         Indent();
 
         // Emit using directives
@@ -1282,7 +1283,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void EmitMultiDimArrayCreationWithName(MultiDimArrayCreationNode node, string variableName, string? typeName)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-        var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : $"{elementType}[{new string(',', node.Rank - 1)}]";
+        var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : $"{elementType}[{new string(',', Math.Max(node.Rank - 1, 0))}]";
 
         // Sanitize variable names containing section markers
         var originalTarget = variableName;

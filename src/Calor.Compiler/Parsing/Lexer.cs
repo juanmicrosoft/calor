@@ -1034,9 +1034,14 @@ public sealed class Lexer
             // BOOL:true or BOOL:false
             if (upperText == "BOOL" && (lookahead == 't' || lookahead == 'f'))
             {
-                // Extra check: make sure it's actually "true" or "false", not an identifier
+                // Extra check: make sure it's exactly "true" or "false", not an identifier
+                // like "trueTestPermits..." — require word boundary after the literal
                 var remaining = _source[(_position + 1)..];
-                if (remaining.StartsWith("true") || remaining.StartsWith("false"))
+                if (remaining.StartsWith("true") && (remaining.Length == 4 || !char.IsLetterOrDigit(remaining[4])))
+                {
+                    return ScanTypedBoolLiteral();
+                }
+                if (remaining.StartsWith("false") && (remaining.Length == 5 || !char.IsLetterOrDigit(remaining[5])))
                 {
                     return ScanTypedBoolLiteral();
                 }
