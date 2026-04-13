@@ -1007,7 +1007,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (ContainsSectionMarker(argValue))
                 argValue = HoistToTempVar(argValue);
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
-                return $"§A[{node.ArgumentNames[i]}] {argValue}";
+                return $"§A[{node.ArgumentNames[i]!.TrimStart('@')}] {argValue}";
             return $"§A {argValue}";
         });
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
@@ -2172,7 +2172,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var argValue = a.Accept(this);
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
-                return $"§A[{node.ArgumentNames[i]}] {argValue}";
+                return $"§A[{node.ArgumentNames[i]!.TrimStart('@')}] {argValue}";
             return $"§A {argValue}";
         });
         return $"§C{{{fullTarget}}} {string.Join(" ", args)} §/C";
