@@ -3506,7 +3506,9 @@ public sealed class Parser
                 else if (Check(TokenKind.CloseParen)) { scanDepth--; if (scanDepth == 0) break; }
                 else if (Check(TokenKind.RelationalPattern) || Check(TokenKind.Var)
                     || Check(TokenKind.ListPattern) || Check(TokenKind.PropertyPattern)
-                    || Check(TokenKind.PositionalPattern))
+                    || Check(TokenKind.PositionalPattern)
+                    || Check(TokenKind.OpenBrace)  // property pattern {Prop: val}
+                    || (Check(TokenKind.Identifier) && (Current.Text == "or" || Current.Text == "and" || Current.Text == "not")))
                 {
                     containsPatternToken = true;
                     break;
@@ -5147,9 +5149,31 @@ public sealed class Parser
             while (Current.Text == ".")
             {
                 text += Advance().Text; // consume .
-                if (Check(TokenKind.Identifier))
+                if (Check(TokenKind.Identifier) || Current.IsKeyword)
                 {
                     text += Advance().Text;
+                }
+            }
+
+            // Handle generic type names: CascadingValueSource<MyParamType>
+            if (Check(TokenKind.Less))
+            {
+                text += "<";
+                Advance();
+                var gDepth = 1;
+                while (!IsAtEnd && gDepth > 0)
+                {
+                    if (Check(TokenKind.Less)) { text += "<"; gDepth++; Advance(); }
+                    else if (Check(TokenKind.Greater)) { text += ">"; gDepth--; Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { text += ">>"; gDepth -= 2; Advance(); }
+                    else { text += Advance().Text; }
+                }
+                // Continue with dotted access after generic: Type<T>.Member
+                while (Current.Text == ".")
+                {
+                    text += Advance().Text;
+                    if (Check(TokenKind.Identifier) || Current.IsKeyword)
+                        text += Advance().Text;
                 }
             }
 
