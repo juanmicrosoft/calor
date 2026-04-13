@@ -2012,7 +2012,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
-        return EscapeCalorIdentifier(node.Name);
+        // Strip @ from verbatim identifiers (both simple and dotted like this.@object)
+        var name = node.Name.Replace("@", "");
+        return EscapeCalorIdentifier(name);
     }
 
     public string Visit(BinaryOperationNode node)
@@ -2059,7 +2061,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Only hoist when inside an executable body (method, ctor, etc.)
         else if (ContainsSectionMarker(target) && _memberBodyDepth > 0)
             target = HoistToTempVar(target);
-        return $"{target}.{node.FieldName}";
+        var fieldName = node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName;
+        return $"{target}.{fieldName}";
     }
 
     public string Visit(NewExpressionNode node)
@@ -3174,7 +3177,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Strip @ prefix if present (Roslyn's Identifier.Text includes it for verbatim identifiers)
         var bareName = name.StartsWith('@') ? name[1..] : name;
-        return CSharpReservedWords.Contains(bareName) ? $"`{bareName}`" : name;
+        return CSharpReservedWords.Contains(bareName) ? $"`{bareName}`" : bareName;
     }
 
     private void EmitEffects(EffectsNode? effects)
