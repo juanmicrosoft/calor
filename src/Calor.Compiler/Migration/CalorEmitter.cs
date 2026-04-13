@@ -1274,7 +1274,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            AppendLine($"§ARR{{{elementType}:{variableName}:0}}");
+            AppendLine($"§B{{[{elementType}]:{variableName}}} §C{{Array.Empty<{elementType}>}} §/C");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
@@ -2386,10 +2386,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            // Emit with explicit size 0 so the parser treats this as size-specified (3 positionals)
-            // and doesn't look for §/ARR closing tag. Without the :0, the 2-positional form
-            // §ARR{type:id} is parsed as an initialized array that expects §/ARR.
-            return $"§ARR{{{elementType}:{id}:0}}";
+            // Empty array — use Array.Empty<T>() to avoid nested array parsing issues
+            return $"§C{{Array.Empty<{elementType}>}} §/C";
         }
     }
 
