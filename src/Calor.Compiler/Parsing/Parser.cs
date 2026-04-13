@@ -3388,16 +3388,41 @@ public sealed class Parser
             }
 
             // Handle dotted identifier (e.g., Status.OK — enum member constant)
+            var patName = token.Text;
             if (Check(TokenKind.Dot))
             {
-                var name = token.Text;
                 while (Check(TokenKind.Dot) && Peek(1).Kind == TokenKind.Identifier)
                 {
                     Advance(); // consume .
                     var next = Advance(); // consume identifier
-                    name += "." + next.Text;
+                    patName += "." + next.Text;
                 }
-                return new ConstantPatternNode(token.Span, new ReferenceNode(token.Span, name));
+            }
+
+            // Handle generic type pattern: Valid<A>, Result<T, E>
+            if (Check(TokenKind.Less))
+            {
+                var sb3 = new System.Text.StringBuilder(patName);
+                sb3.Append('<');
+                Advance();
+                var gd3 = 1;
+                while (!IsAtEnd && gd3 > 0)
+                {
+                    if (Check(TokenKind.Less)) { sb3.Append('<'); gd3++; Advance(); }
+                    else if (Check(TokenKind.Greater)) { sb3.Append('>'); gd3--; Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { sb3.Append(">>"); gd3 -= 2; Advance(); }
+                    else if (Check(TokenKind.Comma)) { sb3.Append(", "); Advance(); }
+                    else if (Check(TokenKind.Identifier) || Current.IsKeyword) { sb3.Append(Advance().Text); }
+                    else if (Check(TokenKind.Question)) { sb3.Append('?'); Advance(); }
+                    else if (Check(TokenKind.Dot)) { sb3.Append('.'); Advance(); }
+                    else break;
+                }
+                patName = sb3.ToString();
+            }
+
+            if (patName != token.Text)
+            {
+                return new ConstantPatternNode(token.Span, new ReferenceNode(token.Span, patName));
             }
 
             // Handle type pattern with property sub-pattern: TypeName { Prop: value }
@@ -3507,7 +3532,67 @@ public sealed class Parser
             // Otherwise, parse as expression pattern
             _position = saved;
             var expr = ParseExpression();
+            // If followed by <...>, this is a generic type pattern (e.g., Valid<A>)
+            // Consume the generic part and append to the reference name
+            if (Check(TokenKind.Less) && expr is ReferenceNode refNode)
+            {
+                var sb = new System.Text.StringBuilder(refNode.Name);
+                sb.Append('<');
+                Advance();
+                var gDepth = 1;
+                while (!IsAtEnd && gDepth > 0)
+                {
+                    if (Check(TokenKind.Less)) { sb.Append('<'); gDepth++; Advance(); }
+                    else if (Check(TokenKind.Greater)) { sb.Append('>'); gDepth--; Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { sb.Append(">>"); gDepth -= 2; Advance(); }
+                    else if (Check(TokenKind.Comma)) { sb.Append(", "); Advance(); }
+                    else if (Check(TokenKind.Identifier) || Current.IsKeyword) { sb.Append(Advance().Text); }
+                    else if (Check(TokenKind.Question)) { sb.Append('?'); Advance(); }
+                    else if (Check(TokenKind.Dot)) { sb.Append('.'); Advance(); }
+                    else break;
+                }
+                expr = new ReferenceNode(refNode.Span, sb.ToString());
+            }
             return new ConstantPatternNode(expr.Span, expr);
+        }
+
+        // Identifier or keyword in pattern context: treat as type/constant pattern
+        // Handles generic types like Valid<A>, ErrorResult<T>, dotted names like MyEnum.Value
+        if (Check(TokenKind.Identifier) || Current.IsKeyword)
+        {
+            var startSpan = Current.Span;
+            var sb2 = new System.Text.StringBuilder();
+            sb2.Append(Advance().Text);
+
+            // Handle dotted names: MyType.Value
+            while (Check(TokenKind.Dot) && (Peek(1).Kind == TokenKind.Identifier || Peek(1).IsKeyword))
+            {
+                sb2.Append('.');
+                Advance(); // consume .
+                sb2.Append(Advance().Text);
+            }
+
+            // Handle generic types: Valid<A>, Result<T, E>
+            if (Check(TokenKind.Less))
+            {
+                sb2.Append('<');
+                Advance();
+                var gd = 1;
+                while (!IsAtEnd && gd > 0)
+                {
+                    if (Check(TokenKind.Less)) { sb2.Append('<'); gd++; Advance(); }
+                    else if (Check(TokenKind.Greater)) { sb2.Append('>'); gd--; Advance(); }
+                    else if (Check(TokenKind.GreaterGreater)) { sb2.Append(">>"); gd -= 2; Advance(); }
+                    else if (Check(TokenKind.Comma)) { sb2.Append(", "); Advance(); }
+                    else if (Check(TokenKind.Identifier) || Current.IsKeyword) { sb2.Append(Advance().Text); }
+                    else if (Check(TokenKind.Question)) { sb2.Append('?'); Advance(); }
+                    else if (Check(TokenKind.Dot)) { sb2.Append('.'); Advance(); }
+                    else break;
+                }
+            }
+
+            var ref2 = new ReferenceNode(startSpan, sb2.ToString());
+            return new ConstantPatternNode(startSpan, ref2);
         }
 
         // Default: wildcard
