@@ -4922,7 +4922,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else if (node.Initializer.Count > 0)
         {
-            var commas = new string(',', node.Rank - 1);
+            var commas = new string(',', Math.Max(node.Rank - 1, 0));
             var rows = node.Initializer.Select(row =>
                 "{ " + string.Join(", ", row.Select(e => e.Accept(this))) + " }");
             return $"new {elementType}[{commas}] {{ {string.Join(", ", rows)} }}";

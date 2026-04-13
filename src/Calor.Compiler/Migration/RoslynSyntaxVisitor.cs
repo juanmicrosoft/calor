@@ -8096,7 +8096,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             // Use explicit name if present; otherwise infer from the last simple identifier.
             // Complex expressions (indexers, invocations) get a generated safe name.
-            var name = init.NameEquals?.Name.Identifier.Text
+            var name = init.NameEquals?.Name.Identifier.ValueText
                 ?? (init.Expression is IdentifierNameSyntax id ? id.Identifier.ValueText
                     : init.Expression is MemberAccessExpressionSyntax m ? m.Name.Identifier.ValueText
                     : $"_prop{_context.GenerateId("p")}");
