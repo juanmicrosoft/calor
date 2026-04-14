@@ -2400,7 +2400,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // Hoist complex size expressions out of the attribute braces
             // (§C calls, parenthesized expressions, commas, hex literals break attribute parsing)
             if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':') || size.Contains("0x"))
+            {
                 size = HoistToTempVar(size);
+                // If hoisting failed (field level), fall back to raw C# expression
+                if (ContainsSectionMarker(size) || size.Contains('('))
+                {
+                    var rawExpr = $"new {node.ElementType}[{size}]";
+                    return $"§CS{{{rawExpr}}}";
+                }
+            }
             return $"§ARR{{{elementType}:{id}:{size}}}";
         }
         else

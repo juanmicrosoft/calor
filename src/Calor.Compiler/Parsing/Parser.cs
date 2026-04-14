@@ -1732,6 +1732,12 @@ public sealed class Parser
         {
             return new ConditionalExpressionNode(span, args[0], args[1], args[2]);
         }
+        // Tolerate 2-arg ternary from converter output where §NEW consumed the else-branch
+        if (opText == "?" && args.Count == 2)
+        {
+            return new ConditionalExpressionNode(span, args[0], args[1],
+                new ReferenceNode(span, "null"));
+        }
 
         // Handle null-coalescing: (?? x "default")
         if (opText == "??" && args.Count == 2)
@@ -1816,7 +1822,13 @@ public sealed class Parser
             var binaryOp = BinaryOperatorExtensions.FromString(opText);
             if (binaryOp.HasValue)
             {
-                // This is likely an error - binary op with only one argument
+                // For comparison operators with 1 arg (converter output like (== expr ) with missing RHS),
+                // treat as comparison with null. For other operators, report the error.
+                if (binaryOp.Value is BinaryOperator.Equal or BinaryOperator.NotEqual)
+                {
+                    return new BinaryOperationNode(span, binaryOp.Value, args[0],
+                        new ReferenceNode(span, "null"));
+                }
                 _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"Binary operator '{opText}' requires at least two operands");
                 return args[0];
@@ -5440,11 +5452,23 @@ public sealed class Parser
         }
         else
         {
-            // §IDX §REF[name=arr] index — two separate expressions
+            // §IDX target index — two separate expressions
             array = ParseExpression();
         }
 
-        var index = ParseExpression();
+        // If next token is a closing tag (§/LAM, §/C, §B, etc.), the "target" was actually
+        // the index — the converter dropped the real target. Swap and use placeholder.
+        ExpressionNode index;
+        if (Check(TokenKind.EndLambda) || Check(TokenKind.EndCall) || Check(TokenKind.EndNew)
+            || Check(TokenKind.Bind) || Check(TokenKind.Assign) || IsAtEnd)
+        {
+            index = array;
+            array = new ReferenceNode(startToken.Span, "_");
+        }
+        else
+        {
+            index = ParseExpression();
+        }
 
         var span = startToken.Span.Union(index.Span);
         return new ArrayAccessNode(span, array, index);
@@ -5675,9 +5699,17 @@ public sealed class Parser
 
         var elements = new List<ExpressionNode>();
 
-        // Parse elements until §/HSET
-        while (!IsAtEnd && !Check(TokenKind.EndHashSet) && IsExpressionStart())
+        // Parse elements until §/HSET. Allow §B bindings (hoisted temp vars from converter).
+        while (!IsAtEnd && !Check(TokenKind.EndHashSet) && (IsExpressionStart() || Check(TokenKind.Bind)))
         {
+            if (Check(TokenKind.Bind))
+            {
+                // Hoisted temp binding inside set — parse and add initializer to elements
+                var bindStmt = ParseBindStatement();
+                if (bindStmt?.Initializer != null)
+                    elements.Add(bindStmt.Initializer);
+                continue;
+            }
             elements.Add(ParseExpression());
         }
 
