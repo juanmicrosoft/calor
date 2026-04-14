@@ -10515,10 +10515,25 @@ public sealed class Parser
     /// </summary>
     private bool HasEndNewBeforeEndCall()
     {
+        // Track nesting depth so §/C inside a nested §C{} argument doesn't cause
+        // a false negative. We only care about an UNMATCHED §/C (the enclosing call).
+        int callDepth = 0;
+        int newDepth = 0;
         for (int i = _position; i < _tokens.Count; i++)
         {
-            if (_tokens[i].Kind == TokenKind.EndNew) return true;
-            if (_tokens[i].Kind == TokenKind.EndCall) return false;
+            var kind = _tokens[i].Kind;
+            if (kind == TokenKind.Call) callDepth++;
+            else if (kind == TokenKind.EndCall)
+            {
+                if (callDepth > 0) callDepth--;
+                else return false; // unmatched §/C = enclosing call
+            }
+            else if (kind == TokenKind.New) newDepth++;
+            else if (kind == TokenKind.EndNew)
+            {
+                if (newDepth > 0) newDepth--;
+                else return true; // unmatched §/NEW = our §NEW's closing tag
+            }
         }
         return false;
     }
