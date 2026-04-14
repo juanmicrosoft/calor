@@ -1,0 +1,17 @@
+§M{m001:Test_13_02}
+  §CL{c001:VerbatimDemo:pub}
+    §FLD{i32:object:priv}
+    §FLD{str:`class`:priv}
+
+    §CTOR{ctor002:pub} (i32:object, str:`class`)
+      §ASSIGN this.object object
+      §ASSIGN this.class `class`
+    §/CTOR{ctor002}
+
+    §MT{m003:Process:pub} (str:`namespace`, i32:`event`)
+      §B{result} (+ `namespace` (str `event`))
+    §/MT{m003}
+
+  §/CL{c001}
+
+§/M{m001}

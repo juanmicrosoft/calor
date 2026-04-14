@@ -2015,6 +2015,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Strip @ from verbatim identifiers (both simple and dotted like this.@object)
         var name = node.Name.Replace("@", "");
+        // Don't escape literal keywords (true, false, null) when used as expression values —
+        // they're valid Calor expressions, not identifiers needing backtick escaping.
+        if (name is "true" or "false" or "null")
+            return name;
         return EscapeCalorIdentifier(name);
     }
 
@@ -3144,7 +3148,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         "void", "volatile", "while",
         // Contextual keywords that conflict when used as identifiers
         "var", "dynamic", "yield", "async", "await",
-        "nameof", "when"
+        "nameof", "when",
+        // Literal keywords — conflict with Calor typed literals when used as identifiers
+        "true", "false", "null"
     };
 
     /// <summary>

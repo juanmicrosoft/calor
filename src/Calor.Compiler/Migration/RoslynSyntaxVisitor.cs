@@ -9174,13 +9174,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _context.RecordFeatureUsage("default-parameter");
                 }
                 var paramAttrs = ConvertAttributes(p.AttributeLists);
-                var paramName = p.Identifier.ValueText;
-                // Escape parameter names that conflict with Calor literal keywords
-                if (paramName is "true" or "false" or "null")
-                    paramName = $"`{paramName}`";
                 return new ParameterNode(
                     GetTextSpan(p),
-                    paramName,
+                    p.Identifier.ValueText,
                     TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
                     modifier,
                     new AttributeCollection(),

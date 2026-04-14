@@ -1,0 +1,28 @@
+§M{m001:Test_13_10}
+  §U{System.Collections.Generic}
+
+  §CL{c001:MatchListDemo:pub}
+    §MT{m002:GetItems:pub} (i32:category) -> List<str>
+      §W{match003:expr} category
+        §K 1
+          §LIST{_listStr005:str}
+            "a"
+            "b"
+          §/LIST{_listStr005}
+          §R _listStr005
+        §/K
+        §K 2
+          §LIST{_listStr007:str}
+            "c"
+            "d"
+            "e"
+          §/LIST{_listStr007}
+          §R _listStr007
+        §/K
+        §K _ → §NEW{List<str>} §/NEW
+      §/W{match003}
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m001}

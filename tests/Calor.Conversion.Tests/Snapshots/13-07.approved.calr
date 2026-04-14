@@ -1,0 +1,17 @@
+§M{m001:Test_13_07}
+  §CL{c001:EmptyMethods:pub}
+    §MT{m002:DoNothing:pub}
+      §R
+    §/MT{m002}
+
+    §MT{m003:VirtualEmpty:pub:virt}
+      §R
+    §/MT{m003}
+
+    §MT{m004:StaticEmpty:pub:stat}
+      §R
+    §/MT{m004}
+
+  §/CL{c001}
+
+§/M{m001}
