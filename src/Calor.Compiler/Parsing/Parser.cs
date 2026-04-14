@@ -2033,33 +2033,37 @@ public sealed class Parser
             return new CallExpressionNode(span, opText, args);
         }
 
-        // Unknown operator — report error but recover gracefully by treating as a call.
-        // This handles C# constructs the converter couldn't fully decompose
-        // (e.g., BinaryExpressionSyntax(EqualsExpression) from recursive patterns).
-        var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
-        var suggestion = OperatorSuggestions.FindSimilarOperator(opText);
+        // Unknown operator — check if this looks like a C# construct the converter
+        // couldn't decompose (PascalCase names like EqualsExpression, IsExpression).
+        // Treat those as non-error recoveries to avoid failing on converted code.
+        var isPascalCase = opText.Length > 0 && char.IsUpper(opText[0]) && opText.Any(char.IsLower);
+        if (!isPascalCase)
+        {
+            var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
+            var suggestion = OperatorSuggestions.FindSimilarOperator(opText);
 
-        if (csharpHint != null)
-        {
-            _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
-                $"Unknown operator '{opText}'. {csharpHint}");
-        }
-        else if (suggestion != null)
-        {
-            var filePath = _diagnostics.CurrentFilePath ?? "";
-            var fix = new Diagnostics.SuggestedFix(
-                $"Replace '{opText}' with '{suggestion}'",
-                Diagnostics.TextEdit.Replace(filePath, opSpan.Line, opSpan.Column, opSpan.Line, opSpan.Column + opText.Length, suggestion));
-            _diagnostics.ReportErrorWithFix(opSpan, DiagnosticCode.InvalidOperator,
-                $"Unknown operator '{opText}'. Did you mean '{suggestion}'?", fix);
-        }
-        else
-        {
-            _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
-                $"Unknown operator '{opText}'. Valid operators include: {OperatorSuggestions.GetOperatorCategories()}");
+            if (csharpHint != null)
+            {
+                _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
+                    $"Unknown operator '{opText}'. {csharpHint}");
+            }
+            else if (suggestion != null)
+            {
+                var filePath = _diagnostics.CurrentFilePath ?? "";
+                var fix = new Diagnostics.SuggestedFix(
+                    $"Replace '{opText}' with '{suggestion}'",
+                    Diagnostics.TextEdit.Replace(filePath, opSpan.Line, opSpan.Column, opSpan.Line, opSpan.Column + opText.Length, suggestion));
+                _diagnostics.ReportErrorWithFix(opSpan, DiagnosticCode.InvalidOperator,
+                    $"Unknown operator '{opText}'. Did you mean '{suggestion}'?", fix);
+            }
+            else
+            {
+                _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
+                    $"Unknown operator '{opText}'. Valid operators include: {OperatorSuggestions.GetOperatorCategories()}");
+            }
         }
 
-        // Recover by treating as a method call instead of aborting
+        // Recover by treating as a method call
         return new CallExpressionNode(span, opText, args);
     }
 
