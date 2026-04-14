@@ -2170,9 +2170,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var rawArgs = node.Arguments.Count > 0
                 ? $"({string.Join(", ", node.Arguments.Select(a => a.Accept(this)))})"
                 : "()";
-            // Escape inner braces so the balanced-brace scanner works
+            // §CS{...} uses balanced-brace scanning with string/char literal awareness.
+            // Strip // comments (which may contain apostrophes that confuse the char scanner).
             var innerCode = (node.Target + typeArgsSuffix + rawArgs)
-                .Replace("{", "{{").Replace("}", "}}").Replace("\n", " ").Replace("\r", "");
+                .Replace("\r\n", "\n");
+            innerCode = System.Text.RegularExpressions.Regex.Replace(innerCode, @"//[^\n]*", " ");
+            innerCode = innerCode.Replace("\n", " ");
             return $"§CS{{{innerCode}}}";
         }
 
