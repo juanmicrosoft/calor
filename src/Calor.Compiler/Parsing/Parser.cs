@@ -2416,6 +2416,36 @@ public sealed class Parser
             case TokenKind.Match:
                 expr = ParseMatchExpression(); // §W inside Lisp
                 break;
+            case TokenKind.StackAlloc:
+                expr = ParseStackAlloc(); // §SALLOC inside Lisp
+                break;
+            case TokenKind.RangeOp:
+                expr = ParseRangeExpression(); // §RNG inside Lisp
+                break;
+            case TokenKind.IndexEnd:
+                expr = ParseIndexFromEnd(); // §IEND inside Lisp
+                break;
+            case TokenKind.With:
+                expr = ParseWithExpression(); // §WITH inside Lisp
+                break;
+            case TokenKind.AnonymousObject:
+                expr = ParseAnonymousObjectCreation(); // §ANON inside Lisp
+                break;
+            case TokenKind.Ok:
+                expr = ParseOkExpression(); // §OK inside Lisp
+                break;
+            case TokenKind.Err:
+                expr = ParseErrExpression(); // §ERR inside Lisp
+                break;
+            case TokenKind.Record:
+                expr = ParseRecordCreation(); // §REC inside Lisp
+                break;
+            case TokenKind.Array2D:
+                expr = ParseMultiDimArrayCreation(); // §ARR2D inside Lisp
+                break;
+            case TokenKind.NullConditional:
+                expr = ParseNullConditional(); // §?. inside Lisp
+                break;
             case TokenKind.Tilde:
                 Advance(); // consume ~ (used for binding targets in converter output)
                 expr = Check(TokenKind.Identifier) ? ParseBareReference() : new IntLiteralNode(Current.Span, 0);
@@ -3267,13 +3297,32 @@ public sealed class Parser
                 }
                 else
                 {
-                    var left = ParsePattern();
-                    var right = ParsePattern();
-                    Expect(TokenKind.CloseParen);
-                    var span = openParen.Span.Union(right.Span);
-                    return keyword.Text == "or"
-                        ? new OrPatternNode(span, left, right)
-                        : new AndPatternNode(span, left, right);
+                    // Iterative parsing for deeply nested left-associative (or/and) patterns
+                    // to avoid stack overflow (e.g., 1900+ nested (or ...) levels).
+                    var combinator = keyword.Text;
+                    int depth = 1;
+
+                    while (Check(TokenKind.OpenParen) && Peek(1).Kind == TokenKind.Identifier
+                           && Peek(1).Text == combinator)
+                    {
+                        Advance(); // consume (
+                        Advance(); // consume or/and
+                        depth++;
+                    }
+
+                    var result = ParsePattern(); // deepest left operand
+
+                    for (int d = 0; d < depth; d++)
+                    {
+                        var right = ParsePattern();
+                        Expect(TokenKind.CloseParen);
+                        var span = openParen.Span.Union(right.Span);
+                        result = combinator == "or"
+                            ? new OrPatternNode(span, result, right)
+                            : new AndPatternNode(span, result, right);
+                    }
+
+                    return result;
                 }
             }
         }
@@ -9306,8 +9355,15 @@ public sealed class Parser
             {
                 sliceIndex = patterns.Count;
                 var restToken = Expect(TokenKind.Rest);
-                var restAttrs = ParseAttributes();
-                var restName = restAttrs["_pos0"] ?? "_";
+                // Only consume one {name} attribute block — ParseAttributes would
+                // greedily consume a following property pattern { Prop: val } as attributes
+                string restName = "_";
+                if (Check(TokenKind.OpenBrace))
+                {
+                    Advance(); // consume {
+                    restName = ParseValue();
+                    Expect(TokenKind.CloseBrace);
+                }
                 slicePattern = new VarPatternNode(restToken.Span, restName);
             }
             else if (Check(TokenKind.Call))

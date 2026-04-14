@@ -2438,8 +2438,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var sb = new System.Text.StringBuilder();
             sb.Append($"§LAM{{{header}}}");
 
-            // For short lambdas (1-2 statements), emit inline
-            if (node.StatementBody.Count <= 2)
+            // For short lambdas (1-2 statements), emit inline — unless any statement
+            // produces multi-line output (e.g. FallbackCommentNode), which would bury
+            // the §/LAM closing tag inside a comment line.
+            var hasMultiLineStmt = node.StatementBody.Any(s => s is FallbackCommentNode);
+            if (node.StatementBody.Count <= 2 && !hasMultiLineStmt)
             {
                 var stmts = node.StatementBody.Select(s => CaptureStatementOutput(s).Trim()).ToList();
                 sb.Append(" ");

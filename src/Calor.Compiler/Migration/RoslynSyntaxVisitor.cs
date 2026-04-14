@@ -2187,19 +2187,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         else if (expressionBody != null)
         {
+            var result = new List<StatementNode>();
+
             // Check if expression body is an assignment (e.g., void Method() => _field = value)
             if (expressionBody.Expression is AssignmentExpressionSyntax exprAssign)
             {
                 var target = ConvertExpression(exprAssign.Left);
                 var value = ConvertExpression(exprAssign.Right);
-                return new List<StatementNode> { new AssignmentStatementNode(GetTextSpan(expressionBody), target, value) };
+                FlushPendingStatements(result);
+                result.Add(new AssignmentStatementNode(GetTextSpan(expressionBody), target, value));
+                return result;
             }
-            return new List<StatementNode>
-            {
-                new ReturnStatementNode(
-                    GetTextSpan(expressionBody),
-                    ConvertExpression(expressionBody.Expression))
-            };
+
+            var expr = ConvertExpression(expressionBody.Expression);
+            FlushPendingStatements(result);
+            result.Add(new ReturnStatementNode(GetTextSpan(expressionBody), expr));
+            return result;
         }
         return Array.Empty<StatementNode>();
     }
@@ -8678,6 +8681,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .ToList();
         }
 
+        // For new T[0] with no initializer, use Array.Empty<T>() to avoid nested array ID mismatches
+        if (size is IntLiteralNode { Value: 0 } && initializer.Count == 0)
+        {
+            return new CallExpressionNode(GetTextSpan(arrayCreation),
+                $"Array.Empty<{elementType}>",
+                new List<ExpressionNode>(),
+                new List<string>());
+        }
+
         return new ArrayCreationNode(GetTextSpan(arrayCreation), id, name, elementType, size, initializer, new AttributeCollection());
     }
 
@@ -9162,9 +9174,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _context.RecordFeatureUsage("default-parameter");
                 }
                 var paramAttrs = ConvertAttributes(p.AttributeLists);
+                var paramName = p.Identifier.ValueText;
+                // Escape parameter names that conflict with Calor literal keywords
+                if (paramName is "true" or "false" or "null")
+                    paramName = $"`{paramName}`";
                 return new ParameterNode(
                     GetTextSpan(p),
-                    p.Identifier.ValueText,
+                    paramName,
                     TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
                     modifier,
                     new AttributeCollection(),

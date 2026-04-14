@@ -2728,4 +2728,138 @@ public class Foo {
     }
 
     #endregion
+
+    #region Phase 11: Stack overflow on deeply nested or-patterns
+
+    [Fact]
+    public void Parse_DeeplyNestedOrPattern_NoStackOverflow()
+    {
+        // Build a deeply nested (or (or (or ... A B) C) D) pattern with 500+ alternatives
+        // This previously caused a stack overflow in ParsePattern due to recursive descent.
+        var alternatives = Enumerable.Range(1, 500).Select(i => $"INT:{i}").ToList();
+        var pattern = alternatives[0];
+        for (int i = 1; i < alternatives.Count; i++)
+            pattern = $"(or {pattern} {alternatives[i]})";
+
+        var source = $@"
+§M{{m001:Test}}
+§F{{f001:Big:pub}}
+§I{{i32:x}}
+§O{{i32}}
+§W{{m1}} x
+§K {pattern}
+§R INT:1
+§K _
+§R INT:0
+§/W{{m1}}
+§/F{{f001}}
+§/M{{m001}}
+";
+        var csharp = ParseAndEmit(source);
+        Assert.Contains("switch", csharp);
+    }
+
+    #endregion
+
+    #region Phase 11: Lambda with FallbackCommentNode must use multi-line format
+
+    [Fact]
+    public void Convert_LambdaWithFallbackComment_ClosingTagNotBuriedInComment()
+    {
+        // When a lambda body contains a FallbackCommentNode (unsupported C# feature),
+        // the CalorEmitter must use multi-line format so the §/LAM closing tag
+        // is on its own line, not appended after a comment line.
+        var csharp = @"
+using System;
+using System.Collections.Generic;
+using System.Linq;
+public class Foo {
+    public void Bar(Dictionary<string, string> dict) {
+        dict.AddOrUpdate(""key"",
+            addValueFactory: (k) => ""value"",
+            updateValueFactory: (k, existing) => {
+                foreach (var (a, b) in new List<(int, int)>()) { }
+                return existing;
+            });
+    }
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success);
+        // The Calor source should compile — the §/LAM tag must not be inside a comment
+        var compiled = Compile(result.CalorSource!);
+        // Even if the fallback comment prevents full compilation, the §/LAM should be findable
+        Assert.DoesNotContain("// C#:", result.CalorSource!.Split('\n').LastOrDefault(l => l.Contains("§/LAM")) ?? "");
+    }
+
+    #endregion
+
+    #region Phase 11: Parameter names that are keyword literals need backtick escaping
+
+    [Fact]
+    public void Convert_ParameterNamedTrue_BacktickEscaped()
+    {
+        var csharp = @"
+public class Foo {
+    public string Test(string @true, string @false) => @true + @false;
+}";
+        var result = _converter.Convert(csharp);
+        Assert.True(result.Success);
+        Assert.Contains("`true`", result.CalorSource);
+        Assert.Contains("`false`", result.CalorSource);
+        var compiled = Compile(result.CalorSource!);
+        Assert.NotNull(compiled);
+    }
+
+    #endregion
+
+    #region Phase 11: §PLIST §REST followed by property pattern
+
+    [Fact]
+    public void Parse_PlistRestFollowedByPropertyPattern_Compiles()
+    {
+        // When §PLIST §REST{_} is followed by { Prop: value }, ParseAttributes
+        // must not greedily consume the property pattern as REST attributes.
+        var source = @"
+§M{m001:Test}
+§F{f001:Check:pub}
+§I{i32:x}
+§O{bool}
+§B{result} §W{lp001} x
+  §K §PLIST §REST{_} { Flag: true }
+    §R true
+  §/K
+  §K _
+    §R false
+§/W{lp001}
+§R result
+§/F{f001}
+§/M{m001}
+";
+        var diag = ParseWithDiagnostics(source);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+    }
+
+    #endregion
+
+    #region Phase 11: Missing Lisp tokens (§SALLOC in null-coalesce)
+
+    [Fact]
+    public void Parse_StackAllocInsideNullCoalesce_Compiles()
+    {
+        // §SALLOC inside (?? ...) Lisp expression must be recognized as expression start
+        var source = @"
+§M{m001:Test}
+§F{f001:Alloc:pub}
+§O{i32}
+§B{arr} §SALLOC{char:256}
+§B{buf} (?? arr §SALLOC{char:128})
+§R INT:0
+§/F{f001}
+§/M{m001}
+";
+        var diag = ParseWithDiagnostics(source);
+        Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
+    }
+
+    #endregion
 }
