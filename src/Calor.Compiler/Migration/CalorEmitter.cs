@@ -1924,12 +1924,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(IntLiteralNode node)
     {
-        if (node.IsHex)
-        {
-            if (node.IsUnsigned)
-                return $"0x{node.UnsignedValue:X}";
-            return $"0x{node.Value:X}";
-        }
+        // Always emit decimal — hex format (0xE0) breaks attribute parsing inside
+        // §ARR, §L, and other tag blocks where braces are balanced by the parser.
+        if (node.IsUnsigned)
+            return node.UnsignedValue.ToString();
         return node.Value.ToString();
     }
 
@@ -2397,8 +2395,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var size = node.Size.Accept(this);
             // Hoist complex size expressions out of the attribute braces
-            // (§C calls, parenthesized expressions, commas break attribute parsing)
-            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':'))
+            // (§C calls, parenthesized expressions, commas, hex literals break attribute parsing)
+            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':') || size.Contains("0x"))
                 size = HoistToTempVar(size);
             return $"§ARR{{{elementType}:{id}:{size}}}";
         }
