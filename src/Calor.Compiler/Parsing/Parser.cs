@@ -1629,6 +1629,15 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.OpenParen);
 
+        // If the next token is ( — this is a parenthesized sub-expression, not a Lisp form.
+        // Parse the inner expression and consume the closing ).
+        if (Check(TokenKind.OpenParen))
+        {
+            var inner = ParseParenExpressionOrInlineLambda();
+            Expect(TokenKind.CloseParen);
+            return inner;
+        }
+
         // Get the operator
         var (opKind, opText, opSpan) = ParseLispOperator();
 
