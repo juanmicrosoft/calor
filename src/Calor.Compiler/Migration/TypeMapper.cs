@@ -358,6 +358,7 @@ public static class TypeMapper
             var baseName = csharpType[..genericIndex];
             // Find the matching closing '>' by tracking bracket depth
             var closingIndex = FindMatchingCloseBracket(csharpType, genericIndex);
+            if (closingIndex <= genericIndex) return csharpType; // malformed generic — return as-is
             var typeArgs = csharpType[(genericIndex + 1)..closingIndex];
             var suffix = closingIndex + 1 < csharpType.Length ? csharpType[(closingIndex + 1)..] : "";
             var mappedBase = CSharpToCalorMap.TryGetValue(baseName, out var calorBase) ? calorBase : baseName;
@@ -486,6 +487,7 @@ public static class TypeMapper
         {
             var baseName = calorType[..genericIndex];
             var closingIndex = FindMatchingCloseBracket(calorType, genericIndex);
+            if (closingIndex <= genericIndex) return calorType; // malformed generic — return as-is
             var typeArgs = calorType[(genericIndex + 1)..closingIndex];
             var suffix = closingIndex + 1 < calorType.Length ? calorType[(closingIndex + 1)..] : "";
             var mappedBase = CalorToCSharpMap.TryGetValue(baseName, out var csharpBase) ? csharpBase : baseName;

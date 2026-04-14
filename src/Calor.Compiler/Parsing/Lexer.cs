@@ -525,7 +525,8 @@ public sealed class Lexer
         if (Lookahead == '/')
         {
             // Line comment: skip to end of line
-            while (Current != '\n' && Current != '\r' && Current != '\0')
+            // Only \n terminates (not bare \r) to handle embedded \r in doc comments
+            while (Current != '\n' && Current != '\0')
                 Advance();
             return NextToken(); // skip comment entirely, return next real token
         }
