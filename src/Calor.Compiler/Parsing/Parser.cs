@@ -9299,7 +9299,8 @@ public sealed class Parser
         VarPatternNode? slicePattern = null;
         int sliceIndex = -1;
 
-        while (!IsAtEnd && (IsPatternStart() || Check(TokenKind.Rest)))
+        while (!IsAtEnd && (IsPatternStart() || Check(TokenKind.Rest)
+            || Check(TokenKind.Call) || Check(TokenKind.OpenBrace)))
         {
             if (Check(TokenKind.Rest))
             {
@@ -9308,6 +9309,22 @@ public sealed class Parser
                 var restAttrs = ParseAttributes();
                 var restName = restAttrs["_pos0"] ?? "_";
                 slicePattern = new VarPatternNode(restToken.Span, restName);
+            }
+            else if (Check(TokenKind.Call))
+            {
+                // §C{SyntaxKind.WhitespaceTrivia} §/C — property sub-condition in list pattern
+                // Consume the call and its close as an opaque pattern element
+                var callToken = Advance();
+                ParseAttributes();
+                while (!IsAtEnd && !Check(TokenKind.EndCall)) Advance();
+                if (Check(TokenKind.EndCall)) Advance();
+                patterns.Add(new ConstantPatternNode(callToken.Span,
+                    new ReferenceNode(callToken.Span, "_patternCall")));
+            }
+            else if (Check(TokenKind.OpenBrace))
+            {
+                // { Prop: value } property sub-pattern inside list pattern
+                patterns.Add(ParsePattern());
             }
             else
             {
