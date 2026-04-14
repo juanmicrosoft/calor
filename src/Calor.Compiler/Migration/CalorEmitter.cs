@@ -2166,15 +2166,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         // If the target contains characters that would break §C{} attribute parsing
         // (parentheses, brackets from raw C# chains the converter couldn't decompose),
-        // emit the entire expression as raw C# to avoid cascading parse errors.
+        // emit the entire expression as raw §CS{...} to avoid cascading parse errors.
         if (node.Target.IndexOfAny(['(', ')', '[', ']']) >= 0)
         {
             var rawArgs = node.Arguments.Count > 0
                 ? $"({string.Join(", ", node.Arguments.Select(a => a.Accept(this)))})"
                 : "()";
-            var escapedRaw = (node.Target + typeArgsSuffix + rawArgs)
-                .Replace("\\", "\\\\").Replace("\"", "'").Replace("\n", " ").Replace("\r", "");
-            return $"§CS \"{escapedRaw}\"";
+            // Escape inner braces so the balanced-brace scanner works
+            var innerCode = (node.Target + typeArgsSuffix + rawArgs)
+                .Replace("{", "{{").Replace("}", "}}").Replace("\n", " ").Replace("\r", "");
+            return $"§CS{{{innerCode}}}";
         }
 
         // Escape braces in target to avoid conflicts with Calor tag syntax,

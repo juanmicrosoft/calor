@@ -2333,7 +2333,7 @@ public sealed class Parser
                 expr = ParseBareReference(); // Bare variable reference
                 break;
             case TokenKind.OpenParen:
-                expr = ParseLispExpression(); // Nested expression
+                expr = ParseParenExpressionOrInlineLambda(); // Nested expression or tuple
                 break;
             case TokenKind.Call:
                 expr = ParseCallExpression(); // Call expression inside Lisp

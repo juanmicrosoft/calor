@@ -279,6 +279,9 @@ public static class TypeMapper
         if (csharpType.Contains('@'))
             csharpType = csharpType.Replace("@", "");
 
+        // Normalize spaces before array brackets: "OpCode []" → "OpCode[]"
+        csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"\s+(\[)", "$1");
+
         // Strip C-style block comments /* ... */ from Roslyn trivia
         if (csharpType.Contains("/*"))
         {
