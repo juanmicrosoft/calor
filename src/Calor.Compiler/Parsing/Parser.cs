@@ -2033,20 +2033,19 @@ public sealed class Parser
             return new CallExpressionNode(span, opText, args);
         }
 
-        // Unknown operator - provide helpful suggestions
+        // Unknown operator — report error but recover gracefully by treating as a call.
+        // This handles C# constructs the converter couldn't fully decompose
+        // (e.g., BinaryExpressionSyntax(EqualsExpression) from recursive patterns).
         var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
         var suggestion = OperatorSuggestions.FindSimilarOperator(opText);
 
         if (csharpHint != null)
         {
-            // C# construct with Calor alternative
             _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
                 $"Unknown operator '{opText}'. {csharpHint}");
         }
         else if (suggestion != null)
         {
-            // Typo - suggest the correct operator
-            // Use opSpan (the operator token's span) for precise fix positioning
             var filePath = _diagnostics.CurrentFilePath ?? "";
             var fix = new Diagnostics.SuggestedFix(
                 $"Replace '{opText}' with '{suggestion}'",
@@ -2056,12 +2055,12 @@ public sealed class Parser
         }
         else
         {
-            // No suggestion - show categories of valid operators
             _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
                 $"Unknown operator '{opText}'. Valid operators include: {OperatorSuggestions.GetOperatorCategories()}");
         }
 
-        return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
+        // Recover by treating as a method call instead of aborting
+        return new CallExpressionNode(span, opText, args);
     }
 
     private (TokenKind kind, string text, TextSpan span) ParseLispOperator()
