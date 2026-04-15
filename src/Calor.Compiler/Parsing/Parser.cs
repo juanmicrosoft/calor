@@ -3276,15 +3276,12 @@ public sealed class Parser
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
             }
-            else if (IsExpressionStart() && !Check(TokenKind.Bind) && !Check(TokenKind.Call)
-                && !Check(TokenKind.Assign) && !Check(TokenKind.Return) && !Check(TokenKind.If)
-                && !Check(TokenKind.New) && !Check(TokenKind.Array) && !Check(TokenKind.List))
+            else if (Check(TokenKind.Lambda))
             {
-                // Expression-only case body (no arrow, no statement keywords) — common in
-                // converter output where lambdas or expressions appear directly after the pattern.
+                // Lambda-only case body (no arrow) — from converter output where
+                // inline lambdas appear directly after the pattern.
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
-                // Consume optional §/K closing tag
                 if (Check(TokenKind.EndCase)) Advance();
             }
             else
