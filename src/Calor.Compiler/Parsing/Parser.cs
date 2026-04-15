@@ -3506,6 +3506,17 @@ public sealed class Parser
                 patName = sb3.ToString();
             }
 
+            // Handle positional type pattern: TypeName(subpattern) or TypeName((or ...))
+            // from C# recursive patterns like BinaryExpressionSyntax(EqualsExpression)
+            if (Check(TokenKind.OpenParen))
+            {
+                var inner = ParseParenExpressionOrInlineLambda();
+                // Treat inner as an opaque sub-pattern — the exact value doesn't matter
+                // for compilation since this is a C# construct wrapped for round-tripping.
+                return new ConstantPatternNode(token.Span, new CallExpressionNode(
+                    token.Span, patName, new List<ExpressionNode> { inner }));
+            }
+
             if (patName != token.Text)
             {
                 return new ConstantPatternNode(token.Span, new ReferenceNode(token.Span, patName));
@@ -5492,11 +5503,12 @@ public sealed class Parser
             array = ParseExpression();
         }
 
-        // If next token is a closing tag (§/LAM, §/C, §B, etc.), the "target" was actually
+        // If next token is a closing tag (§/LAM, §/C, §B, §EL, etc.), the "target" was actually
         // the index — the converter dropped the real target. Swap and use placeholder.
         ExpressionNode index;
         if (Check(TokenKind.EndLambda) || Check(TokenKind.EndCall) || Check(TokenKind.EndNew)
-            || Check(TokenKind.Bind) || Check(TokenKind.Assign) || IsAtEnd)
+            || Check(TokenKind.Bind) || Check(TokenKind.Assign) || Check(TokenKind.Else)
+            || Check(TokenKind.EndIf) || IsAtEnd)
         {
             index = array;
             array = new ReferenceNode(startToken.Span, "_");
