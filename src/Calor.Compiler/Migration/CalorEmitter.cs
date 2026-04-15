@@ -1116,6 +1116,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var mappedType = node.TypeName != null ? TypeMapper.CSharpToCalor(node.TypeName) : null;
         if (mappedType != null && mappedType.Contains("delegate*"))
             mappedType = "nint"; // function pointers are pointer-sized; use nint as safe placeholder
+        // Compact OPTION[inner=T] → ?T to avoid bracket issues in attribute blocks.
+        // Stop capture at ) or > to avoid swallowing tuple/generic closers.
+        while (mappedType != null && mappedType.Contains("OPTION["))
+            mappedType = System.Text.RegularExpressions.Regex.Replace(mappedType, @"OPTION\[inner=([^\]\)>]+)\]", "?$1");
 
         if (node.IsMutable)
         {
