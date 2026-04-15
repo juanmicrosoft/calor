@@ -3121,6 +3121,22 @@ public sealed class Parser
             }
         }
 
+        // Handle raw C# method call syntax: obj.Method(args) from unconverted code.
+        // Consumes balanced parens and creates a CallExpressionNode.
+        if (Check(TokenKind.OpenParen) && expr is FieldAccessNode rawCallExpr)
+        {
+            Advance(); // consume (
+            int parenDepth = 1;
+            while (!IsAtEnd && parenDepth > 0)
+            {
+                if (Check(TokenKind.OpenParen)) parenDepth++;
+                else if (Check(TokenKind.CloseParen)) parenDepth--;
+                if (parenDepth > 0) Advance();
+            }
+            if (Check(TokenKind.CloseParen)) Advance();
+            expr = new CallExpressionNode(expr.Span, ExtractDottedName(rawCallExpr), new List<ExpressionNode>());
+        }
+
         return expr;
     }
 
