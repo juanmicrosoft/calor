@@ -3359,6 +3359,14 @@ public sealed class Parser
             }
         }
 
+        // Handle §C{TypeName} as opaque type pattern in match cases
+        // (from converter output like §C{MemberAccessExpressionSyntax} §A ...)
+        if (Check(TokenKind.Call))
+        {
+            var callExpr = ParseCallExpression();
+            return new ConstantPatternNode(callExpr.Span, callExpr);
+        }
+
         // Handle §PLIST pattern
         if (Check(TokenKind.ListPattern))
         {
@@ -9452,10 +9460,17 @@ public sealed class Parser
             else if (Check(TokenKind.Call))
             {
                 // §C{SyntaxKind.WhitespaceTrivia} §/C — property sub-condition in list pattern
-                // Consume the call and its close as an opaque pattern element
+                // Consume the call and its close as an opaque pattern element.
+                // Track nesting depth for §C{T} §A §C{K} §/C §/C patterns.
                 var callToken = Advance();
                 ParseAttributes();
-                while (!IsAtEnd && !Check(TokenKind.EndCall)) Advance();
+                int callDepth = 1;
+                while (!IsAtEnd && callDepth > 0)
+                {
+                    if (Check(TokenKind.Call)) callDepth++;
+                    else if (Check(TokenKind.EndCall)) callDepth--;
+                    if (callDepth > 0) Advance();
+                }
                 if (Check(TokenKind.EndCall)) Advance();
                 patterns.Add(new ConstantPatternNode(callToken.Span,
                     new ReferenceNode(callToken.Span, "_patternCall")));
