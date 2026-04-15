@@ -282,6 +282,11 @@ public static class TypeMapper
         // Normalize spaces before array brackets: "OpCode []" → "OpCode[]"
         csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"\s+(\[)", "$1");
 
+        // Compact OPTION[inner=T] → ?T only when it appears in the input
+        // (avoid running regex on every type for performance)
+        if (csharpType.Contains("OPTION["))
+            csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"OPTION\[inner=([^\]\)]+)\]", "?$1");
+
         // Strip C-style block comments /* ... */ from Roslyn trivia
         if (csharpType.Contains("/*"))
         {

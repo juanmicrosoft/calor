@@ -3276,6 +3276,15 @@ public sealed class Parser
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
             }
+            else if (IsExpressionStart() && !Check(TokenKind.Bind) && !Check(TokenKind.Call)
+                && !Check(TokenKind.Assign) && !Check(TokenKind.Return) && !Check(TokenKind.If)
+                && !Check(TokenKind.New) && !Check(TokenKind.Array) && !Check(TokenKind.List))
+            {
+                // Expression-only case body (no arrow, no statement keywords) — common in
+                // converter output where lambdas or expressions appear directly after the pattern.
+                var expr = ParseExpression();
+                body.Add(new ReturnStatementNode(expr.Span, expr));
+            }
             else
             {
                 // Block syntax - parse statements until closing tag or next case
@@ -4056,6 +4065,22 @@ public sealed class Parser
             else
             {
                 initializer = ParseExpression();
+                // If the initializer is a field access followed by ( — this is raw C# method
+                // call syntax the converter couldn't decompose. Consume balanced parens.
+                if (initializer is FieldAccessNode rawCall && Check(TokenKind.OpenParen))
+                {
+                    Advance(); // consume (
+                    int depth = 1;
+                    while (!IsAtEnd && depth > 0)
+                    {
+                        if (Check(TokenKind.OpenParen)) depth++;
+                        else if (Check(TokenKind.CloseParen)) depth--;
+                        if (depth > 0) Advance();
+                    }
+                    if (Check(TokenKind.CloseParen)) Advance();
+                    initializer = new CallExpressionNode(initializer.Span,
+                        ExtractDottedName(rawCall), new List<ExpressionNode>());
+                }
             }
         }
 
