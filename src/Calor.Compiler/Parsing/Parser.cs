@@ -4888,13 +4888,15 @@ public sealed class Parser
             }
             else if (Check(TokenKind.OpenBracket))
             {
-                // Handle array suffix after tuple or other types: (int, string)[], int[]
+                // Handle array suffix/indexer with depth tracking: [0], [..expr[0]]
                 sb.Append('[');
                 Advance();
-                while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+                int bracketDepth2 = 1;
+                while (!IsAtEnd && bracketDepth2 > 0)
                 {
-                    sb.Append(Current.Text);
-                    Advance();
+                    if (Check(TokenKind.OpenBracket)) { bracketDepth2++; sb.Append('['); Advance(); }
+                    else if (Check(TokenKind.CloseBracket)) { bracketDepth2--; if (bracketDepth2 > 0) { sb.Append(']'); Advance(); } }
+                    else { sb.Append(Current.Text); Advance(); }
                 }
                 if (Check(TokenKind.CloseBracket))
                 {
