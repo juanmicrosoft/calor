@@ -3121,22 +3121,6 @@ public sealed class Parser
             }
         }
 
-        // Handle raw C# method call syntax: obj.Method(args) from unconverted code.
-        // Consumes balanced parens and creates a CallExpressionNode.
-        if (Check(TokenKind.OpenParen) && expr is FieldAccessNode rawCallExpr)
-        {
-            Advance(); // consume (
-            int parenDepth = 1;
-            while (!IsAtEnd && parenDepth > 0)
-            {
-                if (Check(TokenKind.OpenParen)) parenDepth++;
-                else if (Check(TokenKind.CloseParen)) parenDepth--;
-                if (parenDepth > 0) Advance();
-            }
-            if (Check(TokenKind.CloseParen)) Advance();
-            expr = new CallExpressionNode(expr.Span, ExtractDottedName(rawCallExpr), new List<ExpressionNode>());
-        }
-
         return expr;
     }
 
@@ -4094,9 +4078,10 @@ public sealed class Parser
             else
             {
                 initializer = ParseExpression();
-                // If the initializer is a field access followed by ( — this is raw C# method
-                // call syntax the converter couldn't decompose. Consume balanced parens.
-                if (initializer is FieldAccessNode rawCall && Check(TokenKind.OpenParen))
+                // If the initializer is a dotted reference followed by ( — this is raw C# method
+                // call syntax the converter couldn't decompose. The lexer includes dots in
+                // identifiers (cache.Get → single token), so check ReferenceNode with dots.
+                if (initializer is ReferenceNode dottedRef && dottedRef.Name.Contains('.') && Check(TokenKind.OpenParen))
                 {
                     Advance(); // consume (
                     int depth = 1;
@@ -4108,7 +4093,7 @@ public sealed class Parser
                     }
                     if (Check(TokenKind.CloseParen)) Advance();
                     initializer = new CallExpressionNode(initializer.Span,
-                        ExtractDottedName(rawCall), new List<ExpressionNode>());
+                        dottedRef.Name, new List<ExpressionNode>());
                 }
             }
         }
