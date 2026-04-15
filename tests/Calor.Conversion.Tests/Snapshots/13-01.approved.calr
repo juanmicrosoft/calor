@@ -1,0 +1,19 @@
+§M{m001:Test_13_01}
+  §U{System.Collections.Generic}
+
+  §CL{c001:Container<TFixture>:pub}
+    §WHERE TFixture : BaseClass<TFixture>.FixtureBase, new
+
+    §MT{m002:Create:pub} () -> TFixture
+      §R §NEW{TFixture} §/NEW
+    §/MT{m002}
+
+  §/CL{c001}
+
+  §CL{c003:BaseClass<T>:pub}
+    §CL{c004:FixtureBase:pub}
+    §/CL{c004}
+
+  §/CL{c003}
+
+§/M{m001}

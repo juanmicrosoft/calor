@@ -1,0 +1,19 @@
+§M{m001:Test_13_09}
+  §CL{c001:AnonDemo:pub}
+    §MT{m002:GetHtmlAttributes:pub} () -> any
+      §R §ANON
+        class = "container"
+        id = "main"
+      §/ANON
+    §/MT{m002}
+
+    §MT{m003:GetConfig:pub} (str:name) -> any
+      §R §ANON
+        name = name
+        value = 42
+      §/ANON
+    §/MT{m003}
+
+  §/CL{c001}
+
+§/M{m001}

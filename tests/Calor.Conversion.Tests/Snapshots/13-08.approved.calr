@@ -1,0 +1,31 @@
+§M{m001:Test_13_08}
+  §U{System.Collections.Generic}
+
+  §CL{c001:CollectionHoistDemo:pub}
+    §MT{m002:GetValues:pub} () -> Dict<str, i32>
+      §DICT{dict003:str:i32}
+        §KV "a" §C{Compute} §A 1 §/C
+        §KV "b" §C{Compute} §A 2 §/C
+      §/DICT{dict003}
+      §R 
+    §/MT{m002}
+
+    §MT{m004:GetNames:pub} () -> Set<str>
+      §HSET{set005:str}
+        §C{Format} §A "x" §/C
+        §C{Format} §A "y" §/C
+      §/HSET{set005}
+      §R 
+    §/MT{m004}
+
+    §MT{m006:Compute:priv} (i32:x) -> i32
+      §R (* x 2)
+    §/MT{m006}
+
+    §MT{m007:Format:priv} (str:s) -> str
+      §R (upper s)
+    §/MT{m007}
+
+  §/CL{c001}
+
+§/M{m001}

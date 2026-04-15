@@ -1,0 +1,13 @@
+§M{m001:Test_13_06}
+  §U{System}
+
+  §EN{e001:ThreadAccess:pub:u32}[@Flags]
+    TERMINATE = (0x0001)
+    SUSPEND_RESUME = (0x0002)
+    GET_CONTEXT = (0x0008)
+    ALL_ACCESS = (0xFFFF)
+    MEDIUM = 2 * 1024
+    LARGE = 4 * 1024
+  §/EN{e001}
+
+§/M{m001}

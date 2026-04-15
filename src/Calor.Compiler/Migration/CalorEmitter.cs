@@ -1924,12 +1924,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(IntLiteralNode node)
     {
-        if (node.IsHex)
-        {
-            if (node.IsUnsigned)
-                return $"0x{node.UnsignedValue:X}";
-            return $"0x{node.Value:X}";
-        }
+        // Always emit decimal — hex format (0xE0) breaks attribute parsing inside
+        // §ARR, §L, and other tag blocks where braces are balanced by the parser.
+        if (node.IsUnsigned)
+            return node.UnsignedValue.ToString();
         return node.Value.ToString();
     }
 
@@ -2015,6 +2013,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Strip @ from verbatim identifiers (both simple and dotted like this.@object)
         var name = node.Name.Replace("@", "");
+        // Don't escape literal keywords (true, false, null) when used as expression values —
+        // they're valid Calor expressions, not identifiers needing backtick escaping.
+        if (name is "true" or "false" or "null")
+            return name;
         return EscapeCalorIdentifier(name);
     }
 
@@ -2158,6 +2160,23 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 return argValue;
             });
             return $"{node.Target}{typeArgsSuffix}({string.Join(", ", inlineArgs)})";
+        }
+
+        // If the target contains characters that would break §C{} attribute parsing
+        // (parentheses, brackets from raw C# chains the converter couldn't decompose),
+        // emit the entire expression as raw §CS{...} to avoid cascading parse errors.
+        if (node.Target.IndexOfAny(['(', ')', '[', ']']) >= 0)
+        {
+            var rawArgs = node.Arguments.Count > 0
+                ? $"({string.Join(", ", node.Arguments.Select(a => a.Accept(this)))})"
+                : "()";
+            // §CS{...} uses balanced-brace scanning with string/char literal awareness.
+            // Strip // comments (which may contain apostrophes that confuse the char scanner).
+            var innerCode = (node.Target + typeArgsSuffix + rawArgs)
+                .Replace("\r\n", "\n");
+            innerCode = System.Text.RegularExpressions.Regex.Replace(innerCode, @"//[^\n]*", " ");
+            innerCode = innerCode.Replace("\n", " ");
+            return $"§CS{{{innerCode}}}";
         }
 
         // Escape braces in target to avoid conflicts with Calor tag syntax,
@@ -2379,9 +2398,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var size = node.Size.Accept(this);
             // Hoist complex size expressions out of the attribute braces
-            // (§C calls, parenthesized expressions, commas break attribute parsing)
-            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':'))
+            // (§C calls, parenthesized expressions, commas, hex literals break attribute parsing)
+            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':') || size.Contains("0x"))
+            {
                 size = HoistToTempVar(size);
+                // If hoisting failed (field level), fall back to raw C# expression
+                if (ContainsSectionMarker(size) || size.Contains('('))
+                {
+                    var rawExpr = $"new {node.ElementType}[{size}]";
+                    return $"§CS{{{rawExpr}}}";
+                }
+            }
             return $"§ARR{{{elementType}:{id}:{size}}}";
         }
         else
@@ -2438,8 +2465,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var sb = new System.Text.StringBuilder();
             sb.Append($"§LAM{{{header}}}");
 
-            // For short lambdas (1-2 statements), emit inline
-            if (node.StatementBody.Count <= 2)
+            // For short lambdas (1-2 statements), emit inline — unless any statement
+            // produces multi-line output (e.g. FallbackCommentNode), which would bury
+            // the §/LAM closing tag inside a comment line.
+            var hasMultiLineStmt = node.StatementBody.Any(s => s is FallbackCommentNode);
+            if (node.StatementBody.Count <= 2 && !hasMultiLineStmt)
             {
                 var stmts = node.StatementBody.Select(s => CaptureStatementOutput(s).Trim()).ToList();
                 sb.Append(" ");
@@ -3141,7 +3171,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         "void", "volatile", "while",
         // Contextual keywords that conflict when used as identifiers
         "var", "dynamic", "yield", "async", "await",
-        "nameof", "when"
+        "nameof", "when",
+        // Literal keywords — conflict with Calor typed literals when used as identifiers
+        "true", "false", "null"
     };
 
     /// <summary>

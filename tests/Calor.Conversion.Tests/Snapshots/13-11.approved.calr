@@ -1,0 +1,18 @@
+§M{m001:Test_13_11}
+  §CL{c001:ArrayDemo:pub}
+    §MT{m002:CreateSized:pub} (i32:n) -> i32[]
+      §R §ARR{i32:arrI32003:n}
+    §/MT{m002}
+
+    §MT{m004:CreateEmpty:pub} () -> str[]
+      §E{*}
+      §R §C{Array.Empty<str>} §/C
+    §/MT{m004}
+
+    §MT{m006:Wrap:pub} (str:value) -> any[]
+      §R §ARR{arrAny007:any} value §ARR{arrI32008:i32} 1 2 §/ARR{arrI32008} §/ARR{arrAny007}
+    §/MT{m006}
+
+  §/CL{c001}
+
+§/M{m001}

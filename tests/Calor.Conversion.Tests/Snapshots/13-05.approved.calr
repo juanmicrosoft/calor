@@ -1,0 +1,14 @@
+§M{m001:Test_13_05}
+  §CL{c001:PatternDemo:pub}
+    §MT{m002:Classify:pub} (any:obj) -> str
+      §W{match003:expr} obj
+        §K string { Length: 0 } → "empty string"
+        §K string { Length: §PREL{gt} 100 } → "long string"
+        §K §VAR{n} §WHEN (> n 0) → "positive"
+        §K _ → "other"
+      §/W{match003}
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m001}

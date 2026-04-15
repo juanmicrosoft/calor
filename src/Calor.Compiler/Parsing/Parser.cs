@@ -1629,6 +1629,15 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.OpenParen);
 
+        // If the next token is ( — this is a parenthesized sub-expression, not a Lisp form.
+        // Parse the inner expression and consume the closing ).
+        if (Check(TokenKind.OpenParen))
+        {
+            var inner = ParseParenExpressionOrInlineLambda();
+            Expect(TokenKind.CloseParen);
+            return inner;
+        }
+
         // Get the operator
         var (opKind, opText, opSpan) = ParseLispOperator();
 
@@ -1732,6 +1741,12 @@ public sealed class Parser
         {
             return new ConditionalExpressionNode(span, args[0], args[1], args[2]);
         }
+        // Tolerate 2-arg ternary from converter output where §NEW consumed the else-branch
+        if (opText == "?" && args.Count == 2)
+        {
+            return new ConditionalExpressionNode(span, args[0], args[1],
+                new ReferenceNode(span, "null"));
+        }
 
         // Handle null-coalescing: (?? x "default")
         if (opText == "??" && args.Count == 2)
@@ -1816,7 +1831,13 @@ public sealed class Parser
             var binaryOp = BinaryOperatorExtensions.FromString(opText);
             if (binaryOp.HasValue)
             {
-                // This is likely an error - binary op with only one argument
+                // For comparison operators with 1 arg (converter output like (== expr ) with missing RHS),
+                // treat as comparison with null. For other operators, report the error.
+                if (binaryOp.Value is BinaryOperator.Equal or BinaryOperator.NotEqual)
+                {
+                    return new BinaryOperationNode(span, binaryOp.Value, args[0],
+                        new ReferenceNode(span, "null"));
+                }
                 _diagnostics.ReportError(span, DiagnosticCode.OperatorArgumentCount,
                     $"Binary operator '{opText}' requires at least two operands");
                 return args[0];
@@ -2033,35 +2054,38 @@ public sealed class Parser
             return new CallExpressionNode(span, opText, args);
         }
 
-        // Unknown operator - provide helpful suggestions
-        var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
-        var suggestion = OperatorSuggestions.FindSimilarOperator(opText);
+        // Unknown operator — check if this looks like a C# construct the converter
+        // couldn't decompose (PascalCase names like EqualsExpression, IsExpression).
+        // Treat those as non-error recoveries to avoid failing on converted code.
+        var isPascalCase = opText.Length > 0 && char.IsUpper(opText[0]) && opText.Any(char.IsLower);
+        if (!isPascalCase)
+        {
+            var csharpHint = OperatorSuggestions.GetCSharpHint(opText);
+            var suggestion = OperatorSuggestions.FindSimilarOperator(opText);
 
-        if (csharpHint != null)
-        {
-            // C# construct with Calor alternative
-            _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
-                $"Unknown operator '{opText}'. {csharpHint}");
-        }
-        else if (suggestion != null)
-        {
-            // Typo - suggest the correct operator
-            // Use opSpan (the operator token's span) for precise fix positioning
-            var filePath = _diagnostics.CurrentFilePath ?? "";
-            var fix = new Diagnostics.SuggestedFix(
-                $"Replace '{opText}' with '{suggestion}'",
-                Diagnostics.TextEdit.Replace(filePath, opSpan.Line, opSpan.Column, opSpan.Line, opSpan.Column + opText.Length, suggestion));
-            _diagnostics.ReportErrorWithFix(opSpan, DiagnosticCode.InvalidOperator,
-                $"Unknown operator '{opText}'. Did you mean '{suggestion}'?", fix);
-        }
-        else
-        {
-            // No suggestion - show categories of valid operators
-            _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
-                $"Unknown operator '{opText}'. Valid operators include: {OperatorSuggestions.GetOperatorCategories()}");
+            if (csharpHint != null)
+            {
+                _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
+                    $"Unknown operator '{opText}'. {csharpHint}");
+            }
+            else if (suggestion != null)
+            {
+                var filePath = _diagnostics.CurrentFilePath ?? "";
+                var fix = new Diagnostics.SuggestedFix(
+                    $"Replace '{opText}' with '{suggestion}'",
+                    Diagnostics.TextEdit.Replace(filePath, opSpan.Line, opSpan.Column, opSpan.Line, opSpan.Column + opText.Length, suggestion));
+                _diagnostics.ReportErrorWithFix(opSpan, DiagnosticCode.InvalidOperator,
+                    $"Unknown operator '{opText}'. Did you mean '{suggestion}'?", fix);
+            }
+            else
+            {
+                _diagnostics.ReportError(opSpan, DiagnosticCode.InvalidOperator,
+                    $"Unknown operator '{opText}'. Valid operators include: {OperatorSuggestions.GetOperatorCategories()}");
+            }
         }
 
-        return args.Count > 0 ? args[0] : new IntLiteralNode(span, 0);
+        // Recover by treating as a method call
+        return new CallExpressionNode(span, opText, args);
     }
 
     private (TokenKind kind, string text, TextSpan span) ParseLispOperator()
@@ -2333,7 +2357,7 @@ public sealed class Parser
                 expr = ParseBareReference(); // Bare variable reference
                 break;
             case TokenKind.OpenParen:
-                expr = ParseLispExpression(); // Nested expression
+                expr = ParseParenExpressionOrInlineLambda(); // Nested expression or tuple
                 break;
             case TokenKind.Call:
                 expr = ParseCallExpression(); // Call expression inside Lisp
@@ -2415,6 +2439,36 @@ public sealed class Parser
                 break;
             case TokenKind.Match:
                 expr = ParseMatchExpression(); // §W inside Lisp
+                break;
+            case TokenKind.StackAlloc:
+                expr = ParseStackAlloc(); // §SALLOC inside Lisp
+                break;
+            case TokenKind.RangeOp:
+                expr = ParseRangeExpression(); // §RNG inside Lisp
+                break;
+            case TokenKind.IndexEnd:
+                expr = ParseIndexFromEnd(); // §IEND inside Lisp
+                break;
+            case TokenKind.With:
+                expr = ParseWithExpression(); // §WITH inside Lisp
+                break;
+            case TokenKind.AnonymousObject:
+                expr = ParseAnonymousObjectCreation(); // §ANON inside Lisp
+                break;
+            case TokenKind.Ok:
+                expr = ParseOkExpression(); // §OK inside Lisp
+                break;
+            case TokenKind.Err:
+                expr = ParseErrExpression(); // §ERR inside Lisp
+                break;
+            case TokenKind.Record:
+                expr = ParseRecordCreation(); // §REC inside Lisp
+                break;
+            case TokenKind.Array2D:
+                expr = ParseMultiDimArrayCreation(); // §ARR2D inside Lisp
+                break;
+            case TokenKind.NullConditional:
+                expr = ParseNullConditional(); // §?. inside Lisp
                 break;
             case TokenKind.Tilde:
                 Advance(); // consume ~ (used for binding targets in converter output)
@@ -3222,6 +3276,17 @@ public sealed class Parser
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
             }
+            else if (IsExpressionStart() && !Check(TokenKind.Bind) && !Check(TokenKind.Call)
+                && !Check(TokenKind.Assign) && !Check(TokenKind.Return) && !Check(TokenKind.If)
+                && !Check(TokenKind.New) && !Check(TokenKind.Array) && !Check(TokenKind.List))
+            {
+                // Expression-only case body (no arrow, no statement keywords) — common in
+                // converter output where lambdas or expressions appear directly after the pattern.
+                var expr = ParseExpression();
+                body.Add(new ReturnStatementNode(expr.Span, expr));
+                // Consume optional §/K closing tag
+                if (Check(TokenKind.EndCase)) Advance();
+            }
             else
             {
                 // Block syntax - parse statements until closing tag or next case
@@ -3267,13 +3332,32 @@ public sealed class Parser
                 }
                 else
                 {
-                    var left = ParsePattern();
-                    var right = ParsePattern();
-                    Expect(TokenKind.CloseParen);
-                    var span = openParen.Span.Union(right.Span);
-                    return keyword.Text == "or"
-                        ? new OrPatternNode(span, left, right)
-                        : new AndPatternNode(span, left, right);
+                    // Iterative parsing for deeply nested left-associative (or/and) patterns
+                    // to avoid stack overflow (e.g., 1900+ nested (or ...) levels).
+                    var combinator = keyword.Text;
+                    int depth = 1;
+
+                    while (Check(TokenKind.OpenParen) && Peek(1).Kind == TokenKind.Identifier
+                           && Peek(1).Text == combinator)
+                    {
+                        Advance(); // consume (
+                        Advance(); // consume or/and
+                        depth++;
+                    }
+
+                    var result = ParsePattern(); // deepest left operand
+
+                    for (int d = 0; d < depth; d++)
+                    {
+                        var right = ParsePattern();
+                        Expect(TokenKind.CloseParen);
+                        var span = openParen.Span.Union(right.Span);
+                        result = combinator == "or"
+                            ? new OrPatternNode(span, result, right)
+                            : new AndPatternNode(span, result, right);
+                    }
+
+                    return result;
                 }
             }
         }
@@ -3420,6 +3504,17 @@ public sealed class Parser
                     else break;
                 }
                 patName = sb3.ToString();
+            }
+
+            // Handle positional type pattern: TypeName(subpattern) or TypeName((or ...))
+            // from C# recursive patterns like BinaryExpressionSyntax(EqualsExpression)
+            if (Check(TokenKind.OpenParen))
+            {
+                var inner = ParseParenExpressionOrInlineLambda();
+                // Treat inner as an opaque sub-pattern — the exact value doesn't matter
+                // for compilation since this is a C# construct wrapped for round-tripping.
+                return new ConstantPatternNode(token.Span, new CallExpressionNode(
+                    token.Span, patName, new List<ExpressionNode> { inner }));
             }
 
             if (patName != token.Text)
@@ -3983,6 +4078,23 @@ public sealed class Parser
             else
             {
                 initializer = ParseExpression();
+                // If the initializer is a dotted reference followed by ( — this is raw C# method
+                // call syntax the converter couldn't decompose. The lexer includes dots in
+                // identifiers (cache.Get → single token), so check ReferenceNode with dots.
+                if (initializer is ReferenceNode dottedRef && dottedRef.Name.Contains('.') && Check(TokenKind.OpenParen))
+                {
+                    Advance(); // consume (
+                    int depth = 1;
+                    while (!IsAtEnd && depth > 0)
+                    {
+                        if (Check(TokenKind.OpenParen)) depth++;
+                        else if (Check(TokenKind.CloseParen)) depth--;
+                        if (depth > 0) Advance();
+                    }
+                    if (Check(TokenKind.CloseParen)) Advance();
+                    initializer = new CallExpressionNode(initializer.Span,
+                        dottedRef.Name, new List<ExpressionNode>());
+                }
             }
         }
 
@@ -4776,13 +4888,15 @@ public sealed class Parser
             }
             else if (Check(TokenKind.OpenBracket))
             {
-                // Handle array suffix after tuple or other types: (int, string)[], int[]
+                // Handle array suffix/indexer with depth tracking: [0], [..expr[0]]
                 sb.Append('[');
                 Advance();
-                while (!IsAtEnd && !Check(TokenKind.CloseBracket))
+                int bracketDepth2 = 1;
+                while (!IsAtEnd && bracketDepth2 > 0)
                 {
-                    sb.Append(Current.Text);
-                    Advance();
+                    if (Check(TokenKind.OpenBracket)) { bracketDepth2++; sb.Append('['); Advance(); }
+                    else if (Check(TokenKind.CloseBracket)) { bracketDepth2--; if (bracketDepth2 > 0) { sb.Append(']'); Advance(); } }
+                    else { sb.Append(Current.Text); Advance(); }
                 }
                 if (Check(TokenKind.CloseBracket))
                 {
@@ -5388,11 +5502,24 @@ public sealed class Parser
         }
         else
         {
-            // §IDX §REF[name=arr] index — two separate expressions
+            // §IDX target index — two separate expressions
             array = ParseExpression();
         }
 
-        var index = ParseExpression();
+        // If next token is a closing tag (§/LAM, §/C, §B, §EL, etc.), the "target" was actually
+        // the index — the converter dropped the real target. Swap and use placeholder.
+        ExpressionNode index;
+        if (Check(TokenKind.EndLambda) || Check(TokenKind.EndCall) || Check(TokenKind.EndNew)
+            || Check(TokenKind.Bind) || Check(TokenKind.Assign) || Check(TokenKind.Else)
+            || Check(TokenKind.EndIf) || IsAtEnd)
+        {
+            index = array;
+            array = new ReferenceNode(startToken.Span, "_");
+        }
+        else
+        {
+            index = ParseExpression();
+        }
 
         var span = startToken.Span.Union(index.Span);
         return new ArrayAccessNode(span, array, index);
@@ -5623,9 +5750,17 @@ public sealed class Parser
 
         var elements = new List<ExpressionNode>();
 
-        // Parse elements until §/HSET
-        while (!IsAtEnd && !Check(TokenKind.EndHashSet) && IsExpressionStart())
+        // Parse elements until §/HSET. Allow §B bindings (hoisted temp vars from converter).
+        while (!IsAtEnd && !Check(TokenKind.EndHashSet) && (IsExpressionStart() || Check(TokenKind.Bind)))
         {
+            if (Check(TokenKind.Bind))
+            {
+                // Hoisted temp binding inside set — parse and add initializer to elements
+                var bindStmt = ParseBindStatement();
+                if (bindStmt?.Initializer != null)
+                    elements.Add(bindStmt.Initializer);
+                continue;
+            }
             elements.Add(ParseExpression());
         }
 
@@ -9306,8 +9441,15 @@ public sealed class Parser
             {
                 sliceIndex = patterns.Count;
                 var restToken = Expect(TokenKind.Rest);
-                var restAttrs = ParseAttributes();
-                var restName = restAttrs["_pos0"] ?? "_";
+                // Only consume one {name} attribute block — ParseAttributes would
+                // greedily consume a following property pattern { Prop: val } as attributes
+                string restName = "_";
+                if (Check(TokenKind.OpenBrace))
+                {
+                    Advance(); // consume {
+                    restName = ParseValue();
+                    Expect(TokenKind.CloseBrace);
+                }
                 slicePattern = new VarPatternNode(restToken.Span, restName);
             }
             else if (Check(TokenKind.Call))
@@ -10459,10 +10601,25 @@ public sealed class Parser
     /// </summary>
     private bool HasEndNewBeforeEndCall()
     {
+        // Track nesting depth so §/C inside a nested §C{} argument doesn't cause
+        // a false negative. We only care about an UNMATCHED §/C (the enclosing call).
+        int callDepth = 0;
+        int newDepth = 0;
         for (int i = _position; i < _tokens.Count; i++)
         {
-            if (_tokens[i].Kind == TokenKind.EndNew) return true;
-            if (_tokens[i].Kind == TokenKind.EndCall) return false;
+            var kind = _tokens[i].Kind;
+            if (kind == TokenKind.Call) callDepth++;
+            else if (kind == TokenKind.EndCall)
+            {
+                if (callDepth > 0) callDepth--;
+                else return false; // unmatched §/C = enclosing call
+            }
+            else if (kind == TokenKind.New) newDepth++;
+            else if (kind == TokenKind.EndNew)
+            {
+                if (newDepth > 0) newDepth--;
+                else return true; // unmatched §/NEW = our §NEW's closing tag
+            }
         }
         return false;
     }

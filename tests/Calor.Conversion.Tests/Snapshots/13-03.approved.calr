@@ -1,0 +1,16 @@
+§M{m001:Test_13_03}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §CL{c001:NullableGenericDemo:pub}
+    §MT{m002:GetPairs:pub} () -> KeyValuePair<str, ?any>[]
+      §R §ARR{arrKeyValuePairstrany003:KeyValuePair<str, ?any>} §NEW{KeyValuePair<str, ?any>} §A "key" §A null §/NEW §NEW{KeyValuePair<str, ?any>} §A "key2" §A "value" §/NEW §/ARR{arrKeyValuePairstrany003}
+    §/MT{m002}
+
+    §MT{m004:GetComparer:pub} () -> Func<?any, ?any, bool>
+      §R §LAM{lam005:a:object:b:object} §C{Equals} §A a §A b §/C §/LAM{lam005}
+    §/MT{m004}
+
+  §/CL{c001}
+
+§/M{m001}
