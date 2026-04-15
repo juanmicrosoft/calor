@@ -3284,6 +3284,8 @@ public sealed class Parser
                 // converter output where lambdas or expressions appear directly after the pattern.
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
+                // Consume optional §/K closing tag
+                if (Check(TokenKind.EndCase)) Advance();
             }
             else
             {
