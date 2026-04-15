@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-04-14
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Fixed
+- **Phase 11-12 — 49→0 conversion failures** — Achieved 100% compilation success across 38,932 .calr files (13,831 roslyn + 25,101 dotnet). Key fixes: iterative or-pattern parsing for stack overflow prevention, lambda multi-line format for FallbackCommentNode, §CS{} raw C# fallback for unconvertible call targets, HasEndNewBeforeEndCall nesting depth tracking, missing Lisp expression tokens, PLIST REST attribute consumption, TypeMapper array bracket normalization, hex→decimal integer emission, literal keyword escaping, empty array conversion, tuple support in Lisp arguments, PascalCase operator recovery, positional type patterns, bracket depth tracking in ParseValue, dotted reference raw call handling
+
 ## [0.4.4] - 2026-04-10
 
 ### Benchmark Results (Statistical: 30 runs)
