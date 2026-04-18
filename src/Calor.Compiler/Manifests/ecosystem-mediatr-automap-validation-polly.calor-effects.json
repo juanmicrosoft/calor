@@ -1,0 +1,170 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for MediatR, AutoMapper, FluentValidation, and Polly",
+  "confidence": "reviewed",
+  "mappings": [
+    {
+      "type": "MediatR.IMediator",
+      "methods": {
+        "Send": [],
+        "Publish": [],
+        "CreateStream": []
+      }
+    },
+    {
+      "type": "MediatR.ISender",
+      "methods": {
+        "Send": [],
+        "CreateStream": []
+      }
+    },
+    {
+      "type": "MediatR.IPublisher",
+      "methods": {
+        "Publish": []
+      }
+    },
+    {
+      "type": "MediatR.Mediator",
+      "methods": {
+        "Send": [],
+        "Publish": [],
+        "CreateStream": []
+      }
+    },
+    {
+      "type": "AutoMapper.IMapper",
+      "defaultEffects": [],
+      "methods": {
+        "Map": [],
+        "ProjectTo": []
+      }
+    },
+    {
+      "type": "AutoMapper.Mapper",
+      "defaultEffects": [],
+      "methods": {
+        "Map": [],
+        "ProjectTo": []
+      }
+    },
+    {
+      "type": "AutoMapper.MapperConfiguration",
+      "defaultEffects": [],
+      "methods": {
+        "CreateMapper": [],
+        "AssertConfigurationIsValid": []
+      }
+    },
+    {
+      "type": "FluentValidation.AbstractValidator`1",
+      "defaultEffects": [],
+      "methods": {
+        "Validate": [],
+        "ValidateAsync": [],
+        "ValidateAndThrow": ["throw"],
+        "ValidateAndThrowAsync": ["throw"]
+      }
+    },
+    {
+      "type": "FluentValidation.IValidator",
+      "defaultEffects": [],
+      "methods": {
+        "Validate": [],
+        "ValidateAsync": []
+      }
+    },
+    {
+      "type": "FluentValidation.IValidator`1",
+      "defaultEffects": [],
+      "methods": {
+        "Validate": [],
+        "ValidateAsync": []
+      }
+    },
+    {
+      "type": "FluentValidation.Results.ValidationResult",
+      "defaultEffects": [],
+      "methods": { "*": [] },
+      "getters": {
+        "IsValid": [],
+        "Errors": []
+      }
+    },
+    {
+      "type": "Polly.Policy",
+      "defaultEffects": [],
+      "methods": {
+        "Handle": [],
+        "HandleResult": [],
+        "Execute": [],
+        "ExecuteAsync": [],
+        "ExecuteAndCapture": [],
+        "ExecuteAndCaptureAsync": [],
+        "WaitAndRetry": [],
+        "WaitAndRetryAsync": [],
+        "WaitAndRetryForever": [],
+        "WaitAndRetryForeverAsync": [],
+        "Retry": [],
+        "RetryAsync": [],
+        "RetryForever": [],
+        "RetryForeverAsync": [],
+        "CircuitBreaker": [],
+        "CircuitBreakerAsync": [],
+        "AdvancedCircuitBreaker": [],
+        "AdvancedCircuitBreakerAsync": [],
+        "Fallback": [],
+        "FallbackAsync": [],
+        "Timeout": [],
+        "TimeoutAsync": [],
+        "Bulkhead": [],
+        "BulkheadAsync": [],
+        "Wrap": [],
+        "WrapAsync": [],
+        "NoOp": [],
+        "NoOpAsync": []
+      }
+    },
+    {
+      "type": "Polly.ISyncPolicy",
+      "methods": {
+        "Execute": [],
+        "ExecuteAndCapture": []
+      }
+    },
+    {
+      "type": "Polly.IAsyncPolicy",
+      "methods": {
+        "ExecuteAsync": [],
+        "ExecuteAndCaptureAsync": []
+      }
+    },
+    {
+      "type": "Polly.ResiliencePipeline",
+      "methods": {
+        "Execute": [],
+        "ExecuteAsync": []
+      }
+    },
+    {
+      "type": "Polly.ResiliencePipelineBuilder",
+      "defaultEffects": [],
+      "methods": {
+        "AddRetry": [],
+        "AddCircuitBreaker": [],
+        "AddTimeout": [],
+        "AddRateLimiter": [],
+        "AddFallback": [],
+        "AddHedging": [],
+        "AddConcurrencyLimiter": [],
+        "Build": []
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "AutoMapper": [],
+    "FluentValidation": [],
+    "FluentValidation.Results": [],
+    "Polly": []
+  }
+}

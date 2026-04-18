@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for Dapper micro-ORM",
+  "library": "Dapper",
+  "confidence": "reviewed",
+  "mappings": [
+    {
+      "type": "Dapper.SqlMapper",
+      "methods": {
+        "Query": ["db:r"],
+        "QueryAsync": ["db:r"],
+        "QueryFirst": ["db:r"],
+        "QueryFirstAsync": ["db:r"],
+        "QueryFirstOrDefault": ["db:r"],
+        "QueryFirstOrDefaultAsync": ["db:r"],
+        "QuerySingle": ["db:r"],
+        "QuerySingleAsync": ["db:r"],
+        "QuerySingleOrDefault": ["db:r"],
+        "QuerySingleOrDefaultAsync": ["db:r"],
+        "QueryMultiple": ["db:r"],
+        "QueryMultipleAsync": ["db:r"],
+        "Execute": ["db:w"],
+        "ExecuteAsync": ["db:w"],
+        "ExecuteScalar": ["db:r"],
+        "ExecuteScalarAsync": ["db:r"],
+        "ExecuteReader": ["db:r"],
+        "ExecuteReaderAsync": ["db:r"]
+      }
+    },
+    {
+      "type": "Dapper.SqlMapper+GridReader",
+      "methods": {
+        "Read": ["db:r"],
+        "ReadAsync": ["db:r"],
+        "ReadFirst": ["db:r"],
+        "ReadFirstAsync": ["db:r"],
+        "ReadFirstOrDefault": ["db:r"],
+        "ReadFirstOrDefaultAsync": ["db:r"],
+        "ReadSingle": ["db:r"],
+        "ReadSingleAsync": ["db:r"],
+        "ReadSingleOrDefault": ["db:r"],
+        "ReadSingleOrDefaultAsync": ["db:r"],
+        "Dispose": [],
+        "DisposeAsync": []
+      }
+    },
+    {
+      "type": "Dapper.DynamicParameters",
+      "defaultEffects": [],
+      "methods": {
+        "Add": ["mut"],
+        "Get": [],
+        "*": []
+      }
+    },
+    {
+      "type": "Dapper.CommandDefinition",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    }
+  ],
+  "namespaceDefaults": {
+    "Dapper": ["db:rw"]
+  }
+}

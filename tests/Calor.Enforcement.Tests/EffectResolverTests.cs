@@ -577,4 +577,129 @@ public class EffectResolverTests
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
     }
+
+    // ========================================================================
+    // Ecosystem manifest tests: Serilog
+    // ========================================================================
+
+    [Theory]
+    [InlineData("Serilog.Log", "Information", "console_write")]
+    [InlineData("Serilog.Log", "Warning", "console_write")]
+    [InlineData("Serilog.Log", "Error", "console_write")]
+    [InlineData("Serilog.Log", "Fatal", "console_write")]
+    [InlineData("Serilog.Log", "Debug", "console_write")]
+    [InlineData("Serilog.ILogger", "Information", "console_write")]
+    [InlineData("Serilog.ILogger", "Write", "console_write")]
+    public void Ecosystem_Serilog_LogMethods_ResolveToCw(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Fact]
+    public void Ecosystem_Serilog_IsEnabled_IsPure()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("Serilog.ILogger", "IsEnabled");
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+    }
+
+    // ========================================================================
+    // Ecosystem manifest tests: Newtonsoft.Json
+    // ========================================================================
+
+    [Theory]
+    [InlineData("Newtonsoft.Json.JsonConvert", "SerializeObject")]
+    [InlineData("Newtonsoft.Json.JsonConvert", "DeserializeObject")]
+    [InlineData("Newtonsoft.Json.Linq.JObject", "Parse")]
+    [InlineData("Newtonsoft.Json.Linq.JArray", "Parse")]
+    [InlineData("Newtonsoft.Json.Linq.JToken", "Parse")]
+    public void Ecosystem_NewtonsoftJson_PureMethods(string type, string method)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+    }
+
+    [Theory]
+    [InlineData("Newtonsoft.Json.Linq.JObject", "Add", "heap_write")]
+    [InlineData("Newtonsoft.Json.Linq.JObject", "Remove", "heap_write")]
+    [InlineData("Newtonsoft.Json.Linq.JArray", "Add", "heap_write")]
+    [InlineData("Newtonsoft.Json.JsonConvert", "PopulateObject", "heap_write")]
+    public void Ecosystem_NewtonsoftJson_MutationMethods(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    // ========================================================================
+    // Ecosystem manifest tests: Dapper
+    // ========================================================================
+
+    [Theory]
+    [InlineData("Dapper.SqlMapper", "Query", "database_read")]
+    [InlineData("Dapper.SqlMapper", "QueryAsync", "database_read")]
+    [InlineData("Dapper.SqlMapper", "QueryFirst", "database_read")]
+    [InlineData("Dapper.SqlMapper", "QueryFirstOrDefault", "database_read")]
+    [InlineData("Dapper.SqlMapper", "QuerySingle", "database_read")]
+    [InlineData("Dapper.SqlMapper", "ExecuteScalar", "database_read")]
+    public void Ecosystem_Dapper_ReadMethods(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Theory]
+    [InlineData("Dapper.SqlMapper", "Execute", "database_write")]
+    [InlineData("Dapper.SqlMapper", "ExecuteAsync", "database_write")]
+    public void Ecosystem_Dapper_WriteMethods(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    // ========================================================================
+    // Ecosystem manifest tests: MediatR, AutoMapper, FluentValidation, Polly
+    // ========================================================================
+
+    [Theory]
+    [InlineData("MediatR.IMediator", "Send")]
+    [InlineData("MediatR.IMediator", "Publish")]
+    [InlineData("AutoMapper.IMapper", "Map")]
+    [InlineData("AutoMapper.IMapper", "ProjectTo")]
+    [InlineData("FluentValidation.IValidator", "Validate")]
+    [InlineData("FluentValidation.IValidator", "ValidateAsync")]
+    [InlineData("Polly.Policy", "Execute")]
+    [InlineData("Polly.Policy", "ExecuteAsync")]
+    public void Ecosystem_MediatR_AutoMapper_FluentValidation_Polly_ArePure(string type, string method)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+    }
+
+    [Fact]
+    public void Ecosystem_FluentValidation_ValidateAndThrow_HasThrowEffect()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("FluentValidation.AbstractValidator`1", "ValidateAndThrow");
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == "intentional");
+    }
 }
