@@ -5,7 +5,6 @@
     §/MT{m002}
 
     §MT{m004:CreateEmpty:pub} () -> str[]
-      §E{*}
       §R §C{Array.Empty<str>} §/C
     §/MT{m004}
 
