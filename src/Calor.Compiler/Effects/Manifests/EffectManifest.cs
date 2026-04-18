@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Calor.Compiler.Effects.Manifests;
 
 /// <summary>
@@ -15,6 +17,36 @@ public sealed class EffectManifest
     /// Optional description of this manifest's purpose.
     /// </summary>
     public string? Description { get; set; }
+
+    /// <summary>
+    /// NuGet package ID this manifest covers (e.g., "Microsoft.EntityFrameworkCore").
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Library { get; set; }
+
+    /// <summary>
+    /// Semver range of the library version this manifest covers (e.g., ">=8.0.0 &lt;10.0.0").
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LibraryVersion { get; set; }
+
+    /// <summary>
+    /// Tool and version that generated this manifest (e.g., "calor-manifest-gen 0.1.0").
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? GeneratedBy { get; set; }
+
+    /// <summary>
+    /// Confidence level: "verified", "reviewed", or "inferred".
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Confidence { get; set; }
+
+    /// <summary>
+    /// ISO 8601 timestamp when this manifest was generated.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? GeneratedAt { get; set; }
 
     /// <summary>
     /// Type-specific effect mappings.

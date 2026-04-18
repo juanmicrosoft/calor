@@ -4,7 +4,6 @@
 
   §CL{c001:Transform:pub}
     §MT{m002:GetNames:pub} (List<str>:items) -> List<str>
-      §E{*}
       §B{_lamOrderBy004} §LAM{lam003:s:str} s §/LAM{lam003}
       §B{_lamSelect006} §LAM{lam005:s:str} (upper s) §/LAM{lam005}
       §B{_lamWhere008} §LAM{lam007:s:str} (> (len s) 0) §/LAM{lam007}

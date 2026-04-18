@@ -39,6 +39,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<StatementNode> _pendingStatements = new();
 
     /// <summary>
+    /// Maps variable names to their resolved type names for effect inference.
+    /// Populated during conversion using SemanticModel; used by InferEffectsFromCallTarget
+    /// to resolve instance method calls (e.g., "client" → "System.Net.Http.HttpClient").
+    /// </summary>
+    private readonly Dictionary<string, string> _variableTypeMap = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Gets the top-level statements collected during conversion (C# 9+ feature).
     /// </summary>
     public IReadOnlyList<StatementNode> TopLevelStatements => _topLevelStatements;
@@ -4625,6 +4632,38 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ? null
             : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
         var isMutable = _reassignedVariables.Contains(name);
+
+        // Track variable-to-type mapping for effect inference on instance calls
+        if (_semanticModel != null)
+        {
+            var typeInfo = _semanticModel.GetTypeInfo(node.Declaration.Type);
+            if (typeInfo.Type != null)
+            {
+                var fullTypeName = typeInfo.Type.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat)
+                    .Replace("global::", "");
+                _variableTypeMap[name] = fullTypeName;
+            }
+        }
+
+        if (!_variableTypeMap.ContainsKey(name))
+        {
+            if (!node.Declaration.Type.IsVar)
+            {
+                // Explicit type: use the syntax text
+                var rawType = node.Declaration.Type.ToString();
+                _variableTypeMap[name] = Calor.Compiler.Effects.EffectEnforcementPass.MapShortTypeNameToFullName(rawType);
+            }
+            else if (variable.Initializer?.Value is ObjectCreationExpressionSyntax objCreate)
+            {
+                // var x = new TypeName(...) — infer type from constructor
+                var createdType = objCreate.Type.ToString();
+                _variableTypeMap[name] = Calor.Compiler.Effects.EffectEnforcementPass.MapShortTypeNameToFullName(createdType);
+            }
+            else if (variable.Initializer?.Value is ImplicitObjectCreationExpressionSyntax)
+            {
+                // var x = new() — can't infer without semantic model
+            }
+        }
         // Emit `default` for uninitialized declarations to prevent the parser from
         // consuming the next statement as the binding's value expression (Calor0104).
         var initializer = variable.Initializer != null
@@ -9238,7 +9277,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// Walks already-converted AST statements and infers effects.
     /// Returns an EffectsNode if any effects are found, null otherwise.
     /// </summary>
-    private static EffectsNode? InferEffectsFromBody(IReadOnlyList<StatementNode> body)
+    private EffectsNode? InferEffectsFromBody(IReadOnlyList<StatementNode> body)
     {
         var effects = new Dictionary<string, string>();
         InferEffectsFromStatements(body, effects);
@@ -9247,7 +9286,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new EffectsNode(new TextSpan(0, 0, 0, 0), effects);
     }
 
-    private static void InferEffectsFromStatements(IEnumerable<StatementNode> statements, Dictionary<string, string> effects)
+    private void InferEffectsFromStatements(IEnumerable<StatementNode> statements, Dictionary<string, string> effects)
     {
         foreach (var stmt in statements)
         {
@@ -9275,7 +9314,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
     }
 
-    private static void InferEffectsFromStatement(StatementNode statement, Dictionary<string, string> effects)
+    private void InferEffectsFromStatement(StatementNode statement, Dictionary<string, string> effects)
     {
         switch (statement)
         {
@@ -9338,7 +9377,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
     }
 
-    private static void InferEffectsFromExpression(ExpressionNode expr, Dictionary<string, string> effects)
+    private void InferEffectsFromExpression(ExpressionNode expr, Dictionary<string, string> effects)
     {
         switch (expr)
         {
@@ -9363,28 +9402,70 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
     }
 
-    private static void InferEffectsFromCallTarget(string target, Dictionary<string, string> effects)
+    // Lazy-initialized resolver for effect inference during C# → Calor conversion.
+    // Loads only embedded BCL manifests (no project-level .calor-effects.json) because
+    // the converter is best-effort for effects — strict checking happens at compilation time.
+    private static readonly Lazy<EffectResolver> _migrationResolver = new(() =>
     {
-        var effectInfo = EffectChecker.TryGetKnownEffect(target);
-        if (effectInfo != null)
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        return resolver;
+    });
+
+    private void InferEffectsFromCallTarget(string target, Dictionary<string, string> effects)
+    {
+        // Parse the call target into type + method for manifest resolution
+        var lastDot = target.LastIndexOf('.');
+        if (lastDot <= 0)
+            return;
+
+        var methodName = target[(lastDot + 1)..];
+        var typePart = target[..lastDot];
+
+        // For chained calls like "response.Content.ReadAsStringAsync", take the first part
+        var firstDot = typePart.IndexOf('.');
+        var receiverName = firstDot > 0 ? typePart[..firstDot] : typePart;
+
+        // Try to resolve the type: first via known type names, then via variable type map
+        if (!typePart.Contains('.'))
         {
-            var category = effectInfo.Kind switch
+            var mapped = Calor.Compiler.Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart);
+            if (mapped != typePart)
             {
-                EffectKind.IO => "io",
-                EffectKind.Mutation => "mutation",
-                EffectKind.Nondeterminism => "nondeterminism",
-                EffectKind.Exception => "exception",
-                EffectKind.Memory => "memory",
-                _ => "unknown"
-            };
-            AddEffect(effects, category, effectInfo.Value);
+                // Successfully mapped a known type name
+                typePart = mapped;
+            }
+            else if (_variableTypeMap.TryGetValue(typePart, out var resolvedType))
+            {
+                // Variable name resolved to its declared type
+                typePart = resolvedType;
+            }
         }
-        else if (target.Contains('.'))
+        else if (_variableTypeMap.TryGetValue(receiverName, out var resolvedType))
         {
-            // Unknown external call — add wildcard effect so the enforcement pass
-            // won't reject the converted code. §E{*} means "any effects allowed".
-            AddEffect(effects, "Unknown", "*");
+            // Chained call: "response.Content.ReadAsStringAsync" — resolve "response" to its type
+            // For now, use just the resolved type + final method name
+            typePart = resolvedType;
         }
+
+        var resolution = _migrationResolver.Value.Resolve(typePart, methodName);
+        if (resolution.Status != EffectResolutionStatus.Unknown)
+        {
+            foreach (var effect in resolution.Effects.Effects)
+            {
+                var category = effect.Kind switch
+                {
+                    EffectKind.IO => "io",
+                    EffectKind.Mutation => "mutation",
+                    EffectKind.Nondeterminism => "nondeterminism",
+                    EffectKind.Exception => "exception",
+                    EffectKind.Memory => "memory",
+                    _ => "unknown"
+                };
+                AddEffect(effects, category, effect.Value);
+            }
+        }
+        // Don't add wildcard for unknown calls — let the enforcement pass handle them
     }
 
     // --- Unsafe/Low-Level conversions ---

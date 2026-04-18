@@ -363,7 +363,21 @@ public sealed class Binder
         var symbol = _scope.Lookup(callExpr.Target);
         var returnType = symbol is FunctionSymbol funcSym ? funcSym.ReturnType : "INT";
 
-        return new BoundCallExpression(callExpr.Span, callExpr.Target, args, returnType);
+        // Populate structured type info for effect resolution
+        string? resolvedTypeName = null;
+        string? resolvedMethodName = null;
+        var lastDot = callExpr.Target.LastIndexOf('.');
+        if (lastDot > 0)
+        {
+            resolvedMethodName = callExpr.Target[(lastDot + 1)..];
+            var typePart = callExpr.Target[..lastDot];
+            resolvedTypeName = !typePart.Contains('.')
+                ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart)
+                : typePart;
+        }
+
+        return new BoundCallExpression(callExpr.Span, callExpr.Target, args, returnType,
+            resolvedTypeName, resolvedMethodName);
     }
 
     private BoundExpression BindConditionalExpression(ConditionalExpressionNode condExpr)

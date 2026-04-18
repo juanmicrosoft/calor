@@ -2,7 +2,7 @@
 
 §F{f001:Main:pub}
   §O{void}
-  §E{cw}
+  §E{cw,mut}
 
   §LIST{numbers:i32}
     1

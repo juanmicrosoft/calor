@@ -459,10 +459,8 @@ public class Program
         if (options.EnforceEffects)
         {
             phaseSw.Restart();
-            var catalog = EffectsCatalog.CreateWithProjectStubs(options.ProjectDirectory);
             var enforcementPass = new EffectEnforcementPass(
                 diagnostics,
-                catalog,
                 options.UnknownCallPolicy,
                 resolver: null,
                 strictEffects: options.StrictEffects,
@@ -786,7 +784,7 @@ public sealed class CompilationOptions
     public ContractMode ContractMode { get; init; } = ContractMode.Debug;
 
     /// <summary>
-    /// Project directory for loading calor.effects.json stubs.
+    /// Project directory for loading .calor-effects.json manifests.
     /// </summary>
     public string? ProjectDirectory { get; init; }
 

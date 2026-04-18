@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for System.Text.RegularExpressions types",
+  "mappings": [
+    {
+      "type": "System.Text.RegularExpressions.Regex",
+      "defaultEffects": [],
+      "methods": {
+        "IsMatch": [],
+        "Match": [],
+        "Matches": [],
+        "Replace": [],
+        "Split": [],
+        "Count": [],
+        "EnumerateMatches": [],
+        "ToString": []
+      },
+      "constructors": {
+        "(String)": [],
+        "(String,RegexOptions)": [],
+        "(String,RegexOptions,TimeSpan)": []
+      }
+    },
+    {
+      "type": "System.Text.RegularExpressions.Match",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    },
+    {
+      "type": "System.Text.RegularExpressions.Group",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    },
+    {
+      "type": "System.Text.RegularExpressions.Capture",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    },
+    {
+      "type": "System.Text.RegularExpressions.MatchCollection",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    },
+    {
+      "type": "System.Text.RegularExpressions.GroupCollection",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    }
+  ]
+}

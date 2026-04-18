@@ -1108,10 +1108,10 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
-        Assert.Contains(effectDiagnostics, d => d.Message.Contains("Mutation"));
+        Assert.Contains(effectDiagnostics, d => d.Message.Contains("mut"));
     }
 
     [Fact]
@@ -1130,10 +1130,10 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
-        Assert.Contains(effectDiagnostics, d => d.Message.Contains("Mutation"));
+        Assert.Contains(effectDiagnostics, d => d.Message.Contains("mut"));
     }
 
     [Fact]
@@ -1152,10 +1152,10 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
-        Assert.Contains(effectDiagnostics, d => d.Message.Contains("Mutation"));
+        Assert.Contains(effectDiagnostics, d => d.Message.Contains("mut"));
     }
 
     [Fact]
@@ -1174,10 +1174,10 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
-        Assert.Contains(effectDiagnostics, d => d.Message.Contains("Mutation"));
+        Assert.Contains(effectDiagnostics, d => d.Message.Contains("mut"));
     }
 
     [Fact]
@@ -1196,10 +1196,10 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
-        Assert.Contains(effectDiagnostics, d => d.Message.Contains("Mutation"));
+        Assert.Contains(effectDiagnostics, d => d.Message.Contains("mut"));
     }
 
     [Fact]
@@ -1218,10 +1218,10 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
-        Assert.Contains(effectDiagnostics, d => d.Message.Contains("Mutation"));
+        Assert.Contains(effectDiagnostics, d => d.Message.Contains("mut"));
     }
 
     [Fact]
@@ -1240,8 +1240,8 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
         Assert.DoesNotContain(effectDiagnostics, d => d.Message.Contains("Mutation"));
     }
@@ -1265,8 +1265,8 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
         Assert.DoesNotContain(effectDiagnostics, d => d.Message.Contains("Mutation"));
     }
@@ -2439,11 +2439,11 @@ public class CollectionOperationsTests
         Assert.False(diagnostics.HasErrors);
 
         var effectDiagnostics = new DiagnosticBag();
-        var checker = new EffectChecker(effectDiagnostics);
-        checker.Check(module);
+        var enforcementPass = new EffectEnforcementPass(effectDiagnostics, UnknownCallPolicy.Permissive);
+        enforcementPass.Enforce(module);
 
         // Should report mutation effect for PUSH operation
-        Assert.Contains(effectDiagnostics, d => d.Message.Contains("Mutation"));
+        Assert.Contains(effectDiagnostics, d => d.Message.Contains("mut"));
     }
 
     #endregion

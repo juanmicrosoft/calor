@@ -26,7 +26,7 @@ public class InteropEffectCoverageCalculator : IMetricCalculator
         }
 
         var loader = new ManifestLoader();
-        var resolver = new EffectResolver(loader, EffectsCatalog.CreateDefault());
+        var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
         // Collect external calls from AST

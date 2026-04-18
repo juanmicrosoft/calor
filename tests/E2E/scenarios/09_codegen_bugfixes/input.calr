@@ -29,7 +29,7 @@
   §MT{mt1:Transliterate:pub}
     §I{str:input}
     §O{str}
-    §E{cw,cr}
+    §E{cw,cr,mut}
 
     §B{~dict} §NEW{Dictionary<char,str>}
     §B{[char]:buf} §ARR{char:buf:256}
