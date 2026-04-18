@@ -1,0 +1,172 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for Newtonsoft.Json (Json.NET) serialization library",
+  "library": "Newtonsoft.Json",
+  "confidence": "reviewed",
+  "mappings": [
+    {
+      "type": "Newtonsoft.Json.JsonConvert",
+      "defaultEffects": [],
+      "methods": {
+        "SerializeObject": [],
+        "DeserializeObject": [],
+        "PopulateObject": ["mut"],
+        "ToString": [],
+        "SerializeXmlNode": [],
+        "DeserializeXmlNode": [],
+        "*": []
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.JsonSerializer",
+      "methods": {
+        "Serialize": ["cw"],
+        "Deserialize": ["cr"],
+        "Populate": ["mut"],
+        "Create": [],
+        "CreateDefault": []
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.Linq.JObject",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "FromObject": [],
+        "Load": ["cr"],
+        "LoadAsync": ["cr"],
+        "WriteTo": ["cw"],
+        "WriteToAsync": ["cw"],
+        "Add": ["mut"],
+        "Remove": ["mut"],
+        "TryGetValue": [],
+        "GetValue": [],
+        "Property": [],
+        "Properties": [],
+        "ToString": [],
+        "ToObject": [],
+        "SelectToken": [],
+        "SelectTokens": [],
+        "Merge": ["mut"],
+        "DeepClone": []
+      },
+      "getters": {
+        "Count": [],
+        "Type": [],
+        "HasValues": [],
+        "First": [],
+        "Last": [],
+        "Item": []
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.Linq.JArray",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "FromObject": [],
+        "Load": ["cr"],
+        "LoadAsync": ["cr"],
+        "WriteTo": ["cw"],
+        "WriteToAsync": ["cw"],
+        "Add": ["mut"],
+        "Remove": ["mut"],
+        "RemoveAt": ["mut"],
+        "Insert": ["mut"],
+        "Clear": ["mut"],
+        "ToString": [],
+        "ToObject": [],
+        "SelectToken": [],
+        "SelectTokens": [],
+        "DeepClone": []
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.Linq.JToken",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "FromObject": [],
+        "Load": ["cr"],
+        "LoadAsync": ["cr"],
+        "WriteTo": ["cw"],
+        "WriteToAsync": ["cw"],
+        "ToString": [],
+        "ToObject": [],
+        "SelectToken": [],
+        "SelectTokens": [],
+        "Value": [],
+        "Values": [],
+        "Children": [],
+        "DeepClone": [],
+        "Replace": ["mut"]
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.Linq.JValue",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.JsonReader",
+      "methods": {
+        "Read": ["cr"],
+        "ReadAsync": ["cr"],
+        "ReadAsString": ["cr"],
+        "ReadAsInt32": ["cr"],
+        "ReadAsBoolean": ["cr"],
+        "Close": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.JsonWriter",
+      "methods": {
+        "WriteStartObject": ["cw"],
+        "WriteEndObject": ["cw"],
+        "WriteStartArray": ["cw"],
+        "WriteEndArray": ["cw"],
+        "WritePropertyName": ["cw"],
+        "WriteValue": ["cw"],
+        "WriteNull": ["cw"],
+        "WriteRawValue": ["cw"],
+        "WriteRaw": ["cw"],
+        "Flush": ["cw"],
+        "FlushAsync": ["cw"],
+        "Close": [],
+        "CloseAsync": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.JsonTextReader",
+      "methods": {
+        "Read": ["cr"],
+        "ReadAsync": ["cr"],
+        "Close": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "(TextReader)": []
+      }
+    },
+    {
+      "type": "Newtonsoft.Json.JsonTextWriter",
+      "methods": {
+        "Flush": ["cw"],
+        "FlushAsync": ["cw"],
+        "Close": [],
+        "Dispose": []
+      },
+      "constructors": {
+        "(TextWriter)": []
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "Newtonsoft.Json.Linq": [],
+    "Newtonsoft.Json.Serialization": []
+  }
+}

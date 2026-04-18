@@ -1,0 +1,74 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for Serilog structured logging library",
+  "library": "Serilog",
+  "confidence": "reviewed",
+  "mappings": [
+    {
+      "type": "Serilog.Log",
+      "methods": {
+        "Verbose": ["cw"],
+        "Debug": ["cw"],
+        "Information": ["cw"],
+        "Warning": ["cw"],
+        "Error": ["cw"],
+        "Fatal": ["cw"],
+        "Write": ["cw"],
+        "CloseAndFlush": ["cw"],
+        "ForContext": [],
+        "Logger": []
+      },
+      "getters": {
+        "Logger": []
+      }
+    },
+    {
+      "type": "Serilog.ILogger",
+      "methods": {
+        "Verbose": ["cw"],
+        "Debug": ["cw"],
+        "Information": ["cw"],
+        "Warning": ["cw"],
+        "Error": ["cw"],
+        "Fatal": ["cw"],
+        "Write": ["cw"],
+        "ForContext": [],
+        "BindMessageTemplate": [],
+        "BindProperty": [],
+        "IsEnabled": []
+      }
+    },
+    {
+      "type": "Serilog.LoggerConfiguration",
+      "defaultEffects": [],
+      "methods": {
+        "MinimumLevel": [],
+        "WriteTo": [],
+        "Enrich": [],
+        "Filter": [],
+        "Destructure": [],
+        "ReadFrom": [],
+        "AuditTo": [],
+        "CreateLogger": []
+      }
+    },
+    {
+      "type": "Serilog.Core.Logger",
+      "methods": {
+        "Verbose": ["cw"],
+        "Debug": ["cw"],
+        "Information": ["cw"],
+        "Warning": ["cw"],
+        "Error": ["cw"],
+        "Fatal": ["cw"],
+        "Write": ["cw"],
+        "ForContext": [],
+        "Dispose": []
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "Serilog": ["cw"],
+    "Serilog.Events": []
+  }
+}

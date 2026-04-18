@@ -311,6 +311,28 @@ public sealed class EffectEnforcementPass
         "ControllerBase" => "Microsoft.AspNetCore.Mvc.ControllerBase",
         "Results" => "Microsoft.AspNetCore.Http.Results",
         "TypedResults" => "Microsoft.AspNetCore.Http.TypedResults",
+        // Serilog
+        "Log" => "Serilog.Log",
+        "SerilogLog" => "Serilog.Log",
+        // Newtonsoft.Json
+        "JsonConvert" => "Newtonsoft.Json.JsonConvert",
+        "JObject" => "Newtonsoft.Json.Linq.JObject",
+        "JArray" => "Newtonsoft.Json.Linq.JArray",
+        "JToken" => "Newtonsoft.Json.Linq.JToken",
+        // Dapper
+        "SqlMapper" => "Dapper.SqlMapper",
+        // MediatR
+        "IMediator" => "MediatR.IMediator",
+        "ISender" => "MediatR.ISender",
+        "Mediator" => "MediatR.Mediator",
+        // AutoMapper
+        "IMapper" => "AutoMapper.IMapper",
+        "Mapper" => "AutoMapper.Mapper",
+        // FluentValidation
+        "IValidator" => "FluentValidation.IValidator",
+        // Polly
+        "Policy" => "Polly.Policy",
+        "ResiliencePipeline" => "Polly.ResiliencePipeline",
         _ => shortName
     };
 
