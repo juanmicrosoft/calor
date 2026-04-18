@@ -155,6 +155,32 @@
       }
     },
     {
+      "type": "System.IO.TextWriter",
+      "methods": {
+        "Write": ["cw"],
+        "WriteAsync": ["cw"],
+        "WriteLine": ["cw"],
+        "WriteLineAsync": ["cw"],
+        "Flush": ["cw"],
+        "FlushAsync": ["cw"],
+        "Close": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.IO.TextReader",
+      "methods": {
+        "Read": ["cr"],
+        "ReadAsync": ["cr"],
+        "ReadLine": ["cr"],
+        "ReadLineAsync": ["cr"],
+        "ReadToEnd": ["cr"],
+        "ReadToEndAsync": ["cr"],
+        "Close": [],
+        "Dispose": []
+      }
+    },
+    {
       "type": "System.IO.MemoryStream",
       "defaultEffects": [],
       "methods": {

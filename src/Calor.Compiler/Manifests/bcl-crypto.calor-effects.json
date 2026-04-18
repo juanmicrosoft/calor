@@ -1,0 +1,111 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for System.Security.Cryptography types",
+  "mappings": [
+    {
+      "type": "System.Security.Cryptography.SHA256",
+      "defaultEffects": [],
+      "methods": {
+        "Create": [],
+        "HashData": [],
+        "TryHashData": [],
+        "ComputeHash": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.Security.Cryptography.SHA384",
+      "defaultEffects": [],
+      "methods": {
+        "Create": [],
+        "HashData": [],
+        "ComputeHash": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.Security.Cryptography.SHA512",
+      "defaultEffects": [],
+      "methods": {
+        "Create": [],
+        "HashData": [],
+        "ComputeHash": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.Security.Cryptography.MD5",
+      "defaultEffects": [],
+      "methods": {
+        "Create": [],
+        "HashData": [],
+        "ComputeHash": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.Security.Cryptography.HMACSHA256",
+      "defaultEffects": [],
+      "methods": {
+        "HashData": [],
+        "ComputeHash": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.Security.Cryptography.Aes",
+      "defaultEffects": [],
+      "methods": {
+        "Create": [],
+        "CreateEncryptor": [],
+        "CreateDecryptor": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.Security.Cryptography.RSA",
+      "defaultEffects": [],
+      "methods": {
+        "Create": [],
+        "Encrypt": [],
+        "Decrypt": [],
+        "SignData": [],
+        "VerifyData": [],
+        "SignHash": [],
+        "VerifyHash": [],
+        "ExportRSAPublicKey": [],
+        "ExportRSAPrivateKey": [],
+        "ImportRSAPublicKey": [],
+        "ImportRSAPrivateKey": [],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.Security.Cryptography.RandomNumberGenerator",
+      "methods": {
+        "GetBytes": ["rand"],
+        "GetNonZeroBytes": ["rand"],
+        "GetInt32": ["rand"],
+        "GetHexString": ["rand"],
+        "GetItems": ["rand"],
+        "Shuffle": ["rand"],
+        "Create": [],
+        "Fill": ["rand"],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "System.Convert",
+      "defaultEffects": [],
+      "methods": {
+        "ToBase64String": [],
+        "FromBase64String": [],
+        "ToBase64CharArray": [],
+        "FromBase64CharArray": [],
+        "ToHexString": [],
+        "FromHexString": [],
+        "*": []
+      }
+    }
+  ]
+}

@@ -296,12 +296,42 @@ public static class AttributeHelper
                         {
                             // Combine: "fs" + "w" -> "fs:w"
                             effectCodes.Add($"{lastPart}:{nextParts[0]}");
-                            // If there were more parts after the modifier, add them
+                            i++; // Skip the next positional since we consumed it
+
+                            // If there were more parts after the modifier, check if
+                            // any are prefixes needing their own modifier from further positionals
                             for (int k = 1; k < nextParts.Length; k++)
                             {
-                                effectCodes.Add(nextParts[k]);
+                                var remainingPart = nextParts[k];
+                                if (effectPrefixes.Contains(remainingPart.ToLowerInvariant()))
+                                {
+                                    // This remaining part is a prefix — look for its modifier
+                                    var futureCode = attrs[$"_pos{i + 1}"];
+                                    if (!string.IsNullOrEmpty(futureCode))
+                                    {
+                                        var futureParts = futureCode.Split(',');
+                                        if (effectModifiers.Contains(futureParts[0].ToLowerInvariant()))
+                                        {
+                                            effectCodes.Add($"{remainingPart}:{futureParts[0]}");
+                                            for (int f = 1; f < futureParts.Length; f++)
+                                                effectCodes.Add(futureParts[f]);
+                                            i++; // Skip the consumed positional
+                                        }
+                                        else
+                                        {
+                                            effectCodes.Add(remainingPart);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        effectCodes.Add(remainingPart);
+                                    }
+                                }
+                                else
+                                {
+                                    effectCodes.Add(remainingPart);
+                                }
                             }
-                            i++; // Skip the next positional since we consumed it
                         }
                         else
                         {
@@ -330,12 +360,40 @@ public static class AttributeHelper
                     {
                         // Combine the split effect code
                         effectCodes.Add($"{code}:{nextParts[0]}");
-                        // Add any remaining comma-separated parts
+                        i++; // Skip the next positional since we consumed it
+
+                        // Remaining parts may themselves be prefixes needing their own modifier
                         for (int k = 1; k < nextParts.Length; k++)
                         {
-                            effectCodes.Add(nextParts[k]);
+                            var remainingPart = nextParts[k];
+                            if (effectPrefixes.Contains(remainingPart.ToLowerInvariant()))
+                            {
+                                var futureCode = attrs[$"_pos{i + 1}"];
+                                if (!string.IsNullOrEmpty(futureCode))
+                                {
+                                    var futureParts = futureCode.Split(',');
+                                    if (effectModifiers.Contains(futureParts[0].ToLowerInvariant()))
+                                    {
+                                        effectCodes.Add($"{remainingPart}:{futureParts[0]}");
+                                        for (int f = 1; f < futureParts.Length; f++)
+                                            effectCodes.Add(futureParts[f]);
+                                        i++;
+                                    }
+                                    else
+                                    {
+                                        effectCodes.Add(remainingPart);
+                                    }
+                                }
+                                else
+                                {
+                                    effectCodes.Add(remainingPart);
+                                }
+                            }
+                            else
+                            {
+                                effectCodes.Add(remainingPart);
+                            }
                         }
-                        i++; // Skip the next positional since we consumed it
                     }
                     else
                     {

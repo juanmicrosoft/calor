@@ -1,0 +1,409 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for common .NET framework interfaces (Tier B). These interfaces cannot be resolved by compile-time IL analysis due to architectural limits (delegate dispatch, BCL intrinsics, DI resolution). Annotations are curated design decisions based on the intended semantics of each interface.",
+  "library": "Microsoft.Extensions.*",
+  "confidence": "reviewed",
+  "mappings": [
+    {
+      "type": "Microsoft.Extensions.Logging.ILogger",
+      "methods": {
+        "Log": ["cw"],
+        "BeginScope": [],
+        "IsEnabled": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Logging.ILogger`1",
+      "methods": {
+        "Log": ["cw"],
+        "BeginScope": [],
+        "IsEnabled": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Logging.ILoggerFactory",
+      "methods": {
+        "CreateLogger": [],
+        "AddProvider": ["mut"],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Logging.LoggerExtensions",
+      "methods": {
+        "LogInformation": ["cw"],
+        "LogWarning": ["cw"],
+        "LogError": ["cw"],
+        "LogDebug": ["cw"],
+        "LogTrace": ["cw"],
+        "LogCritical": ["cw"],
+        "Log": ["cw"]
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Configuration.IConfiguration",
+      "methods": {
+        "GetSection": ["env:r"],
+        "GetChildren": ["env:r"]
+      },
+      "getters": {
+        "Item": ["env:r"]
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Configuration.IConfigurationRoot",
+      "methods": {
+        "GetSection": ["env:r"],
+        "GetChildren": ["env:r"],
+        "Reload": ["env:r"]
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Configuration.IConfigurationSection",
+      "methods": {
+        "GetSection": ["env:r"],
+        "GetChildren": ["env:r"]
+      },
+      "getters": {
+        "Value": ["env:r"],
+        "Key": [],
+        "Path": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Configuration.ConfigurationExtensions",
+      "methods": {
+        "GetConnectionString": ["env:r"],
+        "GetValue": ["env:r"],
+        "GetRequiredSection": ["env:r"]
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.DependencyInjection.IServiceProvider",
+      "methods": {
+        "GetService": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+      "methods": {
+        "*": ["mut"]
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.DependencyInjection.IServiceScope",
+      "methods": {
+        "Dispose": []
+      },
+      "getters": {
+        "ServiceProvider": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.DependencyInjection.IServiceScopeFactory",
+      "methods": {
+        "CreateScope": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions",
+      "methods": {
+        "GetRequiredService": [],
+        "GetService": [],
+        "GetServices": [],
+        "CreateScope": [],
+        "CreateAsyncScope": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Options.IOptions`1",
+      "defaultEffects": [],
+      "getters": {
+        "Value": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Options.IOptionsSnapshot`1",
+      "defaultEffects": [],
+      "getters": {
+        "Value": []
+      },
+      "methods": {
+        "Get": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Options.IOptionsMonitor`1",
+      "getters": {
+        "CurrentValue": []
+      },
+      "methods": {
+        "Get": [],
+        "OnChange": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Hosting.IHost",
+      "methods": {
+        "StartAsync": ["net:rw"],
+        "StopAsync": ["net:rw"],
+        "RunAsync": ["net:rw"],
+        "Dispose": []
+      },
+      "getters": {
+        "Services": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Hosting.IHostBuilder",
+      "methods": {
+        "Build": [],
+        "ConfigureAppConfiguration": [],
+        "ConfigureHostConfiguration": [],
+        "ConfigureServices": [],
+        "UseServiceProviderFactory": []
+      },
+      "getters": {
+        "Properties": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Hosting.IHostedService",
+      "methods": {
+        "StartAsync": ["net:rw"],
+        "StopAsync": ["net:rw"]
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Hosting.IHostApplicationLifetime",
+      "methods": {
+        "StopApplication": ["proc"]
+      },
+      "getters": {
+        "ApplicationStarted": [],
+        "ApplicationStopping": [],
+        "ApplicationStopped": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions",
+      "methods": {
+        "Run": ["net:rw"],
+        "RunAsync": ["net:rw"],
+        "Start": ["net:rw"],
+        "StopAsync": ["net:rw"],
+        "WaitForShutdown": ["net:rw"],
+        "WaitForShutdownAsync": ["net:rw"]
+      }
+    },
+    {
+      "type": "Microsoft.EntityFrameworkCore.DbContext",
+      "methods": {
+        "SaveChanges": ["db:w"],
+        "SaveChangesAsync": ["db:w"],
+        "Find": ["db:r"],
+        "FindAsync": ["db:r"],
+        "Add": ["mut"],
+        "AddAsync": ["mut"],
+        "AddRange": ["mut"],
+        "AddRangeAsync": ["mut"],
+        "Update": ["mut"],
+        "UpdateRange": ["mut"],
+        "Remove": ["mut"],
+        "RemoveRange": ["mut"],
+        "Attach": ["mut"],
+        "AttachRange": ["mut"],
+        "Entry": [],
+        "Set": [],
+        "Dispose": [],
+        "DisposeAsync": []
+      }
+    },
+    {
+      "type": "Microsoft.EntityFrameworkCore.DbSet`1",
+      "methods": {
+        "Add": ["mut"],
+        "AddAsync": ["mut"],
+        "AddRange": ["mut"],
+        "AddRangeAsync": ["mut"],
+        "Update": ["mut"],
+        "UpdateRange": ["mut"],
+        "Remove": ["mut"],
+        "RemoveRange": ["mut"],
+        "Attach": ["mut"],
+        "AttachRange": ["mut"],
+        "Find": ["db:r"],
+        "FindAsync": ["db:r"],
+        "Entry": [],
+        "AsNoTracking": [],
+        "AsTracking": [],
+        "Include": [],
+        "ThenInclude": []
+      }
+    },
+    {
+      "type": "Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions",
+      "methods": {
+        "ToListAsync": ["db:r"],
+        "ToArrayAsync": ["db:r"],
+        "FirstAsync": ["db:r"],
+        "FirstOrDefaultAsync": ["db:r"],
+        "SingleAsync": ["db:r"],
+        "SingleOrDefaultAsync": ["db:r"],
+        "CountAsync": ["db:r"],
+        "AnyAsync": ["db:r"],
+        "AllAsync": ["db:r"],
+        "SumAsync": ["db:r"],
+        "AverageAsync": ["db:r"],
+        "MinAsync": ["db:r"],
+        "MaxAsync": ["db:r"],
+        "ContainsAsync": ["db:r"],
+        "AsNoTracking": [],
+        "AsTracking": [],
+        "Include": [],
+        "ThenInclude": [],
+        "Load": ["db:r"],
+        "LoadAsync": ["db:r"],
+        "ForEachAsync": ["db:r"]
+      }
+    },
+    {
+      "type": "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions",
+      "methods": {
+        "FromSqlRaw": ["db:r"],
+        "FromSqlInterpolated": ["db:r"],
+        "FromSql": ["db:r"],
+        "ExecuteSqlRaw": ["db:w"],
+        "ExecuteSqlRawAsync": ["db:w"],
+        "ExecuteSqlInterpolated": ["db:w"],
+        "ExecuteSqlInterpolatedAsync": ["db:w"]
+      }
+    },
+    {
+      "type": "Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade",
+      "methods": {
+        "EnsureCreated": ["db:w"],
+        "EnsureCreatedAsync": ["db:w"],
+        "EnsureDeleted": ["db:w"],
+        "EnsureDeletedAsync": ["db:w"],
+        "Migrate": ["db:w"],
+        "MigrateAsync": ["db:w"],
+        "CanConnect": ["db:r"],
+        "CanConnectAsync": ["db:r"],
+        "BeginTransaction": ["db:rw"],
+        "BeginTransactionAsync": ["db:rw"],
+        "CommitTransaction": ["db:w"],
+        "CommitTransactionAsync": ["db:w"],
+        "RollbackTransaction": ["db:w"],
+        "RollbackTransactionAsync": ["db:w"],
+        "ExecuteSqlRaw": ["db:w"],
+        "ExecuteSqlRawAsync": ["db:w"],
+        "ExecuteSqlInterpolated": ["db:w"],
+        "ExecuteSqlInterpolatedAsync": ["db:w"]
+      }
+    },
+    {
+      "type": "Microsoft.AspNetCore.Http.HttpContext",
+      "defaultEffects": [],
+      "getters": {
+        "Request": [],
+        "Response": [],
+        "User": [],
+        "Session": [],
+        "Connection": [],
+        "Items": [],
+        "RequestAborted": [],
+        "RequestServices": []
+      }
+    },
+    {
+      "type": "Microsoft.AspNetCore.Http.HttpRequest",
+      "defaultEffects": [],
+      "getters": {
+        "Path": [],
+        "Method": [],
+        "Query": [],
+        "Headers": [],
+        "Body": [],
+        "Form": ["net:r"],
+        "ContentType": [],
+        "ContentLength": [],
+        "Cookies": [],
+        "Host": [],
+        "Scheme": [],
+        "Protocol": [],
+        "IsHttps": [],
+        "RouteValues": [],
+        "QueryString": []
+      },
+      "methods": {
+        "ReadFormAsync": ["net:r"]
+      }
+    },
+    {
+      "type": "Microsoft.AspNetCore.Http.HttpResponse",
+      "methods": {
+        "WriteAsync": ["net:w"],
+        "Redirect": ["net:w"],
+        "StartAsync": ["net:w"],
+        "CompleteAsync": ["net:w"]
+      },
+      "getters": {
+        "StatusCode": [],
+        "Headers": [],
+        "ContentType": [],
+        "Body": [],
+        "Cookies": []
+      },
+      "setters": {
+        "StatusCode": [],
+        "ContentType": []
+      }
+    },
+    {
+      "type": "Microsoft.AspNetCore.Http.Results",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "Microsoft.AspNetCore.Http.TypedResults",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "Microsoft.AspNetCore.Mvc.ControllerBase",
+      "defaultEffects": [],
+      "methods": {
+        "Ok": [],
+        "NotFound": [],
+        "BadRequest": [],
+        "Created": [],
+        "CreatedAtAction": [],
+        "CreatedAtRoute": [],
+        "NoContent": [],
+        "Accepted": [],
+        "Conflict": [],
+        "Unauthorized": [],
+        "Forbid": [],
+        "StatusCode": [],
+        "Json": [],
+        "File": ["fs:r"],
+        "PhysicalFile": ["fs:r"],
+        "RedirectToAction": [],
+        "RedirectToRoute": [],
+        "View": [],
+        "PartialView": []
+      }
+    }
+  ],
+  "namespaceDefaults": {
+    "Microsoft.Extensions.Logging": ["cw"],
+    "Microsoft.Extensions.Configuration": ["env:r"],
+    "Microsoft.Extensions.Options": [],
+    "Microsoft.Extensions.DependencyInjection": []
+  }
+}

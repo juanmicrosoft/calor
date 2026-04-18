@@ -116,7 +116,7 @@ public static class EffectsCommand
         }
 
         var loader = new ManifestLoader();
-        var resolver = new EffectResolver(loader, EffectsCatalog.CreateDefault());
+        var resolver = new EffectResolver(loader);
         resolver.Initialize(project?.FullName, solution?.FullName);
 
         var resolution = resolver.Resolve(typeName, methodName);
@@ -225,31 +225,6 @@ public static class EffectsCommand
             }
         }
 
-        // Also include built-in catalog types
-        var builtInTypes = new HashSet<string>();
-        foreach (var sig in EffectsCatalog.CreateDefault().AllSignatures)
-        {
-            var colonIndex = sig.IndexOf("::", StringComparison.Ordinal);
-            if (colonIndex > 0)
-            {
-                var typeName = sig[..colonIndex];
-                if (string.IsNullOrEmpty(typeFilter) ||
-                    typeName.Contains(typeFilter, StringComparison.OrdinalIgnoreCase))
-                {
-                    builtInTypes.Add(typeName);
-                }
-            }
-        }
-
-        foreach (var typeName in builtInTypes.OrderBy(t => t))
-        {
-            var existing = types.FirstOrDefault(t => t.Type == typeName);
-            if (existing == null)
-            {
-                types.Add(new TypeListEntry(typeName, "built-in", new List<string>(), 0));
-            }
-        }
-
         types = types.OrderBy(t => t.Type).ToList();
 
         if (json)
@@ -297,21 +272,7 @@ public static class EffectsCommand
         if (!typePart.Contains('.'))
         {
             // Map common short names to full types
-            typePart = typePart switch
-            {
-                "Console" => "System.Console",
-                "File" => "System.IO.File",
-                "Directory" => "System.IO.Directory",
-                "Path" => "System.IO.Path",
-                "Random" => "System.Random",
-                "DateTime" => "System.DateTime",
-                "Environment" => "System.Environment",
-                "Process" => "System.Diagnostics.Process",
-                "HttpClient" => "System.Net.Http.HttpClient",
-                "Math" => "System.Math",
-                "Guid" => "System.Guid",
-                _ => typePart
-            };
+            typePart = EffectEnforcementPass.MapShortTypeNameToFullName(typePart);
         }
 
         return (typePart, methodName);

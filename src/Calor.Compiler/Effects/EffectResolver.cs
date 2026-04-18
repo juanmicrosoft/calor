@@ -5,25 +5,23 @@ namespace Calor.Compiler.Effects;
 /// <summary>
 /// Resolves effects for .NET method calls using a layered approach.
 /// Resolution order:
-/// 1. Specific method signature in type mapping
-/// 2. Wildcard "*" in type mapping
-/// 3. DefaultEffects on type
-/// 4. NamespaceDefaults matching namespace pattern
-/// 5. Built-in effects catalog
+/// 1. Specific method signature in type mapping (from manifests)
+/// 2. Method name in type mapping
+/// 3. Wildcard "*" in type mapping
+/// 4. DefaultEffects on type
+/// 5. NamespaceDefaults matching namespace pattern
 /// 6. Unknown
 /// </summary>
 public sealed class EffectResolver
 {
     private readonly ManifestLoader _manifestLoader;
-    private readonly EffectsCatalog _builtInCatalog;
     private readonly Dictionary<string, ResolvedTypeInfo> _typeCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EffectResolution> _methodCache = new(StringComparer.Ordinal);
     private bool _initialized;
 
-    public EffectResolver(ManifestLoader? manifestLoader = null, EffectsCatalog? builtInCatalog = null)
+    public EffectResolver(ManifestLoader? manifestLoader = null)
     {
         _manifestLoader = manifestLoader ?? new ManifestLoader();
-        _builtInCatalog = builtInCatalog ?? EffectsCatalog.CreateDefault();
     }
 
     /// <summary>
@@ -115,17 +113,7 @@ public sealed class EffectResolver
 
     private EffectResolution ResolveInternal(string type, string method, string[] parameterTypes, string signature)
     {
-        // 1. Check built-in catalog first (highest precision)
-        var builtInEffects = _builtInCatalog.TryGetEffects(signature);
-        if (builtInEffects != null)
-        {
-            return new EffectResolution(
-                builtInEffects.IsEmpty ? EffectResolutionStatus.PureExplicit : EffectResolutionStatus.Resolved,
-                builtInEffects,
-                "built-in");
-        }
-
-        // 2. Check type cache from manifests
+        // 1. Check type cache from manifests
         if (_typeCache.TryGetValue(type, out var typeInfo))
         {
             // 2a. Try specific method with parameters
@@ -168,17 +156,7 @@ public sealed class EffectResolver
 
     private EffectResolution ResolveGetterInternal(string type, string propertyName, string signature)
     {
-        // Check built-in catalog
-        var builtInEffects = _builtInCatalog.TryGetEffects(signature);
-        if (builtInEffects != null)
-        {
-            return new EffectResolution(
-                builtInEffects.IsEmpty ? EffectResolutionStatus.PureExplicit : EffectResolutionStatus.Resolved,
-                builtInEffects,
-                "built-in");
-        }
-
-        // Check type cache
+        // Check type cache from manifests
         if (_typeCache.TryGetValue(type, out var typeInfo))
         {
             if (typeInfo.Getters.TryGetValue(propertyName, out var getterEffects))
@@ -203,17 +181,7 @@ public sealed class EffectResolver
 
     private EffectResolution ResolveSetterInternal(string type, string propertyName, string signature)
     {
-        // Check built-in catalog
-        var builtInEffects = _builtInCatalog.TryGetEffects(signature);
-        if (builtInEffects != null)
-        {
-            return new EffectResolution(
-                builtInEffects.IsEmpty ? EffectResolutionStatus.PureExplicit : EffectResolutionStatus.Resolved,
-                builtInEffects,
-                "built-in");
-        }
-
-        // Check type cache
+        // Check type cache from manifests
         if (_typeCache.TryGetValue(type, out var typeInfo))
         {
             if (typeInfo.Setters.TryGetValue(propertyName, out var setterEffects))
@@ -238,17 +206,7 @@ public sealed class EffectResolver
 
     private EffectResolution ResolveConstructorInternal(string type, string[] parameterTypes, string signature)
     {
-        // Check built-in catalog
-        var builtInEffects = _builtInCatalog.TryGetEffects(signature);
-        if (builtInEffects != null)
-        {
-            return new EffectResolution(
-                builtInEffects.IsEmpty ? EffectResolutionStatus.PureExplicit : EffectResolutionStatus.Resolved,
-                builtInEffects,
-                "built-in");
-        }
-
-        // Check type cache
+        // Check type cache from manifests
         if (_typeCache.TryGetValue(type, out var typeInfo))
         {
             var paramSig = $"({string.Join(",", parameterTypes)})";

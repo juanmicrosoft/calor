@@ -350,12 +350,34 @@ public sealed class BoundCallExpression : BoundExpression
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public override string TypeName { get; }
 
-    public BoundCallExpression(TextSpan span, string target, IReadOnlyList<BoundExpression> arguments, string resultType)
+    /// <summary>
+    /// Fully-qualified type name resolved during binding (e.g., "System.Console").
+    /// Null if the type could not be resolved.
+    /// </summary>
+    public string? ResolvedTypeName { get; }
+
+    /// <summary>
+    /// Method name resolved during binding (e.g., "WriteLine").
+    /// Null if the method could not be resolved.
+    /// </summary>
+    public string? ResolvedMethodName { get; }
+
+    /// <summary>
+    /// Parameter types resolved during binding (e.g., ["System.String"]).
+    /// Null if parameter types could not be resolved.
+    /// </summary>
+    public IReadOnlyList<string>? ResolvedParameterTypes { get; }
+
+    public BoundCallExpression(TextSpan span, string target, IReadOnlyList<BoundExpression> arguments, string resultType,
+        string? resolvedTypeName = null, string? resolvedMethodName = null, IReadOnlyList<string>? resolvedParameterTypes = null)
         : base(span)
     {
         Target = target;
         Arguments = arguments;
         TypeName = resultType;
+        ResolvedTypeName = resolvedTypeName;
+        ResolvedMethodName = resolvedMethodName;
+        ResolvedParameterTypes = resolvedParameterTypes;
     }
 }
 

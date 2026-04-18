@@ -10,7 +10,7 @@ namespace Calor.Enforcement.Tests;
 public class EffectResolverTests
 {
     [Fact]
-    public void Resolve_ReturnsBuiltInEffects_ForKnownBclMethods()
+    public void Resolve_ReturnsManifestEffects_ForKnownBclMethods()
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
@@ -19,7 +19,7 @@ public class EffectResolverTests
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "console_write");
-        Assert.Equal("built-in", resolution.Source);
+        Assert.Contains("embedded:", resolution.Source);
     }
 
     [Fact]
@@ -284,5 +284,297 @@ public class EffectResolverTests
         resolver.Initialize();
 
         Assert.NotEmpty(resolver.LoadErrors);
+    }
+
+    // ========================================================================
+    // Tier B: Framework interface manifest tests
+    // ========================================================================
+
+    [Theory]
+    [InlineData("Microsoft.Extensions.Logging.ILogger", "Log", "console_write")]
+    [InlineData("Microsoft.Extensions.Logging.LoggerExtensions", "LogInformation", "console_write")]
+    [InlineData("Microsoft.Extensions.Logging.LoggerExtensions", "LogError", "console_write")]
+    [InlineData("Microsoft.Extensions.Logging.LoggerExtensions", "LogWarning", "console_write")]
+    [InlineData("Microsoft.Extensions.Logging.LoggerExtensions", "LogDebug", "console_write")]
+    [InlineData("Microsoft.Extensions.Logging.LoggerExtensions", "LogCritical", "console_write")]
+    public void TierB_Logger_ResolvesToConsoleWrite(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve(type, method);
+
+        Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Fact]
+    public void TierB_ILogger_IsEnabled_IsPure()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve("Microsoft.Extensions.Logging.ILogger", "IsEnabled");
+
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+    }
+
+    [Theory]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "SaveChanges", "database_write")]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "SaveChangesAsync", "database_write")]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "Find", "database_read")]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "FindAsync", "database_read")]
+    public void TierB_DbContext_ResolvesToDatabaseEffects(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve(type, method);
+
+        Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Theory]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "Add", "heap_write")]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "Update", "heap_write")]
+    [InlineData("Microsoft.EntityFrameworkCore.DbContext", "Remove", "heap_write")]
+    public void TierB_DbContext_MutationMethods_ResolveToMut(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve(type, method);
+
+        Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Theory]
+    [InlineData("Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions", "ToListAsync", "database_read")]
+    [InlineData("Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions", "FirstOrDefaultAsync", "database_read")]
+    [InlineData("Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions", "CountAsync", "database_read")]
+    [InlineData("Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions", "AnyAsync", "database_read")]
+    public void TierB_EfCoreQueryExtensions_ResolveToDbRead(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve(type, method);
+
+        Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Theory]
+    [InlineData("Microsoft.Extensions.Configuration.IConfiguration", "GetSection", "environment_read")]
+    [InlineData("Microsoft.Extensions.Configuration.IConfigurationSection", "GetSection", "environment_read")]
+    [InlineData("Microsoft.Extensions.Configuration.ConfigurationExtensions", "GetConnectionString", "environment_read")]
+    public void TierB_Configuration_ResolvesToEnvRead(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve(type, method);
+
+        Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Fact]
+    public void TierB_IServiceProvider_GetService_IsPure()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve("Microsoft.Extensions.DependencyInjection.IServiceProvider", "GetService");
+
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+    }
+
+    [Theory]
+    [InlineData("Microsoft.Extensions.Hosting.IHost", "RunAsync", "network_readwrite")]
+    [InlineData("Microsoft.Extensions.Hosting.IHost", "StartAsync", "network_readwrite")]
+    [InlineData("Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions", "Run", "network_readwrite")]
+    public void TierB_Hosting_ResolvesToNetRw(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve(type, method);
+
+        Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Fact]
+    public void TierB_IOptions_Value_IsPure()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.ResolveGetter("Microsoft.Extensions.Options.IOptions`1", "Value");
+
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+    }
+
+    [Theory]
+    [InlineData("Microsoft.AspNetCore.Mvc.ControllerBase", "Ok")]
+    [InlineData("Microsoft.AspNetCore.Mvc.ControllerBase", "NotFound")]
+    [InlineData("Microsoft.AspNetCore.Mvc.ControllerBase", "BadRequest")]
+    public void TierB_MvcController_ResultMethods_ArePure(string type, string method)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve(type, method);
+
+        Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
+    }
+
+    [Fact]
+    public void TierB_HttpResponse_WriteAsync_IsNetWrite()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve("Microsoft.AspNetCore.Http.HttpResponse", "WriteAsync");
+
+        Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == "network_write");
+    }
+
+    [Fact]
+    public void TierB_DatabaseFacade_Migrate_IsDbWrite()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+
+        var resolution = resolver.Resolve("Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade", "Migrate");
+
+        Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
+        Assert.Contains(resolution.Effects.Effects, e => e.Value == "database_write");
+    }
+
+    // ========================================================================
+    // BCL manifest tests: System.Text.Json
+    // ========================================================================
+
+    [Theory]
+    [InlineData("System.Text.Json.JsonSerializer", "Serialize")]
+    [InlineData("System.Text.Json.JsonSerializer", "Deserialize")]
+    [InlineData("System.Text.Json.JsonSerializer", "SerializeToUtf8Bytes")]
+    public void BCL_JsonSerializer_PureMethods_ArePure(string type, string method)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+    }
+
+    [Fact]
+    public void BCL_JsonSerializer_SerializeAsync_HasFsWrite()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.Text.Json.JsonSerializer", "SerializeAsync");
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == "filesystem_write");
+    }
+
+    [Fact]
+    public void BCL_JsonSerializer_DeserializeAsync_HasFsRead()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.Text.Json.JsonSerializer", "DeserializeAsync");
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == "filesystem_read");
+    }
+
+    [Fact]
+    public void BCL_JsonElement_IsPure()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.Text.Json.JsonElement", "GetString");
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+    }
+
+    // ========================================================================
+    // BCL manifest tests: Regex
+    // ========================================================================
+
+    [Theory]
+    [InlineData("System.Text.RegularExpressions.Regex", "IsMatch")]
+    [InlineData("System.Text.RegularExpressions.Regex", "Match")]
+    [InlineData("System.Text.RegularExpressions.Regex", "Replace")]
+    [InlineData("System.Text.RegularExpressions.Regex", "Split")]
+    public void BCL_Regex_AllMethods_ArePure(string type, string method)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+    }
+
+    // ========================================================================
+    // BCL manifest tests: Concurrent collections
+    // ========================================================================
+
+    [Theory]
+    [InlineData("System.Collections.Concurrent.ConcurrentDictionary`2", "TryAdd", "heap_write")]
+    [InlineData("System.Collections.Concurrent.ConcurrentDictionary`2", "TryRemove", "heap_write")]
+    [InlineData("System.Collections.Concurrent.ConcurrentQueue`1", "Enqueue", "heap_write")]
+    [InlineData("System.Collections.Concurrent.ConcurrentStack`1", "Push", "heap_write")]
+    [InlineData("System.Collections.Concurrent.ConcurrentBag`1", "Add", "heap_write")]
+    public void BCL_Concurrent_MutationMethods_HaveMut(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
+    }
+
+    [Theory]
+    [InlineData("System.Collections.Concurrent.ConcurrentDictionary`2", "TryGetValue")]
+    [InlineData("System.Collections.Concurrent.ConcurrentDictionary`2", "ContainsKey")]
+    [InlineData("System.Collections.Concurrent.ConcurrentQueue`1", "TryPeek")]
+    public void BCL_Concurrent_ReadMethods_ArePure(string type, string method)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+    }
+
+    // ========================================================================
+    // BCL manifest tests: Crypto
+    // ========================================================================
+
+    [Theory]
+    [InlineData("System.Security.Cryptography.SHA256", "HashData")]
+    [InlineData("System.Security.Cryptography.SHA256", "ComputeHash")]
+    [InlineData("System.Security.Cryptography.Aes", "Create")]
+    [InlineData("System.Security.Cryptography.RSA", "Encrypt")]
+    public void BCL_Crypto_DeterministicMethods_ArePure(string type, string method)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
+    }
+
+    [Theory]
+    [InlineData("System.Security.Cryptography.RandomNumberGenerator", "GetBytes", "random")]
+    [InlineData("System.Security.Cryptography.RandomNumberGenerator", "GetInt32", "random")]
+    public void BCL_Crypto_RandomMethods_HaveRand(string type, string method, string expectedValue)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
+        Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
     }
 }

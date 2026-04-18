@@ -696,4 +696,153 @@ public class EffectEnforcementTests
         Assert.False(result.HasErrors,
             $"Unique cross-class method name should resolve. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
+
+    // ========================================================================
+    // E2E: Tier B framework interface effects resolve through enforcement
+    // ========================================================================
+
+    [Fact]
+    public void TierB_E2E_ILoggerCall_ResolvesToCw_NoUnknownWarning()
+    {
+        // A Calor function calls ILogger.LogInformation and declares cw effect.
+        // Should compile without Calor0411 (unknown external call).
+        var source = @"
+§M{m001:Test}
+§F{f001:LogSomething:pub}
+  §O{void}
+  §E{cw}
+  §C{ILogger.LogInformation}
+    §A STR:""Processing request""
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
+            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+
+        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
+            $"ILogger.LogInformation should not produce Calor0411. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void TierB_E2E_DbContextCall_ResolvesToDbW_NoUnknownWarning()
+    {
+        // A Calor function calls DbContext.SaveChanges and declares db:w effect.
+        var source = @"
+§M{m001:Test}
+§F{f001:SaveData:pub}
+  §O{void}
+  §E{db:w}
+  §C{DbContext.SaveChanges}
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
+            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+
+        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
+            $"DbContext.SaveChanges should not produce Calor0411. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void TierB_E2E_IConfigurationCall_ResolvesToEnvR_NoUnknownWarning()
+    {
+        // A Calor function calls IConfiguration.GetSection and declares env:r effect.
+        var source = @"
+§M{m001:Test}
+§F{f001:ReadConfig:pub}
+  §O{void}
+  §E{env:r}
+  §C{IConfiguration.GetSection}
+    §A STR:""ConnectionStrings""
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
+            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+
+        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
+            $"IConfiguration.GetSection should not produce Calor0411. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void TierB_E2E_ControllerOk_IsPure_NoUnknownWarning()
+    {
+        // A Calor function calls ControllerBase.Ok — should be pure.
+        var source = @"
+§M{m001:Test}
+§F{f001:GetResult:pub}
+  §O{void}
+  §C{ControllerBase.Ok}
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
+            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+
+        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
+            $"ControllerBase.Ok should not produce Calor0411. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
+
+    [Fact]
+    public void TierB_E2E_UndeclaredDbEffect_ProducesForbiddenEffect()
+    {
+        // A Calor function calls DbContext.SaveChanges but does NOT declare db:w.
+        // Should produce Calor0410 (forbidden effect), NOT Calor0411 (unknown).
+        var source = @"
+§M{m001:Test}
+§F{f001:SaveData:pub}
+  §O{void}
+  §C{DbContext.SaveChanges}
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
+            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+
+        // Should have forbidden-effect error (using db:w without declaring it), NOT unknown-call error
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("DbContext.SaveChanges"));
+    }
+
+    [Fact]
+    public void TierB_E2E_MultipleFrameworkCalls_AllResolve()
+    {
+        // A realistic function that calls multiple framework methods in STRICT mode.
+        // This verifies the full pipeline: declared effects match computed effects.
+        var source = @"
+§M{m001:Test}
+§F{f001:HandleRequest:pub}
+  §O{void}
+  §E{cw,db:w,env:r}
+  §C{ILogger.LogInformation}
+    §A STR:""Starting request""
+  §/C
+  §C{IConfiguration.GetSection}
+    §A STR:""AppSettings""
+  §/C
+  §C{DbContext.SaveChanges}
+  §/C
+  §C{ILogger.LogInformation}
+    §A STR:""Request complete""
+  §/C
+§/F{f001}
+§/M{m001}
+";
+        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
+            policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+
+        // No unknown external calls — all framework calls resolve from Tier B manifests
+        Assert.False(result.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.UnknownExternalCall),
+            $"All framework calls should resolve. Unknown call errors: {string.Join("; ", result.Diagnostics.Errors.Where(d => d.Code == DiagnosticCode.UnknownExternalCall).Select(e => e.Message))}");
+
+        // No forbidden effect errors — declared effects match computed effects
+        Assert.False(result.HasErrors,
+            $"Should compile with all effects declared. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+    }
 }

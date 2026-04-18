@@ -14,7 +14,6 @@ namespace Calor.Compiler.Effects;
 public sealed class EffectEnforcementPass
 {
     private readonly DiagnosticBag _diagnostics;
-    private readonly EffectsCatalog _catalog;
     private readonly EffectResolver _resolver;
     private readonly UnknownCallPolicy _policy;
     private readonly bool _strictEffects;
@@ -27,7 +26,6 @@ public sealed class EffectEnforcementPass
 
     public EffectEnforcementPass(
         DiagnosticBag diagnostics,
-        EffectsCatalog? catalog = null,
         UnknownCallPolicy policy = UnknownCallPolicy.Strict,
         EffectResolver? resolver = null,
         bool strictEffects = false,
@@ -35,12 +33,11 @@ public sealed class EffectEnforcementPass
         string? solutionDirectory = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
-        _catalog = catalog ?? EffectsCatalog.CreateDefault();
         _policy = policy;
         _strictEffects = strictEffects;
 
         // Initialize the effect resolver with manifests
-        _resolver = resolver ?? new EffectResolver(null, _catalog);
+        _resolver = resolver ?? new EffectResolver();
         _resolver.Initialize(projectDirectory, solutionDirectory);
     }
 
@@ -147,7 +144,7 @@ public sealed class EffectEnforcementPass
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
         var context = new InferenceContext(
-            _catalog, _resolver, _computedEffects,
+            _resolver, _computedEffects,
             _callGraphAnalysis.Functions,
             _callGraphAnalysis.FunctionNameToId,
             _callGraphAnalysis.MethodNameToIds,
@@ -193,38 +190,129 @@ public sealed class EffectEnforcementPass
             return EffectSet.Empty;
         }
 
-        // Effects dictionary is key:value like {"io": "console_write"} or {"io": "console_write,filesystem_write"}
-        // Values can be comma-separated if multiple effects were declared in the same category
-        var surfaceCodes = new List<string>();
+        // The EffectsNode.Effects dictionary is populated by InterpretEffectsAttributes/ExpandEffectCode
+        // in the parser. Keys are categories ("io", "mutation", etc.) and values are internal names
+        // ("console_write", "database_write") — potentially comma-separated for multiple effects
+        // in the same category.
+        //
+        // We build (EffectKind, string) tuples directly to match the internal representation
+        // used by the enforcement pass and manifest resolver.
+        var effects = new List<(EffectKind Kind, string Value)>();
         foreach (var kv in function.Effects.Effects)
         {
-            // Split comma-separated values
+            var kind = ParseEffectCategory(kv.Key);
             var values = kv.Value.Split(',');
             foreach (var value in values)
             {
                 var trimmedValue = value.Trim();
-                if (kv.Key.Contains(':') || IsSurfaceCode(trimmedValue))
+                if (!string.IsNullOrEmpty(trimmedValue))
                 {
-                    surfaceCodes.Add(trimmedValue);
-                }
-                else
-                {
-                    surfaceCodes.Add($"{kv.Key}:{trimmedValue}");
+                    effects.Add((kind, trimmedValue));
                 }
             }
         }
-        return EffectSet.From(surfaceCodes.ToArray());
+        return EffectSet.FromInternal(effects);
     }
 
-    private static bool IsSurfaceCode(string code)
+    private static EffectKind ParseEffectCategory(string category)
     {
-        // Check if the value is already a surface code
-        return code.ToLowerInvariant() switch
+        return category.ToLowerInvariant() switch
         {
-            "cw" or "cr" or "fw" or "fr" or "net" or "http" or "db" or "time" or "rand" or "mut" or "throw" => true,
-            _ => false
+            "io" => EffectKind.IO,
+            "mutation" => EffectKind.Mutation,
+            "memory" => EffectKind.Memory,
+            "exception" => EffectKind.Exception,
+            "nondeterminism" => EffectKind.Nondeterminism,
+            _ => EffectKind.Unknown
         };
     }
+
+    private static (string TypeName, string MethodName) ParseCallTargetForChain(string target)
+    {
+        var lastDot = target.LastIndexOf('.');
+        if (lastDot <= 0)
+            return ("", "");
+
+        var methodName = target[(lastDot + 1)..];
+        var typePart = target[..lastDot];
+
+        if (!typePart.Contains('.'))
+        {
+            typePart = MapShortTypeNameToFullName(typePart);
+        }
+
+        return (typePart, methodName);
+    }
+
+    /// <summary>
+    /// Maps common short type names to fully-qualified names for manifest resolution.
+    /// Used by both ParseCallTarget (in EffectInferrer) and ParseCallTargetForChain.
+    /// </summary>
+    internal static string MapShortTypeNameToFullName(string shortName) => shortName switch
+    {
+        // BCL types
+        "Console" => "System.Console",
+        "File" => "System.IO.File",
+        "Directory" => "System.IO.Directory",
+        "Path" => "System.IO.Path",
+        "Random" => "System.Random",
+        "DateTime" => "System.DateTime",
+        "Environment" => "System.Environment",
+        "Process" => "System.Diagnostics.Process",
+        "HttpClient" => "System.Net.Http.HttpClient",
+        "Math" => "System.Math",
+        "Guid" => "System.Guid",
+        "Enumerable" => "System.Linq.Enumerable",
+        "String" => "System.String",
+        "Int32" => "System.Int32",
+        "Int64" => "System.Int64",
+        "Double" => "System.Double",
+        "Boolean" => "System.Boolean",
+        "Convert" => "System.Convert",
+        "Array" => "System.Array",
+        "StringBuilder" => "System.Text.StringBuilder",
+        "Stopwatch" => "System.Diagnostics.Stopwatch",
+        "Debug" => "System.Diagnostics.Debug",
+        "Trace" => "System.Diagnostics.Trace",
+        "Thread" => "System.Threading.Thread",
+        "Task" => "System.Threading.Tasks.Task",
+        "JsonSerializer" => "System.Text.Json.JsonSerializer",
+        "JsonDocument" => "System.Text.Json.JsonDocument",
+        "Regex" => "System.Text.RegularExpressions.Regex",
+        // Microsoft.Extensions.Logging
+        "ILogger" => "Microsoft.Extensions.Logging.ILogger",
+        "LoggerExtensions" => "Microsoft.Extensions.Logging.LoggerExtensions",
+        "ILoggerFactory" => "Microsoft.Extensions.Logging.ILoggerFactory",
+        // Microsoft.Extensions.Configuration
+        "IConfiguration" => "Microsoft.Extensions.Configuration.IConfiguration",
+        "IConfigurationRoot" => "Microsoft.Extensions.Configuration.IConfigurationRoot",
+        "IConfigurationSection" => "Microsoft.Extensions.Configuration.IConfigurationSection",
+        "ConfigurationExtensions" => "Microsoft.Extensions.Configuration.ConfigurationExtensions",
+        // Microsoft.Extensions.DependencyInjection
+        "IServiceProvider" => "Microsoft.Extensions.DependencyInjection.IServiceProvider",
+        "IServiceCollection" => "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+        "IServiceScopeFactory" => "Microsoft.Extensions.DependencyInjection.IServiceScopeFactory",
+        // Microsoft.Extensions.Options
+        "IOptions" => "Microsoft.Extensions.Options.IOptions`1",
+        "IOptionsSnapshot" => "Microsoft.Extensions.Options.IOptionsSnapshot`1",
+        "IOptionsMonitor" => "Microsoft.Extensions.Options.IOptionsMonitor`1",
+        // Microsoft.Extensions.Hosting
+        "IHost" => "Microsoft.Extensions.Hosting.IHost",
+        "IHostBuilder" => "Microsoft.Extensions.Hosting.IHostBuilder",
+        "IHostedService" => "Microsoft.Extensions.Hosting.IHostedService",
+        // Microsoft.EntityFrameworkCore
+        "DbContext" => "Microsoft.EntityFrameworkCore.DbContext",
+        "DbSet" => "Microsoft.EntityFrameworkCore.DbSet`1",
+        "DatabaseFacade" => "Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade",
+        // Microsoft.AspNetCore
+        "HttpContext" => "Microsoft.AspNetCore.Http.HttpContext",
+        "HttpRequest" => "Microsoft.AspNetCore.Http.HttpRequest",
+        "HttpResponse" => "Microsoft.AspNetCore.Http.HttpResponse",
+        "ControllerBase" => "Microsoft.AspNetCore.Mvc.ControllerBase",
+        "Results" => "Microsoft.AspNetCore.Http.Results",
+        "TypedResults" => "Microsoft.AspNetCore.Http.TypedResults",
+        _ => shortName
+    };
 
     private List<string> FindCallChain(string startFunctionId, EffectKind targetKind, string targetValue)
     {
@@ -247,14 +335,19 @@ public sealed class EffectEnforcementPass
                     // Resolve callee name to ID for internal calls (handles cross-class method calls)
                     var calleeId = ResolveToInternalId(calleeName);
 
-                    // Check external calls
+                    // Check external calls via manifest resolver
                     if (calleeId == null)
                     {
-                        var effects = _catalog.TryGetEffects(calleeName);
-                        if (effects != null && effects.Contains(targetKind, targetValue))
+                        var (typeName, methodName) = ParseCallTargetForChain(calleeName);
+                        if (!string.IsNullOrEmpty(typeName) && !string.IsNullOrEmpty(methodName))
                         {
-                            var result = new List<string>(path) { calleeName };
-                            return result;
+                            var resolution = _resolver.Resolve(typeName, methodName);
+                            if (resolution.Status != EffectResolutionStatus.Unknown &&
+                                resolution.Effects.Contains(targetKind, targetValue))
+                            {
+                                var result = new List<string>(path) { calleeName };
+                                return result;
+                            }
                         }
                     }
                     // Check internal calls
@@ -276,7 +369,6 @@ public sealed class EffectEnforcementPass
     /// </summary>
     private sealed class InferenceContext
     {
-        public EffectsCatalog Catalog { get; }
         public EffectResolver Resolver { get; }
         public Dictionary<string, EffectSet> ComputedEffects { get; }
         public Dictionary<string, FunctionNode> Functions { get; }
@@ -289,7 +381,6 @@ public sealed class EffectEnforcementPass
         public string CurrentFunctionId { get; }
 
         public InferenceContext(
-            EffectsCatalog catalog,
             EffectResolver resolver,
             Dictionary<string, EffectSet> computedEffects,
             Dictionary<string, FunctionNode> functions,
@@ -301,7 +392,6 @@ public sealed class EffectEnforcementPass
             DiagnosticBag diagnostics,
             string currentFunctionId)
         {
-            Catalog = catalog;
             Resolver = resolver;
             ComputedEffects = computedEffects;
             Functions = functions;
@@ -400,6 +490,14 @@ public sealed class EffectEnforcementPass
                 ReturnStatementNode ret => ret.Expression != null ? InferFromExpression(ret.Expression) : EffectSet.Empty,
                 BindStatementNode bind => bind.Initializer != null ? InferFromExpression(bind.Initializer) : EffectSet.Empty,
                 AssignmentStatementNode assign => InferFromAssignment(assign),
+                // Collection mutations
+                CollectionPushNode => EffectSet.From("mut"),
+                DictionaryPutNode => EffectSet.From("mut"),
+                CollectionRemoveNode => EffectSet.From("mut"),
+                CollectionSetIndexNode => EffectSet.From("mut"),
+                CollectionClearNode => EffectSet.From("mut"),
+                CollectionInsertNode => EffectSet.From("mut"),
+                DictionaryForeachNode dictForeach => InferFromStatements(dictForeach.Body),
                 _ => EffectSet.Empty
             };
         }
@@ -443,16 +541,17 @@ public sealed class EffectEnforcementPass
                 {
                     return resolution.Effects;
                 }
-            }
 
-            // Fall back to legacy signature-based lookup
-            var signatures = BuildPotentialSignatures(target);
-            foreach (var sig in signatures)
-            {
-                var effects = _context.Catalog.TryGetEffects(sig);
-                if (effects != null)
+                // If type didn't resolve, try variable type resolution:
+                // "r.Next" where "r" is a variable declared as "new Random()"
+                var resolvedVarType = ResolveVariableType(typeName);
+                if (resolvedVarType != null && resolvedVarType != typeName)
                 {
-                    return effects;
+                    resolution = _context.Resolver.Resolve(resolvedVarType, methodName);
+                    if (resolution.Status != EffectResolutionStatus.Unknown)
+                    {
+                        return resolution.Effects;
+                    }
                 }
             }
 
@@ -507,7 +606,7 @@ public sealed class EffectEnforcementPass
                 _context.Diagnostics.Report(
                     span,
                     DiagnosticCode.UnknownExternalCall,
-                    $"Unknown external call to '{target}'. Add effect declaration in a manifest or calor.effects.json.",
+                    $"Unknown external call to '{target}'. Add effect declaration in a .calor-effects.json manifest.",
                     severity);
             }
             else if (_context.Policy == UnknownCallPolicy.Warn)
@@ -534,22 +633,7 @@ public sealed class EffectEnforcementPass
             if (!typePart.Contains('.'))
             {
                 // Map common short names to full types
-                typePart = typePart switch
-                {
-                    "Console" => "System.Console",
-                    "File" => "System.IO.File",
-                    "Directory" => "System.IO.Directory",
-                    "Path" => "System.IO.Path",
-                    "Random" => "System.Random",
-                    "DateTime" => "System.DateTime",
-                    "Environment" => "System.Environment",
-                    "Process" => "System.Diagnostics.Process",
-                    "HttpClient" => "System.Net.Http.HttpClient",
-                    "Math" => "System.Math",
-                    "Guid" => "System.Guid",
-                    "Enumerable" => "System.Linq.Enumerable",
-                    _ => typePart
-                };
+                typePart = MapShortTypeNameToFullName(typePart);
             }
 
             return (typePart, methodName);
@@ -595,42 +679,38 @@ public sealed class EffectEnforcementPass
             return null;
         }
 
-        private List<string> BuildPotentialSignatures(string target)
+        /// <summary>
+        /// Resolves a variable name to its declared type by scanning the current function's
+        /// body for §B (bind) statements with §NEW initializers.
+        /// E.g., "§B{client} §NEW{HttpClient}" → "client" resolves to "System.Net.Http.HttpClient".
+        /// </summary>
+        private string? ResolveVariableType(string variableName)
         {
-            var signatures = new List<string>();
+            if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
+                return null;
 
-            // Handle common patterns
-            // Console.WriteLine -> System.Console::WriteLine(...)
-            var parts = target.Split('.');
-            if (parts.Length == 2)
+            return ScanForVariableType(variableName, function.Body);
+        }
+
+        private static string? ScanForVariableType(string variableName, IEnumerable<StatementNode> statements)
+        {
+            foreach (var stmt in statements)
             {
-                var typeName = parts[0];
-                var methodName = parts[1];
-
-                // Try common BCL namespaces
-                var namespaces = new[]
+                if (stmt is BindStatementNode bind && bind.Name == variableName && bind.Initializer != null)
                 {
-                    "System",
-                    "System.IO",
-                    "System.Net.Http",
-                    "System.Threading",
-                    "System.Threading.Tasks",
-                    "System.Diagnostics",
-                    "System.Linq"
-                };
-
-                foreach (var ns in namespaces)
-                {
-                    // Try with various common parameter patterns
-                    signatures.Add($"{ns}.{typeName}::{methodName}()");
-                    signatures.Add($"{ns}.{typeName}::{methodName}(System.String)");
-                    signatures.Add($"{ns}.{typeName}::{methodName}(System.Object)");
-                    signatures.Add($"{ns}.{typeName}::{methodName}(System.Int32)");
-                    signatures.Add($"{ns}.{typeName}::get_{methodName}()");  // Property getter
+                    // §B{var} §NEW{TypeName} → resolve TypeName
+                    if (bind.Initializer is NewExpressionNode newExpr)
+                    {
+                        return MapShortTypeNameToFullName(newExpr.TypeName);
+                    }
+                    // §B{var:TypeName} — explicit type declaration
+                    if (bind.TypeName != null)
+                    {
+                        return MapShortTypeNameToFullName(bind.TypeName);
+                    }
                 }
             }
-
-            return signatures;
+            return null;
         }
 
         private EffectSet InferFromIf(IfStatementNode ifStmt)
@@ -753,12 +833,11 @@ public sealed class EffectEnforcementPass
         {
             var effects = EffectSet.Empty;
 
-            // Check if constructor has effects
-            var signature = EffectsCatalog.BuildConstructorSignature("", newExpr.TypeName);
-            var ctorEffects = _context.Catalog.TryGetEffects(signature);
-            if (ctorEffects != null)
+            // Check if constructor has effects via manifest resolver
+            var ctorResolution = _context.Resolver.ResolveConstructor(newExpr.TypeName);
+            if (ctorResolution.Status != EffectResolutionStatus.Unknown)
             {
-                effects = effects.Union(ctorEffects);
+                effects = effects.Union(ctorResolution.Effects);
             }
 
             foreach (var arg in newExpr.Arguments)

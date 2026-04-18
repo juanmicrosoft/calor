@@ -537,21 +537,30 @@ public class Example
     #region Issue 310: Async console operations in known effects
 
     [Fact]
-    public void BuiltInEffects_TextWriterWriteLineAsync_IsKnown()
+    public void ManifestEffects_TextWriterWriteLineAsync_IsKnown()
     {
-        Assert.True(BuiltInEffects.IsKnown("System.IO.TextWriter::WriteLineAsync(System.String)"));
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.IO.TextWriter", "WriteLineAsync");
+        Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
     }
 
     [Fact]
-    public void BuiltInEffects_StreamReaderReadLineAsync_IsKnown()
+    public void ManifestEffects_StreamReaderReadLineAsync_IsKnown()
     {
-        Assert.True(BuiltInEffects.IsKnown("System.IO.StreamReader::ReadLineAsync()"));
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.IO.StreamReader", "ReadLineAsync");
+        Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
     }
 
     [Fact]
-    public void BuiltInEffects_TextWriterFlushAsync_IsKnown()
+    public void ManifestEffects_TextWriterFlushAsync_IsKnown()
     {
-        Assert.True(BuiltInEffects.IsKnown("System.IO.TextWriter::FlushAsync()"));
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.IO.TextWriter", "FlushAsync");
+        Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
     }
 
     #endregion
@@ -559,33 +568,48 @@ public class Example
     #region Issue 311: Math functions as known pure methods
 
     [Fact]
-    public void BuiltInEffects_MathFloor_IsPure()
+    public void ManifestEffects_MathFloor_IsPure()
     {
-        Assert.True(BuiltInEffects.IsKnownPure("System.Math::Floor(System.Double)"));
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.Math", "Floor");
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
     [Fact]
-    public void BuiltInEffects_MathClamp_IsPure()
+    public void ManifestEffects_MathClamp_IsPure()
     {
-        Assert.True(BuiltInEffects.IsKnownPure("System.Math::Clamp(System.Int32,System.Int32,System.Int32)"));
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.Math", "Clamp");
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
     [Fact]
-    public void BuiltInEffects_MathSin_IsPure()
+    public void ManifestEffects_MathSin_IsPure()
     {
-        Assert.True(BuiltInEffects.IsKnownPure("System.Math::Sin(System.Double)"));
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.Math", "Sin");
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
     [Fact]
-    public void BuiltInEffects_MathRound_IsPure()
+    public void ManifestEffects_MathRound_IsPure()
     {
-        Assert.True(BuiltInEffects.IsKnownPure("System.Math::Round(System.Double,System.Int32)"));
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.Math", "Round");
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
     [Fact]
-    public void BuiltInEffects_MathLog_IsPure()
+    public void ManifestEffects_MathLog_IsPure()
     {
-        Assert.True(BuiltInEffects.IsKnownPure("System.Math::Log(System.Double)"));
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve("System.Math", "Log");
+        Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
     #endregion

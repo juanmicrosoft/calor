@@ -1,0 +1,119 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for System.Text.Json types",
+  "mappings": [
+    {
+      "type": "System.Text.Json.JsonSerializer",
+      "methods": {
+        "Serialize": [],
+        "SerializeAsync": ["fs:w"],
+        "SerializeToUtf8Bytes": [],
+        "SerializeToNode": [],
+        "SerializeToDocument": [],
+        "SerializeToElement": [],
+        "Deserialize": [],
+        "DeserializeAsync": ["fs:r"],
+        "DeserializeAsyncEnumerable": ["fs:r"]
+      }
+    },
+    {
+      "type": "System.Text.Json.JsonDocument",
+      "defaultEffects": [],
+      "methods": {
+        "Parse": [],
+        "ParseAsync": ["fs:r"],
+        "ParseValue": [],
+        "Dispose": [],
+        "WriteTo": []
+      },
+      "getters": {
+        "RootElement": []
+      }
+    },
+    {
+      "type": "System.Text.Json.JsonElement",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.Text.Json.Utf8JsonReader",
+      "defaultEffects": [],
+      "methods": {
+        "Read": [],
+        "TrySkip": [],
+        "GetString": [],
+        "GetInt32": [],
+        "GetInt64": [],
+        "GetDouble": [],
+        "GetBoolean": [],
+        "GetGuid": [],
+        "GetDateTime": [],
+        "GetDecimal": [],
+        "GetBytesFromBase64": [],
+        "ValueTextEquals": []
+      }
+    },
+    {
+      "type": "System.Text.Json.Utf8JsonWriter",
+      "methods": {
+        "WriteStartObject": ["mut"],
+        "WriteEndObject": ["mut"],
+        "WriteStartArray": ["mut"],
+        "WriteEndArray": ["mut"],
+        "WriteString": ["mut"],
+        "WriteNumber": ["mut"],
+        "WriteBoolean": ["mut"],
+        "WriteNull": ["mut"],
+        "WritePropertyName": ["mut"],
+        "WriteStringValue": ["mut"],
+        "WriteNumberValue": ["mut"],
+        "WriteBooleanValue": ["mut"],
+        "WriteNullValue": ["mut"],
+        "WriteRawValue": ["mut"],
+        "Flush": [],
+        "FlushAsync": [],
+        "Reset": ["mut"],
+        "Dispose": [],
+        "DisposeAsync": []
+      }
+    },
+    {
+      "type": "System.Text.Json.Nodes.JsonNode",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "System.Text.Json.Nodes.JsonObject",
+      "defaultEffects": [],
+      "methods": {
+        "Add": ["mut"],
+        "Remove": ["mut"],
+        "Clear": ["mut"],
+        "*": []
+      }
+    },
+    {
+      "type": "System.Text.Json.Nodes.JsonArray",
+      "defaultEffects": [],
+      "methods": {
+        "Add": ["mut"],
+        "Remove": ["mut"],
+        "RemoveAt": ["mut"],
+        "Clear": ["mut"],
+        "Insert": ["mut"],
+        "*": []
+      }
+    },
+    {
+      "type": "System.Text.Json.JsonSerializerOptions",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    }
+  ]
+}

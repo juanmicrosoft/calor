@@ -1,0 +1,134 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for System.Collections.Concurrent types",
+  "mappings": [
+    {
+      "type": "System.Collections.Concurrent.ConcurrentDictionary`2",
+      "methods": {
+        "TryAdd": ["mut"],
+        "TryUpdate": ["mut"],
+        "TryRemove": ["mut"],
+        "AddOrUpdate": ["mut"],
+        "GetOrAdd": ["mut"],
+        "Clear": ["mut"],
+        "TryGetValue": [],
+        "ContainsKey": [],
+        "ToArray": [],
+        "GetEnumerator": []
+      },
+      "getters": {
+        "Count": [],
+        "IsEmpty": [],
+        "Keys": [],
+        "Values": []
+      }
+    },
+    {
+      "type": "System.Collections.Concurrent.ConcurrentQueue`1",
+      "methods": {
+        "Enqueue": ["mut"],
+        "TryDequeue": ["mut"],
+        "TryPeek": [],
+        "Clear": ["mut"],
+        "ToArray": [],
+        "GetEnumerator": []
+      },
+      "getters": {
+        "Count": [],
+        "IsEmpty": []
+      }
+    },
+    {
+      "type": "System.Collections.Concurrent.ConcurrentStack`1",
+      "methods": {
+        "Push": ["mut"],
+        "TryPop": ["mut"],
+        "TryPeek": [],
+        "Clear": ["mut"],
+        "PushRange": ["mut"],
+        "TryPopRange": ["mut"],
+        "ToArray": [],
+        "GetEnumerator": []
+      },
+      "getters": {
+        "Count": [],
+        "IsEmpty": []
+      }
+    },
+    {
+      "type": "System.Collections.Concurrent.ConcurrentBag`1",
+      "methods": {
+        "Add": ["mut"],
+        "TryTake": ["mut"],
+        "TryPeek": [],
+        "Clear": ["mut"],
+        "ToArray": [],
+        "GetEnumerator": []
+      },
+      "getters": {
+        "Count": [],
+        "IsEmpty": []
+      }
+    },
+    {
+      "type": "System.Collections.Concurrent.BlockingCollection`1",
+      "methods": {
+        "Add": ["mut"],
+        "TryAdd": ["mut"],
+        "Take": ["mut"],
+        "TryTake": ["mut"],
+        "CompleteAdding": ["mut"],
+        "Dispose": [],
+        "ToArray": [],
+        "GetConsumingEnumerable": []
+      },
+      "getters": {
+        "Count": [],
+        "IsCompleted": [],
+        "IsAddingCompleted": [],
+        "BoundedCapacity": []
+      }
+    },
+    {
+      "type": "System.Threading.Channels.Channel`1",
+      "defaultEffects": [],
+      "getters": {
+        "Reader": [],
+        "Writer": []
+      }
+    },
+    {
+      "type": "System.Threading.Channels.Channel",
+      "defaultEffects": [],
+      "methods": {
+        "CreateBounded": [],
+        "CreateUnbounded": []
+      }
+    },
+    {
+      "type": "System.Threading.Channels.ChannelReader`1",
+      "methods": {
+        "ReadAsync": ["mut"],
+        "TryRead": ["mut"],
+        "WaitToReadAsync": [],
+        "ReadAllAsync": ["mut"]
+      },
+      "getters": {
+        "Count": [],
+        "CanCount": [],
+        "CanPeek": [],
+        "Completion": []
+      }
+    },
+    {
+      "type": "System.Threading.Channels.ChannelWriter`1",
+      "methods": {
+        "WriteAsync": ["mut"],
+        "TryWrite": ["mut"],
+        "WaitToWriteAsync": [],
+        "Complete": ["mut"],
+        "TryComplete": ["mut"]
+      }
+    }
+  ]
+}

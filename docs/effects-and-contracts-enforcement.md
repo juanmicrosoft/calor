@@ -146,21 +146,38 @@ System.DateTime::get_UtcNow() → time
 System.Guid::NewGuid() → rand
 ```
 
-## Project-Level Stubs
+## Project-Level Effect Manifests
 
-Create a `calor.effects.json` file in your project directory:
+Create a `.calor-effects.json` file in your project directory to declare effects for types not covered by the built-in manifests:
 
 ```json
 {
-  "stubs": {
-    "MyCompany.Logging.Logger::Log(System.String)": ["cw"],
-    "MyCompany.Data.Repository::Save(MyCompany.Data.Entity)": ["db:w", "mut"],
-    "MyCompany.Http.Client::Fetch(System.String)": ["net:r"]
-  }
+  "version": "1.0",
+  "description": "Effects for MyCompany types",
+  "mappings": [
+    {
+      "type": "MyCompany.Logging.Logger",
+      "methods": {
+        "Log": ["cw"]
+      }
+    },
+    {
+      "type": "MyCompany.Data.Repository",
+      "methods": {
+        "Save": ["db:w", "mut"]
+      }
+    },
+    {
+      "type": "MyCompany.Http.Client",
+      "methods": {
+        "Fetch": ["net:r"]
+      }
+    }
+  ]
 }
 ```
 
-Project stubs override built-in catalog entries on conflict.
+Project-level manifests have the highest priority and override all other sources. See `docs/guides/effect-manifests.md` for the full manifest schema.
 
 ## Runtime Contract Enforcement
 
@@ -270,8 +287,8 @@ error Calor0410: Function 'greetUser' uses effect 'console_write' but does not d
 ### Unknown External Call
 
 ```
-error Calor0411: Unknown external call to 'MyLib.Helper::DoSomething()'
-  in strict mode. Add stub in calor.effects.json or use a known method.
+error Calor0411: Unknown external call to 'MyLib.Helper.DoSomething()'.
+  Add effect declaration in a .calor-effects.json manifest.
 ```
 
 ## Version History
