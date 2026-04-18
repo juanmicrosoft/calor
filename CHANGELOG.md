@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-04-18
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Added
+- **Effect system: .NET framework manifests** — Tier B effect manifests for 30+ common .NET framework interfaces (ILogger, DbContext, IConfiguration, HttpClient, ControllerBase, etc.) enabling the compiler to enforce correct effect declarations when Calor code calls framework types
+- **Effect system: ecosystem library manifests** — Manifests for Serilog, Newtonsoft.Json, Dapper, MediatR, AutoMapper, FluentValidation, Polly
+- **Effect system: BCL manifest expansion** — New manifests for System.Text.Json, Regex, Concurrent collections, Crypto types
+- **Effect system: variable type resolution** — Enforcement pass resolves instance method calls via §NEW initializer tracking (e.g., §B{r} §NEW{Random} → r.Next resolves to rand)
+- **Effect system: structured type info** — BoundCallExpression now carries ResolvedTypeName and ResolvedMethodName from the binder
+- **Effect system: centralized type mapping** — MapShortTypeNameToFullName with 65+ type name mappings across BCL, framework, and ecosystem types
+- 95 new enforcement tests (210 total)
+
+### Fixed
+- **Effect system: unified resolver** — Consolidated three parallel effect systems (BuiltInEffects, EffectsCatalog, EffectChecker.KnownEffects) into a single manifest-based resolver
+- **Parser: compound effect codes** — Fixed §E{db:r,cw,env:r} silently mis-parsing the third compound code when colon-delimited effects are chained with commas
+- **EffectCodes.ToCompact: missing mappings** — Added environment_read→env:r, database_write→db:w, heap_write→mut and other internal-to-surface code conversions
+- **Enforcement: collection mutations** — Added CollectionPushNode, DictionaryPutNode, CollectionRemoveNode, etc. to the enforcement pass (→ mut effect)
+- **Converter: effect declaration format** — Fixed converter emitting internal values (environment_read) instead of surface codes (env:r) in §E declarations
+
+### Removed
+- `BuiltInEffects.cs` — ~204 hardcoded entries migrated to manifest JSON files
+- `EffectsCatalog.cs` — Intermediate layer removed; EffectResolver handles all resolution
+- `EffectChecker` class — Legacy checker replaced by EffectEnforcementPass; shared types moved to EffectTypes.cs
+
 ## [0.4.5] - 2026-04-14
 
 ### Benchmark Results (Statistical: 30 runs)
