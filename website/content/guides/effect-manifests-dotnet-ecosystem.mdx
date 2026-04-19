@@ -1,0 +1,197 @@
+---
+title: "Effect Manifests: .NET Ecosystem Coverage"
+section: "guides"
+order: 3
+description: "How Calor knows the effects of .NET framework and ecosystem library calls"
+---
+
+
+When Calor code calls into .NET libraries, the compiler needs to know what side effects those calls have. Effect manifests provide this information — JSON files that map types and methods to their effects.
+
+---
+
+## The Problem
+
+Calor enforces that every function declares its effects:
+
+```
+§F{f001:SaveUser:pub}
+  §O{void}
+  §E{db:w,cw}
+  §C{DbContext.SaveChanges} §/C
+  §C{ILogger.LogInformation} §A STR:"User saved" §/C
+§/F{f001}
+```
+
+But how does the compiler know that `DbContext.SaveChanges` has effect `db:w` and `ILogger.LogInformation` has effect `cw`? Without this knowledge, every external call would be flagged as `Unknown`.
+
+## What's Covered
+
+Calor ships with **14 embedded manifest files** covering **~170 types** across three tiers:
+
+### BCL Types (10 manifests)
+
+Core .NET types the compiler has always known about, plus recent additions:
+
+| Manifest | Types | Examples |
+|----------|-------|---------|
+| `bcl-system` | Console, Math, String, LINQ, Collections | `Console.WriteLine → cw`, `Math.Abs → pure` |
+| `bcl-io` | File, Directory, Stream, TextWriter | `File.ReadAllText → fs:r`, `File.WriteAllText → fs:w` |
+| `bcl-net` | HttpClient, Socket, DNS, WebClient | `HttpClient.GetAsync → net:rw` |
+| `bcl-data` | DbConnection, DbCommand, SqlClient | `DbCommand.ExecuteNonQuery → db:w` |
+| `bcl-runtime` | Random, DateTime, Environment, Process, Task | `Random.Next → rand`, `DateTime.Now → time` |
+| `bcl-text-json` | JsonSerializer, JsonDocument, Utf8JsonWriter | `JsonSerializer.Serialize → pure` |
+| `bcl-text-regex` | Regex, Match, Group | `Regex.IsMatch → pure` |
+| `bcl-concurrent` | ConcurrentDictionary, Channel, BlockingCollection | `ConcurrentDictionary.TryAdd → mut` |
+| `bcl-crypto` | SHA256, RSA, Aes, RandomNumberGenerator | `SHA256.HashData → pure`, `RandomNumberGenerator.GetBytes → rand` |
+| `bcl-framework-interfaces` | ILogger, DbContext, IConfiguration, IHost, ControllerBase | See below |
+
+### Framework Interfaces (Tier B)
+
+The most commonly used .NET framework types — these are the calls AI agents generate most often:
+
+| Type | Method | Effect | Why |
+|------|--------|--------|-----|
+| `ILogger.LogInformation` | All log methods | `cw` | Observable output |
+| `DbContext.SaveChanges` | SaveChanges/Async | `db:w` | Database write |
+| `DbContext.Find` | Find/FindAsync | `db:r` | Database read |
+| `IConfiguration.GetSection` | GetSection, GetValue | `env:r` | Environment/config read |
+| `ControllerBase.Ok` | Ok, NotFound, BadRequest | pure | No side effects |
+| `HttpResponse.WriteAsync` | WriteAsync, Redirect | `net:w` | Network write |
+| `IHost.RunAsync` | Run, Start, Stop | `net:rw` | Starts network listener |
+| `IServiceProvider.GetService` | GetService | pure | DI resolution |
+| `IOptions<T>.Value` | Value getter | pure | Configuration read |
+| `DbSet<T>.ToListAsync` | All query extensions | `db:r` | Database query |
+| `DatabaseFacade.Migrate` | Migrate, EnsureCreated | `db:w` | Schema modification |
+
+### Ecosystem Libraries (4 manifests)
+
+Popular NuGet packages that AI agents commonly generate code for:
+
+| Library | Key types | Effects |
+|---------|-----------|---------|
+| **Serilog** | `Log.Information`, `ILogger.Write` | `cw` |
+| **Newtonsoft.Json** | `JsonConvert.SerializeObject` | pure |
+| **Dapper** | `SqlMapper.Query` / `Execute` | `db:r` / `db:w` |
+| **MediatR** | `IMediator.Send` | pure (handler-dependent) |
+| **AutoMapper** | `IMapper.Map` | pure |
+| **FluentValidation** | `IValidator.Validate` | pure |
+| **Polly** | `Policy.Execute` | pure (wraps delegate) |
+
+## How Resolution Works
+
+When the compiler encounters `§C{DbContext.SaveChanges}`, it:
+
+1. Parses the target: type = `DbContext`, method = `SaveChanges`
+2. Maps the short name: `DbContext` → `Microsoft.EntityFrameworkCore.DbContext`
+3. Looks up the manifest: finds `bcl-framework-interfaces.calor-effects.json`
+4. Returns the effect: `db:w`
+
+For instance calls like `§C{client.GetAsync}` (from converted C# code), the compiler also checks variable declarations — if `§B{client} §NEW{HttpClient}`, it resolves `client` → `System.Net.Http.HttpClient` → `net:rw`.
+
+### Resolution Priority
+
+Manifests are loaded in priority order (higher overrides lower):
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 0 | **Built-in** (embedded in compiler) | All 14 shipped manifests |
+| 100 | **User-level** (`~/.calor/manifests/`) | Personal overrides |
+| 200 | **Solution-level** (`{solution}/.calor-effects/`) | Team-shared manifests |
+| 300 | **Project-local** (`.calor-effects.json`) | Project-specific types |
+
+## Adding Custom Manifests
+
+For types not covered by the built-in manifests, create a `.calor-effects.json` file in your project root:
+
+```json
+{
+  "version": "1.0",
+  "description": "Effects for MyApp types",
+  "mappings": [
+    {
+      "type": "MyApp.Services.EmailService",
+      "methods": {
+        "SendAsync": ["net:w"],
+        "ValidateAddress": []
+      }
+    },
+    {
+      "type": "MyApp.Data.CacheService",
+      "methods": {
+        "Get": ["db:r"],
+        "Set": ["db:w"],
+        "Remove": ["db:w"]
+      }
+    }
+  ]
+}
+```
+
+### Manifest Schema
+
+Each manifest supports:
+
+- **`methods`** — Per-method effects (or `"*"` wildcard for all methods)
+- **`getters`** / **`setters`** — Property accessor effects
+- **`constructors`** — Constructor effects (keyed by parameter signature)
+- **`defaultEffects`** — Fallback for any method not explicitly listed
+- **`namespaceDefaults`** — Default effects for entire namespaces
+
+## Effect Code Reference
+
+| Code | Meaning | Example |
+|------|---------|---------|
+| `cw` | Console write | `Console.WriteLine`, `ILogger.Log` |
+| `cr` | Console read | `Console.ReadLine` |
+| `fs:r` | Filesystem read | `File.ReadAllText` |
+| `fs:w` | Filesystem write | `File.WriteAllText` |
+| `net:r` | Network read | `HttpClient.GetStringAsync` |
+| `net:w` | Network write | `HttpResponse.WriteAsync` |
+| `net:rw` | Network read+write | `HttpClient.GetAsync` |
+| `db:r` | Database read | `DbContext.Find`, `SqlMapper.Query` |
+| `db:w` | Database write | `DbContext.SaveChanges`, `SqlMapper.Execute` |
+| `env:r` | Environment read | `IConfiguration.GetSection` |
+| `time` | System time | `DateTime.Now` |
+| `rand` | Random generation | `Random.Next`, `Guid.NewGuid` |
+| `mut` | Heap mutation | `List.Add`, `ConcurrentDictionary.TryAdd` |
+| `throw` | Intentional throw | `ValidateAndThrow` |
+
+Broader effects encompass narrower ones: `fs:rw` covers both `fs:r` and `fs:w`.
+
+## CLI Tools
+
+### Resolve effects for a method
+
+```bash
+calor effects resolve Console.WriteLine    # → cw
+calor effects resolve DbContext.SaveChanges # → db:w
+calor effects resolve ILogger.Log          # → cw
+calor effects resolve JsonSerializer.Serialize # → [pure]
+```
+
+### Validate manifests
+
+```bash
+calor effects validate
+calor effects validate --project ./src
+```
+
+### List all covered types
+
+```bash
+calor effects list
+calor effects list --type ILogger
+```
+
+## Architecture: Why Manifests?
+
+Calor is designed for AI agents as primary code authors. When an agent generates Calor code that calls `DbContext.SaveChanges()`, the compiler needs to verify the function declares `§E{db:w}`. Without manifests, every external call would be Unknown — defeating the purpose of effect enforcement.
+
+The manifest approach was chosen over alternatives:
+
+- **Hardcoded catalogs** were fragile and couldn't be extended by users
+- **Runtime analysis** is too slow for compilation
+- **Compile-time IL analysis** works for concrete call chains but not for interface-heavy types like ILogger (see [prototype results](/docs/plans/prototype-results))
+
+The current architecture uses manifests as the primary resolution mechanism, with a validated path toward compile-time IL analysis for concrete call chains in a future release.
