@@ -8,6 +8,16 @@ All notable changes to Calor, organized by release.
 
 ---
 
+## [0.4.8] - 2026-04-20
+
+### Added
+- **`calor effects suggest` CLI command** — Analyzes Calor source files and generates a `.calor-effects.suggested.json` manifest template for unresolved external calls. Supports `--json` for agent consumption, `--merge` for additive updates to existing manifests. Uses AST-based collection with internal function filtering, variable type resolution, and call kind tagging.
+- **Shared `ExternalCallCollector`** — Extracted from `InteropEffectCoverageCalculator`, extended to walk class methods and constructors. Resolves variable types via `§NEW` initializer scanning.
+- **[Effect manifests .NET ecosystem guide](/guides/effect-manifests-dotnet-ecosystem/)** — New website page documenting ~170 covered types, resolution mechanics, custom manifest authoring, and CLI tools
+- 15 new suggest tests (collection, dedup, merge, E2E, multi-file, constructors)
+
+---
+
 ## [0.4.7] - 2026-04-20
 
 ### Added
