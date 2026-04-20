@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-04-20
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Added
+- **`calor effects suggest` CLI command** — Analyzes Calor source files and generates a `.calor-effects.suggested.json` manifest template for unresolved external calls. Supports `--json` for agent consumption, `--merge` for additive updates to existing manifests. Uses AST-based collection (not diagnostic parsing) with internal function filtering, variable type resolution, and call kind tagging.
+- **Shared `ExternalCallCollector`** — Extracted from `InteropEffectCoverageCalculator`, extended to walk class methods and constructors (was functions only). Resolves variable types via `§NEW` initializer scanning. Both the coverage calculator and suggest command use it.
+- **Effect manifests .NET ecosystem guide** — New website page documenting ~170 covered types, resolution mechanics, custom manifest authoring, and CLI tools
+- 15 new suggest tests (collection, dedup, merge, E2E, multi-file, constructors)
+
 ## [0.4.7] - 2026-04-20
 
 ### Benchmark Results (Statistical: 30 runs)
