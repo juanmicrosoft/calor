@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Calor.Compiler.Tests" />
+    <InternalsVisibleTo Include="Calor.Enforcement.Tests" />
   </ItemGroup>
 
   <PropertyGroup>

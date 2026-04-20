@@ -1,5 +1,6 @@
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Effects.Manifests;
@@ -226,5 +227,160 @@ public class EffectsSuggestTests
         var calls = ExternalCallCollector.Collect(module);
 
         Assert.Empty(calls);
+    }
+
+    // ========================================================================
+    // Merge mode
+    // ========================================================================
+
+    [Fact]
+    public void Merge_PreservesExistingEffects()
+    {
+        // Existing manifest has OrderService.Save with db:w
+        var existingJson = @"{
+            ""version"": ""1.0"",
+            ""description"": ""Production manifest"",
+            ""confidence"": ""verified"",
+            ""mappings"": [
+                {
+                    ""type"": ""OrderService"",
+                    ""methods"": {
+                        ""Save"": [""db:w""],
+                        ""Delete"": [""db:w""]
+                    }
+                }
+            ],
+            ""namespaceDefaults"": {
+                ""MyApp.Data"": [""db:rw""]
+            }
+        }";
+
+        // Write to temp file
+        var tempPath = Path.Combine(Path.GetTempPath(), $"calor-merge-test-{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(tempPath, existingJson);
+
+            // Build a suggested manifest that adds a new method to OrderService + a new type
+            var suggested = new EffectManifest
+            {
+                Version = "1.0",
+                Description = "Suggested",
+                Confidence = "inferred",
+                Mappings = new List<TypeMapping>
+                {
+                    new TypeMapping { Type = "OrderService", Methods = new Dictionary<string, List<string>> { ["Cancel"] = new() } },
+                    new TypeMapping { Type = "CacheClient", Methods = new Dictionary<string, List<string>> { ["Get"] = new() } }
+                }
+            };
+
+            var result = EffectsCommand.MergeManifest(tempPath, suggested);
+
+            // Existing effects preserved
+            var orderMapping = result.Mappings.First(m => m.Type == "OrderService");
+            Assert.Equal(new List<string> { "db:w" }, orderMapping.Methods!["Save"]);
+            Assert.Equal(new List<string> { "db:w" }, orderMapping.Methods!["Delete"]);
+
+            // New method added
+            Assert.True(orderMapping.Methods!.ContainsKey("Cancel"));
+            Assert.Empty(orderMapping.Methods!["Cancel"]);
+
+            // New type added
+            Assert.Contains(result.Mappings, m => m.Type == "CacheClient");
+
+            // Metadata preserved
+            Assert.Equal("Production manifest", result.Description);
+            Assert.Equal("verified", result.Confidence);
+
+            // NamespaceDefaults preserved
+            Assert.NotNull(result.NamespaceDefaults);
+            Assert.True(result.NamespaceDefaults.ContainsKey("MyApp.Data"));
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
+
+    [Fact]
+    public void Merge_ExistingEmptyEffectsNotOverwritten()
+    {
+        // A method with explicitly empty [] (marked pure) should NOT be overwritten
+        var existingJson = @"{
+            ""version"": ""1.0"",
+            ""mappings"": [
+                {
+                    ""type"": ""MyService"",
+                    ""methods"": {
+                        ""PureMethod"": [],
+                        ""EffectfulMethod"": [""db:w""]
+                    }
+                }
+            ]
+        }";
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"calor-merge-test-{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(tempPath, existingJson);
+
+            var suggested = new EffectManifest
+            {
+                Version = "1.0",
+                Mappings = new List<TypeMapping>
+                {
+                    new TypeMapping { Type = "MyService", Methods = new Dictionary<string, List<string>>
+                    {
+                        ["PureMethod"] = new(),         // would overwrite if not careful
+                        ["EffectfulMethod"] = new(),    // would overwrite if not careful
+                        ["NewMethod"] = new()           // genuinely new
+                    }}
+                }
+            };
+
+            var result = EffectsCommand.MergeManifest(tempPath, suggested);
+
+            var mapping = result.Mappings.First(m => m.Type == "MyService");
+
+            // Existing empty [] preserved (not overwritten)
+            Assert.Empty(mapping.Methods!["PureMethod"]);
+
+            // Existing filled effects preserved
+            Assert.Equal(new List<string> { "db:w" }, mapping.Methods!["EffectfulMethod"]);
+
+            // New method added
+            Assert.True(mapping.Methods!.ContainsKey("NewMethod"));
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
+
+    [Fact]
+    public void MergeDictionary_OnlyAddsNewKeys()
+    {
+        var existing = new Dictionary<string, List<string>>
+        {
+            ["Save"] = new List<string> { "db:w" },
+            ["Pure"] = new List<string>()
+        };
+
+        var suggested = new Dictionary<string, List<string>>
+        {
+            ["Save"] = new List<string>(),       // existing — should NOT overwrite
+            ["Pure"] = new List<string>(),        // existing — should NOT overwrite
+            ["NewMethod"] = new List<string>()    // new — should add
+        };
+
+        EffectsCommand.MergeDictionary(existing, suggested);
+
+        // Existing entries untouched
+        Assert.Equal(new List<string> { "db:w" }, existing["Save"]);
+        Assert.Empty(existing["Pure"]);
+
+        // New entry added
+        Assert.True(existing.ContainsKey("NewMethod"));
+        Assert.Empty(existing["NewMethod"]);
     }
 }

@@ -594,7 +594,7 @@ public static class EffectsCommand
         return manifest;
     }
 
-    private static EffectManifest MergeManifest(string existingPath, EffectManifest suggested)
+    internal static EffectManifest MergeManifest(string existingPath, EffectManifest suggested)
     {
         try
         {
@@ -648,7 +648,7 @@ public static class EffectsCommand
         }
     }
 
-    private static void MergeDictionary(
+    internal static void MergeDictionary(
         Dictionary<string, List<string>>? existing,
         Dictionary<string, List<string>>? suggested)
     {
