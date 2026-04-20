@@ -1,0 +1,166 @@
+---
+title: "Static Analysis (--analyze)"
+section: "cli"
+order: 2
+---
+
+
+Find bugs in Calor code using dataflow analysis, Z3 verification, and taint tracking.
+
+```bash
+calor --input <file.calr> --analyze [--all-findings]
+```
+
+---
+
+## Overview
+
+The `--analyze` flag enables advanced static analysis on Calor source files. It runs **after compilation** and uses the bound syntax tree to detect bugs that C# alone cannot catch:
+
+- **Division by zero** — proven via Z3 SMT solver or constant analysis
+- **Null dereference** — unsafe `.unwrap()` on Option/Result types without prior checks
+- **Integer overflow** — Z3-verified signed overflow in arithmetic operations
+- **Index out of bounds** — array access with provably negative indices
+- **Off-by-one errors** — loop bounds vs. array length mismatches
+- **SQL injection** — tainted user input flowing to SQL queries
+- **Command injection** — tainted data reaching command execution
+- **Path traversal** — tainted data used as file paths
+- **Cross-site scripting** — tainted data in HTML output
+
+By default, only **verified findings** are reported — issues that are proven by Z3 or constant analysis. Use `--all-findings` to see lower-confidence results.
+
+---
+
+## Quick Start
+
+```bash
+# Analyze a Calor file for bugs
+calor -i MyModule.calr --analyze --permissive-effects
+
+# Analyze with all findings (including inconclusive)
+calor -i MyModule.calr --analyze --all-findings --permissive-effects
+
+# Combine with contract verification
+calor -i MyModule.calr --analyze --verify --permissive-effects
+```
+
+---
+
+## Options
+
+| Option | Description |
+|:-------|:------------|
+| `--analyze` | Enable static analysis (dataflow, bug patterns, taint tracking) |
+| `--all-findings` | Report all findings including inconclusive and low-confidence results |
+| `--permissive-effects` | Recommended for converted code: suppresses unknown-effect warnings |
+| `--verification-timeout` | Z3 solver timeout per check in milliseconds (default: 5000) |
+| `--verbose` | Show analysis summary (functions analyzed, patterns found) |
+
+---
+
+## What Gets Detected
+
+### Bug Patterns (Calor0920-0927)
+
+| Code | Pattern | Severity | Method |
+|:-----|:--------|:---------|:-------|
+| Calor0920 | Division by zero | Error (proven) / Warning (Z3) | Constant analysis + Z3 SMT |
+| Calor0921 | Index out of bounds | Error / Warning | Negative literal + Z3 |
+| Calor0922 | Null dereference | Warning | Unwrap pattern analysis |
+| Calor0923 | Integer overflow | Warning | Z3 bitvector arithmetic |
+| Calor0925 | Unsafe unwrap | Warning | Option/Result flow tracking |
+| Calor0926 | Missing precondition | Warning | Divisor parameter analysis |
+| Calor0927 | Off-by-one | Warning | Loop bounds heuristic |
+
+### Security (Calor0980-0984)
+
+| Code | Pattern | Severity | Method |
+|:-----|:--------|:---------|:-------|
+| Calor0981 | SQL injection | Warning | Taint tracking (source-to-sink) |
+| Calor0982 | Command injection | Warning | Taint tracking |
+| Calor0983 | Path traversal | Warning | Taint tracking |
+| Calor0984 | Cross-site scripting | Warning | Taint tracking |
+
+### Dataflow (Calor0900-0902)
+
+| Code | Pattern | Severity | Method |
+|:-----|:--------|:---------|:-------|
+| Calor0900 | Uninitialized variable | Error / Warning | CFG-based reaching definitions |
+| Calor0901 | Dead code | Warning | Control flow analysis |
+| Calor0902 | Dead store | Warning | Live variable analysis |
+
+---
+
+## Default vs. --all-findings
+
+The `--analyze` flag uses **verification-gated reporting** by default. This means:
+
+| Finding type | Default (`--analyze`) | `--all-findings` |
+|:------------|:---------------------|:-----------------|
+| Division by literal zero | Reported | Reported |
+| Z3-proven division by zero | Reported | Reported |
+| Inconclusive division check | **Suppressed** | Reported as Info |
+| Heuristic-only findings | **Suppressed** | Reported as Warning |
+| Missing precondition suggestions | **Suppressed** | Reported as Warning |
+| Multi-hop taint flows (2+ hops) | Reported | Reported |
+| Single-hop taint flows | **Suppressed** | Reported |
+
+This approach follows the principle used by tools like Infer, Error Prone, and the Rust compiler: **report only what you can prove.**
+
+---
+
+## Real-World Findings
+
+The analysis has found verified issues across 51 open-source C# projects converted to Calor:
+
+| Project | Finding | Type |
+|:--------|:--------|:-----|
+| ILSpy | Unsafe unwrap in NullPropagationTransform | Null dereference |
+| Mapster | Nullable type unwrap without check | Null dereference |
+| Avalonia | Nullable unwrap in Android platform code | Null dereference |
+| FluentFTP | Remote file paths used without sanitization | Path traversal |
+| ASP.NET Core | Tainted data in file handling | Path traversal |
+| Newtonsoft.Json | `FloatingPointRemainder(dividend, 0)` | Division by zero |
+
+---
+
+## Class Member Analysis
+
+The analysis covers all executable class members:
+
+- **Methods** (`§MT`) — including overloaded methods with arity-aware resolution
+- **Constructors** (`§CTOR`) — including initializer argument analysis
+- **Property accessors** (`§PROP` get/set/init) — with implicit `value` parameter
+- **Operator overloads** (`§OP`) — arithmetic operators checked for overflow
+- **Indexers** (`§IXER`) — getter/setter bodies
+- **Event accessors** (`§EVT` add/remove) — with implicit `value` parameter
+
+Class fields are in scope for all member bodies, preventing false uninitialized-variable reports.
+
+---
+
+## Integration with CI/CD
+
+Use `calor diagnose --format sarif` for SARIF output compatible with GitHub Code Scanning and other tools:
+
+```bash
+# Generate SARIF report
+calor diagnose MyModule.calr --format sarif --output results.sarif
+
+# Combine with static analysis
+calor -i MyModule.calr --analyze --permissive-effects 2> analysis-output.txt
+```
+
+---
+
+## Performance
+
+Analysis adds minimal overhead to compilation:
+
+| File size | Methods | Analysis time |
+|:----------|:--------|:-------------|
+| Small (50 tokens) | 2-5 | < 100ms |
+| Medium (1K tokens) | 10-30 | 200-500ms |
+| Large (5K tokens) | 50-100 | 500ms-2s |
+
+Z3 verification adds 1-5 seconds per file depending on the number of contracts and the `--verification-timeout` setting.

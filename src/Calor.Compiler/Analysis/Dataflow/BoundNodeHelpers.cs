@@ -39,6 +39,26 @@ public static class BoundNodeHelpers
                     foreach (var v in GetUsedVariables(arg))
                         yield return v;
                 break;
+
+            case BoundFieldAccessExpression fieldAccess:
+                foreach (var v in GetUsedVariables(fieldAccess.Target))
+                    yield return v;
+                break;
+
+            case BoundNewExpression newExpr:
+                foreach (var arg in newExpr.Arguments)
+                    foreach (var v in GetUsedVariables(arg))
+                        yield return v;
+                break;
+
+            case BoundConditionalExpression condExpr:
+                foreach (var v in GetUsedVariables(condExpr.Condition))
+                    yield return v;
+                foreach (var v in GetUsedVariables(condExpr.WhenTrue))
+                    yield return v;
+                foreach (var v in GetUsedVariables(condExpr.WhenFalse))
+                    yield return v;
+                break;
         }
     }
 
@@ -50,6 +70,10 @@ public static class BoundNodeHelpers
         return statement switch
         {
             BoundBindStatement bind => bind.Variable,
+            BoundAssignmentStatement assign when assign.Target is BoundVariableExpression varExpr => varExpr.Variable,
+            BoundCompoundAssignment compound when compound.Target is BoundVariableExpression varExpr => varExpr.Variable,
+            BoundForeachStatement forEach => forEach.LoopVariable,
+            BoundUsingStatement usingStmt => usingStmt.Resource,
             _ => null
         };
     }
@@ -95,6 +119,48 @@ public static class BoundNodeHelpers
                 if (forStmt.Step != null)
                     foreach (var v in GetUsedVariables(forStmt.Step))
                         yield return v;
+                break;
+
+            case BoundAssignmentStatement assign:
+                // For simple variable targets (x = expr), the target is defined, not used.
+                // Only yield uses from sub-expressions of the target (e.g., this.field → yield this).
+                if (assign.Target is not BoundVariableExpression)
+                    foreach (var v in GetUsedVariables(assign.Target))
+                        yield return v;
+                foreach (var v in GetUsedVariables(assign.Value))
+                    yield return v;
+                break;
+
+            case BoundCompoundAssignment compound:
+                foreach (var v in GetUsedVariables(compound.Target))
+                    yield return v;
+                foreach (var v in GetUsedVariables(compound.Value))
+                    yield return v;
+                break;
+
+            case BoundForeachStatement forEach:
+                foreach (var v in GetUsedVariables(forEach.Collection))
+                    yield return v;
+                break;
+
+            case BoundUsingStatement usingStmt:
+                foreach (var v in GetUsedVariables(usingStmt.ResourceExpression))
+                    yield return v;
+                break;
+
+            case BoundThrowStatement throwStmt:
+                foreach (var v in GetUsedVariables(throwStmt.Expression))
+                    yield return v;
+                break;
+
+            case BoundDoWhileStatement doWhile:
+                foreach (var v in GetUsedVariables(doWhile.Condition))
+                    yield return v;
+                break;
+
+            case BoundExpressionStatement exprStmt:
+                foreach (var v in GetUsedVariables(exprStmt.Expression))
+                    yield return v;
                 break;
         }
     }
@@ -153,6 +219,41 @@ public static class BoundNodeHelpers
                 foreach (var s in forStmt.Body)
                     foreach (var v in GetAllDefinedVariablesInStatement(s))
                         yield return v;
+                break;
+
+            case BoundForeachStatement forEach:
+                yield return forEach.LoopVariable;
+                foreach (var s in forEach.Body)
+                    foreach (var v in GetAllDefinedVariablesInStatement(s))
+                        yield return v;
+                break;
+
+            case BoundDoWhileStatement doWhile:
+                foreach (var s in doWhile.Body)
+                    foreach (var v in GetAllDefinedVariablesInStatement(s))
+                        yield return v;
+                break;
+
+            case BoundUsingStatement usingStmt:
+                if (usingStmt.Resource != null)
+                    yield return usingStmt.Resource;
+                foreach (var s in usingStmt.Body)
+                    foreach (var v in GetAllDefinedVariablesInStatement(s))
+                        yield return v;
+                break;
+
+            case BoundTryStatement tryStmt:
+                foreach (var s in tryStmt.TryBody)
+                    foreach (var v in GetAllDefinedVariablesInStatement(s))
+                        yield return v;
+                foreach (var catchClause in tryStmt.CatchClauses)
+                    foreach (var s in catchClause.Body)
+                        foreach (var v in GetAllDefinedVariablesInStatement(s))
+                            yield return v;
+                if (tryStmt.FinallyBody != null)
+                    foreach (var s in tryStmt.FinallyBody)
+                        foreach (var v in GetAllDefinedVariablesInStatement(s))
+                            yield return v;
                 break;
         }
     }

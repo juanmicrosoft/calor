@@ -106,6 +106,51 @@ public sealed class OverflowChecker : IBugPatternChecker
                     CheckStatement(s, function, diagnostics, pathConditions);
                 }
                 break;
+
+            case BoundAssignmentStatement assign:
+                CheckExpression(assign.Target, function, diagnostics, pathConditions);
+                CheckExpression(assign.Value, function, diagnostics, pathConditions);
+                break;
+
+            case BoundCompoundAssignment compound:
+                CheckExpression(compound.Target, function, diagnostics, pathConditions);
+                CheckExpression(compound.Value, function, diagnostics, pathConditions);
+                break;
+
+            case BoundForeachStatement forEach:
+                CheckExpression(forEach.Collection, function, diagnostics, pathConditions);
+                foreach (var s in forEach.Body)
+                {
+                    CheckStatement(s, function, diagnostics, pathConditions);
+                }
+                break;
+
+            case BoundDoWhileStatement doWhile:
+                CheckExpression(doWhile.Condition, function, diagnostics, pathConditions);
+                foreach (var s in doWhile.Body)
+                {
+                    CheckStatement(s, function, diagnostics, pathConditions);
+                }
+                break;
+
+            case BoundUsingStatement usingStmt:
+                CheckExpression(usingStmt.ResourceExpression, function, diagnostics, pathConditions);
+                foreach (var s in usingStmt.Body)
+                {
+                    CheckStatement(s, function, diagnostics, pathConditions);
+                }
+                break;
+
+            case BoundExpressionStatement exprStmt:
+                CheckExpression(exprStmt.Expression, function, diagnostics, pathConditions);
+                break;
+
+            case BoundThrowStatement throwStmt:
+                if (throwStmt.Expression != null)
+                {
+                    CheckExpression(throwStmt.Expression, function, diagnostics, pathConditions);
+                }
+                break;
         }
     }
 
@@ -143,6 +188,12 @@ public sealed class OverflowChecker : IBugPatternChecker
                 {
                     CheckExpression(arg, function, diagnostics, pathConditions);
                 }
+                break;
+
+            case BoundConditionalExpression condExpr:
+                CheckExpression(condExpr.Condition, function, diagnostics, pathConditions);
+                CheckExpression(condExpr.WhenTrue, function, diagnostics, pathConditions);
+                CheckExpression(condExpr.WhenFalse, function, diagnostics, pathConditions);
                 break;
         }
     }
@@ -198,8 +249,9 @@ public sealed class OverflowChecker : IBugPatternChecker
                     $"Potential integer overflow in {opName}");
             }
         }
-        else if (potentialOverflow == true)
+        else if (potentialOverflow == true && !_options.ReportOnlyVerified)
         {
+            // Heuristic-only finding — only show with --all-findings
             diagnostics.ReportInfo(
                 binExpr.Span,
                 DiagnosticCode.IntegerOverflow,

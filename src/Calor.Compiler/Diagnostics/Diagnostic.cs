@@ -287,6 +287,24 @@ public static class DiagnosticCode
     /// </summary>
     public const string InferredContract = "Calor0928";
 
+    // Class member analysis (Calor0930-0949)
+
+    /// <summary>
+    /// Warning: Analysis of a class member was skipped due to a known limitation.
+    /// </summary>
+    public const string AnalysisSkipped = "Calor0930";
+
+    /// <summary>
+    /// Info: A statement type is not fully supported in analysis and is treated as opaque.
+    /// Deduplicated per NodeTypeName per file.
+    /// </summary>
+    public const string AnalysisUnsupportedNode = "Calor0931";
+
+    /// <summary>
+    /// Error: Internal compiler error during class member analysis.
+    /// </summary>
+    public const string AnalysisICE = "Calor0932";
+
     // K-induction / loop analysis (Calor0950-0979)
 
     /// <summary>

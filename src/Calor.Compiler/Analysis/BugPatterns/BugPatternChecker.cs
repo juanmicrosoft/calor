@@ -90,6 +90,13 @@ public sealed class BugPatternOptions
     public bool CheckOffByOne { get; init; } = true;
 
     /// <summary>
+    /// When true, only report findings that are definitively proven (by Z3 or constant analysis).
+    /// Suppresses Info-level "inconclusive" findings and precondition suggestions.
+    /// Default: false (backward compatible). The CLI sets this to true unless --all-findings is passed.
+    /// </summary>
+    public bool ReportOnlyVerified { get; init; } = false;
+
+    /// <summary>
     /// Use Z3 SMT solver for verification (more precise but slower).
     /// </summary>
     public bool UseZ3Verification { get; init; } = true;

@@ -113,6 +113,51 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                     CheckStatement(s, function, diagnostics, pathConditions);
                 }
                 break;
+
+            case BoundAssignmentStatement assign:
+                CheckExpression(assign.Target, function, diagnostics, pathConditions);
+                CheckExpression(assign.Value, function, diagnostics, pathConditions);
+                break;
+
+            case BoundCompoundAssignment compound:
+                CheckExpression(compound.Target, function, diagnostics, pathConditions);
+                CheckExpression(compound.Value, function, diagnostics, pathConditions);
+                break;
+
+            case BoundForeachStatement forEach:
+                CheckExpression(forEach.Collection, function, diagnostics, pathConditions);
+                foreach (var s in forEach.Body)
+                {
+                    CheckStatement(s, function, diagnostics, pathConditions);
+                }
+                break;
+
+            case BoundDoWhileStatement doWhile:
+                CheckExpression(doWhile.Condition, function, diagnostics, pathConditions);
+                foreach (var s in doWhile.Body)
+                {
+                    CheckStatement(s, function, diagnostics, pathConditions);
+                }
+                break;
+
+            case BoundUsingStatement usingStmt:
+                CheckExpression(usingStmt.ResourceExpression, function, diagnostics, pathConditions);
+                foreach (var s in usingStmt.Body)
+                {
+                    CheckStatement(s, function, diagnostics, pathConditions);
+                }
+                break;
+
+            case BoundExpressionStatement exprStmt:
+                CheckExpression(exprStmt.Expression, function, diagnostics, pathConditions);
+                break;
+
+            case BoundThrowStatement throwStmt:
+                if (throwStmt.Expression != null)
+                {
+                    CheckExpression(throwStmt.Expression, function, diagnostics, pathConditions);
+                }
+                break;
         }
     }
 
@@ -148,6 +193,12 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                 {
                     CheckExpression(arg, function, diagnostics, pathConditions);
                 }
+                break;
+
+            case BoundConditionalExpression condExpr:
+                CheckExpression(condExpr.Condition, function, diagnostics, pathConditions);
+                CheckExpression(condExpr.WhenTrue, function, diagnostics, pathConditions);
+                CheckExpression(condExpr.WhenFalse, function, diagnostics, pathConditions);
                 break;
         }
     }
@@ -203,9 +254,9 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                     DiagnosticCode.DivisionByZero,
                     $"Potential division by zero: divisor can be zero under some conditions");
             }
-            else if (canBeZero == null)
+            else if (canBeZero == null && !_options.ReportOnlyVerified)
             {
-                // Unknown - report as info
+                // Unknown - report as info (only when --all-findings is used)
                 diagnostics.ReportInfo(
                     divisionExpr.Span,
                     DiagnosticCode.DivisionByZero,
@@ -213,9 +264,10 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
             }
             // false means proven safe - no diagnostic
         }
-        else
+        else if (!_options.ReportOnlyVerified)
         {
-            // Simple heuristic: warn if divisor is a variable without obvious guard
+            // Simple heuristic without Z3: warn if divisor is a variable without obvious guard
+            // (only when --all-findings is used — heuristic findings are not verified)
             if (divisor is BoundVariableExpression varExpr)
             {
                 // Check if there's a guard in the path conditions

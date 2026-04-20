@@ -96,6 +96,10 @@ public class Program
             aliases: ["--analyze"],
             description: "Enable advanced verification analyses (dataflow, bug patterns, taint tracking)");
 
+        var allFindingsOption = new Option<bool>(
+            aliases: ["--all-findings"],
+            description: "Report all analysis findings including inconclusive and low-confidence results (default: only report verified findings)");
+
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
             inputOption,
@@ -112,7 +116,8 @@ public class Program
             clearCacheOption,
             verificationTimeoutOption,
             noTelemetryOption,
-            analyzeOption
+            analyzeOption,
+            allFindingsOption
         };
 
         // Legacy compile handler (when --input is provided)
@@ -143,6 +148,7 @@ public class Program
             var clearCache = ctx.ParseResult.GetValueForOption(clearCacheOption);
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
             var analyze = ctx.ParseResult.GetValueForOption(analyzeOption);
+            var allFindings = ctx.ParseResult.GetValueForOption(allFindingsOption);
 
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
             {
@@ -160,7 +166,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings);
             }
             catch (Exception ex)
             {
@@ -226,7 +232,7 @@ public class Program
         return result;
     }
 
-    private static async Task<int> CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze)
+    private static async Task<int> CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false)
     {
         try
         {
@@ -300,7 +306,19 @@ public class Program
                 ProjectDirectory = Path.GetDirectoryName(input.FullName),
                 VerificationCacheOptions = cacheOptions,
                 VerificationTimeoutMs = (uint)verificationTimeout,
-                EnableVerificationAnalyses = analyze
+                EnableVerificationAnalyses = analyze,
+                VerificationAnalysisOptions = analyze ? new Analysis.VerificationAnalysisOptions
+                {
+                    BugPatternOptions = new Analysis.BugPatterns.BugPatternOptions
+                    {
+                        ReportOnlyVerified = !allFindings,
+                        Z3TimeoutMs = (uint)verificationTimeout
+                    },
+                    TaintOptions = new Analysis.Security.TaintAnalysisOptions
+                    {
+                        MinTaintHops = allFindings ? 1 : 2
+                    }
+                } : null
             };
             var result = Compile(source, input.FullName, options);
 

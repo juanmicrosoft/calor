@@ -82,6 +82,61 @@ export function CatchBugs() {
               </p>
             </div>
           </div>
+
+          {/* Static Analysis section */}
+          <div className="mt-20 mx-auto max-w-2xl text-center">
+            <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Static Analysis Finds What C# Misses
+            </h3>
+            <p className="mt-4 text-lg text-muted-foreground font-body">
+              Run <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">calor --analyze</code> to
+              detect null dereferences, injection vulnerabilities, and arithmetic bugs across your entire codebase.
+            </p>
+          </div>
+
+          <div className="mt-10 mx-auto max-w-3xl">
+            <div className="rounded-lg border border-calor-navy/20 bg-calor-navy overflow-hidden shadow-lg">
+              <div className="border-b border-white/10 px-4 py-2">
+                <span className="text-sm text-calor-cyan/70 font-mono">$ calor --analyze --input NullPropagationTransform.calr</span>
+              </div>
+              <pre className="p-5 text-sm leading-7 overflow-x-auto">
+                <code className="font-mono">
+                  <span className="text-calor-salmon">{'warning Calor0922: Potential unsafe unwrap without prior\n'}</span>
+                  <span className="text-calor-salmon">{'                   Option/Result check\n'}</span>
+                  <span className="text-white/50">{'\n'}</span>
+                  <span className="text-calor-cyan/70">{'  NullPropagationTransform.calr(75,9)\n'}</span>
+                  <span className="text-calor-cyan/70">{'  NullPropagationTransform.calr(81,9)\n'}</span>
+                  <span className="text-calor-cyan/70">{'  NullPropagationTransform.calr(86,9)\n'}</span>
+                  <span className="text-white/50">{'\n'}</span>
+                  <span className="text-calor-salmon">{'warning Calor0983: Potential path traversal: tainted data\n'}</span>
+                  <span className="text-calor-salmon">{'                   from FileRead flows to file path\n'}</span>
+                  <span className="text-white/50">{'\n'}</span>
+                  <span className="text-calor-cyan/70">{'  FtpClient.calr(1201,11)\n'}</span>
+                  <span className="text-white/50">{'\n'}</span>
+                  <span className="text-green-400">{'Verified findings only. Use --all-findings for more.\n'}</span>
+                </code>
+              </pre>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="text-center p-4 rounded-lg border bg-background">
+                <div className="text-2xl font-bold text-calor-cerulean">51</div>
+                <div className="text-xs text-muted-foreground mt-1">Projects scanned</div>
+              </div>
+              <div className="text-center p-4 rounded-lg border bg-background">
+                <div className="text-2xl font-bold text-calor-cerulean">262K</div>
+                <div className="text-xs text-muted-foreground mt-1">Files analyzed</div>
+              </div>
+              <div className="text-center p-4 rounded-lg border bg-background">
+                <div className="text-2xl font-bold text-calor-salmon">23</div>
+                <div className="text-xs text-muted-foreground mt-1">Verified findings</div>
+              </div>
+              <div className="text-center p-4 rounded-lg border bg-background">
+                <div className="text-2xl font-bold text-green-500">~90%</div>
+                <div className="text-xs text-muted-foreground mt-1">True positive rate</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

@@ -53,6 +53,7 @@ public sealed class FunctionSymbol : Symbol
 public sealed class Scope
 {
     private readonly Dictionary<string, Symbol> _symbols = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<FunctionSymbol>> _overloadSets = new(StringComparer.Ordinal);
     public Scope? Parent { get; }
 
     public Scope(Scope? parent = null)
@@ -71,6 +72,22 @@ public sealed class Scope
         return true;
     }
 
+    /// <summary>
+    /// Declares a function overload. Multiple overloads with the same name are stored
+    /// in an overload set for arity-aware resolution. The first overload is also
+    /// registered in _symbols for backward compatibility with Lookup callers.
+    /// </summary>
+    public void DeclareOverload(FunctionSymbol symbol)
+    {
+        if (!_overloadSets.TryGetValue(symbol.Name, out var list))
+        {
+            list = new List<FunctionSymbol>();
+            _overloadSets[symbol.Name] = list;
+        }
+        list.Add(symbol);
+        _symbols.TryAdd(symbol.Name, symbol);
+    }
+
     public Symbol? Lookup(string name)
     {
         if (_symbols.TryGetValue(name, out var symbol))
@@ -79,6 +96,21 @@ public sealed class Scope
         }
 
         return Parent?.Lookup(name);
+    }
+
+    /// <summary>
+    /// Looks up a function by name and argument count (arity-aware overload resolution).
+    /// Prefers exact arity match; falls back to first overload if no arity match.
+    /// </summary>
+    public FunctionSymbol? LookupByArity(string name, int argCount)
+    {
+        if (_overloadSets.TryGetValue(name, out var list))
+        {
+            var match = list.FirstOrDefault(f => f.Parameters.Count == argCount);
+            return match ?? list[0];
+        }
+
+        return Parent?.LookupByArity(name, argCount);
     }
 
     public bool TryLookup(string name, out Symbol? symbol)

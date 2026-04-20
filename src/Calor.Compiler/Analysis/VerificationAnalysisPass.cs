@@ -210,7 +210,90 @@ public sealed class VerificationAnalysisPass
                 result[func.Name] = guardedNames;
         }
 
+        // Also extract from class members with preconditions
+        foreach (var cls in module.Classes)
+        {
+            foreach (var method in cls.Methods)
+            {
+                if (method.Preconditions.Count == 0) continue;
+                var paramNames = method.Parameters.Select(p => p.Name).ToHashSet();
+                var guardedNames = new HashSet<string>();
+                foreach (var pre in method.Preconditions)
+                    CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                if (guardedNames.Count > 0)
+                    result[$"{cls.Name}.{method.Name}"] = guardedNames;
+            }
+
+            foreach (var ctor in cls.Constructors)
+            {
+                if (ctor.Preconditions.Count == 0) continue;
+                var paramNames = ctor.Parameters.Select(p => p.Name).ToHashSet();
+                var guardedNames = new HashSet<string>();
+                foreach (var pre in ctor.Preconditions)
+                    CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                if (guardedNames.Count > 0)
+                    result[$"{cls.Name}..ctor"] = guardedNames;
+            }
+
+            foreach (var op in cls.OperatorOverloads)
+            {
+                if (op.Preconditions.Count == 0) continue;
+                var paramNames = op.Parameters.Select(p => p.Name).ToHashSet();
+                var guardedNames = new HashSet<string>();
+                foreach (var pre in op.Preconditions)
+                    CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                if (guardedNames.Count > 0)
+                    result[$"{cls.Name}.op_{op.Kind}"] = guardedNames;
+            }
+
+            // Property/indexer accessor preconditions
+            foreach (var prop in cls.Properties)
+            {
+                if (prop.Setter?.Preconditions.Count > 0)
+                {
+                    var setterParams = new HashSet<string> { "value" };
+                    var guardedNames = new HashSet<string>();
+                    foreach (var pre in prop.Setter.Preconditions)
+                        CollectReferencedNames(pre.Condition, setterParams, guardedNames);
+                    if (guardedNames.Count > 0)
+                        result[$"{cls.Name}.{prop.Name}.set"] = guardedNames;
+                }
+            }
+
+            // Recurse into nested classes
+            foreach (var nested in cls.NestedClasses)
+                ExtractFromClass(nested, result);
+        }
+
         return result;
+    }
+
+    private static void ExtractFromClass(Ast.ClassDefinitionNode cls, Dictionary<string, HashSet<string>> result)
+    {
+        foreach (var method in cls.Methods)
+        {
+            if (method.Preconditions.Count == 0) continue;
+            var paramNames = method.Parameters.Select(p => p.Name).ToHashSet();
+            var guardedNames = new HashSet<string>();
+            foreach (var pre in method.Preconditions)
+                CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+            if (guardedNames.Count > 0)
+                result[$"{cls.Name}.{method.Name}"] = guardedNames;
+        }
+
+        foreach (var ctor in cls.Constructors)
+        {
+            if (ctor.Preconditions.Count == 0) continue;
+            var paramNames = ctor.Parameters.Select(p => p.Name).ToHashSet();
+            var guardedNames = new HashSet<string>();
+            foreach (var pre in ctor.Preconditions)
+                CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+            if (guardedNames.Count > 0)
+                result[$"{cls.Name}..ctor"] = guardedNames;
+        }
+
+        foreach (var nested in cls.NestedClasses)
+            ExtractFromClass(nested, result);
     }
 
     /// <summary>
@@ -284,7 +367,7 @@ public sealed class VerificationAnalysisPass
             if (_options.EnableTaintAnalysis)
             {
                 var taintOptions = _options.TaintOptions ?? TaintAnalysisOptions.Default;
-                var taintAnalysis = new TaintAnalysis(function, taintOptions);
+                var taintAnalysis = new TaintAnalysis(function, taintOptions, function.DeclaredEffects);
                 taintVulnerabilities += taintAnalysis.Vulnerabilities.Count;
                 taintAnalysis.ReportDiagnostics(_diagnostics);
             }

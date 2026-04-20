@@ -54,6 +54,21 @@ public sealed class OffByOneChecker : IBugPatternChecker
                 foreach (var s in whileStmt.Body)
                     CheckStatement(s, diagnostics);
                 break;
+
+            case BoundForeachStatement forEach:
+                foreach (var s in forEach.Body)
+                    CheckStatement(s, diagnostics);
+                break;
+
+            case BoundDoWhileStatement doWhile:
+                foreach (var s in doWhile.Body)
+                    CheckStatement(s, diagnostics);
+                break;
+
+            case BoundUsingStatement usingStmt:
+                foreach (var s in usingStmt.Body)
+                    CheckStatement(s, diagnostics);
+                break;
         }
     }
 

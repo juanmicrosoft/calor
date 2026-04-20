@@ -39,6 +39,10 @@ public sealed class ContractInferencePass
 
         foreach (var boundFunc in boundModule.Functions)
         {
+            // Only run contract inference on top-level functions (not class members)
+            if (boundFunc.MemberKind != BoundMemberKind.TopLevelFunction)
+                continue;
+
             if (functionsWithContracts.Contains(boundFunc.Symbol.Name))
                 continue;
 
@@ -194,6 +198,37 @@ public sealed class ContractInferencePass
                 foreach (var s in forStmt.Body)
                     FindDivisorParamsInStatement(s, paramNames, divisorParams);
                 break;
+            case BoundAssignmentStatement assign:
+                FindDivisorParamsInExpression(assign.Value, paramNames, divisorParams);
+                break;
+            case BoundCompoundAssignment compound:
+                FindDivisorParamsInExpression(compound.Value, paramNames, divisorParams);
+                break;
+            case BoundExpressionStatement exprStmt:
+                FindDivisorParamsInExpression(exprStmt.Expression, paramNames, divisorParams);
+                break;
+            case BoundForeachStatement forEach:
+                foreach (var s in forEach.Body)
+                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
+                break;
+            case BoundDoWhileStatement doWhile:
+                foreach (var s in doWhile.Body)
+                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
+                break;
+            case BoundUsingStatement usingStmt:
+                foreach (var s in usingStmt.Body)
+                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
+                break;
+            case BoundTryStatement tryStmt:
+                foreach (var s in tryStmt.TryBody)
+                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
+                foreach (var catchClause in tryStmt.CatchClauses)
+                    foreach (var s in catchClause.Body)
+                        FindDivisorParamsInStatement(s, paramNames, divisorParams);
+                if (tryStmt.FinallyBody != null)
+                    foreach (var s in tryStmt.FinallyBody)
+                        FindDivisorParamsInStatement(s, paramNames, divisorParams);
+                break;
         }
     }
 
@@ -224,6 +259,12 @@ public sealed class ContractInferencePass
             case BoundCallExpression callExpr:
                 foreach (var arg in callExpr.Arguments)
                     FindDivisorParamsInExpression(arg, paramNames, divisorParams);
+                break;
+
+            case BoundConditionalExpression condExpr:
+                FindDivisorParamsInExpression(condExpr.Condition, paramNames, divisorParams);
+                FindDivisorParamsInExpression(condExpr.WhenTrue, paramNames, divisorParams);
+                FindDivisorParamsInExpression(condExpr.WhenFalse, paramNames, divisorParams);
                 break;
         }
     }
