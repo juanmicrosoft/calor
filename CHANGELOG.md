@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-04-20
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Added
+- **Static analysis for class members** — The `--analyze` flag now examines methods, constructors, property accessors, operators, indexers, and event accessors (previously only top-level functions were analyzed)
+- **Verification-gated reporting** — `--analyze` only reports proven findings by default (Z3-confirmed or constant analysis); use `--all-findings` for lower-confidence results
+- **Taint hop-count tracking** — Taint analysis tracks propagation steps; single-hop parameter-to-sink flows filtered by default to reduce false positives
+- **Bug pattern detection in class members** — Division by zero, null dereference, integer overflow, off-by-one, path traversal, command injection, and SQL injection detection now covers all class member bodies
+- **ScopeRestorer RAII pattern** — Eliminates scope corruption risk from 14+ manual try/finally blocks in the Binder
+- **Arity-aware overload resolution** — `Scope.LookupByArity` resolves correct overload by argument count, preventing wrong return types from flowing into Z3
+- **Static context enforcement** — `this` expression not bindable in static methods and operators
+- **Nested class scope isolation** — Inner classes don't inherit outer class fields
+- **Constructor initializer binding** — `: base()`/`: this()` arguments visible to bug pattern checkers
+- **BoundConditionalExpression** — Ternary expressions preserve all three branches for analysis (was returning only the true branch)
+- **33 new unit tests** for class member binding, scope, overloads, dataflow, and end-to-end analysis
+- **New `--all-findings` CLI flag** for showing all analysis findings including inconclusive results
+- **New documentation page** (`/cli/static-analysis/`) documenting the analysis pipeline, finding types, and real-world results
+
+### Fixed
+- **False positive elimination** — Unhandled expression types (cast, array length, indexer, etc.) return opaque expressions instead of `BoundIntLiteral(0)`, eliminating the entire class of false division-by-zero reports
+- **DEC literal misparse** — Decimal literals (`DEC:100`) now bind to `BoundFloatLiteral` instead of falling to zero-literal fallback
+- **Assignment LHS not counted as use** — `x = 1` no longer reports `x` as "used before write" in dataflow analysis
+- **Multi-statement sync blocks** — Lock bodies now preserved for analysis (was dropping all statements)
+- **this.field shadowing** — `this.field` resolves from class scope, not method scope (prevents parameter shadowing field)
+- **Throw-to-catch CFG edges** — Throw statements inside try blocks now flow to catch blocks instead of function exit
+- **Using exception path** — Using statements modeled as try/finally with dispose on exception path
+- **DeclaredEffects pass-through** — `VerificationAnalysisPass` now passes function effects to `TaintAnalysis` (was missing)
+
+### Validated
+- **47 open-source projects scanned** — 23 verified findings across 8 projects, 27 projects clean (zero findings), ~90% true positive rate
+- **Real findings**: ILSpy null dereferences, FluentFTP path traversal, ASP.NET Core path traversal, Mapster unsafe unwraps, Avalonia nullable unwraps
+
 ## [0.4.6] - 2026-04-18
 
 ### Benchmark Results (Statistical: 30 runs)
