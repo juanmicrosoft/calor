@@ -1,0 +1,61 @@
+---
+title: "Changelog"
+order: 99
+---
+
+
+All notable changes to Calor, organized by release.
+
+---
+
+## [0.4.7] - 2026-04-20
+
+### Added
+- **Static analysis for class members** — The `--analyze` flag now examines methods, constructors, property accessors, operators, indexers, and event accessors (previously only top-level functions were analyzed)
+- **Verification-gated reporting** — `--analyze` only reports proven findings by default (Z3-confirmed or constant analysis); use `--all-findings` for lower-confidence results
+- **Taint hop-count tracking** — Taint analysis tracks propagation steps; single-hop parameter-to-sink flows filtered by default to reduce false positives
+- **Bug pattern detection in class members** — Division by zero, null dereference, integer overflow, off-by-one, path traversal, command injection, and SQL injection detection now covers all class member bodies
+- **Arity-aware overload resolution** — Correct overload resolved by argument count, preventing wrong return types from flowing into Z3
+- **Constructor initializer binding** — `: base()`/`: this()` arguments visible to bug pattern checkers
+- **33 new unit tests** for class member binding, scope, overloads, dataflow, and end-to-end analysis
+- **New `--all-findings` CLI flag** for showing all analysis findings including inconclusive results
+- **New [static analysis documentation](/cli/static-analysis/)** page
+
+### Fixed
+- **False positive elimination** — Unhandled expression types return opaque expressions instead of literal zero, eliminating false division-by-zero reports
+- **this.field shadowing** — `this.field` resolves from class scope, not method scope
+- **Throw-to-catch CFG edges** — Throw statements inside try blocks now flow to catch blocks
+- **Assignment dataflow** — `x = 1` no longer reports `x` as used before write
+
+### Validated
+- **47 open-source projects scanned** — 23 verified findings, ~90% true positive rate
+- **Real findings**: ILSpy null dereferences, FluentFTP path traversal, ASP.NET Core path traversal
+
+---
+
+## [0.4.6] - 2026-04-18
+
+### Added
+- **Effect system: .NET framework manifests** — Tier B effect manifests for 30+ common .NET framework interfaces (ILogger, DbContext, HttpClient, ControllerBase, etc.)
+- **Effect system: ecosystem library manifests** — Manifests for Serilog, Newtonsoft.Json, Dapper, MediatR, AutoMapper, FluentValidation, Polly
+- **Effect system: BCL manifest expansion** — New manifests for System.Text.Json, Regex, Concurrent collections, Crypto types
+- **Effect system: variable type resolution** — Enforcement pass resolves instance method calls via initializer tracking
+- 95 new enforcement tests (210 total)
+
+### Fixed
+- **Effect system: unified resolver** — Consolidated three parallel effect systems into a single manifest-based resolver
+- **Parser: compound effect codes** — Fixed silent mis-parsing of chained compound codes
+
+---
+
+## [0.4.5] - 2026-04-16
+
+### Fixed
+- Restrict expression-only match case to lambda-only patterns
+- PLIST nested call depth, call-as-pattern, OPTION compaction
+
+---
+
+## Earlier Releases
+
+See the [full changelog on GitHub](https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md) for versions prior to 0.4.5.
