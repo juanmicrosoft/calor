@@ -54,12 +54,24 @@ Update these files with the new version:
 | `editors/vscode/package.json` | `"version": "X.Y.Z"` |
 | `website/package.json` | `"version": "X.Y.Z"` |
 | `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and add benchmark summary |
+| `website/content/changelog.mdx` | Add new version section at the top (same content as CHANGELOG.md but MDX format, no benchmark stats) |
+| `website/src/components/landing/WhatsNewBanner.tsx` | Update version number and one-line description of the release |
 
 When updating CHANGELOG.md:
 1. Find the line `## [Unreleased]`
 2. Replace it with `## [X.Y.Z] - YYYY-MM-DD` where YYYY-MM-DD is today's date
 3. Add a new `## [Unreleased]` section above the new version header
 4. Insert the benchmark summary section immediately after the version header, before any existing changes
+
+When updating website/content/changelog.mdx:
+1. Add a new `## [X.Y.Z] - YYYY-MM-DD` section after the `---` separator at the top (before the previous version)
+2. Copy the **Added**, **Fixed**, **Removed** sections from CHANGELOG.md (skip benchmark stats — those are in CHANGELOG.md only)
+3. Convert any doc references to website links (e.g., `[page title](/docs/path/)`)
+
+When updating WhatsNewBanner.tsx:
+1. Update the version string (e.g., `v0.4.8`)
+2. Update the one-line description to highlight the most notable feature in this release
+3. Keep the "See what's new" link pointing to `/docs/changelog/`
 
 **Benchmark Summary Format for CHANGELOG:**
 
@@ -85,7 +97,7 @@ Extract the key metrics from the benchmark markdown output's Executive Summary s
 
 ```bash
 git checkout -b release/vX.Y.Z
-git add Directory.Build.props editors/vscode/package.json website/package.json CHANGELOG.md website/public/data/benchmark-results.json
+git add Directory.Build.props editors/vscode/package.json website/package.json CHANGELOG.md website/public/data/benchmark-results.json website/content/changelog.mdx website/src/components/landing/WhatsNewBanner.tsx
 git commit -m "chore: bump version to X.Y.Z"
 git push -u origin release/vX.Y.Z
 ```
@@ -97,6 +109,7 @@ gh pr create --title "Release vX.Y.Z" --body "$(cat <<'EOF'
 ## Summary
 - Bump version to X.Y.Z
 - Update CHANGELOG.md with release date and benchmark results
+- Update website changelog and WhatsNewBanner
 - Update benchmark results JSON for website dashboard
 
 ## Benchmark Results
@@ -107,6 +120,8 @@ gh pr create --title "Release vX.Y.Z" --body "$(cat <<'EOF'
 - [ ] Version updated in editors/vscode/package.json
 - [ ] Version updated in website/package.json
 - [ ] CHANGELOG.md updated with version, date, and benchmark summary
+- [ ] website/content/changelog.mdx updated with version and changes (no benchmark stats)
+- [ ] website/src/components/landing/WhatsNewBanner.tsx updated with version and headline
 - [ ] website/public/data/benchmark-results.json updated with latest results
 EOF
 )"
@@ -147,6 +162,12 @@ Remove the temporary benchmark markdown file:
 
 ```bash
 rm -f benchmark-results.md
+```
+
+Trigger the website deploy (the `nextjs-gh-pages` workflow runs on release creation, but if the banner/changelog were updated after the release tag was created, trigger a manual deploy):
+
+```bash
+gh workflow run nextjs-gh-pages.yml
 ```
 
 ## Version Calculation Logic
