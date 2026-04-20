@@ -19,11 +19,9 @@
     <Warning Text="CalorCompilerOverride is set — using local compiler from '$(CalorCompilerOverride)'" />
   </Target>
 
-  <!-- Target to compile Calor files and add them to compilation -->
+  <!-- Task owns all incrementality — no MSBuild-level skip -->
   <Target Name="CompileCalorFiles"
           BeforeTargets="BeforeCompile"
-          Inputs="@(CalorCompile)"
-          Outputs="@(CalorCompile->'$(CalorOutputDirectory)%(Filename).g.cs')"
           Condition="'@(CalorCompile)' != ''">
 
     <Message Text="Compiling Calor files..." Importance="high" />
@@ -35,12 +33,14 @@
     <CompileCalor
         SourceFiles="@(CalorCompile)"
         OutputDirectory="$(CalorOutputDirectory)"
+        ProjectDirectory="$(MSBuildProjectDirectory)"
         Verbose="$(CalorVerbose)">
       <Output TaskParameter="GeneratedFiles" ItemName="CalorGeneratedFiles" />
     </CompileCalor>
 
     <ItemGroup>
       <FileWrites Include="@(CalorGeneratedFiles)" />
+      <FileWrites Include="$(CalorOutputDirectory).calor-build-state.json" />
     </ItemGroup>
 
     <Message Text="Generated @(CalorGeneratedFiles->Count()) C# files from Calor" Importance="high" />
@@ -52,7 +52,11 @@
           DependsOnTargets="CompileCalorFiles"
           Condition="'@(CalorCompile)' != ''">
     <ItemGroup>
-      <Compile Include="$(CalorOutputDirectory)*.g.cs" />
+      <!-- Authoritative: files the task produced this build -->
+      <Compile Include="@(CalorGeneratedFiles)" />
+      <!-- Fallback: on-disk files from prior builds (for design-time/IDE) -->
+      <Compile Include="$(CalorOutputDirectory)**/*.g.cs"
+               Exclude="@(CalorGeneratedFiles)" />
     </ItemGroup>
   </Target>
 
