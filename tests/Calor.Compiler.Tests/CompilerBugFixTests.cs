@@ -1,3 +1,4 @@
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
@@ -326,9 +327,10 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void Binder_FallbackExpression_ReportsDiagnostic()
+    public void Binder_FallbackExpression_ReturnsOpaqueExpression()
     {
-        // Use SomeExpressionNode since NoneExpressionNode is now properly bound
+        // Unsupported expression types should produce an opaque BoundCallExpression,
+        // NOT BoundIntLiteral(0) which causes false positives in bug pattern checkers
         var someExpr = new SomeExpressionNode(DummySpan, new IntLiteralNode(DummySpan, 42));
 
         var func = MakeFunction("Foo", "INT",
@@ -340,9 +342,11 @@ public class CompilerBugFixTests
         var bound = binder.Bind(module);
 
         Assert.NotNull(bound);
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics.Errors,
-            d => d.Message.Contains("Unsupported expression type in binding"));
+        // Fallback should NOT report an error (was causing noise)
+        var ret = bound.Functions.First().Body.OfType<BoundReturnStatement>().First();
+        Assert.IsType<BoundCallExpression>(ret.Expression);
+        // The opaque call should NOT be mistaken for a zero literal
+        Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
     }
 
     #endregion

@@ -53,7 +53,8 @@ public enum TaintSink
 public readonly record struct TaintLabel(
     TaintSource Source,
     string SourceVariable,
-    TextSpan SourceLocation);
+    TextSpan SourceLocation,
+    int Hops = 1);
 
 /// <summary>
 /// Represents a detected security vulnerability.
@@ -161,6 +162,13 @@ public sealed class TaintAnalysisOptions
     /// Enable XSS detection.
     /// </summary>
     public bool DetectXss { get; init; } = true;
+
+    /// <summary>
+    /// Minimum number of taint hops (propagation steps) required before reporting a vulnerability.
+    /// Default: 1 (backward compatible). The CLI sets this to 2 unless --all-findings is passed,
+    /// filtering out direct parameter→sink flows which are often false positives.
+    /// </summary>
+    public int MinTaintHops { get; init; } = 1;
 
     public static TaintAnalysisOptions Default => new();
 }
@@ -328,6 +336,64 @@ public sealed class TaintAnalysis
                 foreach (var s in forStmt.Body)
                     AnalyzeStatement(s);
                 break;
+
+            case BoundAssignmentStatement assign:
+                AnalyzeExpression(assign.Value);
+                // Propagate taint: if value is tainted, target becomes tainted (increment hop count)
+                if (assign.Target is BoundVariableExpression targetVar)
+                {
+                    var sourceLabels = GetTaintLabelsFromExpression(assign.Value);
+                    foreach (var label in sourceLabels)
+                        AddTaint(targetVar.Variable.Name, label with { Hops = label.Hops + 1 });
+                }
+                break;
+
+            case BoundCompoundAssignment compound:
+                AnalyzeExpression(compound.Value);
+                AnalyzeExpression(compound.Target);
+                break;
+
+            case BoundForeachStatement forEach:
+                AnalyzeExpression(forEach.Collection);
+                // Propagate taint from collection to loop variable (increment hop count)
+                var collectionLabels = GetTaintLabelsFromExpression(forEach.Collection);
+                foreach (var label in collectionLabels)
+                    AddTaint(forEach.LoopVariable.Name, label with { Hops = label.Hops + 1 });
+                foreach (var s in forEach.Body)
+                    AnalyzeStatement(s);
+                break;
+
+            case BoundDoWhileStatement doWhile:
+                foreach (var s in doWhile.Body)
+                    AnalyzeStatement(s);
+                AnalyzeExpression(doWhile.Condition);
+                break;
+
+            case BoundUsingStatement usingStmt:
+                AnalyzeExpression(usingStmt.ResourceExpression);
+                foreach (var s in usingStmt.Body)
+                    AnalyzeStatement(s);
+                break;
+
+            case BoundExpressionStatement exprStmt:
+                AnalyzeExpression(exprStmt.Expression);
+                break;
+
+            case BoundThrowStatement throwStmt:
+                if (throwStmt.Expression != null)
+                    AnalyzeExpression(throwStmt.Expression);
+                break;
+
+            case BoundTryStatement tryStmt:
+                foreach (var s in tryStmt.TryBody)
+                    AnalyzeStatement(s);
+                foreach (var catchClause in tryStmt.CatchClauses)
+                    foreach (var s in catchClause.Body)
+                        AnalyzeStatement(s);
+                if (tryStmt.FinallyBody != null)
+                    foreach (var s in tryStmt.FinallyBody)
+                        AnalyzeStatement(s);
+                break;
         }
     }
 
@@ -370,6 +436,11 @@ public sealed class TaintAnalysis
                 var labels = GetTaintLabelsFromExpression(arg);
                 foreach (var label in labels)
                 {
+                    // Only report if taint has propagated through enough hops
+                    // (filters out direct parameter→sink flows which are often false positives)
+                    if (label.Hops < _options.MinTaintHops)
+                        continue;
+
                     var argName = GetExpressionName(arg) ?? "expression";
                     _vulnerabilities.Add(new TaintVulnerability(
                         sink.Value,
@@ -404,6 +475,12 @@ public sealed class TaintAnalysis
 
             case BoundUnaryExpression unaryExpr:
                 AnalyzeExpression(unaryExpr.Operand);
+                break;
+
+            case BoundConditionalExpression condExpr:
+                AnalyzeExpression(condExpr.Condition);
+                AnalyzeExpression(condExpr.WhenTrue);
+                AnalyzeExpression(condExpr.WhenFalse);
                 break;
         }
     }

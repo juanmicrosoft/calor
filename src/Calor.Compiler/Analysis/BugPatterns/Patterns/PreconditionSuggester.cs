@@ -87,6 +87,43 @@ public sealed class PreconditionSuggester : IBugPatternChecker
                 foreach (var s in forStmt.Body)
                     CheckStatement(s, paramNames, guardedParams, diagnostics);
                 break;
+
+            case BoundAssignmentStatement assign:
+                CheckExpression(assign.Target, paramNames, guardedParams, diagnostics);
+                CheckExpression(assign.Value, paramNames, guardedParams, diagnostics);
+                break;
+
+            case BoundCompoundAssignment compound:
+                CheckExpression(compound.Target, paramNames, guardedParams, diagnostics);
+                CheckExpression(compound.Value, paramNames, guardedParams, diagnostics);
+                break;
+
+            case BoundForeachStatement forEach:
+                CheckExpression(forEach.Collection, paramNames, guardedParams, diagnostics);
+                foreach (var s in forEach.Body)
+                    CheckStatement(s, paramNames, guardedParams, diagnostics);
+                break;
+
+            case BoundDoWhileStatement doWhile:
+                CheckExpression(doWhile.Condition, paramNames, guardedParams, diagnostics);
+                foreach (var s in doWhile.Body)
+                    CheckStatement(s, paramNames, guardedParams, diagnostics);
+                break;
+
+            case BoundUsingStatement usingStmt:
+                CheckExpression(usingStmt.ResourceExpression, paramNames, guardedParams, diagnostics);
+                foreach (var s in usingStmt.Body)
+                    CheckStatement(s, paramNames, guardedParams, diagnostics);
+                break;
+
+            case BoundExpressionStatement exprStmt:
+                CheckExpression(exprStmt.Expression, paramNames, guardedParams, diagnostics);
+                break;
+
+            case BoundThrowStatement throwStmt:
+                if (throwStmt.Expression != null)
+                    CheckExpression(throwStmt.Expression, paramNames, guardedParams, diagnostics);
+                break;
         }
     }
 
@@ -105,6 +142,10 @@ public sealed class PreconditionSuggester : IBugPatternChecker
 
                 // Skip if already guarded by a precondition
                 if (guardedParams != null && guardedParams.Contains(paramName))
+                    return;
+
+                // Suggestions are not verified bugs — suppress by default
+                if (_options.ReportOnlyVerified)
                     return;
 
                 var fix = new SuggestedFix(

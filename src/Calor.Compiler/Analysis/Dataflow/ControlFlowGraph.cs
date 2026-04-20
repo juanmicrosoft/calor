@@ -144,6 +144,8 @@ public sealed class ControlFlowGraph
         // Loop context stacks for break/continue handling
         private readonly Stack<BasicBlock> _loopExitStack = new();
         private readonly Stack<BasicBlock> _loopConditionStack = new();
+        // Try context: when inside a try, throws go to catch blocks instead of exit
+        private readonly Stack<BasicBlock> _exceptionTargetStack = new();
 
         public ControlFlowGraph Build(BoundFunction function)
         {
@@ -231,6 +233,51 @@ public sealed class ControlFlowGraph
 
                 case BoundMatchStatement matchStmt:
                     ProcessMatchStatement(matchStmt);
+                    break;
+
+                // New statement types for class member analysis
+                case BoundAssignmentStatement assign:
+                    _currentBlock.Statements.Add(assign);
+                    break;
+
+                case BoundCompoundAssignment compound:
+                    _currentBlock.Statements.Add(compound);
+                    break;
+
+                case BoundExpressionStatement exprStmt:
+                    _currentBlock.Statements.Add(exprStmt);
+                    break;
+
+                case BoundThrowStatement throwStmt:
+                    _currentBlock.Statements.Add(throwStmt);
+                    // If inside a try block, throw goes to catch; otherwise to exit
+                    var throwTarget = _exceptionTargetStack.Count > 0
+                        ? _exceptionTargetStack.Peek()
+                        : _exitBlock;
+                    _currentBlock.AddSuccessor(throwTarget);
+                    _currentBlock = CreateBlock(); // Dead block after throw
+                    break;
+
+                case BoundForeachStatement forEach:
+                    ProcessForeachStatement(forEach);
+                    break;
+
+                case BoundDoWhileStatement doWhile:
+                    ProcessDoWhileStatement(doWhile);
+                    break;
+
+                case BoundUsingStatement usingStmt:
+                    ProcessUsingStatement(usingStmt);
+                    break;
+
+                case BoundUnsupportedStatement unsupported:
+                    // Best-effort: may throw/return (exit edge) or fall through.
+                    // Split block so later statements don't share the exit edge.
+                    _currentBlock.Statements.Add(unsupported);
+                    _currentBlock.AddSuccessor(_exitBlock);
+                    var afterUnsupported = CreateBlock();
+                    _currentBlock.AddSuccessor(afterUnsupported);
+                    _currentBlock = afterUnsupported;
                     break;
 
                 default:
@@ -409,13 +456,19 @@ public sealed class ControlFlowGraph
             var tryBlock = CreateBlock();
             var afterBlock = CreateBlock();
 
+            // Create a landing block for exceptions thrown inside the try body
+            var exceptionLanding = CreateBlock();
+            _exceptionTargetStack.Push(exceptionLanding);
+
             // Connect current block to try block
             _currentBlock.AddSuccessor(tryBlock);
             _currentBlock = tryBlock;
 
-            // Process try body
+            // Process try body (throws inside will now go to exceptionLanding)
             foreach (var s in tryStmt.TryBody)
                 ProcessStatement(s);
+
+            _exceptionTargetStack.Pop();
 
             // Save the block that ends the try body
             var tryEndBlock = _currentBlock;
@@ -429,6 +482,8 @@ public sealed class ControlFlowGraph
 
                 // Exception edges: try body can jump to catch on exception
                 tryBlock.AddSuccessor(catchBlock);
+                // Throws inside try also land here
+                exceptionLanding.AddSuccessor(catchBlock);
 
                 _currentBlock = catchBlock;
                 foreach (var s in catchClause.Body)
@@ -438,6 +493,10 @@ public sealed class ControlFlowGraph
                 if (_currentBlock.Successors.Count == 0)
                     _currentBlock.AddSuccessor(afterBlock);
             }
+
+            // If no catch blocks, exception landing goes to exit
+            if (catchBlocks.Count == 0 && exceptionLanding.Successors.Count == 0)
+                exceptionLanding.AddSuccessor(_exitBlock);
 
             // Process finally block if present
             if (tryStmt.FinallyBody != null && tryStmt.FinallyBody.Count > 0)
@@ -507,6 +566,99 @@ public sealed class ControlFlowGraph
             {
                 matchConditionBlock.AddSuccessor(afterBlock);
             }
+
+            _currentBlock = afterBlock;
+        }
+
+        private void ProcessForeachStatement(BoundForeachStatement forEach)
+        {
+            // Foreach: condition (has next?) -> body -> condition
+            var conditionBlock = CreateBlock();
+            var bodyBlock = CreateBlock();
+            var afterBlock = CreateBlock();
+
+            _loopConditionStack.Push(conditionBlock);
+            _loopExitStack.Push(afterBlock);
+
+            _currentBlock.AddSuccessor(conditionBlock);
+
+            conditionBlock.AddSuccessor(bodyBlock);
+            conditionBlock.AddSuccessor(afterBlock);
+
+            _currentBlock = bodyBlock;
+            foreach (var s in forEach.Body)
+                ProcessStatement(s);
+
+            if (_currentBlock.Successors.Count == 0)
+                _currentBlock.AddSuccessor(conditionBlock);
+
+            _loopConditionStack.Pop();
+            _loopExitStack.Pop();
+
+            _currentBlock = afterBlock;
+        }
+
+        private void ProcessDoWhileStatement(BoundDoWhileStatement doWhile)
+        {
+            // Do-while: body -> condition -> body (back edge) or after
+            var bodyBlock = CreateBlock();
+            var conditionBlock = CreateBlock();
+            var afterBlock = CreateBlock();
+
+            _loopConditionStack.Push(conditionBlock);
+            _loopExitStack.Push(afterBlock);
+
+            _currentBlock.AddSuccessor(bodyBlock);
+
+            _currentBlock = bodyBlock;
+            foreach (var s in doWhile.Body)
+                ProcessStatement(s);
+
+            if (_currentBlock.Successors.Count == 0)
+                _currentBlock.AddSuccessor(conditionBlock);
+
+            conditionBlock.BranchCondition = doWhile.Condition;
+            conditionBlock.AddSuccessor(bodyBlock);  // loop back
+            conditionBlock.AddSuccessor(afterBlock);  // exit
+
+            _loopConditionStack.Pop();
+            _loopExitStack.Pop();
+
+            _currentBlock = afterBlock;
+        }
+
+        private void ProcessUsingStatement(BoundUsingStatement usingStmt)
+        {
+            // Model as try/finally: body can throw, dispose runs on both normal and exception paths
+            _currentBlock.Statements.Add(usingStmt);
+
+            var bodyBlock = CreateBlock();
+            var disposeBlock = CreateBlock(); // implicit finally (Dispose)
+            var afterBlock = CreateBlock();
+
+            // Exception landing for throws inside the using body
+            var exceptionLanding = CreateBlock();
+            _exceptionTargetStack.Push(exceptionLanding);
+
+            _currentBlock.AddSuccessor(bodyBlock);
+            _currentBlock = bodyBlock;
+
+            foreach (var s in usingStmt.Body)
+                ProcessStatement(s);
+
+            _exceptionTargetStack.Pop();
+
+            // Normal path: body → dispose → after
+            if (_currentBlock.Successors.Count == 0)
+                _currentBlock.AddSuccessor(disposeBlock);
+
+            // Exception path: throw → exception landing → dispose → exit
+            exceptionLanding.AddSuccessor(disposeBlock);
+
+            _currentBlock = disposeBlock;
+            // Dispose block flows to after (normal) or exit (exception re-throw)
+            disposeBlock.AddSuccessor(afterBlock);
+            disposeBlock.AddSuccessor(_exitBlock);
 
             _currentBlock = afterBlock;
         }

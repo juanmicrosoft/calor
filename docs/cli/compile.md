@@ -45,6 +45,9 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--output` | `-o` | Yes | Output C# file path |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable static contract verification with Z3 |
+| `--analyze` | | No | Enable static analysis (dataflow, bug patterns, taint tracking) |
+| `--all-findings` | | No | Report all findings including inconclusive (requires `--analyze`) |
+| `--permissive-effects` | | No | Suppress unknown-effect warnings (recommended for converted code) |
 | `--no-cache` | | No | Disable verification result caching |
 | `--clear-cache` | | No | Clear verification cache before compiling |
 | `--contract-mode` | | No | Contract enforcement mode: off, debug, release (default: debug) |

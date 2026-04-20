@@ -10,11 +10,44 @@ public sealed class Binder
 {
     private readonly DiagnosticBag _diagnostics;
     private Scope _scope;
+    private string? _currentClassName;
+    private Scope? _currentClassScope;
+    private bool _isStaticContext;
 
     public Binder(DiagnosticBag diagnostics)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _scope = new Scope();
+    }
+
+    private IDisposable PushScope(Scope newScope)
+    {
+        var previous = _scope;
+        _scope = newScope;
+        return new ScopeRestorer(this, previous);
+    }
+
+    private sealed class ScopeRestorer : IDisposable
+    {
+        private readonly Binder _binder;
+        private readonly Scope _previous;
+        public ScopeRestorer(Binder binder, Scope previous) { _binder = binder; _previous = previous; }
+        public void Dispose() => _binder._scope = _previous;
+    }
+
+    private IDisposable PushStaticContext(bool isStatic)
+    {
+        var previous = _isStaticContext;
+        _isStaticContext = isStatic;
+        return new StaticContextRestorer(this, previous);
+    }
+
+    private sealed class StaticContextRestorer : IDisposable
+    {
+        private readonly Binder _binder;
+        private readonly bool _previous;
+        public StaticContextRestorer(Binder binder, bool previous) { _binder = binder; _previous = previous; }
+        public void Dispose() => _binder._isStaticContext = _previous;
     }
 
     public BoundModule Bind(ModuleNode module)
@@ -38,45 +71,47 @@ public sealed class Binder
             functions.Add(BindFunction(func));
         }
 
+        // Third pass: bind class member bodies
+        foreach (var cls in module.Classes)
+            BindClassMembers(cls, functions);
+
         return new BoundModule(module.Span, module.Name, functions);
     }
 
     private BoundFunction BindFunction(FunctionNode func)
     {
         var functionScope = _scope.CreateChild();
-        var previousScope = _scope;
-        _scope = functionScope;
+        using var _ = PushScope(functionScope);
 
-        try
+        // Bind parameters
+        var parameters = BindParameters(func.Parameters);
+
+        var returnType = func.Output?.TypeName ?? "VOID";
+        var functionSymbol = new FunctionSymbol(func.Name, returnType, parameters);
+
+        // Bind body
+        var boundBody = BindStatements(func.Body);
+
+        // Extract declared effects for taint analysis
+        var declaredEffects = ExtractEffects(func);
+
+        return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects);
+    }
+
+    private List<VariableSymbol> BindParameters(IReadOnlyList<ParameterNode> parameters)
+    {
+        var result = new List<VariableSymbol>();
+        foreach (var param in parameters)
         {
-            // Bind parameters
-            var parameters = new List<VariableSymbol>();
-            foreach (var param in func.Parameters)
+            var paramSymbol = new VariableSymbol(param.Name, param.TypeName, isMutable: false, isParameter: true);
+            if (!_scope.TryDeclare(paramSymbol))
             {
-                var paramSymbol = new VariableSymbol(param.Name, param.TypeName, isMutable: false, isParameter: true);
-                if (!_scope.TryDeclare(paramSymbol))
-                {
-                    var suggestedName = GenerateUniqueName(param.Name);
-                    _diagnostics.ReportDuplicateDefinitionWithFix(param.Span, param.Name, suggestedName);
-                }
-                parameters.Add(paramSymbol);
+                var suggestedName = GenerateUniqueName(param.Name);
+                _diagnostics.ReportDuplicateDefinitionWithFix(param.Span, param.Name, suggestedName);
             }
-
-            var returnType = func.Output?.TypeName ?? "VOID";
-            var functionSymbol = new FunctionSymbol(func.Name, returnType, parameters);
-
-            // Bind body
-            var boundBody = BindStatements(func.Body);
-
-            // Extract declared effects for taint analysis
-            var declaredEffects = ExtractEffects(func);
-
-            return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects);
+            result.Add(paramSymbol);
         }
-        finally
-        {
-            _scope = previousScope;
-        }
+        return result;
     }
 
     private IReadOnlyList<BoundStatement> BindStatements(IReadOnlyList<StatementNode> statements)
@@ -110,7 +145,30 @@ public sealed class Binder
             TryStatementNode tryStmt => BindTryStatement(tryStmt),
             MatchStatementNode matchStmt => BindMatchStatement(matchStmt),
             ProofObligationNode proof => BindProofObligation(proof),
-            _ => throw new InvalidOperationException($"Unknown statement type: {stmt.GetType().Name}")
+            // Class member body statement types
+            AssignmentStatementNode assign => BindAssignmentStatement(assign),
+            CompoundAssignmentStatementNode compound => BindCompoundAssignment(compound),
+            ForeachStatementNode forEach => BindForeachStatement(forEach),
+            UsingStatementNode usingStmt => BindUsingStatement(usingStmt),
+            ThrowStatementNode throwStmt => new BoundThrowStatement(throwStmt.Span,
+                throwStmt.Exception != null ? BindExpression(throwStmt.Exception) : null),
+            RethrowStatementNode rethrow => new BoundThrowStatement(rethrow.Span, null),
+            DoWhileStatementNode doWhile => BindDoWhileStatement(doWhile),
+            ExpressionStatementNode exprStmt => new BoundExpressionStatement(exprStmt.Span, BindExpression(exprStmt.Expression)),
+            YieldReturnStatementNode yieldRet => new BoundReturnStatement(yieldRet.Span,
+                yieldRet.Expression != null ? BindExpression(yieldRet.Expression) : null),
+            YieldBreakStatementNode => new BoundBreakStatement(stmt.Span),
+            SyncBlockNode sync => BindSyncBlock(sync),
+            PrintStatementNode print => new BoundExpressionStatement(print.Span,
+                BindExpression(print.Expression)),
+            // Passthrough nodes — no executable semantics
+            FallbackCommentNode => null,
+            RawCSharpNode => null,
+            PreprocessorDirectiveNode => null,
+            EventSubscribeNode => null,
+            EventUnsubscribeNode => null,
+            // Unknown — explicit unsupported node, NOT null
+            _ => BindUnsupportedStatement(stmt)
         };
     }
 
@@ -139,80 +197,58 @@ public sealed class Binder
 
     private BoundForStatement BindForStatement(ForStatementNode forStmt)
     {
-        var loopScope = _scope.CreateChild();
-        var previousScope = _scope;
-        _scope = loopScope;
+        using var _ = PushScope(_scope.CreateChild());
 
-        try
+        // Declare loop variable
+        var loopVar = new VariableSymbol(forStmt.VariableName, "INT", isMutable: true);
+        if (!_scope.TryDeclare(loopVar))
         {
-            // Declare loop variable
-            var loopVar = new VariableSymbol(forStmt.VariableName, "INT", isMutable: true);
-            if (!_scope.TryDeclare(loopVar))
-            {
-                _diagnostics.ReportError(forStmt.Span, DiagnosticCode.DuplicateDefinition,
-                    $"Variable '{forStmt.VariableName}' is already defined");
-            }
-
-            var from = BindExpression(forStmt.From);
-            var to = BindExpression(forStmt.To);
-            var step = forStmt.Step != null ? BindExpression(forStmt.Step) : null;
-            var body = BindStatements(forStmt.Body);
-
-            return new BoundForStatement(forStmt.Span, loopVar, from, to, step, body);
+            _diagnostics.ReportError(forStmt.Span, DiagnosticCode.DuplicateDefinition,
+                $"Variable '{forStmt.VariableName}' is already defined");
         }
-        finally
-        {
-            _scope = previousScope;
-        }
+
+        var from = BindExpression(forStmt.From);
+        var to = BindExpression(forStmt.To);
+        var step = forStmt.Step != null ? BindExpression(forStmt.Step) : null;
+        var body = BindStatements(forStmt.Body);
+
+        return new BoundForStatement(forStmt.Span, loopVar, from, to, step, body);
     }
 
     private BoundWhileStatement BindWhileStatement(WhileStatementNode whileStmt)
     {
-        var loopScope = _scope.CreateChild();
-        var previousScope = _scope;
-        _scope = loopScope;
+        using var _ = PushScope(_scope.CreateChild());
 
-        try
-        {
-            var condition = BindExpression(whileStmt.Condition);
-            var body = BindStatements(whileStmt.Body);
+        var condition = BindExpression(whileStmt.Condition);
+        var body = BindStatements(whileStmt.Body);
 
-            return new BoundWhileStatement(whileStmt.Span, condition, body);
-        }
-        finally
-        {
-            _scope = previousScope;
-        }
+        return new BoundWhileStatement(whileStmt.Span, condition, body);
     }
 
     private BoundIfStatement BindIfStatement(IfStatementNode ifStmt)
     {
         var condition = BindExpression(ifStmt.Condition);
 
-        var thenScope = _scope.CreateChild();
-        var previousScope = _scope;
-        _scope = thenScope;
-        var thenBody = BindStatements(ifStmt.ThenBody);
-        _scope = previousScope;
+        IReadOnlyList<BoundStatement> thenBody;
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            thenBody = BindStatements(ifStmt.ThenBody);
+        }
 
         var elseIfClauses = new List<BoundElseIfClause>();
         foreach (var elseIf in ifStmt.ElseIfClauses)
         {
             var elseIfCondition = BindExpression(elseIf.Condition);
-            var elseIfScope = _scope.CreateChild();
-            _scope = elseIfScope;
+            using var _ = PushScope(_scope.CreateChild());
             var elseIfBody = BindStatements(elseIf.Body);
-            _scope = previousScope;
             elseIfClauses.Add(new BoundElseIfClause(elseIf.Span, elseIfCondition, elseIfBody));
         }
 
         IReadOnlyList<BoundStatement>? elseBody = null;
         if (ifStmt.ElseBody != null)
         {
-            var elseScope = _scope.CreateChild();
-            _scope = elseScope;
+            using var _ = PushScope(_scope.CreateChild());
             elseBody = BindStatements(ifStmt.ElseBody);
-            _scope = previousScope;
         }
 
         return new BoundIfStatement(ifStmt.Span, condition, thenBody, elseIfClauses, elseBody);
@@ -252,6 +288,7 @@ public sealed class Binder
             StringLiteralNode strLit => new BoundStringLiteral(strLit.Span, strLit.Value),
             BoolLiteralNode boolLit => new BoundBoolLiteral(boolLit.Span, boolLit.Value),
             FloatLiteralNode floatLit => new BoundFloatLiteral(floatLit.Span, floatLit.Value),
+            DecimalLiteralNode decLit => new BoundFloatLiteral(decLit.Span, (double)decLit.Value),
             ReferenceNode refNode => BindReferenceExpression(refNode),
             BinaryOperationNode binOp => BindBinaryOperation(binOp),
             UnaryOperationNode unaryOp => BindUnaryOperation(unaryOp),
@@ -259,8 +296,70 @@ public sealed class Binder
             ConditionalExpressionNode condExpr => BindConditionalExpression(condExpr),
             NameOfExpressionNode nameOf => new BoundStringLiteral(nameOf.Span, nameOf.Name),
             NoneExpressionNode none => new BoundNoneLiteral(none.Span, none.TypeName),
+            // Class member expression types
+            ThisExpressionNode thisExpr => _isStaticContext
+                ? BindFallbackExpression(thisExpr) // 'this' not valid in static context
+                : new BoundThisExpression(thisExpr.Span, _currentClassName ?? "UNKNOWN"),
+            BaseExpressionNode baseExpr => new BoundBaseExpression(baseExpr.Span),
+            FieldAccessNode fieldAccess => BindFieldAccess(fieldAccess),
+            NewExpressionNode newExpr => BindNewExpression(newExpr),
+            TypeOperationNode typeOp => BindTypeOperation(typeOp),
+            IsPatternNode isPattern => BindIsPattern(isPattern),
             _ => BindFallbackExpression(expr)
         };
+    }
+
+    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess)
+    {
+        var target = BindExpression(fieldAccess.Target);
+
+        // If accessing via 'this', resolve the field name from CLASS scope directly
+        // (not _scope which is the method scope — that would let parameters shadow fields)
+        if (fieldAccess.Target is ThisExpressionNode && _currentClassScope != null)
+        {
+            var symbol = _currentClassScope.LookupLocal(fieldAccess.FieldName);
+            if (symbol is VariableSymbol varSymbol)
+                return new BoundVariableExpression(fieldAccess.Span, varSymbol);
+        }
+
+        return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName, "OBJECT");
+    }
+
+    private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
+    {
+        var operand = BindExpression(typeOp.Operand);
+        return typeOp.Operation switch
+        {
+            // Cast: bind inner expression and return it — the value is preserved,
+            // type changes to TargetType. This prevents (cast f64 nonZeroExpr)
+            // from becoming BoundIntLiteral(0) via the fallback path.
+            TypeOp.Cast => operand,
+            // Is: result is always BOOL
+            TypeOp.Is => new BoundBoolLiteral(typeOp.Span, true),
+            // As: result has the target type (nullable), bind inner
+            TypeOp.As => operand,
+            _ => BindFallbackExpression(typeOp)
+        };
+    }
+
+    private BoundExpression BindIsPattern(IsPatternNode isPattern)
+    {
+        BindExpression(isPattern.Operand); // bind for side effects
+        return new BoundBoolLiteral(isPattern.Span, true);
+    }
+
+    private BoundExpression BindNewExpression(NewExpressionNode newExpr)
+    {
+        var boundArgs = new List<BoundExpression>();
+        foreach (var arg in newExpr.Arguments)
+            boundArgs.Add(BindExpression(arg));
+
+        // Also bind object initializer value expressions so they're visible to checkers
+        // (e.g., new Foo { P = 1 / x } — the division must be analyzed)
+        foreach (var init in newExpr.Initializers)
+            BindExpression(init.Value);
+
+        return new BoundNewExpression(newExpr.Span, newExpr.TypeName, boundArgs);
     }
 
     private BoundExpression BindReferenceExpression(ReferenceNode refNode)
@@ -359,9 +458,18 @@ public sealed class Binder
             args.Add(BindExpression(arg));
         }
 
-        // Look up function symbol to determine return type
-        var symbol = _scope.Lookup(callExpr.Target);
-        var returnType = symbol is FunctionSymbol funcSym ? funcSym.ReturnType : "INT";
+        // Try arity-aware lookup first (resolves overloaded sibling methods)
+        string returnType;
+        var funcSymbol = _scope.LookupByArity(callExpr.Target, args.Count);
+        if (funcSymbol != null)
+        {
+            returnType = funcSymbol.ReturnType;
+        }
+        else
+        {
+            var symbol = _scope.Lookup(callExpr.Target);
+            returnType = symbol is FunctionSymbol fs ? fs.ReturnType : "INT";
+        }
 
         // Populate structured type info for effect resolution
         string? resolvedTypeName = null;
@@ -386,17 +494,19 @@ public sealed class Binder
         var whenTrue = BindExpression(condExpr.WhenTrue);
         var whenFalse = BindExpression(condExpr.WhenFalse);
 
-        // Return the type of the true branch (both should match, but we don't enforce here)
-        return whenTrue;
+        return new BoundConditionalExpression(condExpr.Span, condition, whenTrue, whenFalse);
     }
 
     private BoundExpression BindFallbackExpression(ExpressionNode expr)
     {
-        // For expression types not yet fully supported in binding,
-        // report a diagnostic and return a placeholder
-        _diagnostics.ReportError(expr.Span, DiagnosticCode.TypeMismatch,
-            $"Unsupported expression type in binding: {expr.GetType().Name}");
-        return new BoundIntLiteral(expr.Span, 0);
+        // Return an opaque expression for unsupported types.
+        // CRITICAL: Do NOT return BoundIntLiteral(0) — that causes the division-by-zero
+        // checker to report false positives for every unhandled expression used as a divisor
+        // (e.g., cast expressions, array length, string operations, indexers).
+        // Instead, return a call expression with an opaque target that no checker will
+        // confuse with a zero literal or constant.
+        return new BoundCallExpression(expr.Span, $"<unsupported:{expr.GetType().Name}>",
+            Array.Empty<BoundExpression>(), "OBJECT");
     }
 
     /// <summary>
@@ -417,18 +527,17 @@ public sealed class Binder
     private BoundTryStatement BindTryStatement(TryStatementNode tryStmt)
     {
         // Bind try body in its own scope
-        var tryScope = _scope.CreateChild();
-        var previousScope = _scope;
-        _scope = tryScope;
-        var tryBody = BindStatements(tryStmt.TryBody);
-        _scope = previousScope;
+        IReadOnlyList<BoundStatement> tryBody;
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            tryBody = BindStatements(tryStmt.TryBody);
+        }
 
         // Bind catch clauses
         var catchClauses = new List<BoundCatchClause>();
         foreach (var catchClause in tryStmt.CatchClauses)
         {
-            var catchScope = _scope.CreateChild();
-            _scope = catchScope;
+            using var _ = PushScope(_scope.CreateChild());
 
             VariableSymbol? exceptionVar = null;
             if (catchClause.VariableName != null)
@@ -439,7 +548,6 @@ public sealed class Binder
             }
 
             var catchBody = BindStatements(catchClause.Body);
-            _scope = previousScope;
 
             catchClauses.Add(new BoundCatchClause(
                 catchClause.Span,
@@ -452,10 +560,8 @@ public sealed class Binder
         IReadOnlyList<BoundStatement>? finallyBody = null;
         if (tryStmt.FinallyBody != null && tryStmt.FinallyBody.Count > 0)
         {
-            var finallyScope = _scope.CreateChild();
-            _scope = finallyScope;
+            using var _ = PushScope(_scope.CreateChild());
             finallyBody = BindStatements(tryStmt.FinallyBody);
-            _scope = previousScope;
         }
 
         return new BoundTryStatement(tryStmt.Span, tryBody, catchClauses, finallyBody);
@@ -468,9 +574,7 @@ public sealed class Binder
         var cases = new List<BoundMatchCase>();
         foreach (var matchCase in matchStmt.Cases)
         {
-            var caseScope = _scope.CreateChild();
-            var previousScope = _scope;
-            _scope = caseScope;
+            using var _caseScope = PushScope(_scope.CreateChild());
 
             // Bind pattern (if not a wildcard)
             BoundExpression? pattern = null;
@@ -509,7 +613,6 @@ public sealed class Binder
             }
 
             var body = BindStatements(matchCase.Body);
-            _scope = previousScope;
 
             cases.Add(new BoundMatchCase(matchCase.Span, pattern, isDefault, guard, body));
         }
@@ -517,17 +620,436 @@ public sealed class Binder
         return new BoundMatchStatement(matchStmt.Span, target, cases);
     }
 
+    // ===== New statement binders for class member bodies =====
+
+    private readonly HashSet<string> _unsupportedNodeTypes = new();
+
+    private BoundAssignmentStatement BindAssignmentStatement(AssignmentStatementNode assign)
+    {
+        var target = BindExpression(assign.Target);
+        var value = BindExpression(assign.Value);
+        return new BoundAssignmentStatement(assign.Span, target, value);
+    }
+
+    private BoundCompoundAssignment BindCompoundAssignment(CompoundAssignmentStatementNode compound)
+    {
+        var target = BindExpression(compound.Target);
+        var value = BindExpression(compound.Value);
+        return new BoundCompoundAssignment(compound.Span, target, compound.Operator, value);
+    }
+
+    private BoundForeachStatement BindForeachStatement(ForeachStatementNode forEach)
+    {
+        using var _ = PushScope(_scope.CreateChild());
+
+        var loopVar = new VariableSymbol(forEach.VariableName, forEach.VariableType, isMutable: false);
+        _scope.TryDeclare(loopVar);
+
+        if (forEach.IndexVariableName != null)
+        {
+            var indexVar = new VariableSymbol(forEach.IndexVariableName, "INT", isMutable: true);
+            _scope.TryDeclare(indexVar);
+        }
+
+        var collection = BindExpression(forEach.Collection);
+        var body = BindStatements(forEach.Body);
+        return new BoundForeachStatement(forEach.Span, loopVar, collection, body);
+    }
+
+    private BoundUsingStatement BindUsingStatement(UsingStatementNode usingStmt)
+    {
+        using var _ = PushScope(_scope.CreateChild());
+
+        VariableSymbol? resource = null;
+        if (usingStmt.VariableName != null)
+        {
+            var typeName = usingStmt.VariableType ?? "IDisposable";
+            resource = new VariableSymbol(usingStmt.VariableName, typeName, isMutable: false);
+            _scope.TryDeclare(resource);
+        }
+
+        var resourceExpr = BindExpression(usingStmt.Resource);
+        var body = BindStatements(usingStmt.Body);
+        return new BoundUsingStatement(usingStmt.Span, resource, resourceExpr, body);
+    }
+
+    private BoundDoWhileStatement BindDoWhileStatement(DoWhileStatementNode doWhile)
+    {
+        using var _ = PushScope(_scope.CreateChild());
+
+        var body = BindStatements(doWhile.Body);
+        var condition = BindExpression(doWhile.Condition);
+        return new BoundDoWhileStatement(doWhile.Span, condition, body);
+    }
+
+    private BoundStatement BindSyncBlock(SyncBlockNode sync)
+    {
+        // Model lock as a using-like scope block — lock semantics (mutual exclusion)
+        // are out of scope for dataflow, but the body must be preserved for analysis
+        var lockExpr = BindExpression(sync.LockExpression);
+        var body = BindStatements(sync.Body);
+        return new BoundUsingStatement(sync.Span, null, lockExpr, body);
+    }
+
+    private BoundStatement BindUnsupportedStatement(StatementNode stmt)
+    {
+        var typeName = stmt.GetType().Name;
+        if (_unsupportedNodeTypes.Add(typeName))
+        {
+            _diagnostics.ReportInfo(stmt.Span, DiagnosticCode.AnalysisUnsupportedNode,
+                $"Statement type '{typeName}' is not fully supported in analysis; treated as opaque");
+        }
+        return new BoundUnsupportedStatement(stmt.Span, typeName);
+    }
+
+    // ===== Class member binding =====
+
+    private Scope CreateClassScope(ClassDefinitionNode cls)
+    {
+        var classScope = _scope.CreateChild();
+        foreach (var field in cls.Fields)
+        {
+            var isMutable = !field.Modifiers.HasFlag(MethodModifiers.Readonly);
+            var fieldSymbol = new VariableSymbol(field.Name, field.TypeName, isMutable: isMutable);
+            classScope.TryDeclare(fieldSymbol);
+        }
+        return classScope;
+    }
+
+    private static void RegisterClassMembers(ClassDefinitionNode cls, Scope classScope)
+    {
+        // Register methods (with overload support)
+        foreach (var method in cls.Methods)
+        {
+            var parameters = method.Parameters
+                .Select(p => new VariableSymbol(p.Name, p.TypeName, isMutable: false, isParameter: true))
+                .ToList();
+            var returnType = method.Output?.TypeName ?? "VOID";
+            classScope.DeclareOverload(new FunctionSymbol(method.Name, returnType, parameters));
+        }
+
+        // Register constructors (resolvable as class name)
+        foreach (var ctor in cls.Constructors)
+        {
+            var parameters = ctor.Parameters
+                .Select(p => new VariableSymbol(p.Name, p.TypeName, isMutable: false, isParameter: true))
+                .ToList();
+            classScope.DeclareOverload(new FunctionSymbol(cls.Name, "VOID", parameters));
+        }
+
+        // Register properties as symbols (so property access resolves)
+        foreach (var prop in cls.Properties)
+        {
+            classScope.TryDeclare(new VariableSymbol(prop.Name, prop.TypeName, isMutable: prop.Setter != null || prop.Initer != null));
+        }
+    }
+
+    private void BindClassMembers(ClassDefinitionNode cls, List<BoundFunction> functions)
+    {
+        var className = cls.Name;
+        var classScope = CreateClassScope(cls);
+        RegisterClassMembers(cls, classScope);
+
+        using var _ = PushScope(classScope);
+        var previousClassName = _currentClassName;
+        var previousClassScope = _currentClassScope;
+        _currentClassName = className;
+        _currentClassScope = classScope;
+
+        try
+        {
+            // Methods
+            foreach (var method in cls.Methods)
+            {
+                if (method.IsAbstract || method.IsExtern || method.Body.Count == 0)
+                    continue;
+                var bound = TryBindMember(() => BindMethod(method, className), method.Span, className, method.Name);
+                if (bound != null) functions.Add(bound);
+            }
+
+            // Constructors
+            foreach (var ctor in cls.Constructors)
+            {
+                if (ctor.Body.Count == 0) continue;
+                var bound = TryBindMember(() => BindConstructor(ctor, className), ctor.Span, className, ".ctor");
+                if (bound != null) functions.Add(bound);
+            }
+
+            // Property accessors
+            foreach (var prop in cls.Properties)
+            {
+                if (prop.Getter is { IsAutoImplemented: false })
+                {
+                    var bound = TryBindMember(
+                        () => BindPropertyAccessor(prop.Getter, className, prop.Name, prop.TypeName),
+                        prop.Getter.Span, className, $"{prop.Name}.get");
+                    if (bound != null) functions.Add(bound);
+                }
+                if (prop.Setter is { IsAutoImplemented: false })
+                {
+                    var bound = TryBindMember(
+                        () => BindPropertyAccessor(prop.Setter, className, prop.Name, prop.TypeName),
+                        prop.Setter.Span, className, $"{prop.Name}.set");
+                    if (bound != null) functions.Add(bound);
+                }
+                if (prop.Initer is { IsAutoImplemented: false })
+                {
+                    var bound = TryBindMember(
+                        () => BindPropertyAccessor(prop.Initer, className, prop.Name, prop.TypeName),
+                        prop.Initer.Span, className, $"{prop.Name}.init");
+                    if (bound != null) functions.Add(bound);
+                }
+            }
+
+            // Operator overloads
+            foreach (var op in cls.OperatorOverloads)
+            {
+                if (op.Body.Count == 0) continue;
+                var bound = TryBindMember(() => BindOperator(op, className), op.Span, className, $"op_{op.Kind}");
+                if (bound != null) functions.Add(bound);
+            }
+
+            // Indexer accessors
+            foreach (var ixer in cls.Indexers)
+            {
+                if (ixer.Getter is { IsAutoImplemented: false })
+                {
+                    var bound = TryBindMember(
+                        () => BindIndexerAccessor(ixer.Getter, ixer.Parameters, className, ixer.TypeName),
+                        ixer.Getter.Span, className, "this[].get");
+                    if (bound != null) functions.Add(bound);
+                }
+                if (ixer.Setter is { IsAutoImplemented: false })
+                {
+                    var bound = TryBindMember(
+                        () => BindIndexerAccessor(ixer.Setter, ixer.Parameters, className, ixer.TypeName),
+                        ixer.Setter.Span, className, "this[].set");
+                    if (bound != null) functions.Add(bound);
+                }
+            }
+
+            // Event accessors
+            foreach (var evt in cls.Events)
+            {
+                if (evt.AddBody != null && evt.AddBody.Count > 0)
+                {
+                    var bound = TryBindMember(
+                        () => BindEventAccessor(evt.AddBody, className, evt.Name, "add", evt.DelegateType, evt.Span),
+                        evt.Span, className, $"{evt.Name}.add");
+                    if (bound != null) functions.Add(bound);
+                }
+                if (evt.RemoveBody != null && evt.RemoveBody.Count > 0)
+                {
+                    var bound = TryBindMember(
+                        () => BindEventAccessor(evt.RemoveBody, className, evt.Name, "remove", evt.DelegateType, evt.Span),
+                        evt.Span, className, $"{evt.Name}.remove");
+                    if (bound != null) functions.Add(bound);
+                }
+            }
+
+            // Recurse into nested classes — isolate scope so nested classes
+            // don't inherit outer class fields (C# semantics: nested classes
+            // need explicit reference to access outer instance members)
+            foreach (var nested in cls.NestedClasses)
+            {
+                // Temporarily restore to module scope (parent of class scope)
+                var outerScope = _scope;
+                _scope = classScope.Parent!;
+                BindClassMembers(nested, functions);
+                _scope = outerScope;
+            }
+        }
+        finally
+        {
+            _currentClassName = previousClassName;
+            _currentClassScope = previousClassScope;
+        }
+    }
+
+    private BoundFunction? TryBindMember(Func<BoundFunction> bind, Parsing.TextSpan span, string className, string memberName)
+    {
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = bind();
+            sw.Stop();
+
+            // Warn if binding took unusually long (not a hard timeout since binding is synchronous)
+            if (sw.ElapsedMilliseconds > 5000)
+            {
+                _diagnostics.ReportWarning(span, DiagnosticCode.AnalysisSkipped,
+                    $"Analysis of '{className}.{memberName}' took {sw.ElapsedMilliseconds}ms (slow binding)");
+            }
+
+            return result;
+        }
+        catch (NotSupportedException ex)
+        {
+            _diagnostics.ReportWarning(span, DiagnosticCode.AnalysisSkipped,
+                $"Skipped analysis of '{className}.{memberName}': {ex.Message}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.AnalysisICE,
+                $"Internal error analyzing '{className}.{memberName}': {ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private BoundFunction BindMethod(MethodNode method, string className)
+    {
+        var functionScope = _scope.CreateChild();
+        using var _s = PushScope(functionScope);
+        using var _c = PushStaticContext(method.IsStatic);
+
+        var parameters = BindParameters(method.Parameters);
+        var returnType = method.Output?.TypeName ?? "VOID";
+        var qualifiedName = $"{className}.{method.Name}";
+        var functionSymbol = new FunctionSymbol(qualifiedName, returnType, parameters);
+        var boundBody = BindStatements(method.Body);
+        var declaredEffects = ExtractMethodEffects(method.Effects);
+        return new BoundFunction(method.Span, functionSymbol, boundBody, functionScope,
+            declaredEffects, BoundMemberKind.Method, className);
+    }
+
+    private BoundFunction BindConstructor(ConstructorNode ctor, string className)
+    {
+        var functionScope = _scope.CreateChild();
+        using var _s = PushScope(functionScope);
+        using var _c = PushStaticContext(ctor.IsStatic);
+
+        var parameters = BindParameters(ctor.Parameters);
+        var qualifiedName = $"{className}..ctor";
+        var functionSymbol = new FunctionSymbol(qualifiedName, "VOID", parameters);
+
+        // Bind constructor initializer (: base(...) / : this(...)) as a call prepended to body.
+        // This makes initializer arguments visible to bug pattern checkers (e.g., div-by-zero in base(x / y)).
+        // Note: fields set by the chained constructor are NOT tracked (requires interprocedural analysis).
+        var boundBody = new List<BoundStatement>();
+        if (ctor.Initializer != null)
+        {
+            var initArgs = new List<BoundExpression>();
+            foreach (var arg in ctor.Initializer.Arguments)
+                initArgs.Add(BindExpression(arg));
+            var initTarget = ctor.Initializer.IsBaseCall ? "base..ctor" : $"{className}..ctor";
+            boundBody.Add(new BoundCallStatement(ctor.Initializer.Span, initTarget, initArgs));
+        }
+        boundBody.AddRange(BindStatements(ctor.Body));
+
+        return new BoundFunction(ctor.Span, functionSymbol, boundBody, functionScope,
+            Array.Empty<string>(), BoundMemberKind.Constructor, className);
+    }
+
+    private BoundFunction BindPropertyAccessor(
+        PropertyAccessorNode accessor, string className, string propName, string propType)
+    {
+        var functionScope = _scope.CreateChild();
+        using var _ = PushScope(functionScope);
+
+        var parameters = new List<VariableSymbol>();
+        var memberKind = BoundMemberKind.PropertyGetter;
+
+        if (accessor.Kind is PropertyAccessorNode.AccessorKind.Set
+            or PropertyAccessorNode.AccessorKind.Init)
+        {
+            var valueParam = new VariableSymbol("value", propType, isMutable: false, isParameter: true);
+            _scope.TryDeclare(valueParam);
+            parameters.Add(valueParam);
+            memberKind = accessor.Kind == PropertyAccessorNode.AccessorKind.Set
+                ? BoundMemberKind.PropertySetter : BoundMemberKind.PropertyInit;
+        }
+
+        var returnType = accessor.Kind == PropertyAccessorNode.AccessorKind.Get ? propType : "VOID";
+        var qualifiedName = $"{className}.{propName}.{accessor.Kind.ToString().ToLowerInvariant()}";
+        var functionSymbol = new FunctionSymbol(qualifiedName, returnType, parameters);
+        var boundBody = BindStatements(accessor.Body);
+        return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
+            Array.Empty<string>(), memberKind, className);
+    }
+
+    private BoundFunction BindOperator(OperatorOverloadNode op, string className)
+    {
+        var functionScope = _scope.CreateChild();
+        using var _s = PushScope(functionScope);
+        using var _c = PushStaticContext(true); // operators are always static in C#
+
+        var parameters = BindParameters(op.Parameters);
+        var returnType = op.Output?.TypeName ?? "VOID";
+        var qualifiedName = $"{className}.op_{op.Kind}";
+        var functionSymbol = new FunctionSymbol(qualifiedName, returnType, parameters);
+        var boundBody = BindStatements(op.Body);
+        // OperatorOverloadNode has no Effects field — mark as unknown
+        var declaredEffects = new List<string> { "*:*" };
+        return new BoundFunction(op.Span, functionSymbol, boundBody, functionScope,
+            declaredEffects, BoundMemberKind.OperatorOverload, className);
+    }
+
+    private BoundFunction BindIndexerAccessor(
+        PropertyAccessorNode accessor, IReadOnlyList<ParameterNode> indexerParams,
+        string className, string indexerType)
+    {
+        var functionScope = _scope.CreateChild();
+        using var _ = PushScope(functionScope);
+
+        var parameters = BindParameters(indexerParams);
+        var memberKind = BoundMemberKind.IndexerGetter;
+
+        if (accessor.Kind is PropertyAccessorNode.AccessorKind.Set
+            or PropertyAccessorNode.AccessorKind.Init)
+        {
+            var valueParam = new VariableSymbol("value", indexerType, isMutable: false, isParameter: true);
+            _scope.TryDeclare(valueParam);
+            parameters.Add(valueParam);
+            memberKind = BoundMemberKind.IndexerSetter;
+        }
+
+        var returnType = accessor.Kind == PropertyAccessorNode.AccessorKind.Get ? indexerType : "VOID";
+        var qualifiedName = $"{className}.this[].{accessor.Kind.ToString().ToLowerInvariant()}";
+        var functionSymbol = new FunctionSymbol(qualifiedName, returnType, parameters);
+        var boundBody = BindStatements(accessor.Body);
+        return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
+            Array.Empty<string>(), memberKind, className);
+    }
+
+    private BoundFunction BindEventAccessor(
+        IReadOnlyList<StatementNode> body, string className, string eventName,
+        string accessorKind, string delegateType, Parsing.TextSpan span)
+    {
+        var functionScope = _scope.CreateChild();
+        using var _ = PushScope(functionScope);
+
+        var valueParam = new VariableSymbol("value", delegateType, isMutable: false, isParameter: true);
+        _scope.TryDeclare(valueParam);
+        var parameters = new List<VariableSymbol> { valueParam };
+
+        var memberKind = accessorKind == "add" ? BoundMemberKind.EventAdd : BoundMemberKind.EventRemove;
+        var qualifiedName = $"{className}.{eventName}.{accessorKind}";
+        var functionSymbol = new FunctionSymbol(qualifiedName, "VOID", parameters);
+        var boundBody = BindStatements(body);
+        return new BoundFunction(span, functionSymbol, boundBody, functionScope,
+            Array.Empty<string>(), memberKind, className);
+    }
+
+    // ===== Effect extraction =====
+
     /// <summary>
     /// Extracts effect declarations from a function node.
-    /// Returns effects in "category:value" format (e.g., "io:database_write").
     /// </summary>
     private static IReadOnlyList<string> ExtractEffects(FunctionNode func)
+        => ExtractMethodEffects(func.Effects);
+
+    /// <summary>
+    /// Extracts effect declarations from an EffectsNode.
+    /// Returns effects in "category:value" format (e.g., "io:database_write").
+    /// </summary>
+    private static IReadOnlyList<string> ExtractMethodEffects(EffectsNode? effectsNode)
     {
-        if (func.Effects?.Effects == null || func.Effects.Effects.Count == 0)
+        if (effectsNode?.Effects == null || effectsNode.Effects.Count == 0)
             return Array.Empty<string>();
 
         var effects = new List<string>();
-        foreach (var (category, value) in func.Effects.Effects)
+        foreach (var (category, value) in effectsNode.Effects)
         {
             // Store as "category:value" - TaintAnalysis will parse this
             effects.Add($"{category.ToLowerInvariant()}:{value.ToLowerInvariant()}");

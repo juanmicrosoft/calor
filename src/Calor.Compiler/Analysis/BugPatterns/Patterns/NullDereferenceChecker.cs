@@ -124,6 +124,51 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
                     CheckStatement(s, function, diagnostics, checkedVariables, pathConditions);
                 }
                 break;
+
+            case BoundAssignmentStatement assign:
+                CheckExpression(assign.Target, function, diagnostics, checkedVariables, pathConditions);
+                CheckExpression(assign.Value, function, diagnostics, checkedVariables, pathConditions);
+                break;
+
+            case BoundCompoundAssignment compound:
+                CheckExpression(compound.Target, function, diagnostics, checkedVariables, pathConditions);
+                CheckExpression(compound.Value, function, diagnostics, checkedVariables, pathConditions);
+                break;
+
+            case BoundForeachStatement forEach:
+                CheckExpression(forEach.Collection, function, diagnostics, checkedVariables, pathConditions);
+                foreach (var s in forEach.Body)
+                {
+                    CheckStatement(s, function, diagnostics, checkedVariables, pathConditions);
+                }
+                break;
+
+            case BoundDoWhileStatement doWhile:
+                CheckExpression(doWhile.Condition, function, diagnostics, checkedVariables, pathConditions);
+                foreach (var s in doWhile.Body)
+                {
+                    CheckStatement(s, function, diagnostics, checkedVariables, pathConditions);
+                }
+                break;
+
+            case BoundUsingStatement usingStmt:
+                CheckExpression(usingStmt.ResourceExpression, function, diagnostics, checkedVariables, pathConditions);
+                foreach (var s in usingStmt.Body)
+                {
+                    CheckStatement(s, function, diagnostics, checkedVariables, pathConditions);
+                }
+                break;
+
+            case BoundExpressionStatement exprStmt:
+                CheckExpression(exprStmt.Expression, function, diagnostics, checkedVariables, pathConditions);
+                break;
+
+            case BoundThrowStatement throwStmt:
+                if (throwStmt.Expression != null)
+                {
+                    CheckExpression(throwStmt.Expression, function, diagnostics, checkedVariables, pathConditions);
+                }
+                break;
         }
     }
 
@@ -147,6 +192,12 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
 
             case BoundUnaryExpression unaryExpr:
                 CheckExpression(unaryExpr.Operand, function, diagnostics, checkedVariables, pathConditions);
+                break;
+
+            case BoundConditionalExpression condExpr:
+                CheckExpression(condExpr.Condition, function, diagnostics, checkedVariables, pathConditions);
+                CheckExpression(condExpr.WhenTrue, function, diagnostics, checkedVariables, pathConditions);
+                CheckExpression(condExpr.WhenFalse, function, diagnostics, checkedVariables, pathConditions);
                 break;
         }
     }

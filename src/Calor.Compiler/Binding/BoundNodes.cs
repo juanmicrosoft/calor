@@ -51,7 +51,28 @@ public sealed class BoundModule : BoundNode
 }
 
 /// <summary>
-/// Bound function with resolved symbols.
+/// Classifies what kind of member a BoundFunction represents.
+/// This is a pragmatic trade-off: an 11-variant enum pattern-matched across analysis passes.
+/// If it grows beyond ~15 values or needs kind-specific fields, refactor to an ADT.
+/// </summary>
+public enum BoundMemberKind
+{
+    TopLevelFunction,
+    Method,
+    Constructor,
+    PropertyGetter,
+    PropertySetter,
+    PropertyInit,
+    OperatorOverload,
+    IndexerGetter,
+    IndexerSetter,
+    EventAdd,
+    EventRemove
+}
+
+/// <summary>
+/// Bound function with resolved symbols. Also used to represent class members
+/// (methods, constructors, property accessors, operators, indexers, events).
 /// </summary>
 public sealed class BoundFunction : BoundNode
 {
@@ -64,18 +85,36 @@ public sealed class BoundFunction : BoundNode
     /// </summary>
     public IReadOnlyList<string> DeclaredEffects { get; }
 
+    /// <summary>
+    /// What kind of member this bound function represents.
+    /// </summary>
+    public BoundMemberKind MemberKind { get; }
+
+    /// <summary>
+    /// The name of the containing type, or null for top-level functions.
+    /// </summary>
+    public string? ContainingTypeName { get; }
+
     public BoundFunction(TextSpan span, FunctionSymbol symbol, IReadOnlyList<BoundStatement> body, Scope scope)
-        : this(span, symbol, body, scope, Array.Empty<string>())
+        : this(span, symbol, body, scope, Array.Empty<string>(), BoundMemberKind.TopLevelFunction, null)
     {
     }
 
     public BoundFunction(TextSpan span, FunctionSymbol symbol, IReadOnlyList<BoundStatement> body, Scope scope, IReadOnlyList<string> declaredEffects)
+        : this(span, symbol, body, scope, declaredEffects, BoundMemberKind.TopLevelFunction, null)
+    {
+    }
+
+    public BoundFunction(TextSpan span, FunctionSymbol symbol, IReadOnlyList<BoundStatement> body, Scope scope,
+        IReadOnlyList<string> declaredEffects, BoundMemberKind memberKind, string? containingTypeName)
         : base(span)
     {
         Symbol = symbol;
         Body = body;
         Scope = scope;
         DeclaredEffects = declaredEffects ?? Array.Empty<string>();
+        MemberKind = memberKind;
+        ContainingTypeName = containingTypeName;
     }
 }
 
@@ -551,5 +590,222 @@ public sealed class BoundProofObligation : BoundStatement
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
         Description = description;
+    }
+}
+
+// ===== Class member analysis: new statement types =====
+
+/// <summary>
+/// Placeholder for statement types the Binder cannot fully bind.
+/// Preserved in the bound tree so the CFG and dataflow analyses can account for it.
+///
+/// CFG model: two successors — fall-through and function-exit (may throw/return).
+/// A new block is created after the unsupported statement so later statements don't
+/// share the exit edge.
+///
+/// Dataflow model: no definitions, no uses (empty def/use sets). This is NOT conservative —
+/// an opaque statement may define or use variables we can't see. The practical trade-off:
+/// may-define-all/may-use-all would suppress nearly all findings in any function with an
+/// unsupported statement. The current model may produce false positives (dead stores that the
+/// opaque statement reads) and false negatives (defs we miss). This is best-effort.
+/// </summary>
+public sealed class BoundUnsupportedStatement : BoundStatement
+{
+    public string NodeTypeName { get; }
+
+    public BoundUnsupportedStatement(TextSpan span, string nodeTypeName) : base(span)
+    {
+        NodeTypeName = nodeTypeName ?? throw new ArgumentNullException(nameof(nodeTypeName));
+    }
+}
+
+/// <summary>
+/// Bound assignment statement: target = value.
+/// </summary>
+public sealed class BoundAssignmentStatement : BoundStatement
+{
+    public BoundExpression Target { get; }
+    public BoundExpression Value { get; }
+
+    public BoundAssignmentStatement(TextSpan span, BoundExpression target, BoundExpression value)
+        : base(span)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+}
+
+/// <summary>
+/// Bound compound assignment statement: target op= value.
+/// </summary>
+public sealed class BoundCompoundAssignment : BoundStatement
+{
+    public BoundExpression Target { get; }
+    public Ast.CompoundAssignmentOperator Operator { get; }
+    public BoundExpression Value { get; }
+
+    public BoundCompoundAssignment(TextSpan span, BoundExpression target, Ast.CompoundAssignmentOperator op, BoundExpression value)
+        : base(span)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Operator = op;
+        Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+}
+
+/// <summary>
+/// Bound foreach statement: foreach (var item in collection) { body }.
+/// </summary>
+public sealed class BoundForeachStatement : BoundStatement
+{
+    public VariableSymbol LoopVariable { get; }
+    public BoundExpression Collection { get; }
+    public IReadOnlyList<BoundStatement> Body { get; }
+
+    public BoundForeachStatement(TextSpan span, VariableSymbol loopVariable, BoundExpression collection, IReadOnlyList<BoundStatement> body)
+        : base(span)
+    {
+        LoopVariable = loopVariable ?? throw new ArgumentNullException(nameof(loopVariable));
+        Collection = collection ?? throw new ArgumentNullException(nameof(collection));
+        Body = body ?? throw new ArgumentNullException(nameof(body));
+    }
+}
+
+/// <summary>
+/// Bound using statement: using (var resource = expr) { body }.
+/// </summary>
+public sealed class BoundUsingStatement : BoundStatement
+{
+    public VariableSymbol? Resource { get; }
+    public BoundExpression ResourceExpression { get; }
+    public IReadOnlyList<BoundStatement> Body { get; }
+
+    public BoundUsingStatement(TextSpan span, VariableSymbol? resource, BoundExpression resourceExpression, IReadOnlyList<BoundStatement> body)
+        : base(span)
+    {
+        Resource = resource;
+        ResourceExpression = resourceExpression ?? throw new ArgumentNullException(nameof(resourceExpression));
+        Body = body ?? throw new ArgumentNullException(nameof(body));
+    }
+}
+
+/// <summary>
+/// Bound throw statement: throw expr.
+/// </summary>
+public sealed class BoundThrowStatement : BoundStatement
+{
+    public BoundExpression? Expression { get; }
+
+    public BoundThrowStatement(TextSpan span, BoundExpression? expression) : base(span)
+    {
+        Expression = expression;
+    }
+}
+
+/// <summary>
+/// Bound do-while statement: do { body } while (condition).
+/// </summary>
+public sealed class BoundDoWhileStatement : BoundStatement
+{
+    public BoundExpression Condition { get; }
+    public IReadOnlyList<BoundStatement> Body { get; }
+
+    public BoundDoWhileStatement(TextSpan span, BoundExpression condition, IReadOnlyList<BoundStatement> body)
+        : base(span)
+    {
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        Body = body ?? throw new ArgumentNullException(nameof(body));
+    }
+}
+
+/// <summary>
+/// Bound expression statement: expr; (standalone expression evaluated for side effects).
+/// </summary>
+public sealed class BoundExpressionStatement : BoundStatement
+{
+    public BoundExpression Expression { get; }
+
+    public BoundExpressionStatement(TextSpan span, BoundExpression expression) : base(span)
+    {
+        Expression = expression ?? throw new ArgumentNullException(nameof(expression));
+    }
+}
+
+// ===== Class member analysis: new expression types =====
+
+/// <summary>
+/// Bound 'this' expression. Carries the class name as its type.
+/// </summary>
+public sealed class BoundThisExpression : BoundExpression
+{
+    public override string TypeName { get; }
+
+    public BoundThisExpression(TextSpan span, string className) : base(span)
+    {
+        TypeName = className ?? "UNKNOWN";
+    }
+}
+
+/// <summary>
+/// Bound 'base' expression.
+/// </summary>
+public sealed class BoundBaseExpression : BoundExpression
+{
+    public override string TypeName => "OBJECT";
+
+    public BoundBaseExpression(TextSpan span) : base(span) { }
+}
+
+/// <summary>
+/// Bound field access expression: target.fieldName.
+/// </summary>
+public sealed class BoundFieldAccessExpression : BoundExpression
+{
+    public BoundExpression Target { get; }
+    public string FieldName { get; }
+    public override string TypeName { get; }
+
+    public BoundFieldAccessExpression(TextSpan span, BoundExpression target, string fieldName, string typeName)
+        : base(span)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        FieldName = fieldName ?? throw new ArgumentNullException(nameof(fieldName));
+        TypeName = typeName ?? "OBJECT";
+    }
+}
+
+/// <summary>
+/// Bound new expression: new TypeName(args).
+/// </summary>
+public sealed class BoundNewExpression : BoundExpression
+{
+    public override string TypeName { get; }
+    public IReadOnlyList<BoundExpression> Arguments { get; }
+
+    public BoundNewExpression(TextSpan span, string typeName, IReadOnlyList<BoundExpression> arguments)
+        : base(span)
+    {
+        TypeName = typeName ?? "OBJECT";
+        Arguments = arguments ?? Array.Empty<BoundExpression>();
+    }
+}
+
+/// <summary>
+/// Bound conditional expression: condition ? whenTrue : whenFalse.
+/// </summary>
+public sealed class BoundConditionalExpression : BoundExpression
+{
+    public BoundExpression Condition { get; }
+    public BoundExpression WhenTrue { get; }
+    public BoundExpression WhenFalse { get; }
+    public override string TypeName { get; }
+
+    public BoundConditionalExpression(TextSpan span, BoundExpression condition, BoundExpression whenTrue, BoundExpression whenFalse)
+        : base(span)
+    {
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        WhenTrue = whenTrue ?? throw new ArgumentNullException(nameof(whenTrue));
+        WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
+        TypeName = whenTrue.TypeName; // type of the true branch
     }
 }
