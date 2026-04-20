@@ -18,10 +18,13 @@ All notable changes to this project will be documented in this file.
 - **Programs Tested**: 207
 
 ### Added
+- **Incremental compilation** — `CompileCalor` MSBuild task now owns all incremental logic with a two-level cache gate: (mtime, size) stat check then SHA256 content hash. Global invalidation on compiler DLL, options, effect manifest, or output directory changes. Compile failures delete prior `.g.cs` and skip caching to ensure correctness.
 - **`calor effects suggest` CLI command** — Analyzes Calor source files and generates a `.calor-effects.suggested.json` manifest template for unresolved external calls. Supports `--json` for agent consumption, `--merge` for additive updates to existing manifests. Uses AST-based collection (not diagnostic parsing) with internal function filtering, variable type resolution, and call kind tagging.
-- **Shared `ExternalCallCollector`** — Extracted from `InteropEffectCoverageCalculator`, extended to walk class methods and constructors (was functions only). Resolves variable types via `§NEW` initializer scanning. Both the coverage calculator and suggest command use it.
+- **Shared `ExternalCallCollector`** — Extracted from `InteropEffectCoverageCalculator`, extended to walk class methods and constructors (was functions only). Resolves variable types via `§NEW` initializer scanning.
+- **Incremental build benchmark** — `bench/IncrementalBuildBench/` measures cold, warm (no changes), and warm (1 file changed) build times
 - **Effect manifests .NET ecosystem guide** — New website page documenting ~170 covered types, resolution mechanics, custom manifest authoring, and CLI tools
-- 15 new suggest tests (collection, dedup, merge, E2E, multi-file, constructors)
+- **Website changelog page** and **WhatsNewBanner** component for landing page release highlights
+- 15 new suggest tests + BuildStateCache and CompileCalor integration tests
 
 ## [0.4.7] - 2026-04-20
 
