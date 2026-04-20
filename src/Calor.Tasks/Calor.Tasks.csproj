@@ -15,6 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Calor.Tasks.Tests" />
+    <InternalsVisibleTo Include="IncrementalBuildBench" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.0.2" />
   </ItemGroup>
 
