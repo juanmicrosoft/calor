@@ -3,6 +3,7 @@ import { DM_Sans, Raleway, JetBrains_Mono, VT323 } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { WhatsNewBanner } from '@/components/landing/WhatsNewBanner';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -74,6 +75,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${dmSans.variable} ${displayFont.variable} ${jetbrainsMono.variable} ${vt323.variable} font-body antialiased`}>
         <div className="relative flex min-h-screen flex-col">
+          <WhatsNewBanner />
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />

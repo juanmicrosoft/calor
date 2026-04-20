@@ -16,6 +16,7 @@ const navigation = [
   { name: 'Docs', href: '/docs/', path: `${basePath}/docs/` },
   { name: 'Getting Started', href: '/docs/getting-started/', path: `${basePath}/docs/getting-started/` },
   { name: 'Benchmarks', href: '/docs/benchmarking/', path: `${basePath}/docs/benchmarking/` },
+  { name: 'Changelog', href: '/docs/changelog/', path: `${basePath}/docs/changelog/` },
 ];
 
 export function Header() {
