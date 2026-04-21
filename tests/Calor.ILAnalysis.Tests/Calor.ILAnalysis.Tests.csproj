@@ -29,18 +29,24 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Calor.Compiler\Calor.Compiler.csproj" />
+    <!-- Test assembly fixtures — built as dependencies, DLLs copied to output -->
+    <ProjectReference Include="TestAssemblies\TestAssembly.DataAccess\TestAssembly.DataAccess.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <OutputItemType>None</OutputItemType>
+    </ProjectReference>
+    <ProjectReference Include="TestAssemblies\TestAssembly.Scenarios\TestAssembly.Scenarios.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <OutputItemType>None</OutputItemType>
+    </ProjectReference>
   </ItemGroup>
 
   <!-- Copy test assembly DLLs to output for test discovery -->
-  <ItemGroup>
-    <None Include="TestAssemblies\TestAssembly.DataAccess\bin\Release\net10.0\TestAssembly.DataAccess.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>TestAssemblies\TestAssembly.DataAccess.dll</Link>
-    </None>
-    <None Include="TestAssemblies\TestAssembly.Scenarios\bin\Release\net10.0\TestAssembly.Scenarios.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>TestAssemblies\TestAssembly.Scenarios.dll</Link>
-    </None>
-  </ItemGroup>
+  <Target Name="CopyTestAssemblyFixtures" AfterTargets="Build">
+    <MakeDir Directories="$(OutputPath)TestAssemblies" />
+    <Copy SourceFiles="TestAssemblies\TestAssembly.DataAccess\bin\$(Configuration)\net10.0\TestAssembly.DataAccess.dll"
+          DestinationFolder="$(OutputPath)TestAssemblies" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="TestAssemblies\TestAssembly.Scenarios\bin\$(Configuration)\net10.0\TestAssembly.Scenarios.dll"
+          DestinationFolder="$(OutputPath)TestAssemblies" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>
