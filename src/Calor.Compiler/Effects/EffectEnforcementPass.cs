@@ -168,17 +168,61 @@ public sealed class EffectEnforcementPass
                 ? DiagnosticSeverity.Warning
                 : DiagnosticSeverity.Error;
 
+            // Compute the full correct effect set for the fix
+            var correctEffects = declaredEffects.Union(computedEffects);
+            // §E{} syntax uses comma-separated codes without spaces
+            var correctEffectStr = correctEffects.ToDisplayString().Replace(", ", ",");
+            var fixSpan = function.Effects?.Span ?? function.Span;
+            var filePath = _diagnostics.CurrentFilePath ?? "unknown";
+
+            // Generate fix: replace existing §E{...} or insert new one
+            SuggestedFix? fix = null;
+            if (function.Effects != null)
+            {
+                // Replace existing §E{...} with correct effects
+                fix = new SuggestedFix(
+                    $"Update effect declaration to §E{{{correctEffectStr}}}",
+                    TextEdit.Replace(filePath,
+                        function.Effects.Span.Line, function.Effects.Span.Column,
+                        function.Effects.Span.Line, function.Effects.Span.Column + function.Effects.Span.Length,
+                        $"§E{{{correctEffectStr}}}"));
+            }
+            else
+            {
+                // Insert §E{...} after the last §O or §I line
+                var insertLine = function.Span.Line + 1; // Default: after function declaration
+                if (function.Output != null)
+                    insertLine = function.Output.Span.Line + 1;
+                else if (function.Parameters.Count > 0)
+                    insertLine = function.Parameters[^1].Span.Line + 1;
+
+                fix = new SuggestedFix(
+                    $"Add effect declaration §E{{{correctEffectStr}}}",
+                    TextEdit.Insert(filePath, insertLine, 1, $"  §E{{{correctEffectStr}}}\n"));
+            }
+
             foreach (var (kind, value) in forbidden)
             {
                 // Find the call chain that leads to this effect
                 var chain = FindCallChain(function.Id, kind, value);
                 var chainStr = chain.Count > 0 ? $"\n  Call chain: {string.Join(" → ", chain)}" : "";
 
-                _diagnostics.Report(
-                    function.Effects?.Span ?? function.Span,
-                    DiagnosticCode.ForbiddenEffect,
-                    $"Function '{function.Name}' uses effect '{EffectSetExtensions.ToSurfaceCode(kind, value)}' but does not declare it{chainStr}",
-                    severity);
+                var message = $"Function '{function.Name}' uses effect '{EffectSetExtensions.ToSurfaceCode(kind, value)}' but does not declare it{chainStr}";
+
+                if (fix != null)
+                {
+                    _diagnostics.ReportWithFix(
+                        fixSpan,
+                        DiagnosticCode.ForbiddenEffect,
+                        message,
+                        fix,
+                        severity);
+                    fix = null; // Only attach fix to the first forbidden effect diagnostic
+                }
+                else
+                {
+                    _diagnostics.Report(fixSpan, DiagnosticCode.ForbiddenEffect, message, severity);
+                }
             }
         }
     }
