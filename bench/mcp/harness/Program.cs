@@ -83,28 +83,31 @@ foreach (var taskDir in taskDirs)
 
     var source = File.ReadAllText(inputPath);
 
-    // Run the task multiple times for variance measurement
-    var runMetrics = new List<RunMetrics>();
-
+    // Run baseline (no autoFix)
+    var baselineMetrics = new List<RunMetrics>();
     for (var run = 0; run < runs; run++)
-    {
-        var metrics = RunCompileFixLoop(source, taskSpec);
-        runMetrics.Add(metrics);
-    }
+        baselineMetrics.Add(RunCompileFixLoop(source, taskSpec, useAutoFix: false));
 
-    // Compute median metrics
-    var medianRoundTrips = Median(runMetrics.Select(m => (double)m.RoundTrips));
-    var medianDiagnosticsBefore = Median(runMetrics.Select(m => (double)m.DiagnosticsBefore));
-    var medianDiagnosticsAfter = Median(runMetrics.Select(m => (double)m.DiagnosticsAfter));
-    var medianTimeMs = Median(runMetrics.Select(m => m.TotalTimeMs));
-    var successRate = runMetrics.Count(m => m.Success) / (double)runMetrics.Count * 100;
+    // Run with autoFix
+    var autoFixMetrics = new List<RunMetrics>();
+    for (var run = 0; run < runs; run++)
+        autoFixMetrics.Add(RunCompileFixLoop(source, taskSpec, useAutoFix: true));
+
+    // Compute median metrics for both
+    var baselineSuccess = baselineMetrics.Count(m => m.Success) / (double)baselineMetrics.Count * 100;
+    var autoFixSuccess = autoFixMetrics.Count(m => m.Success) / (double)autoFixMetrics.Count * 100;
+    var medianRoundTrips = Median(autoFixMetrics.Select(m => (double)m.RoundTrips));
+    var medianDiagnosticsBefore = Median(baselineMetrics.Select(m => (double)m.DiagnosticsBefore));
+    var medianDiagnosticsAfter = Median(autoFixMetrics.Select(m => (double)m.DiagnosticsAfter));
+    var medianTimeMs = Median(autoFixMetrics.Select(m => m.TotalTimeMs));
+    var successRate = autoFixSuccess;
 
     // Check against expected output if available
     var matchesExpected = false;
-    if (File.Exists(expectedPath) && runMetrics.Count > 0 && runMetrics[0].FinalSource != null)
+    if (File.Exists(expectedPath) && autoFixMetrics.Count > 0 && autoFixMetrics[0].FinalSource != null)
     {
         var expected = File.ReadAllText(expectedPath).Trim();
-        matchesExpected = runMetrics[0].FinalSource!.Trim() == expected;
+        matchesExpected = autoFixMetrics[0].FinalSource!.Trim() == expected;
     }
 
     var result = new TaskResult
@@ -123,9 +126,10 @@ foreach (var taskDir in taskDirs)
     allResults.Add(result);
 
     var statusIcon = result.Status == "pass" ? "OK" : result.Status == "partial" ? "~" : "FAIL";
-    Console.WriteLine($"[{statusIcon}] {taskName}: {medianRoundTrips:F0} round-trips, " +
-        $"{medianDiagnosticsBefore:F0}→{medianDiagnosticsAfter:F0} diagnostics, " +
-        $"{medianTimeMs:F1}ms, {successRate:F0}% success");
+    var improvement = baselineSuccess < autoFixSuccess ? " (IMPROVED)" : "";
+    Console.WriteLine($"[{statusIcon}] {taskName}: baseline={baselineSuccess:F0}% → autoFix={autoFixSuccess:F0}%{improvement}, " +
+        $"{medianRoundTrips:F0} round-trips, {medianDiagnosticsBefore:F0}→{medianDiagnosticsAfter:F0} diags, " +
+        $"{medianTimeMs:F1}ms");
 }
 
 // Summary
@@ -164,7 +168,7 @@ return 0;
 
 // ── Compile-fix loop ──────────────────────────────────────────────
 
-static RunMetrics RunCompileFixLoop(string source, TaskSpec spec)
+static RunMetrics RunCompileFixLoop(string source, TaskSpec spec, bool useAutoFix = false)
 {
     var sw = Stopwatch.StartNew();
     var currentSource = source;
@@ -175,10 +179,57 @@ static RunMetrics RunCompileFixLoop(string source, TaskSpec spec)
     totalRoundTrips++;
     var diagnosticsBefore = result.Diagnostics.Count(d => d.IsError);
 
-    // Baseline measurement: single compile, no automatic fixing.
-    // The agent would read errors and attempt fixes in subsequent round-trips.
-    // We measure the initial diagnostic state — how many errors the compiler reports
-    // before any agent intervention. Future phases will add autoFix and measure the delta.
+    if (useAutoFix && result.HasErrors)
+    {
+        // AutoFix loop: apply fixes from DiagnosticsWithFixes, recompile, repeat
+        const int maxPasses = 3;
+        for (var pass = 0; pass < maxPasses; pass++)
+        {
+            var fixes = result.Diagnostics.DiagnosticsWithFixes;
+            if (fixes.Count == 0) break;
+
+            // Apply all fixes in reverse line order
+            var allEdits = fixes
+                .SelectMany(d => d.Fix.Edits)
+                .OrderByDescending(e => e.StartLine)
+                .ThenByDescending(e => e.StartColumn)
+                .ToList();
+
+            if (allEdits.Count == 0) break;
+
+            var lines = currentSource.Split('\n');
+            foreach (var edit in allEdits)
+            {
+                var startLine = edit.StartLine - 1;
+                var startCol = edit.StartColumn - 1;
+                var endLine = edit.EndLine - 1;
+                var endCol = edit.EndColumn - 1;
+                if (startLine < 0 || startLine >= lines.Length) continue;
+                if (endLine < 0 || endLine >= lines.Length) endLine = startLine;
+
+                var before = startCol >= 0 && startCol <= lines[startLine].Length
+                    ? lines[startLine][..startCol] : lines[startLine];
+                var after = endCol >= 0 && endCol <= lines[endLine].Length
+                    ? lines[endLine][endCol..] : "";
+
+                var newContent = before + edit.NewText + after;
+                var newLines = newContent.Split('\n');
+                var lineList = lines.ToList();
+                lineList.RemoveRange(startLine, endLine - startLine + 1);
+                lineList.InsertRange(startLine, newLines);
+                lines = lineList.ToArray();
+            }
+
+            var newSource = string.Join('\n', lines);
+            if (newSource == currentSource) break; // No changes — bail
+
+            currentSource = newSource;
+            result = CompileCalorSource(currentSource);
+            totalRoundTrips++;
+
+            if (!result.HasErrors) break;
+        }
+    }
 
     sw.Stop();
 

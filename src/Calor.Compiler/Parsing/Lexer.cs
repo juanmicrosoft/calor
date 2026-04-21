@@ -987,8 +987,16 @@ public sealed class Lexer
                 suggestion.TrimStart('/'), out var desc)
                 ? $" ({desc})"
                 : "";
-            _diagnostics.ReportError(CurrentSpan(), Diagnostics.DiagnosticCode.UnknownSectionMarker,
-                $"Unknown section marker '§{keyword}'. Did you mean '§{suggestion}'{description}?");
+            var span = CurrentSpan();
+            var filePath = _diagnostics.CurrentFilePath ?? "";
+            var fix = new Diagnostics.SuggestedFix(
+                $"Replace '§{keyword}' with '§{suggestion}'",
+                Diagnostics.TextEdit.Replace(filePath, span.Line, span.Column,
+                    span.Line, span.Column + span.Length,
+                    $"§{suggestion}"));
+            _diagnostics.ReportErrorWithFix(span, Diagnostics.DiagnosticCode.UnknownSectionMarker,
+                $"Unknown section marker '§{keyword}'. Did you mean '§{suggestion}'{description}?",
+                fix);
         }
         else
         {
