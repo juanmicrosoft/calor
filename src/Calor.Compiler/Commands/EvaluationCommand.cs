@@ -19,8 +19,145 @@ public static class EvaluationCommand
 
         command.AddCommand(CreateRegistryCommand());
         command.AddCommand(CreateRegistryValidateCommand());
+        command.AddCommand(CreateAbCommand());
 
         return command;
+    }
+
+    // ========================================================================
+    // ab subcommand — §5.0c paired baseline-vs-candidate decision runner
+    // ========================================================================
+
+    private static Command CreateAbCommand()
+    {
+        var baselineOption = new Option<FileInfo>(
+            aliases: ["--baseline-file"],
+            description: "JSON file with baseline-run per-program metric values (AbRun schema).")
+        { IsRequired = true };
+
+        var candidateOption = new Option<FileInfo>(
+            aliases: ["--candidate-file"],
+            description: "JSON file with candidate-run per-program metric values (AbRun schema).")
+        { IsRequired = true };
+
+        var primaryMetricOption = new Option<string>(
+            aliases: ["--primary-metric"],
+            description: "Name of the primary metric to gate on.")
+        { IsRequired = true };
+
+        var thresholdOption = new Option<double>(
+            aliases: ["--threshold"],
+            description: "Minimum primary-metric relative effect (e.g., 0.15 = +15%).")
+        { IsRequired = true };
+
+        var directionOption = new Option<string>(
+            aliases: ["--direction"],
+            description: "Direction of effect: up (candidate > baseline) or down (candidate < baseline).",
+            getDefaultValue: () => "up");
+
+        var guardOption = new Option<string[]>(
+            aliases: ["--guard"],
+            description: "No-regression guard: 'MetricName=Tolerance', e.g., 'Comprehension=0.03'. Repeatable.")
+        { Arity = ArgumentArity.ZeroOrMore };
+
+        var resamplesOption = new Option<int>(
+            aliases: ["--bootstrap-resamples"],
+            description: "Bootstrap resample count (default: 2000).",
+            getDefaultValue: () => 2000);
+
+        var seedOption = new Option<int?>(
+            aliases: ["--seed"],
+            description: "Random seed for reproducible bootstrap output.");
+
+        var command = new Command("ab",
+            "Paired baseline-vs-candidate evaluation. Emits a decision memo (PASS/FAIL/INCONCLUSIVE) with PROMOTE/HOLD/DROP recommendation.")
+        {
+            baselineOption, candidateOption, primaryMetricOption, thresholdOption,
+            directionOption, guardOption, resamplesOption, seedOption
+        };
+
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            await Task.Yield();
+            var baselineFile = ctx.ParseResult.GetValueForOption(baselineOption)!;
+            var candidateFile = ctx.ParseResult.GetValueForOption(candidateOption)!;
+            var primaryName = ctx.ParseResult.GetValueForOption(primaryMetricOption)!;
+            var threshold = ctx.ParseResult.GetValueForOption(thresholdOption);
+            var directionRaw = ctx.ParseResult.GetValueForOption(directionOption) ?? "up";
+            var guardArgs = ctx.ParseResult.GetValueForOption(guardOption) ?? Array.Empty<string>();
+            var resamples = ctx.ParseResult.GetValueForOption(resamplesOption);
+            var seed = ctx.ParseResult.GetValueForOption(seedOption);
+
+            ctx.ExitCode = ExecuteAb(
+                baselineFile, candidateFile, primaryName, threshold, directionRaw,
+                guardArgs, resamples, seed);
+        });
+
+        return command;
+    }
+
+    private static int ExecuteAb(
+        FileInfo baselineFile,
+        FileInfo candidateFile,
+        string primaryName,
+        double threshold,
+        string directionRaw,
+        string[] guardArgs,
+        int resamples,
+        int? seed)
+    {
+        if (!Enum.TryParse<EffectDirection>(directionRaw, ignoreCase: true, out var direction))
+        {
+            Console.Error.WriteLine($"--direction must be 'up' or 'down', got '{directionRaw}'");
+            return 2;
+        }
+
+        AbRun? baseline, candidate;
+        try
+        {
+            baseline = JsonSerializer.Deserialize<AbRun>(
+                File.ReadAllText(baselineFile.FullName),
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+            candidate = JsonSerializer.Deserialize<AbRun>(
+                File.ReadAllText(candidateFile.FullName),
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to read input JSON: {ex.Message}");
+            return 2;
+        }
+
+        if (baseline is null || candidate is null)
+        {
+            Console.Error.WriteLine("Baseline and candidate JSON files must parse to AbRun objects.");
+            return 2;
+        }
+
+        var guards = new List<GuardSpec>();
+        foreach (var arg in guardArgs)
+        {
+            var parts = arg.Split('=', 2);
+            if (parts.Length != 2 || !double.TryParse(parts[1],
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var tol))
+            {
+                Console.Error.WriteLine($"--guard must be 'Name=Tolerance', got '{arg}'");
+                return 2;
+            }
+            guards.Add(new GuardSpec(parts[0], tol));
+        }
+
+        var spec = new PrimaryMetricSpec(primaryName, direction, threshold);
+        var memo = AbEvaluator.Evaluate(baseline, candidate, spec, guards, resamples, seed);
+
+        // Always emit the decision memo as JSON on stdout — the agent consumes it.
+        var opts = new JsonSerializerOptions { WriteIndented = true, Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
+        Console.WriteLine(JsonSerializer.Serialize(memo, opts));
+
+        // Non-zero exit on FAIL so scripts can branch on the CLI's outcome directly.
+        return memo.Decision == "PASS" ? 0 : 1;
     }
 
     // ========================================================================
