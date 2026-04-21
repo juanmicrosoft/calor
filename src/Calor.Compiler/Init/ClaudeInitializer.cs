@@ -154,9 +154,12 @@ public class ClaudeInitializer : IAiInitializer
             var existingSection = existingContent[startIdx..(endIdx + SectionEnd.Length)];
             var existingVersion = ParseTemplateVersion(existingSection);
 
-            if (existingVersion > 0 && existingVersion < TemplateVersion)
+            if (existingVersion < TemplateVersion)
             {
-                Console.WriteLine($"  Updating agent instructions (v{existingVersion} → v{TemplateVersion})");
+                if (existingVersion == 0)
+                    Console.Error.WriteLine($"  Installing v{TemplateVersion} agent instructions (no prior version marker)");
+                else
+                    Console.Error.WriteLine($"  Updating agent instructions (v{existingVersion} → v{TemplateVersion})");
             }
         }
 

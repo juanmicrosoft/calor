@@ -70,9 +70,6 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 **Testing:**
 - `calor_self_test` - Run compiler self-test suite
 
-**Testing:**
-- `calor_self_test` - Run Calor self-test suite
-
 #### Key Commands
 ```bash
 calor analyze <path>                 # Score files for Calor migration potential

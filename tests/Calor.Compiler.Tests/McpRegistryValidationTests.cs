@@ -35,11 +35,14 @@ public class McpRegistryValidationTests
         AssertNoPhantomTools(template, "GEMINI.md.template");
     }
 
-    [Fact]
-    public void Templates_ReferenceOnlyRegisteredResources()
+    [Theory]
+    [InlineData("CLAUDE.md.template")]
+    [InlineData("AGENTS.md.template")]
+    [InlineData("GEMINI.md.template")]
+    public void Templates_ReferenceOnlyRegisteredResources(string templateName)
     {
-        var claude = LoadEmbeddedTemplate("CLAUDE.md.template");
-        AssertNoPhantomResources(claude, "CLAUDE.md.template");
+        var template = LoadEmbeddedTemplate(templateName);
+        AssertNoPhantomResources(template, templateName);
     }
 
     [Fact]
