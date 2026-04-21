@@ -101,6 +101,11 @@ public class Program
             aliases: ["--all-findings"],
             description: "Report all analysis findings including inconclusive and low-confidence results (default: only report verified findings)");
 
+        var experimentalOption = new Option<string[]>(
+            aliases: ["--experimental"],
+            description: "Enable an experimental feature flag (repeatable). Flag names are defined in docs/experiments/registry.json. Unknown flags are accepted silently.")
+        { Arity = ArgumentArity.ZeroOrMore };
+
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
             inputOption,
@@ -118,7 +123,8 @@ public class Program
             verificationTimeoutOption,
             noTelemetryOption,
             analyzeOption,
-            allFindingsOption
+            allFindingsOption,
+            experimentalOption
         };
 
         // Legacy compile handler (when --input is provided)
@@ -150,6 +156,7 @@ public class Program
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
             var analyze = ctx.ParseResult.GetValueForOption(analyzeOption);
             var allFindings = ctx.ParseResult.GetValueForOption(allFindingsOption);
+            var experimental = ctx.ParseResult.GetValueForOption(experimentalOption) ?? Array.Empty<string>();
 
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
             {
@@ -162,12 +169,13 @@ public class Program
                 ["verify"] = verify.ToString(),
                 ["noCache"] = noCache.ToString(),
                 ["verificationTimeout"] = verificationTimeout.ToString(),
-                ["analyze"] = analyze.ToString()
+                ["analyze"] = analyze.ToString(),
+                ["experimentalFlagCount"] = experimental.Length.ToString()
             });
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental);
             }
             catch (Exception ex)
             {
@@ -233,7 +241,7 @@ public class Program
         return result;
     }
 
-    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false)
+    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null)
     {
         try
         {
@@ -335,7 +343,10 @@ public class Program
                         {
                             MinTaintHops = allFindings ? 1 : 2
                         }
-                    } : null
+                    } : null,
+                    ExperimentalFlags = experimentalFlags != null && experimentalFlags.Length > 0
+                        ? new ExperimentalFlags(experimentalFlags)
+                        : ExperimentalFlags.None
                 };
                 var result = Compile(source, file.FullName, options);
 
@@ -423,6 +434,21 @@ public class Program
         diagnostics.SetFilePath(filePath);
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         var phaseSw = new Stopwatch();
+
+        // Experimental pilot flag — emits one info diagnostic per compilation when
+        // the pilot-hello-world flag is enabled. Verifies end-to-end plumbing from
+        // CLI (--experimental pilot-hello-world) and MSBuild (CalorExperimentalFlags)
+        // through CompilationOptions.ExperimentalFlags. See Phase 0a of
+        // docs/plans/calor-native-type-system-v2.md.
+        if (options.ExperimentalFlags.IsEnabled("pilot-hello-world"))
+        {
+            diagnostics.ReportInfo(
+                new Parsing.TextSpan(0, 0, 1, 1),
+                DiagnosticCode.ExperimentalFlagPilot,
+                $"Experimental flag 'pilot-hello-world' is enabled; "
+                + $"{options.ExperimentalFlags.Count} flag(s) set on this compilation. "
+                + "This pilot flag is a plumbing probe — no feature behavior is gated on it.");
+        }
 
         // Input profile telemetry (Phase 2)
         try
@@ -935,6 +961,14 @@ public sealed class CompilationOptions
     /// Default: failed=Error, boundary=AlwaysGuard, timeout=WarnAndGuard.
     /// </summary>
     public Verification.Obligations.ObligationPolicy ObligationPolicy { get; init; } = Verification.Obligations.ObligationPolicy.Default;
+
+    /// <summary>
+    /// Experimental feature flags. Used by Phase 0+ of the Calor-native type-system
+    /// research plan (<c>docs/plans/calor-native-type-system-v2.md</c>). Each hypothesis
+    /// lands behind a named flag; features check <c>ExperimentalFlags.IsEnabled(name)</c>
+    /// before acting.
+    /// </summary>
+    public ExperimentalFlags ExperimentalFlags { get; init; } = ExperimentalFlags.None;
 }
 
 /// <summary>

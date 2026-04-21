@@ -591,4 +591,52 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.NotNull(entry.EffectSummary);
         Assert.Equal("TestModule", entry.EffectSummary!.ModuleName);
     }
+
+    // Phase 0a — verifies the ExperimentalFlags MSBuild property plumbs into the
+    // CompileCalor task and compiles cleanly. Per-diagnostic verification (pilot
+    // info diagnostic emitted) lives in Calor.Compiler.Tests.ExperimentalFlagPilotTests;
+    // the task currently drops info diagnostics on successful compile (pre-existing
+    // behavior, out of scope for Phase 0a).
+    [Fact]
+    public void ExperimentalFlags_PilotFlag_CompilesCleanly()
+    {
+        var src = CreateSourceFile("PilotTest.calr", ValidCalorSource);
+
+        var task = CreateTask(src);
+        task.ExperimentalFlags = "pilot-hello-world";
+
+        Assert.True(task.Execute());
+        var engine = (TestBuildEngine)task.BuildEngine;
+        // Plumbing smoke-check: no errors/warnings introduced by setting the flag.
+        Assert.Empty(engine.Errors);
+        Assert.Single(task.GeneratedFiles);
+    }
+
+    [Fact]
+    public void ExperimentalFlags_NotSet_CompilesIdentically()
+    {
+        var src = CreateSourceFile("NoPilotTest.calr", ValidCalorSource);
+
+        var task = CreateTask(src);
+        // ExperimentalFlags deliberately not set (empty string default).
+
+        Assert.True(task.Execute());
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.Empty(engine.Errors);
+        Assert.Single(task.GeneratedFiles);
+    }
+
+    [Fact]
+    public void ExperimentalFlags_SemicolonDelimited_Parsed()
+    {
+        var src = CreateSourceFile("MultiFlagTest.calr", ValidCalorSource);
+
+        var task = CreateTask(src);
+        task.ExperimentalFlags = "pilot-hello-world;some-other-flag;yet-another";
+
+        // Plumbing smoke-check: multi-flag property parses without error and compile succeeds.
+        Assert.True(task.Execute());
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.Empty(engine.Errors);
+    }
 }

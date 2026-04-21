@@ -449,6 +449,19 @@ public static class DiagnosticCode
     /// Info: Proof obligation discharged (proven).
     /// </summary>
     public const string ProofObligationDischarged = "Calor1141";
+
+    // Experimental feature pilot diagnostics (Calor1200-1299) —
+    // reserved for flag-plumbing verification and other short-lived signals
+    // from the research-program (docs/plans/calor-native-type-system-v2.md)
+    // Phase 0. Not intended to appear in shipped features.
+
+    /// <summary>
+    /// Info: An experimental feature flag was enabled for this compilation.
+    /// Used by the Phase 0a pilot flag to verify end-to-end plumbing from CLI
+    /// and MSBuild property through CompilationOptions. Emits once per
+    /// compilation when the <c>pilot-hello-world</c> flag is enabled.
+    /// </summary>
+    public const string ExperimentalFlagPilot = "Calor1200";
 }
 
 /// <summary>
