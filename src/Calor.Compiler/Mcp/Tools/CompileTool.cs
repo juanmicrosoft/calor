@@ -17,7 +17,9 @@ public sealed class CompileTool : McpToolBase
     public override int TimeoutSeconds => 120;
 
     public override string Description =>
-        "Compile Calor source code to C#. Accepts inline 'source', a 'filePath' to a .calr file on disk, or batch modes via 'files'/'projectPath'. Returns generated C# code and any compilation diagnostics.";
+        "Compile Calor source code to C#. Use autoFix: true to auto-fix parser, ID, and effect errors (up to 3 passes). " +
+        "Each diagnostic includes a fix field with concrete edits. " +
+        "Typically the first tool called after writing .calr code. Follow with calor_verify for contract checking.";
 
     public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
 
