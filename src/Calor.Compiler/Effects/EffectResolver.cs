@@ -15,13 +15,15 @@ namespace Calor.Compiler.Effects;
 public sealed class EffectResolver
 {
     private readonly ManifestLoader _manifestLoader;
+    private readonly IL.ILEffectAnalyzer? _ilAnalyzer;
     private readonly Dictionary<string, ResolvedTypeInfo> _typeCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EffectResolution> _methodCache = new(StringComparer.Ordinal);
     private bool _initialized;
 
-    public EffectResolver(ManifestLoader? manifestLoader = null)
+    public EffectResolver(ManifestLoader? manifestLoader = null, IL.ILEffectAnalyzer? ilAnalyzer = null)
     {
         _manifestLoader = manifestLoader ?? new ManifestLoader();
+        _ilAnalyzer = ilAnalyzer;
     }
 
     /// <summary>
@@ -150,7 +152,12 @@ public sealed class EffectResolver
         if (nsResolution != null)
             return nsResolution;
 
-        // 4. Unknown
+        // 4. IL analysis fallback (after all manifest layers, before Unknown)
+        var ilResolution = TryILAnalysis(type, method, parameterTypes);
+        if (ilResolution != null)
+            return ilResolution;
+
+        // 5. Unknown
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
 
@@ -176,6 +183,11 @@ public sealed class EffectResolver
         if (nsResolution != null)
             return nsResolution;
 
+        // IL analysis fallback
+        var ilResolution = TryILAnalysis(type, $"get_{propertyName}");
+        if (ilResolution != null)
+            return ilResolution;
+
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
 
@@ -200,6 +212,11 @@ public sealed class EffectResolver
         var nsResolution = ResolveFromNamespaceDefaults(type);
         if (nsResolution != null)
             return nsResolution;
+
+        // IL analysis fallback
+        var ilResolution = TryILAnalysis(type, $"set_{propertyName}");
+        if (ilResolution != null)
+            return ilResolution;
 
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
@@ -233,7 +250,17 @@ public sealed class EffectResolver
         if (nsResolution != null)
             return nsResolution;
 
+        // IL analysis fallback
+        var ilResolution = TryILAnalysis(type, ".ctor", parameterTypes);
+        if (ilResolution != null)
+            return ilResolution;
+
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
+    }
+
+    private EffectResolution? TryILAnalysis(string type, string method, string[]? parameterTypes = null)
+    {
+        return _ilAnalyzer?.TryResolve(type, method, parameterTypes);
     }
 
     private EffectResolution? ResolveFromNamespaceDefaults(string type)

@@ -5,6 +5,7 @@
   <PropertyGroup>
     <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(IntermediateOutputPath)calor\</CalorOutputDirectory>
     <CalorVerbose Condition="'$(CalorVerbose)' == ''">false</CalorVerbose>
+    <CalorEnableILAnalysis Condition="'$(CalorEnableILAnalysis)' == ''">false</CalorEnableILAnalysis>
   </PropertyGroup>
 
   <!-- Default item group for Calor files -->

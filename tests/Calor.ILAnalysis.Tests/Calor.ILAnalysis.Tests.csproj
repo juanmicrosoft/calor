@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Calor.ILAnalysis.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.6.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="6.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exclude test assembly source files from this project's compilation -->
+    <Compile Remove="TestAssemblies\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Calor.Compiler\Calor.Compiler.csproj" />
+  </ItemGroup>
+
+  <!-- Copy test assembly DLLs to output for test discovery -->
+  <ItemGroup>
+    <None Include="TestAssemblies\TestAssembly.DataAccess\bin\Release\net10.0\TestAssembly.DataAccess.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>TestAssemblies\TestAssembly.DataAccess.dll</Link>
+    </None>
+    <None Include="TestAssemblies\TestAssembly.Scenarios\bin\Release\net10.0\TestAssembly.Scenarios.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>TestAssemblies\TestAssembly.Scenarios.dll</Link>
+    </None>
+  </ItemGroup>
+
+</Project>

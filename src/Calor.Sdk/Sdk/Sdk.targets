@@ -8,6 +8,12 @@
     <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net10.0\Calor.Tasks.dll</CalorTasksAssembly>
   </PropertyGroup>
 
+  <!-- IL analysis: resolve runtime directory for BCL implementation assemblies -->
+  <PropertyGroup Condition="'$(CalorEnableILAnalysis)' == 'true'">
+    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences</_CalorCompileCalorDependsOn>
+    <_CalorRuntimeDir Condition="'$(NetCoreTargetingPackRoot)' != ''">$([System.IO.Path]::GetFullPath('$(NetCoreTargetingPackRoot)\..\..\..\shared\Microsoft.NETCore.App\$(BundledNETCoreAppTargetFrameworkVersion)'))\</_CalorRuntimeDir>
+  </PropertyGroup>
+
   <UsingTask TaskName="Calor.Tasks.CompileCalor" AssemblyFile="$(CalorTasksAssembly)" />
 
   <!-- Validate CalorCompilerOverride (runs unconditionally, not subject to incremental build skip) -->
@@ -22,6 +28,7 @@
   <!-- Task owns all incrementality — no MSBuild-level skip -->
   <Target Name="CompileCalorFiles"
           BeforeTargets="BeforeCompile"
+          DependsOnTargets="$(_CalorCompileCalorDependsOn)"
           Condition="'@(CalorCompile)' != ''">
 
     <Message Text="Compiling Calor files..." Importance="high" />
@@ -34,7 +41,12 @@
         SourceFiles="@(CalorCompile)"
         OutputDirectory="$(CalorOutputDirectory)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
-        Verbose="$(CalorVerbose)">
+        Verbose="$(CalorVerbose)"
+        EnableILAnalysis="$(CalorEnableILAnalysis)"
+        ReferencedAssemblies="@(ReferencePath)"
+        RuntimeDirectory="$(_CalorRuntimeDir)"
+        NuGetPackageRoot="$(NuGetPackageRoot)"
+        DepsFilePath="$(ProjectDepsFilePath)">
       <Output TaskParameter="GeneratedFiles" ItemName="CalorGeneratedFiles" />
     </CompileCalor>
 

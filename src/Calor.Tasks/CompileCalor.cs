@@ -39,6 +39,31 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     /// </summary>
     public bool Verbose { get; set; }
 
+    /// <summary>
+    /// Enable cross-assembly IL analysis for effect resolution.
+    /// </summary>
+    public bool EnableILAnalysis { get; set; }
+
+    /// <summary>
+    /// Referenced assemblies for cross-assembly IL effect analysis.
+    /// </summary>
+    public ITaskItem[] ReferencedAssemblies { get; set; } = Array.Empty<ITaskItem>();
+
+    /// <summary>
+    /// Path to the .NET shared runtime directory for resolving BCL implementation assemblies.
+    /// </summary>
+    public string RuntimeDirectory { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Path to the NuGet global packages folder.
+    /// </summary>
+    public string NuGetPackageRoot { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Path to the project's .deps.json file.
+    /// </summary>
+    public string DepsFilePath { get; set; } = string.Empty;
+
     public override bool Execute()
     {
         if (SourceFiles.Length == 0)
@@ -91,6 +116,55 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             ManifestHash = manifestHash,
             OutputDirectory = relativeOutputDir
         };
+
+        // Construct shared CompilationContext for IL analysis (once per build, reused across files)
+        CompilationContext? compilationContext = null;
+        Compiler.Effects.IL.ILEffectAnalyzer? ilAnalyzer = null;
+        if (EnableILAnalysis && ReferencedAssemblies.Length > 0)
+        {
+            try
+            {
+                var assemblyPaths = ReferencedAssemblies
+                    .Select(item => item.GetMetadata("FullPath"))
+                    .Where(p => !string.IsNullOrEmpty(p) && File.Exists(p))
+                    .ToList();
+
+                if (assemblyPaths.Count > 0)
+                {
+                    var ilOptions = new Compiler.Effects.IL.ILAnalysisOptions
+                    {
+                        RuntimeDirectory = !string.IsNullOrEmpty(RuntimeDirectory) ? RuntimeDirectory : null,
+                        NuGetPackageRoot = !string.IsNullOrEmpty(NuGetPackageRoot) ? NuGetPackageRoot : null,
+                        DepsFilePath = !string.IsNullOrEmpty(DepsFilePath) ? DepsFilePath : null
+                    };
+
+                    var resolver = new Compiler.Effects.EffectResolver();
+                    resolver.Initialize(ProjectDirectory);
+
+                    ilAnalyzer = new Compiler.Effects.IL.ILEffectAnalyzer(
+                        assemblyPaths, resolver, ilOptions);
+
+                    var sharedResolver = new Compiler.Effects.EffectResolver(ilAnalyzer: ilAnalyzer);
+                    sharedResolver.Initialize(ProjectDirectory);
+
+                    compilationContext = new CompilationContext { SharedEffectResolver = sharedResolver };
+
+                    if (Verbose)
+                    {
+                        Log.LogMessage(MessageImportance.High,
+                            "Calor: IL analysis enabled with {0} referenced assemblies ({1} loaded).",
+                            assemblyPaths.Count, ilAnalyzer.LoadedAssemblyCount);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning("Calor: failed to initialize IL analysis: {0}", ex.Message);
+            }
+        }
+
+        try
+        {
 
         var generatedFiles = new List<ITaskItem>();
         var success = true;
@@ -192,7 +266,14 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             try
             {
                 var source = File.ReadAllText(inputPath);
-                var result = Program.Compile(source, inputPath, false);
+                var compileOptions = new CompilationOptions
+                {
+                    Verbose = Verbose,
+                    ProjectDirectory = ProjectDirectory,
+                    Context = compilationContext,
+                    EnableILAnalysis = EnableILAnalysis
+                };
+                var result = Program.Compile(source, inputPath, compileOptions);
 
                 if (result.HasErrors)
                 {
@@ -315,5 +396,11 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
 
         GeneratedFiles = generatedFiles.ToArray();
         return success;
+        }
+        finally
+        {
+            ilAnalyzer?.Dispose();
+            compilationContext?.Dispose();
+        }
     }
 }

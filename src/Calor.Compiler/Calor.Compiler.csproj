@@ -2,7 +2,11 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Calor.Compiler.Tests" />
+<<<<<<< Updated upstream
     <InternalsVisibleTo Include="Calor.Enforcement.Tests" />
+=======
+    <InternalsVisibleTo Include="Calor.ILAnalysis.Tests" />
+>>>>>>> Stashed changes
   </ItemGroup>
 
   <PropertyGroup>
