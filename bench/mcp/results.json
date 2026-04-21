@@ -2,14 +2,14 @@
   {
     "taskId": "01-fix-closing-tag",
     "category": "parser-fix",
-    "status": "fail",
+    "status": "pass",
     "reason": null,
-    "medianRoundTrips": 4,
+    "medianRoundTrips": 2,
     "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 30,
-    "medianTimeMs": 0.5665,
-    "successRate": 0,
-    "matchesExpected": false,
+    "medianDiagnosticsAfter": 0,
+    "medianTimeMs": 3.0197,
+    "successRate": 100,
+    "matchesExpected": true,
     "inputSizeBytes": 166
   },
   {
@@ -20,7 +20,7 @@
     "medianRoundTrips": 2,
     "medianDiagnosticsBefore": 1,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 5.5638,
+    "medianTimeMs": 5.4105,
     "successRate": 100,
     "matchesExpected": false,
     "inputSizeBytes": 151
@@ -33,7 +33,7 @@
     "medianRoundTrips": 1,
     "medianDiagnosticsBefore": 0,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.3519,
+    "medianTimeMs": 2.3379,
     "successRate": 100,
     "matchesExpected": false,
     "inputSizeBytes": 202
@@ -46,7 +46,7 @@
     "medianRoundTrips": 1,
     "medianDiagnosticsBefore": 0,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.3521,
+    "medianTimeMs": 2.4364,
     "successRate": 100,
     "matchesExpected": false,
     "inputSizeBytes": 272
@@ -54,15 +54,15 @@
   {
     "taskId": "05-fix-multiple-errors",
     "category": "multi-fix",
-    "status": "fail",
+    "status": "pass",
     "reason": null,
-    "medianRoundTrips": 4,
+    "medianRoundTrips": 3,
     "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 52,
-    "medianTimeMs": 0.9098,
-    "successRate": 0,
+    "medianDiagnosticsAfter": 0,
+    "medianTimeMs": 5.0978,
+    "successRate": 100,
     "matchesExpected": false,
-    "inputSizeBytes": 515
+    "inputSizeBytes": 312
   },
   {
     "taskId": "06-add-effect-to-function",
@@ -72,10 +72,10 @@
     "medianRoundTrips": 2,
     "medianDiagnosticsBefore": 1,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 4.7311,
+    "medianTimeMs": 4.983,
     "successRate": 100,
     "matchesExpected": false,
-    "inputSizeBytes": 354
+    "inputSizeBytes": 375
   },
   {
     "taskId": "07-greenfield-simple-function",
@@ -137,10 +137,10 @@
     "medianRoundTrips": 2,
     "medianDiagnosticsBefore": 1,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 4.8032,
+    "medianTimeMs": 5.0117,
     "successRate": 100,
-    "matchesExpected": true,
-    "inputSizeBytes": 431
+    "matchesExpected": false,
+    "inputSizeBytes": 454
   },
   {
     "taskId": "12-fix-mismatched-closing-tag",
@@ -150,7 +150,7 @@
     "medianRoundTrips": 2,
     "medianDiagnosticsBefore": 2,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.5638,
+    "medianTimeMs": 2.9345,
     "successRate": 100,
     "matchesExpected": true,
     "inputSizeBytes": 340
@@ -171,41 +171,41 @@
   {
     "taskId": "14-fix-test-ids-in-production",
     "category": "id-fix",
-    "status": "fail",
+    "status": "pass",
     "reason": null,
-    "medianRoundTrips": 2,
-    "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 1,
-    "medianTimeMs": 4.7598,
-    "successRate": 0,
+    "medianRoundTrips": 1,
+    "medianDiagnosticsBefore": 0,
+    "medianDiagnosticsAfter": 0,
+    "medianTimeMs": 2.5117,
+    "successRate": 100,
     "matchesExpected": false,
-    "inputSizeBytes": 665
+    "inputSizeBytes": 371
   },
   {
     "taskId": "15-nontarget-read-module",
     "category": "comprehension",
-    "status": "fail",
+    "status": "pass",
     "reason": null,
-    "medianRoundTrips": 2,
-    "medianDiagnosticsBefore": 3,
-    "medianDiagnosticsAfter": 3,
-    "medianTimeMs": 5.3454,
-    "successRate": 0,
+    "medianRoundTrips": 1,
+    "medianDiagnosticsBefore": 0,
+    "medianDiagnosticsAfter": 0,
+    "medianTimeMs": 2.6746,
+    "successRate": 100,
     "matchesExpected": false,
-    "inputSizeBytes": 1055
+    "inputSizeBytes": 733
   },
   {
     "taskId": "16-nontarget-refactor-rename",
     "category": "refactor",
-    "status": "fail",
+    "status": "pass",
     "reason": null,
     "medianRoundTrips": 1,
-    "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 1,
-    "medianTimeMs": 0.2378,
-    "successRate": 0,
+    "medianDiagnosticsBefore": 0,
+    "medianDiagnosticsAfter": 0,
+    "medianTimeMs": 2.5692,
+    "successRate": 100,
     "matchesExpected": false,
-    "inputSizeBytes": 745
+    "inputSizeBytes": 457
   },
   {
     "taskId": "17-fix-missing-return",
@@ -215,7 +215,7 @@
     "medianRoundTrips": 1,
     "medianDiagnosticsBefore": 0,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.1342,
+    "medianTimeMs": 2.3136,
     "successRate": 100,
     "matchesExpected": false,
     "inputSizeBytes": 116
@@ -228,7 +228,7 @@
     "medianRoundTrips": 2,
     "medianDiagnosticsBefore": 1,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 4.5902,
+    "medianTimeMs": 4.6137,
     "successRate": 100,
     "matchesExpected": false,
     "inputSizeBytes": 150
@@ -254,7 +254,7 @@
     "medianRoundTrips": 1,
     "medianDiagnosticsBefore": 1,
     "medianDiagnosticsAfter": 1,
-    "medianTimeMs": 0.0759,
+    "medianTimeMs": 0.0646,
     "successRate": 0,
     "matchesExpected": false,
     "inputSizeBytes": 138

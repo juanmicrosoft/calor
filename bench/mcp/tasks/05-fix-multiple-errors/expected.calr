@@ -4,22 +4,16 @@
   §I{str:message}
   §O{void}
   §E{cw}
-  §B{timestamp} §C{DateTime.Now.ToString} §A "yyyy-MM-dd HH:mm:ss" §/C
-  §B{formatted} (+ (+ "[" timestamp) (+ "] " message))
-  §C{Console.WriteLine}
-    §A formatted
-  §/C
-  §IF{if01} (> message.Length INT:100)
-    §C{Console.WriteLine}
-      §A "  [WARN] Long message truncated in display"
-    §/C
+  §C{Console.WriteLine} §A message §/C
+  §IF{if01} (== INT:1 INT:1)
+    §C{Console.WriteLine} §A STR:"Extra log" §/C
   §/I{if01}
 §/F{f001}
 
 §F{f002:FormatError:pub}
   §I{str:error}
   §O{str}
-  §R (+ "ERROR: " error)
+  §R (+ STR:"ERROR: " error)
 §/F{f002}
 
 §/M{m001}

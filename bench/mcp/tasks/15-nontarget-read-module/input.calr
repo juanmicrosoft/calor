@@ -5,34 +5,23 @@
   §I{str:subject}
   §I{str:body}
   §O{bool}
-  §E{cw,net:w}
-  §Q (!= to "")
-  §Q (!= subject "")
-  §C{Console.WriteLine}
-    §A (+ "Sending email to: " to)
-  §/C
-  §B{result} §C{SmtpClient.Send}
-    §A to
-    §A subject
-    §A body
-  §/C
-  §R result
+  §E{cw,net:rw}
+  §Q (!= to STR:"")
+  §Q (!= subject STR:"")
+  §C{Console.WriteLine} §A (+ STR:"Sending email to: " to) §/C
+  §C{HttpClient.PostAsync} §A to §A body §/C
+  §R BOOL:true
 §/F{f001}
 
 §F{f002:SendSms:pub}
   §I{str:phoneNumber}
   §I{str:message}
   §O{bool}
-  §E{cw,net:w}
-  §Q (!= phoneNumber "")
-  §C{Console.WriteLine}
-    §A (+ "Sending SMS to: " phoneNumber)
-  §/C
-  §B{result} §C{SmsGateway.Send}
-    §A phoneNumber
-    §A message
-  §/C
-  §R result
+  §E{cw,net:rw}
+  §Q (!= phoneNumber STR:"")
+  §C{Console.WriteLine} §A (+ STR:"Sending SMS to: " phoneNumber) §/C
+  §C{HttpClient.PostAsync} §A phoneNumber §A message §/C
+  §R BOOL:true
 §/F{f002}
 
 §F{f003:LogNotification:pub}
@@ -41,15 +30,7 @@
   §I{bool:success}
   §O{void}
   §E{db:w}
-  §B{entry} §NEW{NotificationLog}
-  §ASSIGN entry.Type type
-  §ASSIGN entry.Recipient recipient
-  §ASSIGN entry.Success success
-  §ASSIGN entry.Timestamp §C{DateTime.UtcNow} §/C
-  §C{_dbContext.NotificationLogs.Add}
-    §A entry
-  §/C
-  §C{_dbContext.SaveChanges} §/C
+  §C{DbContext.SaveChanges} §/C
 §/F{f003}
 
 §/M{m001}

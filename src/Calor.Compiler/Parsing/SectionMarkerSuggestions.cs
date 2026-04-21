@@ -181,6 +181,7 @@ public static class SectionMarkerSuggestions
         ["VARIANT"] = "V",
         ["USING"] = "U",
         // Closing tags
+        ["/IF"] = "/I",     // Most common mistake: §/IF instead of §/I for closing if-blocks
         ["/FUNC"] = "/F",
         ["/FUNCTION"] = "/F",
         ["/MOD"] = "/M",
