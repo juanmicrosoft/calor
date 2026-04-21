@@ -1,4 +1,5 @@
 <!-- BEGIN CalorC SECTION - DO NOT EDIT -->
+<!-- calor-template-version: 1 -->
 ## Calor-First Project
 
 This is an **Calor-first project**. All new code MUST be written in Calor. Existing C# files should be converted to Calor before modification.
