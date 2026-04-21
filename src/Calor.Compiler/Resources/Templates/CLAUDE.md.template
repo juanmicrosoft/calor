@@ -5,12 +5,9 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 
 ### MANDATORY Rules for AI Agents
 
-**Rule 0: Read the primer and look up syntax before writing Calor**
-- At session start, read the `calor://primer` MCP resource for canonical Calor examples
-- Before writing ANY `.calr` code, use `calor_help` MCP tool for syntax guidance
-- Look up effect codes via `calor://effects` resource before writing `§E{...}` declarations
-- Look up ID prefixes via `calor://id-prefixes` resource before creating IDs
-- Applies to: new files, conversions, and edits to existing .calr files
+**Rule 0: Read the primer before writing Calor**
+- At session start, read `calor://primer` MCP resource for canonical Calor examples
+- Use `calor_help` MCP tool for syntax guidance when needed
 
 **Rule 1: Never create new `.cs` files**
 - All new code MUST be written in Calor (`.calr` files)
@@ -27,21 +24,23 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 - Files ending in `.g.cs` are auto-generated from Calor - do not edit them
 - If you need to change generated output, edit the source `.calr` file instead
 
-**Rule 4: Compile with autoFix after writing**
-- After writing or editing ANY `.calr` file, use `calor_compile` with `autoFix: true`
-- This auto-fixes parser errors, ID issues, and missing/wrong effect declarations in up to 3 passes
-- If errors remain after autoFix, read the diagnostics — each includes a `fix` field with concrete edits
-- Apply the fix edits directly instead of re-reasoning about the error
+**Rule 4: Compile after writing**
+- After writing or editing ANY `.calr` file, use `calor_compile` (autoFix is on by default)
+- If errors remain, diagnostics with a `fix` field contain concrete edits — apply them directly
+- Diagnostics without a `fix` field require reasoning about the error message
 
 ### Workflow for Any Code Change
 
-1. **Session start** → Read `calor://primer` resource for syntax examples
-2. **Before writing effects** → Read `calor://effects` resource for valid effect codes
-3. **New feature/file?** → Create `.calr` file, use `calor_help` for syntax
-4. **Modify existing `.calr` file?** → Edit directly
-5. **Modify existing `.cs` file?** → Convert to `.calr` first using `calor_convert`
-6. **After any .calr change** → `calor_compile` with `autoFix: true` — fixes most errors automatically
-7. **If errors remain** → Apply the `fix.edits` from each diagnostic directly
+1. **Session start** → Read `calor://primer` for syntax examples
+2. **New feature/file?** → Create `.calr` file
+3. **Modify existing `.cs` file?** → Convert to `.calr` first using `calor_convert`
+4. **After any .calr change** → `calor_compile` (auto-fixes most errors)
+5. **If errors remain** → Apply `fix` edits from diagnostics, or reason about the message
+
+**On-demand resources** (read when needed, not at session start):
+- `calor://effects` — before writing `§E{...}` declarations
+- `calor://tags` — when unsure about opening/closing tag forms
+- `calor://id-prefixes` — when creating new IDs
 
 ### Pre-PR Agent Testing
 
@@ -61,7 +60,7 @@ All tasks must pass (2/3 runs succeed). If tests fail, investigate before procee
 #### Available MCP Tools
 
 **Compilation & Verification:**
-- `calor_compile` - Compile Calor files to C# (use `autoFix: true` to auto-fix parser, ID, and effect errors)
+- `calor_compile` - Compile Calor files to C# (autoFix on by default)
 - `calor_verify` - Verify contracts and correctness
 - `calor_verify_contracts` - Verify function contracts
 
@@ -96,13 +95,18 @@ All tasks must pass (2/3 runs succeed). If tests fail, investigate before procee
 **Testing:**
 - `calor_self_test` - Run Calor self-test suite
 
-#### MCP Resources (read at session start)
+#### MCP Resources
 
+**Read at session start:**
 - `calor://primer` - Canonical Calor examples (module, function, effects, contracts, class, IDs)
-- `calor://effects` - All valid effect codes with descriptions (read before writing §E{...})
-- `calor://tags` - Section tag grammar with opening/closing forms (§/I not §/IF for if-blocks)
-- `calor://id-prefixes` - ULID ID prefixes for each declaration kind
-- `calor://workflows` - Step-by-step decision trees for common tasks
+
+**Read on demand:**
+- `calor://effects` - Valid effect codes (before writing `§E{...}`)
+- `calor://tags` - Section tag opening/closing forms (before creating blocks)
+- `calor://id-prefixes` - ULID prefixes (before creating IDs)
+- `calor://workflows` - Decision trees for common tasks
+
+**Reference (use `calor_help` instead for quick lookups):**
 - `calor://syntax-reference` - Complete syntax documentation
 - `calor://error-catalog` - All diagnostic codes with fix patterns
 

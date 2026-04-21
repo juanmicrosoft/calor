@@ -17,10 +17,10 @@ public sealed class CompileTool : McpToolBase
     public override int TimeoutSeconds => 120;
 
     public override string Description =>
-        "Compile Calor source code to C#. Use autoFix: true to auto-fix parser, ID, and effect errors (up to 3 passes). " +
-        "Each diagnostic includes a fix field with concrete edits. " +
-        "Typically the first tool called after writing .calr code. Follow with calor_verify for contract checking.";
+        "Compile Calor source code to C#. Auto-fixes parser, ID, and effect errors by default. Follow with calor_verify for contracts.";
 
+    // ReadOnlyHint: true — no disk writes (autoFix returns fixed source in response, doesn't write).
+    // IdempotentHint: true — same input produces same output (autoFix is deterministic).
     public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
 
 
@@ -72,8 +72,8 @@ public sealed class CompileTool : McpToolBase
                         },
                         "autoFix": {
                             "type": "boolean",
-                            "default": false,
-                            "description": "Auto-fix high-confidence errors (parser, ID, effects). Compile → apply fixes → recompile, up to 3 passes. Returns fixed source and fix history."
+                            "default": true,
+                            "description": "Auto-fix high-confidence errors (parser, ID, effects). Set to false to skip auto-fix."
                         }
                     }
                 },
@@ -158,7 +158,7 @@ public sealed class CompileTool : McpToolBase
 
         var verify = GetBool(options, "verify");
         var analyze = GetBool(options, "analyze");
-        var autoFix = GetBool(options, "autoFix");
+        var autoFix = GetBool(options, "autoFix", defaultValue: true);
         var contractModeStr = GetString(options, "contractMode") ?? "debug";
         var effectModeStr = GetString(options, "effectMode") ?? "default";
 
