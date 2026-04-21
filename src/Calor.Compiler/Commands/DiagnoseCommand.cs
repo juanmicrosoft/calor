@@ -12,6 +12,7 @@ namespace Calor.Compiler.Commands;
 /// CLI command for outputting machine-readable diagnostics.
 /// This enables automated fix application by AI agents and tools.
 /// </summary>
+// TODO(v0.6.0): Remove this command — deprecated in PR #609. Use calor_compile MCP tool with autoFix instead.
 public static class DiagnoseCommand
 {
     public static Command Create()
