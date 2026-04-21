@@ -1,0 +1,10 @@
+{
+  "id": "06-add-effect-to-function",
+  "category": "effect-fix",
+  "description": "Function has §E{db:w} but also calls ILogger.LogInformation (needs cw added)",
+  "targetPhase": "phase1",
+  "input": "input.calr",
+  "expected": "expected.calr",
+  "expectedDiagnostics": ["Calor0400"],
+  "successCriteria": "Compiles without errors after adding cw to effect declaration"
+}

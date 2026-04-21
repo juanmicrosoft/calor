@@ -1,0 +1,50 @@
+§M{m001:UserCrud}
+
+§F{f001:CreateUser:pub}
+  §I{str:name}
+  §I{str:email}
+  §O{bool}
+  §E{db:w}
+  §B{user} §NEW{User}
+  §ASSIGN user.Name name
+  §ASSIGN user.Email email
+  §C{_dbContext.Users.Add}
+    §A user
+  §/C
+  §B{result} §C{_dbContext.SaveChanges} §/C
+  §R (> result INT:0)
+§/F{f001}
+
+§F{f002:GetUser:pub}
+  §I{i32:userId}
+  §O{User}
+  §E{db:r}
+  §R §C{_dbContext.Users.Find} §A userId §/C
+§/F{f002}
+
+§F{f003:UpdateUser:pub}
+  §I{i32:userId}
+  §I{str:name}
+  §I{str:email}
+  §O{bool}
+  §E{db:w}
+  §B{~user} §C{_dbContext.Users.Find} §A userId §/C
+  §ASSIGN user.Name name
+  §ASSIGN user.Email email
+  §B{result} §C{_dbContext.SaveChanges} §/C
+  §R (> result INT:0)
+§/F{f003}
+
+§F{f004:DeleteUser:pub}
+  §I{i32:userId}
+  §O{bool}
+  §E{db:w}
+  §B{user} §C{_dbContext.Users.Find} §A userId §/C
+  §C{_dbContext.Users.Remove}
+    §A user
+  §/C
+  §B{result} §C{_dbContext.SaveChanges} §/C
+  §R (> result INT:0)
+§/F{f004}
+
+§/M{m001}

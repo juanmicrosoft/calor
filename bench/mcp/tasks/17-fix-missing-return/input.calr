@@ -1,0 +1,9 @@
+§M{m001:Math}
+
+§F{f001:Double:pub}
+  §I{i32:x}
+  §O{i32}
+  §B{result:i32} (* x INT:2)
+§/F{f001}
+
+§/M{m001}

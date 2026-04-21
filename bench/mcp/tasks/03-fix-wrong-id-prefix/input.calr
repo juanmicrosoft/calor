@@ -1,0 +1,17 @@
+§M{m001:MathUtils}
+
+§F{m001:Add:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (+ a b)
+§/F{m001}
+
+§F{m002:Multiply:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §O{i32}
+  §R (* a b)
+§/F{m002}
+
+§/M{m001}

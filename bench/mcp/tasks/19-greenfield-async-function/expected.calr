@@ -1,0 +1,12 @@
+§M{m001:HttpService}
+
+§AF{f001:FetchData:pub}
+  §I{str:url}
+  §O{str}
+  §E{net:r,cw}
+  §C{HttpClient.GetStringAsync} §A url §/C
+  §C{Console.WriteLine} §A STR:"Fetched data" §/C
+  §R STR:""
+§/AF{f001}
+
+§/M{m001}

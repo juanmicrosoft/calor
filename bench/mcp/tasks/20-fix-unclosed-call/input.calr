@@ -1,0 +1,10 @@
+§M{m001:Logger}
+
+§F{f001:Log:pub}
+  §I{str:message}
+  §O{void}
+  §E{cw}
+  §C{Console.WriteLine} §A message
+§/F{f001}
+
+§/M{m001}

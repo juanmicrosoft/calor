@@ -1,0 +1,11 @@
+§M{m001:UserModule}
+
+§CL{c001:UserService:pub}
+  §MT{m001:GetName:pub}
+    §I{User:user}
+    §O{str}
+    §R user.Name
+  §/MT{m001}
+§/CL{c001}
+
+§/M{m001}

@@ -1,0 +1,9 @@
+{
+  "id": "13-greenfield-crud-module",
+  "category": "greenfield",
+  "description": "Write a full CRUD module (Create, Read, Update, Delete) for a User entity with name and email fields",
+  "targetPhase": "phase2",
+  "expected": "expected.calr",
+  "expectedDiagnostics": [],
+  "successCriteria": "Generated Calor compiles and contains four functions (Create, Read, Update, Delete) with correct effect declarations for database operations"
+}

@@ -1,0 +1,30 @@
+§M{m001:PaymentService}
+
+§F{f001:ProcessPayment:pub}
+  §I{str:cardNumber}
+  §I{f64:amount}
+  §O{bool}
+  §E{db:w,cw}
+  §Q (> amount FLOAT:0.0)
+  §C{Console.WriteLine}
+    §A (+ "Processing payment of $" amount)
+  §/C
+  §B{transaction} §NEW{Transaction}
+  §ASSIGN transaction.CardNumber cardNumber
+  §ASSIGN transaction.Amount amount
+  §C{_dbContext.Transactions.Add}
+    §A transaction
+  §/C
+  §B{result} §C{_dbContext.SaveChanges} §/C
+  §R (> result INT:0)
+§/F{f001}
+
+§F{f002:GetBalance:pub}
+  §I{str:accountId}
+  §O{f64}
+  §E{db:r}
+  §B{account} §C{_dbContext.Accounts.Find} §A accountId §/C
+  §R account.Balance
+§/F{f002}
+
+§/M{m001}

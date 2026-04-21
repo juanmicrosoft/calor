@@ -1,0 +1,10 @@
+{
+  "id": "09-convert-csharp-simple",
+  "category": "conversion",
+  "description": "Convert a simple C# static class with two pure functions to Calor",
+  "targetPhase": "phase2",
+  "input": "input.cs",
+  "expected": "expected.calr",
+  "expectedDiagnostics": [],
+  "successCriteria": "Generated Calor compiles and faithfully represents the C# source with correct module, function IDs, inputs, outputs, and return expressions"
+}

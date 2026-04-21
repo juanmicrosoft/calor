@@ -1,0 +1,9 @@
+{
+  "id": "08-greenfield-module-with-class",
+  "category": "greenfield",
+  "description": "Write a module with a UserService class having a GetName method that takes a User and returns str",
+  "targetPhase": "phase2",
+  "expected": "expected.calr",
+  "expectedDiagnostics": [],
+  "successCriteria": "Generated Calor compiles and contains a module with a UserService class, constructor, and GetName method"
+}
