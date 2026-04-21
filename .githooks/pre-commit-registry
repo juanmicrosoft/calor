@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: enforces the append-only invariant on
+# docs/experiments/registry.json (same rule as
+# .github/workflows/experiment-registry-tamper-check.yml).
+#
+# This hook is a convenience — it provides fast local feedback. CI is the
+# authoritative enforcement layer. Running `git commit --no-verify` skips this
+# hook but does NOT skip CI, so the commit still fails PR review.
+#
+# Install:
+#   git config core.hooksPath .githooks
+# or:
+#   cp .githooks/pre-commit-registry .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+
+set -e
+
+REGISTRY_PATH="docs/experiments/registry.json"
+
+# Only run if registry.json is staged.
+if ! git diff --cached --name-only | grep -q "^${REGISTRY_PATH}$"; then
+    exit 0
+fi
+
+echo "[pre-commit-registry] Validating append-only invariant on ${REGISTRY_PATH}..."
+
+BASE_FILE="$(mktemp)"
+HEAD_FILE="$(mktemp)"
+trap 'rm -f "$BASE_FILE" "$HEAD_FILE"' EXIT
+
+# Base: HEAD (last committed version).
+git show HEAD:"$REGISTRY_PATH" > "$BASE_FILE" 2>/dev/null || echo '{"entries":[]}' > "$BASE_FILE"
+
+# Head: staged version (about to be committed).
+git show ":$REGISTRY_PATH" > "$HEAD_FILE"
+
+# Invoke the validator. dotnet run is slow; if `calor` is on PATH, use that.
+if command -v calor >/dev/null 2>&1; then
+    calor evaluation registry-validate --base-file "$BASE_FILE" --head-file "$HEAD_FILE"
+else
+    dotnet run --project src/Calor.Compiler -- evaluation registry-validate \
+        --base-file "$BASE_FILE" --head-file "$HEAD_FILE"
+fi

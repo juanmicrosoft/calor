@@ -1,0 +1,45 @@
+name: Experiment Registry Tamper Check
+
+# Enforces the append-only invariant on docs/experiments/registry.json per
+# §5.0f of docs/plans/calor-native-type-system-v2.md. Any PR that modifies
+# an existing entry's fields (or removes an entry) fails this check. Only
+# net-new entries are permitted.
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/experiments/registry.json'
+
+jobs:
+  tamper-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR (with full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Extract base-branch version of registry.json
+        run: |
+          git show origin/${{ github.base_ref }}:docs/experiments/registry.json > /tmp/registry-base.json 2>/dev/null \
+            || echo '{"entries":[]}' > /tmp/registry-base.json
+          echo "Base registry:"
+          cat /tmp/registry-base.json
+
+      - name: Build validator CLI
+        run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release --verbosity quiet
+
+      - name: Validate append-only invariant
+        run: |
+          dotnet run --no-build -c Release --project src/Calor.Compiler -- \
+            evaluation registry-validate \
+            --base-file /tmp/registry-base.json \
+            --head-file docs/experiments/registry.json \
+            --json
