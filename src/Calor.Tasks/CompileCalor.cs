@@ -1,6 +1,7 @@
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Calor.Compiler;
+using Calor.Compiler.Effects;
 
 namespace Calor.Tasks;
 
@@ -170,6 +171,10 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         var success = true;
         var pathComparer = BuildStateCache.GetPathComparer();
         var currentRelativePaths = new HashSet<string>(pathComparer);
+        // Collect per-module effect summaries (from fresh ASTs + cached entries) so the
+        // cross-module pass can always see every module, even when incremental caching
+        // skipped recompilation.
+        var moduleSummaries = new List<(Calor.Compiler.Effects.EffectSummary Summary, string FilePath)>();
         // Track output paths to detect collisions from out-of-project file sanitization
         var outputPaths = new Dictionary<string, string>(pathComparer);
 
@@ -231,6 +236,13 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     var outputItem = new TaskItem(outputPath);
                     outputItem.SetMetadata("SourceFile", inputPath);
                     generatedFiles.Add(outputItem);
+
+                    // Carry forward cached effect summary so cross-module enforcement
+                    // still sees this module on warm builds.
+                    if (cachedEntry.EffectSummary != null)
+                    {
+                        moduleSummaries.Add((cachedEntry.EffectSummary, inputPath));
+                    }
 
                     if (Verbose)
                     {
@@ -333,8 +345,15 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
 
                 File.WriteAllText(outputPath, result.GeneratedCode);
 
-                // Record in new state
-                newState.Files[relativePath] = BuildStateCache.CreateFileEntry(inputPath);
+                // Compute effect summary from the fresh AST and cache it for future warm builds.
+                var fileEntry = BuildStateCache.CreateFileEntry(inputPath);
+                if (result.Ast != null)
+                {
+                    var summary = Calor.Compiler.Effects.EffectSummaryBuilder.Build(result.Ast);
+                    fileEntry.EffectSummary = summary;
+                    moduleSummaries.Add((summary, inputPath));
+                }
+                newState.Files[relativePath] = fileEntry;
 
                 var item = new TaskItem(outputPath);
                 item.SetMetadata("SourceFile", inputPath);
@@ -353,6 +372,77 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 }
 
                 success = false;
+            }
+        }
+
+        // 4d. Cross-module effect enforcement — runs over ALL module summaries (fresh from
+        //     this build + cached from skipped files). Because summaries are persisted in
+        //     the build cache, warm builds get complete cross-module coverage without any
+        //     re-parsing: skipped files contribute their cached summary and freshly-compiled
+        //     files contribute a newly-built one.
+        if (moduleSummaries.Count > 1)
+        {
+            try
+            {
+                Log.LogMessage(MessageImportance.Normal,
+                    "Calor: running cross-module effect enforcement over {0} modules",
+                    moduleSummaries.Count);
+
+                var registry = CrossModuleEffectRegistry.Build(moduleSummaries);
+
+                foreach (var diagnostic in registry.BuildDiagnostics)
+                {
+                    Log.LogWarning(
+                        subcategory: "Calor",
+                        warningCode: diagnostic.Code,
+                        helpKeyword: null,
+                        file: diagnostic.FilePath ?? string.Empty,
+                        lineNumber: diagnostic.Span.Line,
+                        columnNumber: diagnostic.Span.Column,
+                        endLineNumber: 0,
+                        endColumnNumber: 0,
+                        message: diagnostic.Message);
+                }
+
+                var crossPass = new CrossModuleEffectEnforcementPass();
+                var crossDiagnostics = crossPass.Enforce(moduleSummaries, registry);
+
+                foreach (var diagnostic in crossDiagnostics)
+                {
+                    if (diagnostic.IsError)
+                    {
+                        Log.LogError(
+                            subcategory: "Calor",
+                            errorCode: diagnostic.Code,
+                            helpKeyword: null,
+                            file: diagnostic.FilePath ?? string.Empty,
+                            lineNumber: diagnostic.Span.Line,
+                            columnNumber: diagnostic.Span.Column,
+                            endLineNumber: 0,
+                            endColumnNumber: 0,
+                            message: diagnostic.Message);
+                        success = false;
+                    }
+                    else if (diagnostic.IsWarning)
+                    {
+                        Log.LogWarning(
+                            subcategory: "Calor",
+                            warningCode: diagnostic.Code,
+                            helpKeyword: null,
+                            file: diagnostic.FilePath ?? string.Empty,
+                            lineNumber: diagnostic.Span.Line,
+                            columnNumber: diagnostic.Span.Column,
+                            endLineNumber: 0,
+                            endColumnNumber: 0,
+                            message: diagnostic.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning(
+                    "Calor: cross-module effect enforcement skipped due to {0}: {1}",
+                    ex.GetType().Name, ex.Message);
             }
         }
 

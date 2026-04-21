@@ -214,7 +214,7 @@ public sealed class EffectEnforcementPass
         return EffectSet.FromInternal(effects);
     }
 
-    private static EffectKind ParseEffectCategory(string category)
+    internal static EffectKind ParseEffectCategory(string category)
     {
         return category.ToLowerInvariant() switch
         {

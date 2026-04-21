@@ -70,3 +70,6 @@ report.json
 
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json
+
+# Plan drafts and critique archives (working artifacts, not deliverables)
+docs/plans/archive/

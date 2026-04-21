@@ -1,5 +1,6 @@
 using Xunit;
 using Calor.Tasks;
+using Calor.Compiler.Effects;
 
 namespace Calor.Tasks.Tests;
 
@@ -133,7 +134,7 @@ public class BuildStateCacheTests : IDisposable
         var loaded = BuildStateCache.Load(outputDir);
 
         Assert.NotNull(loaded);
-        Assert.Equal("1.0", loaded.FormatVersion);
+        Assert.Equal("2.0", loaded.FormatVersion);
         Assert.Equal("abc123", loaded.CompilerHash);
         Assert.Equal("def456", loaded.OptionsHash);
         Assert.Equal("ghi789", loaded.ManifestHash);
@@ -142,6 +143,121 @@ public class BuildStateCacheTests : IDisposable
         Assert.True(loaded.Files.ContainsKey("src/Foo.calr"));
         Assert.Equal("hash1", loaded.Files["src/Foo.calr"].ContentHash);
         Assert.Equal(4096, loaded.Files["src/Foo.calr"].FileSize);
+    }
+
+    // Verifies the EffectSummary payload survives JSON round-trip intact — guards against
+    // System.Text.Json source-gen failing to discover a nested type after schema changes.
+    [Fact]
+    public void LoadSave_RoundTrip_PreservesEffectSummary()
+    {
+        var outputDir = Path.Combine(_tempDir, "output-summary");
+        Directory.CreateDirectory(outputDir);
+
+        var summary = new EffectSummary
+        {
+            ModuleName = "OrderService",
+            InternalFunctionNames = new List<string> { "SaveOrder", "helperPrivate" },
+            InternalMethodNames = new List<string> { "Apply", "Validate" },
+            PublicFunctions = new List<EffectFunctionSummary>
+            {
+                new()
+                {
+                    Name = "SaveOrder",
+                    ClassName = null,
+                    HasEffectDeclaration = true,
+                    DeclaredEffects = new List<EffectEntry>
+                    {
+                        new() { Kind = "IO", Value = "database_write" },
+                        new() { Kind = "IO", Value = "console_write" }
+                    },
+                    DeclarationLine = 3,
+                    DeclarationColumn = 1
+                }
+            },
+            PublicMethods = new List<EffectFunctionSummary>
+            {
+                new()
+                {
+                    Name = "Apply",
+                    ClassName = "OrderRepo",
+                    HasEffectDeclaration = false,
+                    DeclaredEffects = new List<EffectEntry>(),
+                    DeclarationLine = 12,
+                    DeclarationColumn = 5
+                }
+            },
+            Callers = new List<EffectCallerSummary>
+            {
+                new()
+                {
+                    CallerName = "SaveOrder",
+                    DiagnosticLine = 4,
+                    DiagnosticColumn = 3,
+                    DeclaredEffects = new List<EffectEntry>
+                    {
+                        new() { Kind = "IO", Value = "database_write" }
+                    },
+                    Calls = new List<EffectCallSummary>
+                    {
+                        new() { Target = "DbContext.SaveChanges", IsConstructor = false },
+                        new() { Target = "Logger", IsConstructor = true }
+                    }
+                }
+            }
+        };
+
+        var state = new BuildState
+        {
+            CompilerHash = "ch",
+            OptionsHash = "oh",
+            ManifestHash = "mh",
+            OutputDirectory = "obj/",
+            Files =
+            {
+                ["OrderService.calr"] = new BuildFileEntry
+                {
+                    ContentHash = "chash",
+                    LastModified = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc),
+                    FileSize = 500,
+                    EffectSummary = summary
+                }
+            }
+        };
+
+        BuildStateCache.Save(state, outputDir);
+        var loaded = BuildStateCache.Load(outputDir);
+
+        Assert.NotNull(loaded);
+        var entry = loaded.Files["OrderService.calr"];
+        Assert.NotNull(entry.EffectSummary);
+
+        var s = entry.EffectSummary!;
+        Assert.Equal("OrderService", s.ModuleName);
+        Assert.Equal(new[] { "SaveOrder", "helperPrivate" }, s.InternalFunctionNames);
+        Assert.Equal(new[] { "Apply", "Validate" }, s.InternalMethodNames);
+
+        var pf = Assert.Single(s.PublicFunctions);
+        Assert.Equal("SaveOrder", pf.Name);
+        Assert.Null(pf.ClassName);
+        Assert.True(pf.HasEffectDeclaration);
+        Assert.Equal(2, pf.DeclaredEffects.Count);
+        Assert.Contains(pf.DeclaredEffects, e => e.Kind == "IO" && e.Value == "database_write");
+        Assert.Contains(pf.DeclaredEffects, e => e.Kind == "IO" && e.Value == "console_write");
+        Assert.Equal(3, pf.DeclarationLine);
+
+        var pm = Assert.Single(s.PublicMethods);
+        Assert.Equal("Apply", pm.Name);
+        Assert.Equal("OrderRepo", pm.ClassName);
+        Assert.False(pm.HasEffectDeclaration);
+        Assert.Empty(pm.DeclaredEffects);
+
+        var caller = Assert.Single(s.Callers);
+        Assert.Equal("SaveOrder", caller.CallerName);
+        Assert.Equal(4, caller.DiagnosticLine);
+        Assert.Single(caller.DeclaredEffects);
+        Assert.Equal(2, caller.Calls.Count);
+        Assert.Contains(caller.Calls, c => c.Target == "DbContext.SaveChanges" && !c.IsConstructor);
+        Assert.Contains(caller.Calls, c => c.Target == "Logger" && c.IsConstructor);
     }
 
     // Test 7: Compiler hash invalidation → all recompile

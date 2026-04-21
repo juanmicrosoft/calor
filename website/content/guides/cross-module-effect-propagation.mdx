@@ -1,0 +1,205 @@
+---
+title: "Cross-Module Effect Propagation"
+section: "guides"
+order: 4
+description: "How Calor verifies that effect declarations stay consistent across files in a multi-file project"
+---
+
+
+In a single-file project, Calor's effect system checks that every function's `§E{...}` declaration covers the effects of the calls it makes. In a **multi-file project**, that check has to cross file boundaries: if `b.calr` calls a public function defined in `a.calr`, `b.calr` must declare the effects that `a.calr`'s function declared.
+
+This guide explains how Calor enforces that boundary — and what it means for your project layout, your MSBuild integration, and your build performance.
+
+---
+
+## The Problem
+
+Suppose you split your code across two files:
+
+**`OrderService.calr`**
+
+```
+§M{m001:OrderService}
+
+§F{f001:SaveOrder:pub}
+  §I{Order:order}
+  §O{void}
+  §E{db:w}
+  §C{DbContext.SaveChanges} §/C
+§/F{f001}
+
+§/M{m001}
+```
+
+**`Handler.calr`**
+
+```
+§M{m002:Handler}
+
+§F{f001:HandleRequest:pub}
+  §O{void}
+  §C{SaveOrder} §/C
+§/F{f001}
+
+§/M{m002}
+```
+
+`HandleRequest` calls `SaveOrder` — a function defined in another module — but declares no effects. `SaveOrder` has effect `db:w`, so `HandleRequest` must also declare `db:w`.
+
+Without cross-module enforcement, `HandleRequest` silently gets a free pass because the bare-name call `§C{SaveOrder}` is invisible to the per-file effect pass (it can't see another file's declarations). The effect system is only useful if it works across files.
+
+## What Calor Does
+
+Starting in v0.4.9, Calor runs a **cross-module effect enforcement pass** after per-file compilation. It verifies that each caller's `§E{...}` covers the declared effects of any cross-module Calor functions it calls.
+
+For the example above, the compiler emits:
+
+```
+Calor0410: Function 'HandleRequest' uses effect 'db:w' via cross-module call
+to 'SaveOrder' (in module 'OrderService') but does not declare it.
+```
+
+Fix by adding the effect to the caller:
+
+```
+§F{f001:HandleRequest:pub}
+  §O{void}
+  §E{db:w}                    ← now declared
+  §C{SaveOrder} §/C
+§/F{f001}
+```
+
+### The contract model: declared effects propagate, not inferred ones
+
+The cross-module pass uses each function's **declared** effects (what appears in `§E{...}`), not the effects the per-file pass inferred from its body. This matters because:
+
+- **Declarations are contracts.** Callers rely on them. If you change a function's body but not its declaration, no cross-module caller needs to be re-checked.
+- **Declarations are stable across compilation order.** A→B→C and C→B→A produce identical enforcement results.
+- **Declarations are safer.** A function whose body doesn't currently use `db:w` but whose declaration says `db:w` reserves the right to use it later without breaking callers.
+
+### One hop per boundary
+
+If A calls B, and B calls C, the cross-module pass checks **each boundary independently**:
+- A's `§E{...}` must cover B's declared effects.
+- B's `§E{...}` must cover C's declared effects.
+
+It does **not** transitively require A to cover C's effects directly. Each module's `§E` is its contract — if B declares `db:w`, A only needs to declare `db:w` too, regardless of whether that `db:w` came from B's body or from B's own call to C.
+
+### Violations are always errors
+
+Per-file Permissive mode (`--permissive-effects`) demotes *unknown* external calls from errors to warnings, because there's genuine uncertainty about what an unknown `.NET` call does. Cross-module Calor calls have **no such uncertainty** — the callee's declared effects are known and explicit — so cross-module violations are always reported as errors regardless of the mode.
+
+---
+
+## Bare-name vs. qualified calls
+
+Both forms resolve correctly:
+
+```
+§C{SaveOrder}                   ← bare name — resolved if unambiguous across modules
+§C{OrderService.SaveOrder}      ← module-qualified — always resolves
+§C{OrderRepo.Save}              ← class-qualified — resolves to a class method
+```
+
+**Ambiguous bare names:** If two modules both export a function named `Emit`, a bare `§C{Emit}` call is **not** resolved — the pass skips it because it can't determine which module was meant. Use a qualified name instead.
+
+**Internal calls win:** If your module defines a function `Save` and you call `§C{Save}`, it resolves to your internal function — never to another module's `Save`. If you want to call the other module's version, qualify it: `§C{OtherModule.Save}`.
+
+---
+
+## Undeclared public functions: Calor0417
+
+If a public or internal function lacks `§E{...}` entirely, cross-module callers have nothing to verify against. Rather than silently assuming the function is pure, the compiler emits a **warning**:
+
+```
+Calor0417: Public function 'SaveOrder' in module 'OrderService' has no effect
+declaration. Cross-module callers cannot verify effect safety. Add §E{...} to
+declare effects.
+```
+
+The function is excluded from the cross-module registry, so callers get no cross-module check for it — and no false positives. Add an `§E` declaration (even `§E{}` for a provably pure function) to enable the check.
+
+---
+
+## Incremental builds
+
+On warm builds, the cross-module pass runs using a mix of **fresh summaries** (from files that just recompiled) and **cached summaries** (from files that the incremental cache skipped). This means:
+
+- If you edit a callee's `§E{...}` and its file recompiles, the pass still sees every unchanged caller's call sites (because they're cached) and can still flag new violations.
+- If no file changed, both summaries come from the cache; the pass runs quickly and produces the same result as a cold build.
+- The cache stores each module's: public function effect declarations, internal function/method names, and per-caller call-target listings with diagnostic spans.
+
+The build state cache format was bumped from `1.0` to `2.0` in v0.4.9 — older caches are automatically invalidated on first build after upgrade, which forces a cold recompile so every module contributes a summary to the new cache.
+
+---
+
+## Using the CLI
+
+The `calor` CLI accepts multiple `--input` flags to enable cross-module checking:
+
+```bash
+# Single file — no cross-module pass, same as before
+calor --input a.calr
+
+# Multiple files — cross-module pass runs after per-file compilation
+calor --input OrderService.calr --input Handler.calr
+```
+
+When compiling multiple files, the CLI writes `{input}.g.cs` next to each input. The `--output` flag is only supported for single-file compilation.
+
+---
+
+## MSBuild integration
+
+MSBuild projects using `Calor.Sdk` get cross-module enforcement automatically — no new configuration. The `CompileCalor` task collects every `.calr` file in the project, compiles each one, and runs the cross-module pass over the set. Incremental builds remain fast: only changed files recompile, but cross-module correctness is preserved through the cached summaries.
+
+---
+
+## Generated C# interop
+
+The cross-module effect pass works at the AST level, so it's independent of the generated C#. But the **generated C#** still has to compile — which means your call target must resolve as a C# symbol too.
+
+Two patterns work:
+
+### 1. Using directive + bare name
+
+```
+§M{m002:Handler}
+§U{OrderService}                ← adds `using OrderService;` to generated C#
+
+§F{f001:HandleRequest:pub}
+  §O{void}
+  §E{db:w}
+  §C{SaveOrder} §/C             ← resolves via the using directive
+§/F{f001}
+
+§/M{m002}
+```
+
+### 2. Module-qualified call
+
+```
+§F{f001:HandleRequest:pub}
+  §O{void}
+  §E{db:w}
+  §C{OrderService.SaveOrder} §/C
+§/F{f001}
+```
+
+The cross-module effect pass handles both forms identically. Pick whichever reads better for your project.
+
+---
+
+## Troubleshooting
+
+**"Calor0410 appears on a warm build, but I didn't change the caller."**
+Someone else (or an earlier session) edited the callee's `§E{...}`. The cached summary for the caller still refers to the old call target, and the fresh summary for the callee now declares effects the caller doesn't cover. Fix the caller's `§E{...}` to include the new effects — or revert the callee.
+
+**"Cross-module pass isn't catching a call I expect it to."**
+Check three things:
+1. The callee is `pub` or `int` (private functions aren't exported).
+2. The callee has a `§E{...}` declaration. Without one, it's excluded and a Calor0417 warning is emitted.
+3. The bare name isn't ambiguous across modules — if two modules define the same public function name, use a qualified call.
+
+**"Cache seems stale after upgrading the compiler."**
+Delete the build output directory (typically `obj/Debug/net10.0/calor/`) and rebuild. The compiler hash is included in the global invalidation check, so version upgrades force a cold recompile on the next build.

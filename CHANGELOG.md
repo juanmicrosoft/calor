@@ -9,6 +9,19 @@ All notable changes to this project will be documented in this file.
 - **IL analysis validation benchmark** — `bench/ILAnalysisBench/` measures assembly index construction, full analysis time, and per-call-site resolution results
 - **28 IL analysis tests** covering assembly loading, call graph extraction, async/iterator state machines, virtual dispatch, delegate edges, method identity, soundness guarantees, and end-to-end integration
 - **Cross-assembly IL analysis guide** — New website page documenting when to enable IL analysis, what it finds and doesn't, performance characteristics, and relationship to manifests
+- **Cross-module effect propagation** — Multi-file Calor projects now enforce effect contracts across file boundaries. When a caller invokes a public function defined in another module (bare-name `§C{SaveOrder}` or qualified `§C{OrderService.SaveOrder}`), the caller's `§E{...}` must cover the callee's declared effects. Violations emit `Calor0410` with cross-module context; public functions without `§E` emit the new `Calor0417` warning.
+- **Multi-file CLI** — `calor --input a.calr --input b.calr` compiles multiple files and runs the cross-module pass. Single-file usage is unchanged. `--output` is rejected when multiple inputs are passed (outputs are written alongside each input).
+- **MSBuild cross-module enforcement** — `CompileCalor` task automatically runs the cross-module pass over every `.calr` file in the project. No new configuration required.
+- **Persistent effect summary cache** — Each module's public function declarations, internal name table, and per-caller call-site listings are persisted in the build cache (`BuildState` format bumped to v2.0). Warm builds retain complete cross-module enforcement by combining fresh summaries (recompiled files) with cached summaries (incrementally-skipped files) — no re-parsing needed.
+- **`CrossModuleEffectRegistry`** and **`CrossModuleEffectEnforcementPass`** — New enforcement components with AST-based and summary-based overloads. Declared-effects-as-contract model, one-hop-per-boundary enforcement, registry priority over supplemental manifests.
+- **`ExternalCallCollector.CollectPerFunctionWithBareNames`** — New per-function mode retains bare-name call targets (previously dropped) for cross-module resolution.
+- **34 new cross-module enforcement tests** — 24 unit tests (registry/pass behavior + null-guard + 500-module stress test) + 5 MSBuild integration tests + 3 CLI subprocess tests + 2 cache round-trip/migration tests.
+- **[Cross-Module Effect Propagation guide](/guides/cross-module-effect-propagation/)** — Contract model, bare-name vs. qualified calls, ambiguity handling, warm-build semantics, CLI + MSBuild integration, troubleshooting.
+
+### Changed
+- **`--input` option** in the `calor` CLI now accepts multiple values (`Option<FileInfo[]>` with `ArgumentArity.OneOrMore`).
+- **Build state cache format** bumped from `1.0` to `2.0` — existing caches are automatically invalidated on first build after upgrade.
+- **Options hash includes `EffectKind` enum shape** — any future addition, removal, or rename of an `EffectKind` value automatically invalidates the build cache on the next build. Prevents stale summaries from silently dropping effects that a compiler upgrade re-categorized.
 
 ## [0.4.8] - 2026-04-20
 

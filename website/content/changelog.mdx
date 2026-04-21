@@ -8,6 +8,17 @@ All notable changes to Calor, organized by release.
 
 ---
 
+## Unreleased
+
+### Added
+- **Cross-module effect propagation** — Multi-file Calor projects now verify effect contracts at file boundaries. A caller that invokes a public function declared in another module must declare that callee's effects. Violations produce `Calor0410`; public functions without `§E` produce the new `Calor0417` warning.
+- **Multi-file CLI** — `calor --input a.calr --input b.calr` compiles multiple files and runs the cross-module effect pass across them. Single-file invocations are unchanged.
+- **MSBuild cross-module enforcement** — The `CompileCalor` task runs the cross-module pass over every `.calr` in the project. Works correctly on warm builds via persistent per-module effect summaries in the build cache.
+- **Effect summary cache (schema v2.0)** — Each module's public function declarations, internal names, and call-site listings are cached alongside the content hash, so incremental builds retain complete cross-module coverage without re-parsing skipped files.
+- **[Cross-Module Effect Propagation guide](/guides/cross-module-effect-propagation/)** — Contract model, bare-name vs. qualified calls, incremental build semantics, CLI + MSBuild integration.
+
+---
+
 ## [0.4.8] - 2026-04-20
 
 ### Added
