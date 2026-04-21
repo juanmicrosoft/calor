@@ -63,6 +63,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "harness", "harness", "{4DD2
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpBenchHarness", "bench\mcp\harness\McpBenchHarness.csproj", "{CB4E9997-A1F5-45DB-84CC-A5850F32979A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Calor.Experimental.Tests", "tests\Calor.Experimental.Tests\Calor.Experimental.Tests.csproj", "{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -349,6 +351,18 @@ Global
 		{CB4E9997-A1F5-45DB-84CC-A5850F32979A}.Release|x64.Build.0 = Release|Any CPU
 		{CB4E9997-A1F5-45DB-84CC-A5850F32979A}.Release|x86.ActiveCfg = Release|Any CPU
 		{CB4E9997-A1F5-45DB-84CC-A5850F32979A}.Release|x86.Build.0 = Release|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Debug|x64.Build.0 = Debug|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Debug|x86.Build.0 = Debug|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Release|x64.ActiveCfg = Release|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Release|x64.Build.0 = Release|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Release|x86.ActiveCfg = Release|Any CPU
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -379,5 +393,6 @@ Global
 		{042EB103-766A-E255-5E43-5B4AC7449960} = {760AB15A-8938-8D9B-BEDE-5CE1484B84C3}
 		{4DD2B1E7-8949-04F4-8AA0-8529CA230AA5} = {042EB103-766A-E255-5E43-5B4AC7449960}
 		{CB4E9997-A1F5-45DB-84CC-A5850F32979A} = {4DD2B1E7-8949-04F4-8AA0-8529CA230AA5}
+		{DB22515C-58C0-4D3D-9453-C3D279BFDCE3} = {E5F6A7B8-C9D0-1234-EF01-345678901234}
 	EndGlobalSection
 EndGlobal
