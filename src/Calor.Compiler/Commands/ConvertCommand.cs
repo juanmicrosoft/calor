@@ -225,7 +225,7 @@ public static class ConvertCommand
                     Console.Error.WriteLine($"  {err}");
                 if (validationErrors.Count > 5)
                     Console.Error.WriteLine($"  ... and {validationErrors.Count - 5} more");
-                Console.Error.WriteLine("Output written but may not compile. Use calor diagnose for full report.");
+                Console.Error.WriteLine("Output written but may not compile. Use calor_compile MCP tool with autoFix for validation.");
             }
         }
 
