@@ -38,6 +38,15 @@ How Calor knows the effects of .NET framework and ecosystem library calls. Cover
 - Adding custom manifests for your own types
 - Effect code reference and CLI tools
 
+### [Cross-Assembly IL Analysis](/guides/il-analysis/)
+
+Automatic effect discovery through referenced .NET assemblies. Covers:
+
+- How the compiler traces `SaveChanges → db:w` through your data access layer
+- What it finds (concrete call chains, async, delegates) and what it doesn't (interfaces, reflection)
+- Enabling IL analysis with one MSBuild property
+- Performance, diagnostics, and interaction with manifests
+
 ---
 
 ## Getting Started

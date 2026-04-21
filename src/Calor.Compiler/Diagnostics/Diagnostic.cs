@@ -101,6 +101,9 @@ public static class DiagnosticCode
     public const string UnknownExternalCall = "Calor0411";
     public const string MissingSpecificEffect = "Calor0412";
     public const string AmbiguousStub = "Calor0413";
+    public const string ILResolvedEffect = "Calor0414";
+    public const string ILAnalysisFallback = "Calor0415";
+    public const string ILAnalysisBudgetExhausted = "Calor0416";
 
     // Pattern matching errors (Calor0500-0599)
     public const string NonExhaustiveMatch = "Calor0500";

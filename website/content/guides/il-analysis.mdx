@@ -1,0 +1,169 @@
+---
+title: "Cross-Assembly IL Analysis"
+section: "guides"
+order: 4
+description: "Automatic effect discovery through referenced .NET assemblies"
+---
+
+
+When your Calor code calls a method in a referenced assembly, and that method eventually calls `DbContext.SaveChanges()`, Calor can now trace through the IL of the referenced assembly and discover the `db:w` effect automatically — without you writing a manifest entry for every intermediate method.
+
+---
+
+## The Problem
+
+Effect manifests cover .NET framework types (`DbCommand`, `HttpClient`, `ILogger`), but they don't cover **your** code. If you have a data access layer:
+
+```csharp
+// In your MyApp.DataAccess.dll
+public class UserRepository
+{
+    public void Save(User user)
+    {
+        using var conn = CreateConnection();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "INSERT INTO Users ...";
+        cmd.ExecuteNonQuery(); // This is the actual db:w
+    }
+}
+```
+
+And your Calor code calls it:
+
+```
+§F{f001:CreateUser:pub}
+  §I{str:name}
+  §O{void}
+  §E{db:w}
+  §C{UserRepository.Save} §A name §/C
+§/F{f001}
+```
+
+Without IL analysis, the compiler doesn't know that `UserRepository.Save` has `db:w` — it would flag it as an Unknown external call (Calor0411). You'd need to write a custom manifest for every intermediate method.
+
+With IL analysis, the compiler reads the IL of `UserRepository.Save`, traces the call chain to `DbCommand.ExecuteNonQuery`, finds the `db:w` seed in the built-in manifest, and propagates it back. No custom manifest needed.
+
+## Enabling IL Analysis
+
+Add one property to your project file:
+
+```xml
+<PropertyGroup>
+  <CalorEnableILAnalysis>true</CalorEnableILAnalysis>
+</PropertyGroup>
+```
+
+That's it. The compiler will analyze all referenced assemblies during the next build.
+
+## What It Finds
+
+IL analysis traces through **concrete call chains** — method A calls method B which calls method C which calls a manifest-covered method. It handles:
+
+| Pattern | How it works |
+|---------|-------------|
+| **Direct calls** | `Repo.Save()` → `DbCommand.ExecuteNonQuery()` → `db:w` |
+| **Transitive chains** | `Service.Process()` → `Repo.Save()` → `DbCommand.ExecuteNonQuery()` → `db:w` |
+| **Async methods** | Traces through compiler-generated state machines (`MoveNext()`) |
+| **Iterator methods** | Traces through `yield`-based state machines |
+| **Delegate creation** | `Task.Run(() => repo.Save())` traces through the lambda via `ldftn` |
+| **Virtual dispatch** | Unions effects from concrete implementations (up to 5) |
+| **Deep chains** | Follows up to 50 hops (configurable) |
+| **Mutual recursion** | Fixpoint iteration converges correctly |
+
+### Example: What the compiler sees
+
+For a typical 3-layer architecture:
+
+```
+UserService.CreateUser()     → db:rw, db:w   (propagated)
+  UserRepository.Save()      → db:rw, db:w   (propagated)
+    DbConnection.Open()      → db:rw         (from manifest)
+    DbCommand.ExecuteNonQuery() → db:w       (from manifest)
+  UserRepository.FindById()  → db:r, db:rw   (propagated)
+    DbCommand.ExecuteReader() → db:r          (from manifest)
+MathHelper.Add()             → pure           (no effects found)
+```
+
+## What It Doesn't Find
+
+IL analysis has known limitations. These patterns still require manifests:
+
+| Pattern | Why | Solution |
+|---------|-----|---------|
+| **Interface-heavy calls** (`ILogger.Log`, `IConfiguration.GetSection`) | 0% resolution rate — delegates and BCL internals block the trace | Use built-in Tier B manifests |
+| **Delegate invocations** (`Func<T>.Invoke`) | Runtime-determined target, not visible in IL | Mark as Unknown or cover with manifests |
+| **Reflection** (`MethodInfo.Invoke`, `dynamic`) | Not visible as direct calls in IL | Cover with manifests |
+| **P/Invoke / native calls** | No IL body to analyze | Cover with manifests |
+
+The key insight: IL analysis works well for **your** code (repositories, services, handlers) where the call chain is concrete. For .NET framework types (ILogger, IConfiguration), the built-in manifests already cover them. The two approaches complement each other.
+
+## How It Works
+
+The resolution pipeline, in order:
+
+```
+1. Specific method in manifest
+2. Method name in manifest
+3. Wildcard in manifest
+4. Type default effects in manifest
+5. Namespace defaults in manifest
+6. IL analysis                       ← new
+7. Unknown (Calor0411)
+```
+
+Manifests always win. IL analysis only runs for calls that no manifest covers. If IL analysis can't resolve a method either (e.g., the trace hits a depth limit or too many virtual implementations), it falls through to Unknown — it never reports a method as pure when it's unsure.
+
+### Soundness guarantee
+
+IL analysis uses three-state resolution:
+
+- **Resolved** — complete call graph analyzed, effects are precise
+- **Pure** — complete call graph analyzed, no effects found
+- **Incomplete** — analysis cut short (depth limit, missing body, too many implementations)
+
+Incomplete traces are **never** reported as pure. They fall through to Unknown, and you get the same Calor0411 diagnostic you would without IL analysis.
+
+## Performance
+
+IL analysis is fast because it only runs at build time and caches results:
+
+- **Assembly index construction**: ~2ms for typical projects
+- **Full analysis**: ~3ms for 8 call sites across 2 assemblies
+- **Scaling**: analysis cost is proportional to the number of Unknown external calls, not total file count
+- **Caching**: the analyzer is constructed once per build and reused across all `.calr` files
+
+When `CalorEnableILAnalysis` is `false` (the default), there is zero overhead.
+
+## Interaction with Incremental Builds
+
+When IL analysis is enabled, changes to referenced assemblies (e.g., updating a NuGet package) will trigger recompilation of affected `.calr` files. This is handled by the incremental build cache's options hash — the `EnableILAnalysis` flag is included in the cache invalidation key.
+
+## Diagnostics
+
+| Code | Severity | Meaning |
+|------|----------|---------|
+| Calor0414 | Info (verbose only) | Effect resolved via IL analysis — tells you which assembly the effect was traced through |
+| Calor0415 | Info | IL analysis could not resolve a method — explains why (depth limit, missing body, etc.) |
+| Calor0416 | Warning | IL analysis budget exhausted — too many methods visited, remaining treated as Unknown |
+
+## When to Enable It
+
+**Enable if:**
+- Your project references custom DLLs (data access layers, service libraries) that call effectful .NET methods
+- You're getting many Calor0411 (Unknown external call) warnings for methods in your own assemblies
+- You want to reduce the number of custom manifest entries you need to write
+
+**Don't bother if:**
+- All your external calls are to .NET framework types already covered by manifests
+- Your project is small enough that a few custom manifest entries are easy to maintain
+- Build time is critical and every millisecond matters (though the overhead is <5ms)
+
+## Relationship to Manifests
+
+IL analysis **reduces** the number of manifests you need to write — it doesn't replace them. Think of it as:
+
+- **Manifests**: curated, precise, reviewed. Best for framework types and ecosystem libraries.
+- **IL analysis**: automatic, best-effort. Best for your own code and concrete call chains.
+
+The two work together. Manifests provide the "seeds" (e.g., `DbCommand.ExecuteNonQuery → db:w`), and IL analysis propagates those seeds backward through your code's call graph.

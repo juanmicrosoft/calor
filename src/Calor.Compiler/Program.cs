@@ -477,10 +477,12 @@ public class Program
         if (options.EnforceEffects)
         {
             phaseSw.Restart();
+            // Use shared resolver from CompilationContext if available (IL analysis enabled, task-level caching)
+            var sharedResolver = options.Context?.SharedEffectResolver;
             var enforcementPass = new EffectEnforcementPass(
                 diagnostics,
                 options.UnknownCallPolicy,
-                resolver: null,
+                resolver: sharedResolver,
                 strictEffects: options.StrictEffects,
                 projectDirectory: options.ProjectDirectory);
             enforcementPass.Enforce(ast);
@@ -805,6 +807,24 @@ public sealed class CompilationOptions
     /// Project directory for loading .calor-effects.json manifests.
     /// </summary>
     public string? ProjectDirectory { get; init; }
+
+    /// <summary>
+    /// Enable compile-time IL analysis of referenced assemblies to resolve
+    /// effects for methods not covered by manifests. Default: false (opt-in).
+    /// </summary>
+    public bool EnableILAnalysis { get; init; }
+
+    /// <summary>
+    /// Paths to referenced assemblies for cross-assembly IL analysis.
+    /// Populated from MSBuild @(ReferencePath) items.
+    /// </summary>
+    public IReadOnlyList<string>? ReferencedAssemblyPaths { get; init; }
+
+    /// <summary>
+    /// Shared compilation context for reusing expensive state across file compilations.
+    /// Holds the shared EffectResolver with IL analyzer attached.
+    /// </summary>
+    public CompilationContext? Context { get; init; }
 
     /// <summary>
     /// Enable static contract verification with Z3 SMT solver.

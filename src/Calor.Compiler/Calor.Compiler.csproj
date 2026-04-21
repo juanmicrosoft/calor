@@ -3,6 +3,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Calor.Compiler.Tests" />
     <InternalsVisibleTo Include="Calor.Enforcement.Tests" />
+    <InternalsVisibleTo Include="Calor.ILAnalysis.Tests" />
   </ItemGroup>
 
   <PropertyGroup>
