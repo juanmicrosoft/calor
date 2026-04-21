@@ -18,6 +18,8 @@ public class ClaudeInitializer : IAiInitializer
     };
     private const string SectionStart = "<!-- BEGIN CalorC SECTION - DO NOT EDIT -->";
     private const string SectionEnd = "<!-- END CalorC SECTION -->";
+    private const int TemplateVersion = 1;
+    private const string VersionPrefix = "<!-- calor-template-version: ";
 
     /// <summary>
     /// Atomically writes content to a file by writing to a temp file in the same
@@ -138,8 +140,7 @@ public class ClaudeInitializer : IAiInitializer
     {
         if (!File.Exists(path))
         {
-            // No file exists - create with just the Calor section
-            await File.WriteAllTextAsync(path, calorSection);
+            await AtomicWriteAsync(path, calorSection);
             return ClaudeMdUpdateResult.Created;
         }
 
@@ -147,29 +148,60 @@ public class ClaudeInitializer : IAiInitializer
         var startIdx = existingContent.IndexOf(SectionStart, StringComparison.Ordinal);
         var endIdx = existingContent.IndexOf(SectionEnd, StringComparison.Ordinal);
 
+        // Check existing template version for staleness reporting
+        if (startIdx >= 0 && endIdx > startIdx)
+        {
+            var existingSection = existingContent[startIdx..(endIdx + SectionEnd.Length)];
+            var existingVersion = ParseTemplateVersion(existingSection);
+
+            if (existingVersion > 0 && existingVersion < TemplateVersion)
+            {
+                Console.WriteLine($"  Updating agent instructions (v{existingVersion} → v{TemplateVersion})");
+            }
+        }
+
         string newContent;
         if (startIdx >= 0 && endIdx > startIdx)
         {
-            // Replace existing section
             var before = existingContent[..startIdx];
             var after = existingContent[(endIdx + SectionEnd.Length)..];
             newContent = before + calorSection + after;
         }
         else
         {
-            // Append section at the end
             newContent = existingContent.TrimEnd() + "\n\n" + calorSection + "\n";
         }
 
-        // Normalize trailing whitespace for comparison
         if (newContent.TrimEnd() == existingContent.TrimEnd())
         {
             return ClaudeMdUpdateResult.Unchanged;
         }
 
-        await File.WriteAllTextAsync(path, newContent);
+        await AtomicWriteAsync(path, newContent);
         return ClaudeMdUpdateResult.Updated;
     }
+
+    /// <summary>
+    /// Parses the template version from a managed section.
+    /// Returns 0 if no version marker is found.
+    /// </summary>
+    internal static int ParseTemplateVersion(string section)
+    {
+        var idx = section.IndexOf(VersionPrefix, StringComparison.Ordinal);
+        if (idx < 0) return 0;
+
+        var start = idx + VersionPrefix.Length;
+        var end = section.IndexOf("-->", start, StringComparison.Ordinal);
+        if (end < 0) return 0;
+
+        var versionStr = section[start..end].Trim();
+        return int.TryParse(versionStr, out var version) ? version : 0;
+    }
+
+    /// <summary>
+    /// Current template version. Bump when template changes affect agent behavior.
+    /// </summary>
+    internal static int CurrentTemplateVersion => TemplateVersion;
 
     private enum HookSettingsResult
     {

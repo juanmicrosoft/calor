@@ -73,3 +73,6 @@ report.json
 
 # Plan drafts and critique archives (working artifacts, not deliverables)
 docs/plans/archive/
+
+# Calor template backup files
+CLAUDE.md.bak
