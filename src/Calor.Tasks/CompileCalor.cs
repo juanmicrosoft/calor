@@ -65,6 +65,13 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     /// </summary>
     public string DepsFilePath { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Semicolon- or comma-separated list of experimental feature flag names to enable.
+    /// Plumbed through to <see cref="Calor.Compiler.CompilationOptions.ExperimentalFlags"/>.
+    /// Unknown flags are accepted silently — see <see cref="Calor.Compiler.ExperimentalFlags"/>.
+    /// </summary>
+    public string ExperimentalFlags { get; set; } = string.Empty;
+
     public override bool Execute()
     {
         if (SourceFiles.Length == 0)
@@ -283,7 +290,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     Verbose = Verbose,
                     ProjectDirectory = ProjectDirectory,
                     Context = compilationContext,
-                    EnableILAnalysis = EnableILAnalysis
+                    EnableILAnalysis = EnableILAnalysis,
+                    ExperimentalFlags = Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags)
                 };
                 var result = Program.Compile(source, inputPath, compileOptions);
 

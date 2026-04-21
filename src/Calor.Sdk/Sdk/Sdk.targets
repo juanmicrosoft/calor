@@ -46,7 +46,8 @@
         ReferencedAssemblies="@(ReferencePath)"
         RuntimeDirectory="$(_CalorRuntimeDir)"
         NuGetPackageRoot="$(NuGetPackageRoot)"
-        DepsFilePath="$(ProjectDepsFilePath)">
+        DepsFilePath="$(ProjectDepsFilePath)"
+        ExperimentalFlags="$(CalorExperimentalFlags)">
       <Output TaskParameter="GeneratedFiles" ItemName="CalorGeneratedFiles" />
     </CompileCalor>
 
