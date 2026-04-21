@@ -43,43 +43,38 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 - `.g.cs` - Generated C# files (never edit)
 - `.cs` - Legacy C# files (**convert to Calor before modifying**)
 
-#### Available MCP Tools
+#### Available MCP Tools (15 tools)
 
 **Compilation & Verification:**
-- `calor_compile` - Compile Calor files to C#
-- `calor_verify` - Verify contracts and correctness
-- `calor_verify_contracts` - Verify function contracts
+- `calor_compile` - Compile Calor to C# (autoFix on by default)
+- `calor_verify` - Verify contracts with Z3 SMT solver
+- `calor_check` - Diagnostics, lint, typecheck, or snippet validation (use action: "diagnose", "lint", "typecheck", "validate")
 
-**Analysis & Security:**
-- `calor_analyze` - Analyze files for migration potential
-- `calor_assess` - Assess code quality and security
+**Analysis:**
+- `calor_analyze` - Security/bug patterns, migration assessment, or interop minimization
 
 **Code Transformation:**
-- `calor_convert` - Convert between C# and Calor
-- `calor_format` - Format Calor source files
-- `calor_lint` - Lint Calor source files
+- `calor_convert` - Convert C# to Calor
+- `calor_format` - Format Calor source code or manage IDs (action: "format" or "ids")
+- `calor_fix` - Auto-fix compilation errors and ID conflicts
+- `calor_migrate` - Full C# → Calor migration pipeline (assess + convert + compile + fix)
 
-**Diagnostics & Validation:**
-- `calor_diagnose` - Validate syntax and show all errors at once
-- `calor_typecheck` - Type-check Calor source files
-- `calor_validate_snippet` - Validate a Calor code snippet inline
-- `calor_compile_check_compat` - Check compilation compatibility
+**Batch Operations:**
+- `calor_batch` - Batch compile/convert multiple files or a project directory
+
+**Navigation:**
+- `calor_navigate` - Go to definition, find references, search symbols (action: "definition", "references", "find", "symbol", "scope")
+- `calor_structure` - Document outline, call graph, or change impact analysis
 
 **Syntax & Documentation:**
-- `calor_help` - Get help with Calor syntax, feature support, error explanations, or working examples
+- `calor_help` - Syntax reference, feature support, error explanations, working examples
 
-**Navigation (LSP-style):**
-- `calor_goto_definition` - Go to symbol definition
-- `calor_find_references` - Find all references to a symbol
-- `calor_symbol_info` - Get information about a symbol
-- `calor_document_outline` - Get document outline/structure
-- `calor_find_symbol` - Find symbols by name
-
-**ID Management:**
-- `calor_ids` - Manage Calor block IDs
+**Preview & Refinement:**
+- `calor_edit_preview` - Preview edit effects before committing
+- `calor_refine` - Refinement type analysis (obligations, bounds checking)
 
 **Testing:**
-- `calor_self_test` - Run Calor self-test suite
+- `calor_self_test` - Run compiler self-test suite
 
 #### Key Commands
 ```bash
