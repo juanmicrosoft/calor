@@ -5,11 +5,8 @@
   §I{str:value}
   §O{bool}
   §E{db:w}
-  §C{_dbContext.Records.Add}
-    §A §NEW{Record} key value
-  §/C
-  §B{result} §C{_dbContext.SaveChanges} §/C
-  §R (> result INT:0)
+  §C{DbContext.SaveChanges} §/C
+  §R BOOL:true
 §/F{f001}
 
 §F{f002:CreateUser:pub}
@@ -17,16 +14,9 @@
   §I{str:email}
   §O{bool}
   §E{cw,db:w}
-  §C{Console.WriteLine}
-    §A (+ "Creating user: " name)
-  §/C
-  §B{success} §C{WriteRecord}
-    §A "user"
-    §A (+ name (+ ":" email))
-  §/C
-  §C{Console.WriteLine}
-    §A (+ "Result: " success)
-  §/C
+  §C{Console.WriteLine} §A (+ STR:"Creating user: " name) §/C
+  §B{success:bool} §C{WriteRecord} §A STR:"user" §A name §/C
+  §C{Console.WriteLine} §A STR:"Done" §/C
   §R success
 §/F{f002}
 

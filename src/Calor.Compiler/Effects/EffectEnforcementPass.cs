@@ -175,17 +175,19 @@ public sealed class EffectEnforcementPass
             var fixSpan = function.Effects?.Span ?? function.Span;
             var filePath = _diagnostics.CurrentFilePath ?? "unknown";
 
-            // Generate fix: replace existing §E{...} or insert new one
+            // Generate fix: replace existing §E{...} line or insert new one
             SuggestedFix? fix = null;
             if (function.Effects != null)
             {
-                // Replace existing §E{...} with correct effects
+                // Replace the entire §E{...} line to avoid span-length issues
+                // §E{...} always occupies its own line with leading whitespace
+                var effectLine = function.Effects.Span.Line;
                 fix = new SuggestedFix(
                     $"Update effect declaration to §E{{{correctEffectStr}}}",
                     TextEdit.Replace(filePath,
-                        function.Effects.Span.Line, function.Effects.Span.Column,
-                        function.Effects.Span.Line, function.Effects.Span.Column + function.Effects.Span.Length,
-                        $"§E{{{correctEffectStr}}}"));
+                        effectLine, 1,
+                        effectLine + 1, 1,
+                        $"  §E{{{correctEffectStr}}}\n"));
             }
             else
             {
