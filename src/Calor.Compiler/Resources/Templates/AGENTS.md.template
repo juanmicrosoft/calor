@@ -25,10 +25,9 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 - Files ending in `.g.cs` are auto-generated from Calor - do not edit them
 - If you need to change generated output, edit the source `.calr` file instead
 
-**Rule 4: Validate syntax after writing**
-- After writing or editing ANY `.calr` file, run `calor diagnose <file.calr>`
-- Fix any reported errors before proceeding
-- This catches ALL syntax mistakes at once (build only shows first error)
+**Rule 4: Compile after writing**
+- After writing or editing ANY `.calr` file, use `calor_compile` (autoFix is on by default)
+- If errors remain, diagnostics with a `fix` field contain concrete edits — apply them directly
 
 ### Workflow for Any Code Change
 
@@ -36,7 +35,7 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 2. **New feature/file?** → Create `.calr` file
 3. **Modify existing `.calr` file?** → Edit directly
 4. **Modify existing `.cs` file?** → Convert to `.calr` first
-5. **After any .calr change** → Run `calor diagnose` to validate
+5. **After any .calr change** → `calor_compile` (auto-fixes most errors)
 
 ### File Types
 - `.calr` - Calor source files (**use this for all code**)
@@ -79,7 +78,6 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 #### Key Commands
 ```bash
 calor analyze <path>                 # Score files for Calor migration potential
-calor diagnose <file.calr>           # Validate syntax - shows ALL errors at once
 calor --input file.calr -o file.g.cs # Compile Calor to C#
 calor --input file.calr --verify --analyze -v  # Deep analysis (security, bugs, contracts)
 calor convert file.cs                # Convert C# to Calor

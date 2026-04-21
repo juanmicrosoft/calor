@@ -73,6 +73,11 @@ public static class DiagnoseCommand
         bool validateCodegen,
         bool permissiveEffects)
     {
+        // Deprecation notice — print first so it's not buried under diagnostic output
+        Console.Error.WriteLine("Note: 'calor diagnose' is deprecated. Use the calor_compile MCP tool (autoFix is on by default) for automatic error correction.");
+        Console.Error.WriteLine("      Removal planned for v0.6.0.");
+        Console.Error.WriteLine();
+
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("diagnose");
         if (telemetry != null && files.Length > 0)

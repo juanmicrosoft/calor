@@ -108,7 +108,6 @@ All tasks must pass (2/3 runs succeed). If tests fail, investigate before procee
 #### Key Commands
 ```bash
 calor analyze <path>                 # Score files for Calor migration potential
-calor diagnose <file.calr>           # Validate syntax - shows ALL errors at once
 calor --input file.calr -o file.g.cs # Compile Calor to C#
 calor --input file.calr --verify --analyze -v  # Deep analysis (security, bugs, contracts)
 calor convert file.cs                # Convert C# to Calor
