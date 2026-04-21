@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-04-21
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins)
+  - ErrorDetection: 1.83x (Calor wins)
+  - RefactoringStability: 1.52x (Calor wins)
+  - EditPrecision: 1.39x (Calor wins)
+  - Correctness: 1.30x (Calor wins)
+- **Programs Tested**: 207
+
 ### Added
 - **Cross-assembly IL analysis** — Opt-in compile-time analysis that traces method calls through referenced .NET assemblies to discover effects not covered by manifests. Enabled via `<CalorEnableILAnalysis>true</CalorEnableILAnalysis>`. Handles async state machines, iterator methods, delegate creation (`ldftn`), and virtual dispatch. Three-state resolution ensures incomplete traces never report false purity. Benchmark: 2.8ms median for 8 call sites across 2 assemblies, 100% resolution rate on concrete call chains (6 resolved with effects, 2 pure, 0 incomplete). See [Cross-Assembly IL Analysis guide](/guides/il-analysis/).
 - **IL analysis validation benchmark** — `bench/ILAnalysisBench/` measures assembly index construction, full analysis time, and per-call-site resolution results
