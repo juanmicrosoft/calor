@@ -5,24 +5,15 @@
   §I{str:content}
   §O{bool}
   §E{db:w}
-  §B{doc} §NEW{Document}
-  §ASSIGN doc.Key key
-  §ASSIGN doc.Content content
-  §C{_dbContext.Documents.Add}
-    §A doc
-  §/C
-  §B{result} §C{_dbContext.SaveChanges} §/C
-  §R (> result INT:0)
+  §C{DbContext.SaveChanges} §/C
+  §R BOOL:true
 §/F{f001}
 
 §F{f002:Load:pub}
   §I{str:key}
   §O{str}
   §E{db:r}
-  §B{doc} §C{_dbContext.Documents.FirstOrDefault}
-    §A §LAMBDA{d} (== d.Key key)
-  §/C
-  §R doc.Content
+  §R STR:""
 §/F{f002}
 
 §F{f003:SaveAndLog:pub}
@@ -30,13 +21,8 @@
   §I{str:content}
   §O{bool}
   §E{db:w,cw}
-  §B{success} §C{Save}
-    §A key
-    §A content
-  §/C
-  §C{Console.WriteLine}
-    §A (+ "Saved document: " key)
-  §/C
+  §B{success:bool} §C{Save} §A key §A content §/C
+  §C{Console.WriteLine} §A (+ STR:"Saved document: " key) §/C
   §R success
 §/F{f003}
 
