@@ -1,0 +1,33 @@
+§M{m001:DataService}
+
+§F{f001:WriteRecord:pri}
+  §I{str:key}
+  §I{str:value}
+  §O{bool}
+  §E{db:w}
+  §C{_dbContext.Records.Add}
+    §A §NEW{Record} key value
+  §/C
+  §B{result} §C{_dbContext.SaveChanges} §/C
+  §R (> result INT:0)
+§/F{f001}
+
+§F{f002:CreateUser:pub}
+  §I{str:name}
+  §I{str:email}
+  §O{bool}
+  §E{cw,db:w}
+  §C{Console.WriteLine}
+    §A (+ "Creating user: " name)
+  §/C
+  §B{success} §C{WriteRecord}
+    §A "user"
+    §A (+ name (+ ":" email))
+  §/C
+  §C{Console.WriteLine}
+    §A (+ "Result: " success)
+  §/C
+  §R success
+§/F{f002}
+
+§/M{m001}

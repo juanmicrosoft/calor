@@ -1,0 +1,9 @@
+{
+  "id": "20-fix-unclosed-call",
+  "category": "parser-fix",
+  "description": "Method call missing §/C closing tag",
+  "targetPhase": "phase1",
+  "input": "input.calr",
+  "expected": "expected.calr",
+  "successCriteria": "Compiles without errors after adding §/C"
+}

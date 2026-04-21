@@ -1,0 +1,43 @@
+§M{m001:DocumentStore}
+
+§F{f001:Persist:pub}
+  §I{str:key}
+  §I{str:content}
+  §O{bool}
+  §E{db:w}
+  §B{doc} §NEW{Document}
+  §ASSIGN doc.Key key
+  §ASSIGN doc.Content content
+  §C{_dbContext.Documents.Add}
+    §A doc
+  §/C
+  §B{result} §C{_dbContext.SaveChanges} §/C
+  §R (> result INT:0)
+§/F{f001}
+
+§F{f002:Load:pub}
+  §I{str:key}
+  §O{str}
+  §E{db:r}
+  §B{doc} §C{_dbContext.Documents.FirstOrDefault}
+    §A §LAMBDA{d} (== d.Key key)
+  §/C
+  §R doc.Content
+§/F{f002}
+
+§F{f003:PersistAndLog:pub}
+  §I{str:key}
+  §I{str:content}
+  §O{bool}
+  §E{db:w,cw}
+  §B{success} §C{Persist}
+    §A key
+    §A content
+  §/C
+  §C{Console.WriteLine}
+    §A (+ "Saved document: " key)
+  §/C
+  §R success
+§/F{f003}
+
+§/M{m001}

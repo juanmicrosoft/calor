@@ -1,0 +1,30 @@
+§M{m001:UserRepository}
+
+§F{f001:SaveUser:pub}
+  §I{str:name}
+  §I{str:email}
+  §O{bool}
+  §E{db:w}
+  §C{_logger.LogInformation}
+    §A (+ "Saving user: " name)
+  §/C
+  §C{_dbContext.Users.Add}
+    §A §NEW{User} name email
+  §/C
+  §B{result} §C{_dbContext.SaveChanges} §/C
+  §C{_logger.LogInformation}
+    §A "User saved successfully"
+  §/C
+  §R (> result INT:0)
+§/F{f001}
+
+§F{f002:GetUser:pub}
+  §I{str:email}
+  §O{User}
+  §E{db:r}
+  §R §C{_dbContext.Users.FirstOrDefault}
+    §A §LAMBDA{u} (== u.Email email)
+  §/C
+§/F{f002}
+
+§/M{m001}

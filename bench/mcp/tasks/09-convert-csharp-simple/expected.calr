@@ -1,0 +1,15 @@
+§M{m001:TemperatureConverter}
+
+§F{f001:CelsiusToFahrenheit:pub}
+  §I{f64:celsius}
+  §O{f64}
+  §R (+ (/ (* celsius FLOAT:9.0) FLOAT:5.0) FLOAT:32.0)
+§/F{f001}
+
+§F{f002:FahrenheitToCelsius:pub}
+  §I{f64:fahrenheit}
+  §O{f64}
+  §R (/ (* (- fahrenheit FLOAT:32.0) FLOAT:5.0) FLOAT:9.0)
+§/F{f002}
+
+§/M{m001}

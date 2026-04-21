@@ -1,0 +1,8 @@
+{
+  "id": "19-greenfield-async-function",
+  "category": "greenfield",
+  "description": "Write an async function FetchData that takes a str:url, returns str, and has effects net:r,cw",
+  "targetPhase": "phase3",
+  "expected": "expected.calr",
+  "successCriteria": "Generated Calor compiles and has correct async syntax, effects, and IDs"
+}

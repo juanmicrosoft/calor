@@ -1,0 +1,11 @@
+§M{m001:Greeter}
+
+§F{f001:Greet:pub}
+  §I{str:name}
+  §O{void}
+  §C{Console.WriteLine}
+    §A (+ "Hello, " name)
+  §/C
+§/F{f001}
+
+§/M{m001}

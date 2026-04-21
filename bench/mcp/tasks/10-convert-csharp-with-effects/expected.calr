@@ -1,0 +1,30 @@
+§M{m001:OrderService}
+
+§F{f001:PlaceOrder:pub}
+  §I{DbContext:dbContext}
+  §I{str:product}
+  §I{i32:quantity}
+  §O{bool}
+  §E{db:w,cw}
+  §B{order} §NEW{Order}
+  §ASSIGN order.Product product
+  §ASSIGN order.Quantity quantity
+  §C{dbContext.Orders.Add}
+    §A order
+  §/C
+  §B{result} §C{dbContext.SaveChanges} §/C
+  §C{Console.WriteLine}
+    §A (+ (+ (+ "Order placed for " quantity) (+ "x " product)) "")
+  §/C
+  §R (> result INT:0)
+§/F{f001}
+
+§F{f002:GetOrder:pub}
+  §I{DbContext:dbContext}
+  §I{i32:orderId}
+  §O{Order}
+  §E{db:r}
+  §R §C{dbContext.Orders.Find} §A orderId §/C
+§/F{f002}
+
+§/M{m001}

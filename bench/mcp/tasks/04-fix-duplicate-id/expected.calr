@@ -1,0 +1,22 @@
+§M{m001:StringUtils}
+
+§F{f001:GetLength:pub}
+  §I{str:input}
+  §O{i32}
+  §R INT:0
+§/F{f001}
+
+§F{f002:IsEmpty:pub}
+  §I{str:input}
+  §O{bool}
+  §R BOOL:false
+§/F{f002}
+
+§F{f003:Concat:pub}
+  §I{str:a}
+  §I{str:b}
+  §O{str}
+  §R a
+§/F{f003}
+
+§/M{m001}

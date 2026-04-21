@@ -1,0 +1,9 @@
+{
+  "id": "17-fix-missing-return",
+  "category": "parser-fix",
+  "description": "Function declares output type but has no §R return statement",
+  "targetPhase": "phase1",
+  "input": "input.calr",
+  "expected": "expected.calr",
+  "successCriteria": "Compiles without errors after adding return"
+}

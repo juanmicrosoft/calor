@@ -1,0 +1,13 @@
+§M{m001:Calculator}
+
+§F{f001:Abs:pub}
+  §I{i32:x}
+  §O{i32}
+  §IF{if01} (>= x INT:0)
+    §R x
+  §EL
+    §R (- INT:0 x)
+  §/IF{if01}
+§/F{f001}
+
+§/M{m001}

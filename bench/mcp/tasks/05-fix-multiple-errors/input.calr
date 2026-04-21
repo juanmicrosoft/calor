@@ -1,0 +1,24 @@
+§M{m001:Logger}
+
+§F{m001:LogMessage:pub}
+  §I{str:message}
+  §O{void}
+  §B{timestamp} §C{DateTime.Now.ToString} §A "yyyy-MM-dd HH:mm:ss" §/C
+  §B{formatted} (+ (+ "[" timestamp) (+ "] " message))
+  §C{Console.WriteLine}
+    §A formatted
+  §/C
+  §IF{if01} (> message.Length INT:100)
+    §C{Console.WriteLine}
+      §A "  [WARN] Long message truncated in display"
+    §/C
+  §/IF{if01}
+§/F{m001}
+
+§F{f002:FormatError:pub}
+  §I{str:error}
+  §O{str}
+  §R (+ "ERROR: " error)
+§/F{f002}
+
+§/M{m001}
