@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Cross-assembly IL analysis** — Opt-in compile-time analysis that traces method calls through referenced .NET assemblies to discover effects not covered by manifests. Enabled via `<CalorEnableILAnalysis>true</CalorEnableILAnalysis>`. Handles async state machines, iterator methods, delegate creation (`ldftn`), and virtual dispatch. Three-state resolution ensures incomplete traces never report false purity. Benchmark: 2.8ms median for 8 call sites across 2 assemblies, 100% resolution rate on concrete call chains (6 resolved with effects, 2 pure, 0 incomplete). See [Cross-Assembly IL Analysis guide](/guides/il-analysis/).
+- **IL analysis validation benchmark** — `bench/ILAnalysisBench/` measures assembly index construction, full analysis time, and per-call-site resolution results
+- **28 IL analysis tests** covering assembly loading, call graph extraction, async/iterator state machines, virtual dispatch, delegate edges, method identity, soundness guarantees, and end-to-end integration
+- **Cross-assembly IL analysis guide** — New website page documenting when to enable IL analysis, what it finds and doesn't, performance characteristics, and relationship to manifests
+
 ## [0.4.8] - 2026-04-20
 
 ### Benchmark Results (Statistical: 30 runs)

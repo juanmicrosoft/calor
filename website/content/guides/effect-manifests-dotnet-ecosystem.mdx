@@ -184,14 +184,30 @@ calor effects list
 calor effects list --type ILogger
 ```
 
+## Reducing Manifest Burden with IL Analysis
+
+For methods in **your own assemblies** (repositories, services, handlers), you can enable [cross-assembly IL analysis](/guides/il-analysis/) instead of writing manifests. The compiler traces through the IL of your referenced DLLs and discovers effects automatically.
+
+```xml
+<PropertyGroup>
+  <CalorEnableILAnalysis>true</CalorEnableILAnalysis>
+</PropertyGroup>
+```
+
+With IL analysis enabled, the compiler can trace `UserRepository.Save()` → `DbCommand.ExecuteNonQuery()` → `db:w` without a custom manifest for `UserRepository`. Manifests still provide the seeds (`DbCommand.ExecuteNonQuery → db:w`), and IL analysis propagates them through your code.
+
+**When to use each:**
+
+| Approach | Best for | Coverage |
+|----------|----------|----------|
+| **Built-in manifests** | .NET framework types (DbCommand, HttpClient, ILogger) | ~170 types |
+| **Custom manifests** | Ecosystem libraries, interface-heavy patterns | Precise, reviewed |
+| **IL analysis** | Your own assemblies with concrete call chains | Automatic, best-effort |
+
+See the [IL analysis guide](/guides/il-analysis/) for details.
+
 ## Architecture: Why Manifests?
 
 Calor is designed for AI agents as primary code authors. When an agent generates Calor code that calls `DbContext.SaveChanges()`, the compiler needs to verify the function declares `§E{db:w}`. Without manifests, every external call would be Unknown — defeating the purpose of effect enforcement.
 
-The manifest approach was chosen over alternatives:
-
-- **Hardcoded catalogs** were fragile and couldn't be extended by users
-- **Runtime analysis** is too slow for compilation
-- **Compile-time IL analysis** works for concrete call chains but not for interface-heavy types like ILogger (see [prototype results](/docs/plans/prototype-results))
-
-The current architecture uses manifests as the primary resolution mechanism, with a validated path toward compile-time IL analysis for concrete call chains in a future release.
+Manifests are the primary resolution mechanism because they're curated, precise, and cover the interface-heavy patterns (ILogger, IConfiguration) where IL analysis has a 0% resolution rate. IL analysis complements manifests by handling concrete call chains in user code — the gap between "framework types covered by manifests" and "Unknown."
