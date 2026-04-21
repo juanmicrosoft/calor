@@ -730,8 +730,8 @@ public sealed class McpMessageHandler
                     Content = new McpContent
                     {
                         Type = "text",
-                        Text = $"Convert this C# code to Calor. Use calor_convert first, then calor_diagnose to validate. " +
-                               $"If there are §CSHARP interop blocks, check calor_syntax_lookup for native equivalents.\n\n" +
+                        Text = $"Convert this C# code to Calor. Use calor_convert first, then calor_compile to validate (autoFix is on by default). " +
+                               $"If there are §CSHARP interop blocks, use calor_help to check for native equivalents.\n\n" +
                                $"```csharp\n{args?.GetValueOrDefault("csharpSource", "// paste C# here")}\n```"
                     }
                 }
@@ -808,23 +808,34 @@ public sealed class McpMessageHandler
         RULES:
         1. All new code MUST be written in Calor (.calr files), never raw C# (.cs).
         2. Before modifying a .cs file, convert it to .calr first using calor_convert.
-        3. After writing any .calr code, validate with calor_diagnose.
+        3. After writing any .calr code, compile with calor_compile (autoFix is on by default).
         4. Never edit .g.cs files — they are auto-generated from .calr sources.
 
         SYNTAX ESSENTIALS:
         - Module: §M{id:Name} ... §/M{id}
-        - Function: §F{id:name:returnType:vis} ... §/F{id}
+        - Function: §F{id:Name:vis} ... §/F{id}
         - Binding: §B{name:type} expr (immutable), §B{~name:type} expr (mutable)
         - Loop: §L{id:var:from:to:step} ... §/L{id}
-        - Conditional: §IF{id} (cond) → §R expr
+        - Conditional: §IF{id} (cond) ... §/I{id} (NOTE: close with §/I, not §/IF)
         - Typed literals: INT:42, STR:"hello", BOOL:true, FLOAT:3.14
         - Expressions use prefix notation: (+ a b), (== x 0), (% i 15)
         - Types: i32, i64, str, bool, f64, void, ?i32 (option), i32!str (result)
         - Contracts: §Q (precondition), §S (postcondition)
-        - Effects: §E{cw,db,net}
+        - Effects: §E{cw,db:w,net:rw}
 
-        WORKFLOW: Use calor_syntax_lookup for any unfamiliar construct. Use calor_verify for contract checking. Use calor_explain_error for diagnostic help.
+        WORKFLOW: Read calor://primer at session start. Use calor_help for unfamiliar syntax. Use calor_verify for contract checking.
         """;
+
+    // ── Test helpers (for McpRegistryValidationTests) ──────────────
+
+    internal HashSet<string> GetRegisteredToolNamesForTest()
+        => new(_tools.Keys, StringComparer.Ordinal);
+
+    internal HashSet<string> GetRegisteredResourceUrisForTest()
+        => new(_resources.Keys, StringComparer.Ordinal);
+
+    internal string GetServerInstructionsForTest()
+        => GetServerInstructions();
 
     private void Log(string message)
     {
