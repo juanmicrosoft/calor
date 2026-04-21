@@ -385,4 +385,210 @@ public class CompileCalorIntegrationTests : IDisposable
         var state = System.Text.Json.JsonSerializer.Deserialize(json, BuildStateJsonContext.Default.BuildState);
         Assert.NotNull(state);
     }
+
+    // Cross-module effect enforcement — caller is missing a declared effect the callee requires.
+    [Fact]
+    public void CrossModuleEffect_CallerMissingEffect_Errors()
+    {
+        var callee = """
+            §M{m001:OrderService}
+            §F{f001:SaveOrder:pub}
+              §O{void}
+              §E{db:w}
+            §/F{f001}
+            §/M{m001}
+            """;
+        var caller = """
+            §M{m002:Handler}
+            §F{f001:HandleRequest:pub}
+              §O{void}
+              §C{SaveOrder}
+              §/C
+            §/F{f001}
+            §/M{m002}
+            """;
+
+        var src1 = CreateSourceFile("Callee.calr", callee);
+        var src2 = CreateSourceFile("Caller.calr", caller);
+
+        var task = CreateTask(src1, src2);
+        var result = task.Execute();
+
+        Assert.False(result, "Build should fail on cross-module effect violation.");
+
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.Contains(engine.Errors,
+            e => e.Contains("HandleRequest") && e.Contains("SaveOrder") && e.Contains("db:w"));
+    }
+
+    // Cross-module effect enforcement — caller declares the callee's effects → clean build.
+    [Fact]
+    public void CrossModuleEffect_CallerDeclaresEffect_Succeeds()
+    {
+        var callee = """
+            §M{m001:OrderService}
+            §F{f001:SaveOrder:pub}
+              §O{void}
+              §E{db:w}
+            §/F{f001}
+            §/M{m001}
+            """;
+        var caller = """
+            §M{m002:Handler}
+            §F{f001:HandleRequest:pub}
+              §O{void}
+              §E{db:w}
+              §C{SaveOrder}
+              §/C
+            §/F{f001}
+            §/M{m002}
+            """;
+
+        var src1 = CreateSourceFile("Callee.calr", callee);
+        var src2 = CreateSourceFile("Caller.calr", caller);
+
+        var task = CreateTask(src1, src2);
+        Assert.True(task.Execute());
+        Assert.Equal(2, task.GeneratedFiles.Length);
+
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.DoesNotContain(engine.Errors, e => e.Contains("Calor0410"));
+    }
+
+    // Warm-build cross-module enforcement: if the callee's declared effects change
+    // (and the caller's content doesn't), the caller's cached summary + the callee's
+    // fresh summary together should still detect the violation on the warm build.
+    [Fact]
+    public void CrossModuleEffect_WarmBuild_DetectsViolationAfterCalleeEdit()
+    {
+        var calleeOriginal = """
+            §M{m001:Repo}
+            §F{f001:Save:pub}
+              §O{void}
+              §E{db:w}
+            §/F{f001}
+            §/M{m001}
+            """;
+        var caller = """
+            §M{m002:App}
+            §F{f001:Run:pub}
+              §O{void}
+              §E{db:w}
+              §C{Save}
+              §/C
+            §/F{f001}
+            §/M{m002}
+            """;
+
+        var src1 = CreateSourceFile("Repo.calr", calleeOriginal);
+        var src2 = CreateSourceFile("App.calr", caller);
+
+        // Cold build — clean, caller declares db:w which covers callee's db:w.
+        var task1 = CreateTask(src1, src2);
+        Assert.True(task1.Execute());
+
+        // Edit callee to add net:w. Caller source unchanged → caller should be incrementally
+        // skipped on the next build, but cross-module pass should still see the violation
+        // because the caller's summary (including its call to Save) is cached.
+        Thread.Sleep(50);
+        File.WriteAllText(src1, calleeOriginal.Replace("§E{db:w}", "§E{db:w, net:w}"));
+
+        var task2 = CreateTask(src1, src2);
+        var result = task2.Execute();
+
+        Assert.False(result, "Build should fail — caller needs net:w after callee's §E expanded.");
+        var engine = (TestBuildEngine)task2.BuildEngine;
+        Assert.Contains(engine.Errors, e => e.Contains("net:w") && e.Contains("Save"));
+    }
+
+    // Warm-build no-change path: both files stay cached, cross-module pass runs from cached
+    // summaries on every build and stays clean.
+    [Fact]
+    public void CrossModuleEffect_WarmBuild_NoChanges_RunsFromCachedSummariesAndStaysClean()
+    {
+        var callee = """
+            §M{m001:Repo}
+            §F{f001:Save:pub}
+              §O{void}
+              §E{db:w}
+            §/F{f001}
+            §/M{m001}
+            """;
+        var caller = """
+            §M{m002:App}
+            §F{f001:Run:pub}
+              §O{void}
+              §E{db:w}
+              §C{Save}
+              §/C
+            §/F{f001}
+            §/M{m002}
+            """;
+
+        var src1 = CreateSourceFile("Repo.calr", callee);
+        var src2 = CreateSourceFile("App.calr", caller);
+
+        // Cold build — clean, summaries are persisted in the build cache.
+        var task1 = CreateTask(src1, src2);
+        Assert.True(task1.Execute());
+
+        // Second build — no changes. Both files skip compilation; cross-module pass
+        // must still run using cached summaries and must stay clean.
+        var task2 = CreateTask(src1, src2);
+        var result = task2.Execute();
+        var engine2 = (TestBuildEngine)task2.BuildEngine;
+
+        Assert.True(result, $"Warm build should succeed. Errors: {string.Join("; ", engine2.Errors)}");
+        Assert.DoesNotContain(engine2.Errors, e => e.Contains("Calor0410"));
+        // Sanity: both files were actually skipped (not re-compiled).
+        var skipped = engine2.Messages.Count(m => m.Contains("skipping"));
+        Assert.Equal(2, skipped);
+        // And the cross-module pass ACTUALLY ran — proves cached summaries were loaded and
+        // reached the pass, rather than being silently null and gating the pass off.
+        Assert.Contains(engine2.Messages, m =>
+            m.Contains("running cross-module effect enforcement") && m.Contains("2 modules"));
+    }
+
+    // Cache format migration: a v1.0 cache on disk must trigger global invalidation
+    // so everything recompiles with the new schema (and thus gets EffectSummary entries).
+    [Fact]
+    public void CachedV1Format_TriggersGlobalInvalidation()
+    {
+        var src = CreateSourceFile("A.calr", ValidCalorSource);
+
+        // Write a v1.0-style cache file directly (no EffectSummary on entries).
+        var cachePath = BuildStateCache.GetCachePath(_outputDir);
+        var v1Json = """
+            {
+              "formatVersion": "1.0",
+              "compilerHash": "stale",
+              "optionsHash": "stale",
+              "manifestHash": "",
+              "outputDirectory": "",
+              "files": {
+                "A.calr": {
+                  "contentHash": "deadbeef",
+                  "lastModified": "2026-01-01T00:00:00Z",
+                  "fileSize": 42
+                }
+              }
+            }
+            """;
+        File.WriteAllText(cachePath, v1Json);
+
+        var task = CreateTask(src);
+        Assert.True(task.Execute());
+
+        var engine = (TestBuildEngine)task.BuildEngine;
+        // Global invalidation should kick in because format version doesn't match.
+        Assert.Contains(engine.Messages, m => m.Contains("global invalidation"));
+
+        // After this build, the cache should be v2.0 and the file should have a summary.
+        var loaded = BuildStateCache.Load(_outputDir);
+        Assert.NotNull(loaded);
+        Assert.Equal("2.0", loaded.FormatVersion);
+        var entry = Assert.Single(loaded.Files).Value;
+        Assert.NotNull(entry.EffectSummary);
+        Assert.Equal("TestModule", entry.EffectSummary!.ModuleName);
+    }
 }

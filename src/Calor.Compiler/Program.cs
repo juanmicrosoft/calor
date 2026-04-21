@@ -23,9 +23,10 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        var inputOption = new Option<FileInfo>(
+        var inputOption = new Option<FileInfo[]>(
             aliases: ["--input", "-i"],
-            description: "The Calor source file to compile");
+            description: "The Calor source file(s) to compile. Pass multiple files to enable cross-module effect enforcement.")
+        { Arity = ArgumentArity.OneOrMore };
 
         var outputOption = new Option<FileInfo>(
             aliases: ["--output", "-o"],
@@ -129,10 +130,10 @@ public class Program
             var sw = Stopwatch.StartNew();
             var input = ctx.ParseResult.GetValueForOption(inputOption);
 
-            // Discover .calor/config.json for coding agent telemetry
-            if (telemetry != null && input != null)
+            // Discover .calor/config.json for coding agent telemetry (use first input for discovery)
+            if (telemetry != null && input != null && input.Length > 0)
             {
-                var discovered = CalorConfigManager.Discover(input.FullName);
+                var discovered = CalorConfigManager.Discover(input[0].FullName);
                 telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
             }
             var output = ctx.ParseResult.GetValueForOption(outputOption);
@@ -232,25 +233,26 @@ public class Program
         return result;
     }
 
-    private static async Task<int> CompileAsync(FileInfo? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false)
+    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false)
     {
         try
         {
             // If no input provided, show help
-            if (input == null)
+            if (input == null || input.Length == 0)
             {
                 Console.WriteLine("Calor Compiler - Compiles Calor source to C# and migrates between languages");
                 Console.WriteLine();
                 Console.WriteLine("Usage:");
-                Console.WriteLine("  calor --input <file.calr> [--output <file.cs>]  Compile Calor to C#");
-                Console.WriteLine("  calor convert <file>                           Convert between C# and Calor");
-                Console.WriteLine("  calor migrate <project>                        Migrate entire project");
-                Console.WriteLine("  calor assess <directory>                       Assess C# for migration potential");
-                Console.WriteLine("  calor benchmark [options]                      Compare token economics");
-                Console.WriteLine("  calor init --ai <agent>                        Initialize for AI coding agents");
-                Console.WriteLine("  calor format <files>                           Format Calor source files");
-                Console.WriteLine("  calor feature-check <feature>                  Check C# feature support");
-                Console.WriteLine("  calor coverage <file>                          Analyze C# file for conversion coverage");
+                Console.WriteLine("  calor --input <file.calr> [--output <file.cs>]   Compile a single Calor file");
+                Console.WriteLine("  calor --input <a.calr> --input <b.calr>          Compile multiple files with cross-module effect checking");
+                Console.WriteLine("  calor convert <file>                             Convert between C# and Calor");
+                Console.WriteLine("  calor migrate <project>                          Migrate entire project");
+                Console.WriteLine("  calor assess <directory>                         Assess C# for migration potential");
+                Console.WriteLine("  calor benchmark [options]                        Compare token economics");
+                Console.WriteLine("  calor init --ai <agent>                          Initialize for AI coding agents");
+                Console.WriteLine("  calor format <files>                             Format Calor source files");
+                Console.WriteLine("  calor feature-check <feature>                    Check C# feature support");
+                Console.WriteLine("  calor coverage <file>                            Analyze C# file for conversion coverage");
                 Console.WriteLine();
                 Console.WriteLine("Strictness options:");
                 Console.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
@@ -269,88 +271,133 @@ public class Program
                 return 0;
             }
 
-            if (!input.Exists)
+            foreach (var file in input)
             {
-                Console.Error.WriteLine($"Error: Input file not found: {input.FullName}");
+                if (!file.Exists)
+                {
+                    Console.Error.WriteLine($"Error: Input file not found: {file.FullName}");
+                    return 1;
+                }
+            }
+
+            if (output != null && input.Length > 1)
+            {
+                Console.Error.WriteLine("Error: --output is only supported when compiling a single file. When passing multiple --input files, generated .g.cs files are written alongside each input.");
                 return 1;
             }
 
-            if (verbose)
-            {
-                Console.WriteLine($"Compiling: {input.FullName}");
-            }
-
-            var source = await File.ReadAllTextAsync(input.FullName);
             var parsedContractMode = contractMode?.ToLowerInvariant() switch
             {
                 "off" => ContractMode.Off,
                 "release" => ContractMode.Release,
                 _ => ContractMode.Debug
             };
-            var cacheOptions = new VerificationCacheOptions
-            {
-                Enabled = !noCache,
-                ClearBeforeVerification = clearCache,
-                ProjectDirectory = Path.GetDirectoryName(input.FullName)
-            };
-            var options = new CompilationOptions
-            {
-                Verbose = verbose,
-                StrictApi = strictApi,
-                RequireDocs = requireDocs,
-                EnforceEffects = enforceEffects,
-                StrictEffects = strictEffects,
-                UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
-                ContractMode = parsedContractMode,
-                VerifyContracts = verify,
-                ProjectDirectory = Path.GetDirectoryName(input.FullName),
-                VerificationCacheOptions = cacheOptions,
-                VerificationTimeoutMs = (uint)verificationTimeout,
-                EnableVerificationAnalyses = analyze,
-                VerificationAnalysisOptions = analyze ? new Analysis.VerificationAnalysisOptions
-                {
-                    BugPatternOptions = new Analysis.BugPatterns.BugPatternOptions
-                    {
-                        ReportOnlyVerified = !allFindings,
-                        Z3TimeoutMs = (uint)verificationTimeout
-                    },
-                    TaintOptions = new Analysis.Security.TaintAnalysisOptions
-                    {
-                        MinTaintHops = allFindings ? 1 : 2
-                    }
-                } : null
-            };
-            var result = Compile(source, input.FullName, options);
 
-            if (result.HasErrors)
+            var compiledModules = new List<(Ast.ModuleNode Ast, string FilePath)>();
+            var anyErrors = false;
+
+            foreach (var file in input)
             {
-                foreach (var diagnostic in result.Diagnostics)
+                if (verbose)
+                {
+                    Console.WriteLine($"Compiling: {file.FullName}");
+                }
+
+                var source = await File.ReadAllTextAsync(file.FullName);
+                var cacheOptions = new VerificationCacheOptions
+                {
+                    Enabled = !noCache,
+                    ClearBeforeVerification = clearCache,
+                    ProjectDirectory = Path.GetDirectoryName(file.FullName)
+                };
+                var options = new CompilationOptions
+                {
+                    Verbose = verbose,
+                    StrictApi = strictApi,
+                    RequireDocs = requireDocs,
+                    EnforceEffects = enforceEffects,
+                    StrictEffects = strictEffects,
+                    UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
+                    ContractMode = parsedContractMode,
+                    VerifyContracts = verify,
+                    ProjectDirectory = Path.GetDirectoryName(file.FullName),
+                    VerificationCacheOptions = cacheOptions,
+                    VerificationTimeoutMs = (uint)verificationTimeout,
+                    EnableVerificationAnalyses = analyze,
+                    VerificationAnalysisOptions = analyze ? new Analysis.VerificationAnalysisOptions
+                    {
+                        BugPatternOptions = new Analysis.BugPatterns.BugPatternOptions
+                        {
+                            ReportOnlyVerified = !allFindings,
+                            Z3TimeoutMs = (uint)verificationTimeout
+                        },
+                        TaintOptions = new Analysis.Security.TaintAnalysisOptions
+                        {
+                            MinTaintHops = allFindings ? 1 : 2
+                        }
+                    } : null
+                };
+                var result = Compile(source, file.FullName, options);
+
+                if (result.HasErrors)
+                {
+                    foreach (var diagnostic in result.Diagnostics)
+                    {
+                        Console.Error.WriteLine(diagnostic);
+                    }
+                    anyErrors = true;
+                    continue;
+                }
+
+                // Determine output path
+                var outputPath = (output?.FullName)
+                    ?? Path.ChangeExtension(file.FullName, ".g.cs");
+
+                // Ensure output directory exists
+                var outputDir = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+                {
+                    Directory.CreateDirectory(outputDir);
+                }
+
+                await File.WriteAllTextAsync(outputPath, result.GeneratedCode);
+
+                if (verbose)
+                {
+                    Console.WriteLine($"Output written to: {outputPath}");
+                }
+
+                Console.WriteLine($"Compilation successful: {outputPath}");
+
+                if (result.Ast != null)
+                {
+                    compiledModules.Add((result.Ast, file.FullName));
+                }
+            }
+
+            // Cross-module effect enforcement across successfully compiled modules.
+            if (compiledModules.Count > 1)
+            {
+                var registry = Effects.CrossModuleEffectRegistry.Build(compiledModules);
+                foreach (var diagnostic in registry.BuildDiagnostics)
                 {
                     Console.Error.WriteLine(diagnostic);
                 }
-                return 1;
+
+                var crossPass = new Effects.CrossModuleEffectEnforcementPass();
+                var crossDiagnostics = crossPass.Enforce(compiledModules, registry);
+
+                foreach (var diagnostic in crossDiagnostics)
+                {
+                    Console.Error.WriteLine(diagnostic);
+                    if (diagnostic.IsError)
+                    {
+                        anyErrors = true;
+                    }
+                }
             }
 
-            // Determine output path
-            var outputPath = output?.FullName
-                ?? Path.ChangeExtension(input.FullName, ".g.cs");
-
-            // Ensure output directory exists
-            var outputDir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
-            {
-                Directory.CreateDirectory(outputDir);
-            }
-
-            await File.WriteAllTextAsync(outputPath, result.GeneratedCode);
-
-            if (verbose)
-            {
-                Console.WriteLine($"Output written to: {outputPath}");
-            }
-
-            Console.WriteLine($"Compilation successful: {outputPath}");
-            return 0;
+            return anyErrors ? 1 : 0;
         }
         catch (Exception ex)
         {

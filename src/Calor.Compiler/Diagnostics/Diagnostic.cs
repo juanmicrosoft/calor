@@ -105,6 +105,11 @@ public static class DiagnosticCode
     public const string ILAnalysisFallback = "Calor0415";
     public const string ILAnalysisBudgetExhausted = "Calor0416";
 
+    /// <summary>
+    /// Warning: Public Calor function has no §E effect declaration. Cross-module callers cannot verify effect safety.
+    /// </summary>
+    public const string UndeclaredPublicFunction = "Calor0417";
+
     // Pattern matching errors (Calor0500-0599)
     public const string NonExhaustiveMatch = "Calor0500";
     public const string UnreachablePattern = "Calor0501";

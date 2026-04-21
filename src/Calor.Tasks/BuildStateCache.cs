@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Effects;
 
 namespace Calor.Tasks;
 
@@ -11,7 +12,8 @@ internal sealed partial class BuildStateJsonContext : JsonSerializerContext { }
 
 internal sealed class BuildState
 {
-    public string FormatVersion { get; set; } = "1.0";
+    // Bump when cache schema changes (e.g., added EffectSummary in 2.0).
+    public string FormatVersion { get; set; } = "2.0";
     public string CompilerHash { get; set; } = "";
     public string OptionsHash { get; set; } = "";
     public string ManifestHash { get; set; } = "";
@@ -24,11 +26,17 @@ internal sealed class BuildFileEntry
     public string ContentHash { get; set; } = "";
     public DateTime LastModified { get; set; }
     public long FileSize { get; set; }
+
+    /// <summary>
+    /// Serializable effect summary for cross-module enforcement on warm builds.
+    /// Null for entries from older cache versions or files that failed to compile.
+    /// </summary>
+    public EffectSummary? EffectSummary { get; set; }
 }
 
 internal static class BuildStateCache
 {
-    private const string FormatVersion = "1.0";
+    private const string FormatVersion = "2.0";
     private const string CacheFileName = ".calor-build-state.json";
     private const int MaxRetries = 3;
     private const int BaseRetryDelayMs = 50;
@@ -120,9 +128,19 @@ internal static class BuildStateCache
         // The hash exists for forward compatibility. When properties like ContractMode,
         // EnforceEffects, StrictEffects, RequireDocs, StrictApi are added to the task,
         // they MUST be added here as explicit parameters.
-        var bytes = Encoding.UTF8.GetBytes("options:v1");
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexStringLower(hash);
+        //
+        // The set of EffectKind enum values is also folded in: cached EffectSummary entries
+        // reference kinds by name, and a kind added/removed/renamed in a compiler upgrade
+        // must force a cold rebuild so old summaries don't silently drop effects on parse.
+        using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        sha.AppendData(Encoding.UTF8.GetBytes("options:v1"));
+        sha.AppendData(Encoding.UTF8.GetBytes("|effectkinds:"));
+        foreach (var kind in Enum.GetNames(typeof(Calor.Compiler.Effects.EffectKind)))
+        {
+            sha.AppendData(Encoding.UTF8.GetBytes(kind));
+            sha.AppendData(Encoding.UTF8.GetBytes(","));
+        }
+        return Convert.ToHexStringLower(sha.GetHashAndReset());
     }
 
     public static string ComputeManifestHash(string projectDirectory)

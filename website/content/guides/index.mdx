@@ -47,6 +47,16 @@ Automatic effect discovery through referenced .NET assemblies. Covers:
 - Enabling IL analysis with one MSBuild property
 - Performance, diagnostics, and interaction with manifests
 
+### [Cross-Module Effect Propagation](/guides/cross-module-effect-propagation/)
+
+How Calor verifies effect declarations stay consistent across files in a multi-file project. Covers:
+
+- The contract model: declared effects propagate between modules
+- Bare-name vs. qualified calls and ambiguity handling
+- The `Calor0417` warning for undeclared public functions
+- Warm-build correctness via cached effect summaries
+- Multi-file CLI and MSBuild integration
+
 ---
 
 ## Getting Started

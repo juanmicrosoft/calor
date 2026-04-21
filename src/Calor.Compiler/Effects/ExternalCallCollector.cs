@@ -19,14 +19,48 @@ public enum CallKind
 public sealed record CollectedCall(string TypeName, string MethodName, CallKind Kind);
 
 /// <summary>
+/// A call target collected per-function, preserving the caller identity and
+/// the raw target string (including bare-name calls that lack a dot).
+/// Unlike <see cref="CollectedCall"/>, this is not deduplicated and is not
+/// resolved to (type, method) pairs — it is the input to cross-module resolution
+/// which needs to see bare-name calls as-is.
+/// </summary>
+public sealed record RawCall(string CallerName, string Target, bool IsConstructor);
+
+/// <summary>
 /// Walks the Calor AST to collect external method invocations.
 /// Covers top-level functions, class methods, and constructors.
 /// Resolves variable types via §NEW initializer scanning.
+///
+/// Two collection modes share the traversal logic:
+///
+///   1. Standard mode (<see cref="Collect"/>): returns <see cref="CollectedCall"/> list —
+///      dotted targets resolved to (TypeName, MethodName, CallKind) tuples, deduped.
+///      Bare-name targets (no dot) are dropped except for constructor calls.
+///      Used by the <c>calor effects suggest</c> command and interop coverage.
+///
+///   2. Raw per-function mode (<see cref="CollectPerFunctionWithBareNames"/>): returns
+///      <see cref="RawCall"/> list — each record tagged with its enclosing function name
+///      and preserving the target string verbatim (including bare names). Not deduped.
+///      Used by the cross-module effect enforcement pass.
+///
+/// Modes are selected by the factory method used; a single collector instance is
+/// internal to one mode for one module — do not invoke both modes on the same instance.
 /// </summary>
 public sealed class ExternalCallCollector
 {
     private readonly List<CollectedCall> _calls = new();
+    private readonly List<RawCall> _rawCalls = new();
     private readonly Dictionary<string, string> _variableTypeMap = new(StringComparer.OrdinalIgnoreCase);
+
+    // Set by CollectPerFunctionWithBareNames before visiting each function's body,
+    // so TryAddCall can tag RawCalls with the enclosing caller identity.
+    // Null in standard mode.
+    private string? _currentCaller;
+
+    // True when this instance is operating in raw per-function mode. Set once at
+    // construction by the factory and never toggled.
+    private bool _rawMode;
 
     /// <summary>
     /// Collect all external calls from a module (functions + classes).
@@ -53,6 +87,38 @@ public sealed class ExternalCallCollector
         }
 
         return collector._calls.Distinct().ToList();
+    }
+
+    /// <summary>
+    /// Collect raw call targets from a module, tagged with the enclosing caller's name.
+    /// Unlike <see cref="Collect"/>, this retains bare-name targets (no dot) so that
+    /// cross-module resolution can match against the <see cref="CrossModuleEffectRegistry"/>.
+    /// </summary>
+    public static List<RawCall> CollectPerFunctionWithBareNames(ModuleNode module)
+    {
+        var collector = new ExternalCallCollector { _rawMode = true };
+
+        foreach (var function in module.Functions)
+        {
+            collector._currentCaller = function.Name;
+            collector.CollectFromFunctionBody(function.Body);
+        }
+
+        foreach (var cls in module.Classes)
+        {
+            foreach (var method in cls.Methods)
+            {
+                collector._currentCaller = $"{cls.Name}.{method.Name}";
+                collector.CollectFromFunctionBody(method.Body);
+            }
+            foreach (var ctor in cls.Constructors)
+            {
+                collector._currentCaller = $"{cls.Name}..ctor";
+                collector.CollectFromFunctionBody(ctor.Body);
+            }
+        }
+
+        return collector._rawCalls;
     }
 
     private void CollectFromFunctionBody(IReadOnlyList<StatementNode> body)
@@ -211,6 +277,13 @@ public sealed class ExternalCallCollector
 
     private void TryAddCall(string target, CallKind defaultKind)
     {
+        // Record the raw target (including bare names) when running in per-function mode.
+        // The cross-module pass needs to see bare-name calls to resolve them against the registry.
+        if (_rawMode && _currentCaller != null && !string.IsNullOrEmpty(target))
+        {
+            _rawCalls.Add(new RawCall(_currentCaller, target, defaultKind == CallKind.Constructor));
+        }
+
         var lastDot = target.LastIndexOf('.');
         if (lastDot <= 0)
         {
