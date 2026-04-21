@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text.Json;
 using Calor.Compiler.Experiments;
 
@@ -17,8 +18,93 @@ public static class EvaluationCommand
         var command = new Command("evaluation", "Evaluation harness for the Calor-native type-system research plan (Phase 0+).");
 
         command.AddCommand(CreateRegistryCommand());
+        command.AddCommand(CreateRegistryValidateCommand());
 
         return command;
+    }
+
+    // ========================================================================
+    // registry-validate subcommand — §5.0f tamper-evidence check
+    // ========================================================================
+
+    private static Command CreateRegistryValidateCommand()
+    {
+        var baseFileOption = new Option<FileInfo>(
+            aliases: ["--base-file"],
+            description: "Path to the base-branch version of registry.json (e.g., from `git show <base>:docs/experiments/registry.json`).")
+        { IsRequired = true };
+
+        var headFileOption = new Option<FileInfo>(
+            aliases: ["--head-file"],
+            description: "Path to the head (PR) version of registry.json.")
+        { IsRequired = true };
+
+        var jsonOption = new Option<bool>(
+            aliases: ["--json"],
+            description: "Emit a JSON report on stdout in addition to human-readable output.",
+            getDefaultValue: () => false);
+
+        var command = new Command("registry-validate",
+            "Validate registry.json append-only invariant: no existing entry's fields may change. Exits 0 on pass, non-zero on violation.")
+        {
+            baseFileOption,
+            headFileOption,
+            jsonOption
+        };
+
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            await Task.Yield();
+            var baseFile = ctx.ParseResult.GetValueForOption(baseFileOption)!;
+            var headFile = ctx.ParseResult.GetValueForOption(headFileOption)!;
+            var json = ctx.ParseResult.GetValueForOption(jsonOption);
+            ctx.ExitCode = ExecuteRegistryValidate(baseFile, headFile, json);
+        });
+        return command;
+    }
+
+    private static int ExecuteRegistryValidate(FileInfo baseFile, FileInfo headFile, bool json)
+    {
+        var baseDoc = LoadRegistryDoc(baseFile.FullName);
+        var headDoc = LoadRegistryDoc(headFile.FullName);
+
+        var result = RegistryValidator.Validate(baseDoc, headDoc);
+
+        if (json)
+        {
+            Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        else
+        {
+            if (result.IsValid)
+            {
+                Console.WriteLine($"OK: registry.json append-only invariant holds. {result.EntriesAdded} new entr{(result.EntriesAdded == 1 ? "y" : "ies")} added, no existing entries modified.");
+            }
+            else
+            {
+                Console.Error.WriteLine($"FAIL: registry.json append-only invariant violated: {result.Violations.Count} violation(s) detected.");
+                foreach (var v in result.Violations)
+                {
+                    Console.Error.WriteLine($"  [{v.Kind}] {v.EntryId}: {v.Message}");
+                }
+                Console.Error.WriteLine();
+                Console.Error.WriteLine("The registry is append-only. To correct a prior entry, add a new entry with supersedes=<predecessor-id>.");
+            }
+        }
+
+        return result.IsValid ? 0 : 1;
+    }
+
+    private static RegistryDocument LoadRegistryDoc(string path)
+    {
+        if (!File.Exists(path))
+            return new RegistryDocument();
+        var json = File.ReadAllText(path);
+        if (string.IsNullOrWhiteSpace(json))
+            return new RegistryDocument();
+        return JsonSerializer.Deserialize<RegistryDocument>(json,
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower })
+            ?? new RegistryDocument();
     }
 
     // ========================================================================
