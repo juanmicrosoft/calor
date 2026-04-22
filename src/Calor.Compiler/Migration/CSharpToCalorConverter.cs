@@ -127,7 +127,12 @@ public sealed class CSharpToCalorConverter
             // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM
             if (_options.StripPreprocessor)
             {
-                csharpSource = PreprocessorStripper.Strip(csharpSource);
+                try { csharpSource = PreprocessorStripper.Strip(csharpSource); }
+                catch (Exception stripEx)
+                {
+                    context.AddError($"Preprocessor stripping failed: {stripEx.GetType().Name}: {stripEx.Message}");
+                    return new ConversionResult { Success = false, Context = context, Duration = DateTime.UtcNow - startTime };
+                }
             }
 
             // Step 1: Parse C# with Roslyn

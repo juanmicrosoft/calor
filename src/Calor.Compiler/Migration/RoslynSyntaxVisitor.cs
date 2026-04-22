@@ -2017,11 +2017,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 newExpr.Arguments, new List<ObjectInitializerAssignment>());
             statements.Add(new BindStatementNode(span, tempVar, typeName, true, cleanNew, new AttributeCollection()));
 
-            // temp.Prop = value
+            // Emit as setter calls: §C{_objInit.set_PropName} §A value §/C
+            // (§ASSIGN target value fails when value contains complex expressions
+            // with special characters that confuse the Calor parser)
             foreach (var init in newExpr.Initializers)
             {
-                var target = new FieldAccessNode(span, new ReferenceNode(span, tempVar), init.PropertyName);
-                statements.Add(new AssignmentStatementNode(span, target, init.Value));
+                var setterTarget = $"{tempVar}.set_{init.PropertyName}";
+                statements.Add(new CallStatementNode(span, setterTarget, false,
+                    new List<ExpressionNode> { init.Value }, new AttributeCollection()));
             }
 
             // §R _objInit
