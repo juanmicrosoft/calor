@@ -134,9 +134,30 @@ public sealed class CSharpToCalorConverter
             var syntaxTree = CSharpSyntaxTree.ParseText(csharpSource);
             var root = syntaxTree.GetCompilationUnitRoot();
 
-            // Check for parse errors
+            // Check for parse errors.
+            // Skip Roslyn diagnostic CS1028 ("Unexpected preprocessor directive") ONLY
+            // when it's near #region/#endregion text — "# endregion" (with space) is
+            // valid C# that Roslyn reports as error but recovers from.
+            // Do NOT skip CS1028 for #if with undefined symbols — those need handling.
             var diagnostics = root.GetDiagnostics()
                 .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                .Where(d =>
+                {
+                    if (d.Id != "CS1028") return true; // Keep all non-CS1028 errors
+                    // CS1028 near region directives → skip
+                    try
+                    {
+                        var span = d.Location.SourceSpan;
+                        var text = d.Location.SourceTree?.GetText();
+                        if (text == null) return true;
+                        // Check surrounding context for "region"
+                        var start = Math.Max(0, span.Start - 20);
+                        var len = Math.Min(span.Length + 40, text.Length - start);
+                        var context = text.GetSubText(new Microsoft.CodeAnalysis.Text.TextSpan(start, len)).ToString();
+                        return !context.Contains("region", StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch { return true; }
+                })
                 .ToList();
 
             if (diagnostics.Count > 0)
@@ -214,7 +235,12 @@ public sealed class CSharpToCalorConverter
         }
         catch (Exception ex)
         {
+            // If the visitor crashed partway through, try to emit whatever was
+            // converted so far rather than returning nothing. This handles
+            // NullReferenceException in complex class hierarchies where some
+            // members convert fine but one triggers an unhandled null.
             context.AddError($"Conversion failed: {ex.Message}");
+            context.AddWarning("Partial conversion may be available despite the error.");
 
             return new ConversionResult
             {
