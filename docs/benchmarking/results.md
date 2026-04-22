@@ -1,6 +1,6 @@
 <!-- THIS FILE IS AUTO-GENERATED. DO NOT EDIT MANUALLY. -->
 <!-- Generated from website/public/data/benchmark-results.json by CI/CD -->
-<!-- Last generated: 2026-02-24T14:37:29.066Z -->
+<!-- Last generated: 2026-04-22T21:42:50.234Z -->
 
 ---
 layout: default
@@ -13,7 +13,7 @@ nav_order: 2
 
 Evaluated across 207 paired Calor/C# programs.
 
-**Last updated:** February 24, 2026 (commit: c7665e6)
+**Last updated:** April 22, 2026 (commit: 6fc0035)
 
 ---
 
@@ -24,8 +24,9 @@ Evaluated across 207 paired Calor/C# programs.
 | Comprehension | **2.12x** | Calor | Explicit structure aids understanding |
 | Error Detection | **1.75x** | Calor | Contracts surface invariant violations |
 | Edit Precision | **1.38x** | Calor | Unique IDs enable targeted changes |
-| Refactoring Stability | **1.30x** | Calor | Structural IDs preserve refactoring intent |
+| Refactoring Stability | **1.52x** | Calor | Structural IDs preserve refactoring intent |
 | Generation Accuracy | **1.02x** | Calor | Better code generation from prompts |
+| Task Completion | **1.00x** | Calor | Better task completion rate |
 | Token Economics | 0.73x | C# | Calor's explicit syntax uses more tokens |
 | Information Density | **1.08x** | Calor | More semantic content per token |
 
@@ -72,13 +73,17 @@ Unique IDs enable precise targeting:
 for (int i = 0; i < 100; i++)
 ```
 
-#### Refactoring Stability (1.30x)
+#### Refactoring Stability (1.52x)
 
 Structural IDs maintain references across refactoring operations, enabling reliable multi-step transformations.
 
 #### Generation Accuracy (1.02x)
 
 Calor benefits from explicit structure that reduces generation ambiguity.
+
+#### Task Completion (1.00x)
+
+Calor benefits when tasks require understanding code behavior through contracts.
 
 #### Information Density (1.08x)
 
@@ -110,9 +115,11 @@ Average: Calor uses ~1.5x more tokens than C#.
 Comprehension     ████████████████  2.12x
 Error Detection   ██████████████░░  1.75x
 Edit Precision    ███████████░░░░░  1.38x
-Refactoring Stability██████████░░░░░░  1.30x
+Refactoring Stability████████████░░░░  1.52x
                          |
 Generation Accuracy████████░░░░░░░░  1.02x
+Task Completion   ████████░░░░░░░░  1.00x
+                         |
 Token Economics   ░░░░░░░░░░██████  0.73x
 Information Density█████████░░░░░░░  1.08x
 ```
