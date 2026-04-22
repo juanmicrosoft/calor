@@ -17,6 +17,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private readonly List<string> _pendingHoistedLines = new();
     private int _ternaryCounter;
     private int _hoistCounter;
+    private int _nextTempId;
     private int _memberBodyDepth;
 
     public CalorEmitter(ConversionContext? context = null)
@@ -534,7 +535,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Initer != null) Visit(node.Initer);
 
         if (node.DefaultValue != null)
-            AppendLine($"= {node.DefaultValue.Accept(this)}");
+        {
+            var defaultVal = node.DefaultValue.Accept(this);
+            FlushHoistedLines();
+            // If the value is a hoisted temp variable, use §R (return) since the getter body
+            // now has statements before the value. Plain `= value` only works for simple expressions.
+            if (defaultVal.StartsWith("_init"))
+                AppendLine($"§R {defaultVal}");
+            else
+                AppendLine($"= {defaultVal}");
+        }
 
         Dedent();
         AppendLine($"§/PROP{{{node.Id}}}");
@@ -2096,28 +2106,30 @@ public sealed class CalorEmitter : IAstVisitor<string>
         });
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
-        // Handle object initializers (multi-line block format)
+        // Handle object initializers: hoist to pending lines + temp variable
+        // Instead of emitting inline `PropertyName = value` inside §NEW (which the parser
+        // can't handle), create a temp binding and property assignment calls that the
+        // caller drains via FlushPendingHoisted() before using the expression.
         if (node.Initializers.Count > 0)
         {
-            // Pre-evaluate initializer values to collect hoisted bindings
-            var evalInits = new List<(string PropName, string Value)>();
+            var tempName = $"_init{_nextTempId++}";
+
+            // Hoist: §B{~_initN:Type} §NEW{Type} §A args §/NEW
+            _pendingHoistedLines.Add($"§B{{~{tempName}:{node.TypeName}{typeArgs}}} §NEW{{{node.TypeName}{typeArgs}}}{argsStr} §/NEW");
+
+            // Hoist property assignments: §C{_initN.set_PropName} §A value §/C
             foreach (var init in node.Initializers)
             {
                 var valueStr = init.Value.Accept(this);
                 if (!string.IsNullOrWhiteSpace(valueStr))
-                    evalInits.Add((init.PropertyName, valueStr));
+                {
+                    var safeName = init.PropertyName.StartsWith("@") ? init.PropertyName[1..] : init.PropertyName;
+                    _pendingHoistedLines.Add($"§C{{{tempName}.set_{safeName}}} §A {valueStr} §/C");
+                }
             }
 
-            var indent = new string(' ', _indentLevel * 2);
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}");
-            foreach (var (propName, valueStr) in evalInits)
-            {
-                var safeName = propName.StartsWith("@") ? propName[1..] : propName;
-                sb.Append($"\n{indent}  {safeName} = {valueStr}");
-            }
-            sb.Append($"\n{indent}§/NEW");
-            return sb.ToString();
+            // Return the temp variable name — the caller uses it where the §NEW was
+            return tempName;
         }
 
         return $"§NEW{{{node.TypeName}{typeArgs}}}{argsStr} §/NEW";
