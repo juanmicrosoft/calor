@@ -4,8 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-22
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.34x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 2.22x (Calor wins, large effect d=2.36)
+  - ErrorDetection: 1.83x (Calor wins, large effect d=2.02)
+  - RefactoringStability: 1.52x (Calor wins, large effect d=10.09)
+  - EditPrecision: 1.39x (Calor wins, large effect d=4.91)
+  - Correctness: 1.30x (Calor wins, large effect d=1.38)
+- **Programs Tested**: 207
+
+### Added
+- **Roslyn 5.3.0 upgrade** — Migration pipeline now uses Roslyn 5.3.0 (C# 14 support), enabling conversion of modern C# files using lambda parameter modifiers, `out` in lambda parameters, and other C# 13/14 features. Previously failed on files like Avalonia's `IFramebufferPlatformSurface.cs`.
+- **`LanguageVersion.Preview` parse option** — The C# parser now accepts the broadest possible C# syntax, eliminating parse errors on cutting-edge C# code.
+
 ### Changed
 - **Non-exhaustive match on `Option<T>` / `Result<T,E>` is now an error** (`Calor0500 NonExhaustiveMatch`, severity upgraded from Warning to Error for match statements). This is the TIER1C commitment from `docs/design/calor-direction.md` — exhaustive match on known sum types is mandatory syntax. The checker already identified these cases; this release makes them fail the build rather than pass with a warning. No repository `.calr` files were non-exhaustive on known sum types, so this upgrade is backward-compatible for existing code.
+- **Microsoft.CodeAnalysis.CSharp** upgraded from 4.8.0 to 5.3.0 across all projects
 
 ## [0.4.9] - 2026-04-21
 
