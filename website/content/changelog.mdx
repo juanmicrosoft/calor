@@ -8,6 +8,18 @@ All notable changes to Calor, organized by release.
 
 ---
 
+## [0.5.0] - 2026-04-22
+
+### Added
+- **Roslyn 5.3.0 upgrade** — Migration pipeline now uses Roslyn 5.3.0 (C# 14 support), enabling conversion of modern C# files using lambda parameter modifiers, `out` in lambda parameters, and other C# 13/14 features.
+- **`LanguageVersion.Preview` parse option** — The C# parser now accepts the broadest possible C# syntax.
+
+### Changed
+- **Non-exhaustive match on `Option<T>` / `Result<T,E>` is now an error** — exhaustive match on known sum types is mandatory syntax (`Calor0500`).
+- **Microsoft.CodeAnalysis.CSharp** upgraded from 4.8.0 to 5.3.0 across all projects.
+
+---
+
 ## [0.4.9] - 2026-04-21
 
 ### Added
