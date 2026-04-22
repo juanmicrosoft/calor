@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Non-exhaustive match on `Option<T>` / `Result<T,E>` is now an error** (`Calor0500 NonExhaustiveMatch`, severity upgraded from Warning to Error for match statements). This is the TIER1C commitment from `docs/design/calor-direction.md` — exhaustive match on known sum types is mandatory syntax. The checker already identified these cases; this release makes them fail the build rather than pass with a warning. No repository `.calr` files were non-exhaustive on known sum types, so this upgrade is backward-compatible for existing code.
+
 ## [0.4.9] - 2026-04-21
 
 ### Benchmark Results (Statistical: 30 runs)
