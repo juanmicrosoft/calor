@@ -2002,6 +2002,40 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             ? ConvertExpression(node.Initializer.Value)
             : null;
 
+        // When an auto-property's default value has object initializers
+        // (e.g., = new("args") { Prop = val }), convert to a full-body getter.
+        // The emitter can't inline hoisted statements in auto-property syntax.
+        if (isAutoProperty && defaultValue is NewExpressionNode newExpr && newExpr.Initializers.Count > 0
+            && getter != null && getter.IsAutoImplemented)
+        {
+            var span = GetTextSpan(node);
+            var statements = new List<StatementNode>();
+
+            // §B{~_objInit:Type} §NEW{Type} §A args §/NEW
+            var tempVar = "_objInit";
+            var cleanNew = new NewExpressionNode(span, newExpr.TypeName, newExpr.TypeArguments,
+                newExpr.Arguments, new List<ObjectInitializerAssignment>());
+            statements.Add(new BindStatementNode(span, tempVar, typeName, true, cleanNew, new AttributeCollection()));
+
+            // temp.Prop = value
+            foreach (var init in newExpr.Initializers)
+            {
+                var target = new FieldAccessNode(span, new ReferenceNode(span, tempVar), init.PropertyName);
+                statements.Add(new AssignmentStatementNode(span, target, init.Value));
+            }
+
+            // §R _objInit
+            statements.Add(new ReturnStatementNode(span, new ReferenceNode(span, tempVar)));
+
+            getter = new PropertyAccessorNode(
+                getter.Span, getter.Kind, getter.Visibility,
+                preconditions: Array.Empty<RequiresNode>(),
+                body: statements,
+                new AttributeCollection());
+            isAutoProperty = false;
+            defaultValue = null;
+        }
+
         // Block-level collections (§LIST, §DICT, §ARR, §SET) can't appear inline in
         // §PROP{...} = ... format. Convert to §NEW{Type} constructor call instead.
         if (defaultValue != null && IsBlockLevelCollection(defaultValue))
