@@ -151,6 +151,6 @@ Benchmarks live in `benchmarks/`. When writing or modifying benchmarks, ensure t
 
 ## Dependencies
 
-- **Microsoft.CodeAnalysis.CSharp 4.8.0** — Roslyn, for C# parsing in the migration pipeline
+- **Microsoft.CodeAnalysis.CSharp 5.3.0** — Roslyn, for C# parsing in the migration pipeline (supports C# 14)
 - **System.CommandLine 2.0.0-beta4** — CLI argument parsing
 - **Z3 4.15.7** — SMT solver for contract verification (custom ARM64 build)
