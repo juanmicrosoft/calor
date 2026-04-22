@@ -86,3 +86,37 @@ Total: ~4 weeks to ship TIER1A + TIER1C + commit-to-TIER2D. Plus TIER2D implemen
 This is the plan.
 
 — Juan
+
+## Postscript — TIER1A outcome (2026-04-22)
+
+TIER1A was prototyped and reverted one day after this doc was written. **This is the direction doc's first testable prediction, and it failed.** Recording the result honestly; the direction is held in place pending the next test, not vindicated by this one.
+
+**What shipped (on a branch, never merged):** `OptionResultFlowChecker` — flow-sensitive checker for unwrap-before-check, reassignment invalidation, and guard-return patterns. 11 unit tests passing. Gated behind `--experimental flow-option-tracking`.
+
+**What the corpus said:**
+- 436 in-repo `.calr` files → 1 finding in an intentional test fixture. 0 false positives. 0 new true positives beyond the existing suffix-based `NullDereferenceChecker`.
+- 262,142 external `.calr` files (real C# projects converted to Calor) → 0 actual `.unwrap()` / `.expect()` / `.is_some()` method calls. The migration preserves C# idioms (`.Value`, `!`, `??`) verbatim.
+
+**The revert:** checker, tests, diagnostic code, and experimental flag wiring removed. Working tree clean.
+
+**What this updates:**
+
+1. **The designer-judgment gate used by TIER1A failed.** "Does this catch a real bug class?" did not survive contact with the corpus. The same gate is what this doc proposes for TIER2D ("does the after-code read better?"). TIER2D therefore inherits TIER1A's gate-risk, at materially higher cost (4+ months of visitor-pattern tax, EffectSummary cache migration, test corpus breakage, LSP surface) and a harder-to-revert blast radius. Pre-committing to TIER2D on the same gate that just failed would be confirmation-bias infrastructure.
+
+2. **TIER1A's failure mode is ambiguous between two readings**, which point in different directions:
+   - (a) *Corpus is too shape-C# to validate safety features*, because the migration preserves C# idioms. → The design-gated approach to future features is the right response; benchmarks can't help.
+   - (b) *Agents don't write idiomatic Calor Option/Result even when the language supports it.* → Nullable elimination (which this doc deferred as "ergonomic") might be a **precondition** for the safety direction having any validation surface at all, not an orthogonal feature. The safety direction may not survive without an ergonomic component that forces idiomatic usage.
+
+3. **The TIER1C reasoning in this doc was right for the wrong reason at first, and needs re-stating honestly.** TIER1C is a **design-rule commit**, not a bug-catching hypothesis: "exhaustive match on known sum types is mandatory syntax." Low corpus presence is the argument *for* shipping it (it's a forcing function for how code is written, and its first firings are the usage signal we currently lack), not against. It ships. Honest pricing: ~1 week of checker work plus whatever the sample/conversion-snapshot/roundtrip-harness breakage costs.
+
+4. **Calor is already materially different from C# without TIER2D**: explicit `§E` effects, cross-module enforcement, refinement types with Z3, contract enforcement, obligation tracking. TIER2D's contribution is architectural elegance (unifying effects into the type algebra), not a new user-facing capability. That reframes TIER2D from "the feature that defines the language" to "the architectural refactor that cleans up a system that already works" — which changes the cost-benefit materially.
+
+**Updated near-term ordering** (supersedes the Timeline section above):
+
+- **This week:** ship TIER1C as a design-rule commit. Honest pricing includes sample/conversion/roundtrip updates, not just the checker.
+- **Before committing to TIER2D,** we need one of: (a) a 2–3 week emitter-output spike run in parallel with the design doc — evaluated on actual before/after compiler output on 1–2 non-trivial modules, not on prose examples written by the designer; (b) a serious evaluation of **.NET binder work** (resolve .NET method signatures in Calor's binder) as the competing higher-leverage investment. Binder work unblocks TIER1B (type inference), gives TIER2D effects from .NET calls, makes TIER2F (Option<T> vs T?) possible, and directly attacks the "shape-C#" corpus problem that just killed TIER1A. If the binder path is higher-leverage, TIER2D waits.
+- **The "worked-examples-read-better" gate is insufficient as a single-reviewer aesthetic judgment on a 4+ month commitment.** If TIER2D proceeds, it proceeds with an external critique cycle, an emitter spike producing actual compiler output to critique (not prose), and honestly priced blast radius in the design doc itself.
+
+The direction doc's safety bet holds. The specific roadmap above (TIER1A this week → TIER1C next → TIER2D design doc) is re-opened.
+
+— Juan
