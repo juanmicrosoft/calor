@@ -135,8 +135,9 @@ public sealed class CSharpToCalorConverter
                 }
             }
 
-            // Step 1: Parse C# with Roslyn
-            var syntaxTree = CSharpSyntaxTree.ParseText(csharpSource);
+            // Step 1: Parse C# with Roslyn (use Latest language version to accept all C# features)
+            var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
+            var syntaxTree = CSharpSyntaxTree.ParseText(csharpSource, parseOptions);
             var root = syntaxTree.GetCompilationUnitRoot();
 
             // Check for parse errors.
