@@ -78,6 +78,39 @@ public class PatternCheckerTests
     }
 
     [Fact]
+    public void Check_OptionNonExhaustive_IsError_NotWarning()
+    {
+        // TIER1C: non-exhaustive match over Option is an error, regardless of
+        // whether the match is in statement or expression position. See
+        // docs/design/calor-direction.md — exhaustive match on known sum types
+        // is mandatory syntax.
+        var source = @"
+§M{m001:Test}
+§F{f001:Test:pub}
+  §I{i32:x}
+  §O{i32}
+    §W{m1} x
+      §K §NN
+        §R 0
+    §/W{m1}
+§/F{f001}
+§/M{m001}
+";
+        var module = Parse(source, out var parseDiagnostics);
+        Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
+
+        var checkDiagnostics = new DiagnosticBag();
+        var typeEnv = new TypeEnvironment();
+        typeEnv.DefineVariable("x", new OptionType(PrimitiveType.Int));
+        var checker = new PatternChecker(checkDiagnostics, typeEnv);
+        checker.Check(module);
+
+        var diag = checkDiagnostics.FirstOrDefault(d => d.Code == DiagnosticCode.NonExhaustiveMatch);
+        Assert.NotNull(diag);
+        Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
+    }
+
+    [Fact]
     public void Check_OptionMissingNone_ReportsNonExhaustive()
     {
         var source = @"

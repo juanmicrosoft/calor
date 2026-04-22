@@ -43,7 +43,7 @@ public sealed class PatternChecker
         switch (stmt)
         {
             case MatchStatementNode match:
-                CheckMatchExhaustiveness(match.Target, match.Cases, match.Span, isExpression: false);
+                CheckMatchExhaustiveness(match.Target, match.Cases, match.Span);
                 foreach (var c in match.Cases)
                 {
                     foreach (var s in c.Body)
@@ -75,13 +75,14 @@ public sealed class PatternChecker
     }
 
     /// <summary>
-    /// Check a match expression/statement for exhaustiveness and unreachable patterns.
+    /// Check a match for exhaustiveness and unreachable patterns. Non-exhaustive
+    /// matches over known sum types emit <see cref="DiagnosticCode.NonExhaustiveMatch"/>
+    /// at Error severity.
     /// </summary>
     private void CheckMatchExhaustiveness(
         ExpressionNode target,
         IReadOnlyList<MatchCaseNode> cases,
-        Parsing.TextSpan matchSpan,
-        bool isExpression)
+        Parsing.TextSpan matchSpan)
     {
         // Step 1: Detect the target type
         var targetType = InferTargetType(target);
@@ -90,7 +91,7 @@ public sealed class PatternChecker
         CheckUnreachablePatterns(cases);
 
         // Step 3: Check exhaustiveness based on type
-        CheckTypeExhaustiveness(targetType, cases, matchSpan, isExpression);
+        CheckTypeExhaustiveness(targetType, cases, matchSpan);
     }
 
     private CalorType InferTargetType(ExpressionNode target)
@@ -231,8 +232,7 @@ public sealed class PatternChecker
     private void CheckTypeExhaustiveness(
         CalorType targetType,
         IReadOnlyList<MatchCaseNode> cases,
-        Parsing.TextSpan matchSpan,
-        bool isExpression)
+        Parsing.TextSpan matchSpan)
     {
         // Skip exhaustiveness check for error types
         if (targetType is ErrorType) return;
@@ -242,14 +242,17 @@ public sealed class PatternChecker
 
         if (!coverage.IsExhaustive)
         {
-            var severity = isExpression ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning;
+            // Exhaustive match on known sum types (Option/Result/Bool/Union) is
+            // mandatory per docs/design/calor-direction.md — non-exhaustive is an
+            // error, regardless of whether the match is in statement or expression
+            // position.
             var missingCases = string.Join(", ", coverage.MissingPatterns);
 
             _diagnostics.Report(
                 matchSpan,
                 DiagnosticCode.NonExhaustiveMatch,
                 $"Match is not exhaustive. Missing cases: {missingCases}",
-                severity);
+                DiagnosticSeverity.Error);
         }
     }
 
