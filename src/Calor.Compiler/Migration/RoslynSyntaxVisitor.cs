@@ -541,8 +541,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        catch (Exception)
         {
+            // Unconditional catch for class conversion — if any class member crashes,
+            // wrap the entire class as an interop block instead of failing the file.
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "class", InteropMemberKind.Class));
         }
         finally
