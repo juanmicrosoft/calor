@@ -534,7 +534,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Initer != null) Visit(node.Initer);
 
         if (node.DefaultValue != null)
+        {
             AppendLine($"= {node.DefaultValue.Accept(this)}");
+        }
 
         Dedent();
         AppendLine($"§/PROP{{{node.Id}}}");
@@ -1502,7 +1504,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            stmt.Accept(this);
+            stmt?.Accept(this);
         }
 
         Dedent();
@@ -1961,7 +1963,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
             .Replace("\"", "\\\"")
             .Replace("\n", "\\n")
             .Replace("\r", "\\r")
-            .Replace("\t", "\\t");
+            .Replace("\t", "\\t")
+            .Replace("${", "\\${");  // Escape ${ to prevent Calor string interpolation
         var suffix = node.IsUtf8 ? "u8" : "";
         return $"\"{escaped}\"{suffix}";
     }

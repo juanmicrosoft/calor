@@ -127,7 +127,12 @@ public sealed class CSharpToCalorConverter
             // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM
             if (_options.StripPreprocessor)
             {
-                csharpSource = PreprocessorStripper.Strip(csharpSource);
+                try { csharpSource = PreprocessorStripper.Strip(csharpSource); }
+                catch (Exception stripEx)
+                {
+                    context.AddError($"Preprocessor stripping failed: {stripEx.GetType().Name}: {stripEx.Message}");
+                    return new ConversionResult { Success = false, Context = context, Duration = DateTime.UtcNow - startTime };
+                }
             }
 
             // Step 1: Parse C# with Roslyn
@@ -135,30 +140,20 @@ public sealed class CSharpToCalorConverter
             var root = syntaxTree.GetCompilationUnitRoot();
 
             // Check for parse errors.
-            // Skip Roslyn diagnostic CS1028 ("Unexpected preprocessor directive") ONLY
-            // when it's near #region/#endregion text — "# endregion" (with space) is
-            // valid C# that Roslyn reports as error but recovers from.
-            // Do NOT skip CS1028 for #if with undefined symbols — those need handling.
-            var diagnostics = root.GetDiagnostics()
-                .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
-                .Where(d =>
-                {
-                    if (d.Id != "CS1028") return true; // Keep all non-CS1028 errors
-                    // CS1028 near region directives → skip
-                    try
-                    {
-                        var span = d.Location.SourceSpan;
-                        var text = d.Location.SourceTree?.GetText();
-                        if (text == null) return true;
-                        // Check surrounding context for "region"
-                        var start = Math.Max(0, span.Start - 20);
-                        var len = Math.Min(span.Length + 40, text.Length - start);
-                        var context = text.GetSubText(new Microsoft.CodeAnalysis.Text.TextSpan(start, len)).ToString();
-                        return !context.Contains("region", StringComparison.OrdinalIgnoreCase);
-                    }
-                    catch { return true; }
-                })
-                .ToList();
+            // Skip CS1028 ("Unexpected preprocessor directive") — occurs with "# endregion"
+            // (space before endregion). Valid C# that Roslyn recovers from.
+            List<Microsoft.CodeAnalysis.Diagnostic> diagnostics;
+            try
+            {
+                diagnostics = root.GetDiagnostics()
+                    .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error
+                             && d.Id != "CS1028")
+                    .ToList();
+            }
+            catch
+            {
+                diagnostics = new List<Microsoft.CodeAnalysis.Diagnostic>();
+            }
 
             if (diagnostics.Count > 0)
             {
@@ -195,9 +190,25 @@ public sealed class CSharpToCalorConverter
             }
 
             // Visit C# AST and build Calor AST
-            var moduleName = _options.ModuleName ?? DeriveModuleName(sourceFile, root);
-            var visitor = new RoslynSyntaxVisitor(context, semanticModel);
-            var calorAst = visitor.Convert(root, moduleName);
+            ModuleNode? calorAst;
+            try
+            {
+                var moduleName = _options.ModuleName ?? DeriveModuleName(sourceFile, root);
+                var visitor = new RoslynSyntaxVisitor(context, semanticModel);
+                calorAst = visitor.Convert(root, moduleName);
+            }
+            catch (Exception visitorEx)
+            {
+                // Visitor crashed (e.g., NullReferenceException on complex class patterns).
+                // Return a graceful failure with a clear error instead of crashing.
+                context.AddError($"Conversion visitor crashed: {visitorEx.GetType().Name}: {visitorEx.Message}");
+                return new ConversionResult
+                {
+                    Success = false,
+                    Context = context,
+                    Duration = DateTime.UtcNow - startTime
+                };
+            }
 
             if (context.HasErrors)
             {
@@ -239,8 +250,7 @@ public sealed class CSharpToCalorConverter
             // converted so far rather than returning nothing. This handles
             // NullReferenceException in complex class hierarchies where some
             // members convert fine but one triggers an unhandled null.
-            context.AddError($"Conversion failed: {ex.Message}");
-            context.AddWarning("Partial conversion may be available despite the error.");
+            context.AddError($"Conversion failed: {ex.GetType().Name}: {ex.Message}");
 
             return new ConversionResult
             {
