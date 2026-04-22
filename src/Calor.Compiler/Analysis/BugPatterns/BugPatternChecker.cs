@@ -90,6 +90,12 @@ public sealed class BugPatternOptions
     public bool CheckOffByOne { get; init; } = true;
 
     /// <summary>
+    /// Enable flow-sensitive Option/Result unwrap tracking (§6 of the TIER1A
+    /// post-mortem; experimental, opt-in via <c>flow-option-tracking</c> flag).
+    /// </summary>
+    public bool CheckOptionResultFlow { get; init; } = false;
+
+    /// <summary>
     /// When true, only report findings that are definitively proven (by Z3 or constant analysis).
     /// Suppresses Info-level "inconclusive" findings and precondition suggestions.
     /// Default: false (backward compatible). The CLI sets this to true unless --all-findings is passed.
@@ -156,6 +162,9 @@ public sealed class BugPatternRunner
 
         if (_options.CheckOffByOne)
             checkers.Add(new Patterns.OffByOneChecker(_options));
+
+        if (_options.CheckOptionResultFlow)
+            checkers.Add(new Patterns.OptionResultFlowChecker());
 
         return checkers;
     }

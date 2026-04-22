@@ -338,7 +338,9 @@ public class Program
                         BugPatternOptions = new Analysis.BugPatterns.BugPatternOptions
                         {
                             ReportOnlyVerified = !allFindings,
-                            Z3TimeoutMs = (uint)verificationTimeout
+                            Z3TimeoutMs = (uint)verificationTimeout,
+                            CheckOptionResultFlow = experimentalFlags != null
+                                && experimentalFlags.Any(f => string.Equals(f?.Trim(), "flow-option-tracking", StringComparison.OrdinalIgnoreCase))
                         },
                         TaintOptions = new Analysis.Security.TaintAnalysisOptions
                         {

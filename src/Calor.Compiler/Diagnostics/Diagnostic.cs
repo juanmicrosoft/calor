@@ -295,6 +295,15 @@ public static class DiagnosticCode
     /// </summary>
     public const string InferredContract = "Calor0928";
 
+    /// <summary>
+    /// Warning: Unsafe unwrap of an Option/Result variable on a path where it is
+    /// not verified Some/Ok. Complements <see cref="UnsafeUnwrap"/> with
+    /// flow-sensitive tracking (catches reassignment invalidation and recognizes
+    /// guard-return patterns). Emitted by <c>OptionResultFlowChecker</c> under the
+    /// experimental <c>flow-option-tracking</c> flag.
+    /// </summary>
+    public const string UnsafeUnwrapFlow = "Calor0929";
+
     // Class member analysis (Calor0930-0949)
 
     /// <summary>
