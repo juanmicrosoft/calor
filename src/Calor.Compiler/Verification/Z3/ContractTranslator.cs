@@ -83,6 +83,28 @@ public sealed class ContractTranslator
     private readonly Dictionary<string, ArrayInfo> _arrayInfo = new();
 
     /// <summary>
+    /// Z3 uninterpreted sorts for user-defined types (classes). Cached per type name so that
+    /// multiple variables of the same class share a sort, allowing Z3 to reason about field
+    /// accessors as functions on that sort.
+    /// </summary>
+    private readonly Dictionary<string, Sort> _userTypeSorts = new();
+
+    /// <summary>
+    /// Z3 uninterpreted function declarations for field accessors on user-defined types,
+    /// keyed by (type-name, field-name). Created on demand when a FieldAccessNode is
+    /// translated. The result type is the field's declared Calor type when known, or
+    /// signed 32-bit bit-vector as a default fallback.
+    /// </summary>
+    private readonly Dictionary<(string TypeName, string FieldName), FuncDecl> _fieldAccessors = new();
+
+    /// <summary>
+    /// Optional registry of user-defined types and their fields, supplied by the verification
+    /// pass when iterating a module. Lets the translator pick the correct Z3 result sort for
+    /// each field accessor instead of falling back to bit-vector.
+    /// </summary>
+    private IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? _userTypeRegistry;
+
+    /// <summary>
     /// Collects warnings about features that were silently ignored during translation.
     /// These don't cause translation failure but may result in unexpected verification behavior.
     /// </summary>
@@ -108,6 +130,16 @@ public sealed class ContractTranslator
     public ContractTranslator(Context ctx)
     {
         _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
+    }
+
+    /// <summary>
+    /// Registers a map of class type-name → (field-name → field-type) so that
+    /// FieldAccess translation can produce correctly-typed Z3 functions. Pass null
+    /// (or omit the call) to fall back to default-typed accessors.
+    /// </summary>
+    public void SetUserTypeRegistry(IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? registry)
+    {
+        _userTypeRegistry = registry;
     }
 
     /// <summary>
@@ -199,6 +231,7 @@ public sealed class ContractTranslator
             ImplicationExpressionNode impl => TranslateImplication(impl),
             ArrayAccessNode arrayAccess => TranslateArrayAccess(arrayAccess),
             ArrayLengthNode arrayLen => TranslateArrayLength(arrayLen),
+            FieldAccessNode fieldAccess => TranslateFieldAccess(fieldAccess),
 
             // String support using Z3's native string theory
             StringLiteralNode strLit => TrackString(_ctx.MkString(strLit.Value)),
@@ -219,8 +252,78 @@ public sealed class ContractTranslator
         if (_variables.TryGetValue(node.Name, out var variable))
             return variable.Expr;
 
-        // Unknown variable - might be a reference to something we don't know about
+        // Dot-path references like "item.Quantity" come through the parser as a single
+        // ReferenceNode with the dot baked into the name. Resolve them as field access:
+        // item.Quantity → field accessor function applied to item's Z3 const.
+        if (node.Name.Contains('.'))
+        {
+            var resolved = ResolveDotPath(node.Name);
+            if (resolved is not null) return resolved;
+        }
+
         return null;
+    }
+
+    /// <summary>
+    /// Resolves a dot-separated reference name (e.g. "item.Quantity" or "a.b.c") by
+    /// walking the path: the first segment is looked up in the variable scope, and each
+    /// subsequent segment becomes a field-access on the previous result. Each step uses
+    /// (or creates) an uninterpreted Z3 function for the field. The receiver type comes
+    /// from the variable registry; intermediate types come from the user-type registry
+    /// when known, defaulting to i32 otherwise.
+    /// </summary>
+    private Expr? ResolveDotPath(string dottedName)
+    {
+        var parts = dottedName.Split('.');
+        if (parts.Length < 2) return null;
+
+        if (!_variables.TryGetValue(parts[0], out var rootVar))
+            return null;
+
+        Expr current = rootVar.Expr;
+        string currentType = rootVar.Type;
+
+        for (int i = 1; i < parts.Length; i++)
+        {
+            var fieldName = parts[i];
+            var coreType = NormalizeTypeName(currentType);
+            if (coreType.EndsWith("?")) coreType = coreType[..^1];
+            if (coreType.EndsWith("[]"))
+                return null; // array element access via dot-path is not supported here
+
+            string fieldType = "i32";
+            if (_userTypeRegistry is not null
+                && _userTypeRegistry.TryGetValue(coreType, out var fieldMap)
+                && fieldMap.TryGetValue(fieldName, out var t))
+            {
+                fieldType = NormalizeTypeName(t);
+            }
+
+            var key = (coreType, fieldName);
+            if (!_fieldAccessors.TryGetValue(key, out var accessor))
+            {
+                if (!_userTypeSorts.TryGetValue(coreType, out var receiverSort))
+                {
+                    receiverSort = _ctx.MkUninterpretedSort(coreType);
+                    _userTypeSorts[coreType] = receiverSort;
+                }
+                var resultSort = ResultSortForType(fieldType);
+                accessor = _ctx.MkFuncDecl($"{coreType}_{fieldName}", new[] { receiverSort }, resultSort);
+                _fieldAccessors[key] = accessor;
+            }
+
+            current = accessor.Apply(current);
+            currentType = fieldType;
+
+            // Track bit-vector width if the field is integer-typed so subsequent
+            // numerical operations behave correctly.
+            if (current is BitVecExpr bv)
+            {
+                var (w, signed) = GetTypeWidthAndSignedness(fieldType);
+                if (w > 0) TrackBitVec(bv, w, signed);
+            }
+        }
+        return current;
     }
 
     /// <summary>
@@ -501,8 +604,30 @@ public sealed class ContractTranslator
             "string" or "str" => TrackString((SeqExpr)_ctx.MkConst(name, _ctx.StringSort)),
             // Unsupported types
             "f32" or "f64" or "float" or "double" => null,
-            _ => null
+            _ => CreateUserDefinedTypeVariable(name, normalizedType, typeName)
         };
+    }
+
+    /// <summary>
+    /// Creates a Z3 constant of an uninterpreted sort for a user-defined type (class).
+    /// One sort per type name, shared across variables of that type. Strips a trailing
+    /// '?' nullable marker so `Order` and `Order?` map to the same sort. Field accesses
+    /// are then translated as uninterpreted functions on that sort — see
+    /// <see cref="TranslateFieldAccess"/>.
+    /// </summary>
+    private Expr CreateUserDefinedTypeVariable(string name, string normalizedType, string originalType)
+    {
+        // Strip nullable marker for sort lookup; nullability tracked separately if needed.
+        var coreType = normalizedType.EndsWith("?") ? normalizedType[..^1] : normalizedType;
+        if (string.IsNullOrEmpty(coreType))
+            return null!;
+
+        if (!_userTypeSorts.TryGetValue(coreType, out var sort))
+        {
+            sort = _ctx.MkUninterpretedSort(coreType);
+            _userTypeSorts[coreType] = sort;
+        }
+        return _ctx.MkConst(name, sort);
     }
 
     /// <summary>
@@ -1026,6 +1151,95 @@ public sealed class ContractTranslator
     // ===========================================
     // Array Theory Enhancement
     // ===========================================
+
+    /// <summary>
+    /// Translates a field-access expression on a user-defined-type value: obj.Field.
+    /// Models the field as an uninterpreted Z3 function on the object's sort. The
+    /// function's result sort comes from the user-type registry (when supplied) or
+    /// defaults to signed 32-bit bit-vector. One function per (type, field) pair,
+    /// shared across all expressions referencing the same field.
+    /// </summary>
+    private Expr? TranslateFieldAccess(FieldAccessNode node)
+    {
+        // Translate the receiver to a Z3 expression.
+        var target = Translate(node.Target);
+        if (target is null)
+            return null;
+
+        // Determine the receiver's Calor type so we can index our field-accessor table.
+        // For now we look this up via the variable registry when the target is a plain reference.
+        string? receiverType = node.Target switch
+        {
+            ReferenceNode r when _variables.TryGetValue(r.Name, out var v) => v.Type,
+            _ => null,
+        };
+        if (receiverType is null)
+            return null;
+
+        var coreType = NormalizeTypeName(receiverType);
+        if (coreType.EndsWith("?")) coreType = coreType[..^1];
+        if (coreType.EndsWith("[]")) return null; // arrays handled elsewhere
+
+        // Determine the field's declared type, defaulting to i32 when the registry
+        // doesn't know about this type/field.
+        string fieldType = "i32";
+        if (_userTypeRegistry is not null
+            && _userTypeRegistry.TryGetValue(coreType, out var fieldMap)
+            && fieldMap.TryGetValue(node.FieldName, out var t))
+        {
+            fieldType = NormalizeTypeName(t);
+        }
+
+        // Cache the field accessor function decl per (type, field).
+        var key = (coreType, node.FieldName);
+        if (!_fieldAccessors.TryGetValue(key, out var accessor))
+        {
+            // Receiver's sort: if we declared the variable through CreateVariableForType
+            // it'll be the uninterpreted sort we cached. Otherwise create one now.
+            if (!_userTypeSorts.TryGetValue(coreType, out var receiverSort))
+            {
+                receiverSort = _ctx.MkUninterpretedSort(coreType);
+                _userTypeSorts[coreType] = receiverSort;
+            }
+
+            var resultSort = ResultSortForType(fieldType);
+            accessor = _ctx.MkFuncDecl($"{coreType}_{node.FieldName}", new[] { receiverSort }, resultSort);
+            _fieldAccessors[key] = accessor;
+        }
+
+        var applied = accessor.Apply(target);
+
+        // If the field is an integer, track its width so subsequent operations work.
+        if (applied is BitVecExpr bv && fieldType is "i32" or "int" or "i64" or "long" or "u32" or "uint" or "u64" or "ulong" or "i8" or "i16" or "u8" or "u16" or "byte" or "short" or "ushort")
+        {
+            var (w, signed) = GetTypeWidthAndSignedness(fieldType);
+            if (w > 0) TrackBitVec(bv, w, signed);
+        }
+        return applied;
+    }
+
+    /// <summary>
+    /// Maps a Calor field type to the corresponding Z3 sort, used as the result sort of
+    /// uninterpreted field accessors. Defaults to 32-bit signed bit-vector for unknown types.
+    /// </summary>
+    private Sort ResultSortForType(string typeName)
+    {
+        var t = NormalizeTypeName(typeName);
+        if (t.EndsWith("?")) t = t[..^1];
+        return t switch
+        {
+            "i8" or "u8" => _ctx.MkBitVecSort(8),
+            "i16" or "u16" => _ctx.MkBitVecSort(16),
+            "i32" or "u32" or "int" or "uint" => _ctx.MkBitVecSort(32),
+            "i64" or "u64" or "long" or "ulong" => _ctx.MkBitVecSort(64),
+            "bool" => _ctx.BoolSort,
+            "string" or "str" => _ctx.StringSort,
+            _ when !string.IsNullOrEmpty(t) => _userTypeSorts.TryGetValue(t, out var s)
+                                               ? s
+                                               : (_userTypeSorts[t] = _ctx.MkUninterpretedSort(t)),
+            _ => _ctx.MkBitVecSort(32),
+        };
+    }
 
     /// <summary>
     /// Translates array length access: arr.Length -> BitVecExpr (32-bit unsigned)
