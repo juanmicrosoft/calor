@@ -2,6 +2,40 @@
 
 Records why each version of the rubric supersedes the prior one. Append-only.
 
+## v3 supersedes v2
+
+**Date:** 2026-05-01
+**Trigger:** B4 (Calor compiler scale validation) hit emission bugs at scaffold complexity (CS1729 record-struct ctors, CS8618 non-nullable property emission, CS8917 lambda type inference). Documented in `milestone-2-b4-finding.md`.
+**Authority:** user feedback "if you have low confidence in a path, document it and move on to the next idea." Saved as `feedback_pivot_on_low_confidence.md` in memory. Confidence on the Calor port path was ~55%.
+
+### What v3 changes vs v2
+
+| v2 | v3 | Why |
+|----|----|-----|
+| Compares Calor variant vs C# variant | Compares **annotated C#** (B1 state) vs **bare C#** (annotation comments stripped) | Tests the *information* component of Calor's annotation regime independent of *enforcement*. Sidesteps Calor compiler bugs. |
+| Hypothesis: Calor's machine-verifiable annotation regime helps | Hypothesis (T1-prime): annotation regime alone helps, even without enforcement | T1-prime decision-gates Calor compiler work cleanly: positive → invest in enforcement layer; null → annotation alone is a non-starter. |
+| Six prerequisites B1–B6 | B1, B2, B3, B5, B6 retained; B4 dropped (no Calor needed); **B7 added**: bare-C# variant exists and tests pass | B4 unblockable without compiler fixes; B7 is required by the new design. |
+| Cost ~$575 (Calor 1.3× factor) | Cost ~$450 (no MCP overhead asymmetry) | Both arms are vanilla C#. |
+| Run-folder labels: `csharp/`, `calor/` | Run-folder labels: `annotated/`, `bare/` | Reflects new arms. |
+
+### What v3 does not address
+
+- **The value of machine verification.** Out of scope; v3 isolates information from enforcement.
+- **Calor as a whole.** v3 cannot conclude anything about Calor specifically; tests a hypothesis about annotation regimes in C# generally.
+- **The three v0.5.0 emitter bugs.** Documented in milestone-2 as candidates for separate Calor.Compiler maintenance work; not Phase 0 scope.
+
+### Migration path
+
+- `scoring-rubric-v2.md` **superseded** but retained for audit trail.
+- `scoring-rubric-v3.md` is now **authoritative**.
+- `README.md` updated to point to v3.
+- `bench/research-phase-0/calor-baseline/` left in place as evidence of the partial port; not extended.
+- `bench/research-phase-0/csharp-baseline/` is the **annotated** arm.
+- `bench/research-phase-0/csharp-bare/` is the **bare** arm (B7 prerequisite).
+- Existing `cost-budget.md` retains its program-level caps; Phase 0 sub-budget revised to ~$450 in v3.
+
+---
+
 ## v2 supersedes v1
 
 **Date:** 2026-05-01
