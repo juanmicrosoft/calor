@@ -2,6 +2,19 @@
 
 Records why each version of the rubric supersedes the prior one. Append-only.
 
+## v3.1 — grader bug fix during B6 dry-run
+
+**Date:** 2026-05-01
+**Trigger:** B6 dry-run revealed the T1.B grader's `ForceReservationsExpired` helper only manipulated properties whose name contained "Expir". When a model implements expiry as `CreatedAt + lifetime` (a perfectly reasonable pattern, used by the dry-run model), the helper found no relevant property and the reservations stayed at recent timestamps, causing the grader to report 3/7 acceptance failures even though the model's implementation was correct.
+
+**Fix:** broadened the property-name probe to include `Expir`, `Created`, `At`, `Time`, `Timestamp`. Skips properties whose value is null (so we don't accidentally back-date `ConfirmedAt`/`ReleasedAt`/`FulfilledAt` on a Created reservation, which would mark them as terminal).
+
+**Why this is a grader-bug fix and not implementation-favoring tuning:** the bug existed before any implementation was seen — the grader assumed a single naming convention where the prompt explicitly says "anything reasonable." Fixing it brings the grader into line with the prompt's intended generality. The fix is committed alongside this changelog entry; the same grader applies uniformly to all subsequent runs (annotated + bare arm).
+
+**Methodological note:** B6's purpose is to validate the cost envelope and the grader. Discovering grader bugs during B6 is exactly what B6 is for. The fix is logged here for audit; the grader pre-registration is now v3.1 with this single change.
+
+---
+
 ## v3 supersedes v2
 
 **Date:** 2026-05-01
