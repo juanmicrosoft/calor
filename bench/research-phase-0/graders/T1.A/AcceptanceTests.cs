@@ -24,7 +24,8 @@ public class T1A_OrderPriority_AcceptanceTests : IClassFixture<WebApplicationFac
     private async Task<Guid> SeedCustomerAsync()
     {
         var c = new Customer { Name = "T1A", Email = "t@t", BillingAddress = "x", ShippingAddress = "x" };
-        await _factory.Services.GetRequiredService<ICustomerRepository>().AddAsync(c);
+        using var scope = _factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<ICustomerRepository>().AddAsync(c);
         return c.Id;
     }
 
@@ -74,13 +75,14 @@ public class T1A_OrderPriority_AcceptanceTests : IClassFixture<WebApplicationFac
         // Create three orders, advance them to Paid, then check schedulable order.
         // Uses internal services because the API surface for "advance to Paid" is multi-step;
         // this stays acceptance-flavored because we still verify behavior at the schedulable endpoint.
-        var services = _factory.Services;
+        using var scope = _factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
         var orderService = services.GetRequiredService<WholesaleOrders.Services.IOrderService>();
         var paymentService = services.GetRequiredService<WholesaleOrders.Services.IPaymentService>();
         var customerId = await SeedCustomerAsync();
         var inv = services.GetRequiredService<WholesaleOrders.Services.IInventoryService>();
         var sku = WholesaleOrders.Domain.ValueObjects.Sku.Parse("ORD-A");
-        await inv.AddItemAsync(sku, "OrdA", 100);
+        await inv.AddItemAsync(sku, "OrdA", 100, unitPrice: 1m);
 
         async Task<Guid> MakeOrder(string priority)
         {

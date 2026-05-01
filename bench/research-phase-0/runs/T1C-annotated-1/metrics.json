@@ -1,0 +1,19 @@
+{
+  "run_dir": "T1C-annotated-1",
+  "prompt": "T1C",
+  "arm": "annotated",
+  "model": "claude-opus-4-7",
+  "build_ok": true,
+  "build_warnings": 0,
+  "build_errors": 0,
+  "acceptance_passed": 0,
+  "acceptance_failed": 4,
+  "acceptance_total": 4,
+  "regression_passed": 56,
+  "regression_failed": 0,
+  "regression_total": 56,
+  "correctness": 0,
+  "invariant_preservation": 1.0,
+  "regression_rate": 0,
+  "quality": 0
+}

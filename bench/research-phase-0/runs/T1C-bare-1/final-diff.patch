@@ -1,0 +1,1155 @@
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Api.dll and ./src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Api.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Api.pdb and ./src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Api.pdb differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Domain.dll and ./src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Domain.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Domain.pdb and ./src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Domain.pdb differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Infra.dll and ./src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Infra.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Infra.pdb and ./src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Infra.pdb differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Services.dll and ./src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Services.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Services.pdb and ./src/WholesaleOrders.Api/bin/Debug/net10.0/WholesaleOrders.Services.pdb differ
+diff -ur /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/Controllers/ShipmentsController.cs ./src/WholesaleOrders.Api/Controllers/ShipmentsController.cs
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/Controllers/ShipmentsController.cs	2026-05-01 13:14:47.530491400 -0400
++++ ./src/WholesaleOrders.Api/Controllers/ShipmentsController.cs	2026-05-01 15:00:02.981457700 -0400
+@@ -11,13 +11,17 @@
+ 
+     public ShipmentsController(IShipmentService shipments) => _shipments = shipments;
+ 
+-    public sealed record CreateShipmentRequest(Guid OrderId, string Carrier);
++    public sealed record ShipmentLineItemDto(Guid OrderLineItemId, int Quantity);
++    public sealed record CreateShipmentRequest(Guid OrderId, string Carrier, IReadOnlyList<ShipmentLineItemDto>? Items);
+     public sealed record InTransitRequest(string TrackingNumber);
+ 
+     [HttpPost]
+     public async Task<IActionResult> Create([FromBody] CreateShipmentRequest req, CancellationToken ct)
+     {
+-        var shipment = await _shipments.CreateShipmentAsync(req.OrderId, req.Carrier, ct);
++        var items = req.Items?
++            .Select(i => new ShipmentLineItemRequest(i.OrderLineItemId, i.Quantity))
++            .ToList();
++        var shipment = await _shipments.CreateShipmentAsync(req.OrderId, req.Carrier, items, ct);
+         return Ok(shipment);
+     }
+ 
+@@ -41,4 +45,11 @@
+         var orders = await _shipments.GetSchedulableOrdersAsync(ct);
+         return Ok(orders);
+     }
++
++    [HttpGet("orders/{orderId:guid}")]
++    public async Task<IActionResult> ListByOrder(Guid orderId, CancellationToken ct)
++    {
++        var shipments = await _shipments.GetShipmentsForOrderAsync(orderId, ct);
++        return Ok(shipments);
++    }
+ }
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/ref/WholesaleOrders.Api.dll and ./src/WholesaleOrders.Api/obj/Debug/net10.0/ref/WholesaleOrders.Api.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/refint/WholesaleOrders.Api.dll and ./src/WholesaleOrders.Api/obj/Debug/net10.0/refint/WholesaleOrders.Api.dll differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/rjsmcshtml.dswa.cache.json	2026-05-01 13:15:12.712911300 -0400
++++ ./src/WholesaleOrders.Api/obj/Debug/net10.0/rjsmcshtml.dswa.cache.json	2026-05-01 15:00:11.775502600 -0400
+@@ -1 +1 @@
+-{"GlobalPropertiesHash":"0wFdCLGAsu8pA9jXDWDBJ8zR6lN1XyP/t90gtRl0R0o=","FingerprintPatternsHash":"gq3WsqcKBUGTSNle7RKKyXRIwh7M8ccEqOqYvIzoM04=","PropertyOverridesHash":"8ZRc1sGeVrPBx4lD717BgRaQekyh78QKV9SKsdt638U=","InputHashes":["vfYw6bnRyPFhYW3k0xjNZTHm5bA4VCn2/Ibc95yOUk4=","ghkU9Ot8NDPoACmdoRrEL0B\u002B0tK0O5CskKUmLCmS2j0=","Q1Y\u002B5DyhRKfBlmIoeyqoYIlTnKGUzBMYgh6xfub\u002Ber0=","fWxxxU7yj20dLID0FtKokUvfpkEMkp7MtRa4xtn9Z90=","/XP3cjO7HLu7K6F/17UhE8TwwHpO6GKKCiTpQ\u002BDLtxI="],"CachedAssets":{},"CachedCopyCandidates":{}}
+\ No newline at end of file
++{"GlobalPropertiesHash":"XCtXm7ImBvuVscyb4y3Vz2y5MA0vKRCJRv04n2NnQCs=","FingerprintPatternsHash":"gq3WsqcKBUGTSNle7RKKyXRIwh7M8ccEqOqYvIzoM04=","PropertyOverridesHash":"8ZRc1sGeVrPBx4lD717BgRaQekyh78QKV9SKsdt638U=","InputHashes":["6rha08223YIC4ELUzEq3NhxlZPrdMBrMs2frVyBP5\u002BE=","mzJGTjXTFruP0UE4/KJpwT/4WQHGT/nEXel8Nqs1qTQ=","Mx5PrsU7vrssqkzm7b87LEwALB8sKe0kskfpmBUSjLY=","YoULdavQvzSPxxJ9bTzMikdr8w7HrF1ib2ycB3jC3Hg=","H8IqYs9KCV00U4GkCi3OY\u002BdMVkKQlk9F1j4ZwgAhMbQ="],"CachedAssets":{},"CachedCopyCandidates":{}}
+\ No newline at end of file
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/rjsmrazor.dswa.cache.json	2026-05-01 13:15:12.710253600 -0400
++++ ./src/WholesaleOrders.Api/obj/Debug/net10.0/rjsmrazor.dswa.cache.json	2026-05-01 15:00:11.772847300 -0400
+@@ -1 +1 @@
+-{"GlobalPropertiesHash":"Vqjq6eTAoQ5tAioHD+OSVvPovFXg0tuZSPPThCWbjao=","FingerprintPatternsHash":"gq3WsqcKBUGTSNle7RKKyXRIwh7M8ccEqOqYvIzoM04=","PropertyOverridesHash":"8ZRc1sGeVrPBx4lD717BgRaQekyh78QKV9SKsdt638U=","InputHashes":["vfYw6bnRyPFhYW3k0xjNZTHm5bA4VCn2/Ibc95yOUk4=","ghkU9Ot8NDPoACmdoRrEL0B\u002B0tK0O5CskKUmLCmS2j0=","Q1Y\u002B5DyhRKfBlmIoeyqoYIlTnKGUzBMYgh6xfub\u002Ber0=","fWxxxU7yj20dLID0FtKokUvfpkEMkp7MtRa4xtn9Z90=","/XP3cjO7HLu7K6F/17UhE8TwwHpO6GKKCiTpQ\u002BDLtxI="],"CachedAssets":{},"CachedCopyCandidates":{}}
+\ No newline at end of file
++{"GlobalPropertiesHash":"7yH+M0/tiqeFFTTcj7ccZqeNClH5pNPcSNmHx6kSmO8=","FingerprintPatternsHash":"gq3WsqcKBUGTSNle7RKKyXRIwh7M8ccEqOqYvIzoM04=","PropertyOverridesHash":"8ZRc1sGeVrPBx4lD717BgRaQekyh78QKV9SKsdt638U=","InputHashes":["6rha08223YIC4ELUzEq3NhxlZPrdMBrMs2frVyBP5\u002BE=","mzJGTjXTFruP0UE4/KJpwT/4WQHGT/nEXel8Nqs1qTQ=","Mx5PrsU7vrssqkzm7b87LEwALB8sKe0kskfpmBUSjLY=","YoULdavQvzSPxxJ9bTzMikdr8w7HrF1ib2ycB3jC3Hg=","H8IqYs9KCV00U4GkCi3OY\u002BdMVkKQlk9F1j4ZwgAhMbQ="],"CachedAssets":{},"CachedCopyCandidates":{}}
+\ No newline at end of file
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/rpswa.dswa.cache.json	2026-05-01 13:15:11.363072300 -0400
++++ ./src/WholesaleOrders.Api/obj/Debug/net10.0/rpswa.dswa.cache.json	2026-05-01 14:56:59.845917000 -0400
+@@ -1 +1 @@
+-{"GlobalPropertiesHash":"KRIhpICdHVYbt7Nx3jzV1wNxkpGeE7LoQ6w9Fn5hlSU=","FingerprintPatternsHash":"gq3WsqcKBUGTSNle7RKKyXRIwh7M8ccEqOqYvIzoM04=","PropertyOverridesHash":"8ZRc1sGeVrPBx4lD717BgRaQekyh78QKV9SKsdt638U=","InputHashes":["vfYw6bnRyPFhYW3k0xjNZTHm5bA4VCn2/Ibc95yOUk4=","ghkU9Ot8NDPoACmdoRrEL0B\u002B0tK0O5CskKUmLCmS2j0="],"CachedAssets":{},"CachedCopyCandidates":{}}
+\ No newline at end of file
++{"GlobalPropertiesHash":"qfSKqY5If2B/Yih0boXbk+jL8m46IrncRJT8zP7tB+Y=","FingerprintPatternsHash":"gq3WsqcKBUGTSNle7RKKyXRIwh7M8ccEqOqYvIzoM04=","PropertyOverridesHash":"8ZRc1sGeVrPBx4lD717BgRaQekyh78QKV9SKsdt638U=","InputHashes":["6rha08223YIC4ELUzEq3NhxlZPrdMBrMs2frVyBP5\u002BE=","mzJGTjXTFruP0UE4/KJpwT/4WQHGT/nEXel8Nqs1qTQ="],"CachedAssets":{},"CachedCopyCandidates":{}}
+\ No newline at end of file
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.assets.cache and ./src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.assets.cache differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.csproj.AssemblyReference.cache and ./src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.csproj.AssemblyReference.cache differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.csproj.CoreCompileInputs.cache	2026-05-01 13:15:11.431506400 -0400
++++ ./src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.csproj.CoreCompileInputs.cache	2026-05-01 14:56:59.996759700 -0400
+@@ -1 +1 @@
+-8739dec203c9357bed4b183b119bd74d6b28ed420fdc6b30a051b47db4ad33f8
++b61a854fa9820f1e9727752470552afee2f2419128a1d45442b398a078ee6e1b
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.csproj.FileListAbsolute.txt	2026-05-01 13:15:12.995485300 -0400
++++ ./src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.csproj.FileListAbsolute.txt	2026-05-01 14:57:06.968254500 -0400
+@@ -1,39 +1,39 @@
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\appsettings.Development.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\appsettings.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.staticwebassets.endpoints.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.exe
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.deps.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.runtimeconfig.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\Microsoft.AspNetCore.OpenApi.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\Microsoft.OpenApi.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Domain.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Infra.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Services.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Domain.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Services.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Infra.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.csproj.AssemblyReference.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\rpswa.dswa.cache.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.GeneratedMSBuildEditorConfig.editorconfig
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.AssemblyInfoInputs.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.AssemblyInfo.cs
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.csproj.CoreCompileInputs.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.MvcApplicationPartsAssemblyInfo.cs
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.MvcApplicationPartsAssemblyInfo.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\rjimswa.dswa.cache.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\rjsmrazor.dswa.cache.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\scopedcss\bundle\WholesaleOrders.Api.styles.css
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\staticwebassets.build.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\staticwebassets.build.json.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\staticwebassets.development.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\staticwebassets.build.endpoints.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\swae.build.ex.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\Wholesal.59EDD5DC.Up2Date
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\refint\WholesaleOrders.Api.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.genruntimeconfig.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\obj\Debug\net10.0\ref\WholesaleOrders.Api.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\appsettings.Development.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\appsettings.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.staticwebassets.endpoints.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.exe
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.deps.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.runtimeconfig.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Api.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\Microsoft.AspNetCore.OpenApi.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\Microsoft.OpenApi.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Domain.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Infra.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Services.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Domain.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Services.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\bin\Debug\net10.0\WholesaleOrders.Infra.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.csproj.AssemblyReference.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\rpswa.dswa.cache.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.GeneratedMSBuildEditorConfig.editorconfig
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.AssemblyInfoInputs.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.AssemblyInfo.cs
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.csproj.CoreCompileInputs.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.MvcApplicationPartsAssemblyInfo.cs
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.MvcApplicationPartsAssemblyInfo.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\rjimswa.dswa.cache.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\rjsmrazor.dswa.cache.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\scopedcss\bundle\WholesaleOrders.Api.styles.css
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\staticwebassets.build.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\staticwebassets.build.json.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\staticwebassets.development.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\staticwebassets.build.endpoints.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\swae.build.ex.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\Wholesal.59EDD5DC.Up2Date
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\refint\WholesaleOrders.Api.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\WholesaleOrders.Api.genruntimeconfig.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\obj\Debug\net10.0\ref\WholesaleOrders.Api.dll
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.dll and ./src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.dll differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.GeneratedMSBuildEditorConfig.editorconfig	2026-05-01 13:15:11.408161900 -0400
++++ ./src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.GeneratedMSBuildEditorConfig.editorconfig	2026-05-01 14:56:59.942374400 -0400
+@@ -11,13 +11,13 @@
+ build_property._SupportedPlatformList = Linux,macOS,Windows
+ build_property.RootNamespace = WholesaleOrders.Api
+ build_property.RootNamespace = WholesaleOrders.Api
+-build_property.ProjectDir = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api\
++build_property.ProjectDir = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api\
+ build_property.EnableComHosting = 
+ build_property.EnableGeneratedComInterfaceComImportInterop = 
+ build_property.RazorLangVersion = 9.0
+ build_property.SupportLocalizedComponentNames = 
+ build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+-build_property.MSBuildProjectDirectory = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Api
++build_property.MSBuildProjectDirectory = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Api
+ build_property._RazorSourceGeneratorDebug = 
+ build_property.EffectiveAnalysisLevelStyle = 10.0
+ build_property.EnableCodeStyleSeverity = 
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.genruntimeconfig.cache	2026-05-01 13:15:12.892490200 -0400
++++ ./src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.genruntimeconfig.cache	2026-05-01 14:57:06.841945100 -0400
+@@ -1 +1 @@
+-82b9ab43673c5a5d5cf53b83a3fb580da78c20f445a3436743d68fdf13b638b9
++ad873c8a644570bdf5b3641daf7875114ceae71b38d0e76cce6466901bdcce61
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.pdb and ./src/WholesaleOrders.Api/obj/Debug/net10.0/WholesaleOrders.Api.pdb differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/project.assets.json	2026-05-01 13:15:08.972361400 -0400
++++ ./src/WholesaleOrders.Api/obj/project.assets.json	2026-05-01 14:56:38.173386400 -0400
+@@ -144,11 +144,11 @@
+   "project": {
+     "version": "1.0.0",
+     "restore": {
+-      "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
++      "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
+       "projectName": "WholesaleOrders.Api",
+-      "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
++      "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
+       "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-      "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\obj\\",
++      "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\obj\\",
+       "projectStyle": "PackageReference",
+       "fallbackFolders": [
+         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -170,14 +170,14 @@
+         "net10.0": {
+           "targetAlias": "net10.0",
+           "projectReferences": {
+-            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+             },
+-            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
+-              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
++            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
++              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
+             },
+-            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {
+-              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj"
++            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {
++              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj"
+             }
+           }
+         }
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/project.nuget.cache	2026-05-01 13:15:08.975024400 -0400
++++ ./src/WholesaleOrders.Api/obj/project.nuget.cache	2026-05-01 14:56:38.180358600 -0400
+@@ -1,8 +1,8 @@
+ {
+   "version": 2,
+-  "dgSpecHash": "WtMqJvSrBmg=",
++  "dgSpecHash": "HUjZ2oMACNY=",
+   "success": true,
+-  "projectFilePath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
++  "projectFilePath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
+   "expectedPackageFiles": [
+     "C:\\.tools\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.7\\microsoft.aspnetcore.openapi.10.0.7.nupkg.sha512",
+     "C:\\.tools\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512"
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Api/obj/WholesaleOrders.Api.csproj.nuget.dgspec.json	2026-05-01 13:15:08.977686100 -0400
++++ ./src/WholesaleOrders.Api/obj/WholesaleOrders.Api.csproj.nuget.dgspec.json	2026-05-01 14:56:38.185668800 -0400
+@@ -1,17 +1,17 @@
+ {
+   "format": 1,
+   "restore": {
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj": {}
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj": {}
+   },
+   "projects": {
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
+         "projectName": "WholesaleOrders.Api",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\WholesaleOrders.Api.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Api\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Api\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -33,14 +33,14 @@
+           "net10.0": {
+             "targetAlias": "net10.0",
+             "projectReferences": {
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+               },
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
+               },
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj"
+               }
+             }
+           }
+@@ -504,14 +504,14 @@
+         }
+       }
+     },
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+         "projectName": "WholesaleOrders.Domain",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -845,14 +845,14 @@
+         }
+       }
+     },
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+         "projectName": "WholesaleOrders.Infra",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -874,8 +874,8 @@
+           "net10.0": {
+             "targetAlias": "net10.0",
+             "projectReferences": {
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+               }
+             }
+           }
+@@ -1190,14 +1190,14 @@
+         }
+       }
+     },
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
+         "projectName": "WholesaleOrders.Services",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -1219,11 +1219,11 @@
+           "net10.0": {
+             "targetAlias": "net10.0",
+             "projectReferences": {
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+               },
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
+               }
+             }
+           }
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/bin/Debug/net10.0/WholesaleOrders.Domain.dll and ./src/WholesaleOrders.Domain/bin/Debug/net10.0/WholesaleOrders.Domain.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/bin/Debug/net10.0/WholesaleOrders.Domain.pdb and ./src/WholesaleOrders.Domain/bin/Debug/net10.0/WholesaleOrders.Domain.pdb differ
+diff -ur /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/Entities/Shipment.cs ./src/WholesaleOrders.Domain/Entities/Shipment.cs
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/Entities/Shipment.cs	2026-05-01 13:14:50.341836900 -0400
++++ ./src/WholesaleOrders.Domain/Entities/Shipment.cs	2026-05-01 14:58:04.679133600 -0400
+@@ -12,4 +12,10 @@
+     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+     public DateTimeOffset? ShippedAt { get; set; }
+     public DateTimeOffset? DeliveredAt { get; set; }
++
++    /// <summary>
++    /// The line items (and quantities) included in this shipment. A shipment may
++    /// contain a subset of an order's line items to support partial fulfillment.
++    /// </summary>
++    public List<ShipmentLineItem> LineItems { get; } = new();
+ }
+Only in ./src/WholesaleOrders.Domain/Entities: ShipmentLineItem.cs
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/Debug/net10.0/ref/WholesaleOrders.Domain.dll and ./src/WholesaleOrders.Domain/obj/Debug/net10.0/ref/WholesaleOrders.Domain.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/Debug/net10.0/refint/WholesaleOrders.Domain.dll and ./src/WholesaleOrders.Domain/obj/Debug/net10.0/refint/WholesaleOrders.Domain.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.assets.cache and ./src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.assets.cache differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.csproj.CoreCompileInputs.cache	2026-05-01 13:15:09.504698200 -0400
++++ ./src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.csproj.CoreCompileInputs.cache	2026-05-01 15:00:09.391807800 -0400
+@@ -1 +1 @@
+-e19ea2eca9e7a5e3d4f5c1a6541f16b99abf8b261e2d703d87d43c5c485ddb18
++24f29a6b1dc7ef7209ec2c0716273c793268c73493078faf135bc2195c8e9718
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.csproj.FileListAbsolute.txt	2026-05-01 13:15:10.082464100 -0400
++++ ./src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.csproj.FileListAbsolute.txt	2026-05-01 14:56:41.206976500 -0400
+@@ -1,11 +1,11 @@
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\bin\Debug\net10.0\WholesaleOrders.Domain.deps.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\bin\Debug\net10.0\WholesaleOrders.Domain.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\bin\Debug\net10.0\WholesaleOrders.Domain.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.GeneratedMSBuildEditorConfig.editorconfig
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.AssemblyInfoInputs.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.AssemblyInfo.cs
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.csproj.CoreCompileInputs.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\obj\Debug\net10.0\refint\WholesaleOrders.Domain.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\obj\Debug\net10.0\ref\WholesaleOrders.Domain.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\bin\Debug\net10.0\WholesaleOrders.Domain.deps.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\bin\Debug\net10.0\WholesaleOrders.Domain.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\bin\Debug\net10.0\WholesaleOrders.Domain.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.GeneratedMSBuildEditorConfig.editorconfig
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.AssemblyInfoInputs.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.AssemblyInfo.cs
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.csproj.CoreCompileInputs.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\obj\Debug\net10.0\refint\WholesaleOrders.Domain.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\obj\Debug\net10.0\WholesaleOrders.Domain.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\obj\Debug\net10.0\ref\WholesaleOrders.Domain.dll
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.dll and ./src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.dll differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.GeneratedMSBuildEditorConfig.editorconfig	2026-05-01 13:15:09.468086000 -0400
++++ ./src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.GeneratedMSBuildEditorConfig.editorconfig	2026-05-01 14:56:40.002124700 -0400
+@@ -10,7 +10,7 @@
+ build_property.EnforceExtendedAnalyzerRules = 
+ build_property._SupportedPlatformList = Linux,macOS,Windows
+ build_property.RootNamespace = WholesaleOrders.Domain
+-build_property.ProjectDir = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Domain\
++build_property.ProjectDir = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Domain\
+ build_property.EnableComHosting = 
+ build_property.EnableGeneratedComInterfaceComImportInterop = 
+ build_property.EffectiveAnalysisLevelStyle = 10.0
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.pdb and ./src/WholesaleOrders.Domain/obj/Debug/net10.0/WholesaleOrders.Domain.pdb differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/project.assets.json	2026-05-01 13:15:08.197635300 -0400
++++ ./src/WholesaleOrders.Domain/obj/project.assets.json	2026-05-01 14:56:37.741298600 -0400
+@@ -14,11 +14,11 @@
+   "project": {
+     "version": "1.0.0",
+     "restore": {
+-      "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++      "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+       "projectName": "WholesaleOrders.Domain",
+-      "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++      "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+       "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-      "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\obj\\",
++      "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\obj\\",
+       "projectStyle": "PackageReference",
+       "fallbackFolders": [
+         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/project.nuget.cache	2026-05-01 13:15:08.222202900 -0400
++++ ./src/WholesaleOrders.Domain/obj/project.nuget.cache	2026-05-01 14:56:37.778070100 -0400
+@@ -1,8 +1,8 @@
+ {
+   "version": 2,
+-  "dgSpecHash": "lwLqxKe9Qqc=",
++  "dgSpecHash": "YpddBvREw6w=",
+   "success": true,
+-  "projectFilePath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++  "projectFilePath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+   "expectedPackageFiles": [],
+   "logs": []
+ }
+\ No newline at end of file
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Domain/obj/WholesaleOrders.Domain.csproj.nuget.dgspec.json	2026-05-01 13:15:08.230171200 -0400
++++ ./src/WholesaleOrders.Domain/obj/WholesaleOrders.Domain.csproj.nuget.dgspec.json	2026-05-01 14:56:37.786058700 -0400
+@@ -1,17 +1,17 @@
+ {
+   "format": 1,
+   "restore": {
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {}
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {}
+   },
+   "projects": {
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+         "projectName": "WholesaleOrders.Domain",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/bin/Debug/net10.0/WholesaleOrders.Domain.dll and ./src/WholesaleOrders.Infra/bin/Debug/net10.0/WholesaleOrders.Domain.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/bin/Debug/net10.0/WholesaleOrders.Domain.pdb and ./src/WholesaleOrders.Infra/bin/Debug/net10.0/WholesaleOrders.Domain.pdb differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/bin/Debug/net10.0/WholesaleOrders.Infra.dll and ./src/WholesaleOrders.Infra/bin/Debug/net10.0/WholesaleOrders.Infra.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/bin/Debug/net10.0/WholesaleOrders.Infra.pdb and ./src/WholesaleOrders.Infra/bin/Debug/net10.0/WholesaleOrders.Infra.pdb differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/ref/WholesaleOrders.Infra.dll and ./src/WholesaleOrders.Infra/obj/Debug/net10.0/ref/WholesaleOrders.Infra.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/refint/WholesaleOrders.Infra.dll and ./src/WholesaleOrders.Infra/obj/Debug/net10.0/refint/WholesaleOrders.Infra.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.assets.cache and ./src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.assets.cache differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.csproj.AssemblyReference.cache and ./src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.csproj.AssemblyReference.cache differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.csproj.CoreCompileInputs.cache	2026-05-01 13:15:10.153074700 -0400
++++ ./src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.csproj.CoreCompileInputs.cache	2026-05-01 14:56:45.200281200 -0400
+@@ -1 +1 @@
+-652de1418bbe6fdf623ddf9e6de2672cd6ebf5dd1dfe50e1af3ecff2c40304dd
++d48a5710b18af90be79eb75d499d690fe962c9abc23f9adbcff9241896c674cb
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.csproj.FileListAbsolute.txt	2026-05-01 13:15:10.548700400 -0400
++++ ./src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.csproj.FileListAbsolute.txt	2026-05-01 14:56:51.385034800 -0400
+@@ -1,15 +1,15 @@
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Infra.deps.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Infra.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Infra.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Domain.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Domain.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.csproj.AssemblyReference.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.GeneratedMSBuildEditorConfig.editorconfig
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.AssemblyInfoInputs.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.AssemblyInfo.cs
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.csproj.CoreCompileInputs.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\Wholesal.AAAF2377.Up2Date
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\refint\WholesaleOrders.Infra.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\obj\Debug\net10.0\ref\WholesaleOrders.Infra.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Infra.deps.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Infra.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Infra.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Domain.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\bin\Debug\net10.0\WholesaleOrders.Domain.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.csproj.AssemblyReference.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.GeneratedMSBuildEditorConfig.editorconfig
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.AssemblyInfoInputs.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.AssemblyInfo.cs
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.csproj.CoreCompileInputs.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\Wholesal.AAAF2377.Up2Date
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\refint\WholesaleOrders.Infra.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\WholesaleOrders.Infra.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\obj\Debug\net10.0\ref\WholesaleOrders.Infra.dll
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.dll and ./src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.dll differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.GeneratedMSBuildEditorConfig.editorconfig	2026-05-01 13:15:10.129727000 -0400
++++ ./src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.GeneratedMSBuildEditorConfig.editorconfig	2026-05-01 14:56:45.159838300 -0400
+@@ -10,7 +10,7 @@
+ build_property.EnforceExtendedAnalyzerRules = 
+ build_property._SupportedPlatformList = Linux,macOS,Windows
+ build_property.RootNamespace = WholesaleOrders.Infra
+-build_property.ProjectDir = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Infra\
++build_property.ProjectDir = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Infra\
+ build_property.EnableComHosting = 
+ build_property.EnableGeneratedComInterfaceComImportInterop = 
+ build_property.EffectiveAnalysisLevelStyle = 10.0
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.pdb and ./src/WholesaleOrders.Infra/obj/Debug/net10.0/WholesaleOrders.Infra.pdb differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/project.assets.json	2026-05-01 13:15:08.204614900 -0400
++++ ./src/WholesaleOrders.Infra/obj/project.assets.json	2026-05-01 14:56:37.741298600 -0400
+@@ -33,11 +33,11 @@
+   "project": {
+     "version": "1.0.0",
+     "restore": {
+-      "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++      "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+       "projectName": "WholesaleOrders.Infra",
+-      "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++      "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+       "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-      "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\obj\\",
++      "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\obj\\",
+       "projectStyle": "PackageReference",
+       "fallbackFolders": [
+         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -59,8 +59,8 @@
+         "net10.0": {
+           "targetAlias": "net10.0",
+           "projectReferences": {
+-            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+             }
+           }
+         }
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/project.nuget.cache	2026-05-01 13:15:08.222202900 -0400
++++ ./src/WholesaleOrders.Infra/obj/project.nuget.cache	2026-05-01 14:56:37.778070100 -0400
+@@ -1,8 +1,8 @@
+ {
+   "version": 2,
+-  "dgSpecHash": "BdqbRqptDlY=",
++  "dgSpecHash": "kE+gkrmhEfs=",
+   "success": true,
+-  "projectFilePath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++  "projectFilePath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+   "expectedPackageFiles": [],
+   "logs": []
+ }
+\ No newline at end of file
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/obj/WholesaleOrders.Infra.csproj.nuget.dgspec.json	2026-05-01 13:15:08.232834200 -0400
++++ ./src/WholesaleOrders.Infra/obj/WholesaleOrders.Infra.csproj.nuget.dgspec.json	2026-05-01 14:56:37.786058700 -0400
+@@ -1,17 +1,17 @@
+ {
+   "format": 1,
+   "restore": {
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {}
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {}
+   },
+   "projects": {
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+         "projectName": "WholesaleOrders.Domain",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -345,14 +345,14 @@
+         }
+       }
+     },
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+         "projectName": "WholesaleOrders.Infra",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -374,8 +374,8 @@
+           "net10.0": {
+             "targetAlias": "net10.0",
+             "projectReferences": {
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+               }
+             }
+           }
+diff -ur /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/Persistence/AppDbContext.cs ./src/WholesaleOrders.Infra/Persistence/AppDbContext.cs
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/Persistence/AppDbContext.cs	2026-05-01 13:14:52.926354000 -0400
++++ ./src/WholesaleOrders.Infra/Persistence/AppDbContext.cs	2026-05-01 14:58:10.079906000 -0400
+@@ -18,6 +18,7 @@
+     public List<StockReservation> Reservations { get; } = new();
+     public List<Payment> Payments { get; } = new();
+     public List<Shipment> Shipments { get; } = new();
++    public List<ShipmentLineItem> ShipmentLineItems { get; } = new();
+ 
+     public T WithLock<T>(Func<T> action)
+     {
+diff -ur /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/Persistence/ShipmentRepository.cs ./src/WholesaleOrders.Infra/Persistence/ShipmentRepository.cs
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Infra/Persistence/ShipmentRepository.cs	2026-05-01 13:14:54.298743800 -0400
++++ ./src/WholesaleOrders.Infra/Persistence/ShipmentRepository.cs	2026-05-01 14:58:23.582688300 -0400
+@@ -8,6 +8,8 @@
+     Task<List<Shipment>> GetByOrderAsync(Guid orderId, CancellationToken ct = default);
+     Task AddAsync(Shipment shipment, CancellationToken ct = default);
+     Task UpdateAsync(Shipment shipment, CancellationToken ct = default);
++    Task AddLineItemAsync(ShipmentLineItem item, CancellationToken ct = default);
++    Task<List<ShipmentLineItem>> GetLineItemsByOrderAsync(Guid orderId, CancellationToken ct = default);
+ }
+ 
+ public class ShipmentRepository : IShipmentRepository
+@@ -17,14 +19,32 @@
+     public ShipmentRepository(AppDbContext db) => _db = db;
+ 
+     public Task<Shipment?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
+-        Task.FromResult(_db.WithLock(() => _db.Shipments.FirstOrDefault(s => s.Id == id)));
++        Task.FromResult(_db.WithLock(() =>
++        {
++            var s = _db.Shipments.FirstOrDefault(s => s.Id == id);
++            if (s != null) HydrateLineItems(s);
++            return s;
++        }));
+ 
+     public Task<List<Shipment>> GetByOrderAsync(Guid orderId, CancellationToken ct = default) =>
+-        Task.FromResult(_db.WithLock(() => _db.Shipments.Where(s => s.OrderId == orderId).ToList()));
++        Task.FromResult(_db.WithLock(() =>
++        {
++            var shipments = _db.Shipments.Where(s => s.OrderId == orderId).ToList();
++            foreach (var s in shipments) HydrateLineItems(s);
++            return shipments;
++        }));
+ 
+     public Task AddAsync(Shipment shipment, CancellationToken ct = default)
+     {
+-        _db.WithLock(() => _db.Shipments.Add(shipment));
++        _db.WithLock(() =>
++        {
++            _db.Shipments.Add(shipment);
++            foreach (var li in shipment.LineItems)
++            {
++                if (!_db.ShipmentLineItems.Any(x => x.Id == li.Id))
++                    _db.ShipmentLineItems.Add(li);
++            }
++        });
+         return Task.CompletedTask;
+     }
+ 
+@@ -34,7 +54,32 @@
+         {
+             var idx = _db.Shipments.FindIndex(s => s.Id == shipment.Id);
+             if (idx >= 0) _db.Shipments[idx] = shipment;
++            foreach (var li in shipment.LineItems)
++            {
++                if (!_db.ShipmentLineItems.Any(x => x.Id == li.Id))
++                    _db.ShipmentLineItems.Add(li);
++            }
+         });
+         return Task.CompletedTask;
+     }
++
++    public Task AddLineItemAsync(ShipmentLineItem item, CancellationToken ct = default)
++    {
++        _db.WithLock(() => _db.ShipmentLineItems.Add(item));
++        return Task.CompletedTask;
++    }
++
++    public Task<List<ShipmentLineItem>> GetLineItemsByOrderAsync(Guid orderId, CancellationToken ct = default) =>
++        Task.FromResult(_db.WithLock(() =>
++        {
++            var shipmentIds = _db.Shipments.Where(s => s.OrderId == orderId).Select(s => s.Id).ToHashSet();
++            return _db.ShipmentLineItems.Where(li => shipmentIds.Contains(li.ShipmentId)).ToList();
++        }));
++
++    private void HydrateLineItems(Shipment s)
++    {
++        s.LineItems.Clear();
++        foreach (var li in _db.ShipmentLineItems.Where(x => x.ShipmentId == s.Id))
++            s.LineItems.Add(li);
++    }
+ }
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Domain.dll and ./src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Domain.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Domain.pdb and ./src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Domain.pdb differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Infra.dll and ./src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Infra.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Infra.pdb and ./src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Infra.pdb differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Services.dll and ./src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Services.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Services.pdb and ./src/WholesaleOrders.Services/bin/Debug/net10.0/WholesaleOrders.Services.pdb differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/ref/WholesaleOrders.Services.dll and ./src/WholesaleOrders.Services/obj/Debug/net10.0/ref/WholesaleOrders.Services.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/refint/WholesaleOrders.Services.dll and ./src/WholesaleOrders.Services/obj/Debug/net10.0/refint/WholesaleOrders.Services.dll differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.assets.cache and ./src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.assets.cache differ
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.csproj.AssemblyReference.cache and ./src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.csproj.AssemblyReference.cache differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.csproj.CoreCompileInputs.cache	2026-05-01 13:15:10.626379700 -0400
++++ ./src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.csproj.CoreCompileInputs.cache	2026-05-01 14:56:52.355939000 -0400
+@@ -1 +1 @@
+-4772668fe5ece5019389af2117184abcb66aba88b0512203db1a884f550f1d13
++c4d527c9c2a95677e57d8720de18cd86b480e4303ab3cc12dab1b43d735797c2
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.csproj.FileListAbsolute.txt	2026-05-01 13:15:11.017549900 -0400
++++ ./src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.csproj.FileListAbsolute.txt	2026-05-01 14:56:59.192353000 -0400
+@@ -1,17 +1,17 @@
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Services.deps.json
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Services.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Services.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Domain.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Infra.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Domain.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Infra.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.csproj.AssemblyReference.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.GeneratedMSBuildEditorConfig.editorconfig
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.AssemblyInfoInputs.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.AssemblyInfo.cs
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.csproj.CoreCompileInputs.cache
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\Wholesal.C6B6D56D.Up2Date
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\refint\WholesaleOrders.Services.dll
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.pdb
+-C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\obj\Debug\net10.0\ref\WholesaleOrders.Services.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Services.deps.json
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Services.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Services.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Domain.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Infra.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Domain.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\bin\Debug\net10.0\WholesaleOrders.Infra.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.csproj.AssemblyReference.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.GeneratedMSBuildEditorConfig.editorconfig
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.AssemblyInfoInputs.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.AssemblyInfo.cs
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.csproj.CoreCompileInputs.cache
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\Wholesal.C6B6D56D.Up2Date
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\refint\WholesaleOrders.Services.dll
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\WholesaleOrders.Services.pdb
++C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\obj\Debug\net10.0\ref\WholesaleOrders.Services.dll
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.dll and ./src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.dll differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.GeneratedMSBuildEditorConfig.editorconfig	2026-05-01 13:15:10.597180200 -0400
++++ ./src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.GeneratedMSBuildEditorConfig.editorconfig	2026-05-01 14:56:52.302676800 -0400
+@@ -10,7 +10,7 @@
+ build_property.EnforceExtendedAnalyzerRules = 
+ build_property._SupportedPlatformList = Linux,macOS,Windows
+ build_property.RootNamespace = WholesaleOrders.Services
+-build_property.ProjectDir = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\csharp-bare\src\WholesaleOrders.Services\
++build_property.ProjectDir = C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\bench\research-phase-0\runs\T1C-bare-1\src\WholesaleOrders.Services\
+ build_property.EnableComHosting = 
+ build_property.EnableGeneratedComInterfaceComImportInterop = 
+ build_property.EffectiveAnalysisLevelStyle = 10.0
+Binary files /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.pdb and ./src/WholesaleOrders.Services/obj/Debug/net10.0/WholesaleOrders.Services.pdb differ
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/project.assets.json	2026-05-01 13:15:08.204614900 -0400
++++ ./src/WholesaleOrders.Services/obj/project.assets.json	2026-05-01 14:56:37.741298600 -0400
+@@ -52,11 +52,11 @@
+   "project": {
+     "version": "1.0.0",
+     "restore": {
+-      "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
++      "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
+       "projectName": "WholesaleOrders.Services",
+-      "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
++      "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
+       "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-      "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\obj\\",
++      "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\obj\\",
+       "projectStyle": "PackageReference",
+       "fallbackFolders": [
+         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -78,11 +78,11 @@
+         "net10.0": {
+           "targetAlias": "net10.0",
+           "projectReferences": {
+-            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+             },
+-            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
+-              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
++            "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
++              "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
+             }
+           }
+         }
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/project.nuget.cache	2026-05-01 13:15:08.222202900 -0400
++++ ./src/WholesaleOrders.Services/obj/project.nuget.cache	2026-05-01 14:56:37.778070100 -0400
+@@ -1,8 +1,8 @@
+ {
+   "version": 2,
+-  "dgSpecHash": "OcJbLOBwczw=",
++  "dgSpecHash": "UKlOAItKMtc=",
+   "success": true,
+-  "projectFilePath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
++  "projectFilePath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
+   "expectedPackageFiles": [],
+   "logs": []
+ }
+\ No newline at end of file
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/obj/WholesaleOrders.Services.csproj.nuget.dgspec.json	2026-05-01 13:15:08.232834200 -0400
++++ ./src/WholesaleOrders.Services/obj/WholesaleOrders.Services.csproj.nuget.dgspec.json	2026-05-01 14:56:37.786058700 -0400
+@@ -1,17 +1,17 @@
+ {
+   "format": 1,
+   "restore": {
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {}
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {}
+   },
+   "projects": {
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+         "projectName": "WholesaleOrders.Domain",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -345,14 +345,14 @@
+         }
+       }
+     },
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+         "projectName": "WholesaleOrders.Infra",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -374,8 +374,8 @@
+           "net10.0": {
+             "targetAlias": "net10.0",
+             "projectReferences": {
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+               }
+             }
+           }
+@@ -690,14 +690,14 @@
+         }
+       }
+     },
+-    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {
++    "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj": {
+       "version": "1.0.0",
+       "restore": {
+-        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
++        "projectUniqueName": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
+         "projectName": "WholesaleOrders.Services",
+-        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
++        "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\WholesaleOrders.Services.csproj",
+         "packagesPath": "C:\\.tools\\.nuget\\packages\\",
+-        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Services\\obj\\",
++        "outputPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Services\\obj\\",
+         "projectStyle": "PackageReference",
+         "fallbackFolders": [
+           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+@@ -719,11 +719,11 @@
+           "net10.0": {
+             "targetAlias": "net10.0",
+             "projectReferences": {
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Domain\\WholesaleOrders.Domain.csproj"
+               },
+-              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
+-                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\csharp-bare\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
++              "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj": {
++                "projectPath": "C:\\Users\\juanrivera\\sources\\repos\\juanmicrosoft\\calor-2\\bench\\research-phase-0\\runs\\T1C-bare-1\\src\\WholesaleOrders.Infra\\WholesaleOrders.Infra.csproj"
+               }
+             }
+           }
+diff -ur /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/OrderService.cs ./src/WholesaleOrders.Services/OrderService.cs
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/OrderService.cs	2026-05-01 13:14:55.158440300 -0400
++++ ./src/WholesaleOrders.Services/OrderService.cs	2026-05-01 14:59:43.620551500 -0400
+@@ -26,12 +26,17 @@
+     private readonly IOrderRepository _orders;
+     private readonly IOrderValidator _validator;
+     private readonly IStructuredLogger _logger;
++    private readonly IShipmentRepository? _shipments;
+ 
+     public OrderService(IOrderRepository orders, IOrderValidator validator, IStructuredLogger logger)
++        : this(orders, validator, logger, null) { }
++
++    public OrderService(IOrderRepository orders, IOrderValidator validator, IStructuredLogger logger, IShipmentRepository? shipments)
+     {
+         _orders = orders;
+         _validator = validator;
+         _logger = logger;
++        _shipments = shipments;
+     }
+     public async Task<Order> CreateDraftAsync(Guid customerId, string currency = "USD", CancellationToken ct = default)
+     {
+@@ -91,8 +96,37 @@
+         _logger.Info("OrderService.MarkShippedAsync", new { orderId });
+         var order = await _orders.GetByIdAsync(orderId, ct)
+             ?? throw new InvalidOperationException($"Order {orderId} not found.");
++
++        // With partial fulfillment, ShipmentService auto-transitions the order to
++        // Shipped when the last line item ships. Manual MarkShippedAsync is now
++        // idempotent for the already-Shipped case.
++        if (order.Status == OrderStatus.Shipped) return order;
+         if (order.Status != OrderStatus.Paid)
+             throw new InvalidOperationException($"Cannot mark shipped an order in status {order.Status}.");
++
++        // If shipments exist for this order, require that ALL line items have
++        // been fully shipped before allowing the manual transition.
++        if (_shipments != null)
++        {
++            var shipments = await _shipments.GetByOrderAsync(orderId, ct);
++            if (shipments.Count > 0)
++            {
++                var shipped = shipments
++                    .Where(s => s.Status == Domain.Enums.ShipmentStatus.InTransit
++                             || s.Status == Domain.Enums.ShipmentStatus.Delivered)
++                    .SelectMany(s => s.LineItems)
++                    .GroupBy(li => li.OrderLineItemId)
++                    .ToDictionary(g => g.Key, g => g.Sum(li => li.Quantity));
++
++                var allShipped = order.LineItems.All(li =>
++                    shipped.GetValueOrDefault(li.Id, 0) >= li.Quantity);
++
++                if (!allShipped)
++                    throw new InvalidOperationException(
++                        $"Cannot mark order {orderId} as Shipped: not all line items have been shipped.");
++            }
++        }
++
+         order.Status = OrderStatus.Shipped;
+         order.ShippedAt = DateTimeOffset.UtcNow;
+         await _orders.UpdateAsync(order, ct);
+diff -ur /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/ShipmentService.cs ./src/WholesaleOrders.Services/ShipmentService.cs
+--- /c/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/research-phase-0/csharp-bare/src/WholesaleOrders.Services/ShipmentService.cs	2026-05-01 13:14:55.707701600 -0400
++++ ./src/WholesaleOrders.Services/ShipmentService.cs	2026-05-01 14:59:00.022785300 -0400
+@@ -5,12 +5,29 @@
+ 
+ namespace WholesaleOrders.Services;
+ 
++/// <summary>
++/// Describes one line in a shipment request: the order's line item ID and how
++/// many of that line item are included in the shipment.
++/// </summary>
++public sealed record ShipmentLineItemRequest(Guid OrderLineItemId, int Quantity);
++
+ public interface IShipmentService
+ {
+-    Task<Shipment> CreateShipmentAsync(Guid orderId, string carrier, CancellationToken ct = default);
++    /// <summary>
++    /// Creates a shipment containing the specified subset of the order's line items.
++    /// If <paramref name="items"/> is null or empty, the shipment defaults to the
++    /// full set of unshipped quantities for the order (back-compat behavior).
++    /// </summary>
++    Task<Shipment> CreateShipmentAsync(
++        Guid orderId,
++        string carrier,
++        IReadOnlyList<ShipmentLineItemRequest>? items = null,
++        CancellationToken ct = default);
++
+     Task<Shipment> MarkInTransitAsync(Guid shipmentId, string trackingNumber, CancellationToken ct = default);
+     Task<Shipment> MarkDeliveredAsync(Guid shipmentId, CancellationToken ct = default);
+     Task<List<Order>> GetSchedulableOrdersAsync(CancellationToken ct = default);
++    Task<List<Shipment>> GetShipmentsForOrderAsync(Guid orderId, CancellationToken ct = default);
+ }
+ 
+ public class ShipmentService : IShipmentService
+@@ -25,17 +42,82 @@
+         _orders = orders;
+         _logger = logger;
+     }
+-    public async Task<Shipment> CreateShipmentAsync(Guid orderId, string carrier, CancellationToken ct = default)
++
++    public async Task<Shipment> CreateShipmentAsync(
++        Guid orderId,
++        string carrier,
++        IReadOnlyList<ShipmentLineItemRequest>? items = null,
++        CancellationToken ct = default)
+     {
+         var order = await _orders.GetByIdAsync(orderId, ct)
+             ?? throw new InvalidOperationException($"Order {orderId} not found.");
+         if (order.Status != OrderStatus.Paid)
+             throw new InvalidOperationException($"Cannot create shipment for order in status {order.Status}.");
+ 
++        // Sum already-shipped quantities per line item across existing non-cancelled
++        // shipments. (Pending, InTransit, Delivered all count as "committed".)
++        var existing = await _shipments.GetByOrderAsync(orderId, ct);
++        var alreadyShipped = existing
++            .SelectMany(s => s.LineItems)
++            .GroupBy(li => li.OrderLineItemId)
++            .ToDictionary(g => g.Key, g => g.Sum(li => li.Quantity));
++
++        // Default: ship everything that isn't already on a shipment.
++        if (items == null || items.Count == 0)
++        {
++            var defaulted = new List<ShipmentLineItemRequest>();
++            foreach (var li in order.LineItems)
++            {
++                var shipped = alreadyShipped.GetValueOrDefault(li.Id, 0);
++                var remaining = li.Quantity - shipped;
++                if (remaining > 0)
++                    defaulted.Add(new ShipmentLineItemRequest(li.Id, remaining));
++            }
++            items = defaulted;
++        }
++
++        if (items.Count == 0)
++            throw new InvalidOperationException(
++                $"Cannot create shipment for order {orderId}: all line items have already been shipped.");
++
++        // Validate each requested item.
++        foreach (var req in items)
++        {
++            if (req.Quantity <= 0)
++                throw new InvalidOperationException(
++                    $"Shipment line item quantity must be positive (got {req.Quantity}).");
++
++            var orderLine = order.LineItems.FirstOrDefault(li => li.Id == req.OrderLineItemId)
++                ?? throw new InvalidOperationException(
++                    $"Order {orderId} has no line item {req.OrderLineItemId}.");
++
++            var alreadyForLine = alreadyShipped.GetValueOrDefault(orderLine.Id, 0);
++            if (alreadyForLine + req.Quantity > orderLine.Quantity)
++                throw new InvalidOperationException(
++                    $"Cannot ship {req.Quantity} of line item {orderLine.Id}: " +
++                    $"already shipped {alreadyForLine}, ordered {orderLine.Quantity}.");
++        }
++
++        // Disallow duplicate references to the same line item within one shipment.
++        var dup = items.GroupBy(i => i.OrderLineItemId).FirstOrDefault(g => g.Count() > 1);
++        if (dup != null)
++            throw new InvalidOperationException(
++                $"Shipment cannot reference the same order line item twice: {dup.Key}.");
++
+         var shipment = new Shipment { OrderId = orderId, Carrier = carrier };
++        foreach (var req in items)
++        {
++            shipment.LineItems.Add(new ShipmentLineItem
++            {
++                ShipmentId = shipment.Id,
++                OrderLineItemId = req.OrderLineItemId,
++                Quantity = req.Quantity,
++            });
++        }
+         await _shipments.AddAsync(shipment, ct);
+         return shipment;
+     }
++
+     public async Task<Shipment> MarkInTransitAsync(Guid shipmentId, string trackingNumber, CancellationToken ct = default)
+     {
+         var shipment = await _shipments.GetByIdAsync(shipmentId, ct)
+@@ -46,8 +128,12 @@
+         shipment.TrackingNumber = trackingNumber;
+         shipment.ShippedAt = DateTimeOffset.UtcNow;
+         await _shipments.UpdateAsync(shipment, ct);
++
++        // Auto-transition order to Shipped if all line items are now fully shipped.
++        await TryTransitionOrderToShippedAsync(shipment.OrderId, ct);
+         return shipment;
+     }
++
+     public async Task<Shipment> MarkDeliveredAsync(Guid shipmentId, CancellationToken ct = default)
+     {
+         var shipment = await _shipments.GetByIdAsync(shipmentId, ct)
+@@ -72,4 +158,35 @@
+             .OrderBy(o => o.SubmittedAt ?? o.CreatedAt)
+             .ToList();
+     }
++
++    public Task<List<Shipment>> GetShipmentsForOrderAsync(Guid orderId, CancellationToken ct = default) =>
++        _shipments.GetByOrderAsync(orderId, ct);
++
++    /// <summary>
++    /// If every order line item now has total in-transit-or-delivered quantity
++    /// equal to its ordered quantity, transitions the order to Shipped. No-op
++    /// otherwise. Pending shipments do not count (the goods haven't left yet).
++    /// </summary>
++    private async Task TryTransitionOrderToShippedAsync(Guid orderId, CancellationToken ct)
++    {
++        var order = await _orders.GetByIdAsync(orderId, ct);
++        if (order == null || order.Status != OrderStatus.Paid) return;
++
++        var allShipments = await _shipments.GetByOrderAsync(orderId, ct);
++        var shippedQty = allShipments
++            .Where(s => s.Status == ShipmentStatus.InTransit || s.Status == ShipmentStatus.Delivered)
++            .SelectMany(s => s.LineItems)
++            .GroupBy(li => li.OrderLineItemId)
++            .ToDictionary(g => g.Key, g => g.Sum(li => li.Quantity));
++
++        var fullyShipped = order.LineItems.All(li =>
++            shippedQty.GetValueOrDefault(li.Id, 0) >= li.Quantity);
++
++        if (fullyShipped && order.LineItems.Count > 0)
++        {
++            order.Status = OrderStatus.Shipped;
++            order.ShippedAt = DateTimeOffset.UtcNow;
++            await _orders.UpdateAsync(order, ct);
++        }
++    }
+ }

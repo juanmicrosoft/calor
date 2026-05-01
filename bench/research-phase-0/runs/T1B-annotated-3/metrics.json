@@ -1,0 +1,20 @@
+{
+  "run_dir": "T1B-annotated-3",
+  "prompt": "T1B",
+  "arm": "annotated",
+  "model": "claude-opus-4-7",
+  "build_ok": true,
+  "build_warnings": 0,
+  "build_errors": 0,
+  "acceptance_passed": 6,
+  "acceptance_failed": 1,
+  "acceptance_total": 7,
+  "regression_passed": 51,
+  "regression_failed": 0,
+  "regression_total": 51,
+  "correctness": 0.0,
+  "invariant_preservation": 1.0,
+  "regression_rate": 0.0,
+  "quality": 0.0,
+  "note": "1 acceptance test (Sends_Notification) failed; correctness=0 by strict rubric. Model's own tests (51 total = 42 + 9 added) all pass."
+}

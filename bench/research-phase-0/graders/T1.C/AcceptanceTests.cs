@@ -23,7 +23,8 @@ public class T1C_PartialFulfillment_AcceptanceTests : IClassFixture<WebApplicati
 
     private async Task<(Guid orderId, List<OrderLineItem> lineItems)> SetupPaidOrderAsync(int qtyA, int qtyB)
     {
-        var services = _factory.Services;
+        using var scope = _factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
         var customerRepo = services.GetRequiredService<ICustomerRepository>();
         var inv = services.GetRequiredService<WholesaleOrders.Services.IInventoryService>();
         var orderService = services.GetRequiredService<WholesaleOrders.Services.IOrderService>();
@@ -34,8 +35,8 @@ public class T1C_PartialFulfillment_AcceptanceTests : IClassFixture<WebApplicati
 
         var skuA = WholesaleOrders.Domain.ValueObjects.Sku.Parse("PRT-A");
         var skuB = WholesaleOrders.Domain.ValueObjects.Sku.Parse("PRT-B");
-        await inv.AddItemAsync(skuA, "PrtA", 100);
-        await inv.AddItemAsync(skuB, "PrtB", 100);
+        await inv.AddItemAsync(skuA, "PrtA", 100, unitPrice: 1m);
+        await inv.AddItemAsync(skuB, "PrtB", 100, unitPrice: 1m);
 
         var order = await orderService.CreateDraftAsync(customer.Id);
         await orderService.AddLineItemAsync(order.Id, skuA, qtyA, 1m);

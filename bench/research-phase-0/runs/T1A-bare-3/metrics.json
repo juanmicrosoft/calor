@@ -1,0 +1,19 @@
+{
+  "run_dir": "T1A-bare-3",
+  "prompt": "T1A",
+  "arm": "bare",
+  "model": "claude-opus-4-7",
+  "build_ok": true,
+  "build_warnings": 0,
+  "build_errors": 0,
+  "acceptance_passed": 3,
+  "acceptance_failed": 1,
+  "acceptance_total": 4,
+  "regression_passed": 50,
+  "regression_failed": 0,
+  "regression_total": 50,
+  "correctness": 0,
+  "invariant_preservation": 1.0,
+  "regression_rate": 0,
+  "quality": 0
+}
