@@ -195,19 +195,50 @@ public class T1B_ReservationExpiry_AcceptanceTests : IClassFixture<WebApplicatio
     /// </summary>
     private async Task<bool> TryTriggerExpirySweepAsync(IServiceProvider services, TimeSpan advanceBy)
     {
-        // Strategy 1 — reflection-driven sweep method.
+        // Strategy 1 — reflection-driven sweep method on IInventoryService.
+        // Prefer bulk methods (no Guid param) over per-reservation methods.
         var inventoryService = services.GetRequiredService<IInventoryService>();
-        var sweepMethod = inventoryService.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(m =>
+        var candidates = inventoryService.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(m =>
                 m.Name.Contains("Expir", StringComparison.OrdinalIgnoreCase) ||
-                m.Name.Contains("Sweep", StringComparison.OrdinalIgnoreCase));
+                m.Name.Contains("Sweep", StringComparison.OrdinalIgnoreCase) ||
+                m.Name.Contains("Process", StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
-        if (sweepMethod is not null)
+        // Sort: prefer methods without Guid parameters (bulk over single-reservation).
+        var bulkMethod = candidates
+            .Where(m => !m.GetParameters().Any(p => p.ParameterType == typeof(Guid)))
+            .OrderByDescending(m => m.Name.Contains("Due", StringComparison.OrdinalIgnoreCase) || m.Name.Contains("Process", StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault();
+
+        if (bulkMethod is not null)
         {
             ForceReservationsExpired(services, advanceBy);
-            var args = sweepMethod.GetParameters().Select(p => p.HasDefaultValue ? p.DefaultValue : null).ToArray();
-            var result = sweepMethod.Invoke(inventoryService, args);
+            var args = bulkMethod.GetParameters().Select(p => DefaultArgFor(p)).ToArray();
+            var result = bulkMethod.Invoke(inventoryService, args);
             if (result is Task t) await t;
+            return true;
+        }
+
+        // Fallback: per-reservation method — call for every Created reservation.
+        var perResMethod = candidates.FirstOrDefault(m => m.GetParameters().Any(p => p.ParameterType == typeof(Guid)));
+        if (perResMethod is not null)
+        {
+            ForceReservationsExpired(services, advanceBy);
+            var db = _factory.Services.GetRequiredService<AppDbContext>();
+            var ids = db.Reservations.Where(r => r.Status == ReservationStatus.Created).Select(r => r.Id).ToList();
+            foreach (var id in ids)
+            {
+                var args = perResMethod.GetParameters()
+                    .Select(p => p.ParameterType == typeof(Guid) ? (object)id : DefaultArgFor(p))
+                    .ToArray();
+                try
+                {
+                    var result = perResMethod.Invoke(inventoryService, args);
+                    if (result is Task t) await t;
+                }
+                catch { /* skip — may fail for already-released etc */ }
+            }
             return true;
         }
 
@@ -222,7 +253,7 @@ public class T1B_ReservationExpiry_AcceptanceTests : IClassFixture<WebApplicatio
                     mi.Name.Contains("Process", StringComparison.OrdinalIgnoreCase));
             if (m is null) continue;
             ForceReservationsExpired(services, advanceBy);
-            var args = m.GetParameters().Select(p => p.HasDefaultValue ? p.DefaultValue : null).ToArray();
+            var args = m.GetParameters().Select(p => DefaultArgFor(p)).ToArray();
             var result = m.Invoke(hs, args);
             if (result is Task t) await t;
             return true;
@@ -230,7 +261,7 @@ public class T1B_ReservationExpiry_AcceptanceTests : IClassFixture<WebApplicatio
 
         // Strategy 3 — HTTP endpoint probing.
         using var client = _factory.CreateClient();
-        var candidates = new[]
+        var endpoints = new[]
         {
             "/api/inventory/sweep-expired-reservations",
             "/api/inventory/reservations/sweep",
@@ -238,7 +269,7 @@ public class T1B_ReservationExpiry_AcceptanceTests : IClassFixture<WebApplicatio
             "/api/inventory/reservations/expire",
             "/api/reservations/sweep-expired",
         };
-        foreach (var path in candidates)
+        foreach (var path in endpoints)
         {
             ForceReservationsExpired(services, advanceBy);
             var resp = await client.PostAsync(path, JsonContent.Create(new { }));
@@ -246,6 +277,23 @@ public class T1B_ReservationExpiry_AcceptanceTests : IClassFixture<WebApplicatio
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Argument value for invoking the model's sweep method. Honors defaults; for
+    /// required time-typed params (DateTimeOffset/DateTime), passes "now" so the
+    /// model's `<= asOf` comparison includes our back-dated reservations.
+    /// </summary>
+    private static object? DefaultArgFor(ParameterInfo p)
+    {
+        if (p.HasDefaultValue) return p.DefaultValue;
+        if (p.ParameterType == typeof(DateTimeOffset)) return DateTimeOffset.UtcNow;
+        if (p.ParameterType == typeof(DateTimeOffset?)) return (DateTimeOffset?)DateTimeOffset.UtcNow;
+        if (p.ParameterType == typeof(DateTime)) return DateTime.UtcNow;
+        if (p.ParameterType == typeof(DateTime?)) return (DateTime?)DateTime.UtcNow;
+        if (p.ParameterType == typeof(CancellationToken)) return CancellationToken.None;
+        if (p.ParameterType.IsValueType) return Activator.CreateInstance(p.ParameterType);
+        return null;
     }
 
     /// <summary>

@@ -1,7 +1,7 @@
 {
-  "run_dir": "dry-run-T1B-annotated-1",
+  "run_dir": "T1B-bare-3",
   "prompt": "T1B",
-  "arm": "annotated",
+  "arm": "bare",
   "model": "claude-opus-4-7",
   "build_ok": true,
   "build_warnings": 0,

@@ -1,19 +1,19 @@
 {
-  "run_dir": "dry-run-T1B-annotated-1",
-  "prompt": "T1B",
+  "run_dir": "T1A-annotated-1",
+  "prompt": "T1A",
   "arm": "annotated",
   "model": "claude-opus-4-7",
   "build_ok": true,
   "build_warnings": 0,
   "build_errors": 0,
-  "acceptance_passed": 7,
-  "acceptance_failed": 0,
-  "acceptance_total": 7,
+  "acceptance_passed": 2,
+  "acceptance_failed": 2,
+  "acceptance_total": 4,
   "regression_passed": 42,
   "regression_failed": 0,
   "regression_total": 42,
-  "correctness": 1,
+  "correctness": 0,
   "invariant_preservation": 1.0,
   "regression_rate": 0,
-  "quality": 1
+  "quality": 0
 }

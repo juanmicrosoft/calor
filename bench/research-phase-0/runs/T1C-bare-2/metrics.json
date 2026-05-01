@@ -1,0 +1,19 @@
+{
+  "run_dir": "T1C-bare-2",
+  "prompt": "T1C",
+  "arm": "bare",
+  "model": "claude-opus-4-7",
+  "build_ok": true,
+  "build_warnings": 0,
+  "build_errors": 0,
+  "acceptance_passed": 1,
+  "acceptance_failed": 3,
+  "acceptance_total": 4,
+  "regression_passed": 55,
+  "regression_failed": 0,
+  "regression_total": 55,
+  "correctness": 0,
+  "invariant_preservation": 1.0,
+  "regression_rate": 0,
+  "quality": 0
+}
