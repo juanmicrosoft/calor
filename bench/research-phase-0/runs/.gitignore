@@ -1,0 +1,9 @@
+# Each run is a copy of the scaffold + modifications. We only commit the artifacts
+# that summarize the run: metrics, diff, and any transcript captured. The full
+# workspace can be reconstructed from the diff against csharp-baseline (or csharp-bare).
+*/src/
+*/tests/
+*/Directory.Build.props
+*/WholesaleOrders.slnx
+*/bin/
+*/obj/

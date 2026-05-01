@@ -138,13 +138,14 @@ public class T1B_ReservationExpiry_AcceptanceTests : IClassFixture<WebApplicatio
     [Fact]
     public async Task Adversarial_Inventory_Stays_Consistent_During_Sweep()
     {
-        var services = _factory.Services;
-        var db = services.GetRequiredService<AppDbContext>();
+        using var scope = _factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
+        var db = _factory.Services.GetRequiredService<AppDbContext>();
         var inventoryService = services.GetRequiredService<IInventoryService>();
 
         // Seed inventory and a few reservations, some confirmed, some not.
         var sku = WholesaleOrders.Domain.ValueObjects.Sku.Parse("MIX-A");
-        var inventoryItem = await inventoryService.AddItemAsync(sku, "Mix-A", onHand: 50);
+        var inventoryItem = await inventoryService.AddItemAsync(sku, "Mix-A", onHand: 50, unitPrice: 1m);
         var orderId = Guid.NewGuid();
 
         var r1 = await inventoryService.ReserveAsync(orderId, sku, 5);
@@ -165,16 +166,17 @@ public class T1B_ReservationExpiry_AcceptanceTests : IClassFixture<WebApplicatio
     private async Task<(Guid reservationId, Guid inventoryItemId, AppDbContext db, IServiceProvider services)>
         SetupReservationAsync(int quantity, int onHand)
     {
-        var services = _factory.Services;
-        var db = services.GetRequiredService<AppDbContext>();
+        var scope = _factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
+        var db = _factory.Services.GetRequiredService<AppDbContext>();
         var inventoryService = services.GetRequiredService<IInventoryService>();
         var orderService = services.GetRequiredService<IOrderService>();
 
         var customer = new Customer { Name = "Test", Email = "test@test", BillingAddress = "x", ShippingAddress = "x" };
-        services.GetRequiredService<ICustomerRepository>().AddAsync(customer).Wait();
+        await services.GetRequiredService<ICustomerRepository>().AddAsync(customer);
 
         var sku = WholesaleOrders.Domain.ValueObjects.Sku.Parse($"SKU-{Guid.NewGuid():N}");
-        var item = await inventoryService.AddItemAsync(sku, "Test Item", onHand);
+        var item = await inventoryService.AddItemAsync(sku, "Test Item", onHand, unitPrice: 1m);
 
         var order = await orderService.CreateDraftAsync(customer.Id);
         var reservation = await inventoryService.ReserveAsync(order.Id, sku, quantity);
@@ -247,23 +249,36 @@ public class T1B_ReservationExpiry_AcceptanceTests : IClassFixture<WebApplicatio
     }
 
     /// <summary>
-    /// Best-effort: if the model added an ExpiresAt-style field on StockReservation,
-    /// set it to a time in the past so the sweep can find them.
+    /// Best-effort: make every "Created"-status reservation look expired, regardless
+    /// of whether the model uses ExpiresAt, CreatedAt + lifetime, or both. We back-date
+    /// every writable DateTime/DateTimeOffset property whose name looks time-related.
     /// </summary>
     private void ForceReservationsExpired(IServiceProvider services, TimeSpan advanceBy)
     {
-        var db = services.GetRequiredService<AppDbContext>();
-        var prop = typeof(StockReservation).GetProperties()
-            .FirstOrDefault(p => p.Name.Contains("Expir", StringComparison.OrdinalIgnoreCase) && p.CanWrite);
-        if (prop is null) return;
+        var db = _factory.Services.GetRequiredService<AppDbContext>();
+        var timeNames = new[] { "Expir", "Created", "At", "Time", "Timestamp" };
+        var props = typeof(StockReservation).GetProperties()
+            .Where(p => p.CanWrite && timeNames.Any(n => p.Name.Contains(n, StringComparison.OrdinalIgnoreCase)))
+            .Where(p => p.PropertyType == typeof(DateTimeOffset)
+                     || p.PropertyType == typeof(DateTimeOffset?)
+                     || p.PropertyType == typeof(DateTime)
+                     || p.PropertyType == typeof(DateTime?))
+            .ToList();
+
+        if (props.Count == 0) return;
 
         var pastTime = DateTimeOffset.UtcNow - advanceBy;
         foreach (var r in db.Reservations.Where(r => r.Status == ReservationStatus.Created).ToList())
         {
-            if (prop.PropertyType == typeof(DateTimeOffset)) prop.SetValue(r, pastTime);
-            else if (prop.PropertyType == typeof(DateTimeOffset?)) prop.SetValue(r, (DateTimeOffset?)pastTime);
-            else if (prop.PropertyType == typeof(DateTime)) prop.SetValue(r, pastTime.UtcDateTime);
-            else if (prop.PropertyType == typeof(DateTime?)) prop.SetValue(r, (DateTime?)pastTime.UtcDateTime);
+            foreach (var prop in props)
+            {
+                // Don't back-date "ConfirmedAt" / "ReleasedAt" / "FulfilledAt" — they should remain null on a Created reservation.
+                if (prop.GetValue(r) is null) continue;
+                if (prop.PropertyType == typeof(DateTimeOffset)) prop.SetValue(r, pastTime);
+                else if (prop.PropertyType == typeof(DateTimeOffset?)) prop.SetValue(r, (DateTimeOffset?)pastTime);
+                else if (prop.PropertyType == typeof(DateTime)) prop.SetValue(r, pastTime.UtcDateTime);
+                else if (prop.PropertyType == typeof(DateTime?)) prop.SetValue(r, (DateTime?)pastTime.UtcDateTime);
+            }
         }
     }
 }

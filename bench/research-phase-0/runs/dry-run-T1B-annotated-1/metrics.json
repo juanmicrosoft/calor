@@ -1,0 +1,59 @@
+{
+  "run_type": "dry-run",
+  "arm": "annotated",
+  "prompt": "T1.B",
+  "model": "claude-opus-4-7",
+  "turns_proxy_tool_uses": 36,
+  "tokens_total": 59149,
+  "tokens_in_estimate": 47000,
+  "tokens_out_estimate": 12000,
+  "dollar_cost_estimate": 1.61,
+  "wall_clock_s": 216,
+  "completed_naturally": true,
+  "halt_reason": "done",
+  "execution_method": "subagent (model=opus, general-purpose)",
+  "execution_caveat": "ran inside parent autonomous-research conversation; cost is approximate, system prompt differs from vanilla CC, but the implementation is real and gradeable",
+  "build": {
+    "succeeded": true,
+    "warnings": 0,
+    "errors": 0
+  },
+  "existing_tests": {
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0,
+    "regression_count": 0
+  },
+  "acceptance_tests": {
+    "passed": 7,
+    "failed": 0,
+    "total": 7,
+    "breakdown": {
+      "Acceptance_Reservation_Expires_After_30_Minutes_If_Not_Confirmed": "pass",
+      "Acceptance_Expired_Reservation_Releases_Inventory": "pass",
+      "Acceptance_Expired_Reservation_Sends_Notification": "pass",
+      "Acceptance_Confirmed_Reservation_Does_Not_Expire": "pass",
+      "Adversarial_Already_Released_Reservation_Stays_Released": "pass",
+      "Adversarial_Fulfilled_Reservation_Never_Expires": "pass",
+      "Adversarial_Inventory_Stays_Consistent_During_Sweep": "pass"
+    }
+  },
+  "scoring": {
+    "correctness": 1.0,
+    "invariant_preservation": 1.0,
+    "regression_rate": 0.0,
+    "quality": 1.0,
+    "cost_efficiency_estimate": 0.62
+  },
+  "implementation_summary": {
+    "files_modified": [
+      "src/WholesaleOrders.Services/InventoryService.cs",
+      "src/WholesaleOrders.Infra/Persistence/InventoryRepository.cs",
+      "src/WholesaleOrders.Api/DependencyRegistration.cs"
+    ],
+    "files_added": [
+      "src/WholesaleOrders.Api/ReservationExpirationService.cs"
+    ],
+    "approach": "ProcessExpirationsAsync method on IInventoryService scans for Created reservations whose CreatedAt is older than 30-min lifetime; ReservationExpirationService BackgroundService with PeriodicTimer (1-min interval) drives the sweep. TimeProvider injected for testability. Notifications sent on each expiration. Backwards-compatible 3-arg ctor preserved for existing TestFactory."
+  }
+}
