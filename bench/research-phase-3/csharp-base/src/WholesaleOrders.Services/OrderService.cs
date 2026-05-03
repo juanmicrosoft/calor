@@ -142,7 +142,9 @@ public class OrderService : IOrderService
     // PURE: no effects. Computes total from line items.
     public Money RecalculateTotal(Order order)
     {
-        var sum = order.LineItems.Aggregate(0m, (acc, li) => acc + li.Quantity * li.UnitPrice);
+        decimal sum = 0m;
+        foreach (var li in order.LineItems)
+            sum += li.Quantity * li.UnitPrice;
         return new Money(Math.Round(sum, 4, MidpointRounding.ToEven), order.Currency);
     }
 

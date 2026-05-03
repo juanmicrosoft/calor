@@ -6,7 +6,7 @@ public class OrderLineItem
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public Guid OrderId { get; init; }
-    public Sku Sku { get; init; }
+    public required Sku Sku { get; init; }
 
     public int Quantity { get; set; }
     public decimal UnitPrice { get; init; }
