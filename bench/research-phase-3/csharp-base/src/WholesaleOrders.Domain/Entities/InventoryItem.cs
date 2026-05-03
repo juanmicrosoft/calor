@@ -5,7 +5,7 @@ namespace WholesaleOrders.Domain.Entities;
 public class InventoryItem
 {
     public Guid Id { get; init; } = Guid.NewGuid();
-    public Sku Sku { get; init; }
+    public required Sku Sku { get; init; }
     public string Name { get; init; } = "";
 
     public int OnHand { get; set; }

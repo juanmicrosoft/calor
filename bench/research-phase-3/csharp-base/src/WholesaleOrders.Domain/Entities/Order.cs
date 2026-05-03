@@ -24,7 +24,9 @@ public class Order
     // POSTCONDITION: result.Currency == Currency.
     public Money CalculateTotal()
     {
-        var sum = LineItems.Aggregate(0m, (acc, li) => acc + li.Quantity * li.UnitPrice);
+        decimal sum = 0m;
+        foreach (var li in LineItems)
+            sum += li.Quantity * li.UnitPrice;
         return new Money(Math.Round(sum, 2, MidpointRounding.ToEven), Currency);
     }
 }
