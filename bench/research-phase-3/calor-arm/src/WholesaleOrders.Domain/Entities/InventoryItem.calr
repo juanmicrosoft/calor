@@ -1,0 +1,19 @@
+§M{m001:WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.ValueObjects}
+
+  §CL{c001:InventoryItem:pub}
+    §PROP{p002:Id:guid:pub:get,init} = §C{Guid.NewGuid} §/C
+    §PROP{p003:Sku:Sku:pub:req:get,init}
+    §PROP{p004:Name:str:pub:get,init} = ""
+    §PROP{p005:OnHand:i32:pub:get,set}
+    §PROP{p006:Reserved:i32:pub:get,set}
+    §PROP{p007:Available:i32:pub}
+      §GET{pub}
+        §R (- OnHand Reserved)
+      §/GET
+    §/PROP{p007}
+    §PROP{p008:UnitPrice:dec:pub:get,init}
+
+  §/CL{c001}
+
+§/M{m001}

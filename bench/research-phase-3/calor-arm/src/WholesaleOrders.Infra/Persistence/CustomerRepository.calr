@@ -1,0 +1,45 @@
+§M{m001:WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Domain.Entities}
+
+  §IFACE{i001:ICustomerRepository}
+    §MT{m002:GetByIdAsync}
+      §I{guid:id}
+      §I{CancellationToken:ct}
+      §O{Task<?Customer>}
+    §/MT{m002}
+    §MT{m003:AddAsync}
+      §I{Customer:customer}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m003}
+  §/IFACE{i001}
+
+  §CL{c004:CustomerRepository:pub}
+    §IMPL{ICustomerRepository}
+
+    §FLD{AppDbContext:_db:priv:readonly}
+
+    §CTOR{ctor005:pub} (AppDbContext:db)
+      §ASSIGN _db db
+    §/CTOR{ctor005}
+
+    §MT{m006:GetByIdAsync:pub}
+      §I{guid:id}
+      §I{CancellationToken:ct}
+      §O{Task<?Customer>}
+      §B{_lam010} §LAM{lam007} §B{_lam009} §LAM{lam008:c:?} (== c.Id id) §/LAM{lam008} §R §C{_db.Customers.FirstOrDefault} §A _lam009 §/C §/LAM{lam007}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam010 §/C §/C
+    §/MT{m006}
+
+    §MT{m011:AddAsync:pub}
+      §I{Customer:customer}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam013} §LAM{lam012} §C{_db.Customers.Add} §A customer §/C §/LAM{lam012}
+      §C{_db.WithLock} §A _lam013 §/C
+      §R Task.CompletedTask
+    §/MT{m011}
+
+  §/CL{c004}
+
+§/M{m001}

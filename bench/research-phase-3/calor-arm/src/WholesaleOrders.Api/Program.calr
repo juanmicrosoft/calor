@@ -1,0 +1,24 @@
+§M{m001:Program}
+  §U{WholesaleOrders.Api}
+  §U{WholesaleOrders.Api.Middleware}
+
+  §CL{c003:Program:pub:partial}
+  §/CL{c003}
+
+  §F{main:Main:pub}
+    §B{builder} §C{WebApplication.CreateBuilder} §A args §/C
+    §C{builder.Services.AddControllers} §/C
+    §C{builder.Services.AddOpenApi} §/C
+    §C{builder.Services.AddWholesaleOrders} §/C
+    §B{app} §C{builder.Build} §/C
+    §B{_preIsDevelopment002} §C{app.Environment.IsDevelopment} §/C
+    §IF{if001} _preIsDevelopment002
+      §C{app.MapOpenApi} §/C
+    §/I{if001}
+    §C{app.UseMiddleware} §/C
+    §C{app.UseMiddleware} §/C
+    §C{app.MapControllers} §/C
+    §C{app.Run} §/C
+  §/F{main}
+
+§/M{m001}

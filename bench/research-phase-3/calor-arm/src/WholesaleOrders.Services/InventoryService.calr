@@ -1,0 +1,179 @@
+§M{m001:WholesaleOrders.Services}
+  §U{WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.Enums}
+  §U{WholesaleOrders.Domain.ValueObjects}
+  §U{WholesaleOrders.Infra.Logging}
+  §U{WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Services.Validators}
+
+  §IFACE{i001:IInventoryService}
+    §MT{m002:AddItemAsync}
+      §I{Sku:sku}
+      §I{str:name}
+      §I{i32:onHand}
+      §I{dec:unitPrice}
+      §I{CancellationToken:ct}
+      §O{Task<InventoryItem>}
+    §/MT{m002}
+    §MT{m003:ReserveAsync}
+      §I{guid:orderId}
+      §I{Sku:sku}
+      §I{i32:quantity}
+      §I{CancellationToken:ct}
+      §O{Task<StockReservation>}
+    §/MT{m003}
+    §MT{m004:ConfirmAsync}
+      §I{guid:reservationId}
+      §I{CancellationToken:ct}
+      §O{Task<StockReservation>}
+    §/MT{m004}
+    §MT{m005:ReleaseAsync}
+      §I{guid:reservationId}
+      §I{CancellationToken:ct}
+      §O{Task<StockReservation>}
+    §/MT{m005}
+    §MT{m006:FulfillAsync}
+      §I{guid:reservationId}
+      §I{CancellationToken:ct}
+      §O{Task<StockReservation>}
+    §/MT{m006}
+  §/IFACE{i001}
+
+  §CL{c007:InventoryService:pub}
+    §IMPL{IInventoryService}
+
+    §FLD{IInventoryRepository:_inventory:priv:readonly}
+    §FLD{IInventoryValidator:_validator:priv:readonly}
+    §FLD{IStructuredLogger:_logger:priv:readonly}
+
+    §CTOR{ctor008:pub} (IInventoryRepository:inventory, IInventoryValidator:validator, IStructuredLogger:logger)
+      §ASSIGN _inventory inventory
+      §ASSIGN _validator validator
+      §ASSIGN _logger logger
+    §/CTOR{ctor008}
+
+    §AMT{m009:AddItemAsync:pub}
+      §I{Sku:sku}
+      §I{str:name}
+      §I{i32:onHand}
+      §I{dec:unitPrice}
+      §I{CancellationToken:ct}
+      §O{InventoryItem}
+      §B{item} §NEW{InventoryItem}
+        Sku = sku
+        Name = name
+        OnHand = onHand
+        UnitPrice = unitPrice
+      §/NEW
+      §B{_} §AWAIT §C{_inventory.AddAsync} §A item §A ct §/C
+      §R item
+    §/AMT{m009}
+
+    §AMT{m010:ReserveAsync:pub}
+      §I{guid:orderId}
+      §I{Sku:sku}
+      §I{i32:quantity}
+      §I{CancellationToken:ct}
+      §O{StockReservation}
+      §E{throw}
+      §B{item} §AWAIT §C{_inventory.GetBySkuAsync} §A sku §A ct §/C
+      §IF{if011} (== item null)
+        §B{~_hoist000} §ANON
+          sku = sku.Value
+        §/ANON
+        §C{_logger.Error} §A "Inventory item not found" §A[context] _hoist000 §/C
+        §TH §NEW{InvalidOperationException} §A "Inventory item ${sku.Value} not found." §/NEW
+      §/I{if011}
+      §B{result} §C{_validator.ValidateReservation} §A item §A quantity §/C
+      §IF{if012} (! result.IsValid)
+        §TH §NEW{InvalidOperationException} §A (join "; " result.Errors) §/NEW
+      §/I{if012}
+      §ASSIGN item.Reserved (+ item.Reserved quantity)
+      §B{_} §AWAIT §C{_inventory.UpdateAsync} §A item §A ct §/C
+      §B{reservation} §NEW{StockReservation}
+        OrderId = orderId
+        Sku = sku
+        Quantity = quantity
+        Status = ReservationStatus.Created
+      §/NEW
+      §B{_} §AWAIT §C{_inventory.AddReservationAsync} §A reservation §A ct §/C
+      §R reservation
+    §/AMT{m010}
+
+    §AMT{m013:ConfirmAsync:pub}
+      §I{guid:reservationId}
+      §I{CancellationToken:ct}
+      §O{StockReservation}
+      §E{throw}
+      §B{reservation} §AWAIT §C{GetReservationOrThrow} §A reservationId §A ct §/C
+      §IF{if014} (!= reservation.Status ReservationStatus.Created)
+        §TH §NEW{InvalidOperationException} §A "Cannot confirm reservation in status ${reservation.Status}." §/NEW
+      §/I{if014}
+      §ASSIGN reservation.Status ReservationStatus.Confirmed
+      §ASSIGN reservation.ConfirmedAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_inventory.UpdateReservationAsync} §A reservation §A ct §/C
+      §R reservation
+    §/AMT{m013}
+
+    §AMT{m015:ReleaseAsync:pub}
+      §I{guid:reservationId}
+      §I{CancellationToken:ct}
+      §O{StockReservation}
+      §E{throw}
+      §B{reservation} §AWAIT §C{GetReservationOrThrow} §A reservationId §A ct §/C
+      §IF{if016} (|| (== reservation.Status ReservationStatus.Released) (== reservation.Status ReservationStatus.Fulfilled))
+        §TH §NEW{InvalidOperationException} §A "Reservation already in terminal status ${reservation.Status}." §/NEW
+      §/I{if016}
+      §B{item} §AWAIT §C{_inventory.GetBySkuAsync} §A reservation.Sku §A ct §/C
+      §IF{if017} (!= item null)
+        §ASSIGN item.Reserved (- item.Reserved reservation.Quantity)
+        §IF{if018} (< item.Reserved 0)
+          §ASSIGN item.Reserved 0
+        §/I{if018}
+        §B{_} §AWAIT §C{_inventory.UpdateAsync} §A item §A ct §/C
+      §/I{if017}
+      §ASSIGN reservation.Status ReservationStatus.Released
+      §ASSIGN reservation.ReleasedAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_inventory.UpdateReservationAsync} §A reservation §A ct §/C
+      §R reservation
+    §/AMT{m015}
+
+    §AMT{m019:FulfillAsync:pub}
+      §I{guid:reservationId}
+      §I{CancellationToken:ct}
+      §O{StockReservation}
+      §E{throw}
+      §B{reservation} §AWAIT §C{GetReservationOrThrow} §A reservationId §A ct §/C
+      §IF{if020} (!= reservation.Status ReservationStatus.Confirmed)
+        §TH §NEW{InvalidOperationException} §A "Cannot fulfill reservation in status ${reservation.Status}." §/NEW
+      §/I{if020}
+      §B{item} §AWAIT §C{_inventory.GetBySkuAsync} §A reservation.Sku §A ct §/C
+      §IF{if021} (!= item null)
+        §ASSIGN item.OnHand (- item.OnHand reservation.Quantity)
+        §ASSIGN item.Reserved (- item.Reserved reservation.Quantity)
+        §IF{if022} (< item.OnHand 0)
+          §ASSIGN item.OnHand 0
+        §/I{if022}
+        §IF{if023} (< item.Reserved 0)
+          §ASSIGN item.Reserved 0
+        §/I{if023}
+        §B{_} §AWAIT §C{_inventory.UpdateAsync} §A item §A ct §/C
+      §/I{if021}
+      §ASSIGN reservation.Status ReservationStatus.Fulfilled
+      §ASSIGN reservation.FulfilledAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_inventory.UpdateReservationAsync} §A reservation §A ct §/C
+      §R reservation
+    §/AMT{m019}
+
+    §AMT{m024:GetReservationOrThrow:priv} (guid:id, CancellationToken:ct) -> StockReservation
+      §E{throw}
+      §B{found} §AWAIT §C{_inventory.GetReservationByIdAsync} §A id §A ct §/C
+      §IF{if025} (== found null)
+        §TH §NEW{InvalidOperationException} §A "Reservation ${id} not found." §/NEW
+      §/I{if025}
+      §R found
+    §/AMT{m024}
+
+  §/CL{c007}
+
+§/M{m001}

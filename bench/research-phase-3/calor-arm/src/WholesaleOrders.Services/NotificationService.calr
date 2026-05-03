@@ -1,0 +1,65 @@
+§M{m001:WholesaleOrders.Services}
+  §U{WholesaleOrders.Infra.Logging}
+
+  §IFACE{i001:INotificationService}
+    §PROP{p003:Sent:ReadList<Notification>:pub:get}
+    §MT{m002:NotifyAsync}
+      §I{str:topic}
+      §I{str:message}
+      §I{?any:payload} = null
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m002}
+  §/IFACE{i001}
+
+  §CL{r004:Notification:pub:seal}
+    §PROP{p005:Timestamp:datetimeoffset:pub}
+    §/PROP{p005}
+    §PROP{p006:Topic:str:pub}
+    §/PROP{p006}
+    §PROP{p007:Message:str:pub}
+    §/PROP{p007}
+    §PROP{p008:Payload:?any:pub}
+    §/PROP{p008}
+
+  §/CL{r004}
+
+  §CL{c009:NotificationService:pub}
+    §IMPL{INotificationService}
+
+    §FLD{IStructuredLogger:_logger:priv:readonly}
+    §FLD{List<Notification>:_sent:priv:readonly} = §NEW{List<Notification>} §/NEW
+    §FLD{any:_lock:priv:readonly} = §NEW{any} §/NEW
+
+    §PROP{p012:Sent:ReadList<Notification>:pub}
+      §GET{pub}
+        §SYNC{sync011} (_lock)
+          §R §C{_sent.ToList} §/C
+        §/SYNC{sync011}
+      §/GET
+    §/PROP{p012}
+
+    §CTOR{ctor010:pub} (IStructuredLogger:logger)
+      §ASSIGN _logger logger
+    §/CTOR{ctor010}
+
+    §MT{m013:NotifyAsync:pub}
+      §I{str:topic}
+      §I{str:message}
+      §I{?any:payload} = null
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{notif} §NEW{Notification} §A DateTimeOffset.UtcNow §A topic §A message §A payload §/NEW
+      §SYNC{sync014} (_lock)
+        §C{_sent.Add} §A notif §/C
+      §/SYNC{sync014}
+      §B{~_hoist000} §ANON
+        message = message
+      §/ANON
+      §C{_logger.Info} §A "notification: ${topic}" §A _hoist000 §/C
+      §R Task.CompletedTask
+    §/MT{m013}
+
+  §/CL{c009}
+
+§/M{m001}

@@ -1,0 +1,58 @@
+§M{m001:WholesaleOrders.Services.Validators}
+  §U{WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.Enums}
+
+  §IFACE{i001:IOrderValidator}
+    §MT{m002:ValidateForSubmit} (Order:order) -> ValidationResult
+    §/MT{m002}
+    §MT{m003:CanTransitionToCancelled} (OrderStatus:current) -> bool
+    §/MT{m003}
+  §/IFACE{i001}
+
+  §CL{c004:OrderValidator:pub}
+    §IMPL{IOrderValidator}
+
+    §MT{m005:ValidateForSubmit:pub} (Order:order) -> ValidationResult
+      §B{errors} §NEW{List<str>} §/NEW
+      §IF{if006} (== order.LineItems.Count 0)
+        §C{errors.Add} §A "Order must have at least one line item." §/C
+      §/I{if006}
+      §EACH{each007:li:var} order.LineItems
+        §IF{if008} (<= li.Quantity 0)
+          §C{errors.Add} §A "Line item ${li.Id} has non-positive quantity." §/C
+        §/I{if008}
+        §IF{if009} (< li.UnitPrice 0)
+          §C{errors.Add} §A "Line item ${li.Id} has negative unit price." §/C
+        §/I{if009}
+      §/EACH{each007}
+      §IF{if010} (!= order.Status OrderStatus.Draft)
+        §C{errors.Add} §A "Cannot submit order in status ${order.Status}." §/C
+      §/I{if010}
+      §R §IF{tern000} (== errors.Count 0) → §C{ValidationResult.Ok} §/C §EL → §C{ValidationResult.Fail} §A errors §/C §/I{tern000}
+    §/MT{m005}
+
+    §MT{m011:CanTransitionToCancelled:pub} (OrderStatus:current) -> bool
+      §R (|| (|| (== current OrderStatus.Draft) (== current OrderStatus.Submitted)) (== current OrderStatus.Paid))
+    §/MT{m011}
+
+  §/CL{c004}
+
+  §CL{r012:ValidationResult:pub:seal}
+    §PROP{p013:IsValid:bool:pub}
+    §/PROP{p013}
+    §PROP{p014:Errors:ReadList<str>:pub}
+    §/PROP{p014}
+
+    §MT{m015:Ok:pub:stat} () -> ValidationResult
+      §B{~_hoist000} §C{Array.Empty<str>} §/C
+      §R §NEW{ValidationResult} §A true §A _hoist000 §/NEW
+    §/MT{m015}
+
+    §MT{m016:Fail:pub:stat} (Seq<str>:errors) -> ValidationResult
+      §B{~_hoist001} §C{errors.ToList} §/C
+      §R §NEW{ValidationResult} §A false §A _hoist001 §/NEW
+    §/MT{m016}
+
+  §/CL{r012}
+
+§/M{m001}

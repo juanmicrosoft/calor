@@ -1,0 +1,126 @@
+§M{m001:WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Domain.Entities}
+
+  §IFACE{i001:IOrderRepository}
+    §MT{m002:GetByIdAsync}
+      §I{guid:id}
+      §I{CancellationToken:ct}
+      §O{Task<?Order>}
+    §/MT{m002}
+    §MT{m003:GetByCustomerAsync}
+      §I{guid:customerId}
+      §I{CancellationToken:ct}
+      §O{Task<List<Order>>}
+    §/MT{m003}
+    §MT{m004:GetAllAsync}
+      §I{CancellationToken:ct}
+      §O{Task<List<Order>>}
+    §/MT{m004}
+    §MT{m005:AddAsync}
+      §I{Order:order}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m005}
+    §MT{m006:UpdateAsync}
+      §I{Order:order}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m006}
+    §MT{m007:GetLineItemsAsync}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<List<OrderLineItem>>}
+    §/MT{m007}
+    §MT{m008:AddLineItemAsync}
+      §I{OrderLineItem:item}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m008}
+  §/IFACE{i001}
+
+  §CL{c009:OrderRepository:pub}
+    §IMPL{IOrderRepository}
+
+    §FLD{AppDbContext:_db:priv:readonly}
+
+    §CTOR{ctor010:pub} (AppDbContext:db)
+      §ASSIGN _db db
+    §/CTOR{ctor010}
+
+    §MT{m011:GetByIdAsync:pub}
+      §I{guid:id}
+      §I{CancellationToken:ct}
+      §O{Task<?Order>}
+      §B{_lam015} §LAM{lam012} §B{_lam014} §LAM{lam013:o:?} (== o.Id id) §/LAM{lam013} §R §C{_db.Orders.FirstOrDefault} §A _lam014 §/C §/LAM{lam012}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam015 §/C §/C
+    §/MT{m011}
+
+    §MT{m016:GetByCustomerAsync:pub}
+      §I{guid:customerId}
+      §I{CancellationToken:ct}
+      §O{Task<List<Order>>}
+      §B{_lam023} §LAM{lam017}
+  §B{_lam019} §LAM{lam018:o:?} (== o.CustomerId customerId) §/LAM{lam018}
+  §B{_lam021} §LAM{lam020:o:?} (== o.CustomerId customerId) §/LAM{lam020}
+  §B{_chainWhere022} §C{_db.Orders.Where} §A _lam021 §/C
+  §R §C{_chainWhere022.ToList} §/C
+§/LAM{lam017}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam023 §/C §/C
+    §/MT{m016}
+
+    §MT{m024:GetAllAsync:pub}
+      §I{CancellationToken:ct}
+      §O{Task<List<Order>>}
+      §B{_lam026} §LAM{lam025} §C{_db.Orders.ToList} §/C §/LAM{lam025}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam026 §/C §/C
+    §/MT{m024}
+
+    §MT{m027:AddAsync:pub}
+      §I{Order:order}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam029} §LAM{lam028} §C{_db.Orders.Add} §A order §/C §/LAM{lam028}
+      §C{_db.WithLock} §A _lam029 §/C
+      §R Task.CompletedTask
+    §/MT{m027}
+
+    §MT{m030:UpdateAsync:pub}
+      §I{Order:order}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam035} §LAM{lam031}
+  §B{_lam033} §LAM{lam032:o:?} (== o.Id order.Id) §/LAM{lam032}
+  §B{idx} §C{_db.Orders.FindIndex} §A _lam033 §/C
+  §IF{if034} (>= idx 0)
+  §PUT{_db.Orders} idx order
+§/I{if034}
+§/LAM{lam031}
+      §C{_db.WithLock} §A _lam035 §/C
+      §R Task.CompletedTask
+    §/MT{m030}
+
+    §MT{m036:GetLineItemsAsync:pub}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<List<OrderLineItem>>}
+      §B{_lam043} §LAM{lam037}
+  §B{_lam039} §LAM{lam038:li:?} (== li.OrderId orderId) §/LAM{lam038}
+  §B{_lam041} §LAM{lam040:li:?} (== li.OrderId orderId) §/LAM{lam040}
+  §B{_chainWhere042} §C{_db.OrderLineItems.Where} §A _lam041 §/C
+  §R §C{_chainWhere042.ToList} §/C
+§/LAM{lam037}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam043 §/C §/C
+    §/MT{m036}
+
+    §MT{m044:AddLineItemAsync:pub}
+      §I{OrderLineItem:item}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam046} §LAM{lam045} §C{_db.OrderLineItems.Add} §A item §/C §/LAM{lam045}
+      §C{_db.WithLock} §A _lam046 §/C
+      §R Task.CompletedTask
+    §/MT{m044}
+
+  §/CL{c009}
+
+§/M{m001}

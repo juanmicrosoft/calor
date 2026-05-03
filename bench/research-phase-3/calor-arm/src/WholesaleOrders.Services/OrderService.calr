@@ -1,0 +1,257 @@
+§M{m001:WholesaleOrders.Services}
+  §U{WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.Enums}
+  §U{WholesaleOrders.Domain.ValueObjects}
+  §U{WholesaleOrders.Infra.Logging}
+  §U{WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Services.Validators}
+
+  §IFACE{i001:IOrderService}
+    §MT{m002:CreateDraftAsync}
+      §I{guid:customerId}
+      §I{str:currency} = "USD"
+      §I{CancellationToken:ct}
+      §O{Task<Order>}
+    §/MT{m002}
+    §MT{m003:AddLineItemAsync}
+      §I{guid:orderId}
+      §I{Sku:sku}
+      §I{i32:quantity}
+      §I{dec:unitPrice}
+      §I{CancellationToken:ct}
+      §O{Task<Order>}
+    §/MT{m003}
+    §MT{m004:SubmitAsync}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<Order>}
+    §/MT{m004}
+    §MT{m005:MarkPaidAsync}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<Order>}
+    §/MT{m005}
+    §MT{m006:MarkShippedAsync}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<Order>}
+    §/MT{m006}
+    §MT{m007:MarkDeliveredAsync}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<Order>}
+    §/MT{m007}
+    §MT{m008:CancelAsync}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<Order>}
+    §/MT{m008}
+    §MT{m009:RecalculateTotal} (Order:order) -> Money
+    §/MT{m009}
+    §MT{m010:EstimateTotal} (Order:order) -> dec
+    §/MT{m010}
+  §/IFACE{i001}
+
+  §CL{c011:OrderService:pub}
+    §IMPL{IOrderService}
+
+    §FLD{IOrderRepository:_orders:priv:readonly}
+    §FLD{IOrderValidator:_validator:priv:readonly}
+    §FLD{IStructuredLogger:_logger:priv:readonly}
+
+    §CTOR{ctor012:pub} (IOrderRepository:orders, IOrderValidator:validator, IStructuredLogger:logger)
+      §ASSIGN _orders orders
+      §ASSIGN _validator validator
+      §ASSIGN _logger logger
+    §/CTOR{ctor012}
+
+    §AMT{m013:CreateDraftAsync:pub}
+      §I{guid:customerId}
+      §I{str:currency} = "USD"
+      §I{CancellationToken:ct}
+      §O{Order}
+      §B{~_hoist000} §ANON
+        customerId = customerId
+        currency = currency
+      §/ANON
+      §C{_logger.Info} §A "OrderService.CreateDraftAsync" §A _hoist000 §/C
+      §B{order} §NEW{Order}
+        CustomerId = customerId
+        Currency = currency
+      §/NEW
+      §B{_} §AWAIT §C{_orders.AddAsync} §A order §A ct §/C
+      §R order
+    §/AMT{m013}
+
+    §AMT{m014:AddLineItemAsync:pub}
+      §I{guid:orderId}
+      §I{Sku:sku}
+      §I{i32:quantity}
+      §I{dec:unitPrice}
+      §I{CancellationToken:ct}
+      §O{Order}
+      §E{throw}
+      §B{~_hoist001} §ANON
+        orderId = orderId
+        sku = sku.Value
+        quantity = quantity
+      §/ANON
+      §C{_logger.Info} §A "OrderService.AddLineItemAsync" §A _hoist001 §/C
+      §B{_nct015} §AWAIT §C{_orders.GetByIdAsync} §A orderId §A ct §/C
+      §IF{if016} (== _nct015 null)
+        §TH §NEW{InvalidOperationException} §A "Order ${orderId} not found." §/NEW
+      §/I{if016}
+      §B{order} _nct015
+      §IF{if017} (!= order.Status OrderStatus.Draft)
+        §TH §NEW{InvalidOperationException} §A "Cannot add line items to order in status ${order.Status}." §/NEW
+      §/I{if017}
+      §B{item} §NEW{OrderLineItem}
+        OrderId = orderId
+        Sku = sku
+        Quantity = quantity
+        UnitPrice = unitPrice
+      §/NEW
+      §C{order.LineItems.Add} §A item §/C
+      §B{_} §AWAIT §C{_orders.AddLineItemAsync} §A item §A ct §/C
+      §ASSIGN order.TotalAmount §C{RecalculateTotal} §A order §/C
+      §B{_} §AWAIT §C{_orders.UpdateAsync} §A order §A ct §/C
+      §R order
+    §/AMT{m014}
+
+    §AMT{m018:SubmitAsync:pub}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Order}
+      §E{throw}
+      §B{~_hoist002} §ANON
+        orderId = orderId
+      §/ANON
+      §C{_logger.Info} §A "OrderService.SubmitAsync" §A _hoist002 §/C
+      §B{_nct019} §AWAIT §C{_orders.GetByIdAsync} §A orderId §A ct §/C
+      §IF{if020} (== _nct019 null)
+        §TH §NEW{InvalidOperationException} §A "Order ${orderId} not found." §/NEW
+      §/I{if020}
+      §B{order} _nct019
+      §B{result} §C{_validator.ValidateForSubmit} §A order §/C
+      §IF{if021} (! result.IsValid)
+        §TH §NEW{InvalidOperationException} §A (join "; " result.Errors) §/NEW
+      §/I{if021}
+      §ASSIGN order.Status OrderStatus.Submitted
+      §ASSIGN order.SubmittedAt DateTimeOffset.UtcNow
+      §ASSIGN order.TotalAmount §C{RecalculateTotal} §A order §/C
+      §B{_} §AWAIT §C{_orders.UpdateAsync} §A order §A ct §/C
+      §R order
+    §/AMT{m018}
+
+    §AMT{m022:MarkPaidAsync:pub}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Order}
+      §E{throw}
+      §B{~_hoist003} §ANON
+        orderId = orderId
+      §/ANON
+      §C{_logger.Info} §A "OrderService.MarkPaidAsync" §A _hoist003 §/C
+      §B{_nct023} §AWAIT §C{_orders.GetByIdAsync} §A orderId §A ct §/C
+      §IF{if024} (== _nct023 null)
+        §TH §NEW{InvalidOperationException} §A "Order ${orderId} not found." §/NEW
+      §/I{if024}
+      §B{order} _nct023
+      §IF{if025} (!= order.Status OrderStatus.Submitted)
+        §TH §NEW{InvalidOperationException} §A "Cannot mark paid an order in status ${order.Status}." §/NEW
+      §/I{if025}
+      §ASSIGN order.Status OrderStatus.Paid
+      §ASSIGN order.PaidAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_orders.UpdateAsync} §A order §A ct §/C
+      §R order
+    §/AMT{m022}
+
+    §AMT{m026:MarkShippedAsync:pub}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Order}
+      §E{throw}
+      §B{~_hoist004} §ANON
+        orderId = orderId
+      §/ANON
+      §C{_logger.Info} §A "OrderService.MarkShippedAsync" §A _hoist004 §/C
+      §B{_nct027} §AWAIT §C{_orders.GetByIdAsync} §A orderId §A ct §/C
+      §IF{if028} (== _nct027 null)
+        §TH §NEW{InvalidOperationException} §A "Order ${orderId} not found." §/NEW
+      §/I{if028}
+      §B{order} _nct027
+      §IF{if029} (!= order.Status OrderStatus.Paid)
+        §TH §NEW{InvalidOperationException} §A "Cannot mark shipped an order in status ${order.Status}." §/NEW
+      §/I{if029}
+      §ASSIGN order.Status OrderStatus.Shipped
+      §ASSIGN order.ShippedAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_orders.UpdateAsync} §A order §A ct §/C
+      §R order
+    §/AMT{m026}
+
+    §AMT{m030:MarkDeliveredAsync:pub}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Order}
+      §E{throw}
+      §B{~_hoist005} §ANON
+        orderId = orderId
+      §/ANON
+      §C{_logger.Info} §A "OrderService.MarkDeliveredAsync" §A _hoist005 §/C
+      §B{_nct031} §AWAIT §C{_orders.GetByIdAsync} §A orderId §A ct §/C
+      §IF{if032} (== _nct031 null)
+        §TH §NEW{InvalidOperationException} §A "Order ${orderId} not found." §/NEW
+      §/I{if032}
+      §B{order} _nct031
+      §IF{if033} (!= order.Status OrderStatus.Shipped)
+        §TH §NEW{InvalidOperationException} §A "Cannot mark delivered an order in status ${order.Status}." §/NEW
+      §/I{if033}
+      §ASSIGN order.Status OrderStatus.Delivered
+      §ASSIGN order.DeliveredAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_orders.UpdateAsync} §A order §A ct §/C
+      §R order
+    §/AMT{m030}
+
+    §AMT{m034:CancelAsync:pub}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Order}
+      §E{throw}
+      §B{~_hoist006} §ANON
+        orderId = orderId
+      §/ANON
+      §C{_logger.Info} §A "OrderService.CancelAsync" §A _hoist006 §/C
+      §B{_nct035} §AWAIT §C{_orders.GetByIdAsync} §A orderId §A ct §/C
+      §IF{if036} (== _nct035 null)
+        §TH §NEW{InvalidOperationException} §A "Order ${orderId} not found." §/NEW
+      §/I{if036}
+      §B{order} _nct035
+      §IF{if037} (&& (!= order.Status OrderStatus.Draft) (!= order.Status OrderStatus.Submitted))
+        §TH §NEW{InvalidOperationException} §A "Cannot cancel an order in status ${order.Status}." §/NEW
+      §/I{if037}
+      §ASSIGN order.Status OrderStatus.Cancelled
+      §ASSIGN order.CancelledAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_orders.UpdateAsync} §A order §A ct §/C
+      §R order
+    §/AMT{m034}
+
+    §MT{m038:RecalculateTotal:pub} (Order:order) -> Money
+      §B{~sum:dec} DEC:0
+      §EACH{each039:li:var} order.LineItems
+        §ASSIGN sum (+ sum (* li.Quantity li.UnitPrice))
+      §/EACH{each039}
+      §B{~_hoist007} §C{Math.Round} §A sum §A 4 §A MidpointRounding.ToEven §/C
+      §R §NEW{Money} §A _hoist007 §A order.Currency §/NEW
+    §/MT{m038}
+
+    §MT{m040:EstimateTotal:pub} (Order:order) -> dec
+      §B{~estimate:f64} 0
+      §EACH{each041:li:var} order.LineItems
+        §ASSIGN estimate (+ estimate (* (cast f64 li.Quantity) (cast f64 li.UnitPrice)))
+      §/EACH{each041}
+      §R (cast dec estimate)
+    §/MT{m040}
+
+  §/CL{c011}
+
+§/M{m001}

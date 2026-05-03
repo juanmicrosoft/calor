@@ -1,0 +1,64 @@
+§M{m001:WholesaleOrders.Api.Controllers}
+  §U{Microsoft.AspNetCore.Mvc}
+  §U{WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.ValueObjects}
+  §U{WholesaleOrders.Services}
+
+  §CL{c001:OrdersController:pub}[@ApiController][@Route("api/orders")]
+    §EXT{ControllerBase}
+
+    §FLD{IOrderService:_orders:priv:readonly}
+
+    §CTOR{ctor002:pub} (IOrderService:orders)
+      §ASSIGN _orders orders
+    §/CTOR{ctor002}
+
+    §AMT{m010:Create:pub}[@HttpPost]
+      §I{CreateOrderRequest:req}[@FromBody]
+      §I{CancellationToken:ct}
+      §O{IActionResult}
+      §B{order} §AWAIT §C{_orders.CreateDraftAsync} §A req.CustomerId §A req.Currency §A ct §/C
+      §R §C{Ok} §A order §/C
+    §/AMT{m010}
+
+    §AMT{m011:AddItem:pub}[@HttpPost("{orderId:guid}/items")]
+      §I{guid:orderId}
+      §I{AddLineItemRequest:req}[@FromBody]
+      §I{CancellationToken:ct}
+      §O{IActionResult}
+      §B{order} §AWAIT §C{_orders.AddLineItemAsync} §A orderId §A §C{Sku.Parse} §A req.Sku §/C §A req.Quantity §A req.UnitPrice §A ct §/C
+      §R §C{Ok} §A order §/C
+    §/AMT{m011}
+
+    §AMT{m012:Submit:pub}[@HttpPost("{orderId:guid}/submit")] (guid:orderId, CancellationToken:ct) -> IActionResult
+      §B{order} §AWAIT §C{_orders.SubmitAsync} §A orderId §A ct §/C
+      §R §C{Ok} §A order §/C
+    §/AMT{m012}
+
+    §AMT{m013:Cancel:pub}[@HttpPost("{orderId:guid}/cancel")] (guid:orderId, CancellationToken:ct) -> IActionResult
+      §B{order} §AWAIT §C{_orders.CancelAsync} §A orderId §A ct §/C
+      §R §C{Ok} §A order §/C
+    §/AMT{m013}
+
+    §CL{r003:CreateOrderRequest:pub:seal}
+      §PROP{p004:CustomerId:guid:pub}
+      §/PROP{p004}
+      §PROP{p005:Currency:str:pub}
+        = "USD"
+      §/PROP{p005}
+
+    §/CL{r003}
+
+    §CL{r006:AddLineItemRequest:pub:seal}
+      §PROP{p007:Sku:str:pub}
+      §/PROP{p007}
+      §PROP{p008:Quantity:i32:pub}
+      §/PROP{p008}
+      §PROP{p009:UnitPrice:dec:pub}
+      §/PROP{p009}
+
+    §/CL{r006}
+
+  §/CL{c001}
+
+§/M{m001}

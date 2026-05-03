@@ -1,0 +1,75 @@
+§M{m001:WholesaleOrders.Services}
+  §U{WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.Enums}
+  §U{WholesaleOrders.Domain.ValueObjects}
+  §U{WholesaleOrders.Infra.Logging}
+  §U{WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Services.Validators}
+
+  §IFACE{i001:IPaymentService}
+    §MT{m002:ChargeAsync}
+      §I{guid:orderId}
+      §I{Money:amount}
+      §I{str:customerToken}
+      §I{str:idempotencyKey}
+      §I{str:source}
+      §I{CancellationToken:ct}
+      §O{Task<Payment>}
+    §/MT{m002}
+  §/IFACE{i001}
+
+  §CL{c003:PaymentService:pub}
+    §IMPL{IPaymentService}
+
+    §FLD{IOrderRepository:_orders:priv:readonly}
+    §FLD{IPaymentRepository:_payments:priv:readonly}
+    §FLD{IPaymentValidator:_validator:priv:readonly}
+    §FLD{IStructuredLogger:_logger:priv:readonly}
+
+    §CTOR{ctor004:pub} (IOrderRepository:orders, IPaymentRepository:payments, IPaymentValidator:validator, IStructuredLogger:logger)
+      §ASSIGN _orders orders
+      §ASSIGN _payments payments
+      §ASSIGN _validator validator
+      §ASSIGN _logger logger
+    §/CTOR{ctor004}
+
+    §AMT{m005:ChargeAsync:pub}
+      §I{guid:orderId}
+      §I{Money:amount}
+      §I{str:customerToken}
+      §I{str:idempotencyKey}
+      §I{str:source}
+      §I{CancellationToken:ct}
+      §O{Payment}
+      §E{throw}
+      §B{~_hoist000} §ANON
+        orderId = orderId
+        amount = amount.Amount
+        source = source
+      §/ANON
+      §C{_logger.Info} §A "PaymentService.ChargeAsync" §A _hoist000 §/C
+      §B{_nct006} §AWAIT §C{_orders.GetByIdAsync} §A orderId §A ct §/C
+      §IF{if007} (== _nct006 null)
+        §TH §NEW{InvalidOperationException} §A "Order ${orderId} not found." §/NEW
+      §/I{if007}
+      §B{order} _nct006
+      §B{validation} §C{_validator.ValidateCharge} §A order §A amount §/C
+      §IF{if008} (! validation.IsValid)
+        §TH §NEW{InvalidOperationException} §A (join "; " validation.Errors) §/NEW
+      §/I{if008}
+      §B{payment} §NEW{Payment}
+        OrderId = orderId
+        Amount = amount
+        Status = PaymentStatus.Authorized
+        ProcessorReference = "${source}:${idempotencyKey}:${customerToken[§RANGE Math.Min(8, (len customerToken))]}"
+      §/NEW
+      §B{_} §AWAIT §C{_payments.AddAsync} §A payment §A ct §/C
+      §ASSIGN payment.Status PaymentStatus.Captured
+      §ASSIGN payment.CapturedAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_payments.UpdateAsync} §A payment §A ct §/C
+      §R payment
+    §/AMT{m005}
+
+  §/CL{c003}
+
+§/M{m001}

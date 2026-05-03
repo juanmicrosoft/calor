@@ -1,0 +1,36 @@
+§M{m001:WholesaleOrders.Domain.ValueObjects}
+  §CL{c001:Money:pub}
+    §PROP{p002:Amount:dec:pub:get}
+    §PROP{p003:Currency:str:pub:get}
+
+    §CTOR{ctor004:pub} (dec:amount, str:currency)
+      §ASSIGN Amount amount
+      §ASSIGN Currency currency
+    §/CTOR{ctor004}
+
+    §MT{m005:Zero:pub:stat} (str:currency) -> Money
+      §E{}
+      §R §NEW{Money} §A DEC:0 §A currency §/NEW
+    §/MT{m005}
+
+    §MT{m006:Add:pub} (Money:other) -> Money
+      §E{throw}
+      §IF{if007} (! (equals Currency other.Currency :ignore-case))
+        §TH §NEW{InvalidOperationException} §A "Cannot add ${Currency} and ${other.Currency}" §/NEW
+      §/I{if007}
+      §R §NEW{Money} §A (+ Amount other.Amount) §A Currency §/NEW
+    §/MT{m006}
+
+    §MT{m008:Multiply:pub} (dec:factor) -> Money
+      §E{}
+      §R §NEW{Money} §A (* Amount factor) §A Currency §/NEW
+    §/MT{m008}
+
+    §MT{m009:ToString:pub:over} () -> str
+      §E{}
+      §R "${Amount:0.00} ${Currency}"
+    §/MT{m009}
+
+  §/CL{c001}
+
+§/M{m001}

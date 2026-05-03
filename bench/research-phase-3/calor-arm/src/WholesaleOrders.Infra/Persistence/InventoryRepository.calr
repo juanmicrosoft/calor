@@ -1,0 +1,144 @@
+§M{m001:WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.ValueObjects}
+
+  §IFACE{i001:IInventoryRepository}
+    §MT{m002:GetByIdAsync}
+      §I{guid:id}
+      §I{CancellationToken:ct}
+      §O{Task<?InventoryItem>}
+    §/MT{m002}
+    §MT{m003:GetBySkuAsync}
+      §I{Sku:sku}
+      §I{CancellationToken:ct}
+      §O{Task<?InventoryItem>}
+    §/MT{m003}
+    §MT{m004:AddAsync}
+      §I{InventoryItem:item}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m004}
+    §MT{m005:UpdateAsync}
+      §I{InventoryItem:item}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m005}
+    §MT{m006:GetReservationsForOrderAsync}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<List<StockReservation>>}
+    §/MT{m006}
+    §MT{m007:GetReservationByIdAsync}
+      §I{guid:reservationId}
+      §I{CancellationToken:ct}
+      §O{Task<?StockReservation>}
+    §/MT{m007}
+    §MT{m008:AddReservationAsync}
+      §I{StockReservation:reservation}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m008}
+    §MT{m009:UpdateReservationAsync}
+      §I{StockReservation:reservation}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m009}
+  §/IFACE{i001}
+
+  §CL{c010:InventoryRepository:pub}
+    §IMPL{IInventoryRepository}
+
+    §FLD{AppDbContext:_db:priv:readonly}
+
+    §CTOR{ctor011:pub} (AppDbContext:db)
+      §ASSIGN _db db
+    §/CTOR{ctor011}
+
+    §AMT{m012:GetByIdAsync:pub}
+      §I{guid:id}
+      §I{CancellationToken:ct}
+      §O{?InventoryItem}
+      §B{_lam016} §LAM{lam013} §B{_lam015} §LAM{lam014:i:?} (== i.Id id) §/LAM{lam014} §R §C{_db.InventoryItems.FirstOrDefault} §A _lam015 §/C §/LAM{lam013}
+      §R §C{_db.WithLock} §A _lam016 §/C
+    §/AMT{m012}
+
+    §MT{m017:GetBySkuAsync:pub}
+      §I{Sku:sku}
+      §I{CancellationToken:ct}
+      §O{Task<?InventoryItem>}
+      §B{_lam021} §LAM{lam018} §B{_lam020} §LAM{lam019:i:?} (== i.Sku.Value sku.Value) §/LAM{lam019} §R §C{_db.InventoryItems.FirstOrDefault} §A _lam020 §/C §/LAM{lam018}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam021 §/C §/C
+    §/MT{m017}
+
+    §MT{m022:AddAsync:pub}
+      §I{InventoryItem:item}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam024} §LAM{lam023} §C{_db.InventoryItems.Add} §A item §/C §/LAM{lam023}
+      §C{_db.WithLock} §A _lam024 §/C
+      §R Task.CompletedTask
+    §/MT{m022}
+
+    §MT{m025:UpdateAsync:pub}
+      §I{InventoryItem:item}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam030} §LAM{lam026}
+  §B{_lam028} §LAM{lam027:i:?} (== i.Id item.Id) §/LAM{lam027}
+  §B{idx} §C{_db.InventoryItems.FindIndex} §A _lam028 §/C
+  §IF{if029} (>= idx 0)
+  §PUT{_db.InventoryItems} idx item
+§/I{if029}
+§/LAM{lam026}
+      §C{_db.WithLock} §A _lam030 §/C
+      §R Task.CompletedTask
+    §/MT{m025}
+
+    §MT{m031:GetReservationsForOrderAsync:pub}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<List<StockReservation>>}
+      §B{_lam038} §LAM{lam032}
+  §B{_lam034} §LAM{lam033:r:?} (== r.OrderId orderId) §/LAM{lam033}
+  §B{_lam036} §LAM{lam035:r:?} (== r.OrderId orderId) §/LAM{lam035}
+  §B{_chainWhere037} §C{_db.Reservations.Where} §A _lam036 §/C
+  §R §C{_chainWhere037.ToList} §/C
+§/LAM{lam032}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam038 §/C §/C
+    §/MT{m031}
+
+    §MT{m039:GetReservationByIdAsync:pub}
+      §I{guid:reservationId}
+      §I{CancellationToken:ct}
+      §O{Task<?StockReservation>}
+      §B{_lam043} §LAM{lam040} §B{_lam042} §LAM{lam041:r:?} (== r.Id reservationId) §/LAM{lam041} §R §C{_db.Reservations.FirstOrDefault} §A _lam042 §/C §/LAM{lam040}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam043 §/C §/C
+    §/MT{m039}
+
+    §MT{m044:AddReservationAsync:pub}
+      §I{StockReservation:reservation}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam046} §LAM{lam045} §C{_db.Reservations.Add} §A reservation §/C §/LAM{lam045}
+      §C{_db.WithLock} §A _lam046 §/C
+      §R Task.CompletedTask
+    §/MT{m044}
+
+    §MT{m047:UpdateReservationAsync:pub}
+      §I{StockReservation:reservation}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam052} §LAM{lam048}
+  §B{_lam050} §LAM{lam049:r:?} (== r.Id reservation.Id) §/LAM{lam049}
+  §B{idx} §C{_db.Reservations.FindIndex} §A _lam050 §/C
+  §IF{if051} (>= idx 0)
+  §PUT{_db.Reservations} idx reservation
+§/I{if051}
+§/LAM{lam048}
+      §C{_db.WithLock} §A _lam052 §/C
+      §R Task.CompletedTask
+    §/MT{m047}
+
+  §/CL{c010}
+
+§/M{m001}

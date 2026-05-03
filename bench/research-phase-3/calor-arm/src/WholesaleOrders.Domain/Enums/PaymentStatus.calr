@@ -1,0 +1,10 @@
+§M{m001:WholesaleOrders.Domain.Enums}
+  §EN{e001:PaymentStatus:pub}
+    Pending = 0
+    Authorized = 1
+    Captured = 2
+    Failed = 3
+    Refunded = 4
+  §/EN{e001}
+
+§/M{m001}

@@ -1,0 +1,57 @@
+§M{m001:WholesaleOrders.Api.Controllers}
+  §U{Microsoft.AspNetCore.Mvc}
+  §U{WholesaleOrders.Services}
+
+  §CL{c001:ShipmentsController:pub}[@ApiController][@Route("api/shipments")]
+    §EXT{ControllerBase}
+
+    §FLD{IShipmentService:_shipments:priv:readonly}
+
+    §CTOR{ctor002:pub} (IShipmentService:shipments)
+      §ASSIGN _shipments shipments
+    §/CTOR{ctor002}
+
+    §AMT{m008:Create:pub}[@HttpPost]
+      §I{CreateShipmentRequest:req}[@FromBody]
+      §I{CancellationToken:ct}
+      §O{IActionResult}
+      §B{shipment} §AWAIT §C{_shipments.CreateShipmentAsync} §A req.OrderId §A req.Carrier §A ct §/C
+      §R §C{Ok} §A shipment §/C
+    §/AMT{m008}
+
+    §AMT{m009:MarkInTransit:pub}[@HttpPost("{shipmentId:guid}/in-transit")]
+      §I{guid:shipmentId}
+      §I{InTransitRequest:req}[@FromBody]
+      §I{CancellationToken:ct}
+      §O{IActionResult}
+      §B{shipment} §AWAIT §C{_shipments.MarkInTransitAsync} §A shipmentId §A req.TrackingNumber §A ct §/C
+      §R §C{Ok} §A shipment §/C
+    §/AMT{m009}
+
+    §AMT{m010:MarkDelivered:pub}[@HttpPost("{shipmentId:guid}/delivered")] (guid:shipmentId, CancellationToken:ct) -> IActionResult
+      §B{shipment} §AWAIT §C{_shipments.MarkDeliveredAsync} §A shipmentId §A ct §/C
+      §R §C{Ok} §A shipment §/C
+    §/AMT{m010}
+
+    §AMT{m011:Schedulable:pub}[@HttpGet("schedulable")] (CancellationToken:ct) -> IActionResult
+      §B{orders} §AWAIT §C{_shipments.GetSchedulableOrdersAsync} §A ct §/C
+      §R §C{Ok} §A orders §/C
+    §/AMT{m011}
+
+    §CL{r003:CreateShipmentRequest:pub:seal}
+      §PROP{p004:OrderId:guid:pub}
+      §/PROP{p004}
+      §PROP{p005:Carrier:str:pub}
+      §/PROP{p005}
+
+    §/CL{r003}
+
+    §CL{r006:InTransitRequest:pub:seal}
+      §PROP{p007:TrackingNumber:str:pub}
+      §/PROP{p007}
+
+    §/CL{r006}
+
+  §/CL{c001}
+
+§/M{m001}

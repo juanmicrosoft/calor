@@ -1,0 +1,120 @@
+§M{m001:WholesaleOrders.Services}
+  §U{WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.Enums}
+  §U{WholesaleOrders.Infra.Logging}
+  §U{WholesaleOrders.Infra.Persistence}
+
+  §IFACE{i001:IShipmentService}
+    §MT{m002:CreateShipmentAsync}
+      §I{guid:orderId}
+      §I{str:carrier}
+      §I{CancellationToken:ct}
+      §O{Task<Shipment>}
+    §/MT{m002}
+    §MT{m003:MarkInTransitAsync}
+      §I{guid:shipmentId}
+      §I{str:trackingNumber}
+      §I{CancellationToken:ct}
+      §O{Task<Shipment>}
+    §/MT{m003}
+    §MT{m004:MarkDeliveredAsync}
+      §I{guid:shipmentId}
+      §I{CancellationToken:ct}
+      §O{Task<Shipment>}
+    §/MT{m004}
+    §MT{m005:GetSchedulableOrdersAsync}
+      §I{CancellationToken:ct}
+      §O{Task<List<Order>>}
+    §/MT{m005}
+  §/IFACE{i001}
+
+  §CL{c006:ShipmentService:pub}
+    §IMPL{IShipmentService}
+
+    §FLD{IShipmentRepository:_shipments:priv:readonly}
+    §FLD{IOrderRepository:_orders:priv:readonly}
+    §FLD{IStructuredLogger:_logger:priv:readonly}
+
+    §CTOR{ctor007:pub} (IShipmentRepository:shipments, IOrderRepository:orders, IStructuredLogger:logger)
+      §ASSIGN _shipments shipments
+      §ASSIGN _orders orders
+      §ASSIGN _logger logger
+    §/CTOR{ctor007}
+
+    §AMT{m008:CreateShipmentAsync:pub}
+      §I{guid:orderId}
+      §I{str:carrier}
+      §I{CancellationToken:ct}
+      §O{Shipment}
+      §E{throw}
+      §B{_nct009} §AWAIT §C{_orders.GetByIdAsync} §A orderId §A ct §/C
+      §IF{if010} (== _nct009 null)
+        §TH §NEW{InvalidOperationException} §A "Order ${orderId} not found." §/NEW
+      §/I{if010}
+      §B{order} _nct009
+      §IF{if011} (!= order.Status OrderStatus.Paid)
+        §TH §NEW{InvalidOperationException} §A "Cannot create shipment for order in status ${order.Status}." §/NEW
+      §/I{if011}
+      §B{shipment} §NEW{Shipment}
+        OrderId = orderId
+        Carrier = carrier
+      §/NEW
+      §B{_} §AWAIT §C{_shipments.AddAsync} §A shipment §A ct §/C
+      §R shipment
+    §/AMT{m008}
+
+    §AMT{m012:MarkInTransitAsync:pub}
+      §I{guid:shipmentId}
+      §I{str:trackingNumber}
+      §I{CancellationToken:ct}
+      §O{Shipment}
+      §E{throw}
+      §B{_nct013} §AWAIT §C{_shipments.GetByIdAsync} §A shipmentId §A ct §/C
+      §IF{if014} (== _nct013 null)
+        §TH §NEW{InvalidOperationException} §A "Shipment ${shipmentId} not found." §/NEW
+      §/I{if014}
+      §B{shipment} _nct013
+      §IF{if015} (!= shipment.Status ShipmentStatus.Pending)
+        §TH §NEW{InvalidOperationException} §A "Cannot mark in-transit a shipment in status ${shipment.Status}." §/NEW
+      §/I{if015}
+      §ASSIGN shipment.Status ShipmentStatus.InTransit
+      §ASSIGN shipment.TrackingNumber trackingNumber
+      §ASSIGN shipment.ShippedAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_shipments.UpdateAsync} §A shipment §A ct §/C
+      §R shipment
+    §/AMT{m012}
+
+    §AMT{m016:MarkDeliveredAsync:pub}
+      §I{guid:shipmentId}
+      §I{CancellationToken:ct}
+      §O{Shipment}
+      §E{throw}
+      §B{_nct017} §AWAIT §C{_shipments.GetByIdAsync} §A shipmentId §A ct §/C
+      §IF{if018} (== _nct017 null)
+        §TH §NEW{InvalidOperationException} §A "Shipment ${shipmentId} not found." §/NEW
+      §/I{if018}
+      §B{shipment} _nct017
+      §IF{if019} (!= shipment.Status ShipmentStatus.InTransit)
+        §TH §NEW{InvalidOperationException} §A "Cannot mark delivered a shipment in status ${shipment.Status}." §/NEW
+      §/I{if019}
+      §ASSIGN shipment.Status ShipmentStatus.Delivered
+      §ASSIGN shipment.DeliveredAt DateTimeOffset.UtcNow
+      §B{_} §AWAIT §C{_shipments.UpdateAsync} §A shipment §A ct §/C
+      §R shipment
+    §/AMT{m016}
+
+    // Returns Paid orders that are eligible to be scheduled for shipment, in the order they should be processed. Today: FIFO by SubmittedAt.
+    §AMT{m020:GetSchedulableOrdersAsync:pub}
+      §I{CancellationToken:ct}
+      §O{List<Order>}
+      §B{all} §AWAIT §C{_orders.GetAllAsync} §A ct §/C
+      §B{_lamOrderBy022} §LAM{lam021:o:?} (?? o.SubmittedAt o.CreatedAt) §/LAM{lam021}
+      §B{_lamWhere024} §LAM{lam023:o:?} (== o.Status OrderStatus.Paid) §/LAM{lam023}
+      §B{_chainWhere025} §C{all.Where} §A _lamWhere024 §/C
+      §B{_chainOrderBy026} §C{_chainWhere025.OrderBy} §A _lamOrderBy022 §/C
+      §R §C{_chainOrderBy026.ToList} §/C
+    §/AMT{m020}
+
+  §/CL{c006}
+
+§/M{m001}

@@ -1,0 +1,30 @@
+§M{m001:WholesaleOrders.Services.Validators}
+  §U{WholesaleOrders.Domain.Entities}
+
+  §IFACE{i001:IInventoryValidator}
+    §MT{m002:ValidateReservation} (InventoryItem:item, i32:requestedQuantity) -> ValidationResult
+    §/MT{m002}
+  §/IFACE{i001}
+
+  §CL{c003:InventoryValidator:pub}
+    §IMPL{IInventoryValidator}
+
+    §MT{m004:ValidateReservation:pub} (InventoryItem:item, i32:requestedQuantity) -> ValidationResult
+      §ARR{_arrStr007:str}
+        "Reservation quantity must be positive."
+      §/ARR{_arrStr007}
+      §IF{if005} (<= requestedQuantity 0)
+        §R §C{ValidationResult.Fail} §A _arrStr007 §/C
+      §/I{if005}
+      §ARR{_arrObject010:any}
+        "Insufficient inventory for SKU ${item.Sku.Value}: requested ${requestedQuantity}, available ${item.Available}."
+      §/ARR{_arrObject010}
+      §IF{if008} (< item.Available requestedQuantity)
+        §R §C{ValidationResult.Fail} §A _arrObject010 §/C
+      §/I{if008}
+      §R §C{ValidationResult.Ok} §/C
+    §/MT{m004}
+
+  §/CL{c003}
+
+§/M{m001}

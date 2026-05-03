@@ -1,0 +1,9 @@
+§M{m001:WholesaleOrders.Domain.Enums}
+  §EN{e001:ShipmentStatus:pub}
+    Pending = 0
+    InTransit = 1
+    Delivered = 2
+    Failed = 3
+  §/EN{e001}
+
+§/M{m001}
