@@ -1,0 +1,67 @@
+§M{m001:WholesaleOrders.Api.Middleware}
+  §U{System.Collections.Concurrent}
+  §U{System.Text}
+
+  §CL{c001:IdempotencyMiddleware:pub}
+    §FLD{str:HeaderName:priv:const} = "Idempotency-Key"
+    §FLD{timespan:Ttl:priv:stat,readonly} = §C{TimeSpan.FromHours} §A 24 §/C
+    §FLD{RequestDelegate:_next:priv:readonly}
+    §FLD{ConcurrentDictionary<str, CachedResponse>:_cache:priv:stat,readonly} = §NEW{ConcurrentDictionary<str, CachedResponse>} §/NEW
+
+    §CTOR{ctor002:pub} (RequestDelegate:next)
+      §ASSIGN _next next
+    §/CTOR{ctor002}
+
+    §AMT{m003:InvokeAsync:pub} (HttpContext:context)
+      §B{_preIsPost005} §C{HttpMethods.IsPost} §A context.Request.Method §/C
+      §B{_preIsPut006} §C{HttpMethods.IsPut} §A context.Request.Method §/C
+      §IF{if004} (&& (! _preIsPost005) (! _preIsPut006))
+        §B{_} §AWAIT §C{_next} §A context §/C
+        §R
+      §/I{if004}
+      §B{_preTryGetValue008} §C{context.Request.Headers.TryGetValue} §A HeaderName §A key §/C
+      §IF{if007} (|| (! _preTryGetValue008) (isblank key))
+        §B{~key}
+        §B{_} §AWAIT §C{_next} §A context §/C
+        §R
+      §/I{if007}
+      §B{cacheKey} "${key}:${context.Request.Path}"
+      §B{_preTryGetValue010} §C{_cache.TryGetValue} §A cacheKey §A cached §/C
+      §IF{if009} (&& _preTryGetValue010 (> cached.Expiry DateTimeOffset.UtcNow))
+        §B{~cached}
+        §ASSIGN context.Response.StatusCode cached.StatusCode
+        §ASSIGN context.Response.ContentType cached.ContentType
+        §B{_} §AWAIT §C{context.Response.Body.WriteAsync} §A cached.Body §/C
+        §R
+      §/I{if009}
+      §B{originalBody} context.Response.Body
+      §B{ms} §NEW{MemoryStream} §/NEW
+      §ASSIGN context.Response.Body ms
+      §TR{try011}
+        §B{_} §AWAIT §C{_next} §A context §/C
+        §ASSIGN ms.Position 0
+        §B{bytes} §C{ms.ToArray} §/C
+        §B{~_hoist000} §C{DateTimeOffset.UtcNow.Add} §A Ttl §/C
+        §PUT{_cache} cacheKey §NEW{CachedResponse} §A context.Response.StatusCode §A (?? context.Response.ContentType "application/json") §A bytes §A _hoist000 §/NEW
+        §ASSIGN ms.Position 0
+        §B{_} §AWAIT §C{ms.CopyToAsync} §A originalBody §/C
+      §FI
+        §ASSIGN context.Response.Body originalBody
+      §/TR{try011}
+    §/AMT{m003}
+
+    §CL{r012:CachedResponse:priv:seal}
+      §PROP{p013:StatusCode:i32:pub}
+      §/PROP{p013}
+      §PROP{p014:ContentType:str:pub}
+      §/PROP{p014}
+      §PROP{p015:Body:u8[]:pub}
+      §/PROP{p015}
+      §PROP{p016:Expiry:datetimeoffset:pub}
+      §/PROP{p016}
+
+    §/CL{r012}
+
+  §/CL{c001}
+
+§/M{m001}

@@ -1,0 +1,14 @@
+§M{m001:WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.ValueObjects}
+
+  §CL{c001:OrderLineItem:pub}
+    §PROP{p002:Id:guid:pub:get,init} = §C{Guid.NewGuid} §/C
+    §PROP{p003:OrderId:guid:pub:get,init}
+    §PROP{p004:Sku:Sku:pub:req:get,init}
+    §PROP{p005:Quantity:i32:pub:get,set}
+    §PROP{p006:UnitPrice:dec:pub:get,init}
+    §PROP{p007:Description:str:pub:get,init} = ""
+
+  §/CL{c001}
+
+§/M{m001}

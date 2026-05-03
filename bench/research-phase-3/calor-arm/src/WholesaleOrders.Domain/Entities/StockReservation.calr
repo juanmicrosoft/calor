@@ -1,0 +1,18 @@
+§M{m001:WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.Enums}
+  §U{WholesaleOrders.Domain.ValueObjects}
+
+  §CL{c001:StockReservation:pub}
+    §PROP{p002:Id:guid:pub:get,init} = §C{Guid.NewGuid} §/C
+    §PROP{p003:OrderId:guid:pub:get,init}
+    §PROP{p004:Sku:Sku:pub:req:get,init}
+    §PROP{p005:Quantity:i32:pub:get,init}
+    §PROP{p006:Status:ReservationStatus:pub:get,set} = ReservationStatus.Created
+    §PROP{p007:CreatedAt:datetimeoffset:pub:get,init} = DateTimeOffset.UtcNow
+    §PROP{p008:ConfirmedAt:?datetimeoffset:pub:get,set}
+    §PROP{p009:ReleasedAt:?datetimeoffset:pub:get,set}
+    §PROP{p010:FulfilledAt:?datetimeoffset:pub:get,set}
+
+  §/CL{c001}
+
+§/M{m001}

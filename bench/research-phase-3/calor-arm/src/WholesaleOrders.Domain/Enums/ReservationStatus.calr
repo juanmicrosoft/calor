@@ -1,0 +1,9 @@
+§M{m001:WholesaleOrders.Domain.Enums}
+  §EN{e001:ReservationStatus:pub}
+    Created = 0
+    Confirmed = 1
+    Released = 2
+    Fulfilled = 3
+  §/EN{e001}
+
+§/M{m001}

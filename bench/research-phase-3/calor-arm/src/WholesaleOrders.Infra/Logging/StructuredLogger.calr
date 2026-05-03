@@ -1,0 +1,74 @@
+§M{m001:WholesaleOrders.Infra.Logging}
+  §IFACE{i001:IStructuredLogger}
+    §MT{m002:Info}
+      §I{str:message}
+      §I{?any:context} = null
+    §/MT{m002}
+    §MT{m003:Warn}
+      §I{str:message}
+      §I{?any:context} = null
+    §/MT{m003}
+    §MT{m004:Error}
+      §I{str:message}
+      §I{?Exception:exception} = null
+      §I{?any:context} = null
+    §/MT{m004}
+  §/IFACE{i001}
+
+  §CL{c005:StructuredLogger:pub}
+    §IMPL{IStructuredLogger}
+
+    §FLD{List<LogEntry>:_entries:priv:readonly} = §NEW{List<LogEntry>} §/NEW
+    §FLD{any:_lock:priv:readonly} = §NEW{any} §/NEW
+
+    §PROP{p007:Entries:ReadList<LogEntry>:pub}
+      §GET{pub}
+        §SYNC{sync006} (_lock)
+          §R §C{_entries.ToList} §/C
+        §/SYNC{sync006}
+      §/GET
+    §/PROP{p007}
+
+    §MT{m008:Info:pub}
+      §I{str:message}
+      §I{?any:context} = null
+      §R §C{Append} §A "INFO" §A message §A[exception] null §A context §/C
+    §/MT{m008}
+
+    §MT{m009:Warn:pub}
+      §I{str:message}
+      §I{?any:context} = null
+      §R §C{Append} §A "WARN" §A message §A[exception] null §A context §/C
+    §/MT{m009}
+
+    §MT{m010:Error:pub}
+      §I{str:message}
+      §I{?Exception:exception} = null
+      §I{?any:context} = null
+      §R §C{Append} §A "ERROR" §A message §A exception §A context §/C
+    §/MT{m010}
+
+    §MT{m011:Append:priv} (str:level, str:message, ?Exception:exception, ?any:context)
+      §B{entry} §NEW{LogEntry} §A DateTimeOffset.UtcNow §A level §A message §A (?. exception "ToString()") §A context §/NEW
+      §SYNC{sync012} (_lock)
+        §C{_entries.Add} §A entry §/C
+      §/SYNC{sync012}
+    §/MT{m011}
+
+  §/CL{c005}
+
+  §CL{r013:LogEntry:pub:seal}
+    §PROP{p014:Timestamp:datetimeoffset:pub}
+    §/PROP{p014}
+    §PROP{p015:Level:str:pub}
+    §/PROP{p015}
+    §PROP{p016:Message:str:pub}
+    §/PROP{p016}
+    §PROP{p017:Exception:?str:pub}
+    §/PROP{p017}
+    §PROP{p018:Context:?any:pub}
+    §/PROP{p018}
+
+  §/CL{r013}
+
+§/M{m001}

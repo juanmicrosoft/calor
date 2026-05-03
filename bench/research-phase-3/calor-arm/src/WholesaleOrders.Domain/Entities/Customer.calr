@@ -1,0 +1,13 @@
+§M{m001:WholesaleOrders.Domain.Entities}
+  §CL{c001:Customer:pub}
+    §PROP{p002:Id:guid:pub:get,init} = §C{Guid.NewGuid} §/C
+    §PROP{p003:Name:str:pub:get,init} = ""
+    §PROP{p004:Email:str:pub:get,init} = ""
+    §PROP{p005:BillingAddress:str:pub:get,init} = ""
+    §PROP{p006:ShippingAddress:str:pub:get,init} = ""
+    §PROP{p007:CreatedAt:datetimeoffset:pub:get,init} = DateTimeOffset.UtcNow
+    §PROP{p008:LegacyCustomerCode:str:pub:get,init}[@Obsolete("Use Id instead.")] = ""
+
+  §/CL{c001}
+
+§/M{m001}

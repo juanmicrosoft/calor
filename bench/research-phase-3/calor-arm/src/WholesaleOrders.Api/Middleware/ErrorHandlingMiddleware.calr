@@ -1,0 +1,50 @@
+§M{m001:WholesaleOrders.Api.Middleware}
+  §U{WholesaleOrders.Infra.Logging}
+
+  §CL{c001:ErrorHandlingMiddleware:pub}
+    §FLD{RequestDelegate:_next:priv:readonly}
+    §FLD{IStructuredLogger:_logger:priv:readonly}
+
+    §CTOR{ctor002:pub} (RequestDelegate:next, IStructuredLogger:logger)
+      §ASSIGN _next next
+      §ASSIGN _logger logger
+    §/CTOR{ctor002}
+
+    §AMT{m003:InvokeAsync:pub} (HttpContext:context)
+      §TR{try004}
+        §B{_} §AWAIT §C{_next} §A context §/C
+      §CA{InvalidOperationException:ex}
+        §B{~_hoist000} §ANON
+          path = context.Request.Path.Value
+          message = ex.Message
+        §/ANON
+        §C{_logger.Warn} §A "InvalidOperation caught" §A _hoist000 §/C
+        §ASSIGN context.Response.StatusCode StatusCodes.Status400BadRequest
+        §B{_} §AWAIT §C{context.Response.WriteAsJsonAsync} §A §ANON
+          error = ex.Message
+        §/ANON §/C
+      §CA{ArgumentException:ex}
+        §B{~_hoist001} §ANON
+          path = context.Request.Path.Value
+          message = ex.Message
+        §/ANON
+        §C{_logger.Warn} §A "ArgumentException caught" §A _hoist001 §/C
+        §ASSIGN context.Response.StatusCode StatusCodes.Status400BadRequest
+        §B{_} §AWAIT §C{context.Response.WriteAsJsonAsync} §A §ANON
+          error = ex.Message
+        §/ANON §/C
+      §CA{Exception:ex}
+        §B{~_hoist002} §ANON
+          path = context.Request.Path.Value
+        §/ANON
+        §C{_logger.Error} §A "Unhandled exception" §A ex §A _hoist002 §/C
+        §ASSIGN context.Response.StatusCode StatusCodes.Status500InternalServerError
+        §B{_} §AWAIT §C{context.Response.WriteAsJsonAsync} §A §ANON
+          error = "Internal server error."
+        §/ANON §/C
+      §/TR{try004}
+    §/AMT{m003}
+
+  §/CL{c001}
+
+§/M{m001}

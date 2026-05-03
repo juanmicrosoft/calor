@@ -1,0 +1,29 @@
+§M{m001:WholesaleOrders.Api}
+  §U{WholesaleOrders.Infra.Logging}
+  §U{WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Services}
+  §U{WholesaleOrders.Services.Validators}
+
+  §CL{c001:DependencyRegistration:pub:stat}
+    §MT{m002:AddWholesaleOrders:pub:stat} (IServiceCollection:services:this) -> IServiceCollection
+      §C{services.AddSingleton} §/C
+      §C{services.AddSingleton} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §C{services.AddScoped} §/C
+      §R services
+    §/MT{m002}
+
+  §/CL{c001}
+
+§/M{m001}

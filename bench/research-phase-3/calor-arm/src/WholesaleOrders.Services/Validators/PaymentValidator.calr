@@ -1,0 +1,37 @@
+§M{m001:WholesaleOrders.Services.Validators}
+  §U{WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.ValueObjects}
+
+  §IFACE{i001:IPaymentValidator}
+    §MT{m002:ValidateCharge} (Order:order, Money:amount) -> ValidationResult
+    §/MT{m002}
+  §/IFACE{i001}
+
+  §CL{c003:PaymentValidator:pub}
+    §IMPL{IPaymentValidator}
+
+    §MT{m004:ValidateCharge:pub} (Order:order, Money:amount) -> ValidationResult
+      §ARR{_arrStr007:str}
+        "Payment amount must be positive."
+      §/ARR{_arrStr007}
+      §IF{if005} (<= amount.Amount 0)
+        §R §C{ValidationResult.Fail} §A _arrStr007 §/C
+      §/I{if005}
+      §ARR{_arrObject010:any}
+        "Payment currency ${amount.Currency} does not match order currency ${order.Currency}."
+      §/ARR{_arrObject010}
+      §IF{if008} (! (equals amount.Currency order.Currency :ignore-case))
+        §R §C{ValidationResult.Fail} §A _arrObject010 §/C
+      §/I{if008}
+      §ARR{_arrObject013:any}
+        "Payment amount ${amount.Amount} does not match order total ${order.TotalAmount.Amount}."
+      §/ARR{_arrObject013}
+      §IF{if011} (!= amount.Amount order.TotalAmount.Amount)
+        §R §C{ValidationResult.Fail} §A _arrObject013 §/C
+      §/I{if011}
+      §R §C{ValidationResult.Ok} §/C
+    §/MT{m004}
+
+  §/CL{c003}
+
+§/M{m001}

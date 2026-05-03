@@ -1,0 +1,65 @@
+§M{m001:WholesaleOrders.Api.Controllers}
+  §U{Microsoft.AspNetCore.Mvc}
+  §U{WholesaleOrders.Domain.ValueObjects}
+  §U{WholesaleOrders.Services}
+
+  §CL{c001:InventoryController:pub}[@ApiController][@Route("api/inventory")]
+    §EXT{ControllerBase}
+
+    §FLD{IInventoryService:_inventory:priv:readonly}
+
+    §CTOR{ctor002:pub} (IInventoryService:inventory)
+      §ASSIGN _inventory inventory
+    §/CTOR{ctor002}
+
+    §AMT{m012:Add:pub}[@HttpPost("items")]
+      §I{AddItemRequest:req}[@FromBody]
+      §I{CancellationToken:ct}
+      §O{IActionResult}
+      §B{item} §AWAIT §C{_inventory.AddItemAsync} §A §C{Sku.Parse} §A req.Sku §/C §A req.Name §A req.OnHand §A req.UnitPrice §A ct §/C
+      §R §C{Ok} §A item §/C
+    §/AMT{m012}
+
+    §AMT{m013:Reserve:pub}[@HttpPost("reserve")]
+      §I{ReserveRequest:req}[@FromBody]
+      §I{CancellationToken:ct}
+      §O{IActionResult}
+      §B{reservation} §AWAIT §C{_inventory.ReserveAsync} §A req.OrderId §A §C{Sku.Parse} §A req.Sku §/C §A req.Quantity §A ct §/C
+      §R §C{Ok} §A reservation §/C
+    §/AMT{m013}
+
+    §AMT{m014:Confirm:pub}[@HttpPost("reservations/{reservationId:guid}/confirm")] (guid:reservationId, CancellationToken:ct) -> IActionResult
+      §B{reservation} §AWAIT §C{_inventory.ConfirmAsync} §A reservationId §A ct §/C
+      §R §C{Ok} §A reservation §/C
+    §/AMT{m014}
+
+    §AMT{m015:Release:pub}[@HttpPost("reservations/{reservationId:guid}/release")] (guid:reservationId, CancellationToken:ct) -> IActionResult
+      §B{reservation} §AWAIT §C{_inventory.ReleaseAsync} §A reservationId §A ct §/C
+      §R §C{Ok} §A reservation §/C
+    §/AMT{m015}
+
+    §CL{r003:AddItemRequest:pub:seal}
+      §PROP{p004:Sku:str:pub}
+      §/PROP{p004}
+      §PROP{p005:Name:str:pub}
+      §/PROP{p005}
+      §PROP{p006:OnHand:i32:pub}
+      §/PROP{p006}
+      §PROP{p007:UnitPrice:dec:pub}
+      §/PROP{p007}
+
+    §/CL{r003}
+
+    §CL{r008:ReserveRequest:pub:seal}
+      §PROP{p009:OrderId:guid:pub}
+      §/PROP{p009}
+      §PROP{p010:Sku:str:pub}
+      §/PROP{p010}
+      §PROP{p011:Quantity:i32:pub}
+      §/PROP{p011}
+
+    §/CL{r008}
+
+  §/CL{c001}
+
+§/M{m001}

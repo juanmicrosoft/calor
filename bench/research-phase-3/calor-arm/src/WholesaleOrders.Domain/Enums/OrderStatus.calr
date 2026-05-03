@@ -1,0 +1,12 @@
+§M{m001:WholesaleOrders.Domain.Enums}
+  §EN{e001:OrderStatus:pub}
+    Draft = 0
+    Submitted = 1
+    Paid = 2
+    Shipped = 3
+    Delivered = 4
+    Cancelled = 5
+    Returned = 6
+  §/EN{e001}
+
+§/M{m001}

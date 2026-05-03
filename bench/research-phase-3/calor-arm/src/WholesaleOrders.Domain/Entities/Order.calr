@@ -1,0 +1,30 @@
+§M{m001:WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.Enums}
+  §U{WholesaleOrders.Domain.ValueObjects}
+
+  §CL{c001:Order:pub}
+    §PROP{p002:Id:guid:pub:get,init} = §C{Guid.NewGuid} §/C
+    §PROP{p003:CustomerId:guid:pub:get,init}
+    §PROP{p004:Status:OrderStatus:pub:get,set} = OrderStatus.Draft
+    §PROP{p005:Currency:str:pub:get,init} = "USD"
+    §PROP{p006:CreatedAt:datetimeoffset:pub:get,init} = DateTimeOffset.UtcNow
+    §PROP{p007:SubmittedAt:?datetimeoffset:pub:get,set}
+    §PROP{p008:PaidAt:?datetimeoffset:pub:get,set}
+    §PROP{p009:ShippedAt:?datetimeoffset:pub:get,set}
+    §PROP{p010:DeliveredAt:?datetimeoffset:pub:get,set}
+    §PROP{p011:CancelledAt:?datetimeoffset:pub:get,set}
+    §PROP{p012:LineItems:List<OrderLineItem>:pub:get} = §NEW{List<OrderLineItem>} §/NEW
+    §PROP{p013:TotalAmount:Money:pub:get,set} = §C{Money.Zero} §A "USD" §/C
+
+    §MT{m014:CalculateTotal:pub} () -> Money
+      §B{~sum:dec} DEC:0
+      §EACH{each015:li:var} LineItems
+        §ASSIGN sum (+ sum (* li.Quantity li.UnitPrice))
+      §/EACH{each015}
+      §B{~_hoist000} §C{Math.Round} §A sum §A 2 §A MidpointRounding.ToEven §/C
+      §R §NEW{Money} §A _hoist000 §A Currency §/NEW
+    §/MT{m014}
+
+  §/CL{c001}
+
+§/M{m001}

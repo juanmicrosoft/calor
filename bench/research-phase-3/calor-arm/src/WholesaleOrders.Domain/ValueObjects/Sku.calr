@@ -1,0 +1,29 @@
+§M{m001:WholesaleOrders.Domain.ValueObjects}
+  §CL{c001:Sku:pub}
+    §PROP{p002:Value:str:pub:get}
+
+    §CTOR{ctor003:pub} (str:value)
+      §ASSIGN Value value
+    §/CTOR{ctor003}
+
+    §MT{m004:Parse:pub:stat} (str:raw) -> Sku
+      §E{throw}
+      §IF{if005} (isblank raw)
+        §TH §NEW{ArgumentException} §A "SKU cannot be empty" §A (nameof raw) §/NEW
+      §/I{if005}
+      §IF{if006} (> (len raw) 64)
+        §TH §NEW{ArgumentException} §A "SKU exceeds 64 characters" §A (nameof raw) §/NEW
+      §/I{if006}
+      §B{_chainTrim007} (trim raw)
+      §B{~_hoist000} §C{_chainTrim007.ToUpperInvariant} §/C
+      §R §NEW{Sku} §A _hoist000 §/NEW
+    §/MT{m004}
+
+    §MT{m008:ToString:pub:over} () -> str
+      §E{}
+      §R Value
+    §/MT{m008}
+
+  §/CL{c001}
+
+§/M{m001}

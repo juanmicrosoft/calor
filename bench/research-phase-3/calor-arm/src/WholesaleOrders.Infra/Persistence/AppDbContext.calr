@@ -1,0 +1,30 @@
+§M{m001:WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Domain.Entities}
+
+  // In-memory data store. Synthetic scaffold — no EF Core, just thread-safe lists. Production would replace this with EF Core + a real DB; the repository contracts are written to make that swap feasible.
+  §CL{c001:AppDbContext:pub}
+    §FLD{any:_lock:priv:readonly} = §NEW{any} §/NEW
+
+    §PROP{p002:Orders:List<Order>:pub:get} = §NEW{List<Order>} §/NEW
+    §PROP{p003:OrderLineItems:List<OrderLineItem>:pub:get} = §NEW{List<OrderLineItem>} §/NEW
+    §PROP{p004:Customers:List<Customer>:pub:get} = §NEW{List<Customer>} §/NEW
+    §PROP{p005:InventoryItems:List<InventoryItem>:pub:get} = §NEW{List<InventoryItem>} §/NEW
+    §PROP{p006:Reservations:List<StockReservation>:pub:get} = §NEW{List<StockReservation>} §/NEW
+    §PROP{p007:Payments:List<Payment>:pub:get} = §NEW{List<Payment>} §/NEW
+    §PROP{p008:Shipments:List<Shipment>:pub:get} = §NEW{List<Shipment>} §/NEW
+
+    §MT{m009:WithLock<T>:pub} (Func<T>:action) -> T
+      §SYNC{sync010} (_lock)
+        §R §C{action} §/C
+      §/SYNC{sync010}
+    §/MT{m009}
+
+    §MT{m011:WithLock:pub} (Action:action)
+      §SYNC{sync012} (_lock)
+        §C{action} §/C
+      §/SYNC{sync012}
+    §/MT{m011}
+
+  §/CL{c001}
+
+§/M{m001}

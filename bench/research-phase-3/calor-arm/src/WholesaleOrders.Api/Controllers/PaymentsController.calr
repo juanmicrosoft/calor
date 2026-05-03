@@ -1,0 +1,46 @@
+§M{m001:WholesaleOrders.Api.Controllers}
+  §U{Microsoft.AspNetCore.Mvc}
+  §U{WholesaleOrders.Domain.ValueObjects}
+  §U{WholesaleOrders.Services}
+
+  §CL{c001:PaymentsController:pub}[@ApiController][@Route("api/payments")]
+    §EXT{ControllerBase}
+
+    §FLD{IPaymentService:_payments:priv:readonly}
+
+    §CTOR{ctor002:pub} (IPaymentService:payments)
+      §ASSIGN _payments payments
+    §/CTOR{ctor002}
+
+    §AMT{m009:Charge:pub}[@HttpPost("charge")]
+      §I{ChargeRequest:req}[@FromBody]
+      §I{?str:idempotencyKey}[@FromHeader(Name="Idempotency-Key")]
+      §I{CancellationToken:ct}
+      §O{IActionResult}
+      §IF{if010} (isblank idempotencyKey)
+        §R §C{BadRequest} §A §ANON
+          error = "Idempotency-Key header is required for payment charges."
+        §/ANON §/C
+      §/I{if010}
+      §B{_newMoney011} §NEW{Money} §A req.Amount §A req.Currency §/NEW
+      §B{payment} §AWAIT §C{_payments.ChargeAsync} §A req.OrderId §A _newMoney011 §A req.CustomerToken §A idempotencyKey §A req.Source §A ct §/C
+      §R §C{Ok} §A payment §/C
+    §/AMT{m009}
+
+    §CL{r003:ChargeRequest:pub:seal}
+      §PROP{p004:OrderId:guid:pub}
+      §/PROP{p004}
+      §PROP{p005:Amount:dec:pub}
+      §/PROP{p005}
+      §PROP{p006:Currency:str:pub}
+      §/PROP{p006}
+      §PROP{p007:CustomerToken:str:pub}
+      §/PROP{p007}
+      §PROP{p008:Source:str:pub}
+      §/PROP{p008}
+
+    §/CL{r003}
+
+  §/CL{c001}
+
+§/M{m001}

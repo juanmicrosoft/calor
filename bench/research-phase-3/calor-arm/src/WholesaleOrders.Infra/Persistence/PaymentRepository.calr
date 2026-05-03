@@ -1,0 +1,83 @@
+§M{m001:WholesaleOrders.Infra.Persistence}
+  §U{WholesaleOrders.Domain.Entities}
+
+  §IFACE{i001:IPaymentRepository}
+    §MT{m002:GetByIdAsync}
+      §I{guid:id}
+      §I{CancellationToken:ct}
+      §O{Task<?Payment>}
+    §/MT{m002}
+    §MT{m003:GetByOrderAsync}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<List<Payment>>}
+    §/MT{m003}
+    §MT{m004:AddAsync}
+      §I{Payment:payment}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m004}
+    §MT{m005:UpdateAsync}
+      §I{Payment:payment}
+      §I{CancellationToken:ct}
+      §O{Task}
+    §/MT{m005}
+  §/IFACE{i001}
+
+  §CL{c006:PaymentRepository:pub}
+    §IMPL{IPaymentRepository}
+
+    §FLD{AppDbContext:_db:priv:readonly}
+
+    §CTOR{ctor007:pub} (AppDbContext:db)
+      §ASSIGN _db db
+    §/CTOR{ctor007}
+
+    §MT{m008:GetByIdAsync:pub}
+      §I{guid:id}
+      §I{CancellationToken:ct}
+      §O{Task<?Payment>}
+      §B{_lam012} §LAM{lam009} §B{_lam011} §LAM{lam010:p:?} (== p.Id id) §/LAM{lam010} §R §C{_db.Payments.FirstOrDefault} §A _lam011 §/C §/LAM{lam009}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam012 §/C §/C
+    §/MT{m008}
+
+    §MT{m013:GetByOrderAsync:pub}
+      §I{guid:orderId}
+      §I{CancellationToken:ct}
+      §O{Task<List<Payment>>}
+      §B{_lam020} §LAM{lam014}
+  §B{_lam016} §LAM{lam015:p:?} (== p.OrderId orderId) §/LAM{lam015}
+  §B{_lam018} §LAM{lam017:p:?} (== p.OrderId orderId) §/LAM{lam017}
+  §B{_chainWhere019} §C{_db.Payments.Where} §A _lam018 §/C
+  §R §C{_chainWhere019.ToList} §/C
+§/LAM{lam014}
+      §R §C{Task.FromResult} §A §C{_db.WithLock} §A _lam020 §/C §/C
+    §/MT{m013}
+
+    §MT{m021:AddAsync:pub}
+      §I{Payment:payment}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam023} §LAM{lam022} §C{_db.Payments.Add} §A payment §/C §/LAM{lam022}
+      §C{_db.WithLock} §A _lam023 §/C
+      §R Task.CompletedTask
+    §/MT{m021}
+
+    §MT{m024:UpdateAsync:pub}
+      §I{Payment:payment}
+      §I{CancellationToken:ct}
+      §O{Task}
+      §B{_lam029} §LAM{lam025}
+  §B{_lam027} §LAM{lam026:p:?} (== p.Id payment.Id) §/LAM{lam026}
+  §B{idx} §C{_db.Payments.FindIndex} §A _lam027 §/C
+  §IF{if028} (>= idx 0)
+  §PUT{_db.Payments} idx payment
+§/I{if028}
+§/LAM{lam025}
+      §C{_db.WithLock} §A _lam029 §/C
+      §R Task.CompletedTask
+    §/MT{m024}
+
+  §/CL{c006}
+
+§/M{m001}

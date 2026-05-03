@@ -1,0 +1,16 @@
+§M{m001:WholesaleOrders.Domain.Entities}
+  §U{WholesaleOrders.Domain.Enums}
+
+  §CL{c001:Shipment:pub}
+    §PROP{p002:Id:guid:pub:get,init} = §C{Guid.NewGuid} §/C
+    §PROP{p003:OrderId:guid:pub:get,init}
+    §PROP{p004:Status:ShipmentStatus:pub:get,set} = ShipmentStatus.Pending
+    §PROP{p005:Carrier:str:pub:get,set} = ""
+    §PROP{p006:TrackingNumber:str:pub:get,set} = ""
+    §PROP{p007:CreatedAt:datetimeoffset:pub:get,init} = DateTimeOffset.UtcNow
+    §PROP{p008:ShippedAt:?datetimeoffset:pub:get,set}
+    §PROP{p009:DeliveredAt:?datetimeoffset:pub:get,set}
+
+  §/CL{c001}
+
+§/M{m001}
