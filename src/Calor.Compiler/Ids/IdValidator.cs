@@ -4,6 +4,13 @@ namespace Calor.Compiler.Ids;
 
 /// <summary>
 /// Validates Calor IDs for format compliance.
+///
+/// v6+ accepts two payload formats:
+///   - Legacy ULID: 26 Crockford Base32 characters (uppercase, used by
+///     the historical <see cref="IdGenerator.Generate"/> path).
+///   - Compact:     12 Crockford lowercase characters (used by the
+///     <see cref="CompactIdGenerator"/> introduced in PR-2a).
+/// Validation accepts either form; emitters choose one.
 /// </summary>
 public static partial class IdValidator
 {
@@ -13,7 +20,7 @@ public static partial class IdValidator
     public const int UlidLength = 26;
 
     /// <summary>
-    /// Pattern for valid ULID characters (Crockford Base32).
+    /// Pattern for valid ULID characters (Crockford Base32, uppercase).
     /// Excludes I, L, O, U to avoid ambiguity.
     /// </summary>
     private static readonly Regex UlidPattern = UlidPatternRegex();
@@ -60,19 +67,24 @@ public static partial class IdValidator
         if (kind != expectedKind)
             return IdValidationResult.WrongPrefix;
 
-        // Extract and validate ULID portion
-        var ulidPortion = IdGenerator.ExtractUlid(id);
-        if (ulidPortion == null)
+        // Extract the payload (post-prefix). v6+ accepts either format:
+        //   26-char ULID  (legacy IdGenerator path)
+        //   12-char compact (CompactIdGenerator path, PR-2a)
+        var payload = IdGenerator.ExtractIdPortion(id);
+        if (payload == null)
             return IdValidationResult.InvalidFormat;
 
-        if (!IsValidUlid(ulidPortion))
+        if (!IsValidPayload(payload))
             return IdValidationResult.InvalidFormat;
 
         return IdValidationResult.Valid;
     }
 
     /// <summary>
-    /// Checks if a string is a valid ULID format.
+    /// Checks if a string is a valid ULID format (26 Crockford Base32
+    /// chars). Preserved for callers that explicitly need ULID
+    /// semantics. Prefer <see cref="IsValidPayload"/> for format-agnostic
+    /// validation in v6+ code.
     /// </summary>
     /// <param name="ulid">The string to check.</param>
     /// <returns>True if valid ULID format.</returns>
@@ -85,6 +97,23 @@ public static partial class IdValidator
             return false;
 
         return UlidPattern.IsMatch(ulid);
+    }
+
+    /// <summary>
+    /// True when <paramref name="payload"/> is a valid payload of
+    /// either supported format (26-char ULID or 12-char compact). This
+    /// is the v6+ canonical payload check.
+    /// </summary>
+    public static bool IsValidPayload(string? payload)
+    {
+        if (string.IsNullOrEmpty(payload))
+            return false;
+        return payload.Length switch
+        {
+            UlidLength => UlidPattern.IsMatch(payload),
+            CompactIdGenerator.PayloadLength => CompactIdGenerator.IsValidPayload(payload),
+            _ => false,
+        };
     }
 
     /// <summary>
@@ -153,7 +182,10 @@ public static partial class IdValidator
     };
 
     /// <summary>
-    /// Checks if an ID is a canonical production ID (with ULID).
+    /// Checks if an ID is a canonical production ID (either 26-char ULID
+    /// or 12-char compact payload, with a recognised prefix). The name
+    /// "canonical" predates the v6 compact format; in v6+ "canonical"
+    /// means "passes <see cref="IsValidPayload"/> on a recognised prefix."
     /// </summary>
     public static bool IsCanonicalId(string? id)
     {
@@ -164,8 +196,8 @@ public static partial class IdValidator
         if (kind == null)
             return false;
 
-        var ulidPortion = IdGenerator.ExtractUlid(id);
-        return ulidPortion != null && IsValidUlid(ulidPortion);
+        var payload = IdGenerator.ExtractIdPortion(id);
+        return payload != null && IsValidPayload(payload);
     }
 
     [GeneratedRegex("^[0-9A-HJKMNP-TV-Z]+$", RegexOptions.IgnoreCase)]

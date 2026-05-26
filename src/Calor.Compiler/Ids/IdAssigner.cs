@@ -171,13 +171,16 @@ public static partial class IdAssigner
             return (line, null);
         }
 
-        // Generate a new ID
-        var newId = IdGenerator.Generate(kind);
+        // Generate a new ID. v6+ defaults to the compact 12-char form
+        // (CompactIdGenerator); the legacy ULID generator
+        // (IdGenerator.Generate) remains available for the migrator's
+        // reverse-path and for callers that pin the legacy format.
+        var newId = CompactIdGenerator.Generate(kind);
 
-        // Ensure uniqueness
+        // Ensure uniqueness within the file's current ID set.
         while (existingIds.Contains(newId))
         {
-            newId = IdGenerator.Generate(kind);
+            newId = CompactIdGenerator.Generate(kind);
         }
         existingIds.Add(newId);
 
