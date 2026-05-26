@@ -143,4 +143,36 @@ public static class IdGenerator
         var prefix = GetPrefix(kind.Value);
         return id.Substring(prefix.Length);
     }
+
+    /// <summary>
+    /// Format-aware: returns the payload (everything after the prefix)
+    /// regardless of whether <paramref name="id"/> holds a 26-char ULID
+    /// or a 12-char compact payload. Returns <c>null</c> if the prefix
+    /// is not recognised.
+    ///
+    /// This is the v6+ canonical way to peel a prefix off an ID; legacy
+    /// callers that specifically need ULID semantics should keep using
+    /// <see cref="ExtractUlid"/>.
+    /// </summary>
+    public static string? ExtractIdPortion(string id) => ExtractUlid(id);
+
+    /// <summary>
+    /// True when the payload (after the prefix) is the 12-char compact
+    /// form. Used by analyzers that want to flag legacy ULIDs.
+    /// </summary>
+    public static bool IsCompactId(string id)
+    {
+        var payload = ExtractIdPortion(id);
+        return payload is not null && CompactIdGenerator.IsValidPayload(payload);
+    }
+
+    /// <summary>
+    /// True when the payload (after the prefix) is exactly 26
+    /// characters — the legacy ULID form.
+    /// </summary>
+    public static bool IsLegacyUlid(string id)
+    {
+        var payload = ExtractIdPortion(id);
+        return payload is not null && payload.Length == 26;
+    }
 }
