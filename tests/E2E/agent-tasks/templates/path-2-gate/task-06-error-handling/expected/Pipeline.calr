@@ -1,0 +1,21 @@
+§M{m001:Pipeline}
+
+§F{f001:FetchAndStore:pub}
+  §I{str:url}
+  §O{i32}
+  §B{~closed} BOOL:false
+  §TR{t1}
+    §B{data} §C{FetchRemote} §A url §/C
+    §B{rc} §C{WriteRecord} §A data §/C
+    §R rc
+  §CA{NetworkError:ne}
+    §R INT:-1
+  §CA{IoError:ie}
+    §R INT:-2
+  §FI
+    §B{~closed} BOOL:true
+  §/TR{t1}
+  §R INT:0
+§/F{f001}
+
+§/M{m001}

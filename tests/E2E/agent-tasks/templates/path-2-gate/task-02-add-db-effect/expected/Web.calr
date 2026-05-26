@@ -1,0 +1,11 @@
+§M{m003:Web}
+
+§F{f003:RenderHome:pub}
+  §I{i32:userId}
+  §O{str}
+  §E{db}
+  §B{board} §C{PrepareDashboard} §A userId §/C
+  §R board
+§/F{f003}
+
+§/M{m003}
