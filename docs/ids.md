@@ -53,6 +53,34 @@ Some elements use local scope identifiers rather than global IDs:
 - If blocks (`§IF{if1}`) - scope-local
 - Call targets (`§C{target}`) - reference, not declaration
 
+### 2.2 Structural IDs Are Optional in v6+ (Phase 1)
+
+As of the v6 release, structural openers (`§M`, `§F`, `§AF`, `§L`,
+`§IF`, `§TR`, `§CL`, `§IN`, `§PR`, `§MT`) accept a **compact form**
+that omits the leading `{id:…}` block. The compiler infers an ID
+automatically. Both forms are accepted side-by-side; the legacy form
+remains valid.
+
+```calor
+§M{Calculator}              # compact form (v6+, recommended)
+§/M
+
+§M{m_01J5X7K9M2NPQRSTABWXYZ12:Calculator}   # legacy form (still valid)
+§/M{m_01J5X7K9M2NPQRSTABWXYZ12}
+```
+
+Existing repositories can migrate mechanically with:
+
+```bash
+calor fix --drop-structural-ids <root> --log migration.log.json
+```
+
+The migrator records every removed byte range in `migration.log.json`
+and can be reverted with `calor fix --drop-structural-ids --revert`.
+The opt-in lint **Calor0820** (`LegacyStructuralId`) flags any
+remaining legacy blocks. Phase 2 will introduce 12-char compact IDs
+(diagnostics **Calor0821** and **Calor0822**).
+
 ---
 
 ## 3. Canonical ID Format
