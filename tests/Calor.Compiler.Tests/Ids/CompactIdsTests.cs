@@ -107,4 +107,36 @@ public class CompactIdsTests
         Assert.Null(IdGenerator.ExtractIdPortion("zzz_0123456789ab"));
         Assert.Null(IdGenerator.ExtractIdPortion(""));
     }
+
+    [Fact]
+    public void RegisterFromSourceReturnsTrueOnFirstInsert()
+    {
+        var r = new IdRegistry();
+        var bag = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var ok = r.RegisterFromSource(
+            "f_aaaaaaaaaaaa", bag, "a.calr", 1, 1, IdKind.Function);
+
+        Assert.True(ok);
+        Assert.Empty(bag);
+        Assert.Equal(1, r.Count);
+    }
+
+    [Fact]
+    public void RegisterFromSourceEmitsCalor0822OnCollision()
+    {
+        var r = new IdRegistry();
+        var bag = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        Assert.True(r.RegisterFromSource(
+            "f_aaaaaaaaaaaa", bag, "a.calr", 1, 1, IdKind.Function));
+
+        var ok = r.RegisterFromSource(
+            "f_aaaaaaaaaaaa", bag, "b.calr", 7, 3, IdKind.Function);
+
+        Assert.False(ok);
+        var diag = Assert.Single(bag);
+        Assert.Equal("Calor0822", diag.Code);
+        Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticSeverity.Error, diag.Severity);
+        Assert.Equal("b.calr", diag.FilePath);
+        Assert.Contains("a.calr", diag.Message);
+    }
 }

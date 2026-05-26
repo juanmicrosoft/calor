@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Calor.Compiler.Diagnostics;
 
 namespace Calor.Compiler.Ids;
 
@@ -65,6 +66,40 @@ public sealed class IdRegistry
         }
         throw new InvalidOperationException(
             $"unable to generate a unique compact ID after {maxAttempts} attempts");
+    }
+
+    /// <summary>
+    /// Register an ID that came from source (parser or migrator).
+    /// On collision emits a Calor0822 (<see cref="DiagnosticCode.CompactIdCollision"/>)
+    /// diagnostic into <paramref name="bag"/> instead of throwing, so
+    /// callers downstream of parsing can surface the issue with proper
+    /// source location.
+    ///
+    /// Returns <c>true</c> if the ID was registered, <c>false</c> if a
+    /// collision was reported.
+    /// </summary>
+    public bool RegisterFromSource(
+        string id,
+        DiagnosticBag bag,
+        string sourcePath,
+        int line,
+        int column,
+        IdKind? kind = null)
+    {
+        if (TryRegister(id, kind, sourcePath))
+        {
+            return true;
+        }
+
+        var existing = _ids[id];
+        var diag = new Diagnostic(
+            DiagnosticCode.CompactIdCollision,
+            $"compact ID '{id}' is already used at {existing.SourcePath ?? "<unknown>"}",
+            new Parsing.TextSpan(0, 0, line, column),
+            DiagnosticSeverity.Error,
+            sourcePath);
+        bag.AddRange(new[] { diag });
+        return false;
     }
 
     /// <summary>
