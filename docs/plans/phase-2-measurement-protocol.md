@@ -255,23 +255,155 @@ Before `scripts/run_phase_2_gate.py` invokes the first run, it verifies:
 
 ### 10.1.a Real-run kickoff command
 
-The exact command for the real gate run (after the pre-registration is
-locked and the maintainer is ready to spend the LLM budget):
+This subsection is the **canonical operational procedure** for kicking
+off the Tier 3 gate. It is the one place an operator should need to
+read to start a real run. Every step is mandatory; skipping any of
+them invalidates the run per §10.5.
+
+#### Prerequisites (must all be true before kickoff)
+
+1. **This document is merged to `main`** (per RFC §10.5,
+   pre-registration is immutable once merged). Verify with:
+   ```bash
+   git fetch origin main
+   git log origin/main -- docs/plans/phase-2-measurement-protocol.md \
+       | head -1
+   # Output should show the merge commit; if the file has only been
+   # touched on a feature branch, DO NOT kick off — merge it first.
+   ```
+2. **Working tree is clean** on a freshly checked-out
+   `feature/compact-ids-v6` (or the equivalent Phase-1+2 branch):
+   ```bash
+   git status --porcelain   # must print nothing
+   ```
+3. **§1 (mechanical checks) is fully green on the branch tip:**
+   ```bash
+   dotnet build -c Release   # exit 0, zero warnings (TWaE)
+   dotnet test  --nologo     # all green; only 2 known-skipped
+   python scripts/verify_phase1.py    # exit 0, [11/11] OK
+   python scripts/migrator_revert_roundtrip.py tests/E2E/corpus
+   ```
+   A regression in any check here means the substrate is not ready;
+   fix before kickoff. Record the pass timestamps in the kickoff log.
+4. **The branches/refs supplied to the three arms exist and resolve:**
+    - Arm A ref → today's `main` SHA (baseline; no v6 ID work).
+    - Arm B ref → a release branch built from `main` + only the
+      Phase 1 PRs (PR-1a..1h) — i.e. structural-opener drop without
+      compact IDs. If no such branch exists yet, cut it before kickoff
+      and pin the SHA into the kickoff log; do NOT reuse Arm C's ref
+      for Arm B.
+    - Arm C ref → the Phase 1+2 branch tip (`feature/compact-ids-v6`
+      or its merge into a release branch).
+   These three refs MUST be distinct commits; the gate is undefined
+   if Arm B = Arm C (criterion 4 in §7 would be meaningless).
+5. **Pinned model is published and warm.** The model identifier MUST
+   be a fully qualified, version-pinned string (e.g. provider's
+   immutable model ID, not a moving alias). The kickoff command's
+   `--model` argument must reproduce byte-for-byte across the 4–5
+   day window. Send a single sanity prompt manually before kickoff
+   and record the model ping latency in the kickoff log.
+6. **4-hour monitoring tick is scheduled** (cron / ScheduleWakeup /
+   external timer). See §10.2.
+7. **Disk + network headroom verified:** ≥ 10 GiB free under
+   `results/`; network reachable to the model endpoint.
+8. **Reserve budget acknowledged** in writing (RFC §10.5): one retry
+   on protocol violation is funded; criterion failure is NOT a retry.
+9. **Solo-mode sign-off ritual completed** (v6 §9.c): if the
+   maintainer is the only human approver, the written justification,
+   external read, and ≥24 h cool-off are recorded in a GitHub issue
+   *before* this command is run.
+
+If any prerequisite fails, halt — do not run the command below.
+
+#### The kickoff command
+
+Run the following from the repo root, against a clean checkout of the
+Arm C branch with `git status --porcelain` empty:
 
 ```bash
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+ARM_A_REF=<sha-of-todays-main>                      # e.g. origin/main
+ARM_B_REF=<sha-of-phase-1-only-release-branch>      # MUST differ from C
+ARM_C_REF=<sha-of-phase-1-plus-2-branch>            # branch tip
+MODEL=<fully-qualified-version-pinned-model-id>     # immutable provider id
+
 python3 scripts/run_phase_2_gate.py \
-    --arm-a-ref main \
-    --arm-b-ref release/0.x+1 \
-    --arm-c-ref release/0.x+1 \
-    --model <pinned-string-required> \
-    --output-dir results/gate-$(date -u +%Y%m%dT%H%M%SZ) \
-    --seeds 1,2,3,4,5,6,7,8,9,10
-# ... 4–5 day run window, ~900 LLM invocations ...
-python3 scripts/analyze_gate_results.py \
-    --runs results/gate-<timestamp>/runs.jsonl \
-    --output docs/plans/phase-2-measurement-results.md
-echo "gate decision: exit code $? (0 = PASS, 1 = FAIL)"
+    --pre-reg   docs/plans/phase-2-measurement-protocol.md \
+    --output-dir "results/gate-${TS}" \
+    --arm-a-ref "${ARM_A_REF}" \
+    --arm-b-ref "${ARM_B_REF}" \
+    --arm-c-ref "${ARM_C_REF}" \
+    --model     "${MODEL}" \
+    --seeds     1,2,3,4,5,6,7,8,9,10 \
+    2>&1 | tee "results/gate-${TS}/kickoff.log"
 ```
+
+Notes on the invocation:
+
+- `--output-dir` MUST be a fresh directory. `runs.jsonl` is appended
+  to (mode `"a"`); reusing a directory will mix runs from different
+  kickoffs and silently corrupt the analysis.
+- `--pre-reg` is the document `run_phase_2_gate.py` writes the frozen
+  arm SHAs into (`write_shas_into_prereg`). After kickoff, the
+  document will contain a trailing `Arm SHAs frozen at gate kickoff:`
+  block with the three SHAs and a UTC timestamp. **Commit this edit
+  to a new branch and open a PR** so the recorded SHAs are
+  auditable; do NOT force-push over it.
+- `--skip-model-ping` is **forbidden in production**. It exists only
+  for dry-run / smoke testing.
+- The wall-clock window is 4–5 days for 900 trials. Do not interrupt
+  the process; if the host must be rebooted, treat the partial
+  `runs.jsonl` as a protocol violation per §9 and trigger §10.5.
+
+#### What `run_phase_2_gate.py` does, in order (for auditors)
+
+1. Parses CLI, creates the output directory.
+2. Calls `pre_flight()` — fails fast on disk / fixture count
+   (must be 30) / unresolved arm refs / missing model ping.
+3. Calls `freeze_arm_shas()` — captures the three SHAs once, at
+   kickoff. These SHAs are the canonical record of what was measured.
+4. Calls `write_shas_into_prereg()` — appends the SHAs + UTC
+   timestamp to this document. The append is non-destructive; it
+   does not edit existing prose.
+5. Streams 30 × 10 × 3 = 900 trial records into
+   `results/gate-${TS}/runs.jsonl`, flushing after each write so
+   the file is durable across crashes.
+
+#### Post-run analysis (run immediately when the gate driver exits)
+
+```bash
+python3 scripts/analyze_gate_results.py \
+    --runs   "results/gate-${TS}/runs.jsonl" \
+    --output docs/plans/phase-2-measurement-results.md
+RC=$?
+echo "gate decision: exit code ${RC} (0 = PASS / SHIP, 1 = FAIL / REVERT)"
+```
+
+The analyser writes `docs/plans/phase-2-measurement-results.md`
+**regardless of pass or fail** (RFC §16.E item 8; see §8 of this
+document). Commit the results document on a new branch and open the
+ship/revert PR per the decision matrix in `phase-2-validation-criteria.md` §4:
+
+- `RC == 0` (all four criteria green) → open the Phase 2 ship PR.
+- `RC == 1` (one or more red criteria) → open the Phase 2 revert PR
+  per RFC §11. **Do not retry the gate** to "see if it passes next
+  time" — criterion failure is final per §9 and RFC §10.3.
+
+#### Pre-flight smoke test (RECOMMENDED before the real kickoff)
+
+Before committing the LLM budget, verify the full pipeline is plumbed
+correctly using the deterministic dry-run path:
+
+```bash
+python3 scripts/smoke_phase_2_gate_dryrun.py
+```
+
+This exercises `pre_flight → dispatch → JSONL → analyze → markdown
+→ exit code` end-to-end with seeded synthetic records and asserts
+both the gate-pass and gate-fail simulated regimes produce the
+expected analyser exit code. It runs in seconds and uses zero LLM
+budget. A failure here is a harness bug that MUST be fixed before
+the real kickoff. See §10.1.b for details.
 
 ### 10.1.b Dry-run pipeline verification (CI-cheap)
 
