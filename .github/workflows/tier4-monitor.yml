@@ -1,0 +1,39 @@
+name: Tier 4 — Phase 1 Post-Ship Monitor
+
+on:
+  schedule:
+    # Daily at 04:17 UTC — outside the normal CI burst window.
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/phase1_post_ship_monitor.py"
+      - ".github/workflows/tier4-monitor.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+
+      - name: Run monitor
+        run: |
+          python3 scripts/phase1_post_ship_monitor.py \
+            --root . \
+            --window 7 \
+            --output phase1-monitor.json
+          cat phase1-monitor.json
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-monitor-report
+          path: phase1-monitor.json
+          retention-days: 30
