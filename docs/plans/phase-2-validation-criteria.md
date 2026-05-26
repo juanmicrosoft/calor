@@ -26,48 +26,46 @@ trust its substrate.
 |---|-------|---------|-----------|
 | 1 | Build is green on Debug + Release | `dotnet build -c Release` | Exit 0; zero warnings (TWaE is on) |
 | 2 | Full xUnit suite is green | `dotnet test --nologo` | All tests pass; only the 2 known-skipped (`SolutionInitializationIntegrationTests`) are skipped |
-| 3 | Tier 1 harness is green **net of pre-existing failures** | `python scripts/verify_phase1.py` | Exit 0 **OR** the only failures are the 4 known-pre-existing samples (§1.x) |
+| 3 | Tier 1 harness is green | `python scripts/verify_phase1.py` | Exit 0; 0 `ast_roundtrip` failures |
 | 4 | Round-trip identity on a known corpus | `python scripts/migrator_revert_roundtrip.py` | Original ⇄ Phase 2 mapping round-trips byte-for-byte |
 | 5 | Byte preservation on the structural-ID dropper | `python scripts/byte_preservation_check.py` | Every file matches its expected `(N_removed × bytes_per_id)` delta |
 | 6 | AST round-trip after compact-id rewrite | `python scripts/ast_roundtrip_check.py` | AST equality (modulo ID payloads) pre/post `calor fix --compact-ids` |
 
-Failing any §1 check (other than the documented pre-existing samples
-in §1.x) **blocks merge** independently of Tier 3 result.
+Failing any §1 check **blocks merge** independently of Tier 3 result.
 
 These do not validate the user-visible improvement claim. They validate
 that the implementation does not silently corrupt source.
 
-### 1.x — Known pre-existing Tier 1 failures (not introduced by v6 ID work)
+### 1.x — Pre-existing Tier 1 failures (resolved on this branch)
 
-`scripts/verify_phase1.py`'s `ast_roundtrip` step fails on 4 samples
-that pre-date `feature/compact-ids-v6` and use deprecated section
-markers the current parser does not accept:
+Earlier on this branch `scripts/verify_phase1.py`'s `ast_roundtrip` step
+failed on 4 samples that pre-dated `feature/compact-ids-v6` and used
+deprecated section markers the current parser does not accept:
 
-| File | Last touched | Failing markers |
-|------|--------------|------------------|
-| `samples/TypeSystem/typesystem.calr` | commit `2629449` (Add Z3 static contract verification, #108) | `§SOME`, `§NONE` |
-| `samples/Verification/mixed-contracts.calr` | commit `2629449` | `§DOC`, `§ELSE`, `§/IF` |
-| `samples/Verification/proven-contracts.calr` | commit `2629449` | `§DOC`, `§ELSE`, `§/IF` |
-| `samples/Verification/violation-detected.calr` | commit `2629449` | `§DOC` |
+| File | Last touched before fix | Failing markers (then) | Replacement (applied) |
+|------|--------------------------|-------------------------|-----------------------|
+| `samples/TypeSystem/typesystem.calr` | commit `2629449` (Add Z3 static contract verification, #108) | `§SOME`, `§NONE{type=…}` | `§SM`, `§NN{…}` |
+| `samples/Verification/mixed-contracts.calr` | commit `2629449` | `§DOC{…}`, `§ELSE{id}`, `§/IF{id}` | strip `§DOC`; `§EL`; `§/I{id}` |
+| `samples/Verification/proven-contracts.calr` | commit `2629449` | `§DOC{…}`, `§ELSE{id}`, `§/IF{id}` | strip `§DOC`; `§EL`; `§/I{id}` |
+| `samples/Verification/violation-detected.calr` | commit `2629449` | `§DOC{…}` | strip `§DOC` |
 
-These samples were committed before this branch was cut and have not
-been kept current with parser evolution. `SectionMarkerSuggestions.cs`
-still lists `DOC`, `SM`, etc. as suggestable markers, but the lexer's
-keyword dictionary does not implement them, so any source that uses
-them fails to compile.
+All 4 files now compile cleanly and pass `ast_roundtrip` (verified:
+Tier 1 reports `[11/11] OK`, total 29.4 s, well under the 60 s budget).
+`samples/TypeSystem/typesystem.g.cs` was regenerated against the fixed
+source.
 
-**Tier 1 contract on this branch:** the harness must report exactly
-these 4 failures and no others. A 5th `ast_roundtrip` failure (or any
-new failure in `byte_preservation`, `migrator_corpus_dryrun`, or
-`token_delta_spot`) is a regression caused by this branch and blocks
-merge. The maintainer should record the failure list with each
-"ready for Tier 3" annotation so the §10 gate is not run on a
-substrate with hidden new failures.
+**Lexer ↔ suggestion table drift remains.** `SectionMarkerSuggestions.cs`
+still lists `DOC` (and emits `Did you mean '§DOC' (Documentation)?` for
+unknown `§DOC` input) even though the lexer's keyword dictionary has no
+entry for it. The misleading suggestion `§/I (Input parameter)` for
+`§/IF` is also wrong (the correct close is `§/I{id}` as the IF terminator).
+Fixing the suggestion table is out of scope for v6 ID work and tracked
+separately.
 
-Fixing the pre-existing samples (either by updating them to current
-syntax or by extending the lexer to implement the markers
-`SectionMarkerSuggestions.cs` advertises) is out of scope for this
-branch and tracked separately.
+**Tier 1 contract on this branch:** the harness must report 0
+`ast_roundtrip` failures. Any failure in `byte_preservation`,
+`ast_roundtrip`, `migrator_corpus_dryrun`, or `token_delta_spot` is a
+regression caused by this branch and blocks merge.
 
 ---
 
@@ -215,9 +213,9 @@ into a user-visible benefit — that requires criterion 3 from §3.1.
 But it does materially reduce the risk that Tier 3 fails for
 "implementation didn't deliver the expected delta" reasons.
 
-The Tier 1 `ast_roundtrip` step continues to report the 4
-pre-existing failures listed in §1.x; no additional failures on the
-branch tip.
+The Tier 1 `ast_roundtrip` step now reports `[11/11] OK` (the 4
+pre-existing failures listed in §1.x were fixed on this branch); no
+additional failures on the branch tip.
 
 ---
 

@@ -1,8 +1,6 @@
 §M{m001:ProvenContracts}
-§DOC{Demonstrates contracts that can be statically proven by Z3}
 
 §F{f001:Square:pub}
-  §DOC{Squares a non-negative integer. All contracts are provable.}
   §I{i32:x}
   §O{i32}
   §Q (>= x 0)
@@ -11,19 +9,17 @@
 §/F{f001}
 
 §F{f002:AbsoluteValue:pub}
-  §DOC{Returns the absolute value. Postcondition is provable.}
   §I{i32:x}
   §O{i32}
   §S (>= result 0)
   §IF{if001} (< x 0)
     §R (- 0 x)
-  §ELSE{if001}
+  §EL
     §R x
-  §/IF{if001}
+  §/I{if001}
 §/F{f002}
 
 §F{f003:Max:pub}
-  §DOC{Returns the larger of two values. All contracts provable.}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -31,13 +27,12 @@
   §S (>= result b)
   §IF{if001} (>= a b)
     §R a
-  §ELSE{if001}
+  §EL
     §R b
-  §/IF{if001}
+  §/I{if001}
 §/F{f003}
 
 §F{f004:AddPositive:pub}
-  §DOC{Adds two positive numbers. Result is greater than both inputs.}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
@@ -49,7 +44,6 @@
 §/F{f004}
 
 §F{f005:Identity:pub}
-  §DOC{Identity function - trivially provable postcondition.}
   §I{i32:x}
   §O{i32}
   §S (== result x)
