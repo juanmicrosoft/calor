@@ -1,0 +1,57 @@
+name: Tier 2 verification
+
+# Tier 2 — corpus-wide verification (v6 §3.2).
+# Only runs for PRs that target phase-1/phase-2/release/0.x+1 branches,
+# or on manual dispatch. Tier 1 runs on every PR (test.yml).
+
+on:
+  pull_request:
+    branches:
+      - 'phase-1'
+      - 'phase-1-*'
+      - 'phase-2'
+      - 'phase-2-*'
+      - 'release/**'
+  workflow_dispatch:
+
+jobs:
+  verify-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore and build
+        run: |
+          dotnet restore
+          dotnet build -c Release --no-restore
+
+      - name: Run Tier 2 corpus verification
+        id: tier2
+        run: |
+          set -o pipefail
+          /usr/bin/time -f '%e' -o tier2.time \
+            python3 scripts/verify_corpus.py 2>&1 | tee tier2.log
+          echo "elapsed_seconds=$(cat tier2.time)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Tier 2 artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier2-verification
+          path: |
+            tier2.log
+            tier2.time
+          retention-days: 30

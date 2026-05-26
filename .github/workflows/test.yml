@@ -339,3 +339,113 @@ jobs:
           else
             echo "No .calr files found in docs or examples"
           fi
+
+  verify-phase1:
+    # Tier 1 self-verification harness — v6 §3.1.
+    # Goal: every PR finishes Tier 1 in < 60s.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore and build (needed for ast_roundtrip)
+        run: |
+          dotnet restore
+          dotnet build -c Release --no-restore
+
+      - name: Run Tier 1 (self-tests + identity checks)
+        id: tier1_self
+        run: |
+          set -o pipefail
+          /usr/bin/time -f '%e' -o tier1-self.time \
+            python3 scripts/verify_phase1.py --self-test --skip-dotnet \
+              2>&1 | tee tier1-self.log
+          echo "elapsed_seconds=$(cat tier1-self.time)" >> "$GITHUB_OUTPUT"
+
+      - name: Run Tier 1 (samples/ corpus)
+        id: tier1_samples
+        run: |
+          set -o pipefail
+          /usr/bin/time -f '%e' -o tier1-samples.time \
+            python3 scripts/verify_phase1.py --skip-dotnet \
+              2>&1 | tee tier1-samples.log
+          echo "elapsed_seconds=$(cat tier1-samples.time)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Tier 1 logs and timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier1-verification
+          path: |
+            tier1-self.log
+            tier1-self.time
+            tier1-samples.log
+            tier1-samples.time
+          retention-days: 30
+
+  phase1-corpus-clean:
+    # Gate-A: ensure no legacy 26-char ULID structural blocks are
+    # introduced into the corpus. Runs on every PR; budget < 5s.
+    # Pairs with the scheduled tier4-monitor job, but blocks PRs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Assert zero legacy structural ULIDs in the corpus
+        run: |
+          python3 scripts/phase1_post_ship_monitor.py \
+            --root . \
+            --window 7 \
+            --output phase1-corpus-clean.json \
+            --fail-on-increase-over 0
+          cat phase1-corpus-clean.json
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-corpus-clean
+          path: phase1-corpus-clean.json
+          retention-days: 14
+
+  phase2-gate-dryrun:
+    # Gate-D: exercise the Tier 3 gate plumbing without spending LLM
+    # budget. Asserts the analyzer returns exit 0 for a "good" seed
+    # and exit 1 for a "bad" seed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install analyzer deps
+        run: pip install scipy
+
+      - name: Run phase-2 gate dry-run smoke
+        run: python3 scripts/smoke_phase_2_gate_dryrun.py
