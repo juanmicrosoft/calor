@@ -184,6 +184,41 @@ If the maintainer ships an interim release that includes Phase 1 only
 (no Phase 2 user-visible behavior), that ships from a different branch
 (`release/0.x+1` per the v6 plan), not from `feature/compact-ids-v6`.
 
+### 5.1 — Empirical evidence accumulated so far (no Tier 3 yet)
+
+The §3 gate is the only validator that licenses the merge decision.
+Cheaper checks accumulated on this branch *cannot* substitute, but
+they do offer early signal on whether the Tier 3 spend is justified.
+Current readings:
+
+- **Build & xUnit suite** (§1.1, §1.2): green. 5,427 tests pass on
+  the branch tip; 2 known-skipped. +12 PR-2e tests on top of the
+  PR-2a..2d baseline.
+- **Migrator dry-run** (§2.1, both modes): green on the full
+  `tests/` corpus (1,541 files). No file mutates under `--dry-run`
+  for `drop-structural-ids` or `compact-ids`.
+- **Migrator round-trip** (§1.4, both modes): byte-perfect on 1,541
+  files. `original → forward → revert` reproduces every byte for
+  both Phase 1 and Phase 2 paths.
+- **Token-delta sanity** (§2.2): RFC §16.F predicted **9.67
+  tokens/ID** (N=100 RNG-generated IDs, 95% CI 9.30–10.04). The
+  corpus has **16,669 ID blocks** across 1,541 files; predicted
+  aggregate Δ = 9.67 × 16669 = **161,159 tokens**; measured
+  aggregate Δ = **161,189 tokens** — within **0.02%** of the
+  prediction. The per-ID estimate generalises to the corpus.
+
+That last reading is the most useful piece of evidence available
+without spending Tier 3 budget: it confirms that Phase 1's mechanical
+rewrite removes the predicted volume of tokens at the predicted
+per-ID rate. It does **not** validate that this reduction translates
+into a user-visible benefit — that requires criterion 3 from §3.1.
+But it does materially reduce the risk that Tier 3 fails for
+"implementation didn't deliver the expected delta" reasons.
+
+The Tier 1 `ast_roundtrip` step continues to report the 4
+pre-existing failures listed in §1.x; no additional failures on the
+branch tip.
+
 ---
 
 ## §6 — Provenance and auditability
