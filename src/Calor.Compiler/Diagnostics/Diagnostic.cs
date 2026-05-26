@@ -209,6 +209,34 @@ public static class DiagnosticCode
     /// </summary>
     public const string Z3UnavailableForInheritance = "Calor0817";
 
+    // Legacy structural-ID lint (Calor0820-0822) — Phase 1/2 v6 plan
+    // (drop structural IDs, then introduce compact 12-char IDs).
+
+    /// <summary>
+    /// Info (opt-in lint): a structural opener still carries a legacy
+    /// <c>{id:…}</c> block that the Phase 1 migrator (<c>calor fix
+    /// --drop-structural-ids</c>) can safely remove.
+    ///
+    /// Per RFC §5.7 the diagnostic is informational and must include a
+    /// machine-applicable suggested fix (the byte range to delete).
+    /// </summary>
+    public const string LegacyStructuralId = "Calor0820";
+
+    /// <summary>
+    /// Info (opt-in lint, Phase 2): a Calor declaration uses a 26-char
+    /// ULID payload that the compact migrator (<c>calor fix
+    /// --compact-ids</c>) can rewrite to a 12-char Crockford-lowercase
+    /// compact ID.
+    /// </summary>
+    public const string LegacyUlidPayload = "Calor0821";
+
+    /// <summary>
+    /// Warning (Phase 2): two declarations in the compile unit produced
+    /// the same compact ID. Indicates a generator collision and is
+    /// surfaced as a hard error in the registry path.
+    /// </summary>
+    public const string CompactIdCollision = "Calor0822";
+
     // Contract simplification (Calor0330-0339)
 
     /// <summary>
