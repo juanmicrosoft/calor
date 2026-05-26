@@ -75,6 +75,18 @@ public sealed class Parser
         var attrs = ParseAttributes();
 
         var (id, moduleName) = AttributeHelper.InterpretModuleAttributes(attrs);
+
+        // --- Compact syntax: optional ID (RFC §1 Phase 1) ---
+        // §M{Calculator} or §M Calculator (1 positional, name only)
+        // is accepted in addition to the legacy §M{m001:Calculator}.
+        var modPosCount = int.TryParse(attrs["_posCount"], out var mpc) ? mpc : 0;
+        if (modPosCount < 2 && !IsIdPattern(id) && !string.IsNullOrEmpty(id))
+        {
+            // Shift: id was actually name.
+            moduleName = id;
+            id = GenerateParserAutoId("m");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "MODULE", "id");
@@ -3710,6 +3722,25 @@ public sealed class Parser
 
         // Interpret loop attributes
         var (id, varName, fromStr, toStr, stepStr) = AttributeHelper.InterpretForAttributes(attrs);
+
+        // --- Compact syntax: optional ID (RFC §1 Phase 1) ---
+        // §L{var:from:to[:step]} is accepted alongside the legacy
+        // §L{id:var:from:to[:step]}. Disambiguation: when _pos0 does
+        // not match the id pattern, treat the values as shifted left.
+        var forPosCount = int.TryParse(attrs["_posCount"], out var fpc) ? fpc : 0;
+        if (forPosCount < 5 && !IsIdPattern(id) && !string.IsNullOrEmpty(id))
+        {
+            varName = id;
+            fromStr = attrs["_pos1"] ?? "";
+            toStr = attrs["_pos2"] ?? "";
+            stepStr = attrs["_pos3"] ?? "";
+            if (string.IsNullOrEmpty(stepStr))
+            {
+                stepStr = "1";
+            }
+            id = GenerateParserAutoId("l");
+        }
+
         if (string.IsNullOrEmpty(id))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "FOR", "id");

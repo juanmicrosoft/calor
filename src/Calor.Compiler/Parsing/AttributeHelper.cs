@@ -8,7 +8,60 @@ namespace Calor.Compiler.Parsing;
 public static class AttributeHelper
 {
     /// <summary>
-    /// Interprets attributes for MODULE/§M: {id:name}
+    /// Heuristic shape check: returns true when <paramref name="value"/>
+    /// looks like a structural ID emitted by the compiler — i.e. a
+    /// lowercase prefix, an underscore, and an alphanumeric payload.
+    ///
+    /// Used by the structural-opener interpreters (Module, Func, Loop,
+    /// …) to distinguish the legacy form <c>§F{id:Name}</c> from the
+    /// new form <c>§F{Name}</c> introduced by RFC §1 Phase 1. Both
+    /// ULID-shaped IDs (<c>f_01J5X7K9M2NPQRSTABWXYZ12AB</c>) and the
+    /// compact form (<c>f_abc123def456</c>) match.
+    ///
+    /// User-supplied names like <c>Calculator</c>, <c>do_thing</c>,
+    /// or <c>Foo_bar</c> are deliberately rejected: real Calor names
+    /// follow PascalCase or contain uppercase letters, while IDs are
+    /// strictly lowercase digits-and-letters with one separating
+    /// underscore.
+    /// </summary>
+    public static bool LooksLikeId(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return false;
+        var underscoreIx = value.IndexOf('_');
+        if (underscoreIx <= 0 || underscoreIx >= value.Length - 1)
+        {
+            return false;
+        }
+        // Prefix must be all-lowercase letters.
+        for (int i = 0; i < underscoreIx; i++)
+        {
+            if (!char.IsLower(value[i])) return false;
+        }
+        // Payload must be all lowercase letters or digits (Crockford
+        // base32 lowercase or uppercase digits/letters as emitted by
+        // either generator). No underscores, no uppercase, no
+        // punctuation.
+        for (int i = underscoreIx + 1; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (!(char.IsDigit(c) || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
+            {
+                return false;
+            }
+        }
+        // Plausible payload lengths: 12 (compact) or 26 (ULID). Any
+        // smaller would be a typo; any larger is too speculative.
+        var payloadLen = value.Length - underscoreIx - 1;
+        return payloadLen == 12 || payloadLen == 26;
+    }
+
+    /// <summary>
+    /// Interprets attributes for MODULE/§M: <c>{id:name}</c>.
+    ///
+    /// Returns raw positional values. Form-disambiguation (legacy
+    /// <c>{id:Name}</c> vs new <c>{Name}</c>) is performed by the
+    /// Parser at the call site so the auto-id assignment can share its
+    /// counter with other compact-syntax shifts.
     /// </summary>
     public static (string Id, string Name) InterpretModuleAttributes(AttributeCollection attrs)
     {
@@ -24,7 +77,11 @@ public static class AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for FUNC/§F: {id:name:visibility}
+    /// Interprets attributes for FUNC/§F: <c>{id:name:visibility}</c>.
+    ///
+    /// Returns raw positional values. Form-disambiguation (legacy 3-arg
+    /// vs new 2-arg) is performed by the Parser; see
+    /// <c>ParseFunction</c> in <c>Parser.cs</c>.
     /// </summary>
     public static (string Id, string Name, string Visibility) InterpretFuncAttributes(AttributeCollection attrs)
     {
@@ -48,6 +105,13 @@ public static class AttributeHelper
 
         return (attrs["_pos0"] ?? "", attrs["_pos1"] ?? "", visibility);
     }
+
+    /// <summary>
+    /// Visibility tokens recognised by the Parser when disambiguating
+    /// the compact <c>§F{Name:vis}</c> form.
+    /// </summary>
+    public static bool IsVisibilityToken(string value) => value is
+        "pub" or "pri" or "int" or "public" or "private" or "internal";
 
     /// <summary>
     /// Interprets attributes for END_FUNC/§/F: {id}
@@ -206,7 +270,11 @@ public static class AttributeHelper
     }
 
     /// <summary>
-    /// Interprets attributes for FOR/§L (loop): {id:var:from:to:step}
+    /// Interprets attributes for FOR/§L (loop):
+    /// <c>{id:var:from:to:step}</c>.
+    ///
+    /// Returns raw positional values. Form-disambiguation (legacy 5-arg
+    /// vs new 4-arg) is performed by the Parser at <c>ParseFor</c>.
     /// </summary>
     public static (string Id, string Var, string From, string To, string Step) InterpretForAttributes(AttributeCollection attrs)
     {
