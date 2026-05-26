@@ -119,10 +119,11 @@ echo $?  # canonical pass/fail signal
 A **single red criterion** → ship Phase 1 alone per RFC §11. This is
 already encoded in `analyze_gate_results.py:434` (`all_pass = c1["passes"] and c2["passes"] and c3["passes"] and c4["passes"]`).
 
-### 3.2 Pre-flight checks (protocol §10.1)
+### 3.2 Pre-flight checks (protocol §10.1 and §10.1.a)
 
 Before the first run executes, the harness verifies (encoded in
-`run_phase_2_gate.py` and the protocol's §10.1):
+`run_phase_2_gate.py` and the protocol's §10.1; the operator
+checklist that wraps these is in protocol §10.1.a):
 
 1. Monitoring tick scheduled (v6 §3.3.b).
 2. Pinned model available (1-prompt ping).
@@ -130,8 +131,14 @@ Before the first run executes, the harness verifies (encoded in
 4. All 30 fixtures resolve to readable dirs.
 5. Three arm SHAs resolve to checkoutable commits.
 
-If any pre-flight check fails, the gate halts with non-zero exit before
-spending real run budget.
+Protocol §10.1.a additionally requires (operator-side, before the
+script is invoked): pre-registration document merged to `main`, clean
+working tree, §1 mechanical checks all green, a fresh `--output-dir`,
+distinct Arm A/B/C refs, the smoke-test path exercised, and (in
+solo-mode) the v6 §9.c sign-off ritual completed.
+
+If any pre-flight check fails, the gate halts with non-zero exit
+before spending real run budget.
 
 ### 3.3 What "validates improvement" means
 
