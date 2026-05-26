@@ -81,19 +81,23 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     failures = 0
+    # `calor fix` takes a positional <root> directory and walks it
+    # recursively for .calr files; it does not accept --input. For
+    # Tier 2 corpus coverage we invoke fix once over the whole root
+    # and rely on `--dry-run` to ensure no file changes.
+    hashes_before = {f: file_sha1(f) for f in files}
+    cmd = calor_cmd + [
+        "fix", str(root), f"--{args.mode}", "--dry-run",
+    ]
+    cp = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
+    if cp.returncode != 0:
+        print(f"  FAIL: migrator exit {cp.returncode}", file=sys.stderr)
+        print(f"    {cp.stderr.strip()[-1000:]}", file=sys.stderr)
+        return 1
+    # Verify no file was actually modified by dry-run.
     for f in files:
-        h_before = file_sha1(f)
-        cmd = calor_cmd + [
-            "fix", f"--{args.mode}", "--dry-run", "--input", str(f),
-        ]
-        cp = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
-        if cp.returncode != 0:
-            print(f"  FAIL {f}: migrator exit {cp.returncode}", file=sys.stderr)
-            print(f"    {cp.stderr.strip()[-500:]}", file=sys.stderr)
-            failures += 1
-            continue
         h_after = file_sha1(f)
-        if h_before != h_after:
+        if h_after != hashes_before.get(f):
             print(f"  FAIL {f}: file changed despite --dry-run",
                   file=sys.stderr)
             failures += 1

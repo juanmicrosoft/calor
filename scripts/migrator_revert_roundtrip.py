@@ -61,13 +61,13 @@ def main(argv: list[str] | None = None) -> int:
         calor_cmd + ["fix", "--help"], capture_output=True, text=True
     )
     forward_flag = f"--{args.mode}"
-    revert_flag = (
-        "--revert-drop-structural-ids"
-        if args.mode == "drop-structural-ids"
-        else "--revert-compact-ids"
-    )
     text = probe.stdout + probe.stderr
-    if probe.returncode != 0 or forward_flag not in text or revert_flag not in text:
+    if (
+        probe.returncode != 0
+        or forward_flag not in text
+        or "--revert" not in text
+        or "--log" not in text
+    ):
         print(f"migrator_revert_roundtrip: required flags not present in "
               f"`calor fix --help`; Phase 0 stub run.")
         return 0
@@ -79,9 +79,11 @@ def main(argv: list[str] | None = None) -> int:
         work_root = Path(td) / "work"
         log_path = Path(td) / "migration.log.json"
         shutil.copytree(root, work_root)
-        # Forward migration on the temp tree.
+        # Forward migration on the temp tree. `calor fix` takes the
+        # root directory as a positional argument; the forward run
+        # writes the migration log to --log.
         fwd = subprocess.run(
-            calor_cmd + ["fix", forward_flag, "--root", str(work_root),
+            calor_cmd + ["fix", str(work_root), forward_flag,
                          "--log", str(log_path)],
             capture_output=True, text=True, cwd=REPO_ROOT,
         )
@@ -90,10 +92,11 @@ def main(argv: list[str] | None = None) -> int:
                   file=sys.stderr)
             print(fwd.stderr[-1000:], file=sys.stderr)
             return 1
-        # Revert.
+        # Revert: same subcommand with --revert reads the same log to
+        # reverse the rewrite.
         rev = subprocess.run(
-            calor_cmd + ["fix", revert_flag, "--root", str(work_root),
-                         "--log", str(log_path)],
+            calor_cmd + ["fix", str(work_root), forward_flag,
+                         "--revert", "--log", str(log_path)],
             capture_output=True, text=True, cwd=REPO_ROOT,
         )
         if rev.returncode != 0:
