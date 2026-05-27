@@ -570,16 +570,28 @@ def main(argv: list[str] | None = None) -> int:
                    help="Seed for the dry-run record generator.")
     p.add_argument("--skip-model-ping", action="store_true",
                    help="Skip the pre-flight model availability check.")
+    p.add_argument(
+        "--tasks-manifest",
+        default=str(TASK_MANIFEST),
+        help=(
+            "Path to the trial manifest (one `kind:value` per line). "
+            "v2 §10.1.b makes this part of the pre-registration: "
+            "specify it explicitly at kickoff so the chosen manifest is "
+            "recorded in shell history and CI logs even though it has a "
+            "sensible default."
+        ),
+    )
     args = p.parse_args(argv)
 
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
-    trials = collect_trials()
+    manifest_path = Path(args.tasks_manifest).resolve()
+    trials = collect_trials(manifest_path)
     print(
         f"discovered {len(trials)} trials from manifest "
-        f"({TASK_MANIFEST.relative_to(REPO_ROOT)})"
+        f"({manifest_path.relative_to(REPO_ROOT) if manifest_path.is_relative_to(REPO_ROOT) else manifest_path})"
     )
 
     pre_flight(args, trials)
