@@ -34,13 +34,54 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURE_DIR = REPO_ROOT / "tests" / "E2E" / "agent-tasks" / "fixtures"
-TEMPLATE_DIR = (
-    REPO_ROOT / "tests" / "E2E" / "agent-tasks" / "templates" / "path-2-gate"
-)
+AGENT_TASKS_DIR = REPO_ROOT / "tests" / "E2E" / "agent-tasks"
+TASKS_DIR = AGENT_TASKS_DIR / "tasks"
+FIXTURE_DIR = AGENT_TASKS_DIR / "fixtures"
+TEMPLATE_DIR = AGENT_TASKS_DIR / "templates" / "path-2-gate"
+TASK_MANIFEST = AGENT_TASKS_DIR / "phase-2-gate-tasks.txt"
 DEFAULT_SEEDS = list(range(1, 11))  # seeds 1..10
 ARMS = ("A", "B", "C")
 PRE_FLIGHT_DISK_BYTES = 10 * 1024 * 1024 * 1024  # 10 GiB
+EXPECTED_TRIAL_COUNT = 30
+
+
+class Trial:
+    """One row of the pre-registered task manifest.
+
+    ``trial_id`` is the stable identifier the analyser sees on each
+    record. ``kind`` is either ``"task"`` (driven by a
+    ``tasks/<cat>/<task>/task.json`` paired with a workspace fixture)
+    or ``"template"`` (a self-contained path-2-gate template with its
+    own task.md/setup/expected/acceptance.sh).
+
+    For ``task`` trials, ``task_dir`` is the directory containing
+    ``task.json`` and ``fixture_dir`` is the resolved workspace
+    template referenced by the task's ``fixture`` field.
+
+    For ``template`` trials, ``task_dir`` is the template directory
+    itself and ``fixture_dir`` is ``None`` (the template owns its
+    workspace).
+    """
+
+    __slots__ = ("trial_id", "kind", "task_dir", "fixture_dir")
+
+    def __init__(
+        self,
+        trial_id: str,
+        kind: str,
+        task_dir: Path,
+        fixture_dir: Path | None,
+    ) -> None:
+        self.trial_id = trial_id
+        self.kind = kind
+        self.task_dir = task_dir
+        self.fixture_dir = fixture_dir
+
+    def __repr__(self) -> str:  # pragma: no cover — debug aid only
+        return (
+            f"Trial(id={self.trial_id!r}, kind={self.kind!r}, "
+            f"task_dir={self.task_dir}, fixture_dir={self.fixture_dir})"
+        )
 
 
 def utcnow_iso() -> str:
@@ -101,6 +142,10 @@ def git_head_sha(branch: str) -> str:
 
 
 def collect_fixtures() -> list[Path]:
+    """Legacy v1 substrate enumeration. Kept for backwards-compat with
+    callers that haven't migrated to ``collect_trials``. Do not use in
+    new code — it returns workspace fixtures, most of which lack a
+    runnable task contract (see protocol v2 §1 substrate-gap notes)."""
     existing = sorted(p for p in FIXTURE_DIR.iterdir() if p.is_dir())
     new = (
         sorted(p for p in TEMPLATE_DIR.iterdir() if p.is_dir())
@@ -110,7 +155,76 @@ def collect_fixtures() -> list[Path]:
     return existing + new
 
 
-def pre_flight(args, fixtures: list[Path]) -> None:
+def collect_trials(manifest_path: Path = TASK_MANIFEST) -> list[Trial]:
+    """Read the pre-registered task manifest and resolve each line to a
+    fully populated :class:`Trial`.
+
+    Raises ``RuntimeError`` on the first malformed entry — the
+    pre-registration discipline (RFC §10.5) treats a broken manifest as
+    a kickoff-blocking error rather than something to paper over with
+    placeholder records. The dry-run pipeline reuses this so smoke
+    tests catch protocol drift early.
+    """
+    if not manifest_path.exists():
+        raise RuntimeError(f"trial manifest not found: {manifest_path}")
+    trials: list[Trial] = []
+    for line_no, raw in enumerate(
+        manifest_path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" not in line:
+            raise RuntimeError(
+                f"{manifest_path}:{line_no}: missing 'kind:' prefix in "
+                f"{line!r}"
+            )
+        kind, _, body = line.partition(":")
+        kind = kind.strip()
+        body = body.strip()
+        if kind == "task":
+            task_dir = TASKS_DIR / body
+            task_json_path = task_dir / "task.json"
+            if not task_json_path.exists():
+                raise RuntimeError(
+                    f"{manifest_path}:{line_no}: task.json not found at "
+                    f"{task_json_path}"
+                )
+            data = json.loads(task_json_path.read_text(encoding="utf-8"))
+            fixture_name = data.get("fixture")
+            if not fixture_name:
+                raise RuntimeError(
+                    f"{manifest_path}:{line_no}: task {body!r} has no "
+                    f"'fixture' field in task.json (github-sourced tasks "
+                    f"are not eligible for the gate; remove from manifest)"
+                )
+            fixture_dir = FIXTURE_DIR / fixture_name
+            if not fixture_dir.is_dir():
+                raise RuntimeError(
+                    f"{manifest_path}:{line_no}: task {body!r} references "
+                    f"missing fixture workspace {fixture_dir}"
+                )
+            trial_id = f"task:{body}"
+        elif kind == "template":
+            tpl_dir = TEMPLATE_DIR / body
+            if not tpl_dir.is_dir():
+                raise RuntimeError(
+                    f"{manifest_path}:{line_no}: template dir not found "
+                    f"at {tpl_dir}"
+                )
+            task_dir = tpl_dir
+            fixture_dir = None
+            trial_id = f"template:{body}"
+        else:
+            raise RuntimeError(
+                f"{manifest_path}:{line_no}: unknown kind {kind!r}; "
+                f"expected 'task' or 'template'"
+            )
+        trials.append(Trial(trial_id, kind, task_dir, fixture_dir))
+    return trials
+
+
+def pre_flight(args, trials: list[Trial]) -> None:
     issues: list[str] = []
     # Disk space — skip for dry-run since we write tiny placeholders.
     if not args.dry_run and hasattr(os, "statvfs"):
@@ -118,14 +232,20 @@ def pre_flight(args, fixtures: list[Path]) -> None:
         free = st.f_bavail * st.f_frsize
         if free < PRE_FLIGHT_DISK_BYTES:
             issues.append(f"disk: {free} bytes free < {PRE_FLIGHT_DISK_BYTES}")
-    # Fixtures.
-    if not args.dry_run and len(fixtures) != 30:
+    # Trials: the manifest is the contract; require the pre-registered count.
+    if not args.dry_run and len(trials) != EXPECTED_TRIAL_COUNT:
         issues.append(
-            f"fixtures: expected 30 (24 + 6 new), found {len(fixtures)}"
+            f"trials: expected {EXPECTED_TRIAL_COUNT} from manifest, "
+            f"found {len(trials)}"
         )
-    for f in fixtures:
-        if not f.is_dir():
-            issues.append(f"fixture not a dir: {f}")
+    for t in trials:
+        if not t.task_dir.is_dir():
+            issues.append(f"trial {t.trial_id}: task_dir missing: {t.task_dir}")
+        if t.kind == "task" and (t.fixture_dir is None or not t.fixture_dir.is_dir()):
+            issues.append(
+                f"trial {t.trial_id}: fixture workspace missing: "
+                f"{t.fixture_dir}"
+            )
     # Arm SHAs resolvable.
     if not args.dry_run:
         for arm, branch in (
@@ -193,7 +313,7 @@ def write_shas_into_prereg(pre_reg_path: Path, shas: dict[str, str], dry_run: bo
 
 
 def dispatch_run(
-    fixture: Path,
+    trial: Trial,
     arm: str,
     seed: int,
     model: str,
@@ -203,19 +323,21 @@ def dispatch_run(
     sim_seed: int = 42,
 ) -> dict:
     started = utcnow_iso()
-    raw_log = output_dir / arm / fixture.name / f"seed-{seed}" / "log.jsonl"
+    # Use a filesystem-safe slug for the per-trial log subtree.
+    slug = trial.trial_id.replace(":", "__").replace("/", "_")
+    raw_log = output_dir / arm / slug / f"seed-{seed}" / "log.jsonl"
     raw_log.parent.mkdir(parents=True, exist_ok=True)
 
     if dry_run:
         record = _synth_record(
-            fixture, arm, seed, model, started, raw_log, simulate, sim_seed)
+            trial, arm, seed, model, started, raw_log, simulate, sim_seed)
         return record
 
     # Real invocation — delegate to the existing harness if present.
     harness_sh = REPO_ROOT / "tests" / "E2E" / "agent-tasks" / "run.sh"
     if not harness_sh.exists():
         return {
-            "task_id": fixture.name,
+            "task_id": trial.trial_id,
             "arm": arm,
             "seed": seed,
             "model": model,
@@ -233,8 +355,16 @@ def dispatch_run(
     cmd = [
         _resolve_bash(),
         str(harness_sh),
-        "--task",
-        fixture.name,
+        "--trial-id",
+        trial.trial_id,
+        "--kind",
+        trial.kind,
+        "--task-dir",
+        str(trial.task_dir),
+    ]
+    if trial.fixture_dir is not None:
+        cmd.extend(["--fixture-dir", str(trial.fixture_dir)])
+    cmd.extend([
         "--arm",
         arm,
         "--seed",
@@ -243,12 +373,12 @@ def dispatch_run(
         model,
         "--log",
         str(raw_log),
-    ]
+    ])
     cp = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
     ended = utcnow_iso()
     if cp.returncode != 0:
         return {
-            "task_id": fixture.name,
+            "task_id": trial.trial_id,
             "arm": arm,
             "seed": seed,
             "model": model,
@@ -275,7 +405,7 @@ def dispatch_run(
         except json.JSONDecodeError:
             continue
     record = {
-        "task_id": fixture.name,
+        "task_id": trial.trial_id,
         "arm": arm,
         "seed": seed,
         "model": model,
@@ -303,7 +433,7 @@ def dispatch_run(
 
 
 def _synth_record(
-    fixture: Path,
+    trial: Trial,
     arm: str,
     seed: int,
     model: str,
@@ -314,7 +444,7 @@ def _synth_record(
 ) -> dict:
     """Generate a deterministic plausible-looking dry-run record.
 
-    `simulate` selects the regime:
+    ``simulate`` selects the regime:
       * ``trivial``   — all-zero placeholder (back-compat default).
       * ``gate-pass`` — Arms B and C show 15% turn / 20% token reduction
         over Arm A with ≥95% success and ≤1% identity errors.
@@ -328,13 +458,13 @@ def _synth_record(
     import hashlib
     import random
 
-    base = f"{sim_seed}|{simulate}|{arm}|{fixture.name}|{seed}"
+    base = f"{sim_seed}|{simulate}|{arm}|{trial.trial_id}|{seed}"
     digest = hashlib.sha256(base.encode("utf-8")).digest()
     rng = random.Random(int.from_bytes(digest[:8], "big"))
 
     if simulate == "trivial":
         return {
-            "task_id": fixture.name,
+            "task_id": trial.trial_id,
             "arm": arm,
             "seed": seed,
             "model": model,
@@ -385,7 +515,7 @@ def _synth_record(
     edit_correctness_errors = 0 if success else 1
 
     return {
-        "task_id": fixture.name,
+        "task_id": trial.trial_id,
         "arm": arm,
         "seed": seed,
         "model": model,
@@ -446,27 +576,30 @@ def main(argv: list[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
-    fixtures = collect_fixtures()
-    print(f"discovered {len(fixtures)} fixtures")
+    trials = collect_trials()
+    print(
+        f"discovered {len(trials)} trials from manifest "
+        f"({TASK_MANIFEST.relative_to(REPO_ROOT)})"
+    )
 
-    pre_flight(args, fixtures)
+    pre_flight(args, trials)
     shas = freeze_arm_shas(args)
     write_shas_into_prereg(Path(args.pre_reg), shas, dry_run=args.dry_run)
 
     runs_jsonl = output_dir / "runs.jsonl"
-    n_total = len(fixtures) * len(seeds) * len(ARMS)
+    n_total = len(trials) * len(seeds) * len(ARMS)
     print(
-        f"starting {n_total} runs ({len(fixtures)} fixtures × "
+        f"starting {n_total} runs ({len(trials)} trials × "
         f"{len(seeds)} seeds × {len(ARMS)} arms)"
     )
     with runs_jsonl.open("a", encoding="utf-8") as out:
         i = 0
-        for fixture in fixtures:
+        for trial in trials:
             for arm in ARMS:
                 for seed in seeds:
                     i += 1
                     rec = dispatch_run(
-                        fixture=fixture,
+                        trial=trial,
                         arm=arm,
                         seed=seed,
                         model=args.model,
@@ -478,7 +611,7 @@ def main(argv: list[str] | None = None) -> int:
                     out.write(json.dumps(rec) + "\n")
                     out.flush()
                     print(
-                        f"  [{i}/{n_total}] {fixture.name} arm={arm} "
+                        f"  [{i}/{n_total}] {trial.trial_id} arm={arm} "
                         f"seed={seed} success={rec.get('success')}"
                     )
     print(f"wrote {n_total} run records to {runs_jsonl}")
