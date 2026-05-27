@@ -233,7 +233,7 @@ def pre_flight(args, trials: list[Trial]) -> None:
         if free < PRE_FLIGHT_DISK_BYTES:
             issues.append(f"disk: {free} bytes free < {PRE_FLIGHT_DISK_BYTES}")
     # Trials: the manifest is the contract; require the pre-registered count.
-    if not args.dry_run and len(trials) != EXPECTED_TRIAL_COUNT:
+    if not args.dry_run and not args.calibration and len(trials) != EXPECTED_TRIAL_COUNT:
         issues.append(
             f"trials: expected {EXPECTED_TRIAL_COUNT} from manifest, "
             f"found {len(trials)}"
@@ -581,6 +581,17 @@ def main(argv: list[str] | None = None) -> int:
             "sensible default."
         ),
     )
+    p.add_argument(
+        "--calibration",
+        action="store_true",
+        help=(
+            "Calibration mode: skips the EXPECTED_TRIAL_COUNT guard and "
+            "the write_shas_into_prereg() side-effect. Use ONLY for the "
+            "per-trial cost calibration prescribed in "
+            "docs/plans/phase-2-spend-authorisation.md §2. The real Tier "
+            "3 gate kickoff MUST NOT use this flag."
+        ),
+    )
     args = p.parse_args(argv)
 
     output_dir = Path(args.output_dir).resolve()
@@ -596,7 +607,13 @@ def main(argv: list[str] | None = None) -> int:
 
     pre_flight(args, trials)
     shas = freeze_arm_shas(args)
-    write_shas_into_prereg(Path(args.pre_reg), shas, dry_run=args.dry_run)
+    if not args.calibration:
+        write_shas_into_prereg(Path(args.pre_reg), shas, dry_run=args.dry_run)
+    else:
+        print(
+            "calibration mode: skipping write_shas_into_prereg; "
+            "this is NOT the real Tier 3 gate kickoff"
+        )
 
     runs_jsonl = output_dir / "runs.jsonl"
     n_total = len(trials) * len(seeds) * len(ARMS)
