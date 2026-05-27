@@ -252,3 +252,106 @@ gate:
 
 When the maintainer is ready to spend the Tier 3 budget, the kickoff
 command is in protocol §10.1.a.
+
+---
+
+## §8 — Gate readiness snapshot (live audit, updated 2026-05-27)
+
+This section captures the live readiness state of the §10 gate. It is
+maintained as the answer to "can we run the gate today?" and updated
+whenever a blocker is resolved or a new one is discovered. **Until §8.1
+shows all green, the kickoff command in protocol §10.1.a will produce
+either an invalid run (no statistical power) or no run at all.**
+
+### 8.1 — Prerequisite readiness matrix
+
+| # | Prerequisite (protocol §10.1.a) | Status | Owner | Detail |
+|---|---------------------------------|--------|-------|--------|
+| 1 | Pre-registration doc merged to `main` | 🔴 Blocker | Maintainer | Protocol + this doc currently live only on `feature/compact-ids-v6` (commit `b45a3c6`). RFC §10.5 immutability requires `main`. Open a docs-only PR (no implementation) to land both files. |
+| 2 | Working tree clean on Arm C checkout | 🟡 Operator step | Operator | Verified procedurally in §10.1.a; not an artifact gate. |
+| 3 | §1 (mechanical) checks green | 🟢 Done | — | Tier 1 `[11/11] OK`, all 5,427 tests pass, both round-trip harnesses byte-perfect on the corpus. |
+| 4 | 30 fixtures resolve to readable dirs | 🟡 Resolves, but see §8.2 | — | 24 + 6 directories exist; 24 of them lack a runnable task contract. |
+| 5 | Three **distinct** arm refs (A ≠ B ≠ C) | 🟢 Local only | Maintainer (push) | `release/phase-1-only` cut locally at `82301fe` (3 cherry-picks + 1 stub commit; builds + all tests green). Not yet pushed; needs maintainer review before publishing. |
+| 6 | Agent harness wired to driver | 🟢 Done | — | `tests/E2E/agent-tasks/run.sh` adapter authored this session. `scripts/run_phase_2_gate.py` patched to (a) resolve git-bash on Windows for local dev and (b) propagate the adapter's `harness_error` field into `runs.jsonl` (was silently dropped). Verified end-to-end: 90 records via `CALOR_GATE_DRY_RUN=1`, all `harness_crash=false`. Smoke test (`scripts/smoke_phase_2_gate_dryrun.py`) remains green. |
+| 7 | Version-pinned model id + API credentials + budget | 🔴 Blocker | Maintainer | `claude.exe` is on `PATH`; no API spend authorization captured. Budget ~$2–4k per RFC §10.1. |
+| 8 | 4-hour monitoring tick scheduled | 🔴 Blocker | Operator | Cron / Task Scheduler / external timer not configured. |
+| 9 | v6 §9.c solo-mode sign-off ritual | 🔴 Blocker | Maintainer | 24h cool-off issue not opened. |
+
+Legend: 🟢 ready, 🟡 conditional, 🔴 blocker.
+
+### 8.2 — Substrate gap (criterion-level impact)
+
+The gate driver in `scripts/run_phase_2_gate.py:collect_fixtures` iterates
+both `tests/E2E/agent-tasks/fixtures/` (24 directories) and
+`tests/E2E/agent-tasks/templates/path-2-gate/` (6 directories). Only the
+6 templates have a runnable task contract (`task.md` + `setup/` +
+`acceptance.sh`). The 24 fixtures are workspace skeletons referenced by
+`tests/E2E/agent-tasks/tasks/<category>/<task>/task.json` files via the
+`fixture` field — they are *workspaces*, not *tasks*.
+
+Demonstrated empirically (90 records produced by `CALOR_GATE_DRY_RUN=1`
+on this branch):
+
+| Substrate class | Fixtures | Records (1 seed × 3 arms) | Adapter `harness_error` |
+|-----------------|----------|----------------------------|-------------------------|
+| Templates with task contract | 6 | 18 | `dry_run` (would be real LLM runs) |
+| Fixtures with no contract | 24 | 72 | `no_task_contract` |
+
+In a full 900-run gate (10 seeds), **720 / 900 (80%)** of records would
+be `no_task_contract` — providing zero criterion-1 signal differentiating
+arms because no agent ever runs against them. The remaining 180 useful
+records is well below the sample size the protocol's statistical power
+analysis assumed (RFC §10.1).
+
+Two paths forward, both require a protocol amendment per RFC §10.5
+(`phase-2-measurement-protocol-v2.md`):
+
+1. **Author 24 new task contracts**, one per existing fixture. Each
+   contract needs a `task.md` prompt, optional `setup/` overlay,
+   `expected/` reference output, and `acceptance.sh`. Estimated effort:
+   1–2 weeks of careful task design. Preserves the 30-fixture × 10-seed
+   × 3-arm = 900-run plan.
+
+2. **Refactor `run_phase_2_gate.py:collect_fixtures` to iterate
+   `tests/E2E/agent-tasks/tasks/<cat>/<task>/task.json`**, joining each
+   `task.json` with its declared `fixture`. Many tasks share the same
+   fixture, so the trial count would shift to N(tasks) × 10 × 3. With
+   ~40 existing tasks plus the 6 templates, that's 46 × 30 = 1,380 runs,
+   which over-provisions statistical power but inflates the budget by
+   ~50%. Re-pre-register sample size and Bonferroni α accordingly.
+
+A third "shortcut" — running the gate with the current substrate and
+filtering out `no_task_contract` records in `analyze_gate_results.py` —
+is **not acceptable** because it silently changes the planned sample
+size, violating the pre-registration discipline of RFC §10.5.
+
+### 8.3 — What is concretely runnable today
+
+If the operator hand-waves blockers 1, 7, 8, and 9 (i.e. authorises
+spend and accepts an off-protocol run for engineering signal only,
+NOT for the merge decision), the system can drive the **6 templates × 10
+seeds × 3 arms = 180 trials** through the now-wired adapter against
+real LLM endpoints. This would produce a runs.jsonl with real
+`success` / `turn_count` / `total_output_tokens` data for the 18 /
+trial-slice per task, giving early signal but with sample size too
+small for the protocol's pre-registered power. Treat any such run as
+exploratory.
+
+### 8.4 — Recommended next steps before kickoff
+
+In dependency order:
+
+1. **Push `release/phase-1-only`** so Arm B has a public, stable ref.
+   (Locally at `82301fe`; one `git push -u origin release/phase-1-only`.)
+2. **Open the docs-only PR** that merges this document and
+   `phase-2-measurement-protocol.md` to `main`. This freezes the
+   pre-registration without touching implementation.
+3. **Decide path 1 vs path 2 of §8.2** and author
+   `phase-2-measurement-protocol-v2.md` if needed (with the new sample
+   size and re-derived statistical power).
+4. **Authorise LLM spend, pick a pinned model id, configure the
+   4-hour monitoring tick, complete the §9.c sign-off.**
+5. **Then** execute the kickoff command in protocol §10.1.a.
+
+Steps 1–3 are technical/editorial and can proceed without spend.
+Step 4 is the irreversible commitment.
