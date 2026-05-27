@@ -54,21 +54,65 @@ python3 scripts/run_phase_2_gate.py \
 # --output-format=json mode).
 ```
 
-**Calibration results (operator fills in before signing):**
+**Calibration results — 2026-05-27 (calor@`9b7db39`, claude-sonnet-4-6):**
 
-| Trial id                                     | $ cost | turns | output tokens |
-|----------------------------------------------|-------:|------:|--------------:|
-| `template:test-utility-conversion-seed0`     |  TBD   | TBD   | TBD           |
-| `task:simple-cs-to-calor/basic-class-seed0`  |  TBD   | TBD   | TBD           |
-| `task:<chosen expensive trial>-seed0`        |  TBD   | TBD   | TBD           |
-| **Median per-trial cost**                    | **TBD**|   —   |   —           |
-| **Projected 900-trial total**                | **TBD**|   —   |   —           |
+Observed three representative tasks × three arms × one seed = 9 real LLM
+invocations (all three arms pinned to `main@8e72278f`, which is the
+same SHA pre/post-sign — variance here is pure LLM stochasticity, not
+treatment effect). All raw artefacts live under
+`results/calibration-2026-05-27/runs/`. The driver was invoked with
+the `--calibration` flag added by `fffc446` so the discovered manifest
+is 3 trials, not the immutable 30 of the real Tier 3 protocol.
 
-If the projected 900-trial total exceeds the hard ceiling in §3, the
-operator MUST either (a) reduce the trial grid (which invalidates v1
-power assumptions and requires re-pre-registration via v3 of the
-protocol), or (b) raise the hard ceiling via a §9.c retry-sign-off
-amendment.
+| Trial id                                                | arm |   $ cost | turns | output tokens | result |
+|---------------------------------------------------------|----:|---------:|------:|--------------:|:------:|
+| `task:type-system/01_option_some_return`                |  A  | $0.1099  |   4   |         2,497 | fail*  |
+| `task:type-system/01_option_some_return`                |  B  | $0.1064  |   4   |         2,634 | pass   |
+| `task:type-system/01_option_some_return`                |  C  | $0.0996  |   4   |         1,673 | fail*  |
+| `task:string-operations/01_length_upper_lower`          |  A  | $0.1054  |   4   |         2,162 | fail*  |
+| `task:string-operations/01_length_upper_lower`          |  B  | $0.1028  |   4   |         1,627 | pass   |
+| `task:string-operations/01_length_upper_lower`          |  C  | $0.0921  |   4   |         1,459 | pass   |
+| `task:refactoring/01_extract_pure_function`             |  A  | $0.0852  |   4   |         1,579 | pass   |
+| `task:refactoring/01_extract_pure_function`             |  B  | $0.1418  |   6   |         3,387 | pass   |
+| `task:refactoring/01_extract_pure_function`             |  C  | $0.0954  |   4   |         2,023 | pass   |
+| **Mean per-trial cost**                                 |  —  | **$0.106** |  —  |             — |   —    |
+| **Median per-trial cost**                               |  —  | **$0.103** |  —  |             — |   —    |
+| **Projected 900-trial total (mean × 900)**              |  —  |  **$95** |   —   |             — |   —    |
+| **Projected 900-trial total (95th-percentile × 900)**   |  —  | **$128** |   —   |             — |   —    |
+
+\* The three `fail*` outcomes are agent-side: the LLM emitted invalid
+Calor (e.g. `Calor0100: Expected EndIf but found OpenParen`,
+`Calor0106: Unknown operator 'some'`) and the compiler correctly
+rejected it. This is the legitimate variance the §10 gate is designed
+to measure, not an apparatus bug. The earlier calibration attempt
+(`results/calibration-2026-05-27/runs.jsonl.broken-verify`-style logs,
+before commit `9b7db39`) returned `success=False` for all 9 trials
+because the adapter invoked `calor build` (a nonexistent subcommand);
+that bug was found by this calibration and fixed, which is exactly the
+defence the §2 calibration exists to provide.
+
+**Projection vs. budget envelope:**
+
+The mean per-trial cost is $0.106, **38× lower than the $4.00
+placeholder** in `phase-2-gate-config.json`. The 95th-percentile per-trial
+cost ($0.142) projects to $128 over 900 trials, **39× under the $5,000
+hard ceiling** and **23× under the $3,000 soft target**. Even with a
+10× safety factor for harder integration-tier tasks not represented
+in this calibration sample, the projection ($1,280) sits comfortably
+below the soft target.
+
+Operator MAY proceed to §6 signing on this projection.
+
+Operator MAY update `phase-2-gate-config.json` `per_trial_estimate_usd`
+from `4.00` to `0.15` (mean × ~1.4 safety factor) so the monitoring
+tick `cost_burn_rate_per_trial_usd` abort trigger fires earlier on real
+cost runaway. Doing so is a config-only change and does NOT require
+v6 §9.c retry-sign-off (per `phase-2-gate-config.json` `_meta`).
+
+Calibration spend so far: **$1.44** ($0.48 from the broken-verify
+discovery run + $0.96 from the post-fix verification run). Both are
+sunk costs that materially de-risked the Tier 3 spend by uncovering
+the `calor build` apparatus bug.
 
 ## §3 — Budget envelope
 
