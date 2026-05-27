@@ -63,6 +63,34 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, **kwargs)
 
 
+def _resolve_bash() -> str:
+    """Return the path to a working bash interpreter.
+
+    On Linux/macOS this is just ``bash`` (resolved from PATH). On Windows
+    the first ``bash.exe`` on PATH is typically the WSL bridge
+    (``C:\\Windows\\system32\\bash.exe``), which fails if no WSL distro is
+    installed — turning every gate trial into a phantom ``harness_crash``.
+    Prefer the Git for Windows shell when present, falling back to PATH
+    if not.
+
+    Operators running the real gate should run it from Linux or macOS;
+    the Windows-aware fallback exists to support local plumbing tests
+    (``--dry-run``) on developer laptops.
+    """
+    override = os.environ.get("CALOR_GATE_BASH")
+    if override:
+        return override
+    if os.name == "nt":
+        for candidate in (
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+            r"C:\Program Files (x86)\Git\bin\bash.exe",
+        ):
+            if Path(candidate).exists():
+                return candidate
+    return "bash"
+
+
 def git_head_sha(branch: str) -> str:
     cp = run(["git", "rev-parse", branch], cwd=REPO_ROOT)
     if cp.returncode != 0:
@@ -203,7 +231,7 @@ def dispatch_run(
             "harness_error": "run.sh missing",
         }
     cmd = [
-        "bash",
+        _resolve_bash(),
         str(harness_sh),
         "--task",
         fixture.name,
@@ -246,7 +274,7 @@ def dispatch_run(
             break
         except json.JSONDecodeError:
             continue
-    return {
+    record = {
         "task_id": fixture.name,
         "arm": arm,
         "seed": seed,
@@ -265,6 +293,13 @@ def dispatch_run(
         "harness_crash": False,
         "raw_log_path": _rel_to_repo(raw_log),
     }
+    # Propagate any harness_error tag the adapter emitted (e.g.
+    # "no_task_contract", "dry_run", "agent_cli_missing"). The analyser
+    # relies on this to distinguish task-substrate gaps from genuine
+    # agent failures; dropping it silently would corrupt criterion 1.
+    if "harness_error" in summary:
+        record["harness_error"] = str(summary["harness_error"])
+    return record
 
 
 def _synth_record(
