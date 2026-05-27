@@ -230,82 +230,23 @@ public static class FixCommand
     private static async Task<int> CompactIdsAsync(
         DirectoryInfo root, FileInfo? logFile, bool dryRun)
     {
-        var migrator = new CompactIdMigrator();
-        var mappingLog = new CompactIdMigrator.MappingLog();
-        int filesChanged = 0;
-        int totalRewrites = 0;
-
-        foreach (var path in EnumerateCalrFiles(root))
-        {
-            var rel = MakeRelativePosix(root, path);
-            var original = await File.ReadAllTextAsync(path, Encoding.UTF8);
-            var (migrated, newEntries) = migrator.Process(original, rel);
-            if (newEntries.Count == 0) continue;
-
-            mappingLog.Entries.AddRange(newEntries);
-            totalRewrites += newEntries.Sum(e => e.OccurrenceCount);
-            filesChanged++;
-
-            if (!dryRun)
-            {
-                await File.WriteAllTextAsync(path, migrated, new UTF8Encoding(false));
-            }
-        }
-
-        Console.WriteLine(
-            $"compact-ids: {(dryRun ? "[dry-run] " : "")}files_changed={filesChanged} rewrites={totalRewrites}");
-
-        if (logFile != null)
-        {
-            var json = System.Text.Json.JsonSerializer.Serialize(mappingLog,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower,
-                });
-            await File.WriteAllTextAsync(logFile.FullName, json, new UTF8Encoding(false));
-            Console.WriteLine($"wrote {logFile.FullName}");
-        }
-        return 0;
+        // Arm B (Phase 1 only): --compact-ids is intentionally disabled.
+        // This stub keeps the build green so the gate can drive this arm;
+        // emitting --compact-ids work would defeat the arm's purpose.
+        await Task.CompletedTask;
+        _ = root; _ = logFile; _ = dryRun;
+        Console.Error.WriteLine(
+            "--compact-ids is not available in this build (Arm B = Phase 1 only).");
+        return 2;
     }
 
     private static async Task<int> RevertCompactIdsAsync(
         DirectoryInfo root, FileInfo? logFile, bool dryRun)
     {
-        if (logFile == null || !logFile.Exists)
-        {
-            Console.Error.WriteLine("--revert requires --log <existing compact-id mapping.json>");
-            return 2;
-        }
-        var json = await File.ReadAllTextAsync(logFile.FullName, Encoding.UTF8);
-        var mappingLog = System.Text.Json.JsonSerializer.Deserialize<CompactIdMigrator.MappingLog>(
-            json,
-            new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower,
-                PropertyNameCaseInsensitive = true,
-            }) ?? new CompactIdMigrator.MappingLog();
-
-        int filesRestored = 0;
-        var entriesByFile = mappingLog.Entries.GroupBy(e => e.File);
-        foreach (var group in entriesByFile)
-        {
-            var migPath = Path.Combine(root.FullName, group.Key.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(migPath))
-            {
-                Console.Error.WriteLine($"skip missing file: {migPath}");
-                continue;
-            }
-            var migrated = await File.ReadAllTextAsync(migPath, Encoding.UTF8);
-            var restored = CompactIdMigrator.Revert(migrated, group);
-            if (!dryRun)
-            {
-                await File.WriteAllTextAsync(migPath, restored, new UTF8Encoding(false));
-            }
-            filesRestored++;
-        }
-        Console.WriteLine(
-            $"compact-ids revert: {(dryRun ? "[dry-run] " : "")}files_restored={filesRestored}");
-        return 0;
+        await Task.CompletedTask;
+        _ = root; _ = logFile; _ = dryRun;
+        Console.Error.WriteLine(
+            "--compact-ids --revert is not available in this build (Arm B = Phase 1 only).");
+        return 2;
     }
 }
