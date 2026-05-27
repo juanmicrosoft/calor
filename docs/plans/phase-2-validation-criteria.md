@@ -267,18 +267,38 @@ either an invalid run (no statistical power) or no run at all.**
 
 | # | Prerequisite (protocol v2 §10.1.a-b) | Status | Owner | Detail |
 |---|---------------------------------|--------|-------|--------|
-| 1 | Pre-registration doc merged to `main` | 🟡 Pending PR | Maintainer | Protocol v1 + v2 + this doc live only on `feature/compact-ids-v6`. Docs-only PR to `main` is the next step. |
+| 1 | Pre-registration doc merged to `main` | 🟡 Pending PR | Maintainer | Protocol v1 + v2 + this doc live on `docs/phase-2-pre-registration`; PR [#621](https://github.com/juanmicrosoft/calor/pull/621) open against `main`. |
 | 2 | Working tree clean on Arm C checkout | 🟡 Operator step | Operator | Verified procedurally in §10.1.a; not an artifact gate. |
 | 3 | §1 (mechanical) checks green | 🟢 Done | — | Tier 1 `[11/11] OK`, all 5,427 tests pass, both round-trip harnesses byte-perfect on the corpus. |
 | 4 | 30 trials resolve to runnable contracts | 🟢 Done | — | Substrate gap resolved by protocol v2 (see §8.2). Driver reads `tests/E2E/agent-tasks/phase-2-gate-tasks.txt` and resolves 24 `task:` + 6 `template:` = 30 trials, all with `task.json`/`task.md` + workspace. |
 | 5 | Three **distinct** arm refs (A ≠ B ≠ C) | 🟢 Done | — | `release/phase-1-only` cut and pushed to origin at `82301fe` (3 cherry-picks + 1 stub commit; builds + all tests green). |
 | 6 | Agent harness wired to driver | 🟢 Done | — | `tests/E2E/agent-tasks/run.sh` adapter accepts new `--trial-id/--kind/--task-dir [--fixture-dir]` contract; supports both `task:` and `template:` kinds. `scripts/run_phase_2_gate.py` reads manifest, propagates adapter's `harness_error`. End-to-end verified: 90 records via `CALOR_GATE_DRY_RUN=1`, all `harness_crash=false`, all `harness_error="dry_run"` (no substrate noise). |
-| 7 | Version-pinned model id + API credentials + budget | 🔴 Blocker | Maintainer | `claude.exe` is on `PATH`; no API spend authorization captured. Budget ~$2–4k per RFC §10.1. |
-| 8 | 4-hour monitoring tick scheduled | 🔴 Blocker | Operator | Cron / Task Scheduler / external timer not configured. |
-| 9 | v6 §9.c solo-mode sign-off ritual | 🔴 Blocker | Maintainer | 24h cool-off issue not opened. |
-| 10 | Trial manifest at SHA used for Arm C kickoff (v2 §10.1.b new) | 🟡 Pending PR | Maintainer | Manifest is part of the docs-only PR to `main`. |
+| 7 | Version-pinned model id + API credentials + budget | 🟡 Config staged, unsigned | Maintainer | `phase-2-gate-config.json` pins `claude-sonnet-4-6` (verified callable, $0.048 for a 'say hi' trial via Claude Code 2.1.144 on 2026-05-27). `phase-2-spend-authorisation.md` template authored; awaits per-trial calibration (§2 of that doc) + operator signature (§6). |
+| 8 | 4-hour monitoring tick scheduled | 🟡 Script staged, scheduler not registered | Operator | `scripts/monitor_phase_2_gate.py` authored + verified on stub data (exit 0 green / exit 1 tripped / exit 2 missing); `phase-2-monitoring-tick.md` documents Windows Task Scheduler + cron setup. Operator must register the task on the host that will run kickoff. |
+| 9 | Solo-mode kickoff cool-off (§9.a pattern applied to kickoff) | 🟡 Procedure documented, issue not opened | Maintainer | v6 §9.c formally covers *retry* sign-off only, not first-run. `phase-2-spend-authorisation.md` §5 prescribes a §9.a-style 4-hour cool-off issue at kickoff. Issue MUST be opened (and 4h MUST elapse) before signing `phase-2-spend-authorisation.md` §6. |
+| 10 | Trial manifest at SHA used for Arm C kickoff (v2 §10.1.b new) | 🟡 Pending PR | Maintainer | Manifest is part of PR [#621](https://github.com/juanmicrosoft/calor/pull/621). |
 
 Legend: 🟢 ready, 🟡 conditional, 🔴 blocker.
+
+### 8.1.a — Operator artifacts authored in this commit (2026-05-27)
+
+These four files together close §8.1 rows 7, 8, and 9 to 🟡 (staged
+but not yet signed/scheduled/opened). They are operator deliverables,
+not part of the immutable pre-registration; revising them does NOT
+trigger the v6 §9.c retry-sign-off discipline.
+
+- [`phase-2-gate-config.json`](phase-2-gate-config.json) — pinned
+  `claude-sonnet-4-6`, budget envelope ($5k ceiling), abort triggers,
+  exact kickoff CLI template.
+- [`phase-2-spend-authorisation.md`](phase-2-spend-authorisation.md) —
+  signature artifact; §2 prescribes per-trial calibration, §5
+  prescribes the §9.a-style kickoff cool-off, §6 is the signature
+  block the maintainer commits.
+- [`phase-2-monitoring-tick.md`](phase-2-monitoring-tick.md) — Windows
+  Task Scheduler + POSIX cron setup for the 4-hour monitor.
+- `scripts/monitor_phase_2_gate.py` — the monitor itself; verified
+  green / tripped / missing-file paths against stub data; exits 0 /
+  1 / 2 respectively.
 
 ### 8.2 — Substrate gap (RESOLVED in protocol v2)
 
@@ -334,16 +354,23 @@ In dependency order:
 1. ✅ ~~Push `release/phase-1-only`~~ (done; pushed to origin at `82301fe`).
 2. ✅ ~~Pick substrate path and author protocol v2~~ (done; path 2 chosen;
    `phase-2-measurement-protocol-v2.md` + manifest committed).
-3. **Open the docs-only PR** that merges `phase-2-measurement-protocol.md`,
-   `phase-2-measurement-protocol-v2.md`, this document, and
-   `tests/E2E/agent-tasks/phase-2-gate-tasks.txt` to `main`. This
-   freezes the pre-registration without touching implementation. The PR
-   should also include the driver + adapter refactor commits, since
-   protocol v2 §10.1.b makes the driver/adapter contract part of the
-   pre-registration.
-4. **Authorise LLM spend, pick a pinned model id, configure the 4-hour
-   monitoring tick, complete the §9.c sign-off.**
-5. **Then** execute the kickoff command in protocol v2 §10.1.a.
+3. ✅ ~~Open docs-only PR~~ (done; PR [#621](https://github.com/juanmicrosoft/calor/pull/621)
+   open against `main`; awaits review/merge).
+4. ✅ ~~Author operator artifacts~~ (done 2026-05-27): pinned model
+   config, spend-authorisation template, monitoring tick + Windows/POSIX
+   scheduling docs. See §8.1.a.
+5. **Operator: complete the four signature/scheduling actions.** In
+   any order:
+   - Run per-trial calibration (`phase-2-spend-authorisation.md` §2)
+     and update the table with real numbers.
+   - Register the monitoring tick on the host that will run kickoff
+     (`phase-2-monitoring-tick.md` §2 for Windows / §3 for POSIX).
+   - Open the §9.a-style kickoff cool-off issue
+     (`phase-2-spend-authorisation.md` §5).
+   - After ≥ 4 hours have elapsed since the cool-off issue body was
+     committed, sign `phase-2-spend-authorisation.md` §6.
+6. **Then** execute the kickoff command in protocol v2 §10.1.a.
 
-Steps 1–3 are technical/editorial and proceed without spend.
-Step 4 is the irreversible commitment.
+Steps 1–4 are technical/editorial and proceed without spend.
+Step 5 is signature work — irreversible commitment only at the moment
+the kickoff command is executed in step 6.
