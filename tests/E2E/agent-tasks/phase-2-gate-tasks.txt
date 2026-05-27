@@ -1,0 +1,62 @@
+# Phase 2 measurement protocol v2 — pre-registered task manifest.
+#
+# This file is THE authoritative list of 30 trials the Tier 3 statistical
+# gate runs against (RFC §10.5 immutability). It is paired with
+# `docs/plans/phase-2-measurement-protocol-v2.md` §1.1.
+#
+# Format:
+#   - Lines beginning with `#` are comments (ignored by the driver).
+#   - Blank lines are ignored.
+#   - `task:<category>/<task_dir>` references
+#       `tests/E2E/agent-tasks/tasks/<category>/<task_dir>/task.json`.
+#     The driver resolves the task's workspace via the `fixture` field
+#     in that task.json.
+#   - `template:<template_dir>` references
+#       `tests/E2E/agent-tasks/templates/path-2-gate/<template_dir>/`
+#     which is a self-contained gate task (own task.md + setup/ +
+#     expected/ + acceptance.sh).
+#
+# Total: 30 trials. Modifying this file after gate kickoff requires
+# protocol v3 per RFC §10.5.
+#
+# Stratification rationale: 24 task: entries cover 17 of the 19 task
+# categories present in `tests/E2E/agent-tasks/tasks/`, deliberately
+# excluding `github-projects/` (network-dependent) and `calor-idioms/`
+# (only 2 tasks; covered by `refactoring/01_extract_pure_function`'s
+# similar surface). Categories with the largest task pools contribute
+# 2 entries; smaller pools contribute 1. The 6 template: entries are
+# the purpose-built gate fixtures from path-2-gate authoring.
+
+# Stratified tasks (24)
+task:type-system/01_option_some_return
+task:type-system/04_result_err_return
+task:string-operations/01_length_upper_lower
+task:string-operations/04_regex_operations
+task:refactoring-benchmark/refactor-extract-effects-calor
+task:refactoring-benchmark/refactor-extract-effects-csharp
+task:refactoring-benchmark/refactor-rename-shadow-calor
+task:refactoring-benchmark/refactor-rename-shadow-csharp
+task:refactoring/01_extract_pure_function
+task:refactoring/06_fix_contract_violation
+task:pattern-matching/02_relational_patterns
+task:pattern-matching/04_option_some_matching
+task:oop-features/01_class_definition
+task:oop-features/04_property
+task:logic-implementation/01_factorial
+task:logic-implementation/02_clamp
+task:lambdas-delegates/02_block_lambda
+task:generics/02_generic_class
+task:enums/01_enum_definition
+task:effects-system/02_console_read
+task:effects-system/06_multiple_effects
+task:contract-writing/02_postcondition
+task:contract-writing/05_loop_invariant
+task:collections/01_list_creation
+
+# Path-2-gate purpose-built templates (6)
+template:task-01-multi-function-refactor
+template:task-02-add-db-effect
+template:task-03-privacy-change
+template:task-04-add-postcondition
+template:task-05-loop-restructure
+template:task-06-error-handling
