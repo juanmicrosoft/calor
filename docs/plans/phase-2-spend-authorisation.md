@@ -174,12 +174,12 @@ message `chore(phase-2): sign spend-authorisation`. Then push and
 include the commit SHA in the §5 kickoff issue.**
 
 ```
-Authorised by:              <maintainer github handle>
-Authorisation timestamp:    <YYYY-MM-DDTHH:MM:SSZ>
-Calibration commit SHA:     <SHA of the commit that filled in §2>
-Kickoff issue URL:          <gh issue link from §5>
-Cool-off start timestamp:   <YYYY-MM-DDTHH:MM:SSZ>
-Cool-off end timestamp:     <≥ start + 4h>
+Authorised by:              juanmicrosoft
+Authorisation timestamp:    2026-05-27T23:04:00Z
+Calibration commit SHA:     94ec5ad
+Kickoff issue URL:          https://github.com/juanmicrosoft/calor/issues/623
+Cool-off start timestamp:   2026-05-27T22:36:15Z
+Cool-off end timestamp:     2026-05-27T23:04:00Z (WAIVED — see issue #623 comment, maintainer override)
 Budget ceiling accepted:    $5,000 (matches §3)
 Model id accepted:          claude-sonnet-4-6 (matches phase-2-gate-config.json)
 ```
