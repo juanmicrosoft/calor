@@ -326,9 +326,24 @@ else  # kind=task
       exit 0
     fi
     set +e
-    ( cd "$WORK_DIR" && "$CALOR" build ) \
-      > "${LOG_DIR}/calor-build.stdout" 2> "${LOG_DIR}/calor-build.stderr"
-    BUILD_RC=$?
+    # Calor doesn't have a single "build" command; compile each .calr file
+    # in the workspace via `calor --input <file.calr> --output <file.g.cs>`
+    # (the canonical invocation used by tests/E2E/agent-tasks/lib/helpers.sh
+    # verify_calor_compilation()). If any file fails to compile, the trial
+    # is marked failed.
+    BUILD_RC=0
+    : > "${LOG_DIR}/calor-build.stdout"
+    : > "${LOG_DIR}/calor-build.stderr"
+    while IFS= read -r -d '' calr_file; do
+      cs_file="${calr_file%.calr}.g.cs"
+      ( cd "$WORK_DIR" && "$CALOR" --input "$calr_file" --output "$cs_file" ) \
+        >> "${LOG_DIR}/calor-build.stdout" 2>> "${LOG_DIR}/calor-build.stderr"
+      rc=$?
+      if [[ $rc -ne 0 ]]; then
+        BUILD_RC=$rc
+        echo "calor failed for $calr_file (exit $rc)" >> "${LOG_DIR}/calor-build.stderr"
+      fi
+    done < <(cd "$WORK_DIR" && find . -name '*.calr' -type f -print0)
     set -e
     [[ "$BUILD_RC" -eq 0 ]] && SUCCESS=true
   else
