@@ -1,0 +1,9 @@
+§M{m001:TaxCalc}
+
+§F{f001:ComputeTax:pub}
+  §I{i32:amount}
+  §O{i32}
+  §R (/ amount 10)
+§/F{f001}
+
+§/M{m001}
