@@ -275,17 +275,25 @@ if [[ "$AGENT_RC" -ne 0 ]]; then
 fi
 
 # ----------------------------------------------------------------------------
-# Parse the agent's JSON summary. The Claude Code CLI emits a top-level
-# JSON object on stdout in --output-format=json mode with .num_turns and
-# .total_tokens fields. Defensive: if the format drifts, fall back to 0
-# and let the analyser flag it (the analyser already treats zeros as a
-# data-quality signal per phase-2-validation-criteria.md §3.1).
+# Parse the agent's JSON summary. The Claude Code CLI's --output-format=json
+# emits a top-level result object with fields:
+#   .num_turns                          — iterations the agent ran
+#   .usage.output_tokens                — tokens the agent emitted
+#   .usage.input_tokens                 — tokens in the user message
+#   .total_cost_usd                     — dollar cost of this trial
+# The protocol's criterion 2 measures TURNS and OUTPUT TOKENS (RFC §10.1.2),
+# so we record num_turns and usage.output_tokens. total_cost_usd is captured
+# in the agent.stdout file for budget tracking but not reported as a metric.
+#
+# Defensive: if the format drifts, fall back to 0 and let the analyser flag
+# it (the analyser already treats zeros as a data-quality signal per
+# phase-2-validation-criteria.md §3.1).
 # ----------------------------------------------------------------------------
 TURNS=0
 TOKENS=0
 if command -v jq >/dev/null 2>&1; then
-  TURNS=$(jq -r '.num_turns // 0'     "$RAW_STDOUT" 2>/dev/null || echo 0)
-  TOKENS=$(jq -r '.total_tokens // 0' "$RAW_STDOUT" 2>/dev/null || echo 0)
+  TURNS=$(jq -r '.num_turns // 0'           "$RAW_STDOUT" 2>/dev/null || echo 0)
+  TOKENS=$(jq -r '.usage.output_tokens // 0' "$RAW_STDOUT" 2>/dev/null || echo 0)
 fi
 
 # ----------------------------------------------------------------------------
