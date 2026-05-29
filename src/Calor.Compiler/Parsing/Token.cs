@@ -345,6 +345,13 @@ public enum TokenKind
     // Special
     Newline,
     Whitespace,
+
+    // Phase 3 (RFC §4.1) — indentation tokens emitted by the lexer's
+    // indent post-pass when run via TokenizeWithIndent(). The plain
+    // Tokenize() entry point does NOT emit these (Phase 1 compatibility).
+    Indent,
+    Dedent,
+
     Eof,
     Error
 }
