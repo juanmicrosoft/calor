@@ -1,0 +1,27 @@
+{
+  "summary": {
+    "corpus_size": 1552,
+    "total_orig_lines": 31120,
+    "total_orig_bytes": 548489,
+    "total_orig_tokens": 90473,
+    "total_closer_lines_removable": 6581,
+    "total_indent_lines": 24539,
+    "total_indent_bytes": 473398,
+    "total_indent_tokens": 77419,
+    "aggregate_lines_reduction_pct": 21.15,
+    "aggregate_bytes_reduction_pct": 13.69,
+    "aggregate_tokens_reduction_pct": 14.43,
+    "median_lines_reduction_pct": 22.22,
+    "median_bytes_reduction_pct": 14.62,
+    "median_tokens_reduction_pct": 16.0,
+    "p10_lines_reduction_pct": 16.67,
+    "p90_lines_reduction_pct": 30.0,
+    "p10_bytes_reduction_pct": 9.98,
+    "p90_bytes_reduction_pct": 22.22,
+    "p10_tokens_reduction_pct": 10.1,
+    "p90_tokens_reduction_pct": 25.45,
+    "files_with_zero_reduction": 0,
+    "files_with_ge_10pct_lines_reduction": 1552,
+    "files_with_ge_20pct_lines_reduction": 1120
+  }
+}
