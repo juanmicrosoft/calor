@@ -228,3 +228,9 @@ resolve has been resolved (substrate gap, adapter wiring, Arm B
 branch, driver propagation of `harness_error`). The remaining items
 are operator decisions: spend authorisation, model pin, monitoring
 cadence, solo-mode sign-off.
+
+Arm SHAs frozen at gate kickoff:
+  Arm A: 47558d1a049a4c18f8498d4ebe86db7adf0423f7
+  Arm B: 82301fedde61ceb46d5620039169bf99e762c9c0
+  Arm C: 7418b0c93051ac8c508df2b7c067f18202ee05cc
+  Recorded: 2026-05-27T23:06:44Z
