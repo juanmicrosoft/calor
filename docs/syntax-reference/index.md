@@ -43,7 +43,7 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Return | `§R expr` | `§R (+ a b)` |
 | Binding | `§B{name} expr` | `§B{x} (+ 1 2)` |
 | Operations | `(op args...)` | `(+ a b)`, `(== x 0)` |
-| Close tag | `§/X{id}` | `§/F{f001}` |
+| Close tag | `§/X` or `§/X{id}` | `§/F` (preferred), `§/F{f001}` |
 | List | `§LIST{id:type}` | `§LIST{nums:i32}` |
 | Dictionary | `§DICT{id:kType:vType}` | `§DICT{ages:str:i32}` |
 | HashSet | `§HSET{id:type}` | `§HSET{tags:str}` |
@@ -136,11 +136,14 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`, `(upper s)`
     §EI (== (% i 3) 0) → §P "Fizz"
     §EI (== (% i 5) 0) → §P "Buzz"
     §EL → §P i
-    §/I{if1}
-  §/L{for1}
-§/F{f001}
-§/M{m001}
+    §/I
+  §/L
+§/F
+§/M
 ```
+
+> Closing-tag IDs are optional for structural closers — see
+> [Structure Tags](/calor/syntax-reference/structure-tags/) for the rule.
 
 ---
 

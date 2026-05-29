@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Optional closing-tag IDs** — Structural closing tags (`§/M`, `§/F`, `§/AF`, `§/L`, `§/I`, `§/TR`, `§/CL`, `§/IN`, `§/PR`, `§/MT`) may now omit the trailing `{id}` block. Both forms are accepted side-by-side; the parser pairs closers with their nearest matching opener by structural nesting. Openers continue to carry IDs as before.
+- **`calor fix --drop-structural-ids <root>`** — Bulk, mechanical, byte-reversible source rewriter that strips `{id}` from structural closing tags (and the leading `{id:…}` from openers when the rest can be preserved). Records every removal in a `migration.log.json` and supports `--revert --log <file>` to restore the original bytes exactly. Only touches values that look like production IDs (`prefix_payload` with a 12-char compact or 26-char ULID payload); short test IDs like `m001` are left alone. See [`docs/cli/fix.md`](docs/cli/fix.md).
+- **`Calor0820 LegacyStructuralId`** — Opt-in lint that flags closing tags still carrying a production-ID payload, with a `fix` patch that points at `calor fix --drop-structural-ids`.
+- **`BytePreservationVerifier`** — Migration utility that verifies a rewrite plus its revert reproduces the original file byte-for-byte. Used by the integration tests for `calor fix`.
+
+### Documentation
+- New: `docs/cli/fix.md`.
+- Updated: `docs/syntax-reference/structure-tags.md`, `docs/syntax-reference/index.md`, `docs/ids.md`, `docs/cli/index.md` reflect the optional closing-tag ID and the new `calor fix` command.
+
 ## [0.5.0] - 2026-04-22
 
 ### Benchmark Results (Statistical: 30 runs)

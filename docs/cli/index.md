@@ -41,6 +41,7 @@ dotnet tool update -g calor
 | [`calor ids`](/calor/cli/ids/) | Manage unique identifiers (check, assign, index) |
 | [`calor benchmark`](/calor/cli/benchmark/) | Compare Calor vs C# across evaluation metrics |
 | [`calor format`](/calor/cli/format/) | Format Calor source files to canonical style |
+| [`calor fix`](/calor/cli/fix/) | Bulk, reversible source rewrites (e.g. drop legacy closing-tag IDs) |
 | [`calor diagnose`](/calor/cli/diagnose/) | Output machine-readable diagnostics for tooling |
 | [`calor mcp`](/calor/cli/mcp/) | Start MCP server for AI agent tool integration |
 | `calor lsp` | Start Language Server Protocol server for IDE features |
