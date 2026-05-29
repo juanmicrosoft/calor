@@ -1,6 +1,5 @@
 using System.CommandLine;
 using System.Text;
-using System.Text.Json;
 using Calor.Compiler.Migration;
 
 namespace Calor.Compiler.Commands;
@@ -9,16 +8,13 @@ namespace Calor.Compiler.Commands;
 /// <c>calor fix</c> — bulk source rewrites that are mechanically safe
 /// and reversible (each operation records a <c>migration.log.json</c>).
 ///
-/// Subcommands implemented for the v6 plan:
+/// Subcommands:
 /// <list type="bullet">
-///   <item><description><c>--drop-structural-ids</c>: Phase 1 (PR-1c)
-///   — strips the leading <c>{id…}</c> blocks from structural openers
-///   and closers. Run repeatedly: each invocation drops only IDs that
-///   match the recognized shape.</description></item>
-///   <item><description><c>--compact-ids</c>: Phase 2 (PR-2d) — rewrites
-///   ULID payloads to 12-char Crockford-lowercase compact IDs.
-///   Implemented in a later PR; the flag is wired here as a stub to
-///   keep CLI surface stable.</description></item>
+///   <item><description><c>--drop-structural-ids</c>: strips the leading
+///   <c>{id…}</c> blocks from structural closing tags
+///   (<c>§/M{id}</c> → <c>§/M</c>, etc.). Closing-tag IDs are optional
+///   since v0.5.x — the lexer accepts both forms. Run repeatedly: each
+///   invocation drops only IDs that match the recognized shape.</description></item>
 /// </list>
 /// </summary>
 public static class FixCommand
@@ -34,11 +30,7 @@ public static class FixCommand
 
         var dropStructuralIdsOption = new Option<bool>(
             aliases: ["--drop-structural-ids"],
-            description: "Phase 1: drop {id...} blocks from structural openers/closers");
-
-        var compactIdsOption = new Option<bool>(
-            aliases: ["--compact-ids"],
-            description: "Phase 2: rewrite ULID payloads to 12-char compact IDs");
+            description: "Drop {id...} blocks from structural closing tags");
 
         var revertOption = new Option<bool>(
             aliases: ["--revert"],
@@ -56,7 +48,6 @@ public static class FixCommand
         {
             rootArgument,
             dropStructuralIdsOption,
-            compactIdsOption,
             revertOption,
             logOption,
             dryRunOption,
@@ -64,7 +55,7 @@ public static class FixCommand
 
         command.SetHandler(
             ExecuteAsync,
-            rootArgument, dropStructuralIdsOption, compactIdsOption,
+            rootArgument, dropStructuralIdsOption,
             revertOption, logOption, dryRunOption);
 
         return command;
@@ -73,7 +64,6 @@ public static class FixCommand
     private static async Task<int> ExecuteAsync(
         DirectoryInfo root,
         bool dropStructuralIds,
-        bool compactIds,
         bool revert,
         FileInfo? log,
         bool dryRun)
@@ -83,24 +73,10 @@ public static class FixCommand
             Console.Error.WriteLine($"root directory not found: {root.FullName}");
             return 2;
         }
-        if (!(dropStructuralIds || compactIds))
+        if (!dropStructuralIds)
         {
-            Console.Error.WriteLine("specify --drop-structural-ids or --compact-ids");
+            Console.Error.WriteLine("specify --drop-structural-ids");
             return 2;
-        }
-        if (dropStructuralIds && compactIds)
-        {
-            Console.Error.WriteLine("--drop-structural-ids and --compact-ids are mutually exclusive");
-            return 2;
-        }
-
-        if (compactIds)
-        {
-            if (revert)
-            {
-                return await RevertCompactIdsAsync(root, log, dryRun);
-            }
-            return await CompactIdsAsync(root, log, dryRun);
         }
 
         if (revert)
@@ -225,87 +201,5 @@ public static class FixCommand
     {
         var rel = Path.GetRelativePath(root.FullName, fullPath);
         return rel.Replace('\\', '/');
-    }
-
-    private static async Task<int> CompactIdsAsync(
-        DirectoryInfo root, FileInfo? logFile, bool dryRun)
-    {
-        var migrator = new CompactIdMigrator();
-        var mappingLog = new CompactIdMigrator.MappingLog();
-        int filesChanged = 0;
-        int totalRewrites = 0;
-
-        foreach (var path in EnumerateCalrFiles(root))
-        {
-            var rel = MakeRelativePosix(root, path);
-            var original = await File.ReadAllTextAsync(path, Encoding.UTF8);
-            var (migrated, newEntries) = migrator.Process(original, rel);
-            if (newEntries.Count == 0) continue;
-
-            mappingLog.Entries.AddRange(newEntries);
-            totalRewrites += newEntries.Sum(e => e.OccurrenceCount);
-            filesChanged++;
-
-            if (!dryRun)
-            {
-                await File.WriteAllTextAsync(path, migrated, new UTF8Encoding(false));
-            }
-        }
-
-        Console.WriteLine(
-            $"compact-ids: {(dryRun ? "[dry-run] " : "")}files_changed={filesChanged} rewrites={totalRewrites}");
-
-        if (logFile != null)
-        {
-            var json = System.Text.Json.JsonSerializer.Serialize(mappingLog,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower,
-                });
-            await File.WriteAllTextAsync(logFile.FullName, json, new UTF8Encoding(false));
-            Console.WriteLine($"wrote {logFile.FullName}");
-        }
-        return 0;
-    }
-
-    private static async Task<int> RevertCompactIdsAsync(
-        DirectoryInfo root, FileInfo? logFile, bool dryRun)
-    {
-        if (logFile == null || !logFile.Exists)
-        {
-            Console.Error.WriteLine("--revert requires --log <existing compact-id mapping.json>");
-            return 2;
-        }
-        var json = await File.ReadAllTextAsync(logFile.FullName, Encoding.UTF8);
-        var mappingLog = System.Text.Json.JsonSerializer.Deserialize<CompactIdMigrator.MappingLog>(
-            json,
-            new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower,
-                PropertyNameCaseInsensitive = true,
-            }) ?? new CompactIdMigrator.MappingLog();
-
-        int filesRestored = 0;
-        var entriesByFile = mappingLog.Entries.GroupBy(e => e.File);
-        foreach (var group in entriesByFile)
-        {
-            var migPath = Path.Combine(root.FullName, group.Key.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(migPath))
-            {
-                Console.Error.WriteLine($"skip missing file: {migPath}");
-                continue;
-            }
-            var migrated = await File.ReadAllTextAsync(migPath, Encoding.UTF8);
-            var restored = CompactIdMigrator.Revert(migrated, group);
-            if (!dryRun)
-            {
-                await File.WriteAllTextAsync(migPath, restored, new UTF8Encoding(false));
-            }
-            filesRestored++;
-        }
-        Console.WriteLine(
-            $"compact-ids revert: {(dryRun ? "[dry-run] " : "")}files_restored={filesRestored}");
-        return 0;
     }
 }
