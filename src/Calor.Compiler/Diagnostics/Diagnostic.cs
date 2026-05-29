@@ -26,6 +26,9 @@ public static class DiagnosticCode
     public const string UnknownSectionMarker = "Calor0006";
     public const string InvalidSectionOperator = "Calor0007";
 
+    // Phase 3 lexer errors (RFC §4.1)
+    public const string MixedIndentation = "Calor0099";
+
     // Parser errors (Calor0100-0199)
     public const string UnexpectedToken = "Calor0100";
     public const string MismatchedId = "Calor0101";
