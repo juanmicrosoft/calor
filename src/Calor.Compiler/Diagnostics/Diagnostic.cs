@@ -35,6 +35,8 @@ public static class DiagnosticCode
     public const string ExpectedClosingTag = "Calor0105";
     public const string InvalidOperator = "Calor0106";
     public const string InvalidModifier = "Calor0107";
+    public const string IfExpressionRequiresElse = "Calor0108";
+    public const string ExpectedArrowAfterElse = "Calor0109";
 
     // Parser validation errors (Calor0110-0119)
     public const string OperatorArgumentCount = "Calor0110";

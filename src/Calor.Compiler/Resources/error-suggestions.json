@@ -136,7 +136,7 @@
       "id": "if-id-mismatch",
       "title": "IF Block ID Mismatch",
       "matchPatterns": ["does not match IF id", "END_IF id", "mismatch"],
-      "matchCodes": ["Calor0100", "Calor0102"],
+      "matchCodes": ["Calor0100"],
       "description": "Nested IF blocks have mismatched opening/closing IDs, usually caused by converter bug with continue/break inside nested conditionals.",
       "wrongExample": "§IF{if016} (condition)\n  §/I{if017}   // ID mismatch!",
       "correctExample": "§IF{if016} (condition)\n  §/I{if016}   // IDs must match",

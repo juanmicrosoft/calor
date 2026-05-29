@@ -3898,7 +3898,7 @@ public sealed class Parser
         // Expect §EL (else)
         if (!Check(TokenKind.Else))
         {
-            _diagnostics.ReportError(Current.Span, "Calor0101", "IF expression requires an else clause (§EL)");
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.IfExpressionRequiresElse, "IF expression requires an else clause (§EL)");
             return thenExpr;
         }
         Expect(TokenKind.Else);
@@ -3906,7 +3906,7 @@ public sealed class Parser
         // Expect arrow and else expression
         if (!Check(TokenKind.Arrow))
         {
-            _diagnostics.ReportError(Current.Span, "Calor0102", "Expected '→' after §EL in IF expression");
+            _diagnostics.ReportError(Current.Span, DiagnosticCode.ExpectedArrowAfterElse, "Expected '→' after §EL in IF expression");
             return thenExpr;
         }
         Advance(); // consume →
