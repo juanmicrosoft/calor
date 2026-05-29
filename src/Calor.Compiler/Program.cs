@@ -210,6 +210,7 @@ public class Program
         rootCommand.AddCommand(AnalyzeConvertibilityCommand.Create());
         rootCommand.AddCommand(HookCommand.Create());
         rootCommand.AddCommand(IdsCommand.Create());
+        rootCommand.AddCommand(FixCommand.Create());
         rootCommand.AddCommand(EffectsCommand.Create());
         rootCommand.AddCommand(VerifyCommand.Create());
         rootCommand.AddCommand(LspCommand.Create());

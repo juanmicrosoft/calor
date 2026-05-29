@@ -9,6 +9,17 @@ nav_order: 1
 
 Structure tags define the organization of Calor code: modules, functions, and their boundaries.
 
+> **Closing-tag IDs are optional when the opener omits its ID.** Since
+> v6+, the structural opener forms `§M{Name}`, `§F{Name:vis}`,
+> `§L{var:from:to}`, `§IF`, `§CL{Name}`, `§MT{Name:vis}`, etc. drop the
+> `id:` prefix and the parser auto-assigns an ID. Their closing tags
+> (`§/M`, `§/F`, `§/L`, `§/I`, `§/CL`, `§/MT`, …) may then also omit
+> `{id}`. If the opener carries an explicit `{id:…}`, the closer must
+> still match it (`§F{f001:Add:pub}` pairs with `§/F{f001}`). The
+> examples below use the compact form; bulk-migrate production code
+> with [`calor fix --drop-structural-ids`](/calor/cli/fix/), which
+> rewrites opener and closer together.
+
 ---
 
 ## Modules
@@ -18,24 +29,26 @@ Modules are like C# namespaces. They group related functions.
 ### Syntax
 
 ```
-§M{id:name}
+§M{name}
   // contents
-§/M{id}
+§/M
 ```
 
 ### Example
 
 ```
-§M{m001:Calculator}
+§M{Calculator}
   // functions go here
-§/M{m001}
+§/M
 ```
 
 ### Rules
 
-- `id` must be unique within the file
 - `name` becomes the C# namespace
-- Every `§M` must have a matching `§/M` with the same ID
+- Every `§M` must have a matching `§/M`
+- A `§M{id:name}` opener (legacy form) must be paired with `§/M{id}`. The
+  compact form (`§M{name}` / `§/M`) is recommended for new code; bulk-migrate
+  existing files with [`calor fix --drop-structural-ids`](/calor/cli/fix/).
 
 ---
 
@@ -46,14 +59,14 @@ Functions are the primary code containers.
 ### Syntax
 
 ```
-§F{id:name:visibility}
+§F{name:visibility}
   §I{type:param}       // inputs (0 or more)
   §O{type}             // output (required)
   §E{effects}          // effects (optional)
   §Q condition         // preconditions (0 or more)
   §S condition         // postconditions (0 or more)
   // body
-§/F{id}
+§/F
 ```
 
 ### Visibility
@@ -67,34 +80,34 @@ Functions are the primary code containers.
 
 **Simple function:**
 ```
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f001}
+§/F
 ```
 
 **Function with effects:**
 ```
-§F{f001:PrintSum:pub}
+§F{PrintSum:pub}
   §I{i32:a}
   §I{i32:b}
   §O{void}
   §E{cw}
   §P (+ a b)
-§/F{f001}
+§/F
 ```
 
 **Function with contracts:**
 ```
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
   §Q (!= b 0)
   §R (/ a b)
-§/F{f001}
+§/F
 ```
 
 ---
@@ -106,23 +119,23 @@ Async functions use `§AF` instead of `§F` and automatically wrap return types 
 ### Syntax
 
 ```
-§AF{id:name:visibility}
+§AF{name:visibility}
   §I{type:param}       // inputs (0 or more)
   §O{type}             // output (auto-wrapped to Task<T>)
   // body with §AWAIT expressions
-§/AF{id}
+§/AF
 ```
 
 ### Examples
 
 **Simple async function:**
 ```
-§AF{f001:FetchDataAsync:pub}
+§AF{FetchDataAsync:pub}
   §I{str:url}
   §O{str}
   §B{result} §AWAIT §C{httpClient.GetStringAsync} §A url §/C
   §R result
-§/AF{f001}
+§/AF
 ```
 
 Emits C#:
@@ -136,10 +149,10 @@ public static async Task<string> FetchDataAsync(string url)
 
 **Async void function (returns Task):**
 ```
-§AF{f001:ProcessAsync:pub}
+§AF{ProcessAsync:pub}
   §O{void}
   §AWAIT §C{Task.Delay} §A 1000 §/C
-§/AF{f001}
+§/AF
 ```
 
 ### Automatic Task Wrapping
@@ -713,20 +726,26 @@ Every structural element must be closed with a matching tag.
 
 ## Tag Reference
 
+The `id` in closing tags is **optional** for structural closers (`§/M`,
+`§/F`, `§/AF`, `§/L`, `§/I`, `§/CL`, `§/MT`, `§/AMT`, `§/IFACE`,
+`§/PROP`, `§/TR`). The compact form (no `{id}`) is recommended; the
+parser pairs each closer with its nearest matching opener by
+structural nesting.
+
 | Opening | Closing | Purpose |
 |:--------|:--------|:--------|
-| `§M{id:name}` | `§/M{id}` | Module |
-| `§F{id:name:vis}` | `§/F{id}` | Function |
-| `§AF{id:name:vis}` | `§/AF{id}` | Async function |
-| `§MT{id:name:vis}` | `§/MT{id}` | Method |
-| `§AMT{id:name:vis}` | `§/AMT{id}` | Async method |
+| `§M{id:name}` | `§/M` | Module |
+| `§F{id:name:vis}` | `§/F` | Function |
+| `§AF{id:name:vis}` | `§/AF` | Async function |
+| `§MT{id:name:vis}` | `§/MT` | Method |
+| `§AMT{id:name:vis}` | `§/AMT` | Async method |
 | `§DEL{id:name}` | `§/DEL{id}` | Delegate definition |
 | `§LAM{id:params}` | `§/LAM{id}` | Lambda (block body) |
 | `§EVT{id:name:vis:type}` | - | Event definition |
-| `§L{id:var:from:to:step}` | `§/L{id}` | For loop |
+| `§L{id:var:from:to:step}` | `§/L` | For loop |
 | `§WH{id} cond` | `§/WH{id}` | While loop |
 | `§DO{id}` | `§/DO{id} cond` | Do-while loop |
-| `§IF{id} cond` | `§/I{id}` | Conditional |
+| `§IF{id} cond` | `§/I` | Conditional |
 | `§C{target}` | `§/C` | Call (no ID needed) |
 
 ---

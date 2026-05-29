@@ -53,6 +53,46 @@ Some elements use local scope identifiers rather than global IDs:
 - If blocks (`§IF{if1}`) - scope-local
 - Call targets (`§C{target}`) - reference, not declaration
 
+### 2.2 Structural IDs Are Optional in v6+
+
+As of v6, structural openers (`§M`, `§F`, `§AF`, `§L`,
+`§IF`, `§TR`, `§CL`, `§IFACE`, `§MT`, `§CTOR`, `§EN`)
+accept a **compact form** that omits the leading `{id:…}` block. The
+compiler auto-assigns an ID of the shape `<prefix>_auto<N>`.
+
+When the opener uses the compact form, the matching closing tag
+(`§/M`, `§/F`, `§/AF`, `§/L`, `§/I`, `§/TR`, `§/CL`, `§/IFACE`,
+`§/MT`, `§/CTOR`, `§/EN`) may also omit `{id}`. **The two sides are
+linked**: if the opener carries an explicit `{id:…}`, the closer must
+still carry the matching `{id}` (diagnostic `Calor0101` if they
+diverge). Both forms parse and are valid side-by-side:
+
+```calor
+# Compact (recommended for new code)
+§M{Calculator}
+§/M
+
+# Legacy (still accepted)
+§M{m_01j5x7k9m2npqrstabwxyz12:Calculator}
+§/M{m_01j5x7k9m2npqrstabwxyz12}
+```
+
+Existing repositories can migrate mechanically with the
+[`calor fix --drop-structural-ids`](/calor/cli/fix/) command, which
+rewrites opener and closer together (and only touches values that
+look like production IDs — short test IDs like `m001` are left alone):
+
+```bash
+calor fix --drop-structural-ids . --log migration.log.json
+```
+
+The migrator records every removed byte range in `migration.log.json`
+and can be reverted byte-exactly with
+`calor fix --drop-structural-ids --revert --log migration.log.json .`.
+The opt-in lint **Calor0820** (`LegacyStructuralId`) flags any
+remaining legacy closing-tag IDs and emits a `fix` patch that
+points at the `calor fix` command.
+
 ---
 
 ## 3. Canonical ID Format
@@ -343,6 +383,7 @@ calor ids check .
 | Calor0802 | WrongIdPrefix | Error | ID prefix doesn't match kind |
 | Calor0803 | DuplicateId | Error | ID used for multiple declarations |
 | Calor0804 | TestIdInProduction | Error | Test ID (f001) in production code |
+| Calor0820 | LegacyStructuralId | Info (opt-in lint) | Closing tag still carries a `{id}` payload; suggests `calor fix --drop-structural-ids` |
 
 ---
 
