@@ -1,0 +1,10 @@
+file                                     closer_chars indent_chars  delta_chars  delta_pct
+------------------------------------------------------------------------------------------
+violation-detected.calr                           803          762          -41     -5.11%   (body -11.88%)
+contracts.calr                                   1250         1209          -41     -3.28%   (body -5.47%)
+mixed-contracts.calr                              931          867          -64     -6.87%   (body -14.16%)
+proven-contracts.calr                            1237         1150          -87     -7.03%   (body -13.12%)
+matching.calr                                    1900         1824          -76     -4.00%   (body -5.78%)
+------------------------------------------------------------------------------------------
+TOTAL PROMPT                                     6121         5812         -309     -5.05%
+TOTAL FILE BODY ONLY                             3525         3216         -309     -8.77%

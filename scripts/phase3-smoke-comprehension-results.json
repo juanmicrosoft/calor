@@ -1,0 +1,542 @@
+{
+  "kind": "off-protocol comprehension micro-smoke",
+  "warning": "NOT validation plan Tier 1.5. Directional signal only.",
+  "model": "claude-haiku-4-5",
+  "n_files": 5,
+  "trials": [
+    {
+      "file_relpath": "samples/Verification/violation-detected.calr",
+      "arm": "closer",
+      "repeat": 0,
+      "raw_response": "1: 3\n2: ImpossibleContract\n3: 2",
+      "answers": [
+        "3",
+        "ImpossibleContract",
+        "2"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 493,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 25988,
+      "cost_usd": 0.0059378,
+      "duration_ms": 8105,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/violation-detected.calr",
+      "arm": "indent",
+      "repeat": 0,
+      "raw_response": "1: 3\n2: ImpossibleContract\n3: 2",
+      "answers": [
+        "3",
+        "ImpossibleContract",
+        "2"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 707,
+      "cache_creation_tokens": 2044,
+      "cache_read_tokens": 23908,
+      "cost_usd": 0.009322800000000001,
+      "duration_ms": 6850,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/violation-detected.calr",
+      "arm": "closer",
+      "repeat": 1,
+      "raw_response": "1: 3\n2: ImpossibleContract\n3: 2",
+      "answers": [
+        "3",
+        "ImpossibleContract",
+        "2"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 420,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 25988,
+      "cost_usd": 0.0055728,
+      "duration_ms": 6366,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/violation-detected.calr",
+      "arm": "indent",
+      "repeat": 1,
+      "raw_response": "1: 3\n2: ImpossibleContract\n3: 2",
+      "answers": [
+        "3",
+        "ImpossibleContract",
+        "2"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 570,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 25952,
+      "cost_usd": 0.0062872,
+      "duration_ms": 10299,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Contracts/contracts.calr",
+      "arm": "closer",
+      "repeat": 0,
+      "raw_response": "1: 3\n2: Main\n3: 0",
+      "answers": [
+        "3",
+        "Main",
+        "0"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 456,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26121,
+      "cost_usd": 0.0058991,
+      "duration_ms": 5600,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Contracts/contracts.calr",
+      "arm": "indent",
+      "repeat": 0,
+      "raw_response": "1: 3\n2: Main\n3: 0",
+      "answers": [
+        "3",
+        "Main",
+        "0"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 290,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26085,
+      "cost_usd": 0.0050335,
+      "duration_ms": 5065,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Contracts/contracts.calr",
+      "arm": "closer",
+      "repeat": 1,
+      "raw_response": "1: 3\n2: Main\n3: 0",
+      "answers": [
+        "3",
+        "Main",
+        "0"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 574,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26121,
+      "cost_usd": 0.006489099999999999,
+      "duration_ms": 8676,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Contracts/contracts.calr",
+      "arm": "indent",
+      "repeat": 1,
+      "raw_response": "1: 3\n2: Main\n3: 0",
+      "answers": [
+        "3",
+        "Main",
+        "0"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 437,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26085,
+      "cost_usd": 0.005768499999999999,
+      "duration_ms": 8784,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/mixed-contracts.calr",
+      "arm": "closer",
+      "repeat": 0,
+      "raw_response": "1: 4\n2: ClampPositive\n3: 1",
+      "answers": [
+        "4",
+        "ClampPositive",
+        "1"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 801,
+      "cache_creation_tokens": 2164,
+      "cache_read_tokens": 23908,
+      "cost_usd": 0.0100668,
+      "duration_ms": 6740,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/mixed-contracts.calr",
+      "arm": "indent",
+      "repeat": 0,
+      "raw_response": "1: 4\n2: ClampPositive\n3: 1",
+      "answers": [
+        "4",
+        "ClampPositive",
+        "1"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 713,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26031,
+      "cost_usd": 0.0070850999999999996,
+      "duration_ms": 8655,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/mixed-contracts.calr",
+      "arm": "closer",
+      "repeat": 1,
+      "raw_response": "1: 4\n2: ClampPositive\n3: 1",
+      "answers": [
+        "4",
+        "ClampPositive",
+        "1"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 472,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26076,
+      "cost_usd": 0.005933599999999999,
+      "duration_ms": 7613,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/mixed-contracts.calr",
+      "arm": "indent",
+      "repeat": 1,
+      "raw_response": "1: 4\n2: ClampPositive\n3: 1",
+      "answers": [
+        "4",
+        "ClampPositive",
+        "1"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 552,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26031,
+      "cost_usd": 0.006280099999999999,
+      "duration_ms": 6819,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/proven-contracts.calr",
+      "arm": "closer",
+      "repeat": 0,
+      "raw_response": "1: 5\n2: 2\n3: none",
+      "answers": [
+        "5",
+        "2",
+        "none"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 805,
+      "cache_creation_tokens": 2328,
+      "cache_read_tokens": 23908,
+      "cost_usd": 0.0104518,
+      "duration_ms": 10304,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/proven-contracts.calr",
+      "arm": "indent",
+      "repeat": 0,
+      "raw_response": "Looking at the file carefully:\n\n**Question 1: Top-level functions**\nI count: f001:Square, f002:AbsoluteValue, f003:Max, f004:AddPositive, f005:Identity\n\n**Question 2: Functions with BOTH \u00a7Q and \u00a7S**\n- f001:Square: Has \u00a7Q and \u00a7S \u2713\n- f002:AbsoluteValue: Has \u00a7S only \u2717\n- f003:Max: Has \u00a7S only \u2717\n- f004:AddPositive: Has \u00a7Q and \u00a7S \u2713\n- f005:Identity: Has \u00a7S only \u2717\n\n**Question 3: Functions with TWO \u00a7IF blocks**\n- f001:Square: 0 \u00a7IF blocks\n- f002:AbsoluteValue: 1 \u00a7IF block\n- f003:Max: 1 \u00a7IF block\n- f004:AddPositive: 0 \u00a7IF blocks\n- f005:Identity: 0 \u00a7IF blocks\n\n1: 5\n2: 2\n3: none",
+      "answers": [
+        "5",
+        "2",
+        "none"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 1855,
+      "cache_creation_tokens": 2271,
+      "cache_read_tokens": 23908,
+      "cost_usd": 0.01556455,
+      "duration_ms": 13245,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/proven-contracts.calr",
+      "arm": "closer",
+      "repeat": 1,
+      "raw_response": "1: 5\n2: 2\n3: none",
+      "answers": [
+        "5",
+        "2",
+        "none"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 953,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26236,
+      "cost_usd": 0.0085146,
+      "duration_ms": 12299,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/Verification/proven-contracts.calr",
+      "arm": "indent",
+      "repeat": 1,
+      "raw_response": "1: 5\n2: 2\n3: none",
+      "answers": [
+        "5",
+        "2",
+        "none"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 1169,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26179,
+      "cost_usd": 0.0095229,
+      "duration_ms": 11812,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/PatternMatching/matching.calr",
+      "arm": "closer",
+      "repeat": 0,
+      "raw_response": "1: 5\n2: 1\n3: cool",
+      "answers": [
+        "5",
+        "1",
+        "cool"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 531,
+      "cache_creation_tokens": 2602,
+      "cache_read_tokens": 23908,
+      "cost_usd": 0.0097033,
+      "duration_ms": 8443,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/PatternMatching/matching.calr",
+      "arm": "indent",
+      "repeat": 0,
+      "raw_response": "1: 5\n2: 1\n3: cool",
+      "answers": [
+        "5",
+        "1",
+        "cool"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 504,
+      "cache_creation_tokens": 2545,
+      "cache_read_tokens": 23908,
+      "cost_usd": 0.00943105,
+      "duration_ms": 6853,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/PatternMatching/matching.calr",
+      "arm": "closer",
+      "repeat": 1,
+      "raw_response": "1: 5\n2: 1\n3: cool",
+      "answers": [
+        "5",
+        "1",
+        "cool"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 568,
+      "cache_creation_tokens": 2598,
+      "cache_read_tokens": 23908,
+      "cost_usd": 0.0098783,
+      "duration_ms": 10795,
+      "is_error": false,
+      "error": ""
+    },
+    {
+      "file_relpath": "samples/PatternMatching/matching.calr",
+      "arm": "indent",
+      "repeat": 1,
+      "raw_response": "1: 5\n2: 1\n3: cool",
+      "answers": [
+        "5",
+        "1",
+        "cool"
+      ],
+      "correct": [
+        true,
+        true,
+        true
+      ],
+      "num_turns": 1,
+      "input_tokens": 9,
+      "output_tokens": 460,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 26453,
+      "cost_usd": 0.0062843,
+      "duration_ms": 6871,
+      "is_error": false,
+      "error": ""
+    }
+  ],
+  "aggregate": {
+    "arm_closer": {
+      "arm": "closer",
+      "n_trials": 10,
+      "n_errors": 0,
+      "n_questions": 30,
+      "n_correct": 30,
+      "accuracy": 1.0,
+      "mean_input_tokens": 9.0,
+      "mean_cache_creation_tokens": 969.2,
+      "mean_cache_read_tokens": 25216.2,
+      "mean_body_tokens": 978.2,
+      "mean_output_tokens": 607.3,
+      "mean_cost_usd": 0.00784472,
+      "total_cost_usd": 0.0784472,
+      "mean_duration_ms": 8494.1
+    },
+    "arm_indent": {
+      "arm": "indent",
+      "n_trials": 10,
+      "n_errors": 0,
+      "n_questions": 30,
+      "n_correct": 30,
+      "accuracy": 1.0,
+      "mean_input_tokens": 9.0,
+      "mean_cache_creation_tokens": 686.0,
+      "mean_cache_read_tokens": 25454.0,
+      "mean_body_tokens": 695.0,
+      "mean_output_tokens": 725.7,
+      "mean_cost_usd": 0.008058,
+      "total_cost_usd": 0.08058,
+      "mean_duration_ms": 8525.3
+    }
+  }
+}
