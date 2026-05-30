@@ -1,0 +1,807 @@
+[
+  {
+    "opener": "AF",
+    "closer": "/AF",
+    "token_kind": "AsyncFunc",
+    "end_token_kind": "EndAsyncFunc",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 184,
+    "lexer_closer_line": 185
+  },
+  {
+    "opener": "AMT",
+    "closer": "/AMT",
+    "token_kind": "AsyncMethod",
+    "end_token_kind": "EndAsyncMethod",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 186,
+    "lexer_closer_line": 187
+  },
+  {
+    "opener": "ANON",
+    "closer": "/ANON",
+    "token_kind": "AnonymousObject",
+    "end_token_kind": "EndAnonymousObject",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "expression form; appears inside expressions, not as a block",
+    "lexer_line": 263,
+    "lexer_closer_line": 264
+  },
+  {
+    "opener": "ARR",
+    "closer": "/ARR",
+    "token_kind": "Array",
+    "end_token_kind": "EndArray",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 83,
+    "lexer_closer_line": 84
+  },
+  {
+    "opener": "ARR2D",
+    "closer": "/ARR2D",
+    "token_kind": "Array2D",
+    "end_token_kind": "EndArray2D",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 282,
+    "lexer_closer_line": 283
+  },
+  {
+    "opener": "BASE",
+    "closer": "/BASE",
+    "token_kind": "Base",
+    "end_token_kind": "EndBase",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "expression form; appears inside expressions, not as a block",
+    "lexer_line": 133,
+    "lexer_closer_line": 134
+  },
+  {
+    "opener": "C",
+    "closer": "/C",
+    "token_kind": "Call",
+    "end_token_kind": "EndCall",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression",
+      "statement"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "expression form; appears inside expressions, not as a block",
+    "lexer_line": 25,
+    "lexer_closer_line": 45
+  },
+  {
+    "opener": "CL",
+    "closer": "/CL",
+    "token_kind": "Class",
+    "end_token_kind": "EndClass",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 119,
+    "lexer_closer_line": 120
+  },
+  {
+    "opener": "CT",
+    "closer": "/CT",
+    "token_kind": "Context",
+    "end_token_kind": "EndContext",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 244,
+    "lexer_closer_line": 245
+  },
+  {
+    "opener": "CTOR",
+    "closer": "/CTOR",
+    "token_kind": "Constructor",
+    "end_token_kind": "EndConstructor",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 150,
+    "lexer_closer_line": 151
+  },
+  {
+    "opener": "D",
+    "closer": "/D",
+    "token_kind": "Record",
+    "end_token_kind": "EndRecord",
+    "dispatch_contexts": [
+      "expression"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "expression-position only; TokenKind.Record not consumed in statement/declaration context",
+    "lexer_line": 38,
+    "lexer_closer_line": 51
+  },
+  {
+    "opener": "DC",
+    "closer": "/DC",
+    "token_kind": "Decision",
+    "end_token_kind": "EndDecision",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 239,
+    "lexer_closer_line": 240
+  },
+  {
+    "opener": "DEL",
+    "closer": "/DEL",
+    "token_kind": "Delegate",
+    "end_token_kind": "EndDelegate",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 170,
+    "lexer_closer_line": 171
+  },
+  {
+    "opener": "DICT",
+    "closer": "/DICT",
+    "token_kind": "Dict",
+    "end_token_kind": "EndDict",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 93,
+    "lexer_closer_line": 94
+  },
+  {
+    "opener": "DO",
+    "closer": "/DO",
+    "token_kind": "Do",
+    "end_token_kind": "EndDo",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 59,
+    "lexer_closer_line": 60
+  },
+  {
+    "opener": "EACH",
+    "closer": "/EACH",
+    "token_kind": "Foreach",
+    "end_token_kind": "EndForeach",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 87,
+    "lexer_closer_line": 88
+  },
+  {
+    "opener": "EACHKV",
+    "closer": "/EACHKV",
+    "token_kind": "EachKV",
+    "end_token_kind": "EndEachKV",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 108,
+    "lexer_closer_line": 109
+  },
+  {
+    "opener": "EADD",
+    "closer": "/EADD",
+    "token_kind": "EventAdd",
+    "end_token_kind": "EndEventAdd",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 174,
+    "lexer_closer_line": 175
+  },
+  {
+    "opener": "EEXT",
+    "closer": "/EEXT",
+    "token_kind": "EnumExtension",
+    "end_token_kind": "EndEnumExtension",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 214,
+    "lexer_closer_line": 215
+  },
+  {
+    "opener": "EN",
+    "closer": "/EN",
+    "token_kind": "Enum",
+    "end_token_kind": "EndEnum",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 210,
+    "lexer_closer_line": 212
+  },
+  {
+    "opener": "EREM",
+    "closer": "/EREM",
+    "token_kind": "EventRemove",
+    "end_token_kind": "EndEventRemove",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 176,
+    "lexer_closer_line": 177
+  },
+  {
+    "opener": "EVT",
+    "closer": "/EVT",
+    "token_kind": "Event",
+    "end_token_kind": "EndEvent",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 172,
+    "lexer_closer_line": 173
+  },
+  {
+    "opener": "F",
+    "closer": "/F",
+    "token_kind": "Func",
+    "end_token_kind": "EndFunc",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 24,
+    "lexer_closer_line": 44
+  },
+  {
+    "opener": "FIXED",
+    "closer": "/FIXED",
+    "token_kind": "Fixed",
+    "end_token_kind": "EndFixed",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 271,
+    "lexer_closer_line": 272
+  },
+  {
+    "opener": "GET",
+    "closer": "/GET",
+    "token_kind": "Get",
+    "end_token_kind": "EndGet",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 144,
+    "lexer_closer_line": 145
+  },
+  {
+    "opener": "HD",
+    "closer": "/HD",
+    "token_kind": "HiddenSection",
+    "end_token_kind": "EndHidden",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 248,
+    "lexer_closer_line": 249
+  },
+  {
+    "opener": "HSET",
+    "closer": "/HSET",
+    "token_kind": "HashSet",
+    "end_token_kind": "EndHashSet",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 95,
+    "lexer_closer_line": 96
+  },
+  {
+    "opener": "I",
+    "closer": "/I",
+    "token_kind": "In",
+    "end_token_kind": "EndIf",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "single-line atomic form; no body to dedent-close",
+    "lexer_line": 28,
+    "lexer_closer_line": 46
+  },
+  {
+    "opener": "IF",
+    "closer": "/I",
+    "token_kind": "If",
+    "end_token_kind": "EndIf",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "if/elseif/else chain — see RFC §4.2 subtlety 1; chain closer §/I retained as legacy-form alias",
+    "lexer_line": 54,
+    "lexer_closer_line": 46
+  },
+  {
+    "opener": "IFACE",
+    "closer": "/IFACE",
+    "token_kind": "Interface",
+    "end_token_kind": "EndInterface",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 121,
+    "lexer_closer_line": 122
+  },
+  {
+    "opener": "INIT",
+    "closer": "/INIT",
+    "token_kind": "Init",
+    "end_token_kind": "EndInit",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 148,
+    "lexer_closer_line": 149
+  },
+  {
+    "opener": "INTERP",
+    "closer": "/INTERP",
+    "token_kind": "Interpolate",
+    "end_token_kind": "EndInterpolate",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "expression form; appears inside expressions, not as a block",
+    "lexer_line": 190,
+    "lexer_closer_line": 191
+  },
+  {
+    "opener": "ITYPE",
+    "closer": "/ITYPE",
+    "token_kind": "IndexedType",
+    "end_token_kind": "EndIndexedType",
+    "dispatch_contexts": [
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 291,
+    "lexer_closer_line": 292
+  },
+  {
+    "opener": "IXER",
+    "closer": "/IXER",
+    "token_kind": "Indexer",
+    "end_token_kind": "EndIndexer",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 142,
+    "lexer_closer_line": 143
+  },
+  {
+    "opener": "L",
+    "closer": "/L",
+    "token_kind": "For",
+    "end_token_kind": "EndFor",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 32,
+    "lexer_closer_line": 47
+  },
+  {
+    "opener": "LAM",
+    "closer": "/LAM",
+    "token_kind": "Lambda",
+    "end_token_kind": "EndLambda",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "expression form; appears inside expressions, not as a block",
+    "lexer_line": 168,
+    "lexer_closer_line": 169
+  },
+  {
+    "opener": "LIST",
+    "closer": "/LIST",
+    "token_kind": "List",
+    "end_token_kind": "EndList",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 91,
+    "lexer_closer_line": 92
+  },
+  {
+    "opener": "M",
+    "closer": "/M",
+    "token_kind": "Module",
+    "end_token_kind": "EndModule",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 23,
+    "lexer_closer_line": 43
+  },
+  {
+    "opener": "MT",
+    "closer": "/MT",
+    "token_kind": "Method",
+    "end_token_kind": "EndMethod",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 125,
+    "lexer_closer_line": 126
+  },
+  {
+    "opener": "NEW",
+    "closer": "/NEW",
+    "token_kind": "New",
+    "end_token_kind": "EndNew",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "expression form; appears inside expressions, not as a block",
+    "lexer_line": 135,
+    "lexer_closer_line": 136
+  },
+  {
+    "opener": "OP",
+    "closer": "/OP",
+    "token_kind": "OperatorOverload",
+    "end_token_kind": "EndOperatorOverload",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 152,
+    "lexer_closer_line": 153
+  },
+  {
+    "opener": "PP",
+    "closer": "/PP",
+    "token_kind": "Preprocessor",
+    "end_token_kind": "EndPreprocessor",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "module_member",
+      "statement"
+    ],
+    "treatment": "closer-retained",
+    "rationale": "preprocessor directive; closer carries the condition string for grep/audit",
+    "lexer_line": null,
+    "lexer_closer_line": null
+  },
+  {
+    "opener": "PPE",
+    "closer": null,
+    "token_kind": "PreprocessorElse",
+    "end_token_kind": null,
+    "dispatch_contexts": [],
+    "treatment": "closer-retained",
+    "rationale": "preprocessor directive; closer carries the condition string for grep/audit",
+    "lexer_line": null,
+    "lexer_closer_line": null
+  },
+  {
+    "opener": "PROP",
+    "closer": "/PROP",
+    "token_kind": "Property",
+    "end_token_kind": "EndProperty",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 140,
+    "lexer_closer_line": 141
+  },
+  {
+    "opener": "RTYPE",
+    "closer": "/RTYPE",
+    "token_kind": "RefinedType",
+    "end_token_kind": "EndRefinedType",
+    "dispatch_contexts": [
+      "module_member"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 288,
+    "lexer_closer_line": 289
+  },
+  {
+    "opener": "SALLOC",
+    "closer": "/SALLOC",
+    "token_kind": "StackAlloc",
+    "end_token_kind": "EndStackAlloc",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 267,
+    "lexer_closer_line": 268
+  },
+  {
+    "opener": "SET",
+    "closer": "/SET",
+    "token_kind": "Set",
+    "end_token_kind": "EndSet",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 146,
+    "lexer_closer_line": 147
+  },
+  {
+    "opener": "SYNC",
+    "closer": "/SYNC",
+    "token_kind": "SyncBlock",
+    "end_token_kind": "EndSyncBlock",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 278,
+    "lexer_closer_line": 279
+  },
+  {
+    "opener": "T",
+    "closer": "/T",
+    "token_kind": "Type",
+    "end_token_kind": "EndType",
+    "dispatch_contexts": [],
+    "treatment": "not-applicable",
+    "rationale": "no dispatch or closer-consumption evidence for TokenKind.Type",
+    "lexer_line": 37,
+    "lexer_closer_line": 50
+  },
+  {
+    "opener": "THIS",
+    "closer": "/THIS",
+    "token_kind": "This",
+    "end_token_kind": "EndThis",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression"
+    ],
+    "treatment": "not-applicable",
+    "rationale": "expression form; appears inside expressions, not as a block",
+    "lexer_line": 131,
+    "lexer_closer_line": 132
+  },
+  {
+    "opener": "TR",
+    "closer": "/TR",
+    "token_kind": "Try",
+    "end_token_kind": "EndTry",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 158,
+    "lexer_closer_line": 159
+  },
+  {
+    "opener": "UB",
+    "closer": "/UB",
+    "token_kind": "UsedBy",
+    "end_token_kind": "EndUsedBy",
+    "dispatch_contexts": [],
+    "treatment": "not-applicable",
+    "rationale": "no dispatch or closer-consumption evidence for TokenKind.UsedBy",
+    "lexer_line": 226,
+    "lexer_closer_line": 227
+  },
+  {
+    "opener": "UNSAFE",
+    "closer": "/UNSAFE",
+    "token_kind": "Unsafe",
+    "end_token_kind": "EndUnsafe",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 269,
+    "lexer_closer_line": 270
+  },
+  {
+    "opener": "US",
+    "closer": "/US",
+    "token_kind": "Uses",
+    "end_token_kind": "EndUses",
+    "dispatch_contexts": [],
+    "treatment": "not-applicable",
+    "rationale": "no dispatch or closer-consumption evidence for TokenKind.Uses",
+    "lexer_line": 224,
+    "lexer_closer_line": 225
+  },
+  {
+    "opener": "USE",
+    "closer": "/USE",
+    "token_kind": "Use",
+    "end_token_kind": "EndUse",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 79,
+    "lexer_closer_line": 80
+  },
+  {
+    "opener": "VS",
+    "closer": "/VS",
+    "token_kind": "Visible",
+    "end_token_kind": "EndVisible",
+    "dispatch_contexts": [
+      "closer_consumed"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 246,
+    "lexer_closer_line": 247
+  },
+  {
+    "opener": "W",
+    "closer": "/W",
+    "token_kind": "Match",
+    "end_token_kind": "EndMatch",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 33,
+    "lexer_closer_line": 48
+  },
+  {
+    "opener": "WH",
+    "closer": "/WH",
+    "token_kind": "While",
+    "end_token_kind": "EndWhile",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "statement"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 57,
+    "lexer_closer_line": 58
+  },
+  {
+    "opener": "WITH",
+    "closer": "/WITH",
+    "token_kind": "With",
+    "end_token_kind": "EndWith",
+    "dispatch_contexts": [
+      "closer_consumed",
+      "expression"
+    ],
+    "treatment": "dedent-closed",
+    "rationale": "body-bearing construct; dedent closes the block",
+    "lexer_line": 199,
+    "lexer_closer_line": 200
+  }
+]
