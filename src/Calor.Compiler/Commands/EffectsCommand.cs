@@ -362,7 +362,7 @@ public static class EffectsCommand
             var diagnostics = new DiagnosticBag();
 
             var lexer = new Lexer(source, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
             if (diagnostics.HasErrors)
             {
                 Console.Error.WriteLine($"Error: Failed to lex {inputFile.Name}:");

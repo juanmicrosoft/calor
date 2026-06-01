@@ -18,7 +18,7 @@ internal static class CalorSourceHelper
         diagnostics.SetFilePath(filePath ?? "mcp-input.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         if (diagnostics.HasErrors)
         {

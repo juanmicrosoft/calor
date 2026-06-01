@@ -307,7 +307,7 @@ public static class ConvertCommand
     {
         var diagBag = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagBag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagBag);
         parser.Parse();
         return diagBag.Where(d => d.IsError).ToList();

@@ -177,4 +177,42 @@ public class ParserIndentAcceptanceTests
         Assert.Contains("if", csharp);
         Assert.Contains("else", csharp);
     }
+
+    [Fact]
+    public void CloserMode_FixtureParsesViaTokenizeAllForParser()
+    {
+        // Phase 1b regression guard: real-world closer-form fixture parses
+        // correctly when fed through the new indent-aware production entry
+        // point (TokenizeAllForParser). This proves we can flip all 16 CLI
+        // callers from TokenizeAll → TokenizeAllForParser without breaking
+        // existing closer-only source.
+        var src = "§M{m001:FizzBuzz}\n" +
+                  "§F{f001:Main:pub}\n" +
+                  "  §O{void}\n" +
+                  "  §E{cw}\n" +
+                  "  §L{for1:i:1:100:1}\n" +
+                  "    §IF{if1} (== (% i 15) 0) → §P \"FizzBuzz\"\n" +
+                  "    §EI (== (% i 3) 0) → §P \"Fizz\"\n" +
+                  "    §EI (== (% i 5) 0) → §P \"Buzz\"\n" +
+                  "    §EL → §P i\n" +
+                  "    §/I{if1}\n" +
+                  "  §/L{for1}\n" +
+                  "§/F{f001}\n" +
+                  "§/M{m001}\n";
+
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(src, diagnostics);
+        var tokens = lexer.TokenizeAllForParser();
+        var parser = new Parser(tokens, diagnostics);
+        var module = parser.Parse();
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Errors.Select(d => d.Message)));
+        Assert.Equal("FizzBuzz", module.Name);
+        Assert.Single(module.Functions);
+
+        var emitter = new Calor.Compiler.CodeGen.CSharpEmitter();
+        var csharp = emitter.Emit(module);
+        Assert.Contains("FizzBuzz", csharp);
+        Assert.Contains("Main", csharp);
+    }
 }

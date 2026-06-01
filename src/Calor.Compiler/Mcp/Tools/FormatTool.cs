@@ -124,7 +124,7 @@ public sealed class FormatTool : McpToolBase
         diagnostics.SetFilePath("mcp-input.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         if (diagnostics.HasErrors)
         {
@@ -305,7 +305,7 @@ public sealed class FormatTool : McpToolBase
         diagnostics.SetFilePath("mcp-input.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         if (diagnostics.HasErrors)
             return null;

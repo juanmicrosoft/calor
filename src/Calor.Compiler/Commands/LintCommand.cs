@@ -246,7 +246,7 @@ public static class LintCommand
         diagnostics.SetFilePath(filePath);
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         if (diagnostics.HasErrors)
         {

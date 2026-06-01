@@ -518,6 +518,25 @@ public sealed class Lexer
     public List<Token> TokenizeWithIndentAll()
         => TokenizeWithIndent().ToList();
 
+    /// <summary>
+    /// Phase 1b (RFC §4.2) — parser-ready indent-aware token stream:
+    /// <see cref="TokenizeWithIndent"/> output minus <see cref="TokenKind.Newline"/>
+    /// and <see cref="TokenKind.Indent"/> tokens. The parser is newline-insensitive
+    /// (every statement is anchored by a § marker) and treats <c>Indent</c> as
+    /// decorative (every block-opener is already an explicit tag). Only
+    /// <see cref="TokenKind.Dedent"/> is structurally significant — it signals
+    /// block-end alongside the legacy explicit closers (§/F, §/M, etc.).
+    ///
+    /// This is the production entry point for the indent-aware compiler
+    /// pipeline. Closer-form source still works because the parser's
+    /// <c>ExpectBlockEnd</c> helper consumes Dedent followed by the
+    /// explicit closer in sequence.
+    /// </summary>
+    public List<Token> TokenizeAllForParser()
+        => TokenizeWithIndent()
+            .Where(t => t.Kind != TokenKind.Newline && t.Kind != TokenKind.Indent)
+            .ToList();
+
     private Token NextToken()
     {
         StartToken();

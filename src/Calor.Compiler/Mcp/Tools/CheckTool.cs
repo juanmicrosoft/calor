@@ -419,7 +419,7 @@ public sealed class CheckTool : McpToolBase
         diagnostics.SetFilePath("mcp-input.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         if (diagnostics.HasErrors)
         {
@@ -561,7 +561,7 @@ public sealed class CheckTool : McpToolBase
             var diagnostics = new DiagnosticBag();
 
             var lexer = new Lexer(wrapper.WrappedSource, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
 
             List<TokenOutput>? tokenOutput = null;
             if (showTokens)
