@@ -109,21 +109,36 @@ public sealed class Parser
     /// Phase 3 (indent-aware) — consumes the block-end marker and returns
     /// the consumed token (for AST span end calculation).
     ///
-    /// If the current token is Dedent, consume it. If an explicit closer
-    /// immediately follows the Dedent (closer-form code in indent-aware
-    /// mode), consume that too and return it (so span info is preserved).
-    /// Otherwise (no Dedent), fall back to Expect(explicitCloser).
+    /// Behavior:
+    /// 1. If the current token is the explicit closer, consume and return it.
+    /// 2. If the current token is a Dedent and the explicit closer follows
+    ///    after any number of contiguous Dedents (closer-form code parsed
+    ///    via the indent-aware lexer — multiple lexer-level dedents may
+    ///    correspond to a single block-end at the parser level), consume
+    ///    ALL of those Dedents and then the explicit closer.
+    /// 3. Otherwise (indent-only mode, no explicit closer present),
+    ///    consume a single Dedent and return it.
+    /// 4. If neither Dedent nor closer is present, error via Expect.
     /// </summary>
     private Token ExpectBlockEnd(TokenKind explicitCloser)
     {
+        if (Check(explicitCloser))
+        {
+            return Advance();
+        }
         if (Check(TokenKind.Dedent))
         {
-            var dedent = Advance();
-            if (Check(explicitCloser))
+            // Look ahead past any contiguous Dedents for the explicit closer
+            int lookahead = 1;
+            while (Peek(lookahead).Kind == TokenKind.Dedent) lookahead++;
+            if (Peek(lookahead).Kind == explicitCloser)
             {
+                // Closer-form: consume all dedents, then the closer.
+                while (Check(TokenKind.Dedent)) Advance();
                 return Advance();
             }
-            return dedent;
+            // Indent-only: consume the single Dedent that ends this block.
+            return Advance();
         }
         return Expect(explicitCloser);
     }
@@ -281,6 +296,20 @@ public sealed class Parser
         if (ShouldReportMismatchedId(endId, id, endToken))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "MODULE", id, "END_MODULE", endId);
+        }
+
+        // Phase 3 (indent-aware): in indent mode, the module body loop exits
+        // on the first Dedent — which may be an INNER block's dedent, not the
+        // module-ending one. If any non-trivia tokens remain after the module
+        // close, they are orphan tags (e.g. an injected §/NEW between the last
+        // member and §/M) or stray content. Report them.
+        while (!IsAtEnd && Check(TokenKind.Dedent))
+        {
+            Advance();
+        }
+        if (!IsAtEnd)
+        {
+            _diagnostics.ReportUnexpectedToken(Current.Span, TokenKind.Eof, Current.Kind);
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -3358,7 +3387,7 @@ public sealed class Parser
                 // inline lambdas appear directly after the pattern.
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
-                if (IsBlockEnd(TokenKind.EndCase)) Advance();
+                if (IsBlockEnd(TokenKind.EndCase)) ExpectBlockEnd(TokenKind.EndCase);
             }
             else
             {
@@ -3375,7 +3404,7 @@ public sealed class Parser
                 // Consume optional §/K closing tag
                 if (IsBlockEnd(TokenKind.EndCase))
                 {
-                    Advance();
+                    ExpectBlockEnd(TokenKind.EndCase);
                 }
             }
 
@@ -7525,7 +7554,7 @@ public sealed class Parser
         var endSpan = startToken.Span;
         if (IsBlockEnd(TokenKind.EndNew))
         {
-            endSpan = Advance().Span;
+            endSpan = ExpectBlockEnd(TokenKind.EndNew).Span;
         }
 
         var span = endSpan != startToken.Span ? startToken.Span.Union(endSpan)
@@ -7581,7 +7610,7 @@ public sealed class Parser
         var endSpan = startToken.Span;
         if (IsBlockEnd(TokenKind.EndAnonymousObject))
         {
-            endSpan = Advance().Span;
+            endSpan = ExpectBlockEnd(TokenKind.EndAnonymousObject).Span;
         }
 
         return new AnonymousObjectCreationNode(startToken.Span.Union(endSpan), initializers);
@@ -8068,9 +8097,9 @@ public sealed class Parser
         }
 
         // Consume the closing token if present (§/GET or §/SET)
-        if (Check(endTokenKind))
+        if (IsBlockEnd(endTokenKind))
         {
-            Advance();
+            ExpectBlockEnd(endTokenKind);
         }
 
         return new PropertyAccessorNode(startToken.Span, kind, visibility, preconditions, body, attrs);
@@ -8350,9 +8379,9 @@ public sealed class Parser
 
         // Consume the closing token (§/BASE or §/THIS)
         var endTokenKind = isBase ? TokenKind.EndBase : TokenKind.EndThis;
-        if (Check(endTokenKind))
+        if (IsBlockEnd(endTokenKind))
         {
-            Advance();
+            ExpectBlockEnd(endTokenKind);
         }
 
         return new ConstructorInitializerNode(startToken.Span, isBase, arguments);
@@ -9256,9 +9285,9 @@ public sealed class Parser
         }
 
         // Consume the closing token if present (§/EADD or §/EREM)
-        if (Check(endKind))
+        if (IsBlockEnd(endKind))
         {
-            Advance();
+            ExpectBlockEnd(endKind);
         }
 
         return body;
@@ -9579,7 +9608,7 @@ public sealed class Parser
                     else if (IsBlockEnd(TokenKind.EndCall)) callDepth--;
                     if (callDepth > 0) Advance();
                 }
-                if (IsBlockEnd(TokenKind.EndCall)) Advance();
+                if (IsBlockEnd(TokenKind.EndCall)) ExpectBlockEnd(TokenKind.EndCall);
                 patterns.Add(new ConstantPatternNode(callToken.Span,
                     new ReferenceNode(callToken.Span, "_patternCall")));
             }
@@ -10061,7 +10090,7 @@ public sealed class Parser
                         Advance();
                     }
                 }
-                if (IsBlockEnd(TokenKind.EndVisible)) Advance();
+                if (IsBlockEnd(TokenKind.EndVisible)) ExpectBlockEnd(TokenKind.EndVisible);
             }
             else if (Check(TokenKind.HiddenSection))
             {
@@ -10077,7 +10106,7 @@ public sealed class Parser
                         Advance();
                     }
                 }
-                if (IsBlockEnd(TokenKind.EndHidden)) Advance();
+                if (IsBlockEnd(TokenKind.EndHidden)) ExpectBlockEnd(TokenKind.EndHidden);
             }
             else if (Check(TokenKind.Focus))
             {
@@ -11415,7 +11444,7 @@ public sealed class Parser
                 initializer.Add(ParseExpression());
             }
             if (IsBlockEnd(TokenKind.EndStackAlloc))
-                Advance();
+                ExpectBlockEnd(TokenKind.EndStackAlloc);
         }
 
         return new StackAllocNode(startToken.Span, elementType, size, initializer);
@@ -11506,7 +11535,7 @@ public sealed class Parser
             }
             if (IsBlockEnd(TokenKind.EndArray2D))
             {
-                Advance();
+                ExpectBlockEnd(TokenKind.EndArray2D);
                 ParseAttributes(); // consume optional {id} on closing tag
             }
             rank = initializer.Count > 0 ? 2 : rank;
@@ -11558,7 +11587,7 @@ public sealed class Parser
         }
         if (IsBlockEnd(TokenKind.EndSyncBlock))
         {
-            Advance();
+            ExpectBlockEnd(TokenKind.EndSyncBlock);
             ParseAttributes(); // consume optional {id} on closing tag
         }
 
@@ -11582,7 +11611,7 @@ public sealed class Parser
         }
         if (IsBlockEnd(TokenKind.EndUnsafe))
         {
-            Advance();
+            ExpectBlockEnd(TokenKind.EndUnsafe);
             ParseAttributes(); // consume optional {id} on closing tag
         }
 
@@ -11620,7 +11649,7 @@ public sealed class Parser
         }
         if (IsBlockEnd(TokenKind.EndFixed))
         {
-            Advance();
+            ExpectBlockEnd(TokenKind.EndFixed);
             ParseAttributes(); // consume optional {id} on closing tag
         }
 
