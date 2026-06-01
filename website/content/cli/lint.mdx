@@ -86,13 +86,10 @@ Calor uses explicit tags with IDs:
 
 ```calor
 §F{f1:Main:pub}
-§O{void}
-§L{l1:i:0:10:1}
-§IF{i1} (== (% i 2) 0)
-§P i
-§/I{i1}
-§/L{l1}
-§/F{f1}
+  §O{void}
+  §L{l1:i:0:10:1}
+    §IF{i1} (== (% i 2) 0)
+      §P i
 ```
 
 The structure is explicit in the tags (`§L{l1}...§/L{l1}`), making indentation redundant noise.

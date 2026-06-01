@@ -152,7 +152,7 @@ The Calor skills teach Codex:
 - Unique ID generation (`m001`, `f001`, `c001`, etc.)
 - Contract placement (`§Q` preconditions, `§S` postconditions)
 - Effect declarations (`§E{db:rw,net:rw,cw}`)
-- Proper structure nesting and closing tags
+- Proper indentation and block nesting
 
 ### Code Patterns
 
@@ -192,16 +192,13 @@ that n >= 0 and postcondition that result >= 1
 **Expected Response:**
 ```
 §M{m001:Math}
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n 0)
-  §S (>= result 1)
-  §IF{if1} (<= n 1) → §R 1
-  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
-  §/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Factorial:pub}
+    §I{i32:n}
+    §O{i32}
+    §Q (>= n 0)
+    §S (>= result 1)
+    §IF{if1} (<= n 1) → §R 1
+    §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
 ```
 
 ### Find Bugs
@@ -215,7 +212,6 @@ Is there a bug in this Calor code?
   §I{i32:b}
   §O{i32}
   §R (/ a b)
-§/F{f001}
 ```
 
 **Expected Response:**

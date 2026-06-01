@@ -27,7 +27,6 @@ Calor requires explicit declaration:
   §O{bool}
   §E{db:rw,net:rw}        // Declares: database and network operations
   // ...
-§/F{f001}
 ```
 
 Now an agent knows immediately what side effects to expect.
@@ -51,7 +50,6 @@ Place the effect declaration after the output type:
   §Q ...
   §S ...
   // body
-§/F{id}
 ```
 
 ---
@@ -85,7 +83,6 @@ Place the effect declaration after the output type:
   §O{i32}
   // No §E means pure - no side effects
   §R (+ a b)
-§/F{f001}
 ```
 
 Or explicitly:
@@ -97,7 +94,6 @@ Or explicitly:
   §O{i32}
   §E{}                    // Explicitly no effects
   §R (+ a b)
-§/F{f001}
 ```
 
 ### Console Output
@@ -108,7 +104,6 @@ Or explicitly:
   §O{void}
   §E{cw}                  // Console write
   §P name
-§/F{f001}
 ```
 
 ### File Operations
@@ -120,7 +115,6 @@ Or explicitly:
   §O{bool}
   §E{fs:rw}               // Filesystem read and write
   // ...
-§/F{f001}
 ```
 
 ### Network Call
@@ -131,7 +125,6 @@ Or explicitly:
   §O{str!str}
   §E{net:rw}              // Network operations
   // ...
-§/F{f001}
 ```
 
 ### Database with Logging
@@ -142,7 +135,6 @@ Or explicitly:
   §O{i32}
   §E{db:rw,cw}            // Database and console (for logging)
   // ...
-§/F{f001}
 ```
 
 ### Multiple Effects
@@ -153,7 +145,6 @@ Or explicitly:
   §O{bool}
   §E{db:rw,net:rw,fs:w,cw} // Database, network, filesystem write, console write
   // ...
-§/F{f001}
 ```
 
 ---
@@ -169,7 +160,6 @@ Or explicitly:
   §O{Config}
   §E{fs:r}                // Only filesystem read
   // ...
-§/F{f001}
 
 // Read-write file operation
 §F{f002:UpdateConfig:pub}
@@ -178,7 +168,6 @@ Or explicitly:
   §O{void}
   §E{fs:rw}               // Filesystem read and write
   // ...
-§/F{f002}
 ```
 
 ### Interactive Console
@@ -190,7 +179,6 @@ Or explicitly:
   §E{cw,cr}               // Console write and read
   §P question
   §R §C{Console.ReadLine} §/C
-§/F{f001}
 ```
 
 ---
@@ -228,12 +216,10 @@ Or explicitly:
 §F{f001:ProcessAndSave:pub}
   §E{db:rw,cw}            // Must include f002's effects
   §C{f002:Process} ... §/C
-§/F{f001}
 
 §F{f002:Process:pri}
   §E{cw}                  // Has console write effect
   // ...
-§/F{f002}
 ```
 
 ---
@@ -276,13 +262,11 @@ You cannot hide an effect by burying it in helper functions.
 ```
 §F{f001:Helper:pri}
   §C{Console.WriteLine} "hidden"   // Has cw effect
-§/F{f001}
 
 §F{f002:Main:pub}
   §O{void}
   // No §E declaration
   §C{f001:Helper}                  // ERROR: cw effect leaks through
-§/F{f002}
 ```
 
 ### Disabling Enforcement (Not Recommended)

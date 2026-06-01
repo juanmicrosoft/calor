@@ -14,8 +14,6 @@ Classes can have the following modifiers that affect their inheritance behavior:
 §CL{c1:Shape:abs}
   §MT{mt1:Area:pub:abs}
     §O{double}
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 **Semantics:**
@@ -36,7 +34,6 @@ public abstract class Shape
 
 ```calor
 §CL{c1:FinalClass:seal}
-§/CL{c1}
 ```
 
 **Semantics:**
@@ -57,8 +54,6 @@ public sealed class FinalClass { }
 §CL{c1:Utilities:pub}
   §MT{mt1:Helper:pub:stat}
     §O{void}
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 **Semantics:**
@@ -80,7 +75,6 @@ public class Utilities
 
 ```calor
 §CL{c1:DataService:partial}
-§/CL{c1}
 ```
 
 **Semantics:**
@@ -103,7 +97,6 @@ public partial class DataService { }
 §CL{c1:Circle:pub}
   §EXT{Shape}
   // ...
-§/CL{c1}
 ```
 
 **Semantics:**
@@ -121,7 +114,6 @@ public partial class DataService { }
   §IMPL{IMovable}
   §IMPL{IDrawable}
   // ...
-§/CL{c1}
 ```
 
 **Semantics:**
@@ -140,7 +132,6 @@ public partial class DataService { }
   §IMPL{IPet}
   §IMPL{ITrainable}
   // ...
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -158,7 +149,6 @@ public class Dog : Animal, IPet, ITrainable { ... }
 §MT{mt1:Speak:pub:virt}
   §O{str}
   §R "..."
-§/MT{mt1}
 ```
 
 **Semantics:**
@@ -180,7 +170,6 @@ public virtual string Speak()
 §MT{mt1:Speak:pub:over}
   §O{str}
   §R "Woof!"
-§/MT{mt1}
 ```
 
 **Semantics:**
@@ -201,7 +190,6 @@ public override string Speak()
 ```calor
 §MT{mt1:Area:pub:abs}
   §O{double}
-§/MT{mt1}
 ```
 
 **Semantics:**
@@ -221,7 +209,6 @@ public abstract double Area();
 §MT{mt1:Compute:pub:seal over}
   §O{i32}
   §R 42
-§/MT{mt1}
 ```
 
 **Semantics:**
@@ -243,7 +230,6 @@ public override sealed int Compute()
 §MT{mt1:Create:pub:stat}
   §O{MyClass}
   §R §NEW{MyClass}
-§/MT{mt1}
 ```
 
 **Semantics:**
@@ -263,7 +249,6 @@ To call a base class method, use `base.MethodName` as the call target:
 §MT{mt1:GetValue:pub:over}
   §O{i32}
   §R (+ §C{base.GetValue} §/C 5)
-§/MT{mt1}
 ```
 
 > **Important:** Use lowercase `base.Method` inside `§C{...}`, not `§BASE.Method`. The `§BASE` token is only used for constructor initializers.
@@ -289,7 +274,6 @@ public override int GetValue()
   §I{str:breed}
   §BASE §A name §/BASE
   §ASSIGN §THIS._breed breed
-§/CTOR{ctor1}
 ```
 
 **Semantics:**
@@ -321,7 +305,6 @@ Derived classes may **weaken** (but not strengthen) preconditions:
   §O{i32}
   §REQ (> value 0)    // Requires positive
   §R (* value 2)
-§/MT{mt1}
 
 // Derived class - OK: accepts wider range
 §MT{mt1:Process:pub:over}
@@ -329,7 +312,6 @@ Derived classes may **weaken** (but not strengthen) preconditions:
   §O{i32}
   §REQ (>= value 0)   // Also accepts zero
   §R (* value 2)
-§/MT{mt1}
 ```
 
 ### 5.2 Postcondition Strengthening
@@ -342,14 +324,12 @@ Derived classes may **strengthen** (but not weaken) postconditions:
   §O{i32}
   §ENS (>= result 0)   // Ensures non-negative
   §R 10
-§/MT{mt1}
 
 // Derived class - OK: guarantees stronger condition
 §MT{mt1:GetValue:pub:over}
   §O{i32}
   §ENS (> result 0)    // Ensures strictly positive
   §R 42
-§/MT{mt1}
 ```
 
 ### 5.3 Liskov Substitution Principle
@@ -385,12 +365,10 @@ These rules ensure that objects of derived classes can substitute for objects of
 // Base class
 §MT{mt1:Method:pro:virt}
   §O{void}
-§/MT{mt1}
 
 // Derived - OK: increasing visibility
 §MT{mt1:Method:pub:over}
   §O{void}
-§/MT{mt1}
 ```
 
 ---
@@ -410,12 +388,10 @@ Return types support covariance:
 // Base class returns Animal
 §MT{mt1:Clone:pub:virt}
   §O{Animal}
-§/MT{mt1}
 
 // Derived can return Dog (more specific)
 §MT{mt1:Clone:pub:over}
   §O{Dog}
-§/MT{mt1}
 ```
 
 ---

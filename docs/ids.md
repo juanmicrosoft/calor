@@ -70,11 +70,9 @@ diverge). Both forms parse and are valid side-by-side:
 ```calor
 # Compact (recommended for new code)
 §M{Calculator}
-§/M
 
 # Legacy (still accepted)
 §M{m_01j5x7k9m2npqrstabwxyz12:Calculator}
-§/M{m_01j5x7k9m2npqrstabwxyz12}
 ```
 
 Existing repositories can migrate mechanically with the
@@ -178,13 +176,11 @@ c001, c002          Classes
 §F{f_01ABC:Calculate:pub}
   §O{i32}
   §R 42
-§/F{f_01ABC}
 
 // Later in same file
 §F{f_01ABC:Validate:pub}   // ERROR: Duplicate ID
   §O{bool}
   §R true
-§/F{f_01ABC}
 ```
 
 ---
@@ -251,7 +247,6 @@ Converting Calor → C# → Calor must preserve all IDs:
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f_01J5X7K9M2NPQRSTABWXYZ12}
 ```
 
 ```csharp
@@ -267,7 +262,6 @@ public static int Add(int a, int b) => a + b;
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f_01J5X7K9M2NPQRSTABWXYZ12}
 ```
 
 ---
@@ -297,7 +291,6 @@ AI agents and code assistants MUST follow these rules:
 §F{:NewHelper:pri}
   §O{void}
   §C{Console.WriteLine!}("helper")
-§/F{}
 ```
 
 ### 7.3 Copy Rule

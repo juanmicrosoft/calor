@@ -95,7 +95,6 @@ public static int Add(int a, int b)
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f001}
 ```
 
 ### 3. Error Recovery
@@ -134,7 +133,6 @@ public static int Add(int a, int b)
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f001}
 ```
 - Compiles: Yes
 - Structure: Complete
@@ -148,7 +146,6 @@ public static int Add(int a, int b)
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f002}              // Wrong ID!
 ```
 - Compiles: No
 - Error: Mismatched closing tag

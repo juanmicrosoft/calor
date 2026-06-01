@@ -230,49 +230,42 @@ Add these properties to your project file or `Directory.Build.props`:
 
 ```
 §M{m1:Greeting}
-§F{f001:WriteGreeting:pub}
-  §I{str:name}
-  §O{void}
-  §E{cw}
-  §P name
-§/F{f001}
-§/M{m1}
+  §F{f001:WriteGreeting:pub}
+    §I{str:name}
+    §O{void}
+    §E{cw}
+    §P name
 ```
 
 ### Pure Function with Contracts
 
 ```
 §M{m1:Math}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §S (== (* result b) a)
-  §R (/ a b)
-§/F{f001}
-§/M{m1}
+  §F{f001:Divide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §Q (!= b 0)
+    §S (== (* result b) a)
+    §R (/ a b)
 ```
 
 ### Function Calling Another with Effects
 
 ```
 §M{m1:App}
-§F{f001:LoadUserName:pri}
-  §I{i32:userId}
-  §O{str}
-  §E{fs:r}
+  §F{f001:LoadUserName:pri}
+    §I{i32:userId}
+    §O{str}
+    §E{fs:r}
   // ... file read implementation
-§/F{f001}
 
-§F{f002:GreetUser:pub}
-  §I{i32:userId}
-  §O{void}
-  §E{cw, fs:r}                  // Must declare both effects
-  §B{name} §C{f001:LoadUserName} userId §/C
-  §P name
-§/F{f002}
-§/M{m1}
+  §F{f002:GreetUser:pub}
+    §I{i32:userId}
+    §O{void}
+    §E{cw, fs:r}                  // Must declare both effects
+    §B{name} §C{f001:LoadUserName} userId §/C
+    §P name
 ```
 
 ## Error Examples

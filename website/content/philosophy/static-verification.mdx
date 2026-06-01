@@ -20,7 +20,6 @@ When you write contracts in Calor:
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
-§/F{f001}
 ```
 
 The compiler can use Z3 to prove that the postcondition `(>= result 0)` always holds when the precondition `(>= x 0)` is satisfied. This is mathematically provable: the square of a non-negative number is always non-negative.
@@ -211,7 +210,6 @@ In Calor, you declare the contract and Z3 handles verification automatically:
   §Q (>= x 0.0)
   §S (>= result 0.0)
   (* x x)
-§/F{}
 ```
 
 If Z3 can't prove it, the runtime check remains. Your code compiles and runs safely.

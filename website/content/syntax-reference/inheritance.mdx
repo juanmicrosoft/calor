@@ -17,7 +17,6 @@ Classes can be marked with modifiers to control inheritance behavior.
 ```
 §CL{id:Name:modifiers}
   // class body
-§/CL{id}
 ```
 
 > **Note:** Class declarations use 3 positional parts: `{id:name:modifiers}`. Visibility defaults to public.
@@ -38,8 +37,6 @@ Classes can be marked with modifiers to control inheritance behavior.
 §CL{c1:Shape:abs}
   §MT{mt1:Area:pub:abs}
     §O{double}
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 **Sealed class:**
@@ -47,8 +44,6 @@ Classes can be marked with modifiers to control inheritance behavior.
 §CL{c1:FinalService:seal}
   §MT{mt1:Process:pub}
     §O{void}
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 **Static methods** (static class modifier not fully implemented):
@@ -58,8 +53,6 @@ Classes can be marked with modifiers to control inheritance behavior.
     §I{i32:x}
     §O{i32}
     §R (* x x)
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 ---
@@ -75,7 +68,6 @@ Use `§EXT{ClassName}` to inherit from a base class.
   §EXT{Shape}
   §FLD{f64:_radius:pri}
   // ...
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -96,11 +88,8 @@ Use `§IMPL{InterfaceName}` to implement interfaces. Multiple interfaces can be 
   §IMPL{IDrawable}
   §MT{mt1:Move:pub}
     §O{void}
-  §/MT{mt1}
   §MT{mt2:Draw:pub}
     §O{void}
-  §/MT{mt2}
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -120,7 +109,6 @@ public class GameObject : IMovable, IDrawable
   §IMPL{IPet}
   §IMPL{ITrainable}
   // ...
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -140,7 +128,6 @@ Methods support modifiers for polymorphism.
 §MT{id:Name:visibility:modifiers}
   §O{returnType}
   // method body
-§/MT{id}
 ```
 
 ### Modifiers
@@ -160,8 +147,6 @@ Methods support modifiers for polymorphism.
   §MT{mt1:Speak:pub:virt}
     §O{str}
     §R "..."
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -183,8 +168,6 @@ public class Animal
   §MT{mt1:Speak:pub:over}
     §O{str}
     §R "Woof!"
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -206,8 +189,6 @@ Abstract methods have no body and must be in an abstract class.
 §CL{c1:Shape:abs}
   §MT{mt1:Area:pub:abs}
     §O{double}
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -226,7 +207,6 @@ Prevents further overriding in derived classes. Combine modifiers with spaces.
 §MT{mt1:Compute:pub:seal over}
   §O{i32}
   §R 42
-§/MT{mt1}
 ```
 
 **Generated C#:**
@@ -253,8 +233,6 @@ Use `base.MethodName` (lowercase) inside `§C{...}` to call the base class imple
   §MT{mt1:GetValue:pub:over}
     §O{i32}
     §R (+ §C{base.GetValue} §/C 5)
-  §/MT{mt1}
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -282,8 +260,6 @@ Use `§BASE §A args §/BASE` in a constructor to call the base constructor.
     §I{str:breed}
     §BASE §A name §/BASE
     §ASSIGN §THIS._breed breed
-  §/CTOR{ctor1}
-§/CL{c1}
 ```
 
 **Generated C#:**
@@ -315,17 +291,13 @@ Here's a complete example demonstrating inheritance with a Shape hierarchy.
   §CTOR{ctor1:pro}
     §I{str:name}
     §ASSIGN §THIS._name name
-  §/CTOR{ctor1}
 
   §MT{mt1:Area:pub:abs}
     §O{double}
-  §/MT{mt1}
 
   §MT{mt2:Describe:pub:virt}
     §O{str}
     §R §INTERP §THIS._name " with area " §C{this.Area} §/C §/INTERP
-  §/MT{mt2}
-§/CL{c1}
 ```
 
 ### Derived Class
@@ -339,13 +311,10 @@ Here's a complete example demonstrating inheritance with a Shape hierarchy.
     §I{double:radius}
     §BASE §A "Circle" §/BASE
     §ASSIGN §THIS._radius radius
-  §/CTOR{ctor1}
 
   §MT{mt1:Area:pub:over}
     §O{double}
     §R (* 3.14159 (* §THIS._radius §THIS._radius))
-  §/MT{mt1}
-§/CL{c2}
 ```
 
 ### Usage
@@ -355,7 +324,6 @@ Here's a complete example demonstrating inheritance with a Shape hierarchy.
   §O{str}
   §B{shape:Shape} §NEW{Circle} §A 5.0
   §R §C{shape.Describe} §/C
-§/F{f1}
 ```
 
 ---

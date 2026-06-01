@@ -46,12 +46,10 @@ Claude creates `Program.calr`:
 
 ```
 §M{m001:HelloApp}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §P "Hello from Calor!"
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §P "Hello from Calor!"
 ```
 
 You don't need to understand every detail of this syntax - the AI handles it. But here's a quick breakdown:
@@ -119,13 +117,11 @@ Write a greet function that takes a name parameter and prints a greeting.
 
 ```
 §M{m001:Greeter}
-§F{f001:Greet:pub}
-  §I{str:name}
-  §O{void}
-  §E{cw}
-  §P (+ "Hello, " name "!")
-§/F{f001}
-§/M{m001}
+  §F{f001:Greet:pub}
+    §I{str:name}
+    §O{void}
+    §E{cw}
+    §P (+ "Hello, " name "!")
 ```
 
 ### Function with Return Value
@@ -139,13 +135,11 @@ Write a function that adds two integers and returns the result.
 
 ```
 §M{m001:Math}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 ```
 
 ### Function with Contracts
@@ -160,14 +154,12 @@ requires b is not zero, and returns a / b.
 
 ```
 §M{m001:SafeMath}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §Q (!= b 0)
+    §R (/ a b)
 ```
 
 The `§Q (!= b 0)` is a **precondition** - the compiler generates runtime checks to enforce this contract.
@@ -178,7 +170,7 @@ The `§Q (!= b 0)` is a **precondition** - the compiler generates runtime checks
 
 Calor's syntax is optimized for AI agents:
 
-1. **Unambiguous structure** - Every block has explicit open/close tags with IDs, eliminating brace-matching errors
+1. **Indent-only block structure** - Familiar to any agent trained on Python; no `§/X` closer to track or mismatch
 2. **Explicit contracts** - Preconditions and postconditions are first-class, not comments
 3. **Declared effects** - The AI must declare what a function does (console, network, database)
 4. **Lisp-style expressions** - `(+ a b)` is unambiguous; no operator precedence confusion

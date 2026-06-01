@@ -98,12 +98,10 @@ After init, create `.calr` files and they compile automatically. Create `Program
 
 ```
 §M{m001:MyApp}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §P "Hello from Calor!"
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §P "Hello from Calor!"
 ```
 
 Then build:

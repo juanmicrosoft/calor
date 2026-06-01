@@ -44,7 +44,6 @@ In Calor, constraints are part of the parameter declaration:
   §I{i32:maxConnections} | (> # INT:0)
   §O{void}
   // ... actual logic, no validation boilerplate
-§/F{f001}
 ```
 
 ### With Named Refinement Types
@@ -54,19 +53,17 @@ For reusable constraints, define named refinement types:
 ```
 §M{m001:Server}
 
-§RTYPE{r1:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-§RTYPE{r2:NonEmpty:str} (> (len #) INT:0)
-§RTYPE{r3:Positive:i32} (> # INT:0)
+  §RTYPE{r1:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
+    §RTYPE{r2:NonEmpty:str} (> (len #) INT:0)
+      §RTYPE{r3:Positive:i32} (> # INT:0)
 
-§F{f001:ConfigureServer:pub}
-  §I{Port:port}
-  §I{NonEmpty:hostname}
-  §I{Positive:maxConnections}
-  §O{void}
+        §F{f001:ConfigureServer:pub}
+          §I{Port:port}
+          §I{NonEmpty:hostname}
+          §I{Positive:maxConnections}
+          §O{void}
   // ...
-§/F{f001}
 
-§/M{m001}
 ```
 
 Now `Port`, `NonEmpty`, and `Positive` are reusable across the entire module.
@@ -106,22 +103,20 @@ A transfer function where:
 ```
 §M{m001:Banking}
 
-§RTYPE{r1:PositiveAmount:i32} (> # INT:0)
-§RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
+  §RTYPE{r1:PositiveAmount:i32} (> # INT:0)
+    §RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
 
-§F{f001:Transfer:pub}
-  §I{NonNegBalance:balance}
-  §I{PositiveAmount:amount}
-  §O{i32}
-  §Q (>= balance amount)                  // sufficient funds
+      §F{f001:Transfer:pub}
+        §I{NonNegBalance:balance}
+        §I{PositiveAmount:amount}
+        §O{i32}
+        §Q (>= balance amount)                  // sufficient funds
 
-  §B{newBalance:i32} (- balance amount)
-  §PROOF{p1:balance-safe} (>= newBalance INT:0)
+        §B{newBalance:i32} (- balance amount)
+        §PROOF{p1:balance-safe} (>= newBalance INT:0)
 
-  §R newBalance
-§/F{f001}
+        §R newBalance
 
-§/M{m001}
 ```
 
 ### Z3 Proves the Obligation
@@ -149,7 +144,6 @@ Remove the precondition:
   §PROOF{p1:balance-safe} (>= newBalance INT:0)
 
   §R newBalance
-§/F{f002}
 ```
 
 Z3 finds: `balance = 0, amount = 1 → newBalance = -1`. The obligation **fails** with a concrete counterexample. With the default policy, this is a compilation error.
@@ -171,21 +165,18 @@ An agent has written code with unconstrained parameters:
 ```
 §M{m001:Calculator}
 
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
+  §F{f001:Divide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (/ a b)
 
-§F{f002:IndexArray:pub}
-  §I{i32:index}
-  §I{i32:size}
-  §O{i32}
-  §R index
-§/F{f002}
+  §F{f002:IndexArray:pub}
+    §I{i32:index}
+    §I{i32:size}
+    §O{i32}
+    §R index
 
-§/M{m001}
 ```
 
 ### Step 1: Discover Missing Refinements
@@ -234,7 +225,7 @@ The agent applies the suggestions and calls `calor_obligations`:
 
 ```json
 {
-  "source": "§M{m001:Calculator}\n§F{f001:Divide:pub}\n  §I{i32:a}\n  §I{i32:b} | (!= # INT:0)\n  §O{i32}\n  §R (/ a b)\n§/F{f001}\n..."
+  "source": "§M{Calculator}\n§F{Divide:pub}\n  §I{i32:a}\n  §I{i32:b} | (!= # INT:0)\n  §O{i32}\n  §R (/ a b)\n..."
 }
 ```
 
@@ -405,17 +396,15 @@ When you access an indexed-typed array, the obligation engine generates an `Inde
 
 ```
 §M{m001:SafeAccess}
-§ITYPE{it1:SizedList:List:n}
+  §ITYPE{it1:SizedList:List:n}
 
-§F{f001:GetElement:priv}
-  §I{SizedList:items}
-  §I{i32:n}
-  §I{i32:i}
-  §O{i32}
-  §Q (&& (>= i INT:0) (< i n))    // precondition bounds the index
-  §R §IDX items i                   // Z3 proves: 0 <= i < n ✓
-§/F{f001}
-§/M{m001}
+    §F{f001:GetElement:priv}
+      §I{SizedList:items}
+      §I{i32:n}
+      §I{i32:i}
+      §O{i32}
+      §Q (&& (>= i INT:0) (< i n))    // precondition bounds the index
+      §R §IDX items i                   // Z3 proves: 0 <= i < n ✓
 ```
 
 The obligation engine:
@@ -435,7 +424,6 @@ Without a precondition, Z3 finds a counterexample:
   §I{i32:i}
   §O{i32}
   §R §IDX items i                   // FAILED: Counterexample: n=1, i=-1
-§/F{f002}
 ```
 
 ### Constrained Sizes

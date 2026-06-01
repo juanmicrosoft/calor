@@ -84,12 +84,10 @@ Geometric mean of all three ratios.
 **Calor:**
 ```
 §M{m001:Hello}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §P "Hello World"
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §P "Hello World"
 ```
 - Tokens: ~25
 - Lines: 7
@@ -114,18 +112,14 @@ class Program
 **Calor:**
 ```
 §M{m001:FizzBuzz}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §L{for1:i:1:100:1}
-    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-    §EI (== (% i 3) 0) → §P "Fizz"
-    §EI (== (% i 5) 0) → §P "Buzz"
-    §EL → §P i
-    §/I{if1}
-  §/L{for1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §L{for1:i:1:100:1}
+      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
+      §EI (== (% i 3) 0) → §P "Fizz"
+      §EI (== (% i 5) 0) → §P "Buzz"
+      §EL → §P i
 ```
 - Tokens: ~80
 - Lines: 13
@@ -156,7 +150,6 @@ for (int i = 1; i <= 100; i++)
   §Q (!= b 0)
   §S (>= result 0)
   §R (/ a b)
-§/F{f001}
 ```
 - Tokens: ~40
 - Lines: 8
@@ -198,7 +191,6 @@ public static int Divide(int a, int b)
 
 ```
 §M{m001:Name}    // Module requires tag + ID + name
-§/M{m001}        // Closing tag required
 
 // vs C#
 namespace Name   // Just keyword + name
@@ -217,8 +209,8 @@ namespace Name   // Just keyword + name
 Every structure requires explicit closing:
 ```
 §F{f001}...§/F{f001}
-§L{for1}...§/L{for1}
-§IF{if1}...§/I{if1}
+  §L{for1}...§/L{for1}
+    §IF{if1}...§/I{if1}
 ```
 
 ### 4. Contract Syntax

@@ -147,9 +147,8 @@ Calor uses **lexical scoping** with parent chain lookup. See `src/Calor.Compiler
 §IF{if1}
   §COND BOOL:true
   §THEN
-    §BIND{name=x}{type=INT} INT:2   // Shadows outer x
-    §PRINT §REF{name=x}              // Prints 2
-§/IF{if1}
+  §BIND{name=x}{type=INT} INT:2   // Shadows outer x
+  §PRINT §REF{name=x}              // Prints 2
 §PRINT §REF{name=x}                  // Prints 1 (outer x unchanged)
 ```
 
@@ -179,8 +178,7 @@ Return statements in nested scopes must correctly unwind to the function boundar
 §IF{if1}
   §COND BOOL:true
   §THEN
-    §R INT:42   // Returns from function, not just if block
-§/IF{if1}
+  §R INT:42   // Returns from function, not just if block
 ```
 
 **Test Reference:** `S6: ReturnFromNestedScope`
@@ -345,7 +343,6 @@ Effects track side-effect capabilities of functions.
   §O{string}
   §E{io=fs:r,ex=IOException}
   ...
-§/F{f001}
 ```
 
 ### 7.3 Effect Enforcement
@@ -366,9 +363,9 @@ Match expressions MUST be exhaustive. The compiler emits `Calor0500: NonExhausti
 
 ```calor
 §MATCH{m1} expr
-  §CASE pattern1 guard1 => body1
-  §CASE pattern2 => body2
-  §CASE _ => default
+§CASE pattern1 guard1 => body1
+§CASE pattern2 => body2
+§CASE _ => default
 §/MATCH{m1}
 ```
 
@@ -391,11 +388,11 @@ Patterns are tried in **declaration order**. First matching pattern wins.
 
 ```calor
 §TRY{try1}
-  body
+body
 §CATCH{ExceptionType:var}
-  handler
+handler
 §FINALLY
-  cleanup
+cleanup
 §/TRY{try1}
 ```
 

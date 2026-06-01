@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
 ### Documentation
 - New: `docs/cli/fix.md`.
 - Updated: `docs/syntax-reference/structure-tags.md`, `docs/syntax-reference/index.md`, `docs/ids.md`, `docs/cli/index.md` reflect the optional closing-tag ID and the new `calor fix` command.
+- **Phase 5 — Product docs migrated to indent-only syntax.** README, `docs/`, and `website/content/` now teach indent-form Calor as the canonical surface; closer-form (`§/F{id}`, `§/M{id}`, etc.) is mentioned only in legacy callouts that point at `calor fix` for migration. Touched 87 markdown/MDX files via `scripts/phase5_migrate_docs.py` (962 fenced code blocks scanned, 452 transformed, 46 MDX brace-corruption sites repaired) plus surgical hand-edits of prose sections (Quick Reference tables, Closing-Tag rows in control-flow / structure-tags, "Use closing tags" agent guidance in Claude / Codex / Gemini integration pages, Principles tables in philosophy docs). The 6 `tests/E2E/agent-tasks/fixtures/refactor-*-calor/CLAUDE.md` agent-prompt fixtures were also rewritten so the safe-refactoring benchmark teaches indent form when it next runs in CI.
+
+### Known scoring debt (follow-up after Phase 4)
+- The static heuristic metric calculators in `tests/Calor.Evaluation/Metrics/` (`ComprehensionCalculator`, `EditPrecisionCalculator`, `InformationDensityCalculator`, `RefactoringStabilityCalculator`) still reward closer-tag presence directly (e.g., `source.Contains("§/F{")` ⇒ +0.05). After Phase 4 subtractively removes closer-form support, these calculators (and their methodology / metric docs in `docs/benchmarking/` and `website/content/benchmarking/`) must be updated to score indent-form structure instead. The **agent-refactoring** benchmark is unaffected — it is pure compile-or-Z3 pass/fail and does not invoke the heuristic calculators.
 
 ## [0.5.0] - 2026-04-22
 

@@ -17,12 +17,10 @@ Here's the simplest Calor program:
 
 ```
 §M{m001:Hello}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §P "Hello from Calor!"
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §P "Hello from Calor!"
 ```
 
 ---
@@ -89,14 +87,13 @@ This declares that the function writes to console. If you forget this, the compi
 | `§P` | Print statement (alias for `Console.WriteLine`) |
 | `"Hello..."` | String literal to print |
 
-### Closing Tags
+### Block End (Dedent)
 
-```
-§/F{f001}
-§/M{m001}
-```
-
-Every `§F` must have a matching `§/F` with the same ID. Same for modules.
+The function body ends when the next line dedents back to module
+column (zero). Same for the module: it ends at end-of-file (or when
+another `§M{...}` starts a sibling module). **No `§/X` tags are
+required** — they're a legacy form of the language still accepted by
+the lexer for migration compatibility.
 
 ---
 
@@ -148,41 +145,35 @@ namespace Hello
 
 ```
 §M{m001:Greeter}
-§F{f001:Greet:pub}
-  §I{str:name}
-  §O{void}
-  §E{cw}
-  §P name
-§/F{f001}
-§/M{m001}
+  §F{f001:Greet:pub}
+    §I{str:name}
+    §O{void}
+    §E{cw}
+    §P name
 ```
 
 ### With Return Value
 
 ```
 §M{m001:Math}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 ```
 
 ### With Contracts
 
 ```
 §M{m001:SafeMath}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)           // Requires: b is not zero
-  §S (>= result 0)      // Ensures: result is non-negative (for positive inputs)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §Q (!= b 0)           // Requires: b is not zero
+    §S (>= result 0)      // Ensures: result is non-negative (for positive inputs)
+    §R (/ a b)
 ```
 
 ---
@@ -191,14 +182,14 @@ namespace Hello
 
 | Concept | Calor | C# Equivalent |
 |:--------|:-----|:--------------|
-| Module | `§M{id:Name}` | `namespace Name` |
-| Function | `§F{id:Name:vis}` | `public static void Name()` |
+| Module | `§M{Name}` | `namespace Name` |
+| Function | `§F{Name:vis}` | `public static void Name()` |
 | Input | `§I{type:name}` | Parameter |
 | Output | `§O{type}` | Return type |
 | Effects | `§E{codes}` | (No equivalent - implicit) |
 | Print | `§P expr` | `Console.WriteLine(expr)` |
 | Return | `§R expr` | `return expr` |
-| Close | `§/X{id}` | `}` |
+| Block end | _dedent_ | `}` |
 
 ---
 

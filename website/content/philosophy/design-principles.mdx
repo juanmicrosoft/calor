@@ -15,8 +15,8 @@ Calor is built on five core principles that guide every language design decision
 |:----------|:---------------|:--------------|
 | **Explicit over implicit** | Effects declared with `§E{cw,fs:r,net:rw}` | Know side effects without reading implementation |
 | **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
-| **Everything has an ID** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` | Precise references that survive refactoring |
-| **Unambiguous structure** | Matched tags `§F{}...§/F{}` | Parse without semantic analysis |
+| **Stable IDs when you want them** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` (IDs optional) | Precise references that survive refactoring |
+| **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | Lower edit cost; familiar from training data |
 | **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
 
 ---
@@ -37,7 +37,6 @@ Calor requires explicit effect declarations:
   §O{bool}
   §E{db:rw,net:rw}        // Explicit: database and network effects
   // ... implementation
-§/F{f001}
 ```
 
 **Agent benefit:** An agent can immediately filter functions by their effects without analyzing implementation details.
@@ -73,7 +72,6 @@ Preconditions and postconditions aren't comments or assertions buried in code - 
   §Q (>= a 0)              // Requires: a is non-negative
   §S (>= result 0)         // Ensures: result is non-negative
   §R (/ a b)
-§/F{f001}
 ```
 
 **Agent benefit:**
@@ -97,14 +95,10 @@ Every structural element has a unique identifier that persists across refactorin
 
 ```
 §M{m001:Calculator}           // Module ID: m001
-§F{f001:Add:pub}              // Function ID: f001
-  §L{for1:i:1:100:1}          // Loop ID: for1
-    §IF{if1} (> i 50)         // Conditional ID: if1
+  §F{f001:Add:pub}              // Function ID: f001
+    §L{for1:i:1:100:1}          // Loop ID: for1
+      §IF{if1} (> i 50)         // Conditional ID: if1
     // ...
-    §/I{if1}
-  §/L{for1}
-§/F{f001}
-§/M{m001}
 ```
 
 **Agent benefit:**
@@ -129,35 +123,31 @@ Short test IDs (`f001`, `m001`) are allowed only in `tests/`, `docs/`, and examp
 
 ---
 
-## 4. Unambiguous Structure
+## 4. Indent-Based Structure
 
-Every opening tag has a matching closing tag with the same ID:
+Blocks are delimited by **indentation** (Python-style). Each opening
+tag introduces a block whose body must indent further; the block ends
+at the next line that dedents back to the parent column.
 
 ```
-§M{m001:Example}
-  §F{f001:Main:pub}
-    §L{for1:i:1:10:1}
-      §IF{if1} (> i 5)
+§M{Example}
+  §F{Main:pub}
+    §L{i:1:10:1}
+      §IF (> i 5)
         // ...
-      §/I{if1}
-    §/L{for1}
-  §/F{f001}
-§/M{m001}
 ```
 
 **Agent benefit:**
-- No brace-counting ambiguity
-- Parse structure without understanding semantics
-- Easy to verify structural correctness
+- Familiar to any agent trained on Python; no closer tag to forget or mismatch
+- Lower edit cost (in our edit-workload studies, indent form reduced agent token cost by ~16% with no regression in correctness)
+- Structure is visually unambiguous
 
-### Closing Tag Rules
+### Legacy Closer Tags
 
-| Opening | Closing |
-|:--------|:--------|
-| `§M{id:name}` | `§/M{id}` |
-| `§F{id:name:vis}` | `§/F{id}` |
-| `§L{id:var:from:to:step}` | `§/L{id}` |
-| `§IF{id} condition` | `§/I{id}` |
+Pre-Phase-3 Calor used explicit closer tags such as `§/M{m001}` and
+`§/F{f001}`. These are **still accepted** by the lexer during the
+transition window but are no longer recommended. Bulk-migrate older
+sources with [`calor format`](/cli/format/).
 
 ---
 
@@ -192,7 +182,7 @@ a * b + c - d     // Wait, is this (a*b)+(c-d) or a*(b+c)-d?
 
 These principles reinforce each other:
 
-1. **IDs + Closing tags** = Unambiguous scope references
+1. **Stable IDs + Indentation** = Unambiguous scope references and refactoring-safe edits
 2. **Contracts + Explicit effects** = Complete behavioral specification
 3. **Lisp syntax + Contracts** = Symbolic verification possible
 4. **IDs + Contracts** = Traceable invariants across refactoring
