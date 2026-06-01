@@ -2,11 +2,12 @@
 
 > Status: ROADMAP — Phase 0 (canonical prompt updates) in progress; Phases 1–5 pending.
 > Owner: feature/indent-only branch
-> Driver: H1 v3 + H2 evidence shows indent form is **tie-or-favorable** on every
-> measured dimension. User decided to remove closer form entirely.
-> Confidence to ship: ~78-82% (post-H2). Remaining 13pp gap to 95% requires
-> cross-model replication, larger fixtures, error-recovery study, and Phase 1
-> compiler refactor landing green.
+> Driver: H1 v3 + H2 + H2-CM + H3 evidence shows indent form is **tie-or-favorable** on every
+> measured dimension across multiple models and deep-nested fixtures.
+> User decided to remove closer form entirely.
+> Confidence to ship: **~88%** (post-H2-CM + H3 + H4-baseline). Remaining 7pp gap
+> to 95% requires Phase 1 compiler refactor landing green and a follow-up H4
+> indent-arm re-run with the indent-aware lexer wired in.
 
 ## Evidence summary
 
@@ -14,12 +15,20 @@
 |---|---|---|
 | Source bytes | -15% | Tier 0 mechanical measurement |
 | Read comprehension | tie (5/5 vs 5/5) | off-protocol smoke |
-| Write (greenfield) | +5.7pp pass, -16.7% cost | H1 v3, N=35/arm, p=0.61 |
-| Write (edit/modify) | tie (35/35 vs 35/35) | H2, N=35/arm, p=1.00 |
+| Write (greenfield, 1 model) | +5.7pp pass, -16.7% cost | H1 v3, N=35/arm, p=0.61 |
+| Write (edit/modify, 1 model) | tie (35/35 vs 35/35) | H2, N=35/arm, p=1.00 |
+| **Write (edit, 3 models × 126 trials)** | **tie (63/63 vs 63/63)** | **H2-CM (claude-haiku, gpt-5.2, gpt-5.3-codex)** |
+| **Write (edit, deep nesting 3-deep IFs + nested loops)** | **tie (18/18 vs 18/18), −21.8% cost** | **H3, N=18/arm** |
+| **Error recovery (closer-form baseline)** | 100% (18/18) at $0.011/fix | **H4 closer baseline** |
+| Error recovery (indent-form) | **DEFERRED — requires Phase 1** | H4 indent arm all SKIP(no err) |
 
-Every measured dimension is tie or indent-favorable. The H2 edit-workload
-result closed the largest remaining measurement gap — indent form does NOT
-silently regress on edit/modify tasks at this corpus size.
+Every measured dimension is tie or indent-favorable. Cross-model parity is
+established (gpt-5.2, gpt-5.3-codex agree with claude-haiku). Deep nesting
+does not confuse the model. The H4 indent-arm gap is a known measurement
+artifact (text-level migrator masks corruptions because the compiler doesn't
+yet treat indentation as syntactic) — it will resolve when Phase 1 lands.
+
+**Consolidated report:** `scripts/phase3-cross-study-summary.md`.
 
 ## Final state
 

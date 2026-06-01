@@ -1,0 +1,151 @@
+Phase 3 H2 CROSS-MODEL — edit-workload replication across 3 models
+  Models: ['claude-haiku-4-5', 'gpt-5.2', 'gpt-5.3-codex']
+  Tasks:  7  Arms: 2  Trials/cell: 3
+  Total invocations: 126
+  Budget cap: $8.00
+
+
+=== MODEL: claude-haiku-4-5 ===
+  edit-sig-001      closer  1/3 ... PASS  $0.0375  9.1s
+  edit-sig-001      closer  2/3 ... PASS  $0.0067  8.4s
+  edit-sig-001      closer  3/3 ... PASS  $0.0065  7.8s
+  edit-sig-001      indent  1/3 ... PASS  $0.0096  7.4s
+  edit-sig-001      indent  2/3 ... PASS  $0.0063  7.9s
+  edit-sig-001      indent  3/3 ... PASS  $0.0061  7.9s
+  edit-body-001     closer  1/3 ... PASS  $0.0098  9.1s
+  edit-body-001     closer  2/3 ... PASS  $0.0096  5.3s
+  edit-body-001     closer  3/3 ... PASS  $0.0073  9.3s
+  edit-body-001     indent  1/3 ... PASS  $0.0092  9.8s
+  edit-body-001     indent  2/3 ... PASS  $0.0068  8.1s
+  edit-body-001     indent  3/3 ... PASS  $0.0086  9.8s
+  edit-pre-001      closer  1/3 ... PASS  $0.0097  9.2s
+  edit-pre-001      closer  2/3 ... PASS  $0.0074  13.3s
+  edit-pre-001      closer  3/3 ... PASS  $0.0075  10.3s
+  edit-pre-001      indent  1/3 ... PASS  $0.0097  9.5s
+  edit-pre-001      indent  2/3 ... PASS  $0.0091  11.3s
+  edit-pre-001      indent  3/3 ... PASS  $0.0069  9.4s
+  edit-post-001     closer  1/3 ... PASS  $0.0093  7.7s
+  edit-post-001     closer  2/3 ... PASS  $0.0094  5.5s
+  edit-post-001     closer  3/3 ... PASS  $0.0068  5.1s
+  edit-post-001     indent  1/3 ... PASS  $0.0094  10.0s
+  edit-post-001     indent  2/3 ... PASS  $0.0080  10.3s
+  edit-post-001     indent  3/3 ... PASS  $0.0079  10.8s
+  edit-type-001     closer  1/3 ... PASS  $0.0090  8.0s
+  edit-type-001     closer  2/3 ... PASS  $0.0064  8.1s
+  edit-type-001     closer  3/3 ... PASS  $0.0089  4.6s
+  edit-type-001     indent  1/3 ... PASS  $0.0084  8.1s
+  edit-type-001     indent  2/3 ... PASS  $0.0060  6.9s
+  edit-type-001     indent  3/3 ... PASS  $0.0063  9.0s
+  edit-chain-001    closer  1/3 ... PASS  $0.0091  8.8s
+  edit-chain-001    closer  2/3 ... PASS  $0.0091  8.6s
+  edit-chain-001    closer  3/3 ... PASS  $0.0096  10.2s
+  edit-chain-001    indent  1/3 ... PASS  $0.0100  6.6s
+  edit-chain-001    indent  2/3 ... PASS  $0.0089  7.6s
+  edit-chain-001    indent  3/3 ... PASS  $0.0063  8.0s
+  edit-del-001      closer  1/3 ... PASS  $0.0084  7.7s
+  edit-del-001      closer  2/3 ... PASS  $0.0062  8.1s
+  edit-del-001      closer  3/3 ... PASS  $0.0082  7.7s
+  edit-del-001      indent  1/3 ... PASS  $0.0091  11.8s
+  edit-del-001      indent  2/3 ... PASS  $0.0093  8.2s
+  edit-del-001      indent  3/3 ... PASS  $0.0071  9.0s
+
+=== MODEL: gpt-5.2 ===
+  edit-sig-001      closer  1/3 ... PASS  $0.0033  12.2s
+  edit-sig-001      closer  2/3 ... PASS  $0.0033  13.2s
+  edit-sig-001      closer  3/3 ... PASS  $0.0033  11.6s
+  edit-sig-001      indent  1/3 ... PASS  $0.0033  10.3s
+  edit-sig-001      indent  2/3 ... PASS  $0.0033  11.5s
+  edit-sig-001      indent  3/3 ... PASS  $0.0033  11.5s
+  edit-body-001     closer  1/3 ... PASS  $0.0033  10.7s
+  edit-body-001     closer  2/3 ... PASS  $0.0033  13.8s
+  edit-body-001     closer  3/3 ... PASS  $0.0033  11.6s
+  edit-body-001     indent  1/3 ... PASS  $0.0033  10.7s
+  edit-body-001     indent  2/3 ... PASS  $0.0033  10.9s
+  edit-body-001     indent  3/3 ... PASS  $0.0033  10.7s
+  edit-pre-001      closer  1/3 ... PASS  $0.0033  12.0s
+  edit-pre-001      closer  2/3 ... PASS  $0.0033  11.8s
+  edit-pre-001      closer  3/3 ... PASS  $0.0033  12.6s
+  edit-pre-001      indent  1/3 ... PASS  $0.0033  14.1s
+  edit-pre-001      indent  2/3 ... PASS  $0.0033  24.5s
+  edit-pre-001      indent  3/3 ... PASS  $0.0033  12.9s
+  edit-post-001     closer  1/3 ... PASS  $0.0033  13.0s
+  edit-post-001     closer  2/3 ... PASS  $0.0033  12.9s
+  edit-post-001     closer  3/3 ... PASS  $0.0033  15.1s
+  edit-post-001     indent  1/3 ... PASS  $0.0033  11.8s
+  edit-post-001     indent  2/3 ... PASS  $0.0033  10.8s
+  edit-post-001     indent  3/3 ... PASS  $0.0033  11.2s
+  edit-type-001     closer  1/3 ... PASS  $0.0033  11.1s
+  edit-type-001     closer  2/3 ... PASS  $0.0033  11.5s
+  edit-type-001     closer  3/3 ... PASS  $0.0033  10.3s
+  edit-type-001     indent  1/3 ... PASS  $0.0033  11.9s
+  edit-type-001     indent  2/3 ... PASS  $0.0033  11.6s
+  edit-type-001     indent  3/3 ... PASS  $0.0033  10.5s
+  edit-chain-001    closer  1/3 ... PASS  $0.0033  12.3s
+  edit-chain-001    closer  2/3 ... PASS  $0.0033  10.5s
+  edit-chain-001    closer  3/3 ... PASS  $0.0033  12.1s
+  edit-chain-001    indent  1/3 ... PASS  $0.0033  9.6s
+  edit-chain-001    indent  2/3 ... PASS  $0.0033  9.8s
+  edit-chain-001    indent  3/3 ... PASS  $0.0033  10.7s
+  edit-del-001      closer  1/3 ... PASS  $0.0033  11.0s
+  edit-del-001      closer  2/3 ... PASS  $0.0033  9.7s
+  edit-del-001      closer  3/3 ... PASS  $0.0033  13.4s
+  edit-del-001      indent  1/3 ... PASS  $0.0033  16.8s
+  edit-del-001      indent  2/3 ... PASS  $0.0033  11.1s
+  edit-del-001      indent  3/3 ... PASS  $0.0033  9.9s
+
+=== MODEL: gpt-5.3-codex ===
+  edit-sig-001      closer  1/3 ... PASS  $0.0033  11.3s
+  edit-sig-001      closer  2/3 ... PASS  $0.0033  10.7s
+  edit-sig-001      closer  3/3 ... PASS  $0.0033  11.4s
+  edit-sig-001      indent  1/3 ... PASS  $0.0033  10.7s
+  edit-sig-001      indent  2/3 ... PASS  $0.0033  11.6s
+  edit-sig-001      indent  3/3 ... PASS  $0.0033  11.5s
+  edit-body-001     closer  1/3 ... PASS  $0.0033  11.7s
+  edit-body-001     closer  2/3 ... PASS  $0.0033  12.0s
+  edit-body-001     closer  3/3 ... PASS  $0.0033  15.2s
+  edit-body-001     indent  1/3 ... PASS  $0.0033  10.2s
+  edit-body-001     indent  2/3 ... PASS  $0.0033  10.4s
+  edit-body-001     indent  3/3 ... PASS  $0.0033  12.2s
+  edit-pre-001      closer  1/3 ... PASS  $0.0033  12.6s
+  edit-pre-001      closer  2/3 ... PASS  $0.0033  12.3s
+  edit-pre-001      closer  3/3 ... PASS  $0.0033  13.3s
+  edit-pre-001      indent  1/3 ... PASS  $0.0033  10.7s
+  edit-pre-001      indent  2/3 ... PASS  $0.0033  10.3s
+  edit-pre-001      indent  3/3 ... PASS  $0.0033  11.5s
+  edit-post-001     closer  1/3 ... PASS  $0.0033  13.8s
+  edit-post-001     closer  2/3 ... PASS  $0.0033  12.7s
+  edit-post-001     closer  3/3 ... PASS  $0.0033  11.3s
+  edit-post-001     indent  1/3 ... PASS  $0.0033  12.0s
+  edit-post-001     indent  2/3 ... PASS  $0.0033  15.6s
+  edit-post-001     indent  3/3 ... PASS  $0.0033  14.0s
+  edit-type-001     closer  1/3 ... PASS  $0.0033  11.2s
+  edit-type-001     closer  2/3 ... PASS  $0.0033  12.4s
+  edit-type-001     closer  3/3 ... PASS  $0.0033  11.4s
+  edit-type-001     indent  1/3 ... PASS  $0.0033  9.7s
+  edit-type-001     indent  2/3 ... PASS  $0.0033  10.8s
+  edit-type-001     indent  3/3 ... PASS  $0.0033  11.3s
+  edit-chain-001    closer  1/3 ... PASS  $0.0033  11.5s
+  edit-chain-001    closer  2/3 ... PASS  $0.0033  11.8s
+  edit-chain-001    closer  3/3 ... PASS  $0.0033  11.6s
+  edit-chain-001    indent  1/3 ... PASS  $0.0033  11.3s
+  edit-chain-001    indent  2/3 ... PASS  $0.0033  12.1s
+  edit-chain-001    indent  3/3 ... PASS  $0.0033  10.3s
+  edit-del-001      closer  1/3 ... PASS  $0.0033  9.8s
+  edit-del-001      closer  2/3 ... PASS  $0.0033  10.7s
+  edit-del-001      closer  3/3 ... PASS  $0.0033  11.3s
+  edit-del-001      indent  1/3 ... PASS  $0.0033  10.0s
+  edit-del-001      indent  2/3 ... PASS  $0.0033  9.9s
+  edit-del-001      indent  3/3 ... PASS  $0.0033  11.6s
+
+--- AGGREGATE BY MODEL ---
+  claude-haiku-4-5      closer 21/21 (100%)  indent 21/21 (100%)  Δ=+0.0pp  Δ$=-16.6%  p=1.000
+  gpt-5.2               closer 21/21 (100%)  indent 21/21 (100%)  Δ=+0.0pp  Δ$=+0.0%  p=1.000
+  gpt-5.3-codex         closer 21/21 (100%)  indent 21/21 (100%)  Δ=+0.0pp  Δ$=+0.0%  p=1.000
+
+--- AGGREGATE ACROSS MODELS ---
+  closer: 63/63  (100.0%)  $0.341
+  indent: 63/63  (100.0%)  $0.307
+  Δ pass: +0.0pp   Fisher p=1.0000
+
+Total cost: $0.649
+Raw: C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\scripts\phase3-h2-crossmodel-results.json
