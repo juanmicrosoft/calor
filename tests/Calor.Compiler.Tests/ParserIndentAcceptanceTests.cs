@@ -127,4 +127,54 @@ public class ParserIndentAcceptanceTests
         Assert.Equal("Test", module.Name);
         Assert.Single(module.Functions);
     }
+
+    [Fact]
+    public void IndentMode_FullPipelineToCSharp_Emits()
+    {
+        // E2E pipeline test: Lexer (indent mode) → Parser → CSharpEmitter.
+        // Validates that indent-form source flows all the way through the
+        // compiler to a runnable C# string, with no explicit closers.
+        var src = "§M{m1:Mathy}\n" +
+                  "  §F{f1:Add:pub}\n" +
+                  "    §I{i32:a}\n" +
+                  "    §I{i32:b}\n" +
+                  "    §O{i32}\n" +
+                  "    §R (+ a b)\n";
+
+        var module = ParseIndentForm(src, out var diag);
+        Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
+
+        var emitter = new Calor.Compiler.CodeGen.CSharpEmitter();
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("Add", csharp);
+        Assert.Contains("int", csharp);
+        Assert.Contains("a + b", csharp);
+    }
+
+    [Fact]
+    public void IndentMode_FullPipelineWithIfChain_Emits()
+    {
+        // E2E pipeline test on indent-form code with an §IF/§EI/§EL chain.
+        var src = "§M{m1:Sign}\n" +
+                  "  §F{f1:Of:pub}\n" +
+                  "    §I{i32:n}\n" +
+                  "    §O{i32}\n" +
+                  "    §IF{i1} (> n 0)\n" +
+                  "      §R 1\n" +
+                  "    §EI (< n 0)\n" +
+                  "      §R -1\n" +
+                  "    §EL\n" +
+                  "      §R 0\n";
+
+        var module = ParseIndentForm(src, out var diag);
+        Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
+
+        var emitter = new Calor.Compiler.CodeGen.CSharpEmitter();
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("Of", csharp);
+        Assert.Contains("if", csharp);
+        Assert.Contains("else", csharp);
+    }
 }
