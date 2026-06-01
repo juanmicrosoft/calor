@@ -498,6 +498,15 @@ public sealed class Lexer
                     yield return new Token(TokenKind.Dedent, "",
                         new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
                 }
+                // Phase 3 (indent-aware): always emit one final implicit
+                // Dedent at EOF. This lets the outermost block (typically
+                // §M{...}) terminate naturally in indent form without
+                // requiring an explicit §/M. Closer-form code parsed via
+                // TokenizeWithIndent will have already consumed its §/M
+                // before this token; the trailing Dedent is harmless because
+                // Parse() does not inspect tokens after ParseModule returns.
+                yield return new Token(TokenKind.Dedent, "",
+                    new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
                 yield return tok;
                 yield break;
             }

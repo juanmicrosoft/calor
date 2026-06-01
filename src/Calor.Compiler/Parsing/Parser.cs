@@ -53,6 +53,28 @@ public sealed class Parser
         return false;
     }
 
+    /// <summary>
+    /// Phase 3 (indent-aware) — if the current token is a Dedent followed by
+    /// one of the given continuation tokens (e.g. ElseIf, Else, Catch,
+    /// Finally), consume the Dedent. This lets a block-body loop end on
+    /// Dedent without leaving it dangling for the chain continuation check.
+    /// </summary>
+    private void ConsumeDedentBeforeChain(params TokenKind[] continuations)
+    {
+        if (Check(TokenKind.Dedent))
+        {
+            var next = Peek(1).Kind;
+            foreach (var k in continuations)
+            {
+                if (k == next)
+                {
+                    Advance();
+                    return;
+                }
+            }
+        }
+    }
+
     private Token Expect(TokenKind kind)
     {
         if (Check(kind))
@@ -62,6 +84,48 @@ public sealed class Parser
 
         _diagnostics.ReportUnexpectedToken(Current.Span, kind, Current.Kind);
         return new Token(kind, "", Current.Span);
+    }
+
+    /// <summary>
+    /// Phase 3 (indent-aware) — returns true if the current token is a block
+    /// terminator: either the explicit closer (e.g. EndFunc) or a Dedent
+    /// emitted by the indent-aware lexer.
+    ///
+    /// When the lexer is in closer-only mode (Tokenize), Dedent never appears
+    /// and this reduces to Check(explicitCloser). When the lexer is in
+    /// indent-aware mode (TokenizeWithIndent), this accepts either form.
+    /// </summary>
+    private bool IsBlockEnd(TokenKind explicitCloser)
+        => Check(explicitCloser) || Check(TokenKind.Dedent);
+
+    /// <summary>
+    /// Phase 3 (indent-aware) — overload accepting two alternative closers
+    /// (used for sites like §F/§AF that share a body parser).
+    /// </summary>
+    private bool IsBlockEnd(TokenKind closer1, TokenKind closer2)
+        => Check(closer1) || Check(closer2) || Check(TokenKind.Dedent);
+
+    /// <summary>
+    /// Phase 3 (indent-aware) — consumes the block-end marker and returns
+    /// the consumed token (for AST span end calculation).
+    ///
+    /// If the current token is Dedent, consume it. If an explicit closer
+    /// immediately follows the Dedent (closer-form code in indent-aware
+    /// mode), consume that too and return it (so span info is preserved).
+    /// Otherwise (no Dedent), fall back to Expect(explicitCloser).
+    /// </summary>
+    private Token ExpectBlockEnd(TokenKind explicitCloser)
+    {
+        if (Check(TokenKind.Dedent))
+        {
+            var dedent = Advance();
+            if (Check(explicitCloser))
+            {
+                return Advance();
+            }
+            return dedent;
+        }
+        return Expect(explicitCloser);
     }
 
     public ModuleNode Parse()
@@ -117,7 +181,7 @@ public sealed class Parser
         var indexedTypes = new List<IndexedTypeNode>();
         var typePreprocessorBlocks = new List<TypePreprocessorBlockNode>();
 
-        while (!IsAtEnd && !Check(TokenKind.EndModule))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndModule))
         {
             if (Check(TokenKind.Using))
             {
@@ -209,7 +273,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndModule);
+        var endToken = ExpectBlockEnd(TokenKind.EndModule);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndModuleAttributes(endAttrs);
 
@@ -335,7 +399,7 @@ public sealed class Parser
         TaskRefNode? taskRef = null;
 
         // Parse optional sections before BODY
-        while (!IsAtEnd && !Check(TokenKind.Body) && !Check(TokenKind.EndFunc))
+        while (!IsAtEnd && !Check(TokenKind.Body) && !IsBlockEnd(TokenKind.EndFunc))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -439,13 +503,13 @@ public sealed class Parser
             // Explicit §BODY ... §END_BODY
             body = ParseBody();
         }
-        else if (!Check(TokenKind.EndFunc))
+        else if (!IsBlockEnd(TokenKind.EndFunc))
         {
             // Implicit body - parse statements until §/F
             body = ParseImplicitBody();
         }
 
-        var endToken = Expect(TokenKind.EndFunc);
+        var endToken = ExpectBlockEnd(TokenKind.EndFunc);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
@@ -526,7 +590,7 @@ public sealed class Parser
         TaskRefNode? taskRef = null;
 
         // Parse optional sections before BODY
-        while (!IsAtEnd && !Check(TokenKind.Body) && !Check(TokenKind.EndAsyncFunc))
+        while (!IsAtEnd && !Check(TokenKind.Body) && !IsBlockEnd(TokenKind.EndAsyncFunc))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -627,12 +691,12 @@ public sealed class Parser
         {
             body = ParseBody();
         }
-        else if (!Check(TokenKind.EndAsyncFunc))
+        else if (!IsBlockEnd(TokenKind.EndAsyncFunc))
         {
             body = ParseImplicitBody();
         }
 
-        var endToken = Expect(TokenKind.EndAsyncFunc);
+        var endToken = ExpectBlockEnd(TokenKind.EndAsyncFunc);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
@@ -890,7 +954,7 @@ public sealed class Parser
 
         var statements = new List<StatementNode>();
 
-        while (!IsAtEnd && !Check(TokenKind.EndBody))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndBody))
         {
             var statement = ParseStatement();
             if (statement != null)
@@ -899,7 +963,7 @@ public sealed class Parser
             }
         }
 
-        Expect(TokenKind.EndBody);
+        ExpectBlockEnd(TokenKind.EndBody);
 
         return statements;
     }
@@ -911,7 +975,7 @@ public sealed class Parser
     {
         var statements = new List<StatementNode>();
 
-        while (!IsAtEnd && !Check(TokenKind.EndFunc) && !Check(TokenKind.EndAsyncFunc))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndFunc) && !IsBlockEnd(TokenKind.EndAsyncFunc))
         {
             var statement = ParseStatement();
             if (statement != null)
@@ -1156,7 +1220,7 @@ public sealed class Parser
 
         // Standard format with explicit §A and §/C
         var argumentNames = new List<string?>();
-        while (!IsAtEnd && !Check(TokenKind.EndCall))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
         {
             if (Check(TokenKind.Arg))
             {
@@ -1169,7 +1233,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndCall);
+        var endToken = ExpectBlockEnd(TokenKind.EndCall);
         var span2 = startToken.Span.Union(endToken.Span);
 
         // Only pass argument names if any are non-null
@@ -1207,8 +1271,8 @@ public sealed class Parser
         try
         {
             // Handle empty arguments: §A followed immediately by a closing tag
-            if (Check(TokenKind.EndCall) || Check(TokenKind.EndNew) || Check(TokenKind.EndList)
-                || Check(TokenKind.EndThis) || Check(TokenKind.EndBase) || Check(TokenKind.EndBaseCall)
+            if (IsBlockEnd(TokenKind.EndCall) || IsBlockEnd(TokenKind.EndNew) || IsBlockEnd(TokenKind.EndList)
+                || IsBlockEnd(TokenKind.EndThis) || IsBlockEnd(TokenKind.EndBase) || IsBlockEnd(TokenKind.EndBaseCall)
                 || Check(TokenKind.Arg) || IsAtEnd)
             {
                 return new ReferenceNode(Current.Span, "null");
@@ -3210,7 +3274,7 @@ public sealed class Parser
         var target = ParseExpression();
         var cases = ParseMatchCases();
 
-        var endToken = Expect(TokenKind.EndMatch);
+        var endToken = ExpectBlockEnd(TokenKind.EndMatch);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
@@ -3241,7 +3305,7 @@ public sealed class Parser
         var target = ParseExpression();
         var cases = ParseMatchCases();
 
-        var endToken = Expect(TokenKind.EndMatch);
+        var endToken = ExpectBlockEnd(TokenKind.EndMatch);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
@@ -3294,12 +3358,12 @@ public sealed class Parser
                 // inline lambdas appear directly after the pattern.
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
-                if (Check(TokenKind.EndCase)) Advance();
+                if (IsBlockEnd(TokenKind.EndCase)) Advance();
             }
             else
             {
                 // Block syntax - parse statements until closing tag or next case
-                while (!IsAtEnd && !Check(TokenKind.Case) && !Check(TokenKind.EndMatch) && !Check(TokenKind.EndCase))
+                while (!IsAtEnd && !Check(TokenKind.Case) && !IsBlockEnd(TokenKind.EndMatch) && !IsBlockEnd(TokenKind.EndCase))
                 {
                     var stmt = ParseStatement();
                     if (stmt != null)
@@ -3309,7 +3373,7 @@ public sealed class Parser
                 }
 
                 // Consume optional §/K closing tag
-                if (Check(TokenKind.EndCase))
+                if (IsBlockEnd(TokenKind.EndCase))
                 {
                     Advance();
                 }
@@ -3774,7 +3838,7 @@ public sealed class Parser
         // Parse body statements
         var body = ParseStatementBlock(TokenKind.EndFor);
 
-        var endToken = Expect(TokenKind.EndFor);
+        var endToken = ExpectBlockEnd(TokenKind.EndFor);
         var endAttrs = ParseAttributes();
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
@@ -3825,7 +3889,7 @@ public sealed class Parser
         // Parse body statements
         var body = ParseStatementBlock(TokenKind.EndWhile);
 
-        var endToken = Expect(TokenKind.EndWhile);
+        var endToken = ExpectBlockEnd(TokenKind.EndWhile);
         var endAttrs = ParseAttributes();
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
@@ -3854,7 +3918,7 @@ public sealed class Parser
         // Parse body statements
         var body = ParseStatementBlock(TokenKind.EndDo);
 
-        var endToken = Expect(TokenKind.EndDo);
+        var endToken = ExpectBlockEnd(TokenKind.EndDo);
         var endAttrs = ParseAttributes();
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
@@ -3916,9 +3980,9 @@ public sealed class Parser
 
         // Expect closing §/I{id}
         var endSpan = elseExpr.Span;
-        if (Check(TokenKind.EndIf))
+        if (IsBlockEnd(TokenKind.EndIf))
         {
-            var endToken = Expect(TokenKind.EndIf);
+            var endToken = ExpectBlockEnd(TokenKind.EndIf);
             var endAttrs = ParseAttributes();
             endSpan = endToken.Span;
         }
@@ -3976,7 +4040,7 @@ public sealed class Parser
                 else
                 {
                     // Multi-statement body (until next clause or end)
-                    while (!IsAtEnd && !Check(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+                    while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
                     {
                         var stmt = ParseStatement();
                         if (stmt != null)
@@ -4006,7 +4070,7 @@ public sealed class Parser
                 }
                 else
                 {
-                    while (!IsAtEnd && !Check(TokenKind.EndIf))
+                    while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf))
                     {
                         var stmt = ParseStatement();
                         if (stmt != null)
@@ -4017,7 +4081,7 @@ public sealed class Parser
                 }
             }
 
-            var endToken = Expect(TokenKind.EndIf);
+            var endToken = ExpectBlockEnd(TokenKind.EndIf);
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
@@ -4031,7 +4095,7 @@ public sealed class Parser
         }
 
         // Standard multi-statement body
-        while (!IsAtEnd && !Check(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -4040,6 +4104,10 @@ public sealed class Parser
             }
         }
 
+        // Phase 3 (indent-aware): if the body ended on a Dedent and a chain
+        // continuation (§EI/§EL) follows, consume the Dedent.
+        ConsumeDedentBeforeChain(TokenKind.ElseIf, TokenKind.Else);
+
         // Parse ELSEIF clauses
         while (Check(TokenKind.ElseIf))
         {
@@ -4047,7 +4115,7 @@ public sealed class Parser
             var elseIfCondition = ParseExpression();
             var elseIfBody = new List<StatementNode>();
 
-            while (!IsAtEnd && !Check(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
             {
                 var stmt = ParseStatement();
                 if (stmt != null)
@@ -4055,6 +4123,9 @@ public sealed class Parser
                     elseIfBody.Add(stmt);
                 }
             }
+
+            // Phase 3 (indent-aware): consume dangling Dedent before next §EI/§EL.
+            ConsumeDedentBeforeChain(TokenKind.ElseIf, TokenKind.Else);
 
             elseIfClauses.Add(new ElseIfClauseNode(elseIfToken.Span, elseIfCondition, elseIfBody));
         }
@@ -4065,7 +4136,7 @@ public sealed class Parser
             Expect(TokenKind.Else);
             elseBody = new List<StatementNode>();
 
-            while (!IsAtEnd && !Check(TokenKind.EndIf))
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf))
             {
                 var stmt = ParseStatement();
                 if (stmt != null)
@@ -4075,12 +4146,12 @@ public sealed class Parser
             }
         }
 
-        var endToken2 = Expect(TokenKind.EndIf);
+        var endToken2 = ExpectBlockEnd(TokenKind.EndIf);
         var endAttrs2 = ParseAttributes();
         // Positional: [id]
         var endId2 = endAttrs2["_pos0"] ?? endAttrs2["id"] ?? "";
 
-        if (endId2 != id)
+        if (ShouldReportMismatchedId(endId2, id, endToken2))
         {
             _diagnostics.ReportMismatchedIdWithFix(endToken2.Span, "IF", id, "END_IF", endId2);
         }
@@ -4171,7 +4242,7 @@ public sealed class Parser
                 if (parenDepth == 0 && (Check(TokenKind.Bind) || Check(TokenKind.Assign)
                     || Check(TokenKind.For) || Check(TokenKind.Foreach)
                     || Check(TokenKind.While) || Check(TokenKind.Throw)
-                    || Check(TokenKind.Return) || Check(TokenKind.EndIf)))
+                    || Check(TokenKind.Return) || IsBlockEnd(TokenKind.EndIf)))
                     return false;
                 if (Check(TokenKind.OpenParen)) parenDepth++;
                 else if (Check(TokenKind.CloseParen)) { if (parenDepth > 0) parenDepth--; }
@@ -4189,7 +4260,7 @@ public sealed class Parser
     {
         var statements = new List<StatementNode>();
 
-        while (!IsAtEnd && !terminators.Any(Check))
+        while (!IsAtEnd && !terminators.Any(Check) && !Check(TokenKind.Dedent))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -5440,7 +5511,7 @@ public sealed class Parser
         {
             // No size in attributes - parse as initialized array (like §LIST)
             // Support both bare expressions and §A-prefixed elements
-            while (!IsAtEnd && !Check(TokenKind.EndArray))
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndArray))
             {
                 if (Check(TokenKind.Arg))
                 {
@@ -5460,7 +5531,7 @@ public sealed class Parser
 
             // If only one element and no end tag coming, it might be a size expression
             // e.g., §ARR{id:type} 10 (no §/ARR) → treat 10 as size, not initializer
-            if (initializer.Count == 1 && !Check(TokenKind.EndArray))
+            if (initializer.Count == 1 && !IsBlockEnd(TokenKind.EndArray))
             {
                 size = initializer[0];
                 initializer.Clear();
@@ -5469,9 +5540,9 @@ public sealed class Parser
 
         var endSpan = startToken.Span;
         // Check for optional end tag (required for initialized arrays)
-        if (Check(TokenKind.EndArray))
+        if (IsBlockEnd(TokenKind.EndArray))
         {
-            var endToken = Expect(TokenKind.EndArray);
+            var endToken = ExpectBlockEnd(TokenKind.EndArray);
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? "";
 
@@ -5545,9 +5616,9 @@ public sealed class Parser
         // If next token is a closing tag (§/LAM, §/C, §B, §EL, etc.), the "target" was actually
         // the index — the converter dropped the real target. Swap and use placeholder.
         ExpressionNode index;
-        if (Check(TokenKind.EndLambda) || Check(TokenKind.EndCall) || Check(TokenKind.EndNew)
+        if (IsBlockEnd(TokenKind.EndLambda) || IsBlockEnd(TokenKind.EndCall) || IsBlockEnd(TokenKind.EndNew)
             || Check(TokenKind.Bind) || Check(TokenKind.Assign) || Check(TokenKind.Else)
-            || Check(TokenKind.EndIf) || IsAtEnd)
+            || IsBlockEnd(TokenKind.EndIf) || IsAtEnd)
         {
             index = array;
             array = new ReferenceNode(startToken.Span, "_");
@@ -5603,7 +5674,7 @@ public sealed class Parser
         // Parse body statements
         var body = ParseStatementBlock(TokenKind.EndForeach);
 
-        var endToken = Expect(TokenKind.EndForeach);
+        var endToken = ExpectBlockEnd(TokenKind.EndForeach);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -5642,12 +5713,12 @@ public sealed class Parser
         var elements = new List<ExpressionNode>();
 
         // Parse elements until §/LIST
-        while (!IsAtEnd && !Check(TokenKind.EndList) && IsExpressionStart())
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndList) && IsExpressionStart())
         {
             elements.Add(ParseExpression());
         }
 
-        var endToken = Expect(TokenKind.EndList);
+        var endToken = ExpectBlockEnd(TokenKind.EndList);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -5717,12 +5788,12 @@ public sealed class Parser
         var entries = new List<KeyValuePairNode>();
 
         // Parse key-value pairs until §/DICT
-        while (!IsAtEnd && !Check(TokenKind.EndDict) && Check(TokenKind.KeyValue))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndDict) && Check(TokenKind.KeyValue))
         {
             entries.Add(ParseKeyValuePair());
         }
 
-        var endToken = Expect(TokenKind.EndDict);
+        var endToken = ExpectBlockEnd(TokenKind.EndDict);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -5787,7 +5858,7 @@ public sealed class Parser
         var elements = new List<ExpressionNode>();
 
         // Parse elements until §/HSET. Allow §B bindings (hoisted temp vars from converter).
-        while (!IsAtEnd && !Check(TokenKind.EndHashSet) && (IsExpressionStart() || Check(TokenKind.Bind)))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndHashSet) && (IsExpressionStart() || Check(TokenKind.Bind)))
         {
             if (Check(TokenKind.Bind))
             {
@@ -5800,7 +5871,7 @@ public sealed class Parser
             elements.Add(ParseExpression());
         }
 
-        var endToken = Expect(TokenKind.EndHashSet);
+        var endToken = ExpectBlockEnd(TokenKind.EndHashSet);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -6046,7 +6117,7 @@ public sealed class Parser
         // Parse body statements
         var body = ParseStatementBlock(TokenKind.EndEachKV);
 
-        var endToken = Expect(TokenKind.EndEachKV);
+        var endToken = ExpectBlockEnd(TokenKind.EndEachKV);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -6535,7 +6606,7 @@ public sealed class Parser
         var properties = new List<PropertyNode>();
         var indexers = new List<IndexerNode>();
 
-        while (!IsAtEnd && !Check(TokenKind.EndInterface))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndInterface))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -6574,7 +6645,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndInterface);
+        var endToken = ExpectBlockEnd(TokenKind.EndInterface);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -6627,7 +6698,7 @@ public sealed class Parser
         var postconditions = new List<EnsuresNode>();
 
         // Parse signature elements until END_METHOD
-        while (!IsAtEnd && !Check(TokenKind.EndMethod))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndMethod))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -6663,7 +6734,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndMethod);
+        var endToken = ExpectBlockEnd(TokenKind.EndMethod);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -6829,7 +6900,7 @@ public sealed class Parser
         var nestedEnums = new List<EnumDefinitionNode>();
         var nestedDelegates = new List<DelegateDefinitionNode>();
 
-        while (!IsAtEnd && !Check(TokenKind.EndClass))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndClass))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -6923,7 +6994,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndClass);
+        var endToken = ExpectBlockEnd(TokenKind.EndClass);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -7070,7 +7141,7 @@ public sealed class Parser
         var body = new List<StatementNode>();
 
         // Parse signature and body until END_METHOD
-        while (!IsAtEnd && !Check(TokenKind.EndMethod))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndMethod))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -7111,7 +7182,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndMethod);
+        var endToken = ExpectBlockEnd(TokenKind.EndMethod);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -7200,7 +7271,7 @@ public sealed class Parser
         var body = new List<StatementNode>();
 
         // Parse signature and body until END_AMT
-        while (!IsAtEnd && !Check(TokenKind.EndAsyncMethod))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndAsyncMethod))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -7241,7 +7312,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndAsyncMethod);
+        var endToken = ExpectBlockEnd(TokenKind.EndAsyncMethod);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -7396,7 +7467,7 @@ public sealed class Parser
             var value = ParseExpression();
             initializers.Add(new ObjectInitializerAssignment(propName, value));
         }
-        while (!IsAtEnd && !Check(TokenKind.EndNew) && (Check(TokenKind.Identifier) || Check(TokenKind.OpenBracket)))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndNew) && (Check(TokenKind.Identifier) || Check(TokenKind.OpenBracket)))
         {
             if (Check(TokenKind.OpenBracket))
             {
@@ -7429,7 +7500,7 @@ public sealed class Parser
                 {
                     Advance(); // consume '='
                     // Handle empty initializer values: "Prop = " followed by §/NEW or next property
-                    if (Check(TokenKind.EndNew) || (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals))
+                    if (IsBlockEnd(TokenKind.EndNew) || (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals))
                     {
                         // Empty value — use null as placeholder
                         initializers.Add(new ObjectInitializerAssignment(identToken.Text,
@@ -7452,7 +7523,7 @@ public sealed class Parser
 
         // Check for optional end tag
         var endSpan = startToken.Span;
-        if (Check(TokenKind.EndNew))
+        if (IsBlockEnd(TokenKind.EndNew))
         {
             endSpan = Advance().Span;
         }
@@ -7479,7 +7550,7 @@ public sealed class Parser
         var startToken = Expect(TokenKind.AnonymousObject);
         var initializers = new List<ObjectInitializerAssignment>();
 
-        while (!IsAtEnd && !Check(TokenKind.EndAnonymousObject))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndAnonymousObject))
         {
             if (Check(TokenKind.Identifier))
             {
@@ -7508,7 +7579,7 @@ public sealed class Parser
         }
 
         var endSpan = startToken.Span;
-        if (Check(TokenKind.EndAnonymousObject))
+        if (IsBlockEnd(TokenKind.EndAnonymousObject))
         {
             endSpan = Advance().Span;
         }
@@ -7552,12 +7623,12 @@ public sealed class Parser
 
         // If no bracket attribute target and next token starts an expression,
         // parse expression-based call target: §C §NEW{object}§/NEW.GetType §/C
-        if (string.IsNullOrEmpty(target) && !Check(TokenKind.Arg) && !Check(TokenKind.EndCall) && IsExpressionStart())
+        if (string.IsNullOrEmpty(target) && !Check(TokenKind.Arg) && !IsBlockEnd(TokenKind.EndCall) && IsExpressionStart())
         {
             var targetExpr = ParseExpression();
 
             var exprArgs = new List<ExpressionNode>();
-            while (!IsAtEnd && !Check(TokenKind.EndCall))
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
             {
                 if (Check(TokenKind.Arg))
                 {
@@ -7573,7 +7644,7 @@ public sealed class Parser
                 }
             }
 
-            var exprEndToken = Expect(TokenKind.EndCall);
+            var exprEndToken = ExpectBlockEnd(TokenKind.EndCall);
             var exprSpan = startToken.Span.Union(exprEndToken.Span);
             ExpressionNode exprCall = new ExpressionCallNode(exprSpan, targetExpr, exprArgs);
             return ParseTrailingMemberAccess(exprCall);
@@ -7583,7 +7654,7 @@ public sealed class Parser
         var argumentNames = new List<string?>();
 
         // Parse arguments until we hit EndCall
-        while (!IsAtEnd && !Check(TokenKind.EndCall))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
         {
             if (Check(TokenKind.Arg))
             {
@@ -7602,7 +7673,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndCall);
+        var endToken = ExpectBlockEnd(TokenKind.EndCall);
         var span = startToken.Span.Union(endToken.Span);
 
         // Extract trailing generic type arguments from call target.
@@ -7720,7 +7791,7 @@ public sealed class Parser
         PropertyAccessorNode? initer2 = null;
         ExpressionNode? defaultValue2 = null;
 
-        while (!IsAtEnd && !Check(TokenKind.EndProperty))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndProperty))
         {
             if (Check(TokenKind.Get))
             {
@@ -7751,7 +7822,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndProperty);
+        var endToken = ExpectBlockEnd(TokenKind.EndProperty);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -7900,7 +7971,7 @@ public sealed class Parser
         PropertyAccessorNode? setter2 = null;
         PropertyAccessorNode? initer2 = null;
 
-        while (!IsAtEnd && !Check(TokenKind.EndIndexer))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIndexer))
         {
             if (Check(TokenKind.In))
             {
@@ -7924,7 +7995,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndIndexer);
+        var endToken = ExpectBlockEnd(TokenKind.EndIndexer);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -7978,9 +8049,9 @@ public sealed class Parser
         // Parse optional preconditions and body (for non-auto properties/indexers)
         // Also stop at Equals for property default values, next accessor, or end tokens
         while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
-               !Check(TokenKind.Init) && !Check(TokenKind.EndProperty) && !Check(TokenKind.EndIndexer) &&
-               !Check(TokenKind.Equals) && !Check(TokenKind.EndGet) && !Check(TokenKind.EndSet) &&
-               !Check(TokenKind.EndInit))
+               !Check(TokenKind.Init) && !IsBlockEnd(TokenKind.EndProperty) && !IsBlockEnd(TokenKind.EndIndexer) &&
+               !Check(TokenKind.Equals) && !IsBlockEnd(TokenKind.EndGet) && !IsBlockEnd(TokenKind.EndSet) &&
+               !IsBlockEnd(TokenKind.EndInit))
         {
             if (Check(TokenKind.Requires))
             {
@@ -8055,7 +8126,7 @@ public sealed class Parser
         ConstructorInitializerNode? initializer = null;
         var body = new List<StatementNode>();
 
-        while (!IsAtEnd && !Check(TokenKind.EndConstructor))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndConstructor))
         {
             if (Check(TokenKind.In))
             {
@@ -8083,7 +8154,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndConstructor);
+        var endToken = ExpectBlockEnd(TokenKind.EndConstructor);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -8137,7 +8208,7 @@ public sealed class Parser
         TryParseInlineSignature(startToken.Span, parameters, ref output);
         var body = new List<StatementNode>();
 
-        while (!IsAtEnd && !Check(TokenKind.EndOperatorOverload))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndOperatorOverload))
         {
             if (Check(TokenKind.In))
             {
@@ -8165,7 +8236,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndOperatorOverload);
+        var endToken = ExpectBlockEnd(TokenKind.EndOperatorOverload);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -8341,7 +8412,7 @@ public sealed class Parser
         // Parse body statements
         var body = ParseStatementBlock(TokenKind.EndUse);
 
-        var endToken = Expect(TokenKind.EndUse);
+        var endToken = ExpectBlockEnd(TokenKind.EndUse);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -8369,7 +8440,7 @@ public sealed class Parser
 
         // Parse try body
         var tryBody = new List<StatementNode>();
-        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !Check(TokenKind.EndTry))
+        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !IsBlockEnd(TokenKind.EndTry))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -8377,6 +8448,9 @@ public sealed class Parser
                 tryBody.Add(stmt);
             }
         }
+
+        // Phase 3 (indent-aware): consume dangling Dedent before §CA/§FI.
+        ConsumeDedentBeforeChain(TokenKind.Catch, TokenKind.Finally);
 
         // Parse catch clauses
         var catchClauses = new List<CatchClauseNode>();
@@ -8391,7 +8465,7 @@ public sealed class Parser
         {
             Expect(TokenKind.Finally);
             finallyBody = new List<StatementNode>();
-            while (!IsAtEnd && !Check(TokenKind.EndTry))
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndTry))
             {
                 var stmt = ParseStatement();
                 if (stmt != null)
@@ -8401,7 +8475,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndTry);
+        var endToken = ExpectBlockEnd(TokenKind.EndTry);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -8443,7 +8517,7 @@ public sealed class Parser
 
         // Parse catch body
         var body = new List<StatementNode>();
-        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !Check(TokenKind.EndTry))
+        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !IsBlockEnd(TokenKind.EndTry))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -8451,6 +8525,9 @@ public sealed class Parser
                 body.Add(stmt);
             }
         }
+
+        // Phase 3 (indent-aware): consume dangling Dedent before next §CA/§FI in the chain.
+        ConsumeDedentBeforeChain(TokenKind.Catch, TokenKind.Finally);
 
         var span = body.Count > 0 ? startToken.Span.Union(body[^1].Span) : startToken.Span;
         return new CatchClauseNode(span, exceptionType, variableName, filter, body, attrs);
@@ -8597,7 +8674,7 @@ public sealed class Parser
         var body = new List<StatementNode>();
         List<StatementNode>? elseBody = null;
 
-        while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
         {
             var stmt = ParseStatement();
             if (stmt != null) body.Add(stmt);
@@ -8606,14 +8683,14 @@ public sealed class Parser
         if (Match(TokenKind.PreprocessorElse))
         {
             elseBody = new List<StatementNode>();
-            while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+            while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
             {
                 var stmt = ParseStatement();
                 if (stmt != null) elseBody.Add(stmt);
             }
         }
 
-        Expect(TokenKind.EndPreprocessor);
+        ExpectBlockEnd(TokenKind.EndPreprocessor);
         return new PreprocessorDirectiveNode(startToken.Span, condition, body, elseBody);
     }
 
@@ -8634,7 +8711,7 @@ public sealed class Parser
         var operatorOverloads = new List<OperatorOverloadNode>();
 
         // Parse members until §PPE or §/PP
-        while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
         {
             ParseMemberInPreprocessorBlock(fields, properties, constructors, methods, events, operatorOverloads);
         }
@@ -8657,7 +8734,7 @@ public sealed class Parser
                 var elseEvents = new List<EventDefinitionNode>();
                 var elseOperatorOverloads = new List<OperatorOverloadNode>();
 
-                while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+                while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
                 {
                     ParseMemberInPreprocessorBlock(elseFields, elseProperties, elseConstructors, elseMethods, elseEvents, elseOperatorOverloads);
                 }
@@ -8670,7 +8747,7 @@ public sealed class Parser
         // Only expect EndPreprocessor if we didn't recurse into an #elif (which consumes its own end)
         if (elseBranch == null || string.IsNullOrEmpty(elseBranch.Condition))
         {
-            Expect(TokenKind.EndPreprocessor);
+            ExpectBlockEnd(TokenKind.EndPreprocessor);
         }
 
         return new MemberPreprocessorBlockNode(startToken.Span, condition,
@@ -8693,7 +8770,7 @@ public sealed class Parser
         var delegates = new List<DelegateDefinitionNode>();
 
         // Parse type declarations until §PPE or §/PP
-        while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
         {
             ParseTypeInPreprocessorBlock(classes, interfaces, enums, delegates, usings);
         }
@@ -8713,7 +8790,7 @@ public sealed class Parser
                 var elseEnums = new List<EnumDefinitionNode>();
                 var elseDelegates = new List<DelegateDefinitionNode>();
 
-                while (!Check(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+                while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
                 {
                     ParseTypeInPreprocessorBlock(elseClasses, elseInterfaces, elseEnums, elseDelegates, elseUsings);
                 }
@@ -8725,7 +8802,7 @@ public sealed class Parser
 
         if (elseBranch == null || string.IsNullOrEmpty(elseBranch.Condition))
         {
-            Expect(TokenKind.EndPreprocessor);
+            ExpectBlockEnd(TokenKind.EndPreprocessor);
         }
 
         return new TypePreprocessorBlockNode(startToken.Span, condition,
@@ -8918,12 +8995,12 @@ public sealed class Parser
             // Track paren/call depth to handle (condition) and §C...§/C in conditions
             int pDepth = 0;
             int callDepth = 0;
-            while (!IsAtEnd && !Check(TokenKind.EndLambda))
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndLambda))
             {
                 // Only stop at Arrow when not inside a nested call or paren
                 if (Check(TokenKind.Arrow) && pDepth == 0 && callDepth == 0) break;
                 if (Check(TokenKind.Call)) callDepth++;
-                else if (Check(TokenKind.EndCall)) callDepth = Math.Max(0, callDepth - 1);
+                else if (IsBlockEnd(TokenKind.EndCall)) callDepth = Math.Max(0, callDepth - 1);
                 // Stop at statement tokens outside calls — indicates block IF, not ternary
                 if (callDepth == 0 && pDepth == 0 &&
                     (Check(TokenKind.Bind) || Check(TokenKind.Assign) || Check(TokenKind.Return) || Check(TokenKind.Foreach)))
@@ -8958,13 +9035,13 @@ public sealed class Parser
             || Check(TokenKind.Subscribe) || Check(TokenKind.Unsubscribe)
             || Check(TokenKind.Using);
 
-        if (IsExpressionStart() && !Check(TokenKind.EndLambda) && !isStatementToken)
+        if (IsExpressionStart() && !IsBlockEnd(TokenKind.EndLambda) && !isStatementToken)
         {
             expressionBody = ParseExpression();
         }
 
         // Check if there are more statements after the expression
-        while (!IsAtEnd && !Check(TokenKind.EndLambda))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndLambda))
         {
             if (statementBody == null)
             {
@@ -8977,7 +9054,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndLambda);
+        var endToken = ExpectBlockEnd(TokenKind.EndLambda);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -9059,7 +9136,7 @@ public sealed class Parser
         EffectsNode? effects = null;
 
         // Parse parameters, output, and effects until END_DEL
-        while (!IsAtEnd && !Check(TokenKind.EndDelegate))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndDelegate))
         {
             if (Check(TokenKind.In))
             {
@@ -9080,7 +9157,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndDelegate);
+        var endToken = ExpectBlockEnd(TokenKind.EndDelegate);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -9132,7 +9209,7 @@ public sealed class Parser
         List<StatementNode>? addBody = null;
         List<StatementNode>? removeBody = null;
 
-        while (!IsAtEnd && !Check(TokenKind.EndEvent))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndEvent))
         {
             if (Check(TokenKind.EventAdd))
             {
@@ -9148,7 +9225,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndEvent);
+        var endToken = ExpectBlockEnd(TokenKind.EndEvent);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -9169,7 +9246,7 @@ public sealed class Parser
         var body = new List<StatementNode>();
 
         while (!IsAtEnd && !Check(endKind) && !Check(TokenKind.EventAdd) &&
-               !Check(TokenKind.EventRemove) && !Check(TokenKind.EndEvent))
+               !Check(TokenKind.EventRemove) && !IsBlockEnd(TokenKind.EndEvent) && !Check(TokenKind.Dedent))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -9235,7 +9312,7 @@ public sealed class Parser
         var parts = new List<InterpolatedStringPartNode>();
 
         // Parse parts until we hit the end tag
-        while (!IsAtEnd && !Check(TokenKind.EndInterpolate))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndInterpolate))
         {
             if (Check(TokenKind.StrLiteral))
             {
@@ -9257,7 +9334,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndInterpolate);
+        var endToken = ExpectBlockEnd(TokenKind.EndInterpolate);
         var span = startToken.Span.Union(endToken.Span);
         return new InterpolatedStringNode(span, parts);
     }
@@ -9370,7 +9447,7 @@ public sealed class Parser
 
         // Parse property assignments
         var assignments = new List<WithPropertyAssignmentNode>();
-        while (!IsAtEnd && !Check(TokenKind.EndWith))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndWith))
         {
             if (Check(TokenKind.Set))
             {
@@ -9388,7 +9465,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndWith);
+        var endToken = ExpectBlockEnd(TokenKind.EndWith);
         var span = startToken.Span.Union(endToken.Span);
         return new WithExpressionNode(span, target, assignments);
     }
@@ -9499,10 +9576,10 @@ public sealed class Parser
                 while (!IsAtEnd && callDepth > 0)
                 {
                     if (Check(TokenKind.Call)) callDepth++;
-                    else if (Check(TokenKind.EndCall)) callDepth--;
+                    else if (IsBlockEnd(TokenKind.EndCall)) callDepth--;
                     if (callDepth > 0) Advance();
                 }
-                if (Check(TokenKind.EndCall)) Advance();
+                if (IsBlockEnd(TokenKind.EndCall)) Advance();
                 patterns.Add(new ConstantPatternNode(callToken.Span,
                     new ReferenceNode(callToken.Span, "_patternCall")));
             }
@@ -9838,7 +9915,7 @@ public sealed class Parser
         string? author = null;
 
         // Parse decision content
-        while (!IsAtEnd && !Check(TokenKind.EndDecision))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndDecision))
         {
             if (Check(TokenKind.Chosen))
             {
@@ -9909,7 +9986,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndDecision);
+        var endToken = ExpectBlockEnd(TokenKind.EndDecision);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -9968,12 +10045,12 @@ public sealed class Parser
         var hiddenFiles = new List<FileRefNode>();
         string? focusTarget = null;
 
-        while (!IsAtEnd && !Check(TokenKind.EndContext))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndContext))
         {
             if (Check(TokenKind.Visible))
             {
                 Advance();
-                while (!IsAtEnd && !Check(TokenKind.EndVisible))
+                while (!IsAtEnd && !IsBlockEnd(TokenKind.EndVisible))
                 {
                     if (Check(TokenKind.FileRef))
                     {
@@ -9984,12 +10061,12 @@ public sealed class Parser
                         Advance();
                     }
                 }
-                if (Check(TokenKind.EndVisible)) Advance();
+                if (IsBlockEnd(TokenKind.EndVisible)) Advance();
             }
             else if (Check(TokenKind.HiddenSection))
             {
                 Advance();
-                while (!IsAtEnd && !Check(TokenKind.EndHidden))
+                while (!IsAtEnd && !IsBlockEnd(TokenKind.EndHidden))
                 {
                     if (Check(TokenKind.FileRef))
                     {
@@ -10000,7 +10077,7 @@ public sealed class Parser
                         Advance();
                     }
                 }
-                if (Check(TokenKind.EndHidden)) Advance();
+                if (IsBlockEnd(TokenKind.EndHidden)) Advance();
             }
             else if (Check(TokenKind.Focus))
             {
@@ -10019,7 +10096,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndContext);
+        var endToken = ExpectBlockEnd(TokenKind.EndContext);
         var span = startToken.Span.Union(endToken.Span);
         return new ContextNode(span, isPartial, visibleFiles, hiddenFiles, focusTarget, attrs);
     }
@@ -10266,7 +10343,7 @@ public sealed class Parser
         var members = new List<EnumMemberNode>();
 
         // Parse enum members until we hit the closing tag
-        while (!IsAtEnd && !Check(TokenKind.EndEnum))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndEnum))
         {
             // Parse optional C# attributes before enum member (e.g., [@Obsolete])
             var memberAttrs = ParseCSharpAttributes();
@@ -10304,7 +10381,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndEnum);
+        var endToken = ExpectBlockEnd(TokenKind.EndEnum);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -10493,7 +10570,7 @@ public sealed class Parser
         var methods = new List<FunctionNode>();
 
         // Parse extension methods until we hit the closing tag
-        while (!IsAtEnd && !Check(TokenKind.EndEnumExtension))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndEnumExtension))
         {
             if (Check(TokenKind.Func))
             {
@@ -10510,7 +10587,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = Expect(TokenKind.EndEnumExtension);
+        var endToken = ExpectBlockEnd(TokenKind.EndEnumExtension);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -10695,6 +10772,11 @@ public sealed class Parser
 
     private static bool ShouldReportMismatchedId(string endId, string openId, Token endToken)
     {
+        // Phase 3 (indent-aware): if the block was terminated by a Dedent
+        // (not an explicit §/X closer), there is no ID to mismatch against.
+        if (endToken.Kind == TokenKind.Dedent)
+            return false;
+
         // If both are the same, no mismatch
         if (endId == openId)
             return false;
@@ -11328,11 +11410,11 @@ public sealed class Parser
         else
         {
             // Initializer form: parse expressions until §/SALLOC
-            while (!IsAtEnd && !Check(TokenKind.EndStackAlloc))
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndStackAlloc))
             {
                 initializer.Add(ParseExpression());
             }
-            if (Check(TokenKind.EndStackAlloc))
+            if (IsBlockEnd(TokenKind.EndStackAlloc))
                 Advance();
         }
 
@@ -11405,13 +11487,13 @@ public sealed class Parser
         else
         {
             // Initializer form: parse §ROW elements until §/ARR2D
-            while (!IsAtEnd && !Check(TokenKind.EndArray2D))
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndArray2D))
             {
                 if (Check(TokenKind.Row))
                 {
                     Advance();
                     var row = new List<ExpressionNode>();
-                    while (!IsAtEnd && !Check(TokenKind.Row) && !Check(TokenKind.EndArray2D))
+                    while (!IsAtEnd && !Check(TokenKind.Row) && !IsBlockEnd(TokenKind.EndArray2D))
                     {
                         row.Add(ParseExpression());
                     }
@@ -11422,7 +11504,7 @@ public sealed class Parser
                     Advance(); // skip unexpected tokens
                 }
             }
-            if (Check(TokenKind.EndArray2D))
+            if (IsBlockEnd(TokenKind.EndArray2D))
             {
                 Advance();
                 ParseAttributes(); // consume optional {id} on closing tag
@@ -11469,12 +11551,12 @@ public sealed class Parser
         Expect(TokenKind.CloseParen);
 
         var body = new List<StatementNode>();
-        while (!IsAtEnd && !Check(TokenKind.EndSyncBlock))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndSyncBlock))
         {
             var stmt = ParseStatement();
             if (stmt != null) body.Add(stmt);
         }
-        if (Check(TokenKind.EndSyncBlock))
+        if (IsBlockEnd(TokenKind.EndSyncBlock))
         {
             Advance();
             ParseAttributes(); // consume optional {id} on closing tag
@@ -11493,12 +11575,12 @@ public sealed class Parser
         var id = attrs["_pos0"] ?? "_unsafe";
 
         var body = new List<StatementNode>();
-        while (!IsAtEnd && !Check(TokenKind.EndUnsafe))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndUnsafe))
         {
             var stmt = ParseStatement();
             if (stmt != null) body.Add(stmt);
         }
-        if (Check(TokenKind.EndUnsafe))
+        if (IsBlockEnd(TokenKind.EndUnsafe))
         {
             Advance();
             ParseAttributes(); // consume optional {id} on closing tag
@@ -11531,12 +11613,12 @@ public sealed class Parser
         }
 
         var body = new List<StatementNode>();
-        while (!IsAtEnd && !Check(TokenKind.EndFixed))
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndFixed))
         {
             var stmt = ParseStatement();
             if (stmt != null) body.Add(stmt);
         }
-        if (Check(TokenKind.EndFixed))
+        if (IsBlockEnd(TokenKind.EndFixed))
         {
             Advance();
             ParseAttributes(); // consume optional {id} on closing tag

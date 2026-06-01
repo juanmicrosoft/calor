@@ -21,14 +21,18 @@ public class LexerIndentTests
         => tokens.Select(t => t.Kind).Where(k => k != TokenKind.Newline).ToList();
 
     [Fact]
-    public void TokenizeWithIndent_NoIndentation_EmitsNoIndentOrDedent()
+    public void TokenizeWithIndent_NoIndentation_EmitsImplicitEofDedent()
     {
+        // Phase 3 (indent-aware): TokenizeWithIndent now emits one implicit
+        // Dedent at EOF so the outermost block (typically §M) terminates
+        // naturally in indent form. Source without nested indents still
+        // gets that one EOF Dedent.
         var src = "§M\n§/M\n";
         var tokens = TokenizeWithIndent(src, out var diag);
 
         Assert.False(diag.HasErrors);
         Assert.DoesNotContain(tokens, t => t.Kind == TokenKind.Indent);
-        Assert.DoesNotContain(tokens, t => t.Kind == TokenKind.Dedent);
+        Assert.Equal(1, tokens.Count(t => t.Kind == TokenKind.Dedent));
     }
 
     [Fact]
@@ -41,18 +45,20 @@ public class LexerIndentTests
         int indents = tokens.Count(t => t.Kind == TokenKind.Indent);
         int dedents = tokens.Count(t => t.Kind == TokenKind.Dedent);
         Assert.Equal(1, indents);
-        Assert.Equal(1, dedents);
+        // 1 stack-drain Dedent + 1 implicit EOF Dedent = 2.
+        Assert.Equal(2, dedents);
     }
 
     [Fact]
-    public void TokenizeWithIndent_TwoLevelsDeep_EmitsTwoIndentsAndTwoDedents()
+    public void TokenizeWithIndent_TwoLevelsDeep_EmitsTwoIndentsAndThreeDedents()
     {
         var src = "§M\n  §F\n    §L\n    §/L\n  §/F\n§/M\n";
         var tokens = TokenizeWithIndent(src, out var diag);
 
         Assert.False(diag.HasErrors);
         Assert.Equal(2, tokens.Count(t => t.Kind == TokenKind.Indent));
-        Assert.Equal(2, tokens.Count(t => t.Kind == TokenKind.Dedent));
+        // 2 stack-drain Dedents (back to col 0 happens once) + 1 EOF Dedent = 3.
+        Assert.Equal(3, tokens.Count(t => t.Kind == TokenKind.Dedent));
     }
 
     [Fact]
@@ -65,7 +71,8 @@ public class LexerIndentTests
 
         Assert.False(diag.HasErrors);
         Assert.Equal(1, tokens.Count(t => t.Kind == TokenKind.Indent));
-        Assert.Equal(1, tokens.Count(t => t.Kind == TokenKind.Dedent));
+        // 1 stack-drain Dedent + 1 implicit EOF Dedent = 2.
+        Assert.Equal(2, tokens.Count(t => t.Kind == TokenKind.Dedent));
     }
 
     [Fact]
@@ -97,22 +104,24 @@ public class LexerIndentTests
         var tokens = TokenizeWithIndent(src, out var diag);
 
         Assert.False(diag.HasErrors);
-        // No INDENT/DEDENT should be emitted inside the parenthesized expression.
+        // No INDENT should be emitted inside the parenthesized expression.
         Assert.Empty(tokens.Where(t => t.Kind == TokenKind.Indent));
-        Assert.Empty(tokens.Where(t => t.Kind == TokenKind.Dedent));
+        // 0 stack-drain Dedents + 1 implicit EOF Dedent = 1.
+        Assert.Equal(1, tokens.Count(t => t.Kind == TokenKind.Dedent));
     }
 
     [Fact]
     public void TokenizeWithIndent_EmitsEofAtEnd_DrainsRemainingStack()
     {
-        // Unclosed indent at EOF: drain via implicit dedents, then Eof.
+        // Unclosed indent at EOF: drain via implicit dedents, then EOF.
+        // 1 stack-drain Dedent + 1 implicit EOF Dedent = 2.
         var src = "§M\n  §F\n";
         var tokens = TokenizeWithIndent(src, out var diag);
 
         Assert.False(diag.HasErrors);
         Assert.Equal(TokenKind.Eof, tokens[^1].Kind);
         Assert.Equal(1, tokens.Count(t => t.Kind == TokenKind.Indent));
-        Assert.Equal(1, tokens.Count(t => t.Kind == TokenKind.Dedent));
+        Assert.Equal(2, tokens.Count(t => t.Kind == TokenKind.Dedent));
     }
 
     [Fact]
@@ -140,7 +149,8 @@ public class LexerIndentTests
 
         Assert.False(diag.HasErrors);
         Assert.Equal(1, tokens.Count(t => t.Kind == TokenKind.Indent));
-        Assert.Equal(1, tokens.Count(t => t.Kind == TokenKind.Dedent));
+        // 1 stack-drain Dedent + 1 implicit EOF Dedent = 2.
+        Assert.Equal(2, tokens.Count(t => t.Kind == TokenKind.Dedent));
     }
 
     [Fact]
