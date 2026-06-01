@@ -77,7 +77,7 @@ public class EvaluationContext
         try
         {
             var lexer = new Lexer(CalorSource, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
 
             if (diagnostics.HasErrors)
             {

@@ -2986,10 +2986,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(WithExpressionNode node)
     {
         var target = node.Target.Accept(this);
-        var assignments = string.Join("\n  ", node.Assignments.Select(a => a.Accept(this)));
+        var assignments = string.Join(" ", node.Assignments.Select(a => a.Accept(this)));
         if (assignments.Length > 0)
-            return $"§WITH {target}\n  {assignments}\n§/WITH";
-        return $"§WITH {target}\n§/WITH";
+            return $"§WITH {target} {assignments} §/WITH";
+        return $"§WITH {target} §/WITH";
     }
 
     public string Visit(WithPropertyAssignmentNode node)

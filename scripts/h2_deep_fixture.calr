@@ -1,0 +1,79 @@
+§M{m001:Stats}
+
+§F{f001:Sum:pub}
+  §I{i32:n}
+  §O{i32}
+  §B{~total} 0
+  §L{l01:i:0:n:1}
+    §B{~total} (+ total i)
+  §/L{l01}
+  §R total
+§/F{f001}
+
+§F{f002:Max:pub}
+  §I{i32:a}
+  §I{i32:b}
+  §I{i32:c}
+  §O{i32}
+  §IF{i01} (&& (>= a b) (>= a c))
+    §R a
+  §EI (>= b c)
+    §R b
+  §EL
+    §R c
+  §/I{i01}
+§/F{f002}
+
+§F{f003:Classify:pub}
+  §I{i32:score}
+  §O{i32}
+  §IF{i02} (< score 0)
+    §R (- 0 1)
+  §EI (== score 0)
+    §R 0
+  §EI (< score 50)
+    §IF{i03} (< score 25)
+      §R 1
+    §EL
+      §R 2
+    §/I{i03}
+  §EI (< score 80)
+    §R 3
+  §EL
+    §IF{i04} (== score 100)
+      §R 5
+    §EL
+      §R 4
+    §/I{i04}
+  §/I{i02}
+§/F{f003}
+
+§F{f004:CountPositive:pub}
+  §I{i32:n}
+  §O{i32}
+  §B{~count} 0
+  §L{l02:i:0:n:1}
+    §IF{i05} (> i 0)
+      §B{~count} (+ count 1)
+    §/I{i05}
+  §/L{l02}
+  §R count
+§/F{f004}
+
+§F{f005:NestedLoop:pub}
+  §I{i32:n}
+  §O{i32}
+  §B{~acc} 0
+  §L{l03:i:0:n:1}
+    §L{l04:j:0:n:1}
+      §IF{i06} (> i j)
+        §B{~acc} (+ acc 1)
+      §EL
+        §B{~acc} (- acc 1)
+      §/I{i06}
+    §/L{l04}
+  §/L{l03}
+  §R acc
+§/F{f005}
+
+§/M{m001}

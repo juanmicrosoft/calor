@@ -1,0 +1,92 @@
+Phase 3 H2 — EDIT-WORKLOAD study (greenfield was H1 v3; this measures edits)
+  Tasks: 7  Arms: 2  Trials/cell: 5  Total: 70 invocations
+  Budget cap: $5.00  Model: claude-haiku-4-5
+
+  edit-sig-001      closer  1/5 ... PASS  $0.0092  8.9s
+  edit-sig-001      closer  2/5 ... PASS  $0.0073  12.1s
+  edit-sig-001      closer  3/5 ... PASS  $0.0067  8.0s
+  edit-sig-001      closer  4/5 ... PASS  $0.0092  8.2s
+  edit-sig-001      closer  5/5 ... PASS  $0.0066  8.4s
+  edit-sig-001      indent  1/5 ... PASS  $0.0087  9.6s
+  edit-sig-001      indent  2/5 ... PASS  $0.0077  5.9s
+  edit-sig-001      indent  3/5 ... PASS  $0.0075  8.9s
+  edit-sig-001      indent  4/5 ... PASS  $0.0085  8.4s
+  edit-sig-001      indent  5/5 ... PASS  $0.0075  9.2s
+  edit-body-001     closer  1/5 ... PASS  $0.0118  10.1s
+  edit-body-001     closer  2/5 ... PASS  $0.0073  8.4s
+  edit-body-001     closer  3/5 ... PASS  $0.0093  10.3s
+  edit-body-001     closer  4/5 ... PASS  $0.0072  9.0s
+  edit-body-001     closer  5/5 ... PASS  $0.0074  8.3s
+  edit-body-001     indent  1/5 ... PASS  $0.0110  7.4s
+  edit-body-001     indent  2/5 ... PASS  $0.0107  11.6s
+  edit-body-001     indent  3/5 ... PASS  $0.0068  8.3s
+  edit-body-001     indent  4/5 ... PASS  $0.0064  7.9s
+  edit-body-001     indent  5/5 ... PASS  $0.0081  10.3s
+  edit-pre-001      closer  1/5 ... PASS  $0.0093  8.5s
+  edit-pre-001      closer  2/5 ... PASS  $0.0077  10.1s
+  edit-pre-001      closer  3/5 ... PASS  $0.0070  9.3s
+  edit-pre-001      closer  4/5 ... PASS  $0.0069  10.6s
+  edit-pre-001      closer  5/5 ... PASS  $0.0071  8.7s
+  edit-pre-001      indent  1/5 ... PASS  $0.0118  11.7s
+  edit-pre-001      indent  2/5 ... PASS  $0.0095  9.8s
+  edit-pre-001      indent  3/5 ... PASS  $0.0066  8.8s
+  edit-pre-001      indent  4/5 ... PASS  $0.0070  9.6s
+  edit-pre-001      indent  5/5 ... PASS  $0.0067  9.8s
+  edit-post-001     closer  1/5 ... PASS  $0.0094  8.7s
+  edit-post-001     closer  2/5 ... PASS  $0.0085  10.3s
+  edit-post-001     closer  3/5 ... PASS  $0.0090  11.6s
+  edit-post-001     closer  4/5 ... PASS  $0.0088  11.9s
+  edit-post-001     closer  5/5 ... PASS  $0.0071  9.3s
+  edit-post-001     indent  1/5 ... PASS  $0.0096  10.1s
+  edit-post-001     indent  2/5 ... PASS  $0.0066  8.6s
+  edit-post-001     indent  3/5 ... PASS  $0.0072  10.2s
+  edit-post-001     indent  4/5 ... PASS  $0.0071  9.0s
+  edit-post-001     indent  5/5 ... PASS  $0.0072  9.2s
+  edit-type-001     closer  1/5 ... PASS  $0.0090  4.8s
+  edit-type-001     closer  2/5 ... PASS  $0.0090  8.0s
+  edit-type-001     closer  3/5 ... PASS  $0.0068  8.6s
+  edit-type-001     closer  4/5 ... PASS  $0.0067  7.9s
+  edit-type-001     closer  5/5 ... PASS  $0.0066  8.8s
+  edit-type-001     indent  1/5 ... PASS  $0.0088  8.8s
+  edit-type-001     indent  2/5 ... PASS  $0.0074  8.9s
+  edit-type-001     indent  3/5 ... PASS  $0.0061  7.9s
+  edit-type-001     indent  4/5 ... PASS  $0.0062  7.8s
+  edit-type-001     indent  5/5 ... PASS  $0.0085  4.8s
+  edit-chain-001    closer  1/5 ... PASS  $0.0101  9.4s
+  edit-chain-001    closer  2/5 ... PASS  $0.0091  11.7s
+  edit-chain-001    closer  3/5 ... PASS  $0.0072  9.3s
+  edit-chain-001    closer  4/5 ... PASS  $0.0092  8.0s
+  edit-chain-001    closer  5/5 ... PASS  $0.0092  8.4s
+  edit-chain-001    indent  1/5 ... PASS  $0.0092  8.8s
+  edit-chain-001    indent  2/5 ... PASS  $0.0086  12.8s
+  edit-chain-001    indent  3/5 ... PASS  $0.0092  8.0s
+  edit-chain-001    indent  4/5 ... PASS  $0.0066  8.5s
+  edit-chain-001    indent  5/5 ... PASS  $0.0065  9.1s
+  edit-del-001      closer  1/5 ... PASS  $0.0082  8.1s
+  edit-del-001      closer  2/5 ... PASS  $0.0100  10.6s
+  edit-del-001      closer  3/5 ... PASS  $0.0060  7.6s
+  edit-del-001      closer  4/5 ... PASS  $0.0062  7.7s
+  edit-del-001      closer  5/5 ... PASS  $0.0085  4.9s
+  edit-del-001      indent  1/5 ... PASS  $0.0082  7.7s
+  edit-del-001      indent  2/5 ... PASS  $0.0073  9.2s
+  edit-del-001      indent  3/5 ... PASS  $0.0095  8.7s
+  edit-del-001      indent  4/5 ... PASS  $0.0072  8.8s
+  edit-del-001      indent  5/5 ... PASS  $0.0099  6.2s
+
+--- AGGREGATE ---
+  closer  : 35/35  (100.0%)  $0.284
+  indent  : 35/35  (100.0%)  $0.281
+  Δ pass rate: +0.0pp
+  Δ cost:     -1.1%
+  Fisher exact p-value (two-sided): 1.0000  (NOT significant at 0.05)
+
+--- PER-TASK ---
+  edit-sig-001     (signature)  closer 5/5   indent 5/5
+  edit-body-001    (body     )  closer 5/5   indent 5/5
+  edit-pre-001     (contract )  closer 5/5   indent 5/5
+  edit-post-001    (contract )  closer 5/5   indent 5/5
+  edit-type-001    (type     )  closer 5/5   indent 5/5
+  edit-chain-001   (chain    )  closer 5/5   indent 5/5
+  edit-del-001     (delete   )  closer 5/5   indent 5/5
+
+Raw: C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\scripts\phase3-h2-edit-results.json

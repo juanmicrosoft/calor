@@ -466,7 +466,7 @@ public class Program
         // Lexical analysis
         phaseSw.Restart();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         phaseSw.Stop();
         telemetry?.TrackPhase("Lexer", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors,
             new Dictionary<string, string> { ["tokenCount"] = tokens.Count.ToString() });
