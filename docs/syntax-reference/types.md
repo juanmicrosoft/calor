@@ -40,8 +40,8 @@ Calor has a simple type system with primitives, optionals, results, and arrays.
 §I{str:name}        // string name
 §I{f64:price}       // double price
 §I{bool:active}     // bool active
-§I{[u8]:data}       // byte[] data
-§I{[str]:args}      // string[] args
+§I{[u8}:data}       // byte[] data
+§I{[str}:args}      // string[] args
 ```
 
 ### Output Types
@@ -50,7 +50,7 @@ Calor has a simple type system with primitives, optionals, results, and arrays.
 §O{i32}             // returns int
 §O{str}             // returns string
 §O{void}            // returns nothing
-§O{[u8]}            // returns byte[]
+§O{[u8}}            // returns byte[]
 ```
 
 ### Decimal Literals
@@ -89,9 +89,9 @@ Calor uses bracket notation `[T]` for array types, which aligns with common prog
 ### Usage
 
 ```
-§FLD{[u8]:_buffer:priv}       // private byte[] field
-§I{[str]:args}                // string[] parameter
-§O{[i32]}                     // returns int[]
+§FLD{[u8}:_buffer:priv}       // private byte[] field
+§I{[str}:args}                // string[] parameter
+§O{[i32}}                     // returns int[]
 ```
 
 ---
@@ -113,13 +113,11 @@ Options represent values that may be absent.
   §I{str:key}
   §O{?str}              // might return a string, might return nothing
   // ...
-§/F{f001}
 
 §F{f002:Process:pub}
   §I{?i32:maybeValue}   // accepts null
   §O{void}
   // ...
-§/F{f002}
 ```
 
 ### Creating Option Values
@@ -139,8 +137,6 @@ Options represent values that may be absent.
     §R §NN
   §EL
     §R §SM user
-  §/I{if1}
-§/F{f001}
 ```
 
 ---
@@ -166,8 +162,6 @@ T!E                 // Result: either T (success) or E (error)
     §R §ERR "Division by zero"
   §EL
     §R §OK (/ a b)
-  §/I{if1}
-§/F{f001}
 ```
 
 ### Creating Result Values
@@ -185,7 +179,6 @@ T!E                 // Result: either T (success) or E (error)
   §I{str:text}
   §O{i32!str}
   // ...implementation
-§/F{f001}
 ```
 
 **File read:**
@@ -195,7 +188,6 @@ T!E                 // Result: either T (success) or E (error)
   §O{str!str}
   §E{fs:r}
   // ...implementation
-§/F{f001}
 ```
 
 ---
@@ -240,7 +232,6 @@ When defining generic functions or classes, type parameters (like `T`, `U`) can 
   §I{List<T>:items}
   §O{T}
   §R items[0]
-§/F{f001}
 ```
 
 See [Structure Tags - Generics](/calor/syntax-reference/structure-tags/#generics) for more on defining generic functions and classes.
@@ -257,7 +248,6 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 §LIST{name:elementType}
   element1
   element2
-§/LIST{name}
 ```
 
 | Part | Description |
@@ -271,7 +261,6 @@ Calor provides built-in syntax for creating and manipulating collections with ty
   1
   2
   3
-§/LIST{numbers}
 ```
 
 ### Dictionary Creation
@@ -280,7 +269,6 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 §DICT{name:keyType:valueType}
   §KV key1 value1
   §KV key2 value2
-§/DICT{name}
 ```
 
 | Part | Description |
@@ -295,7 +283,6 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 §DICT{ages:str:i32}
   §KV "alice" 30
   §KV "bob" 25
-§/DICT{ages}
 ```
 
 ### HashSet Creation
@@ -304,7 +291,6 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 §HSET{name:elementType}
   element1
   element2
-§/HSET{name}
 ```
 
 **Example:**
@@ -312,7 +298,6 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 §HSET{tags:str}
   "urgent"
   "review"
-§/HSET{tags}
 ```
 
 ### Collection Operations
@@ -344,8 +329,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 
 **Example:**
 ```
-§IF{if1} §HAS{numbers} 5 → §P "Found 5"
-§/I{if1}
+§IF §HAS{numbers} 5 → §P "Found 5"
 
 §B{count} §CNT{ages}
 ```
@@ -366,7 +350,6 @@ Types matter in contracts for proper comparisons:
   §S (>= result min)        // Ensures: result >= min
   §S (<= result max)        // Ensures: result <= max
   // ...
-§/F{f001}
 ```
 
 ---

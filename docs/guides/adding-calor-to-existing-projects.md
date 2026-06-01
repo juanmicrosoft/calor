@@ -114,24 +114,20 @@ Create a new `.calr` file alongside your existing code:
 ```bash
 # Create a simple Calor module
 cat > src/Services/Calculator.calr << 'EOF'
-§M{m001:Calculator}
+§M{Calculator}
 
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f001}
 
-§F{f002:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
   §Q (!= b 0)
   §R (/ a b)
-§/F{f002}
-
-§/M{m001}
 EOF
 ```
 

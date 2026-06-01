@@ -140,7 +140,6 @@ Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 §IF{if1} (> x 0) → §P "positive"
 §EI (< x 0) → §P "negative"
 §EL → §P "zero"
-§/I{if1}
 ```
 
 ### In Contracts
@@ -182,12 +181,10 @@ Check if a collection contains an element.
 // Check if list contains element
 §IF{if1} §HAS{numbers} 5
   §P "Found 5"
-§/I{if1}
 
 // Check if key exists in dictionary
 §IF{if2} §HAS{ages} §KEY "alice"
   §P "Alice found"
-§/I{if2}
 
 // Use in binding
 §B{hasItem} §HAS{inventory} "sword"
@@ -209,12 +206,10 @@ Get the number of elements in a collection.
 // Use in condition
 §IF{if1} (> §CNT{queue} 0)
   §P "Queue not empty"
-§/I{if1}
 
 // Use in loop bound
 §L{for1:i:0:(- §CNT{list} 1):1}
   §P list[i]
-§/L{for1}
 ```
 
 ### Using Collection Expressions in Contracts
@@ -226,7 +221,6 @@ Get the number of elements in a collection.
   §Q (> §CNT{items} 0)           // Requires: items not empty
   §S (>= result 0)
   // ...
-§/F{f001}
 ```
 
 ---

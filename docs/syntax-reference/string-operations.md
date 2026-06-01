@@ -287,7 +287,6 @@ String operations can be freely composed with each other and with other Calor ex
   §R "Letters only"
 §EL
   §R (concat "Valid: " input)
-§/I{v1}
 ```
 
 ### In Contracts
@@ -300,7 +299,6 @@ String operations can be freely composed with each other and with other Calor ex
   §Q (is-letter (char-at name 0))        // Requires: starts with letter
   §S (== (len result) (len name))        // Ensures: same length
   §R (upper name)
-§/F{f001}
 ```
 
 ---
@@ -321,12 +319,10 @@ String operations can throw exceptions at runtime:
 // Check length before accessing
 §IF{safe} (> (len s) 0)
   §B{first} (char-at s 0)
-§/I{safe}
 
 // Check index before substring
 §IF{valid} (&& (>= start 0) (<= (+ start len) (len s)))
   §B{sub} (substr s start len)
-§/I{valid}
 ```
 
 ---

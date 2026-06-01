@@ -23,10 +23,8 @@ Consider a function with multiple code paths:
   §S (>= result 0)
   §IF{if001} (< x 0)
     §R 0
-  §ELSE{if001}
+    §ELSE{if001}
     §R x
-  §/IF{if001}
-§/F{f004}
 ```
 
 With `--verify`, the compiler uses Z3 to analyze both branches:
@@ -44,7 +42,6 @@ For simpler cases, verification is even more straightforward:
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
-§/F{f001}
 ```
 
 The square of a non-negative number is always non-negative — Z3 proves this immediately.
@@ -84,7 +81,6 @@ Z3 found a counterexample showing the contract can be violated. A warning is emi
   §O{i32}
   §S (>= result 0)
   §R (- x 1)
-§/F{f005}
 ```
 
 ```

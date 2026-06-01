@@ -122,14 +122,12 @@ These are different questions that require different benchmarks.
 **Generated Calor:**
 ```calor
 §M{m001:SafeDivideModule}
-§F{f001:SafeDivide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:SafeDivide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §Q (!= b 0)
+    §R (/ a b)
 ```
 
 **Generated C#:**
@@ -164,7 +162,6 @@ Both compile and pass tests. But note that Calor uses a **contract** (`§Q (!= b
   §S (>= result 0)
   §S (<= result 100)
   §R (/ (* score 100) maxScore)
-§/F{f001}
 ```
 
 **Generated C#:**

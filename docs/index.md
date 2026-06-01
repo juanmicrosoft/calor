@@ -35,20 +35,20 @@ Calor asks: *What if we designed a language from the ground up for AI agents?*
 ### Calor - Everything Explicit
 
 ```
-§F{f002:Square:pub}
+§F{Square:pub}
   §I{i32:x}
   §O{i32}
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
-§/F{f002}
 ```
 
 **What Calor tells the agent directly:**
-- Function ID: `f002` - can reference precisely
+- Optional ID slot: add `§F{f002:Square:pub}` if you need a stable handle for tooling
 - Precondition (`§Q`): `x >= 0`
 - Postcondition (`§S`): `result >= 0`
 - No side effects (no `§E` declaration)
+- Block ends at dedent — no closer tag to forget
 
 ### C# - Requires Inference
 
@@ -84,7 +84,7 @@ Because humans find annotation burden too high. Every verification system that r
 Calor is the first language to leverage this insight:
 
 ```
-§F{f001:ProcessOrder:pub}
+§F{ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
   §E{db:rw}                  // Effect declaration enforced at compile time
@@ -93,7 +93,6 @@ Calor is the first language to leverage this insight:
 
   §C{SaveOrder} order       // OK: SaveOrder has db effect
   §C{SendEmail} order       // COMPILE ERROR: net effect not declared
-§/F{f001}
 ```
 
 The compiler catches effect violations with full call chains. The runtime catches contract violations with function ID and source location. Bugs that would ship to production in traditional languages are **impossible** in Calor.

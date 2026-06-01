@@ -59,7 +59,6 @@ Consider a division function with a precondition:
   §O{i32}
   §Q (!= b 0)              // Precondition: b must not be zero
   §R (/ a b)
-§/F{f001}
 ```
 
 When compiled with `--verify`, Z3 checks whether the division can ever fail:
@@ -106,7 +105,6 @@ Z3 can prove that implementations satisfy their postconditions:
   §Q (>= x 0)
   §S (>= result 0)         // Z3 proves: x² ≥ 0 when x ≥ 0
   §R (* x x)
-§/F{f001}
 ```
 
 ```

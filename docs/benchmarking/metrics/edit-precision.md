@@ -66,14 +66,10 @@ Base score: 0.50, cap at 0.85
 §L{for1:i:1:100:1}
   §IF{if1} (> i 50)
     §P i
-  §/I{if1}
-§/L{for1}
 
 §L{for2:j:1:50:1}
   §IF{if2} (< j 25)
     §P j
-  §/I{if2}
-§/L{for2}
 ```
 
 **Agent instruction:** "Change `for1` to start at 0"
@@ -234,19 +230,16 @@ Lower `modified / total` ratio = higher precision.
 
 ```
 §M{m001:Calculator}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§F{f002:Multiply:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f002}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+  §F{f002:Multiply:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (* a b)
 ```
 
 **Score:**

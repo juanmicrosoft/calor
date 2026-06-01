@@ -2,16 +2,25 @@
 
 This is a Calor project. Write code in `.calr` files.
 
+### Block Structure (Indentation)
+
+Calor blocks are delimited by **indentation** (like Python), with the
+default of **2 spaces per nesting level**. There are **no `§/X` closing
+tags** to add; a block ends at the next line that dedents back to (or
+past) the parent column. Stable IDs are **optional** on structural
+openers — provide one (`§F{f001:Name:pub}`) only if you need a handle
+for external tooling. Otherwise `§F{Name:pub}` is fine and the parser
+auto-assigns an ID.
+
 ### Function Syntax
 ```
-§F{id:Name:pub}
+§F{Name:pub}
   §I{type:name}      // Input parameter
   §O{type}           // Output/return type
   §Q (condition)     // Precondition (requires)
   §S (condition)     // Postcondition (ensures)
   §E{effects}        // Effects declaration
   §R expression      // Return
-§/F{id}
 ```
 
 ### Type Mappings
@@ -42,12 +51,12 @@ This is a Calor project. Write code in `.calr` files.
 ### Method Calls
 ```
 §C{MethodName}
-  §A argument
+§A argument
 §/C
 ```
 
 ### Unique IDs
-Each function has a unique ID (e.g., f001, f002). When extracting new functions:
-- Original functions keep their IDs
-- New extracted functions should use the next available ID (f005, f006, etc.)
-- IDs enable stable references across refactorings
+Stable IDs are **optional** on structural openers. When extracting new functions:
+- Existing functions keep any explicit ID they already have
+- New extracted functions may omit the ID (`§F{Name:pub}`) and the parser will auto-assign one
+- Add `§F{f005:Name:pub}` only if you want an external-tooling handle

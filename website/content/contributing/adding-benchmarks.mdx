@@ -55,12 +55,10 @@ Create `program.calr`:
 
 ```
 §M{m001:YourModule}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
   // Your implementation
-§/F{f001}
-§/M{m001}
 ```
 
 **Guidelines:**
@@ -145,23 +143,19 @@ dotnet run --project tests/Calor.Evaluation -- --output report.json
 
 ```
 §M{m001:Math}
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n 0)
-  §Q (<= n 12)
-  §S (>= result 1)
-  §IF{if1} (<= n 1) → §R 1
-  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
-  §/I{if1}
-§/F{f001}
+  §F{f001:Factorial:pub}
+    §I{i32:n}
+    §O{i32}
+    §Q (>= n 0)
+    §Q (<= n 12)
+    §S (>= result 1)
+    §IF{if1} (<= n 1) → §R 1
+    §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
 
-§F{f002:Main:pub}
-  §O{void}
-  §E{cw}
-  §P §C{Factorial} §A 5 §/C
-§/F{f002}
-§/M{m001}
+  §F{f002:Main:pub}
+    §O{void}
+    §E{cw}
+    §P §C{Factorial} §A 5 §/C
 ```
 
 ### C# (`factorial.cs`)

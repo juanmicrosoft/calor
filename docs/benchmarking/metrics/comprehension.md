@@ -70,15 +70,13 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 
 ```
 §M{m001:Calculator}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §S (>= result 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §Q (!= b 0)
+    §S (>= result 0)
+    §R (/ a b)
 ```
 
 **Score calculation:**

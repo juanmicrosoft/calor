@@ -59,11 +59,10 @@ Once defined, use the name as a parameter type:
 ```
 §RTYPE{r1:NatInt:i32} (>= # INT:0)
 
-§F{f001:Process:pub}
-  §I{NatInt:count}
-  §O{void}
+  §F{f001:Process:pub}
+    §I{NatInt:count}
+    §O{void}
   // count is guaranteed non-negative
-§/F{f001}
 ```
 
 The obligation engine creates a verification obligation for `count` — proving the refinement predicate holds given the function's preconditions.
@@ -88,7 +87,6 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
   §I{i32:b} | (!= # INT:0)         // b must be non-zero
   §O{i32}
   §R (/ a b)
-§/F{f001}
 ```
 
 ```
@@ -96,7 +94,6 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
   §I{i32:port} | (&& (>= # INT:1) (<= # INT:65535))
   §O{void}
   // ...
-§/F{f002}
 ```
 
 ### Inline Refinements with Default Values
@@ -149,7 +146,6 @@ A proof obligation asserts that a condition holds at a specific point in the fun
   §PROOF{p1:non-negative} (>= newBalance INT:0)
 
   §R newBalance
-§/F{f001}
 ```
 
 Z3 proves this: given `balance >= amount` and `amount > 0`, then `balance - amount >= 0`.
@@ -186,7 +182,7 @@ Indexed types are size-parameterized types — a collection type annotated with 
 
 ```
 §ITYPE{it1:SizedList:List:n}                            // List with n elements
-§ITYPE{it2:NonEmptyArr:i32[]:n} (> # INT:0)             // array with n > 0 elements
+§ITYPE{it2:NonEmptyArr:i32[}:n} (> # INT:0)             // array with n > 0 elements
 §ITYPE{it3:BoundedVec:List:n} (&& (> # INT:0) (< # INT:1000))
 ```
 
@@ -197,14 +193,13 @@ Declare a parameter with the indexed type name. The size parameter becomes a Z3 
 ```
 §ITYPE{it1:SizedList:List:n}
 
-§F{f001:Sum:priv}
-  §I{SizedList:items}        // items has n elements
-  §I{i32:n}                  // size parameter as explicit param
-  §I{i32:i}
-  §O{i32}
-  §Q (&& (>= i INT:0) (< i n))
-  §R §IDX items i            // proven safe: 0 <= i < n
-§/F{f001}
+  §F{f001:Sum:priv}
+    §I{SizedList:items}        // items has n elements
+    §I{i32:n}                  // size parameter as explicit param
+    §I{i32:i}
+    §O{i32}
+    §Q (&& (>= i INT:0) (< i n))
+    §R §IDX items i            // proven safe: 0 <= i < n
 ```
 
 The obligation engine creates an `IndexBounds` obligation for each `§IDX` on an indexed-typed array. The condition is `(&& (>= index INT:0) (< index sizeParam))`. When the function has preconditions or inline refinements bounding the index, Z3 discharges the obligation automatically.
@@ -295,22 +290,20 @@ Failed obligations emit warnings and guards instead of errors. Use during develo
 §M{m001:Banking}
 
 // Named refinement types
-§RTYPE{r1:PositiveAmount:i32} (> # INT:0)
-§RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
+  §RTYPE{r1:PositiveAmount:i32} (> # INT:0)
+    §RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
 
-§F{f001:Transfer:pub}
-  §I{NonNegBalance:balance}
-  §I{PositiveAmount:amount}
-  §O{i32}
-  §Q (>= balance amount)                  // sufficient funds
+      §F{f001:Transfer:pub}
+        §I{NonNegBalance:balance}
+        §I{PositiveAmount:amount}
+        §O{i32}
+        §Q (>= balance amount)                  // sufficient funds
 
-  §B{result:i32} (- balance amount)
-  §PROOF{p1:balance-safe} (>= result INT:0)
+        §B{result:i32} (- balance amount)
+        §PROOF{p1:balance-safe} (>= result INT:0)
 
-  §R result
-§/F{f001}
+        §R result
 
-§/M{m001}
 ```
 
 The obligation engine:

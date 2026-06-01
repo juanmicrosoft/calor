@@ -169,27 +169,23 @@ The Calor formatter applies these rules:
 ```calor
 // Before (inconsistent)
 §M{m001:Math}
-§F{f001:Add:pub}
-§I{i32:a}
-  §I{i32:b}
-§O{i32}
-§R(+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R(+ a b)
 ```
 
 ```calor
 // After (formatted)
 §M{m001:Math}
 
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 
-§/M{m001}
 ```
 
 ---

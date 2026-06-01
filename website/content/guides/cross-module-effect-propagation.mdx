@@ -21,14 +21,12 @@ Suppose you split your code across two files:
 ```
 §M{m001:OrderService}
 
-§F{f001:SaveOrder:pub}
-  §I{Order:order}
-  §O{void}
-  §E{db:w}
-  §C{DbContext.SaveChanges} §/C
-§/F{f001}
+  §F{f001:SaveOrder:pub}
+    §I{Order:order}
+    §O{void}
+    §E{db:w}
+    §C{DbContext.SaveChanges} §/C
 
-§/M{m001}
 ```
 
 **`Handler.calr`**
@@ -36,12 +34,10 @@ Suppose you split your code across two files:
 ```
 §M{m002:Handler}
 
-§F{f001:HandleRequest:pub}
-  §O{void}
-  §C{SaveOrder} §/C
-§/F{f001}
+  §F{f001:HandleRequest:pub}
+    §O{void}
+    §C{SaveOrder} §/C
 
-§/M{m002}
 ```
 
 `HandleRequest` calls `SaveOrder` — a function defined in another module — but declares no effects. `SaveOrder` has effect `db:w`, so `HandleRequest` must also declare `db:w`.
@@ -66,7 +62,6 @@ Fix by adding the effect to the caller:
   §O{void}
   §E{db:w}                    ← now declared
   §C{SaveOrder} §/C
-§/F{f001}
 ```
 
 ### The contract model: declared effects propagate, not inferred ones
@@ -165,15 +160,13 @@ Two patterns work:
 
 ```
 §M{m002:Handler}
-§U{OrderService}                ← adds `using OrderService;` to generated C#
+  §U{OrderService}                ← adds `using OrderService;` to generated C#
 
-§F{f001:HandleRequest:pub}
-  §O{void}
-  §E{db:w}
-  §C{SaveOrder} §/C             ← resolves via the using directive
-§/F{f001}
+  §F{f001:HandleRequest:pub}
+    §O{void}
+    §E{db:w}
+    §C{SaveOrder} §/C             ← resolves via the using directive
 
-§/M{m002}
 ```
 
 ### 2. Module-qualified call
@@ -183,7 +176,6 @@ Two patterns work:
   §O{void}
   §E{db:w}
   §C{OrderService.SaveOrder} §/C
-§/F{f001}
 ```
 
 The cross-module effect pass handles both forms identically. Pick whichever reads better for your project.

@@ -129,7 +129,6 @@ Calor uses **lexical scoping** with parent chain lookup.
 §IF{if1} BOOL:true
   §B{x} INT:2   // Shadows outer x
   §P x          // Prints 2
-§/I{if1}
 §P x            // Prints 1 (outer x unchanged)
 ```
 
@@ -158,7 +157,6 @@ Return statements in nested scopes must correctly unwind to the function boundar
 ```
 §IF{if1} BOOL:true
   §R INT:42   // Returns from function, not just if block
-§/I{if1}
 ```
 
 **Test:** `S6: ReturnFromNestedScope`

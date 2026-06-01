@@ -2,15 +2,25 @@
 
 This is a Calor project. Write code in `.calr` files.
 
+### Block Structure (Indentation)
+
+Calor blocks are delimited by **indentation** (like Python), with the
+default of **2 spaces per nesting level**. There are **no `§/X` closing
+tags** to add; a block ends at the next line that dedents back to (or
+past) the parent column. Stable IDs are **optional** on structural
+openers — provide one (`§F{f001:Name:pub}`) only if you need a handle
+for external tooling. Otherwise `§F{Name:pub}` is fine and the parser
+auto-assigns an ID.
+
 ### Function Syntax
 ```
-§F{id:Name:pub}
+§F{Name:pub}
   §I{type:name}      // Input parameter
   §O{type}           // Output/return type
   §Q (condition)     // Precondition (requires)
   §S (condition)     // Postcondition (ensures)
+  §E{effects}        // Effects declaration
   §R expression      // Return
-§/F{id}
 ```
 
 ### Inlining Guidelines
@@ -26,8 +36,8 @@ When inlining a function call:
 ### Function Calls
 ```
 §C{FunctionName}
-  §A argument1
-  §A argument2
+§A argument1
+§A argument2
 §/C
 ```
 

@@ -44,12 +44,11 @@ Calor assigns every declaration a **unique ID that represents semantic identity*
 
 ```calor
 §F{f_01J5X7K9M2NPQRSTABWXYZ12:Calculate:pub}
-   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   This ID survives ANY refactoring
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  This ID survives ANY refactoring
   §I{i32:x}
   §O{i32}
   §R (* x 2)
-§/F{f_01J5X7K9M2NPQRSTABWXYZ12}
 ```
 
 The ID `f_01J5X7K9M2NPQRSTABWXYZ12`:
@@ -102,7 +101,6 @@ Code generation and conversion preserve identity:
 §F{f_01ABC:Add:pub}
   §O{i32}
   §R (+ a b)
-§/F{f_01ABC}
 ```
 
 ```csharp
@@ -116,7 +114,6 @@ public static int Add(int a, int b) => a + b;
 §F{f_01ABC:Add:pub}
   §O{i32}
   §R (+ a b)
-§/F{f_01ABC}
 ```
 
 ### 4. Traceable History
@@ -256,12 +253,10 @@ Until IDE tooling ships, full ULIDs are visible in source. This is an accepted t
 // Developer writes (no ID):
 §F{:NewFunction:pub}
   §O{void}
-§/F{}
 
 // After `calor ids assign`:
 §F{f_01NEW...:NewFunction:pub}
   §O{void}
-§/F{f_01NEW...}
 ```
 
 The tooling handles the complexity; developers just write code.

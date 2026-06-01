@@ -32,7 +32,7 @@ This is a fundamental design choice, not a flaw to be fixed.
 | **Comprehension** | Explicit structure and contracts | 1.46x better than C# |
 | **Error Detection** | First-class preconditions/postconditions | 1.45x better than C# |
 | **Edit Precision** | Unique IDs for every element | 1.36x better than C# |
-| **Parseability** | Matched tags, prefix notation | Trivial to parse |
+| **Parseability** | Indentation + prefix notation | Trivial to parse |
 | **Verifiability** | Contracts in syntax, not comments | Machine-checkable specs |
 
 ---
@@ -67,7 +67,6 @@ Calor's tradeoff pays off when:
   §S (== from.balance (- old_from_balance amount))
   §S (== to.balance (+ old_to_balance amount))
   // ...
-§/F{f001}
 ```
 
 An agent can reason about this function's behavior without reading the implementation:
@@ -89,7 +88,6 @@ An agent can reason about this function's behavior without reading the implement
   §S (>= result 0)
   §S (<= result price)
   §R (* price (- 1 (/ discount_percent 100)))
-§/F{f001}
 ```
 
 An agent can immediately verify:

@@ -185,7 +185,7 @@ The Calor skills teach Claude:
 - Unique ID generation (`m001`, `f001`, `c001`, etc.)
 - Contract placement (`§Q` preconditions, `§S` postconditions)
 - Effect declarations (`§E{db:rw,net:rw,cw}`)
-- Proper structure nesting and closing tags
+- Proper indentation and block nesting
 
 ### Code Patterns
 
@@ -221,18 +221,14 @@ Key syntax:
 
 Example:
 §M{m001:FizzBuzz}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §L{for1:i:1:100:1}
-    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-    §EI (== (% i 3) 0) → §P "Fizz"
-    §EI (== (% i 5) 0) → §P "Buzz"
-    §EL → §P i
-    §/I{if1}
-  §/L{for1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §L{for1:i:1:100:1}
+      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
+      §EI (== (% i 3) 0) → §P "Fizz"
+      §EI (== (% i 5) 0) → §P "Buzz"
+      §EL → §P i
 
 Please write Calor code for: [your request]
 ```
@@ -261,9 +257,6 @@ Calor code:
   §L{for1:i:0:n:1}
     §IF{if2} (> y 0)
       // ...
-    §/I{if2}
-  §/L{for1}
-§/I{if1}
 ```
 
 Every scope has explicit open and close tags with matching IDs. No ambiguity.
@@ -295,7 +288,6 @@ The ID `for1` uniquely identifies the target. No confusion with other loops.
   §Q (> years 0)
   §S (>= result principal)
   §R (* principal (** (+ 1 rate) years))
-§/F{f001}
 ```
 
 Claude can verify:
@@ -311,7 +303,6 @@ Claude can verify:
   §O{bool}
   §E{db:rw,net:rw,cw}  // Explicit effects
   // ...
-§/F{f001}
 ```
 
 Claude knows immediately that this function:
@@ -336,16 +327,13 @@ that n >= 0 and postcondition that result >= 1
 **Response:**
 ```
 §M{m001:Math}
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n 0)
-  §S (>= result 1)
-  §IF{if1} (<= n 1) → §R 1
-  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
-  §/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Factorial:pub}
+    §I{i32:n}
+    §O{i32}
+    §Q (>= n 0)
+    §S (>= result 1)
+    §IF{if1} (<= n 1) → §R 1
+    §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
 ```
 
 ### Find Bugs
@@ -359,7 +347,6 @@ Is there a bug in this Calor code?
   §I{i32:b}
   §O{i32}
   §R (/ a b)
-§/F{f001}
 ```
 
 **Response:**
@@ -382,7 +369,6 @@ Refactor this to extract the calculation into a separate function:
   §E{cw}
   §B{x} (* 5 5)
   §P x
-§/F{f001}
 ```
 
 **Response:**
@@ -391,14 +377,12 @@ Refactor this to extract the calculation into a separate function:
   §I{i32:n}
   §O{i32}
   §R (* n n)
-§/F{f001}
 
 §F{f002:Main:pub}
   §O{void}
   §E{cw}
   §B{x} §C{Square} §A 5 §/C
   §P x
-§/F{f002}
 ```
 
 ---
@@ -408,7 +392,7 @@ Refactor this to extract the calculation into a separate function:
 1. **Always include IDs** - They enable precise references
 2. **Declare effects** - Even if empty (`§E{}`)
 3. **Write contracts** - They serve as executable documentation
-4. **Use closing tags** - They prevent scope ambiguity
+4. **Indent consistently** - Block boundaries are inferred from indentation; mixing tabs and spaces is rejected
 5. **Use standard syntax** - `(+ a b)` for expressions
 
 ---

@@ -77,7 +77,6 @@ Base score: 0.30, cap at 0.90
   §Q (>= a 0)              // Explicit: a must be non-negative
   §S (>= result 0)         // Explicit: result is non-negative
   §R (/ a b)
-§/F{f001}
 ```
 
 **Detection capability:**
@@ -186,8 +185,6 @@ Given this buggy call:
   §S (|| (== result.IsOk true) (!= result.Error ""))
   §IF{if1} (== b 0) → §R §ERR "Division by zero"
   §EL → §R §OK (/ a b)
-  §/I{if1}
-§/F{f001}
 ```
 
 **Score:**

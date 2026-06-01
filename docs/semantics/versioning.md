@@ -56,7 +56,6 @@ Modules can declare their required semantics version:
 §M{m001:MyModule}
   §SEMVER{1.0.0}
   ...
-§/M{m001}
 ```
 
 ### 3.2 Syntax Variants
@@ -314,7 +313,6 @@ public const string SemanticsVersionIncompatible = "Calor0701"; // Error
 // Test: Module declares newer version than compiler supports
 §M{m1:Test}
   §SEMVER{99.0.0}  // Future version
-§/M{m1}
 ```
 
 Expected: Diagnostic `Calor0701` (Error)
