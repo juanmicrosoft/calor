@@ -1,5 +1,12 @@
 # Phase 3 — H1 Replication (v2) — Equalized prompts, 7 tasks, 5 trials/cell
 
+> **⚠️ SUPERSEDED by v3** (`phase3-h1-replication-v3-results.md`).
+> The negative verdict below was a teaching artifact, not a form artifact.
+> When v3 added a single paragraph teaching `§IF{id}/§EI/§EL` syntax to BOTH
+> arms (delimiter paragraph still the only difference), indent flipped from
+> 57.1% → 97.1% pass rate and now matches/beats closer. See v3 report for the
+> current recommendation.
+
 **Date:** 2025-11-21  
 **Branch:** `rfc/phase-3-indent`  
 **Harness:** `scripts/phase3_h1_replication.py`  
@@ -7,7 +14,7 @@
 **Total invocations:** 70 (7 tasks × 2 arms × 5 trials)  
 **Model:** claude-haiku-4-5
 
-## Verdict
+## Verdict (SUPERSEDED — see v3)
 
 **Phase 3 (Python-style indentation) HURTS agent write performance.**
 
