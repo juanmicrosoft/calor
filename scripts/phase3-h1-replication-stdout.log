@@ -1,0 +1,93 @@
+Phase 3 H1 REPLICATION (v2)
+  Tasks: 7 (1 control, 6 contract)
+  Arms: 2  Trials/cell: 5  Total: 70 invocations
+  Budget cap: $5.00  Model: claude-haiku-4-5
+
+  basic-001       closer  1/5 ... PASS  $0.0367  11.8s
+  basic-001       closer  2/5 ... PASS  $0.0090  9.4s
+  basic-001       closer  3/5 ... PASS  $0.0063  11.3s
+  basic-001       closer  4/5 ... PASS  $0.0066  5.7s
+  basic-001       closer  5/5 ... PASS  $0.0088  11.0s
+  basic-001       indent  1/5 ... PASS  $0.0091  10.1s
+  basic-001       indent  2/5 ... PASS  $0.0056  8.6s
+  basic-001       indent  3/5 ... PASS  $0.0052  7.6s
+  basic-001       indent  4/5 ... PASS  $0.0062  8.7s
+  basic-001       indent  5/5 ... PASS  $0.0063  9.0s
+  contract-001    closer  1/5 ... PASS  $0.0089  9.3s
+  contract-001    closer  2/5 ... PASS  $0.0095  10.6s
+  contract-001    closer  3/5 ... PASS  $0.0079  11.1s
+  contract-001    closer  4/5 ... PASS  $0.0072  10.6s
+  contract-001    closer  5/5 ... PASS  $0.0065  8.5s
+  contract-001    indent  1/5 ... PASS  $0.0094  12.5s
+  contract-001    indent  2/5 ... PASS  $0.0072  11.9s
+  contract-001    indent  3/5 ... PASS  $0.0067  10.3s
+  contract-001    indent  4/5 ... PASS  $0.0085  6.0s
+  contract-001    indent  5/5 ... PASS  $0.0065  9.1s
+  contract-002    closer  1/5 ... FAIL  $0.0159  16.9s
+  contract-002    closer  2/5 ... PASS  $0.0146  21.7s
+  contract-002    closer  3/5 ... PASS  $0.0103  10.5s
+  contract-002    closer  4/5 ... FAIL  $0.0177  27.9s
+  contract-002    closer  5/5 ... PASS  $0.0128  16.6s
+  contract-002    indent  1/5 ... FAIL  $0.0113  13.2s
+  contract-002    indent  2/5 ... FAIL  $0.0137  18.0s
+  contract-002    indent  3/5 ... FAIL  $0.0103  8.0s
+  contract-002    indent  4/5 ... FAIL  $0.0232  33.2s
+  contract-002    indent  5/5 ... FAIL  $0.0116  18.6s
+  contract-004    closer  1/5 ... PASS  $0.0104  12.2s
+  contract-004    closer  2/5 ... PASS  $0.0096  11.9s
+  contract-004    closer  3/5 ... PASS  $0.0082  11.5s
+  contract-004    closer  4/5 ... PASS  $0.0098  11.4s
+  contract-004    closer  5/5 ... PASS  $0.0079  12.7s
+  contract-004    indent  1/5 ... PASS  $0.0109  13.5s
+  contract-004    indent  2/5 ... PASS  $0.0075  11.9s
+  contract-004    indent  3/5 ... PASS  $0.0070  11.2s
+  contract-004    indent  4/5 ... PASS  $0.0077  12.1s
+  contract-004    indent  5/5 ... PASS  $0.0096  11.0s
+  contract-005    closer  1/5 ... FAIL  $0.0103  10.2s
+  contract-005    closer  2/5 ... FAIL  $0.0084  10.7s
+  contract-005    closer  3/5 ... PASS  $0.0080  11.3s
+  contract-005    closer  4/5 ... PASS  $0.0094  6.7s
+  contract-005    closer  5/5 ... PASS  $0.0108  10.9s
+  contract-005    indent  1/5 ... PASS  $0.0127  13.7s
+  contract-005    indent  2/5 ... PASS  $0.0078  10.3s
+  contract-005    indent  3/5 ... PASS  $0.0118  11.1s
+  contract-005    indent  4/5 ... PASS  $0.0076  11.5s
+  contract-005    indent  5/5 ... PASS  $0.0078  12.1s
+  logic-002       closer  1/5 ... PASS  $0.0180  17.8s
+  logic-002       closer  2/5 ... PASS  $0.0184  22.3s
+  logic-002       closer  3/5 ... PASS  $0.0124  14.0s
+  logic-002       closer  4/5 ... PASS  $0.0080  10.8s
+  logic-002       closer  5/5 ... PASS  $0.0095  13.3s
+  logic-002       indent  1/5 ... FAIL  $0.0151  14.6s
+  logic-002       indent  2/5 ... FAIL  $0.0134  16.5s
+  logic-002       indent  3/5 ... FAIL  $0.0157  23.0s
+  logic-002       indent  4/5 ... FAIL  $0.0151  19.7s
+  logic-002       indent  5/5 ... FAIL  $0.0140  14.8s
+  logic-004       closer  1/5 ... PASS  $0.0119  15.8s
+  logic-004       closer  2/5 ... PASS  $0.0150  22.0s
+  logic-004       closer  3/5 ... PASS  $0.0145  16.7s
+  logic-004       closer  4/5 ... FAIL  $0.0097  15.2s
+  logic-004       closer  5/5 ... PASS  $0.0170  22.6s
+  logic-004       indent  1/5 ... FAIL  $0.0128  12.9s
+  logic-004       indent  2/5 ... FAIL  $0.0112  13.7s
+  logic-004       indent  3/5 ... FAIL  $0.0164  19.0s
+  logic-004       indent  4/5 ... FAIL  $0.0105  17.1s
+  logic-004       indent  5/5 ... FAIL  $0.0152  23.8s
+
+--- AGGREGATE ---
+  closer  : 30/35  (85.7%)  $0.406
+  indent  : 20/35  (57.1%)  $0.370
+  Δ pass rate: -28.6pp
+  Δ cost:     -8.7%
+  Fisher exact p-value (two-sided): 0.0161  (significant at 0.05)
+
+--- PER-TASK ---
+  basic-001      (control )  closer 5/5   indent 5/5
+  contract-001   (contract)  closer 5/5   indent 5/5
+  contract-002   (contract)  closer 3/5   indent 0/5
+  contract-004   (contract)  closer 5/5   indent 5/5
+  contract-005   (contract)  closer 3/5   indent 5/5
+  logic-002      (contract)  closer 5/5   indent 0/5
+  logic-004      (contract)  closer 4/5   indent 0/5
+
+Raw: C:\Users\juanrivera\sources\repos\juanmicrosoft\calor-2\scripts\phase3-h1-replication-results.json
