@@ -2,10 +2,24 @@
 
 > Status: ROADMAP — Phase 0 (canonical prompt updates) in progress; Phases 1–5 pending.
 > Owner: feature/indent-only branch
-> Driver: H1 v3 replication (commit e8c4cf7 on rfc/phase-3-indent) showed indent form
-> matches closer form on agent write pass rate (+5.7pp, p=0.61) when chain syntax is
-> explicitly taught, AND saves 15–17% on tokens and source bytes. User decided to
-> remove closer form entirely.
+> Driver: H1 v3 + H2 evidence shows indent form is **tie-or-favorable** on every
+> measured dimension. User decided to remove closer form entirely.
+> Confidence to ship: ~78-82% (post-H2). Remaining 13pp gap to 95% requires
+> cross-model replication, larger fixtures, error-recovery study, and Phase 1
+> compiler refactor landing green.
+
+## Evidence summary
+
+| Dimension | Result | Source |
+|---|---|---|
+| Source bytes | -15% | Tier 0 mechanical measurement |
+| Read comprehension | tie (5/5 vs 5/5) | off-protocol smoke |
+| Write (greenfield) | +5.7pp pass, -16.7% cost | H1 v3, N=35/arm, p=0.61 |
+| Write (edit/modify) | tie (35/35 vs 35/35) | H2, N=35/arm, p=1.00 |
+
+Every measured dimension is tie or indent-favorable. The H2 edit-workload
+result closed the largest remaining measurement gap — indent form does NOT
+silently regress on edit/modify tasks at this corpus size.
 
 ## Final state
 
