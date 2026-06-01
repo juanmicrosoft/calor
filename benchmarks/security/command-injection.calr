@@ -3,76 +3,68 @@
 
 §M{m001:CommandInjectionBenchmark}
 
-§F{f001:VulnerableShellExec:pub}
-  §DOC{BUG: Direct shell execution with user input}
-  §DOC{EXPECTED: Calor0982 Command Injection}
-  §I{string:user_input}
-  §O{i32}
-  §E{process:rw}
-  §B{cmd:string} (+ STR:"ls -la " user_input)
-  §C shell cmd
-  §R INT:0
-§/F{f001}
+  §F{f001:VulnerableShellExec:pub}
+    §DOC{BUG: Direct shell execution with user input}
+    §DOC{EXPECTED: Calor0982 Command Injection}
+    §I{string:user_input}
+    §O{i32}
+    §E{process:rw}
+    §B{cmd:string} (+ STR:"ls -la " user_input)
+    §C shell cmd
+    §R INT:0
 
-§F{f002:SafeWhitelistedCommand:pub}
-  §DOC{SAFE: Only whitelisted commands executed}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:option}
-  §O{i32}
-  §E{process:rw}
-  §IF (== option INT:1)
-    §C exec STR:"ls"
-  §EIF (== option INT:2)
-    §C exec STR:"pwd"
-  §EL
-    §C exec STR:"whoami"
-  §/IF
-  §R INT:0
-§/F{f002}
+  §F{f002:SafeWhitelistedCommand:pub}
+    §DOC{SAFE: Only whitelisted commands executed}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:option}
+    §O{i32}
+    §E{process:rw}
+    §IF (== option INT:1)
+      §C exec STR:"ls"
+      §EIF (== option INT:2)
+      §C exec STR:"pwd"
+    §EL
+      §C exec STR:"whoami"
+    §R INT:0
 
-§F{f003:VulnerablePopen:pub}
-  §DOC{BUG: User input passed to popen}
-  §DOC{EXPECTED: Calor0982 Command Injection}
-  §I{string:filename}
-  §O{string}
-  §E{process:rw}
-  §B{cmd:string} (+ STR:"cat " filename)
-  §B{result:string} (CALL popen cmd)
-  §R result
-§/F{f003}
+  §F{f003:VulnerablePopen:pub}
+    §DOC{BUG: User input passed to popen}
+    §DOC{EXPECTED: Calor0982 Command Injection}
+    §I{string:filename}
+    §O{string}
+    §E{process:rw}
+    §B{cmd:string} (+ STR:"cat " filename)
+    §B{result:string} (CALL popen cmd)
+    §R result
 
-§F{f004:SafeEscapedCommand:pub}
-  §DOC{SAFE: Shell arguments properly escaped}
-  §DOC{EXPECTED: No warnings}
-  §I{string:user_input}
-  §O{i32}
-  §E{process:rw}
-  §B{safe:string} (CALL shell_escape user_input)
-  §B{cmd:string} (+ STR:"echo " safe)
-  §C shell cmd
-  §R INT:0
-§/F{f004}
+  §F{f004:SafeEscapedCommand:pub}
+    §DOC{SAFE: Shell arguments properly escaped}
+    §DOC{EXPECTED: No warnings}
+    §I{string:user_input}
+    §O{i32}
+    §E{process:rw}
+    §B{safe:string} (CALL shell_escape user_input)
+    §B{cmd:string} (+ STR:"echo " safe)
+    §C shell cmd
+    §R INT:0
 
-§F{f005:VulnerableSystemCall:pub}
-  §DOC{BUG: User input in system call}
-  §DOC{EXPECTED: Calor0982 Command Injection}
-  §I{string:query_param}
-  §O{i32}
-  §E{process:rw}
-  §B{script:string} (+ STR:"python script.py --arg=" query_param)
-  §C system script
-  §R INT:0
-§/F{f005}
+  §F{f005:VulnerableSystemCall:pub}
+    §DOC{BUG: User input in system call}
+    §DOC{EXPECTED: Calor0982 Command Injection}
+    §I{string:query_param}
+    §O{i32}
+    §E{process:rw}
+    §B{script:string} (+ STR:"python script.py --arg=" query_param)
+    §C system script
+    §R INT:0
 
-§F{f006:SafeArrayExec:pub}
-  §DOC{SAFE: Command executed as array (no shell)}
-  §DOC{EXPECTED: No warnings}
-  §I{string:arg}
-  §O{i32}
-  §E{process:rw}
-  §B{safeArg:string} (CALL sanitize arg)
-  §C exec_array STR:"ls" STR:"-la" safeArg
-  §R INT:0
-§/F{f006}
+  §F{f006:SafeArrayExec:pub}
+    §DOC{SAFE: Command executed as array (no shell)}
+    §DOC{EXPECTED: No warnings}
+    §I{string:arg}
+    §O{i32}
+    §E{process:rw}
+    §B{safeArg:string} (CALL sanitize arg)
+    §C exec_array STR:"ls" STR:"-la" safeArg
+    §R INT:0
 
-§/M{m001}

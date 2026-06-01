@@ -3,81 +3,70 @@
 
 §M{m001:NullDerefBenchmark}
 
-§F{f001:VulnerableNullDeref:pub}
-  §DOC{BUG: Potential null dereference without check}
-  §DOC{EXPECTED: Calor0922 Null Dereference}
-  §I{string:maybeNull}
-  §O{i32}
-  §R (CALL string.length maybeNull)
-§/F{f001}
-
-§F{f002:SafeNullCheck:pub}
-  §DOC{SAFE: Null check before use}
-  §DOC{EXPECTED: No warnings}
-  §I{string:maybeNull}
-  §O{i32}
-  §IF (!= maybeNull NONE)
+  §F{f001:VulnerableNullDeref:pub}
+    §DOC{BUG: Potential null dereference without check}
+    §DOC{EXPECTED: Calor0922 Null Dereference}
+    §I{string:maybeNull}
+    §O{i32}
     §R (CALL string.length maybeNull)
-  §EL
-    §R INT:0
-  §/IF
-§/F{f002}
 
-§F{f003:VulnerableChainedAccess:pub}
-  §DOC{BUG: Chained access without null checks}
-  §DOC{EXPECTED: Calor0922 Null Dereference}
-  §I{string:obj}
-  §O{string}
-  §B{inner:string} (CALL get_inner obj)
-  §B{value:string} (CALL get_value inner)
-  §R value
-§/F{f003}
+  §F{f002:SafeNullCheck:pub}
+    §DOC{SAFE: Null check before use}
+    §DOC{EXPECTED: No warnings}
+    §I{string:maybeNull}
+    §O{i32}
+    §IF (!= maybeNull NONE)
+      §R (CALL string.length maybeNull)
+    §EL
+      §R INT:0
 
-§F{f004:SafeCoalesce:pub}
-  §DOC{SAFE: Coalesce provides default}
-  §DOC{EXPECTED: No warnings}
-  §I{string:maybeNull}
-  §O{string}
-  §B{safe:string} (CALL coalesce maybeNull STR:"default")
-  §R safe
-§/F{f004}
+  §F{f003:VulnerableChainedAccess:pub}
+    §DOC{BUG: Chained access without null checks}
+    §DOC{EXPECTED: Calor0922 Null Dereference}
+    §I{string:obj}
+    §O{string}
+    §B{inner:string} (CALL get_inner obj)
+    §B{value:string} (CALL get_value inner)
+    §R value
 
-§F{f005:VulnerableOptionUnwrap:pub}
-  §DOC{BUG: Unwrap without checking Some/None}
-  §DOC{EXPECTED: Calor0925 Unsafe Unwrap}
-  §I{i32:maybeValue}
-  §O{i32}
-  §R (CALL unwrap maybeValue)
-§/F{f005}
+  §F{f004:SafeCoalesce:pub}
+    §DOC{SAFE: Coalesce provides default}
+    §DOC{EXPECTED: No warnings}
+    §I{string:maybeNull}
+    §O{string}
+    §B{safe:string} (CALL coalesce maybeNull STR:"default")
+    §R safe
 
-§F{f006:SafeOptionMatch:pub}
-  §DOC{SAFE: Pattern match on Option}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:maybeValue}
-  §O{i32}
-  §IF (!= maybeValue NONE)
-    §R maybeValue
-  §EL
-    §R INT:0
-  §/IF
-§/F{f006}
+  §F{f005:VulnerableOptionUnwrap:pub}
+    §DOC{BUG: Unwrap without checking Some/None}
+    §DOC{EXPECTED: Calor0925 Unsafe Unwrap}
+    §I{i32:maybeValue}
+    §O{i32}
+    §R (CALL unwrap maybeValue)
 
-§F{f007:VulnerableFunctionReturn:pub}
-  §DOC{BUG: Function return may be null}
-  §DOC{EXPECTED: Calor0922 Null Dereference}
-  §I{i32:key}
-  §O{i32}
-  §B{result:i32} (CALL dict.get key)
-  §R (+ result INT:1)
-§/F{f007}
+  §F{f006:SafeOptionMatch:pub}
+    §DOC{SAFE: Pattern match on Option}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:maybeValue}
+    §O{i32}
+    §IF (!= maybeValue NONE)
+      §R maybeValue
+    §EL
+      §R INT:0
 
-§F{f008:SafeOrDefault:pub}
-  §DOC{SAFE: Using get_or_default}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:key}
-  §O{i32}
-  §B{result:i32} (CALL dict.get_or_default key INT:0)
-  §R (+ result INT:1)
-§/F{f008}
+  §F{f007:VulnerableFunctionReturn:pub}
+    §DOC{BUG: Function return may be null}
+    §DOC{EXPECTED: Calor0922 Null Dereference}
+    §I{i32:key}
+    §O{i32}
+    §B{result:i32} (CALL dict.get key)
+    §R (+ result INT:1)
 
-§/M{m001}
+  §F{f008:SafeOrDefault:pub}
+    §DOC{SAFE: Using get_or_default}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:key}
+    §O{i32}
+    §B{result:i32} (CALL dict.get_or_default key INT:0)
+    §R (+ result INT:1)
+

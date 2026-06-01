@@ -1,17 +1,12 @@
 §M{m001:GridOps}
 
-§F{f001:SumGrid:pub}
-  §I{i32:size}
-  §O{i32}
-  §B{~total} INT:0
-  §L{l1:x:0:size:1}
-    §L{l2:y:0:size:1}
-      §L{l3:z:0:size:1}
-        §B{~total} (+ total (+ x (+ y z)))
-      §/L{l3}
-    §/L{l2}
-  §/L{l1}
-  §R total
-§/F{f001}
+  §F{f001:SumGrid:pub}
+    §I{i32:size}
+    §O{i32}
+    §B{~total} INT:0
+    §L{l1:x:0:size:1}
+      §L{l2:y:0:size:1}
+        §L{l3:z:0:size:1}
+          §B{~total} (+ total (+ x (+ y z)))
+    §R total
 
-§/M{m001}

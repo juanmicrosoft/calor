@@ -1,10 +1,8 @@
 §M{m003:Web}
 
-§F{f003:RenderHome:pub}
-  §I{i32:userId}
-  §O{str}
-  §B{board} §C{PrepareDashboard} §A userId §/C
-  §R board
-§/F{f003}
+  §F{f003:RenderHome:pub}
+    §I{i32:userId}
+    §O{str}
+    §B{board} §C{PrepareDashboard} §A userId §/C
+    §R board
 
-§/M{m003}

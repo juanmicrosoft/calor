@@ -1,27 +1,23 @@
 §M{m001:RenameExamples}
 
-§F{f001:Calculate:pub}
-  §I{i32:val}
-  §O{i32}
-  §S (== result (* val 2))
-  §R (* val 2)
-§/F{f001}
+  §F{f001:Calculate:pub}
+    §I{i32:val}
+    §O{i32}
+    §S (== result (* val 2))
+    §R (* val 2)
 
-§F{f002:ValidatedOp:pub}
-  §I{i32:num}
-  §I{i32:max}
-  §O{i32}
-  §Q (>= num 0)
-  §Q (<= num max)
-  §S (<= result max)
-  §R num
-§/F{f002}
+  §F{f002:ValidatedOp:pub}
+    §I{i32:num}
+    §I{i32:max}
+    §O{i32}
+    §Q (>= num 0)
+    §Q (<= num max)
+    §S (<= result max)
+    §R num
 
-§F{f003:OuterCalc:pub}
-  §I{i32:x}
-  §O{i32}
-  §B{inner} (* x 2)
-  §R (+ x inner)
-§/F{f003}
+  §F{f003:OuterCalc:pub}
+    §I{i32:x}
+    §O{i32}
+    §B{inner} (* x 2)
+    §R (+ x inner)
 
-§/M{m001}

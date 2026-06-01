@@ -3,82 +3,71 @@
 
 §M{m001:OverflowBenchmark}
 
-§F{f001:VulnerableAddition:pub}
-  §DOC{BUG: Unchecked addition may overflow}
-  §DOC{EXPECTED: Calor0923 Integer Overflow}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
+  §F{f001:VulnerableAddition:pub}
+    §DOC{BUG: Unchecked addition may overflow}
+    §DOC{EXPECTED: Calor0923 Integer Overflow}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 
-§F{f002:SafeCheckedAddition:pub}
-  §DOC{SAFE: Addition with overflow check}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §B{result:i32} (CALL checked_add a b)
-  §R result
-§/F{f002}
+  §F{f002:SafeCheckedAddition:pub}
+    §DOC{SAFE: Addition with overflow check}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §B{result:i32} (CALL checked_add a b)
+    §R result
 
-§F{f003:VulnerableMultiplication:pub}
-  §DOC{BUG: Unchecked multiplication may overflow}
-  §DOC{EXPECTED: Calor0923 Integer Overflow}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (* x y)
-§/F{f003}
+  §F{f003:VulnerableMultiplication:pub}
+    §DOC{BUG: Unchecked multiplication may overflow}
+    §DOC{EXPECTED: Calor0923 Integer Overflow}
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
+    §R (* x y)
 
-§F{f004:SafeSmallValues:pub}
-  §DOC{SAFE: Values known to be small}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:x}
-  §O{i32}
-  §PRE (< x INT:1000)
-  §PRE (> x INT:0)
-  §R (* x INT:100)
-§/F{f004}
+  §F{f004:SafeSmallValues:pub}
+    §DOC{SAFE: Values known to be small}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:x}
+    §O{i32}
+    §PRE (< x INT:1000)
+    §PRE (> x INT:0)
+    §R (* x INT:100)
 
-§F{f005:VulnerableLeftShift:pub}
-  §DOC{BUG: Left shift may overflow}
-  §DOC{EXPECTED: Calor0923 Integer Overflow}
-  §I{i32:x}
-  §I{i32:n}
-  §O{i32}
-  §R (<< x n)
-§/F{f005}
+  §F{f005:VulnerableLeftShift:pub}
+    §DOC{BUG: Left shift may overflow}
+    §DOC{EXPECTED: Calor0923 Integer Overflow}
+    §I{i32:x}
+    §I{i32:n}
+    §O{i32}
+    §R (<< x n)
 
-§F{f006:SafeBoundedShift:pub}
-  §DOC{SAFE: Shift amount bounded}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:x}
-  §O{i32}
-  §R (<< x INT:2)
-§/F{f006}
+  §F{f006:SafeBoundedShift:pub}
+    §DOC{SAFE: Shift amount bounded}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:x}
+    §O{i32}
+    §R (<< x INT:2)
 
-§F{f007:VulnerableAccumulator:pub}
-  §DOC{BUG: Accumulator in loop may overflow}
-  §DOC{EXPECTED: Calor0923 Integer Overflow}
-  §I{i32:n}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:1:n:1}
-    §B{sum:i32} (+ sum i)
-  §/L{l1}
-  §R sum
-§/F{f007}
+  §F{f007:VulnerableAccumulator:pub}
+    §DOC{BUG: Accumulator in loop may overflow}
+    §DOC{EXPECTED: Calor0923 Integer Overflow}
+    §I{i32:n}
+    §O{i32}
+    §B{sum:i32} INT:0
+    §L{l1:i:1:n:1}
+      §B{sum:i32} (+ sum i)
+    §R sum
 
-§F{f008:SafeBoundedAccumulator:pub}
-  §DOC{SAFE: Loop bound prevents overflow}
-  §DOC{EXPECTED: No warnings}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:1:100:1}
-    §B{sum:i32} (+ sum i)
-  §/L{l1}
-  §R sum
-§/F{f008}
+  §F{f008:SafeBoundedAccumulator:pub}
+    §DOC{SAFE: Loop bound prevents overflow}
+    §DOC{EXPECTED: No warnings}
+    §O{i32}
+    §B{sum:i32} INT:0
+    §L{l1:i:1:100:1}
+      §B{sum:i32} (+ sum i)
+    §R sum
 
-§/M{m001}
