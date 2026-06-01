@@ -1,17 +1,14 @@
 §M{m003:Invoice}
 
-§F{f004:InvoiceLine:pub}
-  §I{i32:price}
-  §O{i32}
-  §B{t} §C{ComputeTaxWrapper} §A price §/C
-  §R (+ price t)
-§/F{f004}
+  §F{f004:InvoiceLine:pub}
+    §I{i32:price}
+    §O{i32}
+    §B{t} §C{ComputeTaxWrapper} §A price §/C
+    §R (+ price t)
 
-§F{f005:InvoiceFooter:pub}
-  §I{i32:subtotal}
-  §O{i32}
-  §B{t} §C{ComputeTaxWrapper} §A subtotal §/C
-  §R t
-§/F{f005}
+  §F{f005:InvoiceFooter:pub}
+    §I{i32:subtotal}
+    §O{i32}
+    §B{t} §C{ComputeTaxWrapper} §A subtotal §/C
+    §R t
 
-§/M{m003}

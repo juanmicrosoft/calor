@@ -1,16 +1,13 @@
 §M{m001:TaxCalc}
 
-§F{f001:ComputeTax:prv}
-  §I{i32:amount}
-  §O{i32}
-  §R (/ amount 10)
-§/F{f001}
+  §F{f001:ComputeTax:prv}
+    §I{i32:amount}
+    §O{i32}
+    §R (/ amount 10)
 
-§F{f002:ComputeTaxWrapper:pub}
-  §I{i32:amount}
-  §O{i32}
-  §B{t} §C{ComputeTax} §A amount §/C
-  §R t
-§/F{f002}
+  §F{f002:ComputeTaxWrapper:pub}
+    §I{i32:amount}
+    §O{i32}
+    §B{t} §C{ComputeTax} §A amount §/C
+    §R t
 
-§/M{m001}

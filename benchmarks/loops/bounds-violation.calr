@@ -3,98 +3,85 @@
 
 §M{m001:BoundsViolationBenchmark}
 
-§F{f001:VulnerableArrayAccess:pub}
-  §DOC{BUG: Array access with unchecked index}
-  §DOC{EXPECTED: Calor0921 Index Out of Bounds}
-  §I{i32:index}
-  §I{i32:len}
-  §O{i32}
-  §R (CALL array.get index)
-§/F{f001}
-
-§F{f002:SafeBoundsCheck:pub}
-  §DOC{SAFE: Bounds check before access}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:index}
-  §I{i32:len}
-  §O{i32}
-  §IF (&& (>= index INT:0) (< index len))
+  §F{f001:VulnerableArrayAccess:pub}
+    §DOC{BUG: Array access with unchecked index}
+    §DOC{EXPECTED: Calor0921 Index Out of Bounds}
+    §I{i32:index}
+    §I{i32:len}
+    §O{i32}
     §R (CALL array.get index)
-  §EL
-    §R INT:-1
-  §/IF
-§/F{f002}
 
-§F{f003:VulnerableLoopBeyondLength:pub}
-  §DOC{BUG: Loop can exceed array bounds}
-  §DOC{EXPECTED: Calor0921 Index Out of Bounds}
-  §I{i32:n}
-  §I{i32:len}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:n:1}
-    §B{val:i32} (CALL array.get i)
-    §B{sum:i32} (+ sum val)
-  §/L{l1}
-  §R sum
-§/F{f003}
+  §F{f002:SafeBoundsCheck:pub}
+    §DOC{SAFE: Bounds check before access}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:index}
+    §I{i32:len}
+    §O{i32}
+    §IF (&& (>= index INT:0) (< index len))
+      §R (CALL array.get index)
+    §EL
+      §R INT:-1
 
-§F{f004:SafeLoopWithinBounds:pub}
-  §DOC{SAFE: Loop bounded by array length}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:len}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:len:1}
-    §B{val:i32} (CALL array.get i)
-    §B{sum:i32} (+ sum val)
-  §/L{l1}
-  §R sum
-§/F{f004}
+  §F{f003:VulnerableLoopBeyondLength:pub}
+    §DOC{BUG: Loop can exceed array bounds}
+    §DOC{EXPECTED: Calor0921 Index Out of Bounds}
+    §I{i32:n}
+    §I{i32:len}
+    §O{i32}
+    §B{sum:i32} INT:0
+    §L{l1:i:0:n:1}
+      §B{val:i32} (CALL array.get i)
+      §B{sum:i32} (+ sum val)
+    §R sum
 
-§F{f005:VulnerableNegativeIndex:pub}
-  §DOC{BUG: Index can be negative}
-  §DOC{EXPECTED: Calor0921 Index Out of Bounds}
-  §I{i32:offset}
-  §I{i32:base}
-  §O{i32}
-  §B{index:i32} (- base offset)
-  §R (CALL array.get index)
-§/F{f005}
+  §F{f004:SafeLoopWithinBounds:pub}
+    §DOC{SAFE: Loop bounded by array length}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:len}
+    §O{i32}
+    §B{sum:i32} INT:0
+    §L{l1:i:0:len:1}
+      §B{val:i32} (CALL array.get i)
+      §B{sum:i32} (+ sum val)
+    §R sum
 
-§F{f006:SafeClampedIndex:pub}
-  §DOC{SAFE: Index clamped to valid range}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:index}
-  §I{i32:len}
-  §O{i32}
-  §B{minIdx:i32} (CALL math.max index INT:0)
-  §B{safeIdx:i32} (CALL math.min minIdx (- len INT:1))
-  §R (CALL array.get safeIdx)
-§/F{f006}
+  §F{f005:VulnerableNegativeIndex:pub}
+    §DOC{BUG: Index can be negative}
+    §DOC{EXPECTED: Calor0921 Index Out of Bounds}
+    §I{i32:offset}
+    §I{i32:base}
+    §O{i32}
+    §B{index:i32} (- base offset)
+    §R (CALL array.get index)
 
-§F{f007:VulnerableOffByOne:pub}
-  §DOC{BUG: Classic off-by-one error}
-  §DOC{EXPECTED: Calor0921 Index Out of Bounds}
-  §I{i32:len}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:(+ len INT:1):1}
-    §B{val:i32} (CALL array.get i)
-    §B{sum:i32} (+ sum val)
-  §/L{l1}
-  §R sum
-§/F{f007}
+  §F{f006:SafeClampedIndex:pub}
+    §DOC{SAFE: Index clamped to valid range}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:index}
+    §I{i32:len}
+    §O{i32}
+    §B{minIdx:i32} (CALL math.max index INT:0)
+    §B{safeIdx:i32} (CALL math.min minIdx (- len INT:1))
+    §R (CALL array.get safeIdx)
 
-§F{f008:SafeWithPrecondition:pub}
-  §DOC{SAFE: Precondition guarantees valid index}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:index}
-  §I{i32:len}
-  §PRE (>= index INT:0)
-  §PRE (< index len)
-  §O{i32}
-  §R (CALL array.get index)
-§/F{f008}
+  §F{f007:VulnerableOffByOne:pub}
+    §DOC{BUG: Classic off-by-one error}
+    §DOC{EXPECTED: Calor0921 Index Out of Bounds}
+    §I{i32:len}
+    §O{i32}
+    §B{sum:i32} INT:0
+    §L{l1:i:0:(+ len INT:1):1}
+      §B{val:i32} (CALL array.get i)
+      §B{sum:i32} (+ sum val)
+    §R sum
 
-§/M{m001}
+  §F{f008:SafeWithPrecondition:pub}
+    §DOC{SAFE: Precondition guarantees valid index}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:index}
+    §I{i32:len}
+    §PRE (>= index INT:0)
+    §PRE (< index len)
+    §O{i32}
+    §R (CALL array.get index)
+

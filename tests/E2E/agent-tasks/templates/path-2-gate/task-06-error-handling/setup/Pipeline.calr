@@ -1,12 +1,10 @@
 §M{m001:Pipeline}
 
-§F{f001:FetchAndStore:pub}
-  §I{str:url}
-  §O{i32}
-  §B{~closed} BOOL:false
-  §B{data} §C{FetchRemote} §A url §/C
-  §B{rc} §C{WriteRecord} §A data §/C
-  §R rc
-§/F{f001}
+  §F{f001:FetchAndStore:pub}
+    §I{str:url}
+    §O{i32}
+    §B{~closed} BOOL:false
+    §B{data} §C{FetchRemote} §A url §/C
+    §B{rc} §C{WriteRecord} §A data §/C
+    §R rc
 
-§/M{m001}

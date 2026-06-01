@@ -1,23 +1,19 @@
 §M{m001:Utils}
 
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 
-§F{f002:IsPositive:pub}
-  §I{i32:x}
-  §O{bool}
-  §R (> x 0)
-§/F{f002}
+  §F{f002:IsPositive:pub}
+    §I{i32:x}
+    §O{bool}
+    §R (> x 0)
 
-§F{f003:Clamp:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (>= result 0)
-  §R (* x x)
-§/F{f003}
+  §F{f003:Clamp:pub}
+    §I{i32:x}
+    §O{i32}
+    §S (>= result 0)
+    §R (* x x)
 
-§/M{m001}

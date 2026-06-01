@@ -1,15 +1,13 @@
 §M{m001:MathOps}
 
-§F{f001:Calculate:pub}
-  §I{i32:val}
-  §I{i32:prior}
-  §O{i32}
-  §Q (>= val 0)
-  §S (>= result prior)
-  §B{validated} val
-  §B{scaled} (* validated 2)
-  §B{total} (+ scaled prior)
-  §R total
-§/F{f001}
+  §F{f001:Calculate:pub}
+    §I{i32:val}
+    §I{i32:prior}
+    §O{i32}
+    §Q (>= val 0)
+    §S (>= result prior)
+    §B{validated} val
+    §B{scaled} (* validated 2)
+    §B{total} (+ scaled prior)
+    §R total
 
-§/M{m001}

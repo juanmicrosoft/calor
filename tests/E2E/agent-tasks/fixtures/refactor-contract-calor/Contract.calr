@@ -1,31 +1,26 @@
 §M{m001:ContractExamples}
 
-§F{f001:Sqrt:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
+  §F{f001:Sqrt:pub}
+    §I{i32:x}
+    §O{i32}
+    §R x
 
-§F{f002:Abs:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (? (< x 0) (- 0 x) x)
-§/F{f002}
+  §F{f002:Abs:pub}
+    §I{i32:x}
+    §O{i32}
+    §R (? (< x 0) (- 0 x) x)
 
-§F{f003:GetElement:pub}
-  §I{i32:index}
-  §I{i32:length}
-  §O{i32}
-  §R (? (and (>= index 0) (< index length)) index (- 0 1))
-§/F{f003}
+  §F{f003:GetElement:pub}
+    §I{i32:index}
+    §I{i32:length}
+    §O{i32}
+    §R (? (and (>= index 0) (< index length)) index (- 0 1))
 
-§F{f004:PrintValue:pub}
-  §I{i32:x}
-  §O{void}
-  §E{cw}
-  §C{Console.WriteLine}
+  §F{f004:PrintValue:pub}
+    §I{i32:x}
+    §O{void}
+    §E{cw}
+    §C{Console.WriteLine}
     §A x
-  §/C
-§/F{f004}
+    §/C
 
-§/M{m001}
