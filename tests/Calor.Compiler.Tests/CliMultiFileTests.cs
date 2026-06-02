@@ -72,20 +72,16 @@ public class CliMultiFileTests : IDisposable
         var bPath = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(aPath, """
             §M{m001:OrderService}
-            §F{f001:SaveOrder:pub}
-              §O{void}
-              §E{db:w}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:SaveOrder:pub}
+                §O{void}
+                §E{db:w}
             """);
         File.WriteAllText(bPath, """
             §M{m002:Handler}
-            §F{f001:HandleRequest:pub}
-              §O{void}
-              §C{SaveOrder}
-              §/C
-            §/F{f001}
-            §/M{m002}
+              §F{f001:HandleRequest:pub}
+                §O{void}
+                §C{SaveOrder}
+                §/C
             """);
 
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
@@ -104,21 +100,17 @@ public class CliMultiFileTests : IDisposable
         var bPath = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(aPath, """
             §M{m001:OrderService}
-            §F{f001:SaveOrder:pub}
-              §O{void}
-              §E{db:w}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:SaveOrder:pub}
+                §O{void}
+                §E{db:w}
             """);
         File.WriteAllText(bPath, """
             §M{m002:Handler}
-            §F{f001:HandleRequest:pub}
-              §O{void}
-              §E{db:w}
-              §C{SaveOrder}
-              §/C
-            §/F{f001}
-            §/M{m002}
+              §F{f001:HandleRequest:pub}
+                §O{void}
+                §E{db:w}
+                §C{SaveOrder}
+                §/C
             """);
 
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
@@ -136,17 +128,13 @@ public class CliMultiFileTests : IDisposable
         var outPath = Path.Combine(_tempDir, "out.cs");
         File.WriteAllText(aPath, """
             §M{m1:A}
-            §F{f001:Foo:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Foo:pub}
+                §O{void}
             """);
         File.WriteAllText(bPath, """
             §M{m2:B}
-            §F{f001:Bar:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m2}
+              §F{f001:Bar:pub}
+                §O{void}
             """);
 
         var (exit, stdOut, stdErr) = RunCli(

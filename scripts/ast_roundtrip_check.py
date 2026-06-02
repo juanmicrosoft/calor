@@ -97,13 +97,11 @@ def self_test() -> int:
 
         positive = td_path / "positive.calr"
         positive.write_text(
-            "§M{m_pos:Pos}\n\n"
-            "§F{f_pos1:Echo:pub}\n"
-            "  §I{i32:x}\n"
-            "  §O{i32}\n"
-            "  §R x\n"
-            "§/F{f_pos1}\n\n"
-            "§/M{m_pos}\n",
+            "§M{m_pos:Pos}\n"
+            "  §F{f_pos1:Echo:pub}\n"
+            "    §I{i32:x}\n"
+            "    §O{i32}\n"
+            "    §R x\n",
             encoding="utf-8",
         )
         rc, log = compile_one(calor_cmd, positive, td_path)

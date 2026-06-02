@@ -10,14 +10,66 @@ public sealed class Parser
 {
     private readonly List<Token> _tokens;
     private readonly DiagnosticBag _diagnostics;
+    private readonly bool _rejectLegacyClosers;
     private int _position;
     private bool _insideArgContext;
     private bool _insideRefinementPredicate;
 
+    /// <summary>
+    /// Phase 4c — TokenKinds whose textual form is a legacy structural
+    /// closing tag (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …) that indent
+    /// form has replaced. When <see cref="_rejectLegacyClosers"/> is
+    /// true, encountering any of these in the token stream produces a
+    /// <c>Calor0830 LegacyCloserForm</c> error rather than silently
+    /// consuming them.
+    ///
+    /// Closers that still carry payload — <see cref="TokenKind.EndDo"/>
+    /// (carries the do-while condition), <see cref="TokenKind.EndCase"/>
+    /// (match case delimiter), and the preprocessor <c>§/PP</c> — are
+    /// intentionally NOT in this set. Inline expression closers
+    /// (<c>§/C</c>, <c>§/T</c>, <c>§/NEW</c>, <c>§/A</c>, <c>§/LIST</c>,
+    /// <c>§/DICT</c>, <c>§/HSET</c>, <c>§/ARR</c>, <c>§/LAM</c>,
+    /// <c>§/THIS</c>, <c>§/BASE</c>, <c>§/INIT</c>, …) are also kept
+    /// because they can legitimately appear inline within a single
+    /// expression where no dedent is available to terminate them.
+    /// </summary>
+    private static readonly HashSet<TokenKind> StructuralLegacyClosers = new()
+    {
+        TokenKind.EndModule,
+        TokenKind.EndFunc,
+        TokenKind.EndAsyncFunc,
+        TokenKind.EndBody,
+        TokenKind.EndMatch,
+        TokenKind.EndFor,
+        TokenKind.EndWhile,
+        TokenKind.EndIf,
+        TokenKind.EndForeach,
+        TokenKind.EndEachKV,
+        TokenKind.EndInterface,
+        TokenKind.EndMethod,
+        TokenKind.EndClass,
+    };
+
     public Parser(IEnumerable<Token> tokens, DiagnosticBag diagnostics)
+        : this(tokens, diagnostics, rejectLegacyClosers: false)
+    {
+    }
+
+    /// <summary>
+    /// Phase 4c — strict-mode constructor. When
+    /// <paramref name="rejectLegacyClosers"/> is true the parser emits
+    /// a <c>Calor0830 LegacyCloserForm</c> error every time it would
+    /// otherwise silently consume a structural closing tag
+    /// (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …). Production CLI / MCP
+    /// compile paths opt in so user source must use indent form;
+    /// analytic / formatter / migration tooling stays on the lax
+    /// default so it can still consume legacy code.
+    /// </summary>
+    public Parser(IEnumerable<Token> tokens, DiagnosticBag diagnostics, bool rejectLegacyClosers)
     {
         _tokens = tokens.ToList();
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        _rejectLegacyClosers = rejectLegacyClosers;
     }
 
     private Token Current => Peek(0);
@@ -124,6 +176,7 @@ public sealed class Parser
     {
         if (Check(explicitCloser))
         {
+            ReportLegacyCloserIfStrict(Current);
             return Advance();
         }
         if (Check(TokenKind.Dedent))
@@ -135,12 +188,34 @@ public sealed class Parser
             {
                 // Closer-form: consume all dedents, then the closer.
                 while (Check(TokenKind.Dedent)) Advance();
+                ReportLegacyCloserIfStrict(Current);
                 return Advance();
             }
             // Indent-only: consume the single Dedent that ends this block.
             return Advance();
         }
         return Expect(explicitCloser);
+    }
+
+    /// <summary>
+    /// Phase 4c — when strict-mode is on, emit a <c>Calor0830</c> error
+    /// whenever the parser is about to consume a structural legacy
+    /// closer token. The diagnostic is reported once per occurrence;
+    /// the parser still consumes the token so downstream productions
+    /// see the structure they expect (parsing recovers, then the bag
+    /// reports the error to the caller).
+    /// </summary>
+    private void ReportLegacyCloserIfStrict(Token closerToken)
+    {
+        if (!_rejectLegacyClosers) return;
+        if (!StructuralLegacyClosers.Contains(closerToken.Kind)) return;
+
+        _diagnostics.ReportError(
+            closerToken.Span,
+            DiagnosticCode.LegacyCloserForm,
+            $"Legacy structural closing tag '{closerToken.Text}' is no longer accepted. " +
+            "Indent form alone terminates this block — remove the closer line. " +
+            "Run `calor format` to rewrite this file in canonical indent form.");
     }
 
     public ModuleNode Parse()
