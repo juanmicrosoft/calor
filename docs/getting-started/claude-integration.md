@@ -206,15 +206,15 @@ If you're using Claude outside of Claude Code, you can teach it Calor by includi
 I'm working with Calor, a language for AI agents that compiles to C#.
 
 Key syntax:
-- §M{id:Name} / §/M{id} - Module
-- §F{id:Name:vis} / §/F{id} - Function (pub/pri)
+- §M{id:Name} - Module; body indents below
+- §F{id:Name:vis} - Function (pub/pri); body indents below
 - §I{type:name} - Input parameter
 - §O{type} - Output type
 - §E{cw,fs:r,net:rw} - Effects (console write, file read, network)
 - §Q condition - Requires (precondition)
 - §S condition - Ensures (postcondition)
-- §L{id:var:from:to:step} / §/L{id} - Loop
-- §IF{id} cond → action §EI cond → action §EL → action §/I{id} - Conditional
+- §L{id:var:from:to:step} - Loop; body indents below
+- §IF{id} cond → action; §EI/§EL branches align with §IF
 - §P expr - Print
 - §R expr - Return
 - (+ a b), (* a b), (== a b) - Lisp-style expressions

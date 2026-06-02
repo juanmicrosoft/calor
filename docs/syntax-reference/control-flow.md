@@ -233,7 +233,6 @@ For complex branches:
 
 ```
 §IF{if1} (> x 0) → §P "positive"
-§/I{if1}
 ```
 
 ### If-Else
@@ -332,16 +331,16 @@ Pattern matching provides concise multi-way branching with C# switch expression 
 
 ```
 §W{id} expression
-§K pattern1 → result1
-§K pattern2 → result2
-§K _ → default
+  §K pattern1 → result1
+  §K pattern2 → result2
+  §K _ → default
 ```
 
 | Part | Description |
 |:-----|:------------|
 | `§W expr` | Switch expression (cases indent below) |
 | `expression` | Value to match against |
-| `§K` | Case keyword (at same column as `§W`) |
+| `§K` | Case keyword (indented under `§W`) |
 | `pattern` | Pattern to match |
 | `→` | Arrow to result (single expression) |
 | `_` | Wildcard (matches anything) |
@@ -353,11 +352,10 @@ Match exact values:
 
 ```
 §B{day} §W{sw1} dayNum
-§K 0 → "Sunday"
-§K 1 → "Monday"
-§K 2 → "Tuesday"
-§K _ → "Other"
-§/W{sw1}
+  §K 0 → "Sunday"
+  §K 1 → "Monday"
+  §K 2 → "Tuesday"
+  §K _ → "Other"
 ```
 
 ### Relational Patterns (`§PREL`)
@@ -374,12 +372,11 @@ Match value ranges using relational operators:
 **Example - Grade calculation:**
 ```
 §B{grade} §W{sw1} score
-§K §PREL{gte} 90 → "A"
-§K §PREL{gte} 80 → "B"
-§K §PREL{gte} 70 → "C"
-§K §PREL{gte} 60 → "D"
-§K _ → "F"
-§/W{sw1}
+  §K §PREL{gte} 90 → "A"
+  §K §PREL{gte} 80 → "B"
+  §K §PREL{gte} 70 → "C"
+  §K §PREL{gte} 60 → "D"
+  §K _ → "F"
 ```
 
 ### Variable Patterns with Guards (`§VAR`, `§WHEN`)
@@ -388,12 +385,11 @@ Capture the matched value and add conditions:
 
 ```
 §B{desc} §W{sw1} value
-§K §VAR{n} §WHEN (> n 100) → "large positive"
-§K §VAR{n} §WHEN (> n 0) → "small positive"
-§K 0 → "zero"
-§K §VAR{n} §WHEN (> n -100) → "small negative"
-§K _ → "large negative"
-§/W{sw1}
+  §K §VAR{n} §WHEN (> n 100) → "large positive"
+  §K §VAR{n} §WHEN (> n 0) → "small positive"
+  §K 0 → "zero"
+  §K §VAR{n} §WHEN (> n -100) → "small negative"
+  §K _ → "large negative"
 ```
 
 | Part | Description |
@@ -407,9 +403,8 @@ Match Option types:
 
 ```
 §R §W{sw1} maybeValue
-§K §SM §VAR{v} → v        // Some(v) - extract value
-§K §NN → 0                 // None - default
-§/W{sw1}
+  §K §SM §VAR{v} → v        // Some(v) - extract value
+  §K §NN → 0                 // None - default
 ```
 
 ### Result Patterns (`§OK`, `§ERR`)
@@ -418,9 +413,8 @@ Match Result types:
 
 ```
 §R §W{sw1} result
-§K §OK §VAR{v} → (+ "Success: " v)
-§K §ERR §VAR{e} → (+ "Error: " e)
-§/W{sw1}
+  §K §OK §VAR{v} → (+ "Success: " v)
+  §K §ERR §VAR{e} → (+ "Error: " e)
 ```
 
 ### Block Syntax (`§/K`)
@@ -429,12 +423,12 @@ For cases with multiple statements, use block syntax:
 
 ```
 §W{sw1} x
-§K 1 → "one"              // Arrow syntax (single expression)
-§K 2
-  §P "matched two"         // Block syntax (multiple statements)
-  §R "two"
-  §/K
-§K _ → "other"
+  §K 1 → "one"              // Arrow syntax (single expression)
+  §K 2
+    §P "matched two"         // Block syntax (multiple statements)
+    §R "two"
+    §/K
+  §K _ → "other"
 ```
 
 ### Complete Example
@@ -445,13 +439,12 @@ For cases with multiple statements, use block syntax:
     §I{i32:code}
     §O{str}
     §R §W{sw1} code
-§K 200 → "OK"
-§K 201 → "Created"
-§K 400 → "Bad Request"
-§K 404 → "Not Found"
-§K 500 → "Server Error"
-§K _ → "Unknown Status"
-    §/W{sw1}
+      §K 200 → "OK"
+      §K 201 → "Created"
+      §K 400 → "Bad Request"
+      §K 404 → "Not Found"
+      §K 500 → "Server Error"
+      §K _ → "Unknown Status"
 ```
 
 ---
@@ -459,7 +452,7 @@ For cases with multiple statements, use block syntax:
 ## Why Explicit Loop IDs?
 
 1. **Precise targeting** - "Modify loop for1" is unambiguous
-2. **Verification** - Compiler checks matching `§L` and `§/L`
+2. **Verification** - Compiler uses indentation to determine loop boundaries
 3. **Agent-friendly** - Easy to identify loop boundaries
 4. **Refactoring safe** - IDs survive code movement
 

@@ -6,16 +6,16 @@ Syntax highlighting for the [Calor programming language](https://github.com/juan
 
 - Syntax highlighting for `.calr` files
 - Bracket matching and auto-closing
-- Code folding for modules, functions, loops, and conditionals
+- Indentation-based code folding for modules, functions, loops, and conditionals
 - Comment toggling with `//`
 
 ## Supported Syntax Elements
 
 ### Control Structures
-- Module declarations: `§M{id:name}`, `§/M{id}`
-- Function declarations: `§F{id:name:visibility}`, `§/F{id}`
-- Loops: `§L{id:var:from:to:step}`, `§/L{id}`
-- Conditionals: `§IF{id}`, `§EI`, `§EL`, `§/I{id}`
+- Module declarations: `§M{id:name}` with an indented body
+- Function declarations: `§F{id:name:visibility}` with an indented body
+- Loops: `§L{id:var:from:to:step}` with an indented body
+- Conditionals: `§IF{id}`, `§EI`, `§EL` with indented bodies
 - Function calls: `§C{target}`, `§/C`
 
 ### Type System
@@ -45,18 +45,14 @@ Syntax highlighting for the [Calor programming language](https://github.com/juan
 
 ```calor
 §M{m001:FizzBuzz}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §L{for1:i:1:100:1}
-    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-    §EI (== (% i 3) 0) → §P "Fizz"
-    §EI (== (% i 5) 0) → §P "Buzz"
-    §EL → §P i
-    §/I{if1}
-  §/L{for1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §L{for1:i:1:100:1}
+      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
+      §EI (== (% i 3) 0) → §P "Fizz"
+      §EI (== (% i 5) 0) → §P "Buzz"
+      §EL → §P i
 ```
 
 ## Installation

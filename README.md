@@ -129,12 +129,10 @@ calor --input program.calr --output program.g.cs
 
 ```
 §M{m001:Hello}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §P "Hello from Calor!"
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §P "Hello from Calor!"
 ```
 
 Save as `hello.calr`, then:

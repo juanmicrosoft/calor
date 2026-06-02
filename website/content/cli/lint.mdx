@@ -51,7 +51,7 @@ The Calor linter is designed specifically for **agent-optimized code**, not huma
 
 | Aspect | Traditional Linters | Calor Linter |
 |--------|---------------------|--------------|
-| **Indentation** | Enforce consistent indentation | Remove all indentation |
+| **Indentation** | Enforce style indentation | Preserve meaningful block indentation |
 | **Whitespace** | Format for readability | Eliminate unnecessary whitespace |
 | **Identifiers** | Descriptive names encouraged | Abbreviated IDs (`m1`, `f1`, `l1`) |
 | **Blank lines** | Separate logical sections | Remove all blank lines |
@@ -63,11 +63,11 @@ The Calor linter is designed specifically for **agent-optimized code**, not huma
 AI coding agents process code as tokens. Every character costs tokens and processing time. The Calor linter optimizes for:
 
 1. **Minimal token count** - Fewer tokens = faster processing, lower cost
-2. **Unambiguous structure** - Tags and IDs replace indentation for structure
+2. **Unambiguous structure** - Indentation defines blocks; tags and IDs identify elements
 3. **Consistent format** - No style variations that add noise to agent context
 4. **Semantic density** - Maximum information per token
 
-### Key Principle: Structure Through Tags, Not Whitespace
+### Key Principle: Structure Through Indentation
 
 Traditional code uses indentation to show structure:
 
@@ -82,7 +82,7 @@ public void Main() {
 }
 ```
 
-Calor uses explicit tags with IDs:
+Calor uses indent-only blocks with explicit tags and IDs:
 
 ```calor
 §F{f1:Main:pub}
@@ -92,7 +92,7 @@ Calor uses explicit tags with IDs:
       §P i
 ```
 
-The structure is explicit in the tags (`§L{l1}...§/L{l1}`), making indentation redundant noise.
+The structure is explicit in indentation; IDs like `l1` identify blocks without requiring closing tags.
 
 ## Lint Rules
 
@@ -110,11 +110,11 @@ Identifiers should use the shortest unambiguous form.
 
 ### Whitespace
 
-No indentation or trailing whitespace should exist.
+Use two spaces per block level. Avoid trailing whitespace and unnecessary blank lines.
 
 | Issue | Example |
 |-------|---------|
-| Leading spaces | `  §P "text"` (2 leading spaces) |
+| Wrong indent width | `    §P "text"` (4 spaces where 2 expected) |
 | Leading tabs | `\t§P "text"` (leading tab) |
 | Trailing whitespace | `§M{m1:Name}  ` (trailing spaces) |
 | Blank lines | Empty lines between statements |

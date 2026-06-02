@@ -94,7 +94,7 @@ When converting C# to Calor, the converter:
 | `method` | `§F{id:Name:vis}` function |
 | `property` | `§PROP{id:Name:vis:type}` property |
 | `field` | `§FLD{id:type:name}` field |
-| `if/else if/else` | `§IF{id}...§EI...§EL...§/I{id}` |
+| `if/else if/else` | `§IF{id}` / `§EI` / `§EL` branches (end at dedent) |
 | `for` loop | `§L{id:var:from:to:step}` |
 | `while` loop | `§WH{id}` |
 | `try/catch` | Converted to `Result<T,E>` pattern |

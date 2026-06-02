@@ -103,8 +103,8 @@ C# errors often have clear fixes:
 - Wrong type → cast or convert
 
 Calor errors may be less familiar:
-- Missing `§/F{id}` → requires understanding closing tag rules
-- Wrong ID in closing tag → requires ID matching understanding
+- Misindented block body → requires understanding indent-only scope
+- Wrong block nesting → requires indentation-level understanding
 
 ---
 
@@ -140,13 +140,13 @@ public static int Add(int a, int b)
 **Calor generation (common error):**
 ```
 §F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
+§I{i32:a}
+§I{i32:b}
+§O{i32}
+§R (+ a b)
 ```
 - Compiles: No
-- Error: Mismatched closing tag
+- Error: Function body is not indented
 - Score: 0.0
 
 ---
@@ -157,10 +157,10 @@ public static int Add(int a, int b)
 
 | Error | Cause | Example |
 |:------|:------|:--------|
-| Mismatched IDs | Wrong ID in closing tag | `§F{f001}...§/F{f002}` |
-| Missing closing tag | Forgot to close structure | `§L{for1}...` (no `§/L`) |
-| Wrong tag type | Confused closing tag | `§F{f001}...§/M{f001}` |
-| Missing module wrapper | No `§M{}...§/M{}` | Function outside module |
+| Misindented body | Body not indented under opener | `§F{f001}` followed by unindented statements |
+| Missing block body | Forgot statements inside a block | `§L{for1}` with no indented body |
+| Wrong nesting | Dedented or indented at the wrong level | `§IF{if1}` body aligned with parent |
+| Missing module wrapper | No enclosing `§M{}` block | Function outside module |
 
 ### Common C# Errors
 
@@ -178,7 +178,7 @@ public static int Add(int a, int b)
 ### For Calor
 
 1. **Template-based generation:** Start with valid templates
-2. **ID tracking:** Maintain list of open IDs, ensure matching closes
+2. **Indentation tracking:** Maintain consistent block levels
 3. **Validation pass:** Check structure before outputting
 
 ### For C#
