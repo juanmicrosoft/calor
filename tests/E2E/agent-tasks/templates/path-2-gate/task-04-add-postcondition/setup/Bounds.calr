@@ -1,9 +1,5 @@
 §M{m002:Bounds}
-
-  §F{f003:BoundsCheck:pub}
-    §I{i32:val}
-    §I{i32:cap}
-    §O{i32}
+  §F{f003:BoundsCheck:pub} (i32:val, i32:cap) -> i32
     §B{lo} §C{ClampLowerBound} §A val §/C
     §B{hi} §C{ClampScore} §A lo §A cap §/C
     §R hi

@@ -1,10 +1,5 @@
 §M{m002:UtilsModule}
-
-  §F{f010:Log:pub}
-    §I{str:message}
-    §O{void}
+  §F{f010:Log:pub} (str:message) -> void
     §E{cw}
-    §C{Console.WriteLine}
-    §A message
-    §/C
+    §C{Console.WriteLine} §A message §/C
 

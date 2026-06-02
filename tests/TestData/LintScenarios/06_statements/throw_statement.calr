@@ -1,13 +1,8 @@
 §M{m1:Throw}
-§F{f1:Fail:pub}
-§O{void}
-§TH "failure"
-§/F{f1}
-§F{f2:FailIf:pub}
-§I{bool:condition}
-§O{void}
-§IF{i1} condition
-§TH "invalid"
-§/I{i1}
-§/F{f2}
-§/M{m1}
+  §F{f1:Fail:pub} () -> void
+    §TH "failure"
+
+  §F{f2:FailIf:pub} (bool:condition) -> void
+    §IF{i1} condition
+      §TH "invalid"
+

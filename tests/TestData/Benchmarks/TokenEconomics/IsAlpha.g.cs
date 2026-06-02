@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace IsAlpha
 {
@@ -16,17 +13,17 @@ namespace IsAlpha
     {
         public static bool IsUpper(int charCode)
         {
-            return ((charCode >= 65) && (charCode <= 90));
+            return charCode >= 65 && charCode <= 90;
         }
 
         public static bool IsLower(int charCode)
         {
-            return ((charCode >= 97) && (charCode <= 122));
+            return charCode >= 97 && charCode <= 122;
         }
 
         public static bool IsAlpha(int charCode)
         {
-            return (((charCode >= 65) && (charCode <= 90)) || ((charCode >= 97) && (charCode <= 122)));
+            return charCode >= 65 && charCode <= 90 || charCode >= 97 && charCode <= 122;
         }
 
     }

@@ -7,21 +7,19 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace CelsiusToKelvin
 {
     public static class CelsiusToKelvinModule
     {
-        public static double ToKelvin(double celsius)
+        public static float ToKelvin(float celsius)
         {
-            if (!((celsius >= -273.15))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (celsius >= -273.15)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 77, length: 23, sourceFile: null, line: 5, column: 3, condition: "(celsius >= -273.15)");
-            double __result__ = default;
+            if (!(celsius >= -273.15)) throw new Calor.Runtime.ContractViolationException("Precondition failed: celsius >= -273.15", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 76, length: 23, sourceFile: null, line: 3, column: 5, condition: "celsius >= -273.15");
+            float __result__ = default;
 
-            __result__ = (celsius + 273.15);
+            __result__ = celsius + 273.15;
 
-            if (!((__result__ >= 0.0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0.0)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 103, length: 18, sourceFile: null, line: 6, column: 3, condition: "(__result__ >= 0.0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 105, length: 16, sourceFile: null, line: 4, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 

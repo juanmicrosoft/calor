@@ -1,73 +1,37 @@
 §M{m001:TypeSystem}
-
-  §F{f001:Main:pub}
-    §O{void}
+  §F{f001:Main:pub} () -> void
     §E{cw}
-    §C{Console.WriteLine}
-    §A "=== Calor Type System Demo ==="
-    §/C
-    §C{Console.WriteLine}
-    §A ""
-    §/C
-    §C{Console.WriteLine}
-    §A "Testing Option.Some(42)..."
-    §/C
-    §C{TestSome}
-    §/C
-    §C{Console.WriteLine}
-    §A ""
-    §/C
-    §C{Console.WriteLine}
-    §A "Testing Option.None()..."
-    §/C
-    §C{TestNone}
-    §/C
-    §C{Console.WriteLine}
-    §A ""
-    §/C
-    §C{Console.WriteLine}
-    §A "Testing Result.Ok(100)..."
-    §/C
-    §C{TestOk}
-    §/C
-    §C{Console.WriteLine}
-    §A ""
-    §/C
-    §C{Console.WriteLine}
-    §A "Testing Result.Err(error)..."
-    §/C
-    §C{TestErr}
-    §/C
+    §C{Console.WriteLine} §A "=== Calor Type System Demo ===" §/C
+    §C{Console.WriteLine} §A "" §/C
+    §C{Console.WriteLine} §A "Testing Option.Some(42)..." §/C
+    §C{TestSome} §/C
+    §C{Console.WriteLine} §A "" §/C
+    §C{Console.WriteLine} §A "Testing Option.None()..." §/C
+    §C{TestNone} §/C
+    §C{Console.WriteLine} §A "" §/C
+    §C{Console.WriteLine} §A "Testing Result.Ok(100)..." §/C
+    §C{TestOk} §/C
+    §C{Console.WriteLine} §A "" §/C
+    §C{Console.WriteLine} §A "Testing Result.Err(error)..." §/C
+    §C{TestErr} §/C
 
-  §F{f002:TestSome:pri}
-    §O{void}
+  §F{f002:TestSome:priv} () -> void
     §E{cw}
     §B{opt} §SM 42
-    §C{Console.WriteLine}
-    §A "  Created Some(42)"
-    §/C
+    §C{Console.WriteLine} §A "  Created Some(42)" §/C
 
-  §F{f003:TestNone:pri}
-    §O{void}
+  §F{f003:TestNone:priv} () -> void
     §E{cw}
-    §B{opt} §NN{INT}
-    §C{Console.WriteLine}
-    §A "  Created None"
-    §/C
+    §B{opt} §NN{i32}
+    §C{Console.WriteLine} §A "  Created None" §/C
 
-  §F{f004:TestOk:pri}
-    §O{void}
+  §F{f004:TestOk:priv} () -> void
     §E{cw}
-    §B{result} §OK 100
-    §C{Console.WriteLine}
-    §A "  Created Ok(100)"
-    §/C
+    §B{result} §OK{§ARR{arr_init:any} §ARR{arr_init:any} 100 §/ARR{arr_init} §/ARR{arr_init}}
+    §C{Console.WriteLine} §A "  Created Ok(100)" §/C
 
-  §F{f005:TestErr:pri}
-    §O{void}
+  §F{f005:TestErr:priv} () -> void
     §E{cw}
-    §B{result} §ERR "Something went wrong"
-    §C{Console.WriteLine}
-    §A "  Created Err(Something went wrong)"
-    §/C
+    §B{result} §ERR{§ARR{arr_init:any} §ARR{arr_init:any} "Something went wrong" §/ARR{arr_init} §/ARR{arr_init}}
+    §C{Console.WriteLine} §A "  Created Err(Something went wrong)" §/C
 

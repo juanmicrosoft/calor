@@ -1,5 +1,4 @@
 §M{m001:TestModule}
-§F{f001:Main:pub}
-§O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub} () -> void
+    §R
+

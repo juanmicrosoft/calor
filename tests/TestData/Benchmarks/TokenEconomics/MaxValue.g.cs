@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ArrayOps
 {
@@ -16,7 +13,7 @@ namespace ArrayOps
     {
         public static int Max(int a, int b)
         {
-            if ((a > b))
+            if (a > b)
             {
                 return a;
             }
@@ -29,9 +26,9 @@ namespace ArrayOps
 
         public static int Max3(int a, int b, int c)
         {
-            if ((a > b))
+            if (a > b)
             {
-                if ((a > c))
+                if (a > c)
                 {
                     return a;
                 }
@@ -43,7 +40,7 @@ namespace ArrayOps
             }
             else
             {
-                if ((b > c))
+                if (b > c)
                 {
                     return b;
                 }

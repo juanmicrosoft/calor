@@ -1,20 +1,13 @@
 §M{m001:Queue}
-§F{f001:IsEmpty:pub}
-  §I{i32:count}
-  §O{bool}
-  §R (== count 0)
-§/F{f001}
-§F{f002:Size:pub}
-  §I{i32:count}
-  §O{i32}
-  §R count
-§/F{f002}
-§F{f003:NewCount:pub}
-  §I{i32:oldCount}
-  §I{bool:isEnqueue}
-  §O{i32}
-  §IF{if1} isEnqueue → §R (+ oldCount 1)
-  §EL → §R (- oldCount 1)
-  §/I{if1}
-§/F{f003}
-§/M{m001}
+  §F{f001:IsEmpty:pub} (i32:count) -> bool
+    §R (== count 0)
+
+  §F{f002:Size:pub} (i32:count) -> i32
+    §R count
+
+  §F{f003:NewCount:pub} (i32:oldCount, bool:isEnqueue) -> i32
+    §IF{if1} isEnqueue
+      §R (+ oldCount 1)
+    §EL
+      §R (- oldCount 1)
+

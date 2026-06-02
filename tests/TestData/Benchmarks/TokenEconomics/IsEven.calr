@@ -1,7 +1,4 @@
 §M{m001:IsEven}
-§F{f001:IsEven:pub}
-  §I{i32:n}
-  §O{bool}
-  §R (== (% n 2) 0)
-§/F{f001}
-§/M{m001}
+  §F{f001:IsEven:pub} (i32:n) -> bool
+    §R (== (% n 2) 0)
+

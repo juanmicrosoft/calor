@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace StringCheck
 {
@@ -16,7 +13,7 @@ namespace StringCheck
     {
         public static bool IsPalindrome3(string a, string b, string c)
         {
-            if ((a == c))
+            if (a == c)
             {
                 return true;
             }
@@ -29,7 +26,7 @@ namespace StringCheck
 
         public static bool AreEqual(string a, string b)
         {
-            if ((a == b))
+            if (a == b)
             {
                 return true;
             }

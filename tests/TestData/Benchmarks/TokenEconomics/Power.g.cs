@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace MathPower
 {
@@ -16,13 +14,13 @@ namespace MathPower
     {
         public static int Power(int base, int exp)
         {
-            if (!((exp >= 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (exp >= 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 79, length: 13, sourceFile: null, line: 6, column: 3, condition: "(exp >= 0)");
+            if (!(exp >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: exp >= 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 73, length: 13, sourceFile: null, line: 3, column: 5, condition: "exp >= 0");
             var result = 1;
             var i = 0;
-            while ((i < exp))
+            while (i < exp)
             {
-                result = (result * base);
-                i = (i + 1);
+                result = result * base;
+                i = i + 1;
             }
 
             return result;

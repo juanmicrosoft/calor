@@ -1,7 +1,5 @@
 §M{m1:Hello}
-§F{f1:Main:pub}
-§O{void}
-§E{cw}
-§P "Hello from Calor!"
-§/F{f1}
-§/M{m1}
+  §F{f1:Main:pub} () -> void
+    §E{cw}
+    §P "Hello from Calor!"
+

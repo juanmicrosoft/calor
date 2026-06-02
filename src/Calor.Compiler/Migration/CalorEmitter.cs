@@ -946,16 +946,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(RequiresNode node)
     {
         var condition = node.Condition.Accept(this);
-        var message = node.Message != null ? $" \"{node.Message}\"" : "";
-        AppendLine($"§Q {condition}{message}");
+        var head = node.Message != null ? $"§Q{{\"{node.Message}\"}}" : "§Q";
+        AppendLine($"{head} {condition}");
         return "";
     }
 
     public string Visit(EnsuresNode node)
     {
         var condition = node.Condition.Accept(this);
-        var message = node.Message != null ? $" \"{node.Message}\"" : "";
-        AppendLine($"§S {condition}{message}");
+        var head = node.Message != null ? $"§S{{\"{node.Message}\"}}" : "§S";
+        AppendLine($"{head} {condition}");
         return "";
     }
 

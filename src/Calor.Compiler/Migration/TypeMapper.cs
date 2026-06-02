@@ -282,6 +282,13 @@ public static class TypeMapper
         // Normalize spaces before array brackets: "OpCode []" → "OpCode[]"
         csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"\s+(\[)", "$1");
 
+        // Compact canonical INT[bits=N][signed=B] back to friendly aliases (i8..i64, u8..u64)
+        // before further processing. The AST stores types in canonical expanded form
+        // (see AttributeHelper.ToCanonicalType), but emitted compact parameter lists
+        // `(TYPE:name)` cannot re-parse bracketed type literals.
+        if (csharpType.Contains("INT[bits=", StringComparison.Ordinal))
+            csharpType = CompactCanonicalIntAliases(csharpType);
+
         // Compact OPTION[inner=T] → ?T only when it appears in the input
         // (avoid running regex on every type for performance)
         if (csharpType.Contains("OPTION["))
@@ -704,6 +711,38 @@ public static class TypeMapper
             (64, false) => "ulong",
             _ => "int"
         };
+    }
+
+    /// <summary>
+    /// Compacts canonical INT[bits=N][signed=B] tokens to the friendly Calor
+    /// alias (i8/i16/i32/i64, u8/u16/u32/u64) anywhere in <paramref name="type"/>.
+    /// The AST stores types in canonical expanded form, but compact emission
+    /// targets such as inline parameter lists need the friendly aliases to
+    /// re-parse correctly.
+    /// </summary>
+    private static string CompactCanonicalIntAliases(string type)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(
+            type,
+            @"INT\[bits=(\d+)\]\[signed=(true|false)\]",
+            m =>
+            {
+                if (!int.TryParse(m.Groups[1].Value, out var bits))
+                    return m.Value;
+                var signed = m.Groups[2].Value == "true";
+                return (bits, signed) switch
+                {
+                    (8, true) => "i8",
+                    (8, false) => "u8",
+                    (16, true) => "i16",
+                    (16, false) => "u16",
+                    (32, true) => "i32",
+                    (32, false) => "u32",
+                    (64, true) => "i64",
+                    (64, false) => "u64",
+                    _ => m.Value
+                };
+            });
     }
 
     /// <summary>

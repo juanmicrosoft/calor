@@ -1,64 +1,114 @@
 §M{m001:PatternMatchingDemo}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §B{score} 85
+    §B{grade} §W{sw1} score
+  §K §PREL{gte} 90
+    §R "A"
+  §/K
+  §K §PREL{gte} 80
+    §R "B"
+  §/K
+  §K §PREL{gte} 70
+    §R "C"
+  §/K
+  §K §PREL{gte} 60
+    §R "D"
+  §/K
+  §K _
+    §R "F"
+  §/K
+§/W{sw1}
+    §P (+ "Grade: " grade)
+    §B{statusCode} 404
+    §B{status} §W{sw2} statusCode
+  §K 200
+    §R "OK"
+  §/K
+  §K 201
+    §R "Created"
+  §/K
+  §K 400
+    §R "Bad Request"
+  §/K
+  §K 404
+    §R "Not Found"
+  §/K
+  §K 500
+    §R "Server Error"
+  §/K
+  §K _
+    §R "Unknown Status"
+  §/K
+§/W{sw2}
+    §P (+ "HTTP Status: " status)
+    §B{value} -5
+    §B{desc} §W{sw3} value
+  §K §VAR{n}
+    §R "large positive"
+  §/K
+  §K §VAR{n}
+    §R "small positive"
+  §/K
+  §K 0
+    §R "zero"
+  §/K
+  §K §VAR{n}
+    §R "small negative"
+  §/K
+  §K _
+    §R "large negative"
+  §/K
+§/W{sw3}
+    §P (+ "Description: " desc)
+    §B{dayNum} 3
+    §B{day} §W{sw4} dayNum
+  §K 0
+    §R "Sunday"
+  §/K
+  §K 1
+    §R "Monday"
+  §/K
+  §K 2
+    §R "Tuesday"
+  §/K
+  §K 3
+    §R "Wednesday"
+  §/K
+  §K 4
+    §R "Thursday"
+  §/K
+  §K 5
+    §R "Friday"
+  §/K
+  §K 6
+    §R "Saturday"
+  §/K
+  §K _
+    §R "Invalid day"
+  §/K
+§/W{sw4}
+    §P (+ "Day: " day)
+    §B{temp} 25
+    §B{tempDesc} §W{sw5} temp
+  §K §PREL{lt} 0
+    §R "freezing"
+  §/K
+  §K §PREL{lt} 10
+    §R "cold"
+  §/K
+  §K §PREL{lt} 20
+    §R "cool"
+  §/K
+  §K §PREL{lt} 30
+    §R "warm"
+  §/K
+  §K §PREL{lt} 40
+    §R "hot"
+  §/K
+  §K _
+    §R "extreme"
+  §/K
+§/W{sw5}
+    §P (+ "Temperature: " tempDesc)
 
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-
-  §B{score} 85
-  §B{grade} §W{sw1} score
-    §K §PREL{gte} 90 → "A"
-    §K §PREL{gte} 80 → "B"
-    §K §PREL{gte} 70 → "C"
-    §K §PREL{gte} 60 → "D"
-    §K _ → "F"
-  §/W{sw1}
-  §P (+ "Grade: " grade)
-
-  §B{statusCode} 404
-  §B{status} §W{sw2} statusCode
-    §K 200 → "OK"
-    §K 201 → "Created"
-    §K 400 → "Bad Request"
-    §K 404 → "Not Found"
-    §K 500 → "Server Error"
-    §K _ → "Unknown Status"
-  §/W{sw2}
-  §P (+ "HTTP Status: " status)
-
-  §B{value} -5
-  §B{desc} §W{sw3} value
-    §K §VAR{n} §WHEN (> n 100) → "large positive"
-    §K §VAR{n} §WHEN (> n 0) → "small positive"
-    §K 0 → "zero"
-    §K §VAR{n} §WHEN (> n -100) → "small negative"
-    §K _ → "large negative"
-  §/W{sw3}
-  §P (+ "Description: " desc)
-
-  §B{dayNum} 3
-  §B{day} §W{sw4} dayNum
-    §K 0 → "Sunday"
-    §K 1 → "Monday"
-    §K 2 → "Tuesday"
-    §K 3 → "Wednesday"
-    §K 4 → "Thursday"
-    §K 5 → "Friday"
-    §K 6 → "Saturday"
-    §K _ → "Invalid day"
-  §/W{sw4}
-  §P (+ "Day: " day)
-
-  §B{temp} 25
-  §B{tempDesc} §W{sw5} temp
-    §K §PREL{lt} 0 → "freezing"
-    §K §PREL{lt} 10 → "cold"
-    §K §PREL{lt} 20 → "cool"
-    §K §PREL{lt} 30 → "warm"
-    §K §PREL{lt} 40 → "hot"
-    §K _ → "extreme"
-  §/W{sw5}
-  §P (+ "Temperature: " tempDesc)
-
-§/F{f001}
-
-§/M{m001}

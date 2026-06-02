@@ -1,53 +1,31 @@
 §M{m001:PureMath}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
+  §F{f001:Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
 
-§F{f002:Multiply:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f002}
+  §F{f002:Multiply:pub} (i32:a, i32:b) -> i32
+    §R (* a b)
 
-§F{f003:Abs:pub}
-  §I{i32:x}
-  §O{i32}
-  §IF{if1} (< x 0) → §R (- 0 x)
-  §EL → §R x
-  §/I{if1}
-§/F{f003}
+  §F{f003:Abs:pub} (i32:x) -> i32
+    §IF{if1} (< x 0)
+      §R (- 0 x)
+    §EL
+      §R x
 
-§F{f004:Max:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §IF{if1} (> a b) → §R a
-  §EL → §R b
-  §/I{if1}
-§/F{f004}
+  §F{f004:Max:pub} (i32:a, i32:b) -> i32
+    §IF{if1} (> a b)
+      §R a
+    §EL
+      §R b
 
-§F{f005:Power:pub}
-  §I{i32:base}
-  §I{i32:exp}
-  §O{i32}
-  §Q (>= exp 0)
-  §B{~result} 1
-  §B{~i} 0
-  §WH{w1} (< i exp)
-    §B{~result} (* result base)
-    §B{~i} (+ i 1)
-  §/WH{w1}
-  §R result
-§/F{f005}
+  §F{f005:Power:pub} (i32:base, i32:exp) -> i32
+    §Q (>= exp 0)
+    §B{~result} 1
+    §B{~i} 0
+    §WH{w1} (< i exp)
+      §B{~result} (* result base)
+      §B{~i} (+ i 1)
+    §R result
 
-§F{f006:StringConcat:pub}
-  §I{str:a}
-  §I{str:b}
-  §O{str}
-  §R (concat a b)
-§/F{f006}
-§/M{m001}
+  §F{f006:StringConcat:pub} (str:a, str:b) -> str
+    §R (concat a b)
+

@@ -27,12 +27,12 @@ public class LintRegressionTests
     #region ID Abbreviation Tests
 
     [Theory]
-    [InlineData("01_id_abbreviation/padded_module_id.calr", 4)]
-    [InlineData("01_id_abbreviation/padded_function_id.calr", 4)]
-    [InlineData("01_id_abbreviation/loop_id_conversion.calr", 4)]
-    [InlineData("01_id_abbreviation/if_id_conversion.calr", 2)]
+    [InlineData("01_id_abbreviation/padded_module_id.calr", 2)]
+    [InlineData("01_id_abbreviation/padded_function_id.calr", 2)]
+    [InlineData("01_id_abbreviation/loop_id_conversion.calr", 2)]
+    [InlineData("01_id_abbreviation/if_id_conversion.calr", 1)]
     [InlineData("01_id_abbreviation/while_id_conversion.calr", 0)] // while uses WH tag with proper ID
-    [InlineData("01_id_abbreviation/mixed_ids.calr", 8)]
+    [InlineData("01_id_abbreviation/mixed_ids.calr", 4)]
     [InlineData("01_id_abbreviation/already_abbreviated.calr", 0)]
     public void Lint_IdAbbreviation_DetectsExpectedIssues(string file, int expectedIssues)
     {
@@ -93,30 +93,33 @@ public class LintRegressionTests
     [Theory]
     [InlineData("02_whitespace/leading_spaces.calr")]
     [InlineData("02_whitespace/leading_tabs.calr")]
-    public void Lint_Whitespace_DetectsIssues(string file)
+    public void Lint_Whitespace_DoesNotFlagLeadingIndentation(string file)
     {
+        // Phase 4+: indentation is now semantically meaningful (indent-only block form),
+        // so the linter must NOT flag leading whitespace.
         var source = LintTestDataLoader.LoadTestFile(file);
         var issues = LintSource(source);
 
-        var whitespaceIssues = issues.Where(i =>
-            i.Message.Contains("whitespace") ||
-            i.Message.Contains("indentation")).ToList();
+        var indentationIssues = issues.Where(i =>
+            i.Message.Contains("indentation not allowed") ||
+            i.Message.Contains("leading whitespace")).ToList();
 
-        Assert.NotEmpty(whitespaceIssues);
+        Assert.Empty(indentationIssues);
     }
 
     [Theory]
     [InlineData("02_whitespace/blank_lines.calr")]
     [InlineData("02_whitespace/multiple_blank_lines.calr")]
-    public void Lint_BlankLines_DetectsIssues(string file)
+    public void Lint_BlankLines_AreAllowed(string file)
     {
+        // Phase 4+: blank lines are allowed as readability separators.
         var source = LintTestDataLoader.LoadTestFile(file);
         var issues = LintSource(source);
 
         var blankLineIssues = issues.Where(i =>
             i.Message.Contains("Blank lines")).ToList();
 
-        Assert.NotEmpty(blankLineIssues);
+        Assert.Empty(blankLineIssues);
     }
 
     [Fact]
@@ -515,11 +518,8 @@ public class LintRegressionTests
             var line = lines[i];
             var lineNum = i + 1;
 
-            // Check for leading whitespace
-            if (line.Length > 0 && char.IsWhiteSpace(line[0]) && line.TrimStart().Length > 0)
-            {
-                issues.Add(new LintIssue(lineNum, "Line has leading whitespace (indentation not allowed)"));
-            }
+            // Indentation is now semantically meaningful (Phase 1+ indent form);
+            // do not flag leading whitespace.
 
             // Check for trailing whitespace
             if (line.Length > 0 && line.TrimEnd('\r') != line.TrimEnd('\r').TrimEnd())
@@ -558,11 +558,7 @@ public class LintRegressionTests
                 }
             }
 
-            // Check for blank lines
-            if (string.IsNullOrWhiteSpace(line.TrimEnd('\r')))
-            {
-                issues.Add(new LintIssue(lineNum, "Blank lines not allowed in agent-optimized format"));
-            }
+            // Blank lines are now allowed as readability separators (Phase 4 indent form).
         }
 
         return issues;

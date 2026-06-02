@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace IsEven
 {
@@ -16,7 +13,7 @@ namespace IsEven
     {
         public static bool IsEven(int n)
         {
-            return ((n % 2) == 0);
+            return n % 2 == 0;
         }
 
     }

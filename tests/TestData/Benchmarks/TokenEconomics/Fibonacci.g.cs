@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Fibonacci
 {
@@ -16,7 +13,7 @@ namespace Fibonacci
     {
         public static int Calculate(int n)
         {
-            if ((n <= 1))
+            if (n <= 1)
             {
                 return n;
             }
@@ -25,12 +22,12 @@ namespace Fibonacci
                 var a = 0;
                 var b = 1;
                 var i = 2;
-                while ((i <= n))
+                while (i <= n)
                 {
-                    var temp = (a + b);
+                    var temp = a + b;
                     a = b;
                     b = temp;
-                    i = (i + 1);
+                    i = i + 1;
                 }
 
                 return b;

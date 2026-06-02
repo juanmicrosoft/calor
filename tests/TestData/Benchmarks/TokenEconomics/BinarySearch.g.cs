@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Search
 {
@@ -16,15 +13,15 @@ namespace Search
     {
         public static int Find(int target, int val1, int val2, int val3)
         {
-            if ((val1 == target))
+            if (val1 == target)
             {
                 return 0;
             }
-            else if ((val2 == target))
+            else if (val2 == target)
             {
                 return 1;
             }
-            else if ((val3 == target))
+            else if (val3 == target)
             {
                 return 2;
             }

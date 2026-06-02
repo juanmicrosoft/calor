@@ -1,7 +1,4 @@
 §M{m001:DataAccess}
-
-  §F{f001:LoadUserSettings:pub}
-    §I{i32:userId}
-    §O{str}
-    §R STR:"settings-stub"
+  §F{f001:LoadUserSettings:pub} (i32:userId) -> str
+    §R "settings-stub"
 

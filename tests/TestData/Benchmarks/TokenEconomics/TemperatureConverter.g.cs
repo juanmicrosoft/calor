@@ -6,27 +6,24 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace TempConvert
 {
     public static class TempConvertModule
     {
-        public static double CelsiusToFahrenheit(double c)
+        public static float CelsiusToFahrenheit(float c)
         {
-            return ((c * 1.8) + 32);
+            return c * 1.8 + 32;
         }
 
-        public static double FahrenheitToCelsius(double f)
+        public static float FahrenheitToCelsius(float f)
         {
-            return ((f - 32) / 1.8);
+            return (f - 32) / 1.8;
         }
 
-        public static double CelsiusToKelvin(double c)
+        public static float CelsiusToKelvin(float c)
         {
-            return (c + 273.15);
+            return c + 273.15;
         }
 
     }

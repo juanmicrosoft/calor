@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ExpressionBodied
 {
@@ -16,42 +13,42 @@ namespace ExpressionBodied
     {
         public static int Double(int x)
         {
-            return (x * 2);
+            return x * 2;
         }
 
         public static int Triple(int x)
         {
-            return (x * 3);
+            return x * 3;
         }
 
         public static int Square(int x)
         {
-            return (x * x);
+            return x * x;
         }
 
         public static int Increment(int x)
         {
-            return (x + 1);
+            return x + 1;
         }
 
         public static int Decrement(int x)
         {
-            return (x - 1);
+            return x - 1;
         }
 
         public static bool IsPositive(int x)
         {
-            return (x > 0);
+            return x > 0;
         }
 
         public static bool IsNegative(int x)
         {
-            return (x < 0);
+            return x < 0;
         }
 
         public static int Negate(int x)
         {
-            return (0 - x);
+            return 0 - x;
         }
 
     }

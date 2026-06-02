@@ -1,10 +1,5 @@
 §M{m004:Receipt}
+  §F{f006:ReceiptTotal:pub} (i32:gross) -> i32
+    §B{t} §C{ComputeTax} §A gross §/C
+    §R (- gross t)
 
-§F{f006:ReceiptTotal:pub}
-  §I{i32:gross}
-  §O{i32}
-  §B{t} §C{ComputeTax} §A gross §/C
-  §R (- gross t)
-§/F{f006}
-
-§/M{m004}

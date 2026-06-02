@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Capitalize
 {
@@ -16,18 +14,18 @@ namespace Capitalize
     {
         public static bool ShouldCapitalize(int charCode)
         {
-            return ((charCode >= 97) && (charCode <= 122));
+            return charCode >= 97 && charCode <= 122;
         }
 
         public static int ToUpper(int charCode)
         {
-            if (!(((charCode >= 97) && (charCode <= 122)))) throw new Calor.Runtime.ContractViolationException("Precondition failed: ((charCode >= 97) && (charCode <= 122))", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 187, length: 42, sourceFile: null, line: 10, column: 3, condition: "((charCode >= 97) && (charCode <= 122))");
-            return (charCode - 32);
+            if (!(charCode >= 97 && charCode <= 122)) throw new Calor.Runtime.ContractViolationException("Precondition failed: charCode >= 97 && charCode <= 122", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 177, length: 42, sourceFile: null, line: 6, column: 5, condition: "charCode >= 97 && charCode <= 122");
+            return charCode - 32;
         }
 
         public static bool IsEmpty(int length)
         {
-            return (length == 0);
+            return length == 0;
         }
 
     }

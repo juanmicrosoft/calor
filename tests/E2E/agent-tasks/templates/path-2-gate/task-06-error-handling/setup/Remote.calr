@@ -1,14 +1,9 @@
 §M{m002:Remote}
-
-  §F{f002:FetchRemote:pub}
-    §I{str:url}
-    §O{str}
+  §F{f002:FetchRemote:pub} (str:url) -> str
     §E{net}
-    §R STR:"payload"
+    §R "payload"
 
-  §F{f003:WriteRecord:pub}
-    §I{str:data}
-    §O{i32}
+  §F{f003:WriteRecord:pub} (str:data) -> i32
     §E{db}
-    §R INT:0
+    §R 0
 

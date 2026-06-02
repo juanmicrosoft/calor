@@ -1,7 +1,5 @@
 §M{m001:Hello}
-  §F{f001:Main:pub}
-    §O{void}
+  §F{f001:Main:pub} () -> void
     §E{cw}
-    §C{Console.WriteLine}
-    §A "Hello from Calor E2E Test!"
-    §/C
+    §C{Console.WriteLine} §A "Hello from Calor E2E Test!" §/C
+

@@ -365,10 +365,8 @@ public sealed class CheckTool : McpToolBase
             var line = lines[i];
             var lineNum = i + 1;
 
-            if (line.Length > 0 && char.IsWhiteSpace(line[0]) && line.TrimStart().Length > 0)
-            {
-                issues.Add(new LintIssue(lineNum, "Line has leading whitespace (indentation not allowed)"));
-            }
+            // Indentation is now semantically meaningful (Phase 1+ indent form);
+            // do not flag leading whitespace.
 
             if (line.Length > 0 && line.TrimEnd('\r') != line.TrimEnd('\r').TrimEnd())
             {
@@ -409,10 +407,7 @@ public sealed class CheckTool : McpToolBase
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(line.TrimEnd('\r')))
-            {
-                issues.Add(new LintIssue(lineNum, "Blank lines not allowed in agent-optimized format"));
-            }
+            // Blank lines are now allowed as readability separators (Phase 4 indent form).
         }
 
         var diagnostics = new DiagnosticBag();

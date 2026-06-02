@@ -1,27 +1,15 @@
 §M{m001:QuickSort}
-§F{f001:ChoosePivot:pub}
-  §I{i32:low}
-  §I{i32:high}
-  §O{i32}
-  §Q (>= low 0)
-  §Q (<= low high)
-  §R high
-§/F{f001}
-§F{f002:ShouldSwap:pub}
-  §I{i32:value}
-  §I{i32:pivot}
-  §O{bool}
-  §R (<= value pivot)
-§/F{f002}
-§F{f003:NextPartitionIndex:pub}
-  §I{i32:current}
-  §O{i32}
-  §R (+ current 1)
-§/F{f003}
-§F{f004:IsSortedPair:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (<= a b)
-§/F{f004}
-§/M{m001}
+  §F{f001:ChoosePivot:pub} (i32:low, i32:high) -> i32
+    §Q (>= low 0)
+    §Q (<= low high)
+    §R high
+
+  §F{f002:ShouldSwap:pub} (i32:value, i32:pivot) -> bool
+    §R (<= value pivot)
+
+  §F{f003:NextPartitionIndex:pub} (i32:current) -> i32
+    §R (+ current 1)
+
+  §F{f004:IsSortedPair:pub} (i32:a, i32:b) -> bool
+    §R (<= a b)
+

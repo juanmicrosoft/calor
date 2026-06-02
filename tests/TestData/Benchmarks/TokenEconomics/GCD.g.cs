@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace MathUtils
 {
@@ -18,10 +15,10 @@ namespace MathUtils
         {
             var x = a;
             var y = b;
-            while ((y != 0))
+            while (y != 0)
             {
                 var temp = y;
-                y = (x % y);
+                y = x % y;
                 x = temp;
             }
 

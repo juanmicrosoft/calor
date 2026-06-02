@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Factorial
 {
@@ -18,10 +15,10 @@ namespace Factorial
         {
             var result = 1;
             var i = 2;
-            while ((i <= n))
+            while (i <= n)
             {
-                result = (result * i);
-                i = (i + 1);
+                result = result * i;
+                i = i + 1;
             }
 
             return result;

@@ -1,14 +1,7 @@
 §M{m001:ParallelTasks}
-§F{f001:CombineResults:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§F{f002:AllSucceeded:pub}
-  §I{bool:a}
-  §I{bool:b}
-  §O{bool}
-  §R (&& a b)
-§/F{f002}
-§/M{m001}
+  §F{f001:CombineResults:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{f002:AllSucceeded:pub} (bool:a, bool:b) -> bool
+    §R (&& a b)
+

@@ -1,18 +1,11 @@
 §M{m001:TypeAlias}
-§F{f001:UserId:pub}
-  §I{i32:id}
-  §O{i32}
-  §Q (> id 0)
-  §R id
-§/F{f001}
-§F{f002:IsValidId:pub}
-  §I{i32:id}
-  §O{bool}
-  §R (> id 0)
-§/F{f002}
-§F{f003:NextId:pub}
-  §I{i32:id}
-  §O{i32}
-  §R (+ id 1)
-§/F{f003}
-§/M{m001}
+  §F{f001:UserId:pub} (i32:id) -> i32
+    §Q (> id 0)
+    §R id
+
+  §F{f002:IsValidId:pub} (i32:id) -> bool
+    §R (> id 0)
+
+  §F{f003:NextId:pub} (i32:id) -> i32
+    §R (+ id 1)
+

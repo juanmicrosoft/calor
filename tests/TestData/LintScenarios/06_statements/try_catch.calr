@@ -1,23 +1,16 @@
 §M{m1:TryCatch}
-§F{f1:SafeDivide:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§TR{t1}
-§R (/ a b)
-§CA{Exception:ex}
-§R 0
-§/TR{t1}
-§/F{f1}
-§F{f2:WithFinally:pub}
-§O{void}
-§E{cw}
-§TR{t2}
-§P "try"
-§CA{Exception:e}
-§P "catch"
-§FI
-§P "finally"
-§/TR{t2}
-§/F{f2}
-§/M{m1}
+  §F{f1:SafeDivide:pub} (i32:a, i32:b) -> i32
+    §TR{t1}
+      §R (/ a b)
+    §CA{Exception:ex}
+      §R 0
+
+  §F{f2:WithFinally:pub} () -> void
+    §E{cw}
+    §TR{t2}
+      §P "try"
+    §CA{Exception:e}
+      §P "catch"
+    §FI
+      §P "finally"
+

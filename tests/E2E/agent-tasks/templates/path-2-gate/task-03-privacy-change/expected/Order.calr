@@ -1,11 +1,6 @@
 §M{m002:Order}
+  §F{f003:OrderTotal:pub} (i32:price) -> i32
+    §B{t1} §C{ComputeTax} §A price §/C
+    §B{t2} §C{ComputeTax} §A price §/C
+    §R (+ price (+ t1 t2))
 
-§F{f003:OrderTotal:pub}
-  §I{i32:price}
-  §O{i32}
-  §B{t1} §C{ComputeTax} §A price §/C
-  §B{t2} §C{ComputeTax} §A price §/C
-  §R (+ price (+ t1 t2))
-§/F{f003}
-
-§/M{m002}

@@ -1,27 +1,14 @@
 §M{m001:BclUsage}
-§F{f001:LogMessage:pub}
-  §I{str:message}
-  §O{void}
-  §E{cw}
-  §P message
-§/F{f001}
+  §F{f001:LogMessage:pub} (str:message) -> void
+    §E{cw}
+    §P message
 
-§F{f002:ConcatStrings:pub}
-  §I{str:a}
-  §I{str:b}
-  §O{str}
-  §R (concat a b)
-§/F{f002}
+  §F{f002:ConcatStrings:pub} (str:a, str:b) -> str
+    §R (concat a b)
 
-§F{f003:GetLength:pub}
-  §I{str:s}
-  §O{i32}
-  §R (len s)
-§/F{f003}
+  §F{f003:GetLength:pub} (str:s) -> i32
+    §R (len s)
 
-§F{f004:ToUpperCase:pub}
-  §I{str:s}
-  §O{str}
-  §R (upper s)
-§/F{f004}
-§/M{m001}
+  §F{f004:ToUpperCase:pub} (str:s) -> str
+    §R (upper s)
+

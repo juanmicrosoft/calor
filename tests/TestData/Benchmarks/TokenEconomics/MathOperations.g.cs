@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace MathOps
 {
@@ -18,9 +16,9 @@ namespace MathOps
         {
             int __result__ = default;
 
-            if ((x < 0))
+            if (x < 0)
             {
-                return (0 - x);
+                return 0 - x;
             }
             else
             {
@@ -28,13 +26,13 @@ namespace MathOps
             }
 
 
-            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 58, length: 16, sourceFile: null, line: 5, column: 3, condition: "(__result__ >= 0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 57, length: 16, sourceFile: null, line: 3, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 
         public static int Min(int a, int b)
         {
-            if ((a < b))
+            if (a < b)
             {
                 return a;
             }
@@ -47,7 +45,7 @@ namespace MathOps
 
         public static int Max(int a, int b)
         {
-            if ((a > b))
+            if (a > b)
             {
                 return a;
             }

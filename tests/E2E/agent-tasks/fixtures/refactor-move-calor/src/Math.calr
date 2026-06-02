@@ -1,25 +1,14 @@
 §M{m001:MathModule}
-
-  §F{f001:Abs:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f001:Abs:pub} (i32:x) -> i32
     §S (>= result 0)
     §R (? (< x 0) (- 0 x) x)
 
-  §F{f002:SafeDivide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
+  §F{f002:SafeDivide:pub} (i32:a, i32:b) -> i32
     §Q (!= b 0)
     §S (== result (/ a b))
     §R (/ a b)
 
-  §F{f003:Distance:pub}
-    §I{i32:x}
-    §I{i32:y}
-    §O{i32}
+  §F{f003:Distance:pub} (i32:x, i32:y) -> i32
     §S (>= result 0)
-    §R §C{Abs}
-    §A (+ (* x x) (* y y))
-    §/C
+    §R §C{Abs} §A (+ (* x x) (* y y)) §/C
 

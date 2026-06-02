@@ -1,26 +1,14 @@
 §M{m001:LogService}
-§F{f001:LogMessage:pub}
-  §I{str:message}
-  §O{void}
-  §E{cw}
-  §P message
-§/F{f001}
+  §F{f001:LogMessage:pub} (str:message) -> void
+    §E{cw}
+    §P message
 
-§F{f002:ComputeSum:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f002}
+  §F{f002:ComputeSum:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
 
-§F{f003:LogAndCompute:pub}
-  §I{str:label}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §E{cw}
-  §P label
-  §B{result} (+ x y)
-  §R result
-§/F{f003}
-§/M{m001}
+  §F{f003:LogAndCompute:pub} (str:label, i32:x, i32:y) -> i32
+    §E{cw}
+    §P label
+    §B{result} (+ x y)
+    §R result
+

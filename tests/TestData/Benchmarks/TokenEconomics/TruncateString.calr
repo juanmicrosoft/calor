@@ -1,18 +1,12 @@
 §M{m001:TruncateString}
-§F{f001:NeedsTruncation:pub}
-  §I{i32:strLen}
-  §I{i32:maxLen}
-  §O{bool}
-  §Q (> maxLen 0)
-  §R (> strLen maxLen)
-§/F{f001}
-§F{f002:TruncatedLength:pub}
-  §I{i32:strLen}
-  §I{i32:maxLen}
-  §O{i32}
-  §Q (> maxLen 0)
-  §IF{if1} (> strLen maxLen) → §R maxLen
-  §EL → §R strLen
-  §/I{if1}
-§/F{f002}
-§/M{m001}
+  §F{f001:NeedsTruncation:pub} (i32:strLen, i32:maxLen) -> bool
+    §Q (> maxLen 0)
+    §R (> strLen maxLen)
+
+  §F{f002:TruncatedLength:pub} (i32:strLen, i32:maxLen) -> i32
+    §Q (> maxLen 0)
+    §IF{if1} (> strLen maxLen)
+      §R maxLen
+    §EL
+      §R strLen
+

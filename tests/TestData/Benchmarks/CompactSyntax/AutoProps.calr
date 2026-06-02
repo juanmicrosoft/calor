@@ -1,18 +1,10 @@
 §M{m001:AutoProps}
-§F{f001:GetX:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§F{f002:GetY:pub}
-  §I{i32:y}
-  §O{i32}
-  §R y
-§/F{f002}
-§F{f003:Sum:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f003}
-§/M{m001}
+  §F{f001:GetX:pub} (i32:x) -> i32
+    §R x
+
+  §F{f002:GetY:pub} (i32:y) -> i32
+    §R y
+
+  §F{f003:Sum:pub} (i32:x, i32:y) -> i32
+    §R (+ x y)
+

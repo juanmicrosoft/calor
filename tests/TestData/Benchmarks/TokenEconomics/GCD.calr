@@ -1,15 +1,10 @@
 §M{m001:MathUtils}
-§F{f001:GCD:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §B{~x} a
-  §B{~y} b
-  §WH{w1} (!= y 0)
-    §B{temp} y
-    §B{~y} (% x y)
-    §B{~x} temp
-  §/WH{w1}
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:GCD:pub} (i32:a, i32:b) -> i32
+    §B{~x} a
+    §B{~y} b
+    §WH{w1} (!= y 0)
+      §B{temp} y
+      §B{~y} (% x y)
+      §B{~x} temp
+    §R x
+

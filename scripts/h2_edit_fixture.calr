@@ -1,43 +1,21 @@
 §M{m001:MathLib}
+  §F{f001:Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
 
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
+  §F{f002:Subtract:pub} (i32:a, i32:b) -> i32
+    §R (- a b)
 
-§F{f002:Subtract:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (- a b)
-§/F{f002}
+  §F{f003:Multiply:pub} (i32:x, i32:y) -> i32
+    §R (* x y)
 
-§F{f003:Multiply:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (* x y)
-§/F{f003}
+  §F{f004:Divide:pub} (i32:a, i32:b) -> i32
+    §R (/ a b)
 
-§F{f004:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f004}
+  §F{f005:Sign:pub} (i32:n) -> i32
+    §IF{i01} (> n 0)
+      §R 1
+    §EI (< n 0)
+      §R (- 0 1)
+    §EL
+      §R 0
 
-§F{f005:Sign:pub}
-  §I{i32:n}
-  §O{i32}
-  §IF{i01} (> n 0)
-    §R 1
-  §EI (< n 0)
-    §R (- 0 1)
-  §EL
-    §R 0
-  §/I{i01}
-§/F{f005}
-
-§/M{m001}
