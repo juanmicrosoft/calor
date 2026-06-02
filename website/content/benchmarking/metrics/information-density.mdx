@@ -95,11 +95,11 @@ This single line conveys:
 
 Same semantics, but spread across more tokens.
 
-### 2. No Explicit Closing Tags
+### 2. Indent Form Eliminates Most Closing Tags
 
-C# closing braces carry minimal semantic weight but are counted as tokens.
+In Phase 4 indent form, every structural block (`§M{…}`, `§F{…}`, `§CL{…}`, …) is terminated by dedent — no closing tag is emitted, so Calor pays zero token cost for "the block ends here". Only closers that still carry payload (`§/DO` condition, `§/PP` condition, `§/K` case delimiter) and inline expression closers (`§/C`, `§/T`, `§/NEW`, …) remain in the token stream.
 
-Calor closing tags (`§/F{f001}`) also carry minimal semantic weight but use more characters.
+C# closing braces (`}`) carry minimal semantic weight but are still counted as tokens.
 
 ### 3. Effect Information is "Extra"
 
@@ -239,10 +239,9 @@ Calor deliberately trades density for explicitness.
 Potential improvements (with tradeoffs):
 
 1. **Shorter tags** - `§F` could become `@F` (less distinctive)
-2. **Implicit closing** - Remove closing tags (lose verification)
-3. **Remove IDs** - Skip unique identifiers (lose precision)
+2. **Remove IDs** - Skip unique identifiers (lose precision)
 
-Each improvement would sacrifice a design principle.
+Note: Phase 4 already eliminated explicit closing tags via indent form (block boundaries are signalled by dedent), so the previous "implicit closing" suggestion has been realized.
 
 ---
 

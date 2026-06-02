@@ -41,7 +41,7 @@ Calor's explicit structure provides clear signals for understanding:
 
 | Factor | Calor | C# |
 |:-------|:-----|:---|
-| Module boundaries | `§M{id:name}...§/M{id}` | `namespace Name { }` |
+| Module boundaries | `§M{id:name}` opener + indented body (indent form) | `namespace Name { }` |
 | Function signatures | `§F{id:name:vis}` with `§I`, `§O` | Method declarations |
 | Side effects | Explicit `§E{cw,db:rw}` | Must infer from code |
 | Contracts | First-class `§Q`, `§S` | Comments or assertions |

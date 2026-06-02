@@ -255,8 +255,10 @@ public class InformationDensityCalculator : IMetricCalculator
 
     /// <summary>
     /// Counts tokens in source code using simple tokenization.
-    /// For Calor, treats section markers (§M{, §F{, §/F{, etc.) as single tokens
-    /// rather than counting each character separately.
+    /// For Calor, treats section markers (§M{, §F{, etc.) as single tokens
+    /// rather than counting each character separately. In Phase 4 indent
+    /// form the bulk of source markers are openers; the regex still
+    /// matches any §/X{ closers (`§/T`, `§/NEW`, …) that remain inline.
     /// </summary>
     private static int CountTokens(string source)
     {
