@@ -112,7 +112,11 @@ public class IdAssignerTests
     [Fact]
     public void UpdateClosingTags_UpdatesModuleClosingTag()
     {
-        var content = "§M{old_id:Module}\n";
+        // Note: UpdateClosingTags operates on closer-form source via regex
+        // replace. Phase 4d removes closers from user source, but the helper
+        // is still exercised by the `calor fix --reverse-closer-drop` flow
+        // when restoring closer-form for downgrade scenarios.
+        var content = "§M{old_id:Module}\n§/M{old_id}";
         var assignments = new List<IdAssignment>
         {
             new("test.calr", IdKind.Module, "Module", 1, "old_id", "m_01J5X7K9M2NPQRSTABWXYZ1234")
@@ -126,7 +130,9 @@ public class IdAssignerTests
     [Fact]
     public void UpdateClosingTags_UpdatesFunctionClosingTag()
     {
-        var content = "§F{old_id:Func:pub}\n§O{void}\n";
+        // See UpdateClosingTags_UpdatesModuleClosingTag for why this still
+        // uses closer-form input under Phase 4d.
+        var content = "§F{old_id:Func:pub}\n§O{void}\n§/F{old_id}";
         var assignments = new List<IdAssignment>
         {
             new("test.calr", IdKind.Function, "Func", 1, "old_id", "f_01J5X7K9M2NPQRSTABWXYZ1234")
