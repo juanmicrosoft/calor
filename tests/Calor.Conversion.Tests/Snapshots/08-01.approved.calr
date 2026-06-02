@@ -4,6 +4,4 @@
     §PROP{p003:Age:i32:pub:req:get,set}
     §PROP{p004:Email:?str:pub:get,set}
 
-  §/CL{c001}
 
-§/M{m001}

@@ -8,7 +8,6 @@
           §LIST{_listStr005:str}
             "a"
             "b"
-          §/LIST{_listStr005}
           §R _listStr005
         §/K
         §K 2
@@ -16,13 +15,8 @@
             "c"
             "d"
             "e"
-          §/LIST{_listStr007}
           §R _listStr007
         §/K
         §K _ → §NEW{List<str>} §/NEW
-      §/W{match003}
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

@@ -900,7 +900,7 @@ public class CodeGenBugFixTests
         // Re-parse the emitted output
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calor, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var reparsed = parser.Parse();
 
@@ -1185,7 +1185,7 @@ public class CodeGenBugFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -1200,7 +1200,7 @@ public class CodeGenBugFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -1217,7 +1217,7 @@ public class CodeGenBugFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         parser.Parse();

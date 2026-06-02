@@ -61,7 +61,7 @@ public class Foo
         // Try to lex+parse the Calor source
         var diag = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         _output.WriteLine($"Token count: {tokens.Count}");
 
         var parser = new Parser(tokens, diag);
@@ -94,7 +94,7 @@ public class Grader
         // Round-trip: parse the Calor source
         var diag = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
         Assert.True(module.Classes.Count > 0);
@@ -170,7 +170,7 @@ public class Validator
         // Round-trip: parse the Calor source
         var diag = new DiagnosticBag();
         var lexer = new Lexer(result.CalorSource, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 

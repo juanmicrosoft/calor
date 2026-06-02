@@ -4,10 +4,6 @@
       §IF{if003} (is value str)
         §B{str:text} (cast str value)
         §R (len text)
-      §/I{if003}
       §R 0
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

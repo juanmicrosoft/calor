@@ -152,7 +152,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -176,7 +176,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -205,7 +205,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -232,7 +232,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -259,7 +259,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -286,7 +286,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -308,7 +308,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -333,7 +333,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -367,7 +367,7 @@ public class AsyncAwaitTests
         var calor = emitter.Emit(result.Ast!);
 
         Assert.Contains("§AMT{", calor);
-        Assert.Contains("§/AMT{", calor);
+        Assert.DoesNotContain("§/AMT{", calor);
     }
 
     [Fact]
@@ -390,7 +390,7 @@ public class AsyncAwaitTests
         var calor = emitter.Emit(result.Ast!);
 
         Assert.Contains("§MT{", calor);
-        Assert.Contains("§/MT{", calor);
+        Assert.DoesNotContain("§/MT{", calor);
         Assert.DoesNotContain("§AMT{", calor);
     }
 
@@ -415,7 +415,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -446,7 +446,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var classNode = Assert.Single(ast.Classes);
@@ -481,7 +481,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -595,7 +595,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -625,7 +625,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -653,7 +653,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -677,7 +677,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -852,7 +852,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -911,7 +911,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -936,7 +936,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -961,7 +961,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -991,7 +991,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -1021,7 +1021,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -1046,7 +1046,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -1102,7 +1102,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -1129,7 +1129,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -1182,7 +1182,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -1207,7 +1207,7 @@ public class AsyncAwaitTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();

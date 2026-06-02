@@ -166,7 +166,7 @@ public class OperatorOverloadTests
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath("test.calr");
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         parser.Parse();
 
@@ -640,7 +640,7 @@ public class Money
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":+:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -661,7 +661,7 @@ public class Money
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":-:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -682,7 +682,7 @@ public class Money
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":implicit:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -703,7 +703,7 @@ public class Money
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":explicit:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -724,7 +724,7 @@ public class Counter
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":++:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -771,7 +771,7 @@ public class MyBool
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":!:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -791,7 +791,7 @@ public class Vector
         Assert.Contains(":+:", result);
         // Expression body should be converted to a return statement
         Assert.Contains("§R", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -811,7 +811,7 @@ public class Wrapper
         Assert.Contains(":implicit:", result);
         // Expression body should be converted to a return statement
         Assert.Contains("§R", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     #endregion
@@ -995,7 +995,7 @@ public class Wrapper
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -1011,7 +1011,7 @@ public class Wrapper
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -1160,7 +1160,7 @@ public class Wrapper
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calor, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -1184,7 +1184,7 @@ public class Wrapper
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorCode, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 

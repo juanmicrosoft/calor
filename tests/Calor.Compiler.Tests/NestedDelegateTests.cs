@@ -15,7 +15,7 @@ public class NestedDelegateTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -36,7 +36,7 @@ public class NestedDelegateTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
         Assert.Empty(diagnostics);
@@ -55,7 +55,7 @@ public class NestedDelegateTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
         Assert.Empty(diagnostics);
@@ -64,7 +64,7 @@ public class NestedDelegateTests
         var result = emitter.Emit(module);
 
         Assert.Contains("DEL{d001:MyHandler}", result);
-        Assert.Contains("/DEL{d001}", result);
+        Assert.DoesNotContain("/DEL{d001}", result);
     }
 
     [Fact]

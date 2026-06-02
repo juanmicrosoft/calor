@@ -4,10 +4,6 @@
       §B{~total:i32} 0
       §L{for003:i:0:(- n 1):1}
         §ASSIGN total (+ total i)
-      §/L{for003}
       §R total
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

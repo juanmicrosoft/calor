@@ -59,7 +59,7 @@ public class IndexerTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -89,7 +89,7 @@ public class IndexerTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -119,7 +119,7 @@ public class IndexerTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -144,7 +144,7 @@ public class IndexerTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -168,7 +168,7 @@ public class IndexerTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -190,7 +190,7 @@ public class IndexerTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -499,7 +499,7 @@ public class IndexerTests
         // Parse
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
         Assert.Empty(diag);
@@ -530,7 +530,7 @@ public class IndexerTests
         // Re-parse generated Calor
         var diag = new DiagnosticBag();
         var lexer = new Lexer(result.CalorSource!, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
         Assert.Empty(diag);

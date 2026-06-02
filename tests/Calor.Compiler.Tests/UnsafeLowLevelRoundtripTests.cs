@@ -22,7 +22,7 @@ public class UnsafeLowLevelRoundtripTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();

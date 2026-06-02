@@ -6,8 +6,5 @@
 
     §CTOR{ctor003:pub} (T:value)
       §ASSIGN Value value
-    §/CTOR{ctor003}
 
-  §/CL{c001}
 
-§/M{m001}

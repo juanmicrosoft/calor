@@ -292,7 +292,7 @@ public class CodegenBatchFixTests
         Assert.Contains("1", result);
         Assert.Contains("2", result);
         Assert.Contains("3", result);
-        Assert.Contains("§/ARR{", result);
+        Assert.DoesNotContain("§/ARR{", result);
     }
 
     [Fact]
@@ -609,7 +609,7 @@ public class CodegenBatchFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -626,7 +626,7 @@ public class CodegenBatchFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();

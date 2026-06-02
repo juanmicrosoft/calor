@@ -148,6 +148,76 @@ public sealed class Parser
         return ParseModule();
     }
 
+    /// <summary>
+    /// Phase 3 — returns true when the current token starts a sibling class /
+    /// interface member (method, property, field, ctor, op, indexer, event,
+    /// nested type) at the parent's indent level. Used by inline-signature
+    /// method/property parsers to terminate an implicit empty body when the
+    /// next line is another sibling member rather than an indented body
+    /// element. In closer-form code the explicit closer terminates the body
+    /// first; in indent-form code with empty bodies there is no Indent →
+    /// Dedent pair, so we must look ahead.
+    /// </summary>
+    private bool IsClassMemberOpener()
+        => Check(TokenKind.Method) || Check(TokenKind.AsyncMethod)
+            || Check(TokenKind.Property) || Check(TokenKind.FieldDef)
+            || Check(TokenKind.Constructor) || Check(TokenKind.OperatorOverload)
+            || Check(TokenKind.Indexer) || Check(TokenKind.Event)
+            || Check(TokenKind.Class) || Check(TokenKind.Interface)
+            || Check(TokenKind.Enum) || Check(TokenKind.Delegate)
+            || Check(TokenKind.EnumExtension)
+            || Check(TokenKind.Extends) || Check(TokenKind.Implements);
+
+    /// <summary>
+    /// Phase 3 — block-end check for class/interface members. Returns true
+    /// when the member body should terminate: explicit closer, Dedent, or
+    /// a sibling member opener (implicit empty body — no Indent→Dedent
+    /// pair was produced by the lexer because the body had no indented
+    /// content).
+    /// </summary>
+    private bool IsMemberBlockEnd(TokenKind explicitCloser)
+        => IsBlockEnd(explicitCloser) || IsClassMemberOpener();
+
+    /// <summary>
+    /// Phase 3 — consume the end of a class / interface member body and
+    /// (if the explicit closer was present) any post-closer attributes.
+    /// Returns true when the closer was consumed; false when the body
+    /// ended implicitly (caller should skip the ParseAttributes /
+    /// mismatched-id check). The <paramref name="signatureStart"/> is
+    /// the span used when the body ended implicitly.
+    ///
+    /// <paramref name="hasBodyContent"/> controls Dedent handling: when
+    /// true the trailing Dedent terminates the member body and is
+    /// consumed; when false the body had no indented content so any
+    /// Dedent belongs to the parent block and must be left alone.
+    /// </summary>
+    private bool TryExpectMemberBlockEnd(TokenKind explicitCloser, Token signatureStart, bool hasBodyContent, out Token endToken)
+    {
+        if (Check(explicitCloser))
+        {
+            endToken = ExpectBlockEnd(explicitCloser);
+            return true;
+        }
+        if (Check(TokenKind.Dedent))
+        {
+            if (hasBodyContent)
+            {
+                endToken = ExpectBlockEnd(explicitCloser);
+                return true;
+            }
+            // No body content was parsed — this Dedent belongs to the parent.
+            endToken = signatureStart;
+            return false;
+        }
+        if (IsClassMemberOpener())
+        {
+            endToken = signatureStart;
+            return false;
+        }
+        endToken = ExpectBlockEnd(explicitCloser);
+        return true;
+    }
+
     private ModuleNode ParseModule()
     {
         var startToken = Expect(TokenKind.Module);
@@ -6727,35 +6797,43 @@ public sealed class Parser
         var postconditions = new List<EnsuresNode>();
 
         // Parse signature elements until END_METHOD
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndMethod))
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndMethod))
         {
             if (Check(TokenKind.TypeParam))
             {
                 typeParameters.Add(ParseTypeParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Where))
             {
                 ParseWhereClause(typeParameters);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.In))
             {
                 parameters.Add(ParseParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Out))
             {
                 output = ParseOutput();
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Effects))
             {
                 effects = ParseEffects();
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Requires))
             {
                 preconditions.Add(ParseRequires());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Ensures))
             {
                 postconditions.Add(ParseEnsures());
+                bodyHadContent = true;
             }
             else
             {
@@ -6763,13 +6841,16 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndMethod);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        Token endToken;
+        if (TryExpectMemberBlockEnd(TokenKind.EndMethod, startToken, bodyHadContent, out endToken))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -7170,35 +7251,43 @@ public sealed class Parser
         var body = new List<StatementNode>();
 
         // Parse signature and body until END_METHOD
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndMethod))
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndMethod))
         {
             if (Check(TokenKind.TypeParam))
             {
                 typeParameters.Add(ParseTypeParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Where))
             {
                 ParseWhereClause(typeParameters);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.In))
             {
                 parameters.Add(ParseParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Out))
             {
                 output = ParseOutput();
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Effects))
             {
                 effects = ParseEffects();
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Requires))
             {
                 preconditions.Add(ParseRequires());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Ensures))
             {
                 postconditions.Add(ParseEnsures());
+                bodyHadContent = true;
             }
             else
             {
@@ -7207,17 +7296,20 @@ public sealed class Parser
                 if (stmt != null)
                 {
                     body.Add(stmt);
+                    bodyHadContent = true;
                 }
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndMethod);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        if (TryExpectMemberBlockEnd(TokenKind.EndMethod, startToken, bodyHadContent, out var endToken))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "METHOD", id, "END_METHOD", endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -7300,35 +7392,43 @@ public sealed class Parser
         var body = new List<StatementNode>();
 
         // Parse signature and body until END_AMT
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndAsyncMethod))
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndAsyncMethod))
         {
             if (Check(TokenKind.TypeParam))
             {
                 typeParameters.Add(ParseTypeParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Where))
             {
                 ParseWhereClause(typeParameters);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.In))
             {
                 parameters.Add(ParseParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Out))
             {
                 output = ParseOutput();
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Effects))
             {
                 effects = ParseEffects();
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Requires))
             {
                 preconditions.Add(ParseRequires());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Ensures))
             {
                 postconditions.Add(ParseEnsures());
+                bodyHadContent = true;
             }
             else
             {
@@ -7337,17 +7437,20 @@ public sealed class Parser
                 if (stmt != null)
                 {
                     body.Add(stmt);
+                    bodyHadContent = true;
                 }
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndAsyncMethod);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        if (TryExpectMemberBlockEnd(TokenKind.EndAsyncMethod, startToken, bodyHadContent, out var endToken))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "AMT", id, "END_AMT", endId);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "AMT", id, "END_AMT", endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -7820,19 +7923,23 @@ public sealed class Parser
         PropertyAccessorNode? initer2 = null;
         ExpressionNode? defaultValue2 = null;
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndProperty))
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndProperty))
         {
             if (Check(TokenKind.Get))
             {
                 getter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Get);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Set))
             {
                 setter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Set);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Init))
             {
                 initer2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Init);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Equals))
             {
@@ -7851,13 +7958,16 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndProperty);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        Token endToken;
+        if (TryExpectMemberBlockEnd(TokenKind.EndProperty, startToken, bodyHadContent, out endToken))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "PROP", id, "END_PROP", endId);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "PROP", id, "END_PROP", endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -8000,23 +8110,28 @@ public sealed class Parser
         PropertyAccessorNode? setter2 = null;
         PropertyAccessorNode? initer2 = null;
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIndexer))
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndIndexer))
         {
             if (Check(TokenKind.In))
             {
                 parameters2.Add(ParseParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Get))
             {
                 getter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Get);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Set))
             {
                 setter2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Set);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Init))
             {
                 initer2 = ParsePropertyAccessor(PropertyAccessorNode.AccessorKind.Init);
+                bodyHadContent = true;
             }
             else
             {
@@ -8024,13 +8139,16 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndIndexer);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        Token endToken;
+        if (TryExpectMemberBlockEnd(TokenKind.EndIndexer, startToken, bodyHadContent, out endToken))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IXER", id, "END_IXER", endId);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IXER", id, "END_IXER", endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -8155,23 +8273,28 @@ public sealed class Parser
         ConstructorInitializerNode? initializer = null;
         var body = new List<StatementNode>();
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndConstructor))
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndConstructor))
         {
             if (Check(TokenKind.In))
             {
                 parameters.Add(ParseParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Requires))
             {
                 preconditions.Add(ParseRequires());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Base))
             {
                 initializer = ParseConstructorInitializer(isBase: true);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.This))
             {
                 initializer = ParseConstructorInitializer(isBase: false);
+                bodyHadContent = true;
             }
             else
             {
@@ -8179,17 +8302,20 @@ public sealed class Parser
                 if (stmt != null)
                 {
                     body.Add(stmt);
+                    bodyHadContent = true;
                 }
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndConstructor);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        if (TryExpectMemberBlockEnd(TokenKind.EndConstructor, startToken, bodyHadContent, out var endToken))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "CTOR", id, "END_CTOR", endId);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "CTOR", id, "END_CTOR", endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -8237,23 +8363,28 @@ public sealed class Parser
         TryParseInlineSignature(startToken.Span, parameters, ref output);
         var body = new List<StatementNode>();
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndOperatorOverload))
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndOperatorOverload))
         {
             if (Check(TokenKind.In))
             {
                 parameters.Add(ParseParameter());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Out))
             {
                 output = ParseOutput();
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Requires))
             {
                 preconditions.Add(ParseRequires());
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.Ensures))
             {
                 postconditions.Add(ParseEnsures());
+                bodyHadContent = true;
             }
             else
             {
@@ -8261,17 +8392,20 @@ public sealed class Parser
                 if (stmt != null)
                 {
                     body.Add(stmt);
+                    bodyHadContent = true;
                 }
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndOperatorOverload);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        if (TryExpectMemberBlockEnd(TokenKind.EndOperatorOverload, startToken, bodyHadContent, out var endToken))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "OP", id, "END_OP", endId);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "OP", id, "END_OP", endId);
+            }
         }
 
         var kind = OperatorOverloadNode.ResolveOperatorKind(operatorToken, parameters.Count);
@@ -8709,6 +8843,10 @@ public sealed class Parser
             if (stmt != null) body.Add(stmt);
         }
 
+        // Phase 3 (indent-aware): consume dangling Dedent before §PPE/§/PP so
+        // the chain continues even when the body lived at a deeper indent.
+        ConsumeDedentBeforeChain(TokenKind.PreprocessorElse, TokenKind.EndPreprocessor);
+
         if (Match(TokenKind.PreprocessorElse))
         {
             elseBody = new List<StatementNode>();
@@ -8717,6 +8855,7 @@ public sealed class Parser
                 var stmt = ParseStatement();
                 if (stmt != null) elseBody.Add(stmt);
             }
+            ConsumeDedentBeforeChain(TokenKind.EndPreprocessor);
         }
 
         ExpectBlockEnd(TokenKind.EndPreprocessor);
@@ -9238,15 +9377,18 @@ public sealed class Parser
         List<StatementNode>? addBody = null;
         List<StatementNode>? removeBody = null;
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndEvent))
+        var bodyHadContent = false;
+        while (!IsAtEnd && !IsMemberBlockEnd(TokenKind.EndEvent))
         {
             if (Check(TokenKind.EventAdd))
             {
                 addBody = ParseEventAccessorBody(TokenKind.EventAdd, TokenKind.EndEventAdd);
+                bodyHadContent = true;
             }
             else if (Check(TokenKind.EventRemove))
             {
                 removeBody = ParseEventAccessorBody(TokenKind.EventRemove, TokenKind.EndEventRemove);
+                bodyHadContent = true;
             }
             else
             {
@@ -9254,13 +9396,16 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndEvent);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        Token endToken;
+        if (TryExpectMemberBlockEnd(TokenKind.EndEvent, startToken, bodyHadContent, out endToken))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EVT", id, "END_EVT", endId);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "EVT", id, "END_EVT", endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -10047,6 +10192,22 @@ public sealed class Parser
                 var strToken = Advance();
                 reasons.Add((string)strToken.Value!);
             }
+        }
+
+        // §REJECTED has no explicit closer — its indented §REASON list is
+        // implicitly closed by the next sibling or the parent's closer.
+        // In the indent-aware lexer the §REASON body emits a Dedent before
+        // the next §DC content keyword (or §/DC). Swallow it here so the
+        // §DC content loop doesn't mistake it for end-of-§DC.
+        if (Check(TokenKind.Dedent) &&
+            (Peek(1).Kind == TokenKind.Chosen ||
+             Peek(1).Kind == TokenKind.Reason ||
+             Peek(1).Kind == TokenKind.Rejected ||
+             Peek(1).Kind == TokenKind.Context ||
+             Peek(1).Kind == TokenKind.DateMarker ||
+             Peek(1).Kind == TokenKind.AgentAuthor))
+        {
+            Advance();
         }
 
         return new RejectedOptionNode(startToken.Span, name, reasons, new AttributeCollection());

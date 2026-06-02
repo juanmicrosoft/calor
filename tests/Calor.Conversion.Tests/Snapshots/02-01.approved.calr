@@ -2,7 +2,4 @@
   §IFACE{i001:IAnimal}
     §PROP{p003:Name:str:pub:get}
     §MT{m002:Speak} () -> str
-    §/MT{m002}
-  §/IFACE{i001}
 
-§/M{m001}

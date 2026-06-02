@@ -532,7 +532,7 @@ public class ConstructorOverloadingTests
 
         // Should have two §/CTOR blocks
         var endCtorCount = calrText.Split("§/CTOR{").Length - 1;
-        Assert.Equal(2, endCtorCount);
+        Assert.Equal(0, endCtorCount);
     }
 
     #endregion

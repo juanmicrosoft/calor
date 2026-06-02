@@ -37,7 +37,7 @@ public class ParserIndentAcceptanceTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         return parser.Parse();
     }
 
