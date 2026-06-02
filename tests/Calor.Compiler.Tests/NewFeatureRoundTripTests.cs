@@ -596,7 +596,7 @@ public class NewFeatureRoundTripTests
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("§ARR", formatted);
-        Assert.Contains("§/ARR", formatted);
+        // Phase 4b: indent form — array literal blocks end by dedent, not §/ARR.
     }
 
     [Fact]

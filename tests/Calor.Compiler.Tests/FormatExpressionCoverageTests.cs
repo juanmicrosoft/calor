@@ -100,7 +100,11 @@ public class FormatExpressionCoverageTests
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* RangeExpressionNode */", result);
-        Assert.Contains("..", result);
+        // Phase 4b: the formatter delegates to Migration/CalorEmitter, which
+        // renders ranges as the canonical `§RANGE start end` section marker
+        // (parser-symmetric with the source form), not the legacy `start..end`
+        // pretty-print produced by the old hand-coded formatter.
+        Assert.Contains("§RANGE", result);
     }
 
     [Fact]
@@ -379,7 +383,11 @@ public class FormatExpressionCoverageTests
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* WithExpressionNode */", result);
-        Assert.Contains("with", result);
+        // Phase 4b: the formatter delegates to Migration/CalorEmitter, which
+        // renders C# `with` expressions as the canonical `§WITH target ... §/WITH`
+        // section-marker form (parser-symmetric with the source), not the legacy
+        // `target with { ... }` pretty-print produced by the old formatter.
+        Assert.Contains("§WITH", result);
     }
 
     #endregion

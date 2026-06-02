@@ -132,23 +132,31 @@ public class LintRegressionTests
     }
 
     [Fact]
-    public void LintFix_Whitespace_RemovesIndentation()
+    public void LintFix_Whitespace_PreservesIndentation()
     {
+        // Phase 4b: indentation is the canonical block structure; the formatter
+        // (now backed by Migration/CalorEmitter) preserves and normalizes it
+        // rather than stripping it. Verify the output is well-formed and reparseable,
+        // and contains at least one indented line under the function body.
         var source = LintTestDataLoader.LoadTestFile("02_whitespace/leading_spaces.calr");
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess);
+        Assert.NotNull(formatted);
 
-        // No line should start with whitespace
         var lines = formatted!.Split('\n');
-        foreach (var line in lines)
-        {
-            if (!string.IsNullOrEmpty(line))
-            {
-                Assert.False(char.IsWhiteSpace(line[0]),
-                    $"Line should not start with whitespace: '{line}'");
-            }
-        }
+        var anyIndented = lines.Any(l => l.Length > 0 && char.IsWhiteSpace(l[0]));
+        Assert.True(anyIndented, "Indent-form output should contain at least one indented body line.");
+
+        // Re-parse the formatted output to confirm the indent normalization
+        // round-trips cleanly through the production lexer.
+        var diag = new DiagnosticBag();
+        var lexer = new Lexer(formatted, diag);
+        var tokens = lexer.TokenizeAllForParser();
+        var parser = new Parser(tokens, diag);
+        parser.Parse();
+        Assert.False(diag.HasErrors,
+            "Formatted output should reparse cleanly:\n" + string.Join("\n", diag.Errors.Select(e => e.Message)));
     }
 
     #endregion
@@ -187,8 +195,8 @@ public class LintRegressionTests
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess);
+        // Phase 4b: indent form — only the opener is emitted; block end is dedentation.
         Assert.Contains("§WH", formatted);
-        Assert.Contains("§/WH", formatted);
     }
 
     [Fact]
@@ -199,9 +207,12 @@ public class LintRegressionTests
 
         Assert.True(parseSuccess);
 
-        // Visibility should be third positional parameter inside braces
+        // Visibility should be third positional parameter inside braces.
+        // Phase 4b: the formatter now delegates to Migration/CalorEmitter, which uses
+        // the canonical `priv` spelling (matches samples/ and is accepted by the parser
+        // side-by-side with `pri`).
         Assert.Contains(":pub}", formatted);
-        Assert.Contains(":pri}", formatted);
+        Assert.Contains(":priv}", formatted);
     }
 
     #endregion
@@ -471,8 +482,8 @@ public class LintRegressionTests
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess);
+        // Phase 4b: indent form has no closer; the opener alone proves the empty module.
         Assert.Contains("§M{m1:Empty}", formatted);
-        Assert.Contains("§/M{m1}", formatted);
     }
 
     [Fact]

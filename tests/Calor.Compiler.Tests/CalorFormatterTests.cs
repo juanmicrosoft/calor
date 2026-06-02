@@ -453,10 +453,8 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        // Formatter should emit §EACH with variable:type:index order
         Assert.Contains("§EACH{", result);
         Assert.Contains("item:i32:idx", result);
-        Assert.Contains("§/EACH{", result);
     }
 
     [Fact]
@@ -481,9 +479,8 @@ public class CalorFormatterTests
 
         Assert.Contains("§EACH{", result);
         Assert.Contains("item:i32", result);
-        // Should NOT contain a trailing colon after type (no index)
+        // Variable should be just "item:i32" with no trailing :idx slot in indent form
         Assert.DoesNotContain("item:i32:", result);
-        Assert.Contains("§/EACH{", result);
     }
 
     #endregion

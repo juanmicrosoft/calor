@@ -240,6 +240,21 @@ public static class DiagnosticCode
     /// </summary>
     public const string CompactIdCollision = "Calor0822";
 
+    /// <summary>
+    /// Info (opt-in lint, Phase 4b): a structural closing tag (e.g.
+    /// <c>§/F</c>, <c>§/CL</c>, <c>§/L</c>) is present in source that
+    /// has otherwise adopted indent form. Indent form alone now
+    /// terminates every structural block; legacy closers are kept only
+    /// for closers that still carry payload (<c>§/DO</c> condition,
+    /// <c>§/PP</c> condition, <c>§/K</c> case delimiter) and inline
+    /// expression closers (<c>§/C</c>, <c>§/T</c>, <c>§/NEW</c>, etc.).
+    ///
+    /// The fix is to delete the entire closer line (and any trailing
+    /// blank line introduced by the legacy formatter). <c>calor format</c>
+    /// already produces indent form and will strip these automatically.
+    /// </summary>
+    public const string LegacyCloserForm = "Calor0830";
+
     // Contract simplification (Calor0330-0339)
 
     /// <summary>
