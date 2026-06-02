@@ -135,7 +135,7 @@ public class SuggestionTests
     [Fact]
     public void Parser_UnknownOperator_WithTypo_ShowsSuggestion()
     {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -148,7 +148,7 @@ public class SuggestionTests
     [Fact]
     public void Parser_NameofOperator_CompilesSuccessfully()
     {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x) §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x)";
         var result = Program.Compile(source, "test.calr");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
@@ -158,7 +158,7 @@ public class SuggestionTests
     [Fact]
     public void Parser_UnknownOperator_NoSuggestion_ShowsValidOperators()
     {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (xyzqwerty 1 2) §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (xyzqwerty 1 2)";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -321,7 +321,7 @@ public class SuggestionTests
     [Fact]
     public void Parser_UnknownOperator_WithTypo_GeneratesFix()
     {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -344,7 +344,7 @@ public class SuggestionTests
     public void ApplyFix_OperatorTypo_ProducesValidCode()
     {
         // Source with typo
-        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -360,11 +360,11 @@ public class SuggestionTests
         Assert.False(fixedResult.HasErrors, $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-id concept removed under indent-only form")]
     public void ApplyFix_MismatchedId_GeneratesFix()
     {
         // Source with mismatched ID
-        var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R 42 §/F{f002} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R 42";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -380,10 +380,10 @@ public class SuggestionTests
     }
 
     [Theory]
-    [InlineData("§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}", "cotains", "contains")]
-    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello\") §/F{f001} §/M{m001}", "uper", "upper")]
-    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (lowwer \"HELLO\") §/F{f001} §/M{m001}", "lowwer", "lower")]
-    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (substrr \"hello\" 0 2) §/F{f001} §/M{m001}", "substrr", "substr")]
+    [InlineData("§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")", "cotains", "contains")]
+    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello\")", "uper", "upper")]
+    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (lowwer \"HELLO\")", "lowwer", "lower")]
+    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (substrr \"hello\" 0 2)", "substrr", "substr")]
     public void ApplyFix_VariousTypos_ProducesValidCode(string source, string typo, string expected)
     {
         var result = Program.Compile(source, "test.calr");
@@ -521,7 +521,7 @@ public class SuggestionTests
     public void Parser_MultipleTyposOnSameLine_GeneratesMultipleFixes()
     {
         // Source with multiple typos on the same line
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §B{x} (abss (ngative 5)) §R x §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §B{x} (abss (ngative 5)) §R x";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -536,15 +536,12 @@ public class SuggestionTests
     {
         // Nested structure with typos at different levels
         var source = @"§M{m001:Test}
-§F{f001:Fn}
-§O{str}
-§P{s:str} ""test""
-§L{l001:i:0:10:1}
-§B{x} (cotains s ""t"")
-§/L{l001}
-§R s
-§/F{f001}
-§/M{m001}";
+  §F{f001:Fn}
+    §O{str}
+    §P{s:str} ""test""
+    §L{l001:i:0:10:1}
+      §B{x} (cotains s ""t"")
+    §R s";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -559,7 +556,7 @@ public class SuggestionTests
     public void Parser_UnicodeInIdentifier_NoSuggestionCrash()
     {
         // Unicode characters should not cause crashes
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (εpsılοn 5) §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (εpsılοn 5)";
         var result = Program.Compile(source, "test.calr");
 
         // Should not crash, may or may not have suggestions
@@ -570,7 +567,7 @@ public class SuggestionTests
     public void Parser_OperatorWithNumbers_NoSuggestion()
     {
         // Operators with numbers that don't match any valid operator
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (add123 5 3) §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (add123 5 3)";
         var result = Program.Compile(source, "test.calr");
 
         Assert.True(result.HasErrors);
@@ -583,7 +580,7 @@ public class SuggestionTests
     public void Parser_ExactMatchOperator_NoError()
     {
         // Exact match should not produce error
-        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (contains \"hello\" \"h\") §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (contains \"hello\" \"h\")";
         var result = Program.Compile(source, "test.calr");
 
         Assert.False(result.HasErrors);
@@ -603,7 +600,7 @@ public class SuggestionTests
         Assert.Contains("MODUL", error.Message);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: missing close tag concept removed under indent-only form")]
     public void MissingCloseTag_GeneratesInsertFix()
     {
         // Missing closing tag should suggest inserting it
@@ -631,7 +628,7 @@ public class SuggestionTests
     [InlineData("??", false)] // Now supported as null-coalescing operator
     public void Parser_ShortOperators_HandleCorrectly(string op, bool shouldError)
     {
-        var source = $"§M{{m001:Test}} §F{{f001:Fn}} §O{{i32}} §R ({op} 5 3) §/F{{f001}} §/M{{m001}}";
+        var source = $"§M{{m001:Test}} §F{{f001:Fn}} §O{{i32}} §R ({op} 5 3)";
         var result = Program.Compile(source, "test.calr");
 
         Assert.Equal(shouldError, result.HasErrors);
@@ -653,11 +650,9 @@ public class SuggestionTests
     {
         // Source with string operator typo that can be fixed
         var source = @"§M{m001:Test}
-§F{f001:Check}
-§O{bool}
-§R (cotains ""hello"" ""h"")
-§/F{f001}
-§/M{m001}";
+  §F{f001:Check}
+    §O{bool}
+    §R (cotains ""hello"" ""h"")";
 
         // Step 1: Get diagnostics
         var result = Program.Compile(source, "test.calr");
@@ -685,7 +680,7 @@ public class SuggestionTests
     [Fact]
     public void AgentSimulation_SingleTypoFix_ProducesValidCode()
     {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")";
 
         // Step 1: Compile and get diagnostics
         var result = Program.Compile(source, "test.calr");
@@ -708,7 +703,7 @@ public class SuggestionTests
     /// <summary>
     /// Tests that mismatched ID errors have fix suggestions with correct positions.
     /// </summary>
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-id concept removed under indent-only form")]
     public void AgentSimulation_MismatchedIdFix_HasCorrectPositionAndContent()
     {
         var source = @"§M{m001:Test}
@@ -749,7 +744,7 @@ public class SuggestionTests
     [Fact]
     public async Task AgentSimulation_McpWorkflow_ProducesValidCode()
     {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello\") §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello\")";
 
         // Step 1: Call diagnose tool (simulated)
         var tool = new Calor.Compiler.Mcp.Tools.CheckTool();
@@ -790,11 +785,9 @@ public class SuggestionTests
     public void AgentSimulation_IterativeFixes_EventuallyConverges()
     {
         var source = @"§M{m001:Test}
-§F{f001:Complex}
-§O{str}
-§R (uper ""hello"")
-§/F{f001}
-§/M{m001}";
+  §F{f001:Complex}
+    §O{str}
+    §R (uper ""hello"")";
 
         // First iteration: fix "uper" -> "upper"
         var result = Program.Compile(source, "test.calr");

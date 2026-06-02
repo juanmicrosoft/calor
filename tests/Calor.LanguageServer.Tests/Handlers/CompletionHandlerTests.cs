@@ -14,13 +14,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Add}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R a + b
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §R a + b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -35,15 +33,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §FLD{i32:age}
-            §MT{m001:GetName}
-            §O{str}
-            §R name
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+                §FLD{i32:age}
+                §MT{m001:GetName}
+                  §O{str}
+                  §R name
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -61,12 +56,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:Color}
-            §EM{Red}
-            §EM{Green}
-            §EM{Blue}
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Color}
+              §EM{Red}
+              §EM{Green}
+              §EM{Blue}
+              §/EN{e001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -83,12 +77,9 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §IFACE{i001:IShape}
-            §MT{m001:GetArea}
-            §O{f64}
-            §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IShape}
+                §MT{m001:GetArea}
+                  §O{f64}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -105,11 +96,10 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §DEL{d001:Callback}
-            §I{i32:value}
-            §O{void}
-            §/DEL{d001}
-            §/M{m001}
+              §DEL{d001:Callback}
+              §I{i32:value}
+              §O{void}
+              §/DEL{d001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -124,14 +114,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Calculate}
-            §I{i32:x}
-            §I{i32:y}
-            §I{str:label}
-            §O{i32}
-            §R x + y
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Calculate}
+                §I{i32:x}
+                §I{i32:y}
+                §I{str:label}
+                §O{i32}
+                §R x + y
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -151,11 +139,9 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:GetValue}
-            §O{str}
-            §R "hello"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetValue}
+                §O{str}
+                §R "hello"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -171,10 +157,8 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:DoNothing}
-            §R
-            §/F{f001}
-            §/M{m001}
+              §F{f001:DoNothing}
+                §R
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -189,11 +173,9 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §B{x:i32} 42
-            §R x
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §B{x:i32} 42
+                §R x
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -212,12 +194,9 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §L{l001:i:0:10}
-            §P i
-            §/L{l001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §L{l001:i:0:10}
+                  §P i
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -235,13 +214,10 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §B{bool:running} true
-            §WH{w001} running
-            §B{bool:running} false
-            §/WH{w001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §B{bool:running} true
+                §WH{w001} running
+                  §B{bool:running} false
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -258,16 +234,13 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §I{bool:condition}
-            §O{i32}
-            §IF{if001} condition
-            §R 1
-            §EL
-            §R 0
-            §/I{if001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §I{bool:condition}
+                §O{i32}
+                §IF{if001} condition
+                  §R 1
+                §EL
+                  §R 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -286,15 +259,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §FLD{i32:age}
-            §/CL{c001}
-            §F{f001:Test}
-            §B{p:Person} §NEW Person
-            §R p.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+                §FLD{i32:age}
+              §F{f001:Test}
+                §B{p:Person} §NEW Person
+                §R p.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "p.");
@@ -309,19 +279,15 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Calculator}
-            §MT{m001:Add}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R a + b
-            §/MT{m001}
-            §/CL{c001}
-            §F{f001:Test}
-            §B{calc:Calculator} §NEW Calculator
-            §R calc.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Calculator}
+                §MT{m001:Add}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R a + b
+              §F{f001:Test}
+                §B{calc:Calculator} §NEW Calculator
+                §R calc.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "calc.");
@@ -335,16 +301,14 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:Color}
-            §EM{Red}
-            §EM{Green}
-            §EM{Blue}
-            §/EN{e001}
-            §F{f001:Test}
-            §O{Color}
-            §R Color.
-            §/F{f001}
-            §/M{m001}
+              §EN{e001:Color}
+              §EM{Red}
+              §EM{Green}
+              §EM{Blue}
+              §/EN{e001}
+              §F{f001:Test}
+                §O{Color}
+                §R Color.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "Color.");
@@ -360,12 +324,10 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §I{str:text}
-            §O{str}
-            §R text.
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §I{str:text}
+                §O{str}
+                §R text.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "text.");
@@ -381,15 +343,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §/CL{c001}
-            §F{f001:Greet}
-            §I{Person:person}
-            §O{str}
-            §R person.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+              §F{f001:Greet}
+                §I{Person:person}
+                §O{str}
+                §R person.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "person.");
@@ -405,19 +364,15 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Address}
-            §FLD{str:city}
-            §FLD{str:street}
-            §/CL{c001}
-            §CL{c002:Person}
-            §FLD{Address:address}
-            §/CL{c002}
-            §F{f001:Test}
-            §I{Person:person}
-            §O{str}
-            §R person.address.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Address}
+                §FLD{str:city}
+                §FLD{str:street}
+              §CL{c002:Person}
+                §FLD{Address:address}
+              §F{f001:Test}
+                §I{Person:person}
+                §O{str}
+                §R person.address.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "person.address.");
@@ -432,22 +387,17 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:PostalCode}
-            §FLD{str:code}
-            §FLD{str:region}
-            §/CL{c001}
-            §CL{c002:Address}
-            §FLD{PostalCode:postal}
-            §/CL{c002}
-            §CL{c003:Person}
-            §FLD{Address:address}
-            §/CL{c003}
-            §F{f001:Test}
-            §I{Person:person}
-            §O{str}
-            §R person.address.postal.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:PostalCode}
+                §FLD{str:code}
+                §FLD{str:region}
+              §CL{c002:Address}
+                §FLD{PostalCode:postal}
+              §CL{c003:Person}
+                §FLD{Address:address}
+              §F{f001:Test}
+                §I{Person:person}
+                §O{str}
+                §R person.address.postal.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "person.address.postal.");
@@ -462,21 +412,16 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Address}
-            §FLD{str:city}
-            §/CL{c001}
-            §CL{c002:Person}
-            §MT{m001:GetAddress}
-            §O{Address}
-            §R §NEW Address
-            §/MT{m001}
-            §/CL{c002}
-            §F{f001:Test}
-            §I{Person:person}
-            §O{str}
-            §R person.GetAddress().
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Address}
+                §FLD{str:city}
+              §CL{c002:Person}
+                §MT{m001:GetAddress}
+                  §O{Address}
+                  §R §NEW Address
+              §F{f001:Test}
+                §I{Person:person}
+                §O{str}
+                §R person.GetAddress().
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "person.GetAddress().");
@@ -490,23 +435,18 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Name}
-            §FLD{str:first}
-            §FLD{str:last}
-            §/CL{c001}
-            §CL{c002:Person}
-            §FLD{Name:name}
-            §MT{m001:GetName}
-            §O{Name}
-            §R name
-            §/MT{m001}
-            §/CL{c002}
-            §F{f001:Test}
-            §I{Person:person}
-            §O{str}
-            §R person.name.first.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Name}
+                §FLD{str:first}
+                §FLD{str:last}
+              §CL{c002:Person}
+                §FLD{Name:name}
+                §MT{m001:GetName}
+                  §O{Name}
+                  §R name
+              §F{f001:Test}
+                §I{Person:person}
+                §O{str}
+                §R person.name.first.
             """;
 
         // String completions for the final "first" field
@@ -523,12 +463,10 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §I{str:text}
-            §O{str}
-            §R text.ToUpper().
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §I{str:text}
+                §O{str}
+                §R text.ToUpper().
             """;
 
         // ToUpper() returns str, so should show string members
@@ -544,22 +482,17 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Container}
-            §FLD{str:value}
-            §MT{m001:GetValue}
-            §O{str}
-            §R value
-            §/MT{m001}
-            §/CL{c001}
-            §CL{c002:Wrapper}
-            §FLD{Container:inner}
-            §/CL{c002}
-            §F{f001:Test}
-            §I{Wrapper:wrapper}
-            §O{str}
-            §R wrapper.inner.GetValue().
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Container}
+                §FLD{str:value}
+                §MT{m001:GetValue}
+                  §O{str}
+                  §R value
+              §CL{c002:Wrapper}
+                §FLD{Container:inner}
+              §F{f001:Test}
+                §I{Wrapper:wrapper}
+                §O{str}
+                §R wrapper.inner.GetValue().
             """;
 
         // GetValue() returns str, so should show string members
@@ -574,17 +507,13 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Address}
-            §FLD{str:city}
-            §/CL{c001}
-            §CL{c002:Person}
-            §FLD{Address:address}
-            §MT{m001:GetCity}
-            §O{str}
-            §R this.address.
-            §/MT{m001}
-            §/CL{c002}
-            §/M{m001}
+              §CL{c001:Address}
+                §FLD{str:city}
+              §CL{c002:Person}
+                §FLD{Address:address}
+                §MT{m001:GetCity}
+                  §O{str}
+                  §R this.address.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "this.address.");
@@ -602,20 +531,16 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Animal}
-            §FLD{str:name}
-            §FLD{i32:age}
-            §/CL{c001}
-            §CL{c002:Dog}
-            §EXT{Animal}
-            §FLD{str:breed}
-            §/CL{c002}
-            §F{f001:Test}
-            §I{Dog:dog}
-            §O{str}
-            §R dog.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Animal}
+                §FLD{str:name}
+                §FLD{i32:age}
+              §CL{c002:Dog}
+                §EXT{Animal}
+                §FLD{str:breed}
+              §F{f001:Test}
+                §I{Dog:dog}
+                §O{str}
+                §R dog.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "dog.");
@@ -633,25 +558,19 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Animal}
-            §MT{m001:Speak}
-            §O{str}
-            §R "sound"
-            §/MT{m001}
-            §/CL{c001}
-            §CL{c002:Dog}
-            §EXT{Animal}
-            §MT{m002:Bark}
-            §O{str}
-            §R "woof"
-            §/MT{m002}
-            §/CL{c002}
-            §F{f001:Test}
-            §I{Dog:dog}
-            §O{str}
-            §R dog.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Animal}
+                §MT{m001:Speak}
+                  §O{str}
+                  §R "sound"
+              §CL{c002:Dog}
+                §EXT{Animal}
+                §MT{m002:Bark}
+                  §O{str}
+                  §R "woof"
+              §F{f001:Test}
+                §I{Dog:dog}
+                §O{str}
+                §R dog.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "dog.");
@@ -668,22 +587,17 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Address}
-            §FLD{str:city}
-            §/CL{c001}
-            §CL{c002:Person}
-            §FLD{Address:address}
-            §/CL{c002}
-            §CL{c003:Employee}
-            §EXT{Person}
-            §FLD{str:department}
-            §/CL{c003}
-            §F{f001:Test}
-            §I{Employee:emp}
-            §O{str}
-            §R emp.address.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Address}
+                §FLD{str:city}
+              §CL{c002:Person}
+                §FLD{Address:address}
+              §CL{c003:Employee}
+                §EXT{Person}
+                §FLD{str:department}
+              §F{f001:Test}
+                §I{Employee:emp}
+                §O{str}
+                §R emp.address.
             """;
 
         // Should be able to access inherited 'address' field and chain to Address members
@@ -698,23 +612,18 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Animal}
-            §FLD{str:name}
-            §/CL{c001}
-            §CL{c002:Mammal}
-            §EXT{Animal}
-            §FLD{bool:warmBlooded}
-            §/CL{c002}
-            §CL{c003:Dog}
-            §EXT{Mammal}
-            §FLD{str:breed}
-            §/CL{c003}
-            §F{f001:Test}
-            §I{Dog:dog}
-            §O{str}
-            §R dog.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Animal}
+                §FLD{str:name}
+              §CL{c002:Mammal}
+                §EXT{Animal}
+                §FLD{bool:warmBlooded}
+              §CL{c003:Dog}
+                §EXT{Mammal}
+                §FLD{str:breed}
+              §F{f001:Test}
+                §I{Dog:dog}
+                §O{str}
+                §R dog.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "dog.");
@@ -742,17 +651,14 @@ public class CompletionHandlerTests
         // Test basic index access on a generic list parameter
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §FLD{i32:age}
-            §/CL{c001}
-            §F{f001:Test}
-            §I{List<Person>:people}
-            §O{str}
-            §B{p:Person} people[0]
-            §R p.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+                §FLD{i32:age}
+              §F{f001:Test}
+                §I{List<Person>:people}
+                §O{str}
+                §B{p:Person} people[0]
+                §R p.
             """;
 
         // Using intermediate variable to simplify - direct index access completions
@@ -769,19 +675,15 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Address}
-            §FLD{str:city}
-            §/CL{c001}
-            §CL{c002:Person}
-            §FLD{Address:address}
-            §/CL{c002}
-            §F{f001:Test}
-            §I{List<Person>:people}
-            §O{str}
-            §B{p:Person} people[0]
-            §R p.address.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Address}
+                §FLD{str:city}
+              §CL{c002:Person}
+                §FLD{Address:address}
+              §F{f001:Test}
+                §I{List<Person>:people}
+                §O{str}
+                §B{p:Person} people[0]
+                §R p.address.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "p.address.");
@@ -795,16 +697,13 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Item}
-            §FLD{str:name}
-            §/CL{c001}
-            §F{f001:Test}
-            §I{Item[]:items}
-            §O{str}
-            §B{item:Item} items[0]
-            §R item.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Item}
+                §FLD{str:name}
+              §F{f001:Test}
+                §I{Item[]:items}
+                §O{str}
+                §B{item:Item} items[0]
+                §R item.
             """;
 
         var completions = LspTestHarness.GetCompletions(source, "item.");
@@ -820,12 +719,10 @@ public class CompletionHandlerTests
         // This test verifies the type resolution works even if no members are shown
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §I{str:text}
-            §O{str}
-            §R text[0].
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §I{str:text}
+                §O{str}
+                §R text[0].
             """;
 
         // We don't expect char members but the expression should parse without error
@@ -839,17 +736,14 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §/CL{c001}
-            §F{f001:Test}
-            §I{List<List<Person>>:nestedPeople}
-            §O{str}
-            §B{innerList:List<Person>} nestedPeople[0]
-            §B{p:Person} innerList[0]
-            §R p.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+              §F{f001:Test}
+                §I{List<List<Person>>:nestedPeople}
+                §O{str}
+                §B{innerList:List<Person>} nestedPeople[0]
+                §B{p:Person} innerList[0]
+                §R p.
             """;
 
         // Using intermediate variables to verify generic type resolution
@@ -865,15 +759,12 @@ public class CompletionHandlerTests
         // Test that generic type parameters like List<Person> are correctly parsed
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §/CL{c001}
-            §F{f001:Test}
-            §I{List<Person>:people}
-            §O{i32}
-            §R people.
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+              §F{f001:Test}
+                §I{List<Person>:people}
+                §O{i32}
+                §R people.
             """;
 
         // List should show list methods
@@ -893,13 +784,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §I{i32:myParam}
-            §I{str:anotherParam}
-            §O{i32}
-            §R myP
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §I{i32:myParam}
+                §I{str:anotherParam}
+                §O{i32}
+                §R myP
             """;
 
         var doc = LspTestHarness.CreateDocument(source);
@@ -916,13 +805,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{x} 10
-            §B{y} 20
-            §R x
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{x} 10
+                §B{y} 20
+                §R x
             """;
 
         var doc = LspTestHarness.CreateDocument(source);
@@ -939,14 +826,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{first} 1
-            §B{second} 2
-            §B{third} 3
-            §R first
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{first} 1
+                §B{second} 2
+                §B{third} 3
+                §R first
             """;
 
         // Verify all bindings are created
@@ -961,14 +846,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:MyClass}
-            §FLD{str:myField}
-            §MT{m001:MyMethod}
-            §O{str}
-            §R this.myField
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:MyClass}
+                §FLD{str:myField}
+                §MT{m001:MyMethod}
+                  §O{str}
+                  §R this.myField
             """;
 
         var doc = LspTestHarness.CreateDocument(source);
@@ -985,17 +867,14 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §I{bool:condition}
-            §O{i32}
-            §B{outer} 1
-            §IF{if001} condition
-            §B{inner} 2
-            §R inner
-            §/I{if001}
-            §R outer
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §I{bool:condition}
+                §O{i32}
+                §B{outer} 1
+                §IF{if001} condition
+                  §B{inner} 2
+                  §R inner
+                §R outer
             """;
 
         var doc = LspTestHarness.CreateDocument(source);
@@ -1017,13 +896,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §I{i32:myParam}
-            §I{str:otherParam}
-            §O{i32}
-            §R _CURSOR_
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §I{i32:myParam}
+                §I{str:otherParam}
+                §O{i32}
+                §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1037,13 +914,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{localVar:i32} 42
-            §B{anotherVar:str} "hello"
-            §R _CURSOR_
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{localVar:i32} 42
+                §B{anotherVar:str} "hello"
+                §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1057,15 +932,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Helper:pub}
-            §O{i32}
-            §R 42
-            §/F{f001}
-            §F{f002:Main:pub}
-            §O{i32}
-            §R _CURSOR_
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Helper:pub}
+                §O{i32}
+                §R 42
+              §F{f002:Main:pub}
+                §O{i32}
+                §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1078,11 +950,9 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{bool}
-            §R _CURSOR_
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{bool}
+                §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1096,12 +966,10 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §I{i32:count}
-            §O{i32}
-            §R _CURSOR_
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §I{i32:count}
+                §O{i32}
+                §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1117,12 +985,10 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{str}
-            §B{name:str} "test"
-            §R _CURSOR_
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{str}
+                §B{name:str} "test"
+                §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1137,15 +1003,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{~sum:i32} 0
-            §L{l001:i:0:10}
-            §ASSIGN sum (+ sum _CURSOR_)
-            §/L{l001}
-            §R sum
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{~sum:i32} 0
+                §L{l001:i:0:10}
+                  §ASSIGN sum (+ sum _CURSOR_)
+                §R sum
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1162,14 +1025,11 @@ public class CompletionHandlerTests
         // Syntax: §EACH{id:variable:type} collection
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §I{List<str>:items}
-            §O{void}
-            §EACH{e001:item:str} items
-            §P _CURSOR_
-            §/EACH{e001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §I{List<str>:items}
+                §O{void}
+                §EACH{e001:item:str} items
+                  §P _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1185,15 +1045,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Counter}
-            §FLD{i32:count}
-            §FLD{str:name}
-            §MT{m001:Increment}
-            §O{i32}
-            §R _CURSOR_
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Counter}
+                §FLD{i32:count}
+                §FLD{str:name}
+                §MT{m001:Increment}
+                  §O{i32}
+                  §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1210,15 +1067,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Calculator}
-            §MT{m001:Add}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R _CURSOR_
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Calculator}
+                §MT{m001:Add}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1232,13 +1086,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{immutable:i32} 10
-            §B{~mutable:i32} 20
-            §R _CURSOR_
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{immutable:i32} 10
+                §B{~mutable:i32} 20
+                §R _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1260,15 +1112,13 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{~counter:i32} 0
-            §DO{d001}
-            §ASSIGN counter (+ counter _CURSOR_)
-            §/DO{d001} (< counter 10)
-            §R counter
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{~counter:i32} 0
+                §DO{d001}
+                §ASSIGN counter (+ counter _CURSOR_)
+                §/DO{d001} (< counter 10)
+                §R counter
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1282,14 +1132,11 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §I{Dict<str,i32>:scores}
-            §O{void}
-            §EACHKV{e001:name:score} scores
-            §P _CURSOR_
-            §/EACHKV{e001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §I{Dict<str,i32>:scores}
+                §O{void}
+                §EACHKV{e001:name:score} scores
+                  §P _CURSOR_
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1306,15 +1153,12 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §I{i32:value}
-            §O{str}
-            §W{w001} value
-            §K §VAR{x} §WHEN (> x 0) → _CURSOR_
-            §K _ → "other"
-            §/W{w001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §I{i32:value}
+                §O{str}
+                §W{w001} value
+                §K §VAR{x} §WHEN (> x 0) → _CURSOR_
+                §K _ → "other"
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1327,16 +1171,14 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:_name}
-            §FLD{i32:_age}
-            §CTOR{ctor001:pub}
-            §I{str:name}
-            §I{i32:age}
-            §ASSIGN §THIS._name _CURSOR_
-            §/CTOR{ctor001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:_name}
+                §FLD{i32:_age}
+                §CTOR{ctor001:pub}
+                §I{str:name}
+                §I{i32:age}
+                §ASSIGN §THIS._name _CURSOR_
+                §/CTOR{ctor001}
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1350,19 +1192,15 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §I{i32:param}
-            §O{i32}
-            §B{outer:i32} 1
-            §IF{if001} (> param 0)
-            §B{inner:i32} 2
-            §L{l001:i:0:10}
-            §B{deepest:i32} _CURSOR_
-            §/L{l001}
-            §/I{if001}
-            §R outer
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §I{i32:param}
+                §O{i32}
+                §B{outer:i32} 1
+                §IF{if001} (> param 0)
+                  §B{inner:i32} 2
+                  §L{l001:i:0:10}
+                    §B{deepest:i32} _CURSOR_
+                §R outer
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1379,15 +1217,13 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{str}
-            §TR{t001}
-            §R "success"
-            §CA{Exception:ex}
-            §R _CURSOR_
-            §/TR{t001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{str}
+                §TR{t001}
+                §R "success"
+                §CA{Exception:ex}
+                §R _CURSOR_
+                §/TR{t001}
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");
@@ -1401,16 +1237,14 @@ public class CompletionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Rectangle}
-            §FLD{f64:_width}
-            §FLD{f64:_height}
-            §PROP{f64:Area:pub}
-            §GET
-            §R _CURSOR_
-            §/GET
-            §/PROP
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Rectangle}
+                §FLD{f64:_width}
+                §FLD{f64:_height}
+                §PROP{f64:Area:pub}
+                §GET
+                §R _CURSOR_
+                §/GET
+                §/PROP
             """;
 
         var completions = LspTestHarness.GetExpressionCompletionsAt(source, "_CURSOR_");

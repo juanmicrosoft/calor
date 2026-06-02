@@ -64,12 +64,10 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DivByZero:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:0)
-§/F{f001}
-§/M{m001}";
+  §F{f001:DivByZero:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (/ x INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, $"Parse errors: {string.Join(", ", parseDiag.Select(d => d.Message))}");
@@ -92,12 +90,10 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ModByZero:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (% x INT:0)
-§/F{f001}
-§/M{m001}";
+  §F{f001:ModByZero:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (% x INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -120,13 +116,11 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:UncheckedDiv:pub}
-  §I{i32:x}
-  §I{i32:divisor}
-  §O{i32}
-  §R (/ x divisor)
-§/F{f001}
-§/M{m001}";
+  §F{f001:UncheckedDiv:pub}
+      §I{i32:x}
+      §I{i32:divisor}
+      §O{i32}
+      §R (/ x divisor)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -149,12 +143,10 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeDiv:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:7)
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeDiv:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (/ x INT:7)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -177,16 +169,13 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GuardedDiv:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF{if1} (!= y INT:0)
-    §R (/ x y)
-  §/I{if1}
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:GuardedDiv:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §IF{if1} (!= y INT:0)
+          §R (/ x y)
+      §R INT:0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, $"Parse errors: {string.Join(", ", parseDiag.Select(d => d.Message))}");
@@ -217,16 +206,14 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:MultiDiv:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §I{i32:c}
-  §O{i32}
-  §B{x:i32} (/ a b)
-  §B{y:i32} (/ x c)
-  §R y
-§/F{f001}
-§/M{m001}";
+  §F{f001:MultiDiv:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §I{i32:c}
+      §O{i32}
+      §B{x:i32} (/ a b)
+      §B{y:i32} (/ x c)
+      §R y";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -256,13 +243,11 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeArith:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeArith:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -282,14 +267,12 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Constants:pub}
-  §O{i32}
-  §B{a:i32} INT:1
-  §B{b:i32} INT:2
-  §B{c:i32} (+ a b)
-  §R c
-§/F{f001}
-§/M{m001}";
+  §F{f001:Constants:pub}
+      §O{i32}
+      §B{a:i32} INT:1
+      §B{b:i32} INT:2
+      §B{c:i32} (+ a b)
+      §R c";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -411,13 +394,11 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Buggy:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Buggy:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (/ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -439,14 +420,12 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Safe:pub}
-  §I{i32:x}
-  §O{i32}
-  §B{y:i32} (+ x INT:1)
-  §B{z:i32} (* y INT:2)
-  §R z
-§/F{f001}
-§/M{m001}";
+  §F{f001:Safe:pub}
+      §I{i32:x}
+      §O{i32}
+      §B{y:i32} (+ x INT:1)
+      §B{z:i32} (* y INT:2)
+      §R z";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -469,17 +448,15 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:MultiBug:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §I{i32:c}
-  §O{i32}
-  §B{x:i32} (/ a b)
-  §B{y:i32} (/ x c)
-  §B{z:i32} (% y b)
-  §R z
-§/F{f001}
-§/M{m001}";
+  §F{f001:MultiBug:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §I{i32:c}
+      §O{i32}
+      §B{x:i32} (/ a b)
+      §B{y:i32} (/ x c)
+      §B{z:i32} (% y b)
+      §R z";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -509,12 +486,10 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Simple:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (+ x INT:1)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Simple:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (+ x INT:1)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -535,13 +510,11 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Buggy:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Buggy:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (/ x y)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -562,23 +535,19 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Func1:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§F{f002:Func2:pub}
-  §I{i32:y}
-  §O{i32}
-  §R (+ y INT:1)
-§/F{f002}
-§F{f003:Func3:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f003}
-§/M{m001}";
+  §F{f001:Func1:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x
+  §F{f002:Func2:pub}
+      §I{i32:y}
+      §O{i32}
+      §R (+ y INT:1)
+  §F{f003:Func3:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -610,8 +579,7 @@ public class GoldenFileTests
     public void Golden_EmptyModule_NoCrash()
     {
         var source = @"
-§M{m001:Test}
-§/M{m001}";
+§M{m001:Test}";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -632,12 +600,10 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Nested:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (+ (+ (+ (+ x INT:1) INT:2) INT:3) INT:4)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Nested:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (+ (+ (+ (+ x INT:1) INT:2) INT:3) INT:4)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -658,13 +624,11 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:NestedDiv:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ INT:1 (+ INT:2 (/ x y)))
-§/F{f001}
-§/M{m001}";
+  §F{f001:NestedDiv:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ INT:1 (+ INT:2 (/ x y)))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -685,17 +649,15 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:MultiBinds:pub}
-  §I{i32:divisor1}
-  §I{i32:divisor2}
-  §I{i32:divisor3}
-  §O{i32}
-  §B{a:i32} (/ INT:100 divisor1)
-  §B{b:i32} (/ INT:200 divisor2)
-  §B{c:i32} (/ INT:300 divisor3)
-  §R (+ a (+ b c))
-§/F{f001}
-§/M{m001}";
+  §F{f001:MultiBinds:pub}
+      §I{i32:divisor1}
+      §I{i32:divisor2}
+      §I{i32:divisor3}
+      §O{i32}
+      §B{a:i32} (/ INT:100 divisor1)
+      §B{b:i32} (/ INT:200 divisor2)
+      §B{c:i32} (/ INT:300 divisor3)
+      §R (+ a (+ b c))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -724,18 +686,15 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ThenBug:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §I{bool:cond}
-  §O{i32}
-  §IF{if1} cond
-    §R (/ x y)
-  §EL
-    §R INT:0
-  §/I{if1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:ThenBug:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §I{bool:cond}
+      §O{i32}
+      §IF{if1} cond
+          §R (/ x y)
+      §EL
+          §R INT:0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -756,18 +715,15 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ElseBug:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §I{bool:cond}
-  §O{i32}
-  §IF{if1} cond
-    §R INT:0
-  §EL
-    §R (/ x y)
-  §/I{if1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:ElseBug:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §I{bool:cond}
+      §O{i32}
+      §IF{if1} cond
+          §R INT:0
+      §EL
+          §R (/ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -788,19 +744,16 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:BothBugs:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §I{i32:z}
-  §I{bool:cond}
-  §O{i32}
-  §IF{if1} cond
-    §R (/ x y)
-  §EL
-    §R (/ x z)
-  §/I{if1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:BothBugs:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §I{i32:z}
+      §I{bool:cond}
+      §O{i32}
+      §IF{if1} cond
+          §R (/ x y)
+      §EL
+          §R (/ x z)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -825,17 +778,14 @@ public class GoldenFileTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:LoopBug:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §B{result:i32} INT:0
-  §L{l1:i:0:10:1}
-    §B{temp:i32} (/ x y)
-  §/L{l1}
-  §R result
-§/F{f001}
-§/M{m001}";
+  §F{f001:LoopBug:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §B{result:i32} INT:0
+      §L{l1:i:0:10:1}
+          §B{temp:i32} (/ x y)
+      §R result";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -862,14 +812,12 @@ public class GoldenFileTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:PrecondDiv:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §Q (!= y INT:0)
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:PrecondDiv:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §Q (!= y INT:0)
+      §R (/ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -893,12 +841,10 @@ public class GoldenFileTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:LiteralZero:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:0)
-§/F{f001}
-§/M{m001}";
+  §F{f001:LiteralZero:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (/ x INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);

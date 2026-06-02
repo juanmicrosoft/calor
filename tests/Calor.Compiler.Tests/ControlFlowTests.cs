@@ -22,15 +22,12 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §L{for1:i:0:10:1}
-                §C{Console.WriteLine}
-                  §A i
-                §/C
-              §/L{for1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §L{for1:i:0:10:1}
+                      §C{Console.WriteLine}
+                        §A i
+                      §/C
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -71,15 +68,12 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §IF{if1} (== x INT:0)
-                §C{Console.WriteLine}
-                  §A "Zero"
-                §/C
-              §/I{if1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §IF{if1} (== x INT:0)
+                      §C{Console.WriteLine}
+                        §A "Zero"
+                      §/C
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -100,19 +94,16 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §IF{if1} BOOL:true
-                §C{Console.WriteLine}
-                  §A "Then"
-                §/C
-              §EL
-                §C{Console.WriteLine}
-                  §A "Else"
-                §/C
-              §/I{if1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §IF{if1} BOOL:true
+                      §C{Console.WriteLine}
+                        §A "Then"
+                      §/C
+                  §EL
+                      §C{Console.WriteLine}
+                        §A "Else"
+                      §/C
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -130,23 +121,20 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §IF{if1} (== x INT:1)
-                §C{Console.WriteLine}
-                  §A "One"
-                §/C
-              §EI (== x INT:2)
-                §C{Console.WriteLine}
-                  §A "Two"
-                §/C
-              §EL
-                §C{Console.WriteLine}
-                  §A "Other"
-                §/C
-              §/I{if1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §IF{if1} (== x INT:1)
+                      §C{Console.WriteLine}
+                        §A "One"
+                      §/C
+                  §EI (== x INT:2)
+                      §C{Console.WriteLine}
+                        §A "Two"
+                      §/C
+                  §EL
+                      §C{Console.WriteLine}
+                        §A "Other"
+                      §/C
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -164,15 +152,12 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §WH{w1} (< x INT:10)
-                §C{Console.WriteLine}
-                  §A x
-                §/C
-              §/WH{w1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §WH{w1} (< x INT:10)
+                      §C{Console.WriteLine}
+                        §A x
+                      §/C
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -188,11 +173,9 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-            §O{void}
-            §B{x:i32} 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                §O{void}
+                §B{x:i32} 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -210,13 +193,11 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -235,16 +216,13 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §L{l1:i:1:10:1}
-                §C{Console.WriteLine}
-                  §A i
-                §/C
-              §/L{l1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §L{l1:i:1:10:1}
+                      §C{Console.WriteLine}
+                        §A i
+                      §/C
             """;
 
         var result = Program.Compile(source);
@@ -259,20 +237,17 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §IF{i1} BOOL:true
-                §C{Console.WriteLine}
-                  §A STR:"Yes"
-                §/C
-              §EL
-                §C{Console.WriteLine}
-                  §A STR:"No"
-                §/C
-              §/I{i1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §IF{i1} BOOL:true
+                      §C{Console.WriteLine}
+                        §A STR:"Yes"
+                      §/C
+                  §EL
+                      §C{Console.WriteLine}
+                        §A STR:"No"
+                      §/C
             """;
 
         var result = Program.Compile(source);
@@ -287,15 +262,13 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §B{x} INT:42
-              §C{Console.WriteLine}
-                §A x
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §B{x} INT:42
+                  §C{Console.WriteLine}
+                    §A x
+                  §/C
             """;
 
         var result = Program.Compile(source);
@@ -310,13 +283,11 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
             """;
 
         var result = Program.Compile(source);
@@ -330,12 +301,10 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:IsEven:pub}
-              §I{i32:n}
-              §O{bool}
-              §R (== (% n INT:2) INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:IsEven:pub}
+                  §I{i32:n}
+                  §O{bool}
+                  §R (== (% n INT:2) INT:0)
             """;
 
         var result = Program.Compile(source);
@@ -349,15 +318,13 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DO{do1}
-                §C{Console.WriteLine}
-                  §A x
-                §/C
-              §/DO{do1} (< x INT:10)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DO{do1}
+                    §C{Console.WriteLine}
+                      §A x
+                    §/C
+                  §/DO{do1} (< x INT:10)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -375,11 +342,9 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §DO{do1}
-              §/DO{do999} (< x INT:10)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §DO{do1}
+                  §/DO{do999} (< x INT:10)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -396,17 +361,15 @@ public class ControlFlowTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §B{i} INT:0
-              §DO{d1}
-                §C{Console.WriteLine}
-                  §A i
-                §/C
-              §/DO{d1} (< i INT:10)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §B{i} INT:0
+                  §DO{d1}
+                    §C{Console.WriteLine}
+                      §A i
+                    §/C
+                  §/DO{d1} (< i INT:10)
             """;
 
         var result = Program.Compile(source);
@@ -423,16 +386,13 @@ public class ControlFlowTests
         // The ~ prefix indicates mutability, enabling reassignment instead of shadowing
         var source = """
             §M{m001:Test}
-            §F{f001:SumRange:pub}
-              §I{i32:n}
-              §O{i32}
-              §B{~sum:i32} INT:0
-              §L{l1:i:1:n:1}
-                §B{~sum:i32} (+ sum i)
-              §/L{l1}
-              §R sum
-            §/F{f001}
-            §/M{m001}
+              §F{f001:SumRange:pub}
+                  §I{i32:n}
+                  §O{i32}
+                  §B{~sum:i32} INT:0
+                  §L{l1:i:1:n:1}
+                      §B{~sum:i32} (+ sum i)
+                  §R sum
             """;
 
         var result = Program.Compile(source);
@@ -456,17 +416,14 @@ public class ControlFlowTests
         // is the attribute separator. Use plain literals instead.
         var source = """
             §M{m001:Test}
-            §F{f001:ProcessArray:pub}
-              §I{i32:n}
-              §O{void}
-              §E{cw}
-              §L{l1:i:0:(- n 1):1}
-                §C{Console.WriteLine}
-                  §A i
-                §/C
-              §/L{l1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:ProcessArray:pub}
+                  §I{i32:n}
+                  §O{void}
+                  §E{cw}
+                  §L{l1:i:0:(- n 1):1}
+                      §C{Console.WriteLine}
+                        §A i
+                      §/C
             """;
 
         var result = Program.Compile(source);
@@ -484,19 +441,16 @@ public class ControlFlowTests
         // because ':' is the attribute separator.
         var source = """
             §M{m001:Test}
-            §F{f001:IterateWithExpressions:pub}
-              §I{i32:start}
-              §I{i32:end}
-              §I{i32:stepSize}
-              §O{void}
-              §E{cw}
-              §L{l1:i:(+ start 1):(- end 1):(* stepSize 2)}
-                §C{Console.WriteLine}
-                  §A i
-                §/C
-              §/L{l1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:IterateWithExpressions:pub}
+                  §I{i32:start}
+                  §I{i32:end}
+                  §I{i32:stepSize}
+                  §O{void}
+                  §E{cw}
+                  §L{l1:i:(+ start 1):(- end 1):(* stepSize 2)}
+                      §C{Console.WriteLine}
+                        §A i
+                      §/C
             """;
 
         var result = Program.Compile(source);
@@ -514,18 +468,15 @@ public class ControlFlowTests
         // Test nested S-expressions: (+ (- a 1) (- b 2))
         var source = """
             §M{m001:Test}
-            §F{f001:NestedExpr:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{void}
-              §E{cw}
-              §L{l1:i:0:(+ (- a 1) (- b 2)):1}
-                §C{Console.WriteLine}
-                  §A i
-                §/C
-              §/L{l1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:NestedExpr:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{void}
+                  §E{cw}
+                  §L{l1:i:0:(+ (- a 1) (- b 2)):1}
+                      §C{Console.WriteLine}
+                        §A i
+                      §/C
             """;
 
         var result = Program.Compile(source);
@@ -541,17 +492,14 @@ public class ControlFlowTests
         // Test comparison operators in S-expressions
         var source = """
             §M{m001:Test}
-            §F{f001:CompareTest:pub}
-              §I{i32:limit}
-              §O{void}
-              §E{cw}
-              §WH{w1} (<= i limit)
-                §C{Console.WriteLine}
-                  §A i
-                §/C
-              §/WH{w1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:CompareTest:pub}
+                  §I{i32:limit}
+                  §O{void}
+                  §E{cw}
+                  §WH{w1} (<= i limit)
+                      §C{Console.WriteLine}
+                        §A i
+                      §/C
             """;
 
         var result = Program.Compile(source);
@@ -566,13 +514,11 @@ public class ControlFlowTests
         // Test logical operators (&&, ||) in S-expressions
         var source = """
             §M{m001:Test}
-            §F{f001:LogicalTest:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{bool}
-              §R (&& (> a 0) (< b 100))
-            §/F{f001}
-            §/M{m001}
+              §F{f001:LogicalTest:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{bool}
+                  §R (&& (> a 0) (< b 100))
             """;
 
         var result = Program.Compile(source);
@@ -588,19 +534,15 @@ public class ControlFlowTests
         // The ~ prefix indicates mutability, enabling reassignment instead of shadowing
         var source = """
             §M{m001:Test}
-            §F{f001:NestedIfTest:pub}
-              §I{i32:x}
-              §O{i32}
-              §B{~result:i32} INT:0
-              §IF{if1} (> x INT:0)
-                §B{~result:i32} INT:1
-                §IF{if2} (> x INT:10)
-                  §B{~result:i32} INT:2
-                §/I{if2}
-              §/I{if1}
-              §R result
-            §/F{f001}
-            §/M{m001}
+              §F{f001:NestedIfTest:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §B{~result:i32} INT:0
+                  §IF{if1} (> x INT:0)
+                      §B{~result:i32} INT:1
+                      §IF{if2} (> x INT:10)
+                          §B{~result:i32} INT:2
+                  §R result
             """;
 
         var result = Program.Compile(source);
@@ -620,17 +562,13 @@ public class ControlFlowTests
         // Test that variables declared in one method don't affect another
         var source = """
             §M{m001:Test}
-            §CL{c001:TestClass:pub}
-              §MT{mt001:MethodA:pub}
-                §O{void}
-                §B{x:i32} INT:1
-              §/MT{mt001}
-              §MT{mt002:MethodB:pub}
-                §O{void}
-                §B{x:i32} INT:2
-              §/MT{mt002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:TestClass:pub}
+                  §MT{mt001:MethodA:pub}
+                      §O{void}
+                      §B{x:i32} INT:1
+                  §MT{mt002:MethodB:pub}
+                      §O{void}
+                      §B{x:i32} INT:2
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -657,17 +595,14 @@ public class ControlFlowTests
         // Test that float literals work in S-expressions
         var source = """
             §M{m001:Test}
-            §F{f001:FloatTest:pub}
-              §I{f64:start}
-              §O{void}
-              §E{cw}
-              §L{l1:i:0:(- start 0.5):1}
-                §C{Console.WriteLine}
-                  §A i
-                §/C
-              §/L{l1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:FloatTest:pub}
+                  §I{f64:start}
+                  §O{void}
+                  §E{cw}
+                  §L{l1:i:0:(- start 0.5):1}
+                      §C{Console.WriteLine}
+                        §A i
+                      §/C
             """;
 
         var result = Program.Compile(source);
@@ -684,16 +619,13 @@ public class ControlFlowTests
         // A bind in an if block should create a new variable that shadows the outer
         var source = """
             §M{m001:Test}
-            §F{f001:testShadow:pub}
-              §I{bool:cond}
-              §O{i32}
-              §B{x:i32} INT:10
-              §IF{if1} cond
-                §B{x:i32} INT:20
-              §/I{if1}
-              §R x
-            §/F{f001}
-            §/M{m001}
+              §F{f001:testShadow:pub}
+                  §I{bool:cond}
+                  §O{i32}
+                  §B{x:i32} INT:10
+                  §IF{if1} cond
+                      §B{x:i32} INT:20
+                  §R x
             """;
 
         var diagnostics = new DiagnosticBag();

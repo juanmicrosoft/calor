@@ -93,12 +93,10 @@ public class DottedNameRoundTripTests
     {
         var calor = """
             §M{m001:DottedRef}
-            §F{f001:Area:pub}
-              §I{f64:r}
-              §O{f64}
-              §R (* Math.PI (* r r))
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Area:pub}
+                  §I{f64:r}
+                  §O{f64}
+                  §R (* Math.PI (* r r))
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -115,11 +113,9 @@ public class DottedNameRoundTripTests
     {
         var calor = """
             §M{m001:EnumRef}
-            §F{f001:GetMode:pub}
-              §O{i32}
-              §R StringComparison.Ordinal
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetMode:pub}
+                  §O{i32}
+                  §R StringComparison.Ordinal
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -136,13 +132,11 @@ public class DottedNameRoundTripTests
     {
         var calor = """
             §M{m001:MultiDot}
-            §F{f001:Constants:pub}
-              §O{f64}
-              §B{pi} Math.PI
-              §B{e} Math.E
-              §R (+ pi e)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Constants:pub}
+                  §O{f64}
+                  §B{pi} Math.PI
+                  §B{e} Math.E
+                  §R (+ pi e)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -264,11 +258,9 @@ public class DottedNameRoundTripTests
         // Verify the lexer/parser creates ReferenceNode (not FieldAccessNode) for dotted names
         var calor = """
             §M{m001:Test}
-            §F{f001:Get:pub}
-              §O{f64}
-              §R Math.PI
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Get:pub}
+                  §O{f64}
+                  §R Math.PI
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -317,11 +309,9 @@ public class DottedNameRoundTripTests
         // ReferenceNode path (from Calor source)
         var calor = """
             §M{m001:Test}
-            §F{f001:Get:pub}
-              §O{f64}
-              §R Math.PI
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Get:pub}
+                  §O{f64}
+                  §R Math.PI
             """;
 
         var fromCalor = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -356,11 +346,9 @@ public class DottedNameRoundTripTests
     {
         var calor = """
             §M{m001:Deep}
-            §F{f001:Get:pub}
-              §O{str}
-              §R System.Environment.NewLine
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §R System.Environment.NewLine
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -377,11 +365,9 @@ public class DottedNameRoundTripTests
     {
         var calor = """
             §M{m001:Expr}
-            §F{f001:Tau:pub}
-              §O{f64}
-              §R (* 2.0 Math.PI)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Tau:pub}
+                  §O{f64}
+                  §R (* 2.0 Math.PI)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -398,12 +384,10 @@ public class DottedNameRoundTripTests
     {
         var calor = """
             §M{m001:Cond}
-            §F{f001:IsMax:pub}
-              §I{i32:x}
-              §O{bool}
-              §R (== x int.MaxValue)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:IsMax:pub}
+                  §I{i32:x}
+                  §O{bool}
+                  §R (== x int.MaxValue)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions

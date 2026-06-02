@@ -156,11 +156,9 @@ public class TypeSystemTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GetValue:pub}
-  §O{?i32}
-  §R §SM INT:42
-§/F{f001}
-§/M{m001}
+  §F{f001:GetValue:pub}
+      §O{?i32}
+      §R §SM INT:42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -182,11 +180,9 @@ public class TypeSystemTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GetNothing:pub}
-  §O{?i32}
-  §R §NN{i32}
-§/F{f001}
-§/M{m001}
+  §F{f001:GetNothing:pub}
+      §O{?i32}
+      §R §NN{i32}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -209,11 +205,9 @@ public class TypeSystemTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GetResult:pub}
-  §O{i32!str}
-  §R §OK INT:100
-§/F{f001}
-§/M{m001}
+  §F{f001:GetResult:pub}
+      §O{i32!str}
+      §R §OK INT:100
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -232,11 +226,9 @@ public class TypeSystemTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GetError:pub}
-  §O{str!str}
-  §R §ERR STR:""Something went wrong""
-§/F{f001}
-§/M{m001}
+  §F{f001:GetError:pub}
+      §O{str!str}
+      §R §ERR STR:""Something went wrong""
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -825,12 +817,10 @@ public class TypeSystemTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:FindValue:pub}
-              §I{i32:id}
-              §O{?i32}
-              §R §SM INT:42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:FindValue:pub}
+                  §I{i32:id}
+                  §O{?i32}
+                  §R §SM INT:42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -848,11 +838,9 @@ public class TypeSystemTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:FindName:pub}
-              §O{?str}
-              §R §SM STR:"hello"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:FindName:pub}
+                  §O{?str}
+                  §R §SM STR:"hello"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -870,11 +858,9 @@ public class TypeSystemTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Process:pub}
-              §I{?i32:value}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Process:pub}
+                  §I{?i32:value}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -892,12 +878,10 @@ public class TypeSystemTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:TryParse:pub}
-              §I{str:input}
-              §O{i32!str}
-              §R §OK INT:42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:TryParse:pub}
+                  §I{str:input}
+                  §O{i32!str}
+                  §R §OK INT:42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -915,11 +899,9 @@ public class TypeSystemTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetLong:pub}
-              §O{i64}
-              §R INT:100
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetLong:pub}
+                  §O{i64}
+                  §R INT:100
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -937,11 +919,9 @@ public class TypeSystemTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetFloat:pub}
-              §O{f32}
-              §R FLOAT:1.5
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetFloat:pub}
+                  §O{f32}
+                  §R FLOAT:1.5
             """;
 
         var module = Parse(source, out var diagnostics);

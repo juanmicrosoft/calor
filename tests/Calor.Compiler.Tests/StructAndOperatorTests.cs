@@ -138,10 +138,8 @@ public class StructAndOperatorTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Foo:struct}
-            §FLD{i32:Value:pub}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Foo:struct}
+                §FLD{i32:Value:pub}
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -158,10 +156,8 @@ public class StructAndOperatorTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Point:struct,readonly}
-            §FLD{f64:X:pub}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Point:struct,readonly}
+                §FLD{f64:X:pub}
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -664,18 +660,15 @@ public class StructAndOperatorTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Vector:struct}
-            §FLD{f64:X:pub}
-            §FLD{f64:Y:pub}
-            §MT{m1:op_Addition:pub:static}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §Q (>= a INT:0)
-              §R (+ a b)
-            §/MT{m1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Vector:struct}
+                §FLD{f64:X:pub}
+                §FLD{f64:Y:pub}
+                §MT{m1:op_Addition:pub:static}
+                    §I{i32:a}
+                    §I{i32:b}
+                    §O{i32}
+                    §Q (>= a INT:0)
+                    §R (+ a b)
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -699,17 +692,14 @@ public class StructAndOperatorTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Counter:struct}
-            §FLD{i32:Value:pub}
-            §MT{m1:op_Addition:pub:static}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §S (>= result INT:0)
-              §R (+ a b)
-            §/MT{m1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Counter:struct}
+                §FLD{i32:Value:pub}
+                §MT{m1:op_Addition:pub:static}
+                    §I{i32:a}
+                    §I{i32:b}
+                    §O{i32}
+                    §S (>= result INT:0)
+                    §R (+ a b)
             """;
 
         var compilationResult = Program.Compile(calorSource);

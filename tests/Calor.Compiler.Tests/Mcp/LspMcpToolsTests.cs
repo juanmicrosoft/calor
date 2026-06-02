@@ -1,3 +1,4 @@
+// migrate_inline_calor: skip - fixture intentionally embeds closer-form Calor literals or uses position/template patterns incompatible with auto-migration.
 using System.Text.Json;
 using Calor.Compiler.Mcp;
 using Calor.Compiler.Mcp.Tools;
@@ -16,19 +17,19 @@ public class LspMcpToolsTests
             §I{f64:total}
             §O{f64}
             §R total
-          §/F{f001}
+
 
           §CL{c001:Item:pub}
             §FLD{f64:Price:pub}
             §FLD{str:Name:pub}
-          §/CL{c001}
+
 
           §F{f002:greet:pub}
             §I{str:name}
             §O{str}
             §R name
-          §/F{f002}
-        §/M{m001}
+
+
         """;
 
     #region GotoDefinitionTool Tests

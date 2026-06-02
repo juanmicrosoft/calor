@@ -28,12 +28,10 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:positive} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:positive} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -56,11 +54,9 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:age} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:age} | (>= # INT:0)
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -83,11 +79,9 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Helper:priv}
-              §I{i32:age} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Helper:priv}
+                  §I{i32:age} | (>= # INT:0)
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -109,13 +103,11 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §F{f001:Main:pub}
-              §I{i32:x} | (>= # INT:0)
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §F{f001:Main:pub}
+                  §I{i32:x} | (>= # INT:0)
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -136,11 +128,9 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -207,13 +197,11 @@ public sealed class ObligationTests
 
         var source = """
             §M{m001:Test}
-            §F{f001:Add:priv}
-              §I{i32:x}
-              §O{void}
-              §Q (>= x INT:0)
-              §PROOF{p1:non-neg} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:priv}
+                  §I{i32:x}
+                  §O{void}
+                  §Q (>= x INT:0)
+                  §PROOF{p1:non-neg} (>= x INT:0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -236,12 +224,10 @@ public sealed class ObligationTests
 
         var source = """
             §M{m001:Test}
-            §F{f001:Check:priv}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:always-positive} (> x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Check:priv}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:always-positive} (> x INT:0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -269,12 +255,10 @@ public sealed class ObligationTests
         // The # in (>= # INT:0) should resolve to 'age' via PushSelfVariable.
         var source = """
             §M{m001:Test}
-            §F{f001:Validate:priv}
-              §I{i32:age} | (>= # INT:0)
-              §O{void}
-              §Q (>= age INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Validate:priv}
+                  §I{i32:age} | (>= # INT:0)
+                  §O{void}
+                  §Q (>= age INT:0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -298,11 +282,9 @@ public sealed class ObligationTests
         // Private function WITHOUT precondition — inline refinement can't be verified
         var source = """
             §M{m001:Test}
-            §F{f001:Validate:priv}
-              §I{i32:age} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Validate:priv}
+                  §I{i32:age} | (>= # INT:0)
+                  §O{void}
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -324,11 +306,9 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:myParam} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:myParam} | (>= # INT:0)
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -347,12 +327,10 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -373,13 +351,11 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §F{f001:Main:pub}
-              §I{i32:x} | (>= # INT:0)
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §F{f001:Main:pub}
+                  §I{i32:x} | (>= # INT:0)
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
             """;
 
         var options = new CompilationOptions
@@ -402,12 +378,10 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
             """;
 
         var options = new CompilationOptions
@@ -428,12 +402,10 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -463,12 +435,10 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -496,12 +466,10 @@ public sealed class ObligationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);

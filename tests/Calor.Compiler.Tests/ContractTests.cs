@@ -69,13 +69,11 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x INT:0)
+      §R (* x x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -96,13 +94,11 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (>= result INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §S (>= result INT:0)
+      §R (* x x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -123,16 +119,14 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b INT:0)
-  §Q (>= a INT:0)
-  §S (>= result INT:0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b INT:0)
+      §Q (>= a INT:0)
+      §S (>= result INT:0)
+      §R (/ a b)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -150,13 +144,11 @@ public class ContractTests
         // v2 syntax: message is first positional §Q{"message"} (condition)
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-§I{i32:x}
-§O{i32}
-§Q{""x must be nonnegative""} (>= x 0)
-§R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+    §I{i32:x}
+    §O{i32}
+    §Q{""x must be nonnegative""} (>= x 0)
+    §R (* x x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -240,13 +232,11 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x INT:0)
+      §R (* x x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -265,13 +255,11 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (>= result INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §S (>= result INT:0)
+      §R (* x x)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -294,13 +282,11 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x INT:0)
+      §R (* x x)
 ";
 
         var module = Parse(source, out var parseDiags);

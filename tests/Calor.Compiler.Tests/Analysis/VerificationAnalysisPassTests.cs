@@ -112,13 +112,11 @@ public class VerificationAnalysisPassTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Add:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ x y)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -136,13 +134,11 @@ public class VerificationAnalysisPassTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Multiply:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (* x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Multiply:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (* x y)";
 
         var bound = Bind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -159,19 +155,15 @@ public class VerificationAnalysisPassTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Foo:pub}
-  §O{i32}
-  §R INT:1
-§/F{f001}
-§F{f002:Bar:pub}
-  §O{i32}
-  §R INT:2
-§/F{f002}
-§F{f003:Baz:pub}
-  §O{i32}
-  §R INT:3
-§/F{f003}
-§/M{m001}";
+  §F{f001:Foo:pub}
+      §O{i32}
+      §R INT:1
+  §F{f002:Bar:pub}
+      §O{i32}
+      §R INT:2
+  §F{f003:Baz:pub}
+      §O{i32}
+      §R INT:3";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -188,13 +180,11 @@ public class VerificationAnalysisPassTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Divide:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (/ x y)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -211,12 +201,10 @@ public class VerificationAnalysisPassTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Safe:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (+ x INT:1)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Safe:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (+ x INT:1)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -234,12 +222,10 @@ public class VerificationAnalysisPassTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{i32}
-  §B{x:i32} INT:1
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §O{i32}
+      §B{x:i32} INT:1
+      §R x";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -266,18 +252,15 @@ public class VerificationAnalysisPassTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Sum:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A i
-    §/C
-  §/L{l1}
-  §R sum
-§/F{f001}
-§/M{m001}";
+  §F{f001:Sum:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{sum:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A i
+          §/C
+      §R sum";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -296,14 +279,12 @@ public class VerificationAnalysisPassTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:SafeDivide:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §Q (!= y INT:0)
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeDivide:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §Q (!= y INT:0)
+      §R (/ x y)";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -333,19 +314,16 @@ public class VerificationAnalysisPassTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:Sum:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n INT:0)
-  §B{sum:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A i
-    §/C
-  §/L{l1}
-  §R sum
-§/F{f001}
-§/M{m001}";
+  §F{f001:Sum:pub}
+      §I{i32:n}
+      §O{i32}
+      §Q (>= n INT:0)
+      §B{sum:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A i
+          §/C
+      §R sum";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -373,8 +351,7 @@ public class VerificationAnalysisPassTests
     public void VerificationAnalysisPass_EmptyModule_Handles()
     {
         var source = @"
-§M{m001:Test}
-§/M{m001}";
+§M{m001:Test}";
 
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);

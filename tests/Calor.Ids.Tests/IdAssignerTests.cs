@@ -8,7 +8,7 @@ public class IdAssignerTests
     [Fact]
     public void AssignIds_AssignsMissingModuleId()
     {
-        var content = "§M{:TestModule}\n§/M{}";
+        var content = "§M{:TestModule}\n";
 
         var (newContent, assignments) = IdAssigner.AssignIds(content, "test.calr");
 
@@ -23,7 +23,7 @@ public class IdAssignerTests
     [Fact]
     public void AssignIds_AssignsMissingFunctionId()
     {
-        var content = "§F{:TestFunc:pub}\n§O{void}\n§/F{}";
+        var content = "§F{:TestFunc:pub}\n§O{void}\n";
 
         var (newContent, assignments) = IdAssigner.AssignIds(content, "test.calr");
 
@@ -36,7 +36,7 @@ public class IdAssignerTests
     [Fact]
     public void AssignIds_PreservesExistingIds()
     {
-        var content = "§F{f001:TestFunc:pub}\n§O{void}\n§/F{f001}";
+        var content = "§F{f001:TestFunc:pub}\n§O{void}\n";
         var existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var (newContent, assignments) = IdAssigner.AssignIds(content, "test.calr", false, existingIds);
@@ -50,7 +50,7 @@ public class IdAssignerTests
     public void AssignIds_FixesDuplicates()
     {
         // Content with duplicate f001 IDs - first occurrence should be kept, second should be reassigned
-        var content = "§F{f001:Func1:pub}\n§O{void}\n§/F{f001}\n§F{f001:Func2:pub}\n§O{void}\n§/F{f001}";
+        var content = "§F{f001:Func1:pub}\n§O{void}\n\n§F{f001:Func2:pub}\n§O{void}\n";
         // Start with empty existingIds - duplicates are detected within the file
         var existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -67,7 +67,7 @@ public class IdAssignerTests
     [Fact]
     public void AssignIds_GeneratesUniqueIds()
     {
-        var content = "§F{:Func1:pub}\n§O{void}\n§/F{}\n§F{:Func2:pub}\n§O{void}\n§/F{}";
+        var content = "§F{:Func1:pub}\n§O{void}\n\n§F{:Func2:pub}\n§O{void}\n";
 
         var (_, assignments) = IdAssigner.AssignIds(content, "test.calr");
 
@@ -80,25 +80,20 @@ public class IdAssignerTests
     {
         var content = """
             §M{:Module}
-            §F{:Func:pub}
-            §O{void}
-            §/F{}
-            §CL{:Class}
-            §MT{:Method:pub}
-            §O{void}
-            §/MT{}
-            §PROP{:Prop:i32:pub}
-            §GET
-            §/PROP{}
-            §CTOR{:pub}
-            §/CTOR{}
-            §/CL{}
-            §IFACE{:IFace}
-            §/IFACE{}
-            §EN{:Status}
-            Active
-            §/EN{}
-            §/M{}
+              §F{:Func:pub}
+                §O{void}
+              §CL{:Class}
+                §MT{:Method:pub}
+                  §O{void}
+                §PROP{:Prop:i32:pub}
+                §GET
+                §/PROP{}
+                §CTOR{:pub}
+                §/CTOR{}
+              §IFACE{:IFace}
+              §EN{:Status}
+              Active
+              §/EN{}
             """;
 
         var (_, assignments) = IdAssigner.AssignIds(content, "test.calr");
@@ -117,7 +112,7 @@ public class IdAssignerTests
     [Fact]
     public void UpdateClosingTags_UpdatesModuleClosingTag()
     {
-        var content = "§M{old_id:Module}\n§/M{old_id}";
+        var content = "§M{old_id:Module}\n";
         var assignments = new List<IdAssignment>
         {
             new("test.calr", IdKind.Module, "Module", 1, "old_id", "m_01J5X7K9M2NPQRSTABWXYZ1234")
@@ -131,7 +126,7 @@ public class IdAssignerTests
     [Fact]
     public void UpdateClosingTags_UpdatesFunctionClosingTag()
     {
-        var content = "§F{old_id:Func:pub}\n§O{void}\n§/F{old_id}";
+        var content = "§F{old_id:Func:pub}\n§O{void}\n";
         var assignments = new List<IdAssignment>
         {
             new("test.calr", IdKind.Function, "Func", 1, "old_id", "f_01J5X7K9M2NPQRSTABWXYZ1234")
@@ -145,7 +140,7 @@ public class IdAssignerTests
     [Fact]
     public void AssignIds_RecordsLineNumber()
     {
-        var content = "§M{m001:Module}\n§F{:Func:pub}\n§O{void}\n§/F{}";
+        var content = "§M{m001:Module}\n§F{:Func:pub}\n§O{void}\n";
 
         var (_, assignments) = IdAssigner.AssignIds(content, "test.calr");
 
@@ -156,7 +151,7 @@ public class IdAssignerTests
     [Fact]
     public void AssignIds_RecordsFilePath()
     {
-        var content = "§F{:Func:pub}\n§O{void}\n§/F{}";
+        var content = "§F{:Func:pub}\n§O{void}\n";
 
         var (_, assignments) = IdAssigner.AssignIds(content, "/path/to/test.calr");
 

@@ -47,7 +47,7 @@ public class MicroValidationSetTests : IDisposable
         Directory.CreateDirectory(sub);
         for (int i = 0; i < count; i++)
         {
-            File.WriteAllText(Path.Combine(sub, $"{category[..3]}_{i:D3}.calr"), "§M{m1:Test} §/M{m1}");
+            File.WriteAllText(Path.Combine(sub, $"{category[..3]}_{i:D3}.calr"), "§M{m1:Test}");
         }
         // Add a non-.calr file to prove enumerator filters by extension.
         File.WriteAllText(Path.Combine(sub, "README.md"), "# test data");

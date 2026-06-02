@@ -51,12 +51,10 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:CastTest:pub}
-§I{object:x}
-§O{i32}
-§R (cast i32 x)
-§/F{f001}
-§/M{m001}
+  §F{f001:CastTest:pub}
+    §I{object:x}
+    §O{i32}
+    §R (cast i32 x)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("cast", formatted);
@@ -68,12 +66,10 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:IsTest:pub}
-§I{object:x}
-§O{bool}
-§R (is x str)
-§/F{f001}
-§/M{m001}
+  §F{f001:IsTest:pub}
+    §I{object:x}
+    §O{bool}
+    §R (is x str)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("is", formatted);
@@ -85,12 +81,10 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:AsTest:pub}
-§I{object:x}
-§O{str}
-§R (as x str)
-§/F{f001}
-§/M{m001}
+  §F{f001:AsTest:pub}
+    §I{object:x}
+    §O{str}
+    §R (as x str)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("as", formatted);
@@ -102,12 +96,10 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:NestedCast:pub}
-§I{object:x}
-§O{i32}
-§R (cast i32 (cast f64 x))
-§/F{f001}
-§/M{m001}
+  §F{f001:NestedCast:pub}
+    §I{object:x}
+    §O{i32}
+    §R (cast i32 (cast f64 x))
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("cast", formatted);
@@ -122,11 +114,9 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§AF{f001:GetDataAsync:pub}
-§O{str}
-§R ""data""
-§/AF{f001}
-§/M{m001}
+  §AF{f001:GetDataAsync:pub}
+    §O{str}
+    §R ""data""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.NotEmpty(formatted);
@@ -142,19 +132,16 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:MatchTest:pub}
-§I{i32:x}
-§O{str}
-§W{m1} x
-§K 1
-§R ""one""
-§K 2
-§R ""two""
-§K _
-§R ""other""
-§/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:MatchTest:pub}
+    §I{i32:x}
+    §O{str}
+    §W{m1} x
+    §K 1
+      §R ""one""
+    §K 2
+      §R ""two""
+    §K _
+      §R ""other""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§W{", formatted);
@@ -167,17 +154,14 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:OptMatch:pub}
-§I{i32:x}
-§O{i32}
-§W{m1} x
-§K §SM _
-§R 1
-§K §NN
-§R 0
-§/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:OptMatch:pub}
+    §I{i32:x}
+    §O{i32}
+    §W{m1} x
+    §K §SM _
+      §R 1
+    §K §NN
+      §R 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§SM", formatted);
@@ -194,15 +178,13 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§Q (!= b 0)
-§S (>= result 0)
-§R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §Q (!= b 0)
+    §S (>= result 0)
+    §R (/ a b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§Q", formatted);
@@ -219,14 +201,11 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:LoopTest:pub}
-§O{void}
-§E{cw}
-§L{l1:i:0:10:1}
-§C{Console.WriteLine} i
-§/L{l1}
-§/F{f001}
-§/M{m001}
+  §F{f001:LoopTest:pub}
+    §O{void}
+    §E{cw}
+    §L{l1:i:0:10:1}
+      §C{Console.WriteLine} i
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§L{", formatted);
@@ -238,15 +217,12 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:WhileTest:pub}
-§I{bool:running}
-§O{void}
-§E{cw}
-§WH{w1} running
-§P ""working""
-§/WH{w1}
-§/F{f001}
-§/M{m001}
+  §F{f001:WhileTest:pub}
+    §I{bool:running}
+    §O{void}
+    §E{cw}
+    §WH{w1} running
+      §P ""working""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§WH", formatted);
@@ -258,16 +234,12 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:NestedLoop:pub}
-§O{void}
-§E{cw}
-§L{l1:i:0:5:1}
-§L{l2:j:0:5:1}
-§C{Console.WriteLine} (+ i j)
-§/L{l2}
-§/L{l1}
-§/F{f001}
-§/M{m001}
+  §F{f001:NestedLoop:pub}
+    §O{void}
+    §E{cw}
+    §L{l1:i:0:5:1}
+      §L{l2:j:0:5:1}
+        §C{Console.WriteLine} (+ i j)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Single(reparsed.Functions);
@@ -282,21 +254,17 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:NestedIf:pub}
-§I{bool:a}
-§I{bool:b}
-§O{i32}
-§IF{if1} a
-§IF{if2} b
-§R 2
-§EL
-§R 1
-§/I{if2}
-§EL
-§R 0
-§/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:NestedIf:pub}
+    §I{bool:a}
+    §I{bool:b}
+    §O{i32}
+    §IF{if1} a
+      §IF{if2} b
+        §R 2
+      §EL
+        §R 1
+    §EL
+      §R 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§IF{", formatted);
@@ -312,13 +280,11 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:PrintAll:pub}
-§I{str:msg}
-§O{void}
-§E{cw}
-§C{Console.WriteLine} msg
-§/F{f001}
-§/M{m001}
+  §F{f001:PrintAll:pub}
+    §I{str:msg}
+    §O{void}
+    §E{cw}
+    §C{Console.WriteLine} msg
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§E{", formatted);
@@ -334,15 +300,12 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SomeTest:pub}
-§O{i32}
-§R §SM 42
-§/F{f001}
-§F{f002:NoneTest:pub}
-§O{i32}
-§R §NN{i32}
-§/F{f002}
-§/M{m001}
+  §F{f001:SomeTest:pub}
+    §O{i32}
+    §R §SM 42
+  §F{f002:NoneTest:pub}
+    §O{i32}
+    §R §NN{i32}
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§SM", formatted);
@@ -355,15 +318,12 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:OkTest:pub}
-§O{i32}
-§R §OK 42
-§/F{f001}
-§F{f002:ErrTest:pub}
-§O{str}
-§R §ERR ""error""
-§/F{f002}
-§/M{m001}
+  §F{f001:OkTest:pub}
+    §O{i32}
+    §R §OK 42
+  §F{f002:ErrTest:pub}
+    §O{str}
+    §R §ERR ""error""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("OK", formatted);
@@ -380,19 +340,15 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:IntLiteral:pub}
-§O{i32}
-§R 42
-§/F{f001}
-§F{f002:BoolLiteral:pub}
-§O{bool}
-§R true
-§/F{f002}
-§F{f003:StringLiteral:pub}
-§O{str}
-§R ""hello""
-§/F{f003}
-§/M{m001}
+  §F{f001:IntLiteral:pub}
+    §O{i32}
+    §R 42
+  §F{f002:BoolLiteral:pub}
+    §O{bool}
+    §R true
+  §F{f003:StringLiteral:pub}
+    §O{str}
+    §R ""hello""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("42", formatted);
@@ -410,25 +366,21 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:MathLib}
-§F{f001:Add:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§R (+ a b)
-§/F{f001}
-§F{f002:Subtract:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§R (- a b)
-§/F{f002}
-§F{f003:Multiply:prv}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§R (* a b)
-§/F{f003}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+  §F{f002:Subtract:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (- a b)
+  §F{f003:Multiply:prv}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (* a b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("Add", formatted);
@@ -446,21 +398,18 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:ComplexTest}
-§F{f001:Process:pub}
-§I{i32:input}
-§O{i32}
-§E{cw}
-§Q (> input 0)
-§S (>= result 0)
-§IF{if1} (> input 10)
-§C{Console.WriteLine} ""big""
-§R (* input 2)
-§EL
-§C{Console.WriteLine} ""small""
-§R input
-§/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Process:pub}
+    §I{i32:input}
+    §O{i32}
+    §E{cw}
+    §Q (> input 0)
+    §S (>= result 0)
+    §IF{if1} (> input 10)
+      §C{Console.WriteLine} ""big""
+      §R (* input 2)
+    §EL
+      §C{Console.WriteLine} ""small""
+      §R input
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§Q", formatted);
@@ -478,14 +427,12 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:BindTest:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§B{sum} (+ a b)
-§R sum
-§/F{f001}
-§/M{m001}
+  §F{f001:BindTest:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §B{sum} (+ a b)
+    §R sum
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("§B{", formatted);
@@ -500,14 +447,12 @@ public class NewFeatureRoundTripTests
         // Typed immutable: {type:name}, typed mutable: {~name:type}
         var source = @"
 §M{m001:Test}
-§F{f001:TypedBindTest:pub}
-§I{i32:x}
-§O{i32}
-§B{i32:count} 0
-§B{~total:i32} 0
-§R count
-§/F{f001}
-§/M{m001}
+  §F{f001:TypedBindTest:pub}
+    §I{i32:x}
+    §O{i32}
+    §B{i32:count} 0
+    §B{~total:i32} 0
+    §R count
 ";
         var (original, formatted, reparsed) = FormatAndReparse(source);
 
@@ -537,12 +482,10 @@ public class NewFeatureRoundTripTests
         // Legacy CalorEmitter format: {name:const} should parse as immutable, no type
         var source = @"
 §M{m001:Test}
-§F{f001:LegacyTest:pub}
-§O{i32}
-§B{count:const} 42
-§R count
-§/F{f001}
-§/M{m001}
+  §F{f001:LegacyTest:pub}
+    §O{i32}
+    §B{count:const} 42
+    §R count
 ";
         var parsed = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -561,12 +504,10 @@ public class NewFeatureRoundTripTests
         // Legacy format: {type:name:const} should parse as immutable with type
         var source = @"
 §M{m001:Test}
-§F{f001:LegacyTypedTest:pub}
-§O{i32}
-§B{i32:count:const} 42
-§R count
-§/F{f001}
-§/M{m001}
+  §F{f001:LegacyTypedTest:pub}
+    §O{i32}
+    §B{i32:count:const} 42
+    §R count
 ";
         var parsed = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -588,11 +529,9 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m1:Test}
-§F{f001:Main:pub}
-  §O{void}
-  §ARR{nums:i32} 1 2 3 §/ARR{nums}
-§/F{f001}
-§/M{m1}
+  §F{f001:Main:pub}
+      §O{void}
+      §ARR{nums:i32} 1 2 3 §/ARR{nums}
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("§ARR", formatted);
@@ -604,11 +543,9 @@ public class NewFeatureRoundTripTests
     {
         var source = @"
 §M{m1:Test}
-§F{f001:Main:pub}
-  §O{void}
-  §B{[i32]:arr1} §ARR{i32:arr1:10}
-§/F{f001}
-§/M{m1}
+  §F{f001:Main:pub}
+      §O{void}
+      §B{[i32]:arr1} §ARR{i32:arr1:10}
 ";
         var (_, formatted, _) = FormatAndReparse(source);
         Assert.Contains("§ARR", formatted);

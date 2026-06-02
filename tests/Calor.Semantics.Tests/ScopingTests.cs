@@ -18,16 +18,13 @@ public class ScopingTests
         // Inner scope can use outer variable in return
         var source = @"
 §M{m001:Test}
-§F{f001:testAccess:pub}
-  §I{bool:cond}
-  §O{i32}
-  §B{x} INT:42
-  §IF{if1} cond
-    §R (+ x INT:1)
-  §/I{if1}
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:testAccess:pub}
+      §I{bool:cond}
+      §O{i32}
+      §B{x} INT:42
+      §IF{if1} cond
+          §R (+ x INT:1)
+      §R x
 ";
 
         // When cond is true, returns x+1=43 (accessed x from outer scope in inner scope)
@@ -51,15 +48,12 @@ public class ScopingTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:testReturn:pub}
-  §I{bool:condition}
-  §O{i32}
-  §IF{if1} condition
-    §R INT:42
-  §/I{if1}
-  §R INT:0
-§/F{f001}
-§/M{m001}
+  §F{f001:testReturn:pub}
+      §I{bool:condition}
+      §O{i32}
+      §IF{if1} condition
+          §R INT:42
+      §R INT:0
 ";
 
         // With condition=true, should return 42
@@ -82,20 +76,16 @@ public class ScopingTests
         // Access variable from outer scope in deeply nested scope
         var source = @"
 §M{m001:Test}
-§F{f001:testLookup:pub}
-  §I{bool:a}
-  §I{bool:b}
-  §O{i32}
-  §B{outer} INT:100
-  §IF{if1} a
-    §IF{if2} b
-      §R outer
-    §/I{if2}
-    §R (+ outer INT:10)
-  §/I{if1}
-  §R (+ outer INT:20)
-§/F{f001}
-§/M{m001}
+  §F{f001:testLookup:pub}
+      §I{bool:a}
+      §I{bool:b}
+      §O{i32}
+      §B{outer} INT:100
+      §IF{if1} a
+          §IF{if2} b
+              §R outer
+          §R (+ outer INT:10)
+      §R (+ outer INT:20)
 ";
 
         // a=true, b=true: return outer (100)
@@ -122,14 +112,12 @@ public class ScopingTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:useParams:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §B{sum} (+ a b)
-  §R sum
-§/F{f001}
-§/M{m001}
+  §F{f001:useParams:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §B{sum} (+ a b)
+      §R sum
 ";
 
         var result = SemanticsTestHarness.Execute(source, "useParams", new object[] { 10, 20 });
@@ -145,13 +133,11 @@ public class ScopingTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:test:pub}
-  §O{i32}
-  §B{x} INT:5
-  §B{y} (* x INT:2)
-  §R y
-§/F{f001}
-§/M{m001}
+  §F{f001:test:pub}
+      §O{i32}
+      §B{x} INT:5
+      §B{y} (* x INT:2)
+      §R y
 ";
 
         var cnf = SemanticsTestHarness.CompileToCnf(source);
@@ -172,14 +158,12 @@ public class ScopingTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:test:pub}
-  §O{i32}
-  §B{a} INT:1
-  §B{b} INT:2
-  §B{c} INT:3
-  §R (+ (+ a b) c)
-§/F{f001}
-§/M{m001}
+  §F{f001:test:pub}
+      §O{i32}
+      §B{a} INT:1
+      §B{b} INT:2
+      §B{c} INT:3
+      §R (+ (+ a b) c)
 ";
 
         var result = SemanticsTestHarness.Execute(source, "test");

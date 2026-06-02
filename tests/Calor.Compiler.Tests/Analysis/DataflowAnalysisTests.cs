@@ -52,12 +52,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Simple:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Simple:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -72,16 +70,13 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Conditional:pub}
-  §I{i32:x}
-  §O{i32}
-  §IF{if1} (> x INT:0)
-    §R INT:1
-  §EL
-    §R INT:0
-  §/I{if1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Conditional:pub}
+      §I{i32:x}
+      §O{i32}
+      §IF{if1} (> x INT:0)
+          §R INT:1
+      §EL
+          §R INT:0";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -96,18 +91,15 @@ public class DataflowAnalysisTests
         // Use FOR loop since it has built-in iteration without needing ASSIGN
         var source = @"
 §M{m001:Test}
-§F{f001:Loop:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A i
-    §/C
-  §/L{l1}
-  §R sum
-§/F{f001}
-§/M{m001}";
+  §F{f001:Loop:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{sum:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A i
+          §/C
+      §R sum";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -120,18 +112,15 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ForLoop:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A i
-    §/C
-  §/L{l1}
-  §R sum
-§/F{f001}
-§/M{m001}";
+  §F{f001:ForLoop:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{sum:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A i
+          §/C
+      §R sum";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -144,13 +133,11 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Multi:pub}
-  §I{i32:x}
-  §O{i32}
-  §B{y:i32} (+ x INT:1)
-  §R y
-§/F{f001}
-§/M{m001}";
+  §F{f001:Multi:pub}
+      §I{i32:x}
+      §O{i32}
+      §B{y:i32} (+ x INT:1)
+      §R y";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -168,12 +155,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Single:pub}
-  §O{i32}
-  §B{x:i32} INT:42
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Single:pub}
+      §O{i32}
+      §B{x:i32} INT:42
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -191,14 +176,12 @@ public class DataflowAnalysisTests
         // since Calor doesn't support general variable reassignment
         var source = @"
 §M{m001:Test}
-§F{f001:MultiBind:pub}
-  §O{i32}
-  §B{x:i32} INT:1
-  §B{y:i32} INT:2
-  §B{z:i32} (+ x y)
-  §R z
-§/F{f001}
-§/M{m001}";
+  §F{f001:MultiBind:pub}
+      §O{i32}
+      §B{x:i32} INT:1
+      §B{y:i32} INT:2
+      §B{z:i32} (+ x y)
+      §R z";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -214,13 +197,11 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Multi:pub}
-  §O{i32}
-  §B{x:i32} INT:1
-  §B{y:i32} INT:2
-  §R (+ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Multi:pub}
+      §O{i32}
+      §B{x:i32} INT:1
+      §B{y:i32} INT:2
+      §R (+ x y)";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -235,13 +216,11 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Filter:pub}
-  §O{i32}
-  §B{x:i32} INT:1
-  §B{y:i32} INT:2
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Filter:pub}
+      §O{i32}
+      §B{x:i32} INT:1
+      §B{y:i32} INT:2
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -261,12 +240,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Used:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Used:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -283,13 +260,11 @@ public class DataflowAnalysisTests
         // Test dead code detection via unused binding
         var source = @"
 §M{m001:Test}
-§F{f001:Dead:pub}
-  §O{i32}
-  §B{x:i32} INT:1
-  §B{y:i32} INT:2
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:Dead:pub}
+      §O{i32}
+      §B{x:i32} INT:1
+      §B{y:i32} INT:2
+      §R INT:0";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -305,18 +280,15 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Loop:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A i
-    §/C
-  §/L{l1}
-  §R sum
-§/F{f001}
-§/M{m001}";
+  §F{f001:Loop:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{sum:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A i
+          §/C
+      §R sum";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -331,12 +303,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Exit:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Exit:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -355,12 +325,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Param:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Param:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -376,12 +344,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Local:pub}
-  §O{i32}
-  §B{x:i32} INT:42
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Local:pub}
+      §O{i32}
+      §B{x:i32} INT:42
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -397,12 +363,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Report:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Report:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -580,10 +544,8 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Empty:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Empty:pub}
+      §O{void}";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -599,21 +561,17 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Nested:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF{if1} (> x INT:0)
-    §IF{if2} (> y INT:0)
-      §R INT:1
-    §EL
-      §R INT:2
-    §/I{if2}
-  §EL
-    §R INT:3
-  §/I{if1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Nested:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §IF{if1} (> x INT:0)
+          §IF{if2} (> y INT:0)
+              §R INT:1
+          §EL
+              §R INT:2
+      §EL
+          §R INT:3";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -627,15 +585,12 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Early:pub}
-  §I{i32:x}
-  §O{i32}
-  §IF{if1} (< x INT:0)
-    §R INT:0
-  §/I{if1}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Early:pub}
+      §I{i32:x}
+      §O{i32}
+      §IF{if1} (< x INT:0)
+          §R INT:0
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -649,13 +604,11 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Simple:pub}
-  §I{i32:x}
-  §O{i32}
-  §B{y:i32} (+ x INT:1)
-  §R y
-§/F{f001}
-§/M{m001}";
+  §F{f001:Simple:pub}
+      §I{i32:x}
+      §O{i32}
+      §B{y:i32} (+ x INT:1)
+      §R y";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -671,12 +624,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Simple:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Simple:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -696,19 +647,16 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Branch:pub}
-  §I{i32:x}
-  §I{bool:cond}
-  §O{i32}
-  §B{y:i32} INT:0
-  §IF{if1} cond
-    §B{z:i32} INT:1
-  §EL
-    §B{z:i32} INT:2
-  §/I{if1}
-  §R y
-§/F{f001}
-§/M{m001}";
+  §F{f001:Branch:pub}
+      §I{i32:x}
+      §I{bool:cond}
+      §O{i32}
+      §B{y:i32} INT:0
+      §IF{if1} cond
+          §B{z:i32} INT:1
+      §EL
+          §B{z:i32} INT:2
+      §R y";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -724,18 +672,15 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Loop:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A sum
-    §/C
-  §/L{l1}
-  §R sum
-§/F{f001}
-§/M{m001}";
+  §F{f001:Loop:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{sum:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A sum
+          §/C
+      §R sum";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -751,14 +696,12 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Multi:pub}
-  §O{i32}
-  §B{a:i32} INT:1
-  §B{b:i32} INT:2
-  §B{c:i32} INT:3
-  §R (+ a (+ b c))
-§/F{f001}
-§/M{m001}";
+  §F{f001:Multi:pub}
+      §O{i32}
+      §B{a:i32} INT:1
+      §B{b:i32} INT:2
+      §B{c:i32} INT:3
+      §R (+ a (+ b c))";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -777,12 +720,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:UseParam:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:UseParam:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -798,12 +739,10 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Unused:pub}
-  §O{i32}
-  §B{unused:i32} INT:42
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:Unused:pub}
+      §O{i32}
+      §B{unused:i32} INT:42
+      §R INT:0";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -820,15 +759,12 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Cond:pub}
-  §I{i32:x}
-  §O{i32}
-  §IF{if1} (> x INT:0)
-    §R INT:1
-  §/I{if1}
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:Cond:pub}
+      §I{i32:x}
+      §O{i32}
+      §IF{if1} (> x INT:0)
+          §R INT:1
+      §R INT:0";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -843,14 +779,12 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Multi:pub}
-  §I{i32:x}
-  §O{i32}
-  §B{a:i32} x
-  §B{b:i32} x
-  §R (+ a b)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Multi:pub}
+      §I{i32:x}
+      §O{i32}
+      §B{a:i32} x
+      §B{b:i32} x
+      §R (+ a b)";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -869,13 +803,11 @@ public class DataflowAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Safe:pub}
-  §I{i32:x}
-  §O{i32}
-  §B{y:i32} (+ x INT:1)
-  §R y
-§/F{f001}
-§/M{m001}";
+  §F{f001:Safe:pub}
+      §I{i32:x}
+      §O{i32}
+      §B{y:i32} (+ x INT:1)
+      §R y";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);

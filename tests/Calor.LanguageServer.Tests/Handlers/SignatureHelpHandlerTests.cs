@@ -11,13 +11,11 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Add}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R a + b
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §R a + b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -39,11 +37,9 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:GetValue}
-            §O{i32}
-            §R 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetValue}
+                §O{i32}
+                §R 42
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -61,11 +57,9 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:GetString}
-            §O{str}
-            §R "hello"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetString}
+                §O{str}
+                §R "hello"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -83,10 +77,8 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:DoSomething}
-            §P "done"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:DoSomething}
+                §P "done"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -103,15 +95,12 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Calculator}
-            §MT{m001:Add}
-            §I{i32:x}
-            §I{i32:y}
-            §O{i32}
-            §R x + y
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Calculator}
+                §MT{m001:Add}
+                  §I{i32:x}
+                  §I{i32:y}
+                  §O{i32}
+                  §R x + y
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -132,12 +121,9 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Base:pub}
-            §MT{m001:Process:pub:virt}
-            §O{void}
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Base:pub}
+                §MT{m001:Process:pub:virt}
+                  §O{void}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -157,18 +143,13 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Base:pub}
-            §MT{m001:Process:pub:virt}
-            §O{void}
-            §/MT{m001}
-            §/CL{c001}
-            §CL{c002:Derived:pub}
-            §EXT{Base}
-            §MT{m002:Process:pub:over}
-            §O{void}
-            §/MT{m002}
-            §/CL{c002}
-            §/M{m001}
+              §CL{c001:Base:pub}
+                §MT{m001:Process:pub:virt}
+                  §O{void}
+              §CL{c002:Derived:pub}
+                §EXT{Base}
+                §MT{m002:Process:pub:over}
+                  §O{void}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -188,14 +169,12 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Divide}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §Q b != 0
-            §R a / b
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Divide}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §Q b != 0
+                §R a / b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -212,17 +191,14 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Abs}
-            §I{i32:x}
-            §O{i32}
-            §S result >= 0
-            §IF{if001} x >= 0
-            §R x
-            §EL
-            §R -x
-            §/I{if001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Abs}
+                §I{i32:x}
+                §O{i32}
+                §S result >= 0
+                §IF{if001} x >= 0
+                  §R x
+                §EL
+                  §R -x
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -239,14 +215,12 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Process}
-            §I{i32:count}
-            §I{str:name}
-            §I{bool:enabled}
-            §I{f64:ratio}
-            §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Process}
+                §I{i32:count}
+                §I{str:name}
+                §I{bool:enabled}
+                §I{f64:ratio}
+                §O{void}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -267,13 +241,10 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Utils:pub}
-            §MT{m001:Helper:pub:static}
-            §O{i32}
-            §R 0
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Utils:pub}
+                §MT{m001:Helper:pub:static}
+                  §O{i32}
+                  §R 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -293,13 +264,11 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Service}
-            §AMT{m001:FetchData}
-            §O{str}
-            §R "data"
-            §/AMT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Service}
+                §AMT{m001:FetchData}
+                §O{str}
+                §R "data"
+                §/AMT{m001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -319,11 +288,9 @@ public class SignatureHelpHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §AF{f001:LoadData}
-            §O{str}
-            §R "loaded"
-            §/AF{f001}
-            §/M{m001}
+              §AF{f001:LoadData}
+                §O{str}
+                §R "loaded"
             """;
 
         var ast = LspTestHarness.GetAst(source);

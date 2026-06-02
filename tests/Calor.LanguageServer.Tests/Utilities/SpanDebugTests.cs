@@ -21,12 +21,10 @@ public class SpanDebugTests
     public void Debug_SpanPositions()
     {
         var source = @"§M{m001:TestModule}
-§F{f001:Add}
-§I{i32:a}
-§O{i32}
-§R a
-§/F{f001}
-§/M{m001}";
+  §F{f001:Add}
+    §I{i32:a}
+    §O{i32}
+    §R a";
 
         _output.WriteLine("Source:");
         _output.WriteLine(source);
@@ -123,12 +121,10 @@ public class SpanDebugTests
     public void Span_Contains_Position()
     {
         var source = @"§M{m001:TestModule}
-§F{f001:Add}
-§I{i32:a}
-§O{i32}
-§R a
-§/F{f001}
-§/M{m001}";
+  §F{f001:Add}
+    §I{i32:a}
+    §O{i32}
+    §R a";
 
         var ast = LspTestHarness.GetAst(source);
         Assert.NotNull(ast);

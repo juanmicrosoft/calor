@@ -22,12 +22,10 @@ public class TypeOperationTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{{{inputType}}:x}
-              §O{{{outputType}}}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{{{inputType}}:x}
+                  §O{{{outputType}}}
+                  {{body}}
             """;
     }
 

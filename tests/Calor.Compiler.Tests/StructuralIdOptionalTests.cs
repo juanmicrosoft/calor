@@ -27,11 +27,9 @@ public class StructuralIdOptionalTests
     {
         var source = """
             §M{Calculator}
-            §F{Main:pub}
-            §O{void}
-            §R
-            §/F
-            §/M
+              §F{Main:pub}
+                §O{void}
+                §R
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -46,11 +44,9 @@ public class StructuralIdOptionalTests
     {
         var source = """
             §M{m001:Calculator}
-            §F{Main:pub}
-            §O{void}
-            §R
-            §/F
-            §/M{m001}
+              §F{Main:pub}
+                §O{void}
+                §R
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -67,15 +63,12 @@ public class StructuralIdOptionalTests
         // colon-based attribute splitter doesn't split typed literals.
         var source = """
             §M{Loops}
-            §F{Sum:pub}
-            §O{void}
-            §B{~total:i32} INT:0
-            §L{i:0:10}
-              §B{~total:i32} (+ total i)
-            §/L
-            §R
-            §/F
-            §/M
+              §F{Sum:pub}
+                §O{void}
+                §B{~total:i32} INT:0
+                §L{i:0:10}
+                  §B{~total:i32} (+ total i)
+                §R
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -92,15 +85,12 @@ public class StructuralIdOptionalTests
     {
         var source = """
             §M{m001:Loops}
-            §F{f001:Sum:pub}
-            §O{void}
-            §B{~total:i32} INT:0
-            §L{l001:i:0:10}
-              §B{~total:i32} (+ total i)
-            §/L{l001}
-            §R
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sum:pub}
+                §O{void}
+                §B{~total:i32} INT:0
+                §L{l001:i:0:10}
+                    §B{~total:i32} (+ total i)
+                §R
             """;
 
         var module = Parse(source, out var diagnostics);

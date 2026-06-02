@@ -202,9 +202,7 @@ public class ClassVisibilityTests
     {
         var calorSource = """
             §M{m1:Test}
-              §CL{c1:Foo:int:static}
-              §/CL{c1}
-            §/M{m1}
+                §CL{c1:Foo:int:static}
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -222,9 +220,7 @@ public class ClassVisibilityTests
         // Private visibility can appear in hand-written Calor (e.g., nested class scenarios)
         var calorSource = """
             §M{m1:Test}
-              §CL{c1:Inner:pri}
-              §/CL{c1}
-            §/M{m1}
+                §CL{c1:Inner:pri}
             """;
 
         var compilationResult = Program.Compile(calorSource);

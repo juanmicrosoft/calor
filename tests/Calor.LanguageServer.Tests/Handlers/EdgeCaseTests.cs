@@ -16,10 +16,8 @@ public class EdgeCaseTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §CL{c001:/*cursor*/Container<T>}
-            §FLD{T:value}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:/*cursor*/Container<T>}
+                §FLD{T:value}
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -35,14 +33,11 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Utils}
-            §MT{m001:Identity<T>}
-            §I{T:value}
-            §O{T}
-            §R value
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Utils}
+                §MT{m001:Identity<T>}
+                  §I{T:value}
+                  §O{T}
+                  §R value
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -61,15 +56,13 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Compare<T>}
-            §TP{T}
-            §TC{IComparable}
-            §I{T:a}
-            §I{T:b}
-            §O{i32}
-            §R a.CompareTo(b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Compare<T>}
+                §TP{T}
+                §TC{IComparable}
+                §I{T:a}
+                §I{T:b}
+                §O{i32}
+                §R a.CompareTo(b)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -87,11 +80,9 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Animal:pub}
-            §FLD{str:name:pub}
-            §FLD{i32:age:pub}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Animal:pub}
+                §FLD{str:name:pub}
+                §FLD{i32:age:pub}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -107,14 +98,11 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Animal:pub}
-            §FLD{str:name:pub}
-            §/CL{c001}
-            §CL{c002:Dog:pub}
-            §EXT{Animal}
-            §FLD{str:breed:pub}
-            §/CL{c002}
-            §/M{m001}
+              §CL{c001:Animal:pub}
+                §FLD{str:name:pub}
+              §CL{c002:Dog:pub}
+                §EXT{Animal}
+                §FLD{str:breed:pub}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -134,19 +122,14 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §IFACE{i001:IDrawable}
-            §MT{m001:Draw}
-            §O{void}
-            §/MT{m001}
-            §/IFACE{i001}
-            §CL{c001:Circle:pub}
-            §IMPL{IDrawable}
-            §MT{m001:Draw}
-            §O{void}
-            §P "Drawing circle"
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §IFACE{i001:IDrawable}
+                §MT{m001:Draw}
+                  §O{void}
+              §CL{c001:Circle:pub}
+                §IMPL{IDrawable}
+                §MT{m001:Draw}
+                  §O{void}
+                  §P "Drawing circle"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -162,22 +145,16 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §IFACE{i001:IReadable}
-            §MT{m001:Read}
-            §O{str}
-            §/MT{m001}
-            §/IFACE{i001}
-            §IFACE{i002:IWritable}
-            §MT{m001:Write}
-            §I{str:data}
-            §O{void}
-            §/MT{m001}
-            §/IFACE{i002}
-            §CL{c001:File:pub}
-            §IMPL{IReadable}
-            §IMPL{IWritable}
-            §/CL{c001}
-            §/M{m001}
+              §IFACE{i001:IReadable}
+                §MT{m001:Read}
+                  §O{str}
+              §IFACE{i002:IWritable}
+                §MT{m001:Write}
+                  §I{str:data}
+                  §O{void}
+              §CL{c001:File:pub}
+                §IMPL{IReadable}
+                §IMPL{IWritable}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -193,12 +170,9 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Shape:pub:abs}
-            §MT{m001:GetArea:pub:abs}
-            §O{f64}
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Shape:pub:abs}
+                §MT{m001:GetArea:pub:abs}
+                  §O{f64}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -216,10 +190,8 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:FinalClass:pub:sealed}
-            §FLD{i32:value}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:FinalClass:pub:sealed}
+                §FLD{i32:value}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -240,11 +212,9 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §AF{f001:FetchData}
-            §O{str}
-            §R "data"
-            §/AF{f001}
-            §/M{m001}
+              §AF{f001:FetchData}
+                §O{str}
+                §R "data"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -260,13 +230,11 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Service}
-            §AMT{m001:LoadAsync}
-            §O{str}
-            §R "loaded"
-            §/AMT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Service}
+                §AMT{m001:LoadAsync}
+                §O{str}
+                §R "loaded"
+                §/AMT{m001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -285,13 +253,11 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §AF{f001:DownloadFile}
-            §I{str:url}
-            §I{str:path}
-            §O{bool}
-            §R true
-            §/AF{f001}
-            §/M{m001}
+              §AF{f001:DownloadFile}
+                §I{str:url}
+                §I{str:path}
+                §O{bool}
+                §R true
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -312,20 +278,16 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Classify}
-            §I{i32:n}
-            §O{str}
-            §IF{if001} n < 0
-            §R "negative"
-            §EL
-            §IF{if002} n == 0
-            §R "zero"
-            §EL
-            §R "positive"
-            §/I{if002}
-            §/I{if001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Classify}
+                §I{i32:n}
+                §O{str}
+                §IF{if001} n < 0
+                  §R "negative"
+                §EL
+                  §IF{if002} n == 0
+                    §R "zero"
+                §EL
+                    §R "positive"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -338,22 +300,19 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Describe}
-            §I{i32:n}
-            §O{str}
-            §SW{sw001} n
-            §CS{cs001} 0
-            §R "zero"
-            §/CS{cs001}
-            §CS{cs002} 1
-            §R "one"
-            §/CS{cs002}
-            §DF
-            §R "other"
-            §/DF
-            §/SW{sw001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Describe}
+                §I{i32:n}
+                §O{str}
+                §SW{sw001} n
+                  §CS{cs001} 0
+                  §R "zero"
+                  §/CS{cs001}
+                  §CS{cs002} 1
+                  §R "one"
+                  §/CS{cs002}
+                  §DF
+                  §R "other"
+                  §/DF
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -366,16 +325,14 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Sum}
-            §I{i32:n}
-            §O{i32}
-            §B{~total:i32} 0
-            §FOR{for001} i 0 n
-            §B{~total} total + i
-            §/FOR{for001}
-            §R total
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sum}
+                §I{i32:n}
+                §O{i32}
+                §B{~total:i32} 0
+                §FOR{for001} i 0 n
+                §B{~total} total + i
+                §/FOR{for001}
+                §R total
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -388,16 +345,13 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Countdown}
-            §I{i32:n}
-            §O{void}
-            §B{~count:i32} n
-            §WH{wh001} count > 0
-            §P count
-            §B{~count} count - 1
-            §/WH{wh001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Countdown}
+                §I{i32:n}
+                §O{void}
+                §B{~count:i32} n
+                §WH{wh001} count > 0
+                  §P count
+                  §B{~count} count - 1
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -410,18 +364,16 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:SafeDivide}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §TRY{try001}
-            §R a / b
-            §CATCH{catch001:Exception:e}
-            §R 0
-            §/CATCH{catch001}
-            §/TRY{try001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:SafeDivide}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §TRY{try001}
+                §R a / b
+                §CATCH{catch001:Exception:e}
+                §R 0
+                §/CATCH{catch001}
+                §/TRY{try001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -434,12 +386,11 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §DEL{d001:BinaryOp}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §/DEL{d001}
-            §/M{m001}
+              §DEL{d001:BinaryOp}
+              §I{i32:a}
+              §I{i32:b}
+              §O{i32}
+              §/DEL{d001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -454,10 +405,8 @@ public class EdgeCaseTests
         // Events may not be fully supported yet, test that class parses
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Button}
-            §FLD{i32:clickCount}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Button}
+                §FLD{i32:clickCount}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -478,14 +427,12 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §PROP{p001:Name:str:pub}
-            §GET
-            §R ""
-            §/GET
-            §/PROP{p001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §PROP{p001:Name:str:pub}
+                §GET
+                §R ""
+                §/GET
+                §/PROP{p001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -502,16 +449,14 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Counter}
-            §PROP{p001:Value:i32:pub}
-            §GET
-            §R 0
-            §/GET
-            §SET
-            §/SET
-            §/PROP{p001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Counter}
+                §PROP{p001:Value:i32:pub}
+                §GET
+                §R 0
+                §/GET
+                §SET
+                §/SET
+                §/PROP{p001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -531,19 +476,15 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Math}
-            §MT{m001:Max:pub:static}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §IF{if001} a > b
-            §R a
-            §EL
-            §R b
-            §/I{if001}
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Math}
+                §MT{m001:Max:pub:static}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §IF{if001} a > b
+                    §R a
+                  §EL
+                    §R b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -562,10 +503,8 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Config}
-            §FLD{str:Version:pub}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Config}
+                §FLD{str:Version:pub}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -585,14 +524,12 @@ public class EdgeCaseTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:_name:priv}
-            §CTOR{ctor001}
-            §I{str:name}
-            §B{_name} name
-            §/CTOR{ctor001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:_name:priv}
+                §CTOR{ctor001}
+                §I{str:name}
+                §B{_name} name
+                §/CTOR{ctor001}
             """;
 
         var ast = LspTestHarness.GetAst(source);

@@ -460,14 +460,14 @@ public class Test
         // Context with validation patterns (null checks, bounds checks)
         // The estimator looks for patterns like "§Q", "§REQ", "null", ">=", "<"
         var withValidation = CreateTestContext(
-            calorSource: "§M{m001:Test}\n§F{f001:test:pub}\n  §I{i32:x}\n  §O{i32}\n  §Q (>= x 0)\n  §R x\n§/F{f001}\n§/M{m001}",
+            calorSource: "§M{m001:Test}\n§F{f001:test:pub}\n  §I{i32:x}\n  §O{i32}\n  §Q (>= x 0)\n  §R x\n\n",
             csharpSource: "public class T { public int test(int x) { if (x == null) throw new ArgumentNullException(); if (x < 0) throw new ArgumentException(); return x; } }"
         );
         var withValidationResult = await calculator.CalculateAsync(withValidation);
 
         // Context without validation patterns - minimal code
         var withoutValidation = CreateTestContext(
-            calorSource: "§M{m001:Test}\n§F{f001:test:pub}\n  §O{void}\n§/F{f001}\n§/M{m001}",
+            calorSource: "§M{m001:Test}\n§F{f001:test:pub}\n  §O{void}\n\n",
             csharpSource: "public class T { public void test() { } }"
         );
         var withoutValidationResult = await calculator.CalculateAsync(withoutValidation);
@@ -640,7 +640,7 @@ public class Test
         string? csharpSource = null)
     {
         // Use valid or invalid source code to control compilation success
-        var defaultValidCalor = "§M{m001:Test}\n§F{f001:test:pub}\n  §O{void}\n§/F{f001}\n§/M{m001}";
+        var defaultValidCalor = "§M{m001:Test}\n§F{f001:test:pub}\n  §O{void}\n\n";
         var defaultInvalidCalor = "§INVALID SYNTAX";
         var defaultValidCSharp = "public class T { public void test() { } }";
         var defaultInvalidCSharp = "public class { invalid }";

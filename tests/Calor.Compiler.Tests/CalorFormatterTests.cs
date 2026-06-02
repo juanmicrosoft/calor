@@ -24,7 +24,6 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§/M{m001}
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -43,10 +42,8 @@ public class CalorFormatterTests
         // Simplified test without using directives which have complex parsing
         var source = @"
 §M{m001:Test}
-§F{f001:Main:pub}
-§O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -67,13 +64,11 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -90,12 +85,10 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Print:pub}
-§I{str:message}
-§E{cw}
-§C{Console.WriteLine} message
-§/F{f001}
-§/M{m001}
+  §F{f001:Print:pub}
+    §I{str:message}
+    §E{cw}
+    §C{Console.WriteLine} message
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -113,15 +106,13 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§Q (!= b 0)
-§S (>= result 0)
-§R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §Q (!= b 0)
+    §S (>= result 0)
+    §R (/ a b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -142,12 +133,10 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§O{i32}
-§B{x} 42
-§R x
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+    §O{i32}
+    §B{x} 42
+    §R x
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -163,16 +152,13 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§I{bool:cond}
-§O{i32}
-§IF{if1} cond
-§R 1
-§EL
-§R 0
-§/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+    §I{bool:cond}
+    §O{i32}
+    §IF{if1} cond
+      §R 1
+    §EL
+      §R 0
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -188,14 +174,11 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§O{void}
-§E{cw}
-§L{l1:i:0:10:1}
-§C{Console.WriteLine} i
-§/L{l1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+    §O{void}
+    §E{cw}
+    §L{l1:i:0:10:1}
+      §C{Console.WriteLine} i
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -212,15 +195,12 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§I{bool:running}
-§O{void}
-§E{cw}
-§WH{w1} running
-§P ""working""
-§/WH{w1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+    §I{bool:running}
+    §O{void}
+    §E{cw}
+    §WH{w1} running
+      §P ""working""
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -237,17 +217,14 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§I{i32:x}
-§O{i32}
-§W{m1} x
-§K §SM _
-§R 1
-§K §NN
-§R 0
-§/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+    §I{i32:x}
+    §O{i32}
+    §W{m1} x
+    §K §SM _
+      §R 1
+    §K §NN
+      §R 0
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -268,14 +245,12 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§O{void}
-§B{a} 42
-§B{b} 3.14
-§B{c} true
-§B{d} ""hello""
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+    §O{void}
+    §B{a} 42
+    §B{b} 3.14
+    §B{c} true
+    §B{d} ""hello""
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -293,13 +268,11 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -315,15 +288,12 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§O{i32}
-§R §SM 42
-§/F{f001}
-§F{f002:Test2:pub}
-§O{i32}
-§R §NN{i32}
-§/F{f002}
-§/M{m001}
+  §F{f001:Test:pub}
+    §O{i32}
+    §R §SM 42
+  §F{f002:Test2:pub}
+    §O{i32}
+    §R §NN{i32}
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -340,15 +310,12 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§O{i32}
-§R §OK 42
-§/F{f001}
-§F{f002:Test2:pub}
-§O{str}
-§R §ERR ""error""
-§/F{f002}
-§/M{m001}
+  §F{f001:Test:pub}
+    §O{i32}
+    §R §OK 42
+  §F{f002:Test2:pub}
+    §O{str}
+    §R §ERR ""error""
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -369,21 +336,17 @@ public class CalorFormatterTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-§I{bool:a}
-§I{bool:b}
-§O{i32}
-§IF{if1} a
-§IF{if2} b
-§R 2
-§EL
-§R 1
-§/I{if2}
-§EL
-§R 0
-§/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+    §I{bool:a}
+    §I{bool:b}
+    §O{i32}
+    §IF{if1} a
+      §IF{if2} b
+        §R 2
+      §EL
+        §R 1
+    §EL
+      §R 0
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -407,13 +370,11 @@ public class CalorFormatterTests
         // Test that basic formatting works and produces parseable output
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -438,13 +399,10 @@ public class CalorFormatterTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACH{e001:item:i32:idx} items
-                §P item
-              §/EACH{e001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACH{e001:item:i32:idx} items
+                      §P item
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -462,13 +420,10 @@ public class CalorFormatterTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACH{e001:item:i32} items
-                §P item
-              §/EACH{e001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACH{e001:item:i32} items
+                      §P item
             """;
 
         var module = Parse(source, out var diagnostics);

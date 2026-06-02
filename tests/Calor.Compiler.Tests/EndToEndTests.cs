@@ -12,14 +12,12 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Hello}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A "Hello from Calor!"
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §C{Console.WriteLine}
+                    §A "Hello from Calor!"
+                  §/C
             """;
 
         var result = Program.Compile(source);
@@ -39,13 +37,11 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Math}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R 0
             """;
 
         var result = Program.Compile(source);
@@ -60,14 +56,12 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A "Line1\nLine2"
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §C{Console.WriteLine}
+                    §A "Line1\nLine2"
+                  §/C
             """;
 
         var result = Program.Compile(source);
@@ -95,7 +89,6 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §/M{m001}
             """;
 
         var result = Program.Compile(source);
@@ -110,13 +103,10 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{void}
-            §/F{f001}
-            §F{f002:Bar:pri}
-              §O{void}
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{void}
+              §F{f002:Bar:pri}
+                  §O{void}
             """;
 
         var result = Program.Compile(source);
@@ -131,11 +121,9 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:IsEnabled:pub}
-              §O{bool}
-              §R true
-            §/F{f001}
-            §/M{m001}
+              §F{f001:IsEnabled:pub}
+                  §O{bool}
+                  §R true
             """;
 
         var result = Program.Compile(source);
@@ -149,11 +137,9 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetPi:pub}
-              §O{f64}
-              §R 3.14159
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetPi:pub}
+                  §O{f64}
+                  §R 3.14159
             """;
 
         var result = Program.Compile(source);
@@ -167,10 +153,8 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Helper:int}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Helper:int}
+                  §O{void}
             """;
 
         var result = Program.Compile(source);
@@ -185,14 +169,10 @@ public class EndToEndTests
         // Test: (== (% i 15) 0) should generate ((i % 15) == 0)
         var source = """
             §M{m001:Test}
-            §F{f001:Check:pub}
-              §I{i32:i}
-              §O{bool}
-              §BODY
-                §R (== (% i 15) 0)
-              §END_BODY
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Check:pub}
+                  §I{i32:i}
+                  §O{bool}
+                    §R (== (% i 15) 0)
             """;
 
         var result = Program.Compile(source);
@@ -206,14 +186,10 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §BODY
-                §P "Hello!"
-              §END_BODY
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                    §P "Hello!"
             """;
 
         var result = Program.Compile(source);
@@ -227,14 +203,10 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §BODY
-                §C{Console.WriteLine} "Implicit close"
-              §END_BODY
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                    §C{Console.WriteLine} "Implicit close"
             """;
 
         var result = Program.Compile(source);
@@ -248,14 +220,10 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Negate:pub}
-              §I{bool:flag}
-              §O{bool}
-              §BODY
-                §R (! flag)
-              §END_BODY
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Negate:pub}
+                  §I{bool:flag}
+                  §O{bool}
+                    §R (! flag)
             """;
 
         var result = Program.Compile(source);
@@ -269,15 +237,11 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §E{cw}
-              §BODY
-                §P (+ x 10)
-              §END_BODY
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §E{cw}
+                    §P (+ x 10)
             """;
 
         var result = Program.Compile(source);
@@ -292,16 +256,12 @@ public class EndToEndTests
         // (+ a b c) should generate ((a + b) + c)
         var source = """
             §M{m001:Test}
-            §F{f001:Sum3:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §I{i32:c}
-              §O{i32}
-              §BODY
-                §R (+ a b c)
-              §END_BODY
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sum3:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §I{i32:c}
+                  §O{i32}
+                    §R (+ a b c)
             """;
 
         var result = Program.Compile(source);
@@ -317,12 +277,10 @@ public class EndToEndTests
     {
         var source = """
             §M{m001:Hello}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §P "Hello"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §P "Hello"
             """;
 
         var result = Program.Compile(source);

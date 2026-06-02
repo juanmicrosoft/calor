@@ -31,7 +31,7 @@ public class VerificationPerformanceTests
         try
         {
             var lexer = new Lexer(source, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
             var parser = new Parser(tokens, diagnostics);
             var module = parser.Parse();
 
@@ -92,7 +92,7 @@ public class VerificationPerformanceTests
         var sw = Stopwatch.StartNew();
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
         sw.Stop();
@@ -112,7 +112,7 @@ public class VerificationPerformanceTests
         var sw = Stopwatch.StartNew();
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
         sw.Stop();
@@ -132,7 +132,7 @@ public class VerificationPerformanceTests
         var sw = Stopwatch.StartNew();
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
         sw.Stop();
@@ -155,7 +155,7 @@ public class VerificationPerformanceTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
         if (diagnostics.HasErrors) return;
@@ -178,7 +178,7 @@ public class VerificationPerformanceTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
         if (diagnostics.HasErrors) return;
@@ -490,16 +490,14 @@ public class VerificationPerformanceTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SmallFunc:pub}
-  §I{i32:x}
-  §O{i32}
-  §IF (> x INT:0)
-    §R x
-  §EL
-    §R (- INT:0 x)
-  §/IF
-§/F{f001}
-§/M{m001}";
+  §F{f001:SmallFunc:pub}
+      §I{i32:x}
+      §O{i32}
+      §IF (> x INT:0)
+        §R x
+      §EL
+        §R (- INT:0 x)
+      §/IF";
 
         var module = ParseAndBind(source, out var diagnostics);
         if (module == null) return;

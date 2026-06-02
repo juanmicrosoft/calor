@@ -1,3 +1,4 @@
+// migrate_inline_calor: skip - fixture intentionally embeds closer-form Calor literals or uses position/template patterns incompatible with auto-migration.
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Xunit;

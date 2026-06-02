@@ -16,7 +16,7 @@ public class QuantifierTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
@@ -35,13 +35,11 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:x}
-  §O{bool}
-  §Q (forall ((i i32)) (>= i INT:0))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:x}
+      §O{bool}
+      §Q (forall ((i i32)) (>= i INT:0))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -66,13 +64,11 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:x}
-  §O{bool}
-  §Q (exists ((i i32)) (== i x))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:x}
+      §O{bool}
+      §Q (exists ((i i32)) (== i x))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -93,13 +89,11 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32) (j i32)) (== i j))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((i i32) (j i32)) (== i j))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -121,13 +115,11 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:x}
-  §O{bool}
-  §Q (-> (>= x INT:0) (>= x INT:0))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:x}
+      §O{bool}
+      §Q (-> (>= x INT:0) (>= x INT:0))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -148,13 +140,11 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((x i32)) (exists ((y i32)) (== x y)))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((x i32)) (exists ((y i32)) (== x y)))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -178,13 +168,11 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ArrayAllNonNeg:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:ArrayAllNonNeg:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -683,13 +671,11 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:CheckAllPositive:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:CheckAllPositive:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -713,13 +699,11 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:CheckImplication:pub}
-  §I{i32:x}
-  §O{bool}
-  §Q (-> (> x INT:0) (>= x INT:0))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:CheckImplication:pub}
+      §I{i32:x}
+      §O{bool}
+      §Q (-> (> x INT:0) (>= x INT:0))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -743,14 +727,12 @@ public class QuantifierTests
         // in quantifier bodies regardless of the declared parameter type
         var source = @"
 §M{m001:Test}
-§F{f001:AllNonNegative:pub}
-  §I{i32:arr}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= arr{i} INT:0)))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:AllNonNegative:pub}
+      §I{i32:arr}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= arr{i} INT:0)))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -776,15 +758,13 @@ public class QuantifierTests
         // in quantifier bodies regardless of the declared parameter type
         var source = @"
 §M{m001:Test}
-§F{f001:ContainsTarget:pub}
-  §I{i32:arr}
-  §I{i32:n}
-  §I{i32:target}
-  §O{bool}
-  §Q (exists ((i i32)) (&& (>= i INT:0) (< i n) (== arr{i} target)))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:ContainsTarget:pub}
+      §I{i32:arr}
+      §I{i32:n}
+      §I{i32:target}
+      §O{bool}
+      §Q (exists ((i i32)) (&& (>= i INT:0) (< i n) (== arr{i} target)))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -885,13 +865,11 @@ public class QuantifierTests
         // Parse source with quantifiers
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
+      §R true
 ";
 
         var module1 = Parse(source, out var diag1);
@@ -918,13 +896,11 @@ public class QuantifierTests
         // Test that integer types are accepted without warnings
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= i INT:0)))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -941,13 +917,11 @@ public class QuantifierTests
         // Test that float types generate a warning
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((x f32)) (>= x INT:0))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((x f32)) (>= x INT:0))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1023,13 +997,11 @@ public class QuantifierTests
         // Test: quantifier in postcondition referencing 'result'
         var source = @"
 §M{m001:Test}
-§F{f001:SumPositive:pub}
-  §I{i32:n}
-  §O{i32}
-  §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i result)) (>= i INT:0)))
-  §R n
-§/F{f001}
-§/M{m001}
+  §F{f001:SumPositive:pub}
+      §I{i32:n}
+      §O{i32}
+      §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i result)) (>= i INT:0)))
+      §R n
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1111,15 +1083,13 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Sorting}
-§F{f001:IsSorted:pub}
-  §I{i32:arr}
-  §I{i32:n}
-  §O{bool}
-  §Q (> n INT:0)
-  §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:IsSorted:pub}
+      §I{i32:arr}
+      §I{i32:n}
+      §O{bool}
+      §Q (> n INT:0)
+      §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1142,17 +1112,15 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Search}
-§F{f001:BinarySearch:pub}
-  §I{i32:arr}
-  §I{i32:n}
-  §I{i32:target}
-  §O{i32}
-  §Q (> n INT:0)
-  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
-  §S (-> (>= result INT:0) (== arr{result} target))
-  §R INT:0
-§/F{f001}
-§/M{m001}
+  §F{f001:BinarySearch:pub}
+      §I{i32:arr}
+      §I{i32:n}
+      §I{i32:target}
+      §O{i32}
+      §Q (> n INT:0)
+      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
+      §S (-> (>= result INT:0) (== arr{result} target))
+      §R INT:0
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1174,18 +1142,16 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:QuickSort}
-§F{f001:Partition:pub}
-  §I{i32:arr}
-  §I{i32:low}
-  §I{i32:high}
-  §I{i32:pivot}
-  §O{i32}
-  §Q (<= low high)
-  §S (forall ((i i32)) (-> (&& (>= i low) (< i result)) (<= arr{i} pivot)))
-  §S (forall ((j i32)) (-> (&& (> j result) (<= j high)) (> arr{j} pivot)))
-  §R low
-§/F{f001}
-§/M{m001}
+  §F{f001:Partition:pub}
+      §I{i32:arr}
+      §I{i32:low}
+      §I{i32:high}
+      §I{i32:pivot}
+      §O{i32}
+      §Q (<= low high)
+      §S (forall ((i i32)) (-> (&& (>= i low) (< i result)) (<= arr{i} pivot)))
+      §S (forall ((j i32)) (-> (&& (> j result) (<= j high)) (> arr{j} pivot)))
+      §R low
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1211,15 +1177,13 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Validation}
-§F{f001:ValidateGrades:pub}
-  §I{i32:grades}
-  §I{i32:n}
-  §O{bool}
-  §Q (> n INT:0)
-  §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (&& (>= grades{i} INT:0) (<= grades{i} INT:100))))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:ValidateGrades:pub}
+      §I{i32:grades}
+      §I{i32:n}
+      §O{bool}
+      §Q (> n INT:0)
+      §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (&& (>= grades{i} INT:0) (<= grades{i} INT:100))))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1243,16 +1207,14 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Collections}
-§F{f001:Contains:pub}
-  §I{i32:arr}
-  §I{i32:n}
-  §I{i32:target}
-  §O{bool}
-  §Q (>= n INT:0)
-  §S (-> (== result true) (exists ((i i32)) (&& (>= i INT:0) (< i n) (== arr{i} target))))
-  §R false
-§/F{f001}
-§/M{m001}
+  §F{f001:Contains:pub}
+      §I{i32:arr}
+      §I{i32:n}
+      §I{i32:target}
+      §O{bool}
+      §Q (>= n INT:0)
+      §S (-> (== result true) (exists ((i i32)) (&& (>= i INT:0) (< i n) (== arr{i} target))))
+      §R false
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1275,20 +1237,18 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Matrix}
-§F{f001:MultiplyDimCheck:pub}
-  §I{i32:rowsA}
-  §I{i32:colsA}
-  §I{i32:rowsB}
-  §I{i32:colsB}
-  §O{bool}
-  §Q (> rowsA INT:0)
-  §Q (> colsA INT:0)
-  §Q (> rowsB INT:0)
-  §Q (> colsB INT:0)
-  §Q (== colsA rowsB)
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:MultiplyDimCheck:pub}
+      §I{i32:rowsA}
+      §I{i32:colsA}
+      §I{i32:rowsB}
+      §I{i32:colsB}
+      §O{bool}
+      §Q (> rowsA INT:0)
+      §Q (> colsA INT:0)
+      §Q (> rowsB INT:0)
+      §Q (> colsB INT:0)
+      §Q (== colsA rowsB)
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1308,15 +1268,13 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Sets}
-§F{f001:HasUniqueElements:pub}
-  §I{i32:arr}
-  §I{i32:n}
-  §O{bool}
-  §Q (>= n INT:0)
-  §S (-> (== result true) (forall ((i i32) (j i32)) (-> (&& (>= i INT:0) (< i n) (>= j INT:0) (< j n) (!= i j)) (!= arr{i} arr{j}))))
-  §R false
-§/F{f001}
-§/M{m001}
+  §F{f001:HasUniqueElements:pub}
+      §I{i32:arr}
+      §I{i32:n}
+      §O{bool}
+      §Q (>= n INT:0)
+      §S (-> (== result true) (forall ((i i32) (j i32)) (-> (&& (>= i INT:0) (< i n) (>= j INT:0) (< j n) (!= i j)) (!= arr{i} arr{j}))))
+      §R false
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1346,15 +1304,13 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Heap}
-§F{f001:IsMaxHeap:pub}
-  §I{i32:heap}
-  §I{i32:n}
-  §O{bool}
-  §Q (> n INT:0)
-  §S (-> (== result true) (forall ((i i32)) (-> (&& (>= i INT:0) (< (* INT:2 (+ i INT:1)) n)) (>= heap{i} heap{(* INT:2 (+ i INT:1))}))))
-  §R false
-§/F{f001}
-§/M{m001}
+  §F{f001:IsMaxHeap:pub}
+      §I{i32:heap}
+      §I{i32:n}
+      §O{bool}
+      §Q (> n INT:0)
+      §S (-> (== result true) (forall ((i i32)) (-> (&& (>= i INT:0) (< (* INT:2 (+ i INT:1)) n)) (>= heap{i} heap{(* INT:2 (+ i INT:1))}))))
+      §R false
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -1373,15 +1329,13 @@ public class QuantifierTests
     {
         var source = @"
 §M{m001:Sorting}
-§F{f001:Sort:pub}
-  §I{i32:arr}
-  §I{i32:n}
-  §O{bool}
-  §Q (> n INT:0)
-  §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:Sort:pub}
+      §I{i32:arr}
+      §I{i32:n}
+      §O{bool}
+      §Q (> n INT:0)
+      §S (forall ((i i32)) (-> (&& (>= i INT:0) (< i (- n INT:1))) (<= arr{i} arr{(+ i INT:1)})))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);

@@ -618,14 +618,12 @@ public class VerificationCacheTests : IDisposable
 
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x INT:0)
-  §S (>= result INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x INT:0)
+      §S (>= result INT:0)
+      §R (* x x)
 ";
 
         var cacheOptions = new VerificationCacheOptions
@@ -658,14 +656,12 @@ public class VerificationCacheTests : IDisposable
 
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x INT:0)
-  §S (>= result INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x INT:0)
+      §S (>= result INT:0)
+      §R (* x x)
 ";
 
         var cacheOptions = new VerificationCacheOptions
@@ -714,13 +710,11 @@ public class VerificationCacheTests : IDisposable
 
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x INT:0)
+      §R (* x x)
 ";
 
         var cacheOptions = new VerificationCacheOptions
@@ -753,13 +747,11 @@ public class VerificationCacheTests : IDisposable
 
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x INT:0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x INT:0)
+      §R (* x x)
 ";
 
         // First, populate cache
@@ -811,20 +803,17 @@ public class VerificationCacheTests : IDisposable
 
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x INT:0)
-  §S (>= result INT:0)
-  §R (* x x)
-§/F{f001}
-§F{f002:BadDecrement:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (>= result INT:0)
-  §R (- x INT:1)
-§/F{f002}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x INT:0)
+      §S (>= result INT:0)
+      §R (* x x)
+  §F{f002:BadDecrement:pub}
+      §I{i32:x}
+      §O{i32}
+      §S (>= result INT:0)
+      §R (- x INT:1)
 ";
 
         // Run with cache disabled to get fresh results

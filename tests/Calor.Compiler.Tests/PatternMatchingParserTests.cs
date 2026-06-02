@@ -39,16 +39,13 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K 1 → ""one""
-    §K 2 → ""two""
-    §K _ → ""other""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K 1 → ""one""
+          §K 2 → ""two""
+          §K _ → ""other""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -67,19 +64,16 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K 1
-      §R ""one""
-    §/K
-    §K _
-      §R ""other""
-    §/K
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K 1
+            §R ""one""
+          §/K
+          §K _
+            §R ""other""
+          §/K";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -95,19 +89,16 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K 1 → ""one""
-    §K 2
-      §P ""two""
-      §R ""two""
-    §/K
-    §K _ → ""other""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K 1 → ""one""
+          §K 2
+            §P ""two""
+            §R ""two""
+          §/K
+          §K _ → ""other""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -134,14 +125,11 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K §VAR{n} → ""captured""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K §VAR{n} → ""captured""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -158,15 +146,12 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K §VAR{n} §WHEN (> n 0) → ""positive""
-    §K _ → ""non-positive""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K §VAR{n} §WHEN (> n 0) → ""positive""
+          §K _ → ""non-positive""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -188,16 +173,13 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Grade:pub}
-  §I{i32:score}
-  §O{str}
-  §R §W{sw1} score
-    §K §PREL{gte} 90 → ""A""
-    §K §PREL{gte} 80 → ""B""
-    §K _ → ""F""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Grade:pub}
+      §I{i32:score}
+      §O{str}
+      §R §W{sw1} score
+          §K §PREL{gte} 90 → ""A""
+          §K §PREL{gte} 80 → ""B""
+          §K _ → ""F""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -214,18 +196,15 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K §PREL{gte} 100 → ""gte100""
-    §K §PREL{gt} 50 → ""gt50""
-    §K §PREL{lte} 10 → ""lte10""
-    §K §PREL{lt} 0 → ""lt0""
-    §K _ → ""other""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K §PREL{gte} 100 → ""gte100""
+          §K §PREL{gt} 50 → ""gt50""
+          §K §PREL{lte} 10 → ""lte10""
+          §K §PREL{lt} 0 → ""lt0""
+          §K _ → ""other""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -247,15 +226,12 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{?i32:opt}
-  §O{i32}
-  §R §W{sw1} opt
-    §K §SM §VAR{v} → v
-    §K §NN → 0
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{?i32:opt}
+      §O{i32}
+      §R §W{sw1} opt
+          §K §SM §VAR{v} → v
+          §K §NN → 0";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -273,15 +249,12 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:res}
-  §O{str}
-  §R §W{sw1} res
-    §K §OK §VAR{v} → ""ok""
-    §K §ERR §VAR{e} → ""err""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:res}
+      §O{str}
+      §R §W{sw1} res
+          §K §OK §VAR{v} → ""ok""
+          §K §ERR §VAR{e} → ""err""";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -303,16 +276,13 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GetDay:pub}
-  §I{i32:day}
-  §O{str}
-  §R §W{sw1} day
-    §K 1 → ""Monday""
-    §K 2 → ""Tuesday""
-    §K _ → ""Unknown""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:GetDay:pub}
+      §I{i32:day}
+      §O{str}
+      §R §W{sw1} day
+          §K 1 → ""Monday""
+          §K 2 → ""Tuesday""
+          §K _ → ""Unknown""";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -327,16 +297,13 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Grade:pub}
-  §I{i32:score}
-  §O{str}
-  §R §W{sw1} score
-    §K §PREL{gte} 90 → ""A""
-    §K §PREL{lt} 60 → ""F""
-    §K _ → ""C""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Grade:pub}
+      §I{i32:score}
+      §O{str}
+      §R §W{sw1} score
+          §K §PREL{gte} 90 → ""A""
+          §K §PREL{lt} 60 → ""F""
+          §K _ → ""C""";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -349,16 +316,13 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Sign:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K §VAR{n} §WHEN (> n 0) → ""positive""
-    §K §VAR{n} §WHEN (< n 0) → ""negative""
-    §K _ → ""zero""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Sign:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K §VAR{n} §WHEN (> n 0) → ""positive""
+          §K §VAR{n} §WHEN (< n 0) → ""negative""
+          §K _ → ""zero""";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
@@ -374,15 +338,12 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K 1 → ""one""
-    §K _ → ""other""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K 1 → ""one""
+          §K _ → ""other""";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors);
@@ -400,15 +361,12 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{bool:flag}
-  §O{str}
-  §R §W{sw1} flag
-    §K true → ""yes""
-    §K false → ""no""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{bool:flag}
+      §O{str}
+      §R §W{sw1} flag
+          §K true → ""yes""
+          §K false → ""no""";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Errors.Select(d => d.Message)));
@@ -429,15 +387,12 @@ public class PatternMatchingParserTests
         // Use block syntax to create MatchStatementNode (not wrapped in return)
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{?i32:opt}
-  §O{i32}
-    §W{m1} opt
-      §K §NN
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{?i32:opt}
+      §O{i32}
+        §W{m1} opt
+            §K §NN
+              §R 0";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Errors.Select(d => d.Message)));
@@ -458,17 +413,14 @@ public class PatternMatchingParserTests
         // Use block syntax to create MatchStatementNode (not wrapped in return)
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K _
-        §R 0
-      §K 1
-        §R 1
-    §/W{m1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K _
+              §R 0
+            §K 1
+              §R 1";
 
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Errors.Select(d => d.Message)));
@@ -490,15 +442,12 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K 1 → ""one""
-    §K _ → ""other""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K 1 → ""one""
+          §K _ → ""other""";
 
         // Calor → C#
         var csharp = Compile(source, out var diagnostics);
@@ -537,13 +486,10 @@ public class PatternMatchingParserTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x";
 
         var module = Parse(source, out var diagnostics);
         // Parse should succeed but match should have no cases

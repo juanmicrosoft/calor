@@ -2442,13 +2442,10 @@ public class CSharpToCalorConversionTests
     {
         var calorSource = """
             §M{m1:TestModule}
-              §CL{c001:Base:pub}
-                §MT{m001:GetName:pub:vr}
-                  §O{str}
-                  §R "base"
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m1}
+                §CL{c001:Base:pub}
+                    §MT{m001:GetName:pub:vr}
+                        §O{str}
+                        §R "base"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2468,14 +2465,11 @@ public class CSharpToCalorConversionTests
     {
         var calorSource = """
             §M{m1:TestModule}
-              §CL{c001:Derived:pub}
-                §EXT{Base}
-                §MT{m001:GetName:pub:ov}
-                  §O{str}
-                  §R "derived"
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m1}
+                §CL{c001:Derived:pub}
+                    §EXT{Base}
+                    §MT{m001:GetName:pub:ov}
+                        §O{str}
+                        §R "derived"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2495,15 +2489,12 @@ public class CSharpToCalorConversionTests
     {
         var calorSource = """
             §M{m1:TestModule}
-              §CL{c001:Utils:pub:st}
-                §MT{m001:Add:pub:st}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m1}
+                §CL{c001:Utils:pub:st}
+                    §MT{m001:Add:pub:st}
+                        §I{i32:a}
+                        §I{i32:b}
+                        §O{i32}
+                        §R (+ a b)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2549,12 +2540,9 @@ public class CSharpToCalorConversionTests
     {
         var calorSource = """
             §M{m1:TestModule}
-              §F{main:Main:pub}
-                §O{void}
-              §/F{main}
-              §CL{c001:Foo:pub:st}
-              §/CL{c001}
-            §/M{m1}
+                §F{main:Main:pub}
+                    §O{void}
+                §CL{c001:Foo:pub:st}
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -3679,7 +3667,7 @@ public class CSharpToCalorConversionTests
         var diagnostics = new DiagnosticBag();
         var source = "§EN{e1:Test}\nVal = 0xFFFFFFFF\n§/EN{e1}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var intToken = tokens.First(t => t.Kind == TokenKind.IntLiteral);

@@ -173,15 +173,13 @@ public class ContractEnforcementTests
         // B1 scenario: Function with contracts but no effects is valid
         var source = @"
 §M{m001:Test}
-§F{f001:SafeAdd:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (>= a INT:0)
-  §S (>= result a)
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:SafeAdd:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (>= a INT:0)
+      §S (>= result a)
+      §R (+ a b)
 ";
         var result = TestHarness.Compile(source);
 

@@ -18,7 +18,7 @@ public sealed class IndexedTypeTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
@@ -92,8 +92,7 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:List:n}
-            §/M{m001}
+              §ITYPE{it1:SizedList:List:n}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -115,8 +114,7 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it2:NonEmptyArr:IntArr:n} (> # INT:0)
-            §/M{m001}
+              §ITYPE{it2:NonEmptyArr:IntArr:n} (> # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -139,9 +137,8 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:List:n}
-            §ITYPE{it2:NonEmptyArr:IntArr:m} (> # INT:0)
-            §/M{m001}
+              §ITYPE{it1:SizedList:List:n}
+              §ITYPE{it2:NonEmptyArr:IntArr:m} (> # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -158,8 +155,7 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:BoundedArr:IntArr:n} (&& (> # INT:0) (< # INT:1000))
-            §/M{m001}
+              §ITYPE{it1:BoundedArr:IntArr:n} (&& (> # INT:0) (< # INT:1000))
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -180,11 +176,9 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:List:n}
-            §F{f001:Main:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:List:n}
+              §F{f001:Main:pub}
+                  §O{void}
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -201,11 +195,9 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:NonEmptyArr:IntArr:n} (> # INT:0)
-            §F{f001:Main:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:NonEmptyArr:IntArr:n} (> # INT:0)
+              §F{f001:Main:pub}
+                  §O{void}
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -222,8 +214,7 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:List:n}
-            §/M{m001}
+              §ITYPE{it1:SizedList:List:n}
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -236,8 +227,7 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it2:NonEmptyArr:IntArr:n} (> # INT:0)
-            §/M{m001}
+              §ITYPE{it2:NonEmptyArr:IntArr:n} (> # INT:0)
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -253,8 +243,7 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:List:n}
-            §/M{m001}
+              §ITYPE{it1:SizedList:List:n}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -287,14 +276,12 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:Sum:priv}
-              §I{SizedList:items}
-              §I{i32:i}
-              §O{i32}
-              §R §IDX items i
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:Sum:priv}
+                  §I{SizedList:items}
+                  §I{i32:i}
+                  §O{i32}
+                  §R §IDX items i
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -316,13 +303,11 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Sum:priv}
-              §I{[i32]:items}
-              §I{i32:i}
-              §O{i32}
-              §R §IDX items i
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sum:priv}
+                  §I{[i32]:items}
+                  §I{i32:i}
+                  §O{i32}
+                  §R §IDX items i
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -341,14 +326,12 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:Sum:pub}
-              §I{SizedList:items}
-              §I{i32:i}
-              §O{i32}
-              §R §IDX items i
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:Sum:pub}
+                  §I{SizedList:items}
+                  §I{i32:i}
+                  §O{i32}
+                  §R §IDX items i
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -375,15 +358,13 @@ public sealed class IndexedTypeTests
         // The IndexBounds obligation checks (>= i 0) && (< i n), which matches.
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:Sum:priv}
-              §I{SizedList:items}
-              §I{i32:n}
-              §I{i32:i} | (&& (>= # INT:0) (< # n))
-              §O{i32}
-              §R §IDX items i
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:Sum:priv}
+                  §I{SizedList:items}
+                  §I{i32:n}
+                  §I{i32:i} | (&& (>= # INT:0) (< # n))
+                  §O{i32}
+                  §R §IDX items i
             """;
 
         var options = new CompilationOptions
@@ -410,15 +391,13 @@ public sealed class IndexedTypeTests
         // No precondition on i, so the access can't be proven safe
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:BadAccess:priv}
-              §I{SizedList:items}
-              §I{i32:n}
-              §I{i32:i}
-              §O{i32}
-              §R §IDX items i
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:BadAccess:priv}
+                  §I{SizedList:items}
+                  §I{i32:n}
+                  §I{i32:i}
+                  §O{i32}
+                  §R §IDX items i
             """;
 
         var options = new CompilationOptions
@@ -446,15 +425,12 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:Sum:priv}
-              §I{SizedList:items}
-              §O{i32}
-              §L{l1:i:INT:0:n:INT:1}
-                §R §IDX items i
-              §/L{l1}
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:Sum:priv}
+                  §I{SizedList:items}
+                  §O{i32}
+                  §L{l1:i:INT:0:n:INT:1}
+                      §R §IDX items i
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -477,14 +453,12 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:Sum:priv}
-              §I{SizedList:items}
-              §I{i32:i}
-              §O{i32}
-              §R §IDX items i
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:Sum:priv}
+                  §I{SizedList:items}
+                  §I{i32:i}
+                  §O{i32}
+                  §R §IDX items i
             """;
 
         var tool = new Calor.Compiler.Mcp.Tools.RefineTool();
@@ -503,12 +477,10 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §ITYPE{it1:SizedList:List:n}
-            §F{f001:Main:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §ITYPE{it1:SizedList:List:n}
+              §F{f001:Main:pub}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -526,8 +498,7 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedArr:i32[]:n}
-            §/M{m001}
+              §ITYPE{it1:SizedArr:i32[]:n}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -546,8 +517,7 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:NonEmptyArr:i32[]:n} (> # INT:0)
-            §/M{m001}
+              §ITYPE{it1:NonEmptyArr:i32[]:n} (> # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -567,12 +537,10 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:List:n}
-            §F{f001:Sum:pub}
-              §I{SizedList:items}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:List:n}
+              §F{f001:Sum:pub}
+                  §I{SizedList:items}
+                  §O{void}
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -587,12 +555,10 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:List:n}
-            §F{f001:Sum:pub}
-              §I{SizedList<i32>:items}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:List:n}
+              §F{f001:Sum:pub}
+                  §I{SizedList<i32>:items}
+                  §O{void}
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -609,15 +575,13 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:Sum:priv}
-              §I{SizedList:items}
-              §I{i32:i}
-              §O{i32}
-              §Q (< i n)
-              §R §IDX items i
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:Sum:priv}
+                  §I{SizedList:items}
+                  §I{i32:i}
+                  §O{i32}
+                  §Q (< i n)
+                  §R §IDX items i
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -639,16 +603,14 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:Sum:priv}
-              §I{SizedList:items}
-              §I{i32:i}
-              §O{void}
-              §C{Console.WriteLine}
-                §A §IDX items i
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:Sum:priv}
+                  §I{SizedList:items}
+                  §I{i32:i}
+                  §O{void}
+                  §C{Console.WriteLine}
+                    §A §IDX items i
+                  §/C
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -667,16 +629,13 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:Loop:priv}
-              §I{SizedList:items}
-              §I{i32:i}
-              §O{void}
-              §WH{w1} (< i n)
-                §B{x:i32} §IDX items i
-              §/WH{w1}
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:Loop:priv}
+                  §I{SizedList:items}
+                  §I{i32:i}
+                  §O{void}
+                  §WH{w1} (< i n)
+                      §B{x:i32} §IDX items i
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -697,17 +656,14 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §ITYPE{it1:SizedList:IntArr:n}
-            §F{f001:SafeGet:priv}
-              §I{SizedList:items}
-              §I{i32:i}
-              §O{i32}
-              §IF{if1} (< i n)
-                §R §IDX items i
-              §/I{if1}
-              §R INT:0
-            §/F{f001}
-            §/M{m001}
+              §ITYPE{it1:SizedList:IntArr:n}
+              §F{f001:SafeGet:priv}
+                  §I{SizedList:items}
+                  §I{i32:i}
+                  §O{i32}
+                  §IF{if1} (< i n)
+                      §R §IDX items i
+                  §R INT:0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -730,10 +686,8 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
             """;
 
         var tool = new Calor.Compiler.Mcp.Tools.RefineTool();
@@ -754,10 +708,8 @@ public sealed class IndexedTypeTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
             """;
 
         var tool = new Calor.Compiler.Mcp.Tools.RefineTool();

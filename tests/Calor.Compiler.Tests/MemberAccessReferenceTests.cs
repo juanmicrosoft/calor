@@ -240,15 +240,13 @@ public class MemberAccessReferenceTests
         // Parse Calor DSL with an attribute containing a qualified identifier
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyAttribute:pub}[@AttributeUsage(AttributeTargets.Method)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyAttribute:pub}[@AttributeUsage(AttributeTargets.Method)]
             """;
 
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
         diagnostics.SetFilePath("test.calr");
         var lexer = new Calor.Compiler.Parsing.Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Calor.Compiler.Parsing.Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -269,15 +267,13 @@ public class MemberAccessReferenceTests
         // A bare (non-dotted) identifier in an attribute should also be emitted unquoted
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:TestClass:pub}[@DefaultValue(SomeConstant)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:TestClass:pub}[@DefaultValue(SomeConstant)]
             """;
 
         var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
         diagnostics.SetFilePath("test.calr");
         var lexer = new Calor.Compiler.Parsing.Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Calor.Compiler.Parsing.Parser(tokens, diagnostics);
         var module = parser.Parse();
 

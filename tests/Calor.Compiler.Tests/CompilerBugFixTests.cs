@@ -24,7 +24,7 @@ public class CompilerBugFixTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
@@ -71,13 +71,10 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:TestMod}
-            §F{f001:Helper:pub}
-              §O{void}
-            §/F{f001}
-            §F{f002:Main:pub}
-              §O{void}
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Helper:pub}
+                  §O{void}
+              §F{f002:Main:pub}
+                  §O{void}
             """;
 
         var result = Program.Compile(source);
@@ -96,12 +93,10 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Greet:pub}
-              §I{string:name}
-              §O{string}
-              §R name
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Greet:pub}
+                  §I{string:name}
+                  §O{string}
+                  §R name
             """;
 
         var module = Parse(source, out var diag);
@@ -121,12 +116,10 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Check:pub}
-              §I{bool:flag}
-              §O{bool}
-              §R flag
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Check:pub}
+                  §I{bool:flag}
+                  §O{bool}
+                  §R flag
             """;
 
         var module = Parse(source, out var diag);
@@ -144,14 +137,12 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{void}
-              §B{msg:string} STR:"hello"
-              §C{Console.WriteLine}
-                §A msg
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{msg:string} STR:"hello"
+                  §C{Console.WriteLine}
+                    §A msg
+                  §/C
             """;
 
         var module = Parse(source, out var diag);
@@ -179,16 +170,14 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Classify:pub}
-              §I{i32:x}
-              §O{i32}
-              §X{ma001:x}
-                §WC _
-                  §R INT:1
-              §/X{ma001}
-              §R INT:0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Classify:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §X{ma001:x}
+                    §WC _
+                      §R INT:1
+                  §/X{ma001}
+                  §R INT:0
             """;
 
         var module = Parse(source, out var diag);
@@ -226,13 +215,11 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
             """;
 
         var module = Parse(source, out var diag);
@@ -247,13 +234,11 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Add:pub}
-              §I{f64:a}
-              §I{f64:b}
-              §O{f64}
-              §R (+ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{f64:a}
+                  §I{f64:b}
+                  §O{f64}
+                  §R (+ a b)
             """;
 
         var module = Parse(source, out var diag);
@@ -272,14 +257,12 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A STR:"hello"
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §C{Console.WriteLine}
+                    §A STR:"hello"
+                  §/C
             """;
 
         var module = Parse(source, out var diag);
@@ -546,10 +529,8 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Simple:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Simple:pub}
+                  §O{void}
             """;
 
         var result = Program.Compile(source);
@@ -565,20 +546,17 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Calculator}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
-            §/F{f001}
-            §F{f002:Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A INT:42
-              §/C
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
+              §F{f002:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §C{Console.WriteLine}
+                    §A INT:42
+                  §/C
             """;
 
         var result = Program.Compile(source);
@@ -593,14 +571,12 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Safe}
-            §F{f001:Divide:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §Q (!= b INT:0)
-              §R (/ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Divide:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §Q (!= b INT:0)
+                  §R (/ a b)
             """;
 
         var result = Program.Compile(source);
@@ -612,11 +588,9 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §ARR{a001:nums:i32} INT:1 INT:2 INT:3
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §ARR{a001:nums:i32} INT:1 INT:2 INT:3
             """;
 
         var result = Program.Compile(source);

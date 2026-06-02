@@ -42,10 +42,8 @@ public static class LspTestHarness
     {
         return $$"""
             §M{m001:TestModule}
-            §F{f001:TestFunc}
-            {{bodySource}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:TestFunc}
+                {{bodySource}}
             """;
     }
 
@@ -56,8 +54,7 @@ public static class LspTestHarness
     {
         return $$"""
             §M{m001:TestModule}
-            {{moduleContent}}
-            §/M{m001}
+              {{moduleContent}}
             """;
     }
 

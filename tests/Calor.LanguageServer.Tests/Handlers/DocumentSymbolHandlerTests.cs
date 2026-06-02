@@ -10,13 +10,10 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Add}
-            §R 0
-            §/F{f001}
-            §F{f002:Subtract}
-            §R 0
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Add}
+                §R 0
+              §F{f002:Subtract}
+                §R 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -32,13 +29,10 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §/CL{c001}
-            §CL{c002:Employee}
-            §FLD{i32:id}
-            §/CL{c002}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+              §CL{c002:Employee}
+                §FLD{i32:id}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -54,20 +48,16 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Calculator}
-            §FLD{i32:value}
-            §MT{m001:Add}
-            §I{i32:x}
-            §O{i32}
-            §R x
-            §/MT{m001}
-            §MT{m002:Subtract}
-            §I{i32:x}
-            §O{i32}
-            §R x
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Calculator}
+                §FLD{i32:value}
+                §MT{m001:Add}
+                  §I{i32:x}
+                  §O{i32}
+                  §R x
+                §MT{m002:Subtract}
+                  §I{i32:x}
+                  §O{i32}
+                  §R x
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -87,18 +77,13 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §IFACE{i001:IReadable}
-            §MT{m001:Read}
-            §O{str}
-            §/MT{m001}
-            §/IFACE{i001}
-            §IFACE{i002:IWritable}
-            §MT{m001:Write}
-            §I{str:data}
-            §O{void}
-            §/MT{m001}
-            §/IFACE{i002}
-            §/M{m001}
+              §IFACE{i001:IReadable}
+                §MT{m001:Read}
+                  §O{str}
+              §IFACE{i002:IWritable}
+                §MT{m001:Write}
+                  §I{str:data}
+                  §O{void}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -114,17 +99,16 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:Color}
-            §EM{Red}
-            §EM{Green}
-            §EM{Blue}
-            §/EN{e001}
-            §EN{e002:Size}
-            §EM{Small}
-            §EM{Medium}
-            §EM{Large}
-            §/EN{e002}
-            §/M{m001}
+              §EN{e001:Color}
+              §EM{Red}
+              §EM{Green}
+              §EM{Blue}
+              §/EN{e001}
+              §EN{e002:Size}
+              §EM{Small}
+              §EM{Medium}
+              §EM{Large}
+              §/EN{e002}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -140,12 +124,11 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:Status}
-            §EM{Pending}
-            §EM{Active}
-            §EM{Complete}
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Status}
+              §EM{Pending}
+              §EM{Active}
+              §EM{Complete}
+              §/EN{e001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -165,14 +148,13 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §DEL{d001:Action}
-            §O{void}
-            §/DEL{d001}
-            §DEL{d002:Func}
-            §I{i32:x}
-            §O{i32}
-            §/DEL{d002}
-            §/M{m001}
+              §DEL{d001:Action}
+              §O{void}
+              §/DEL{d001}
+              §DEL{d002:Func}
+              §I{i32:x}
+              §O{i32}
+              §/DEL{d002}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -188,20 +170,17 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Helper}
-            §R 0
-            §/F{f001}
-            §CL{c001:MyClass}
-            §/CL{c001}
-            §IFACE{i001:IMyInterface}
-            §/IFACE{i001}
-            §EN{e001:MyEnum}
-            §EM{Value}
-            §/EN{e001}
-            §DEL{d001:MyDelegate}
-            §O{void}
-            §/DEL{d001}
-            §/M{m001}
+              §F{f001:Helper}
+                §R 0
+              §CL{c001:MyClass}
+                §FLD{i32:dummy:pri}
+              §IFACE{i001:IMyInterface}
+                §MT{m001:Foo:pub}
+                  §O{void}
+              §EN{e001:MyEnum}
+                §EM{Value}
+              §DEL{d001:MyDelegate}
+                §O{void}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -219,14 +198,12 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Calculate}
-            §I{i32:a}
-            §I{i32:b}
-            §I{str:label}
-            §O{i32}
-            §R a + b
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Calculate}
+                §I{i32:a}
+                §I{i32:b}
+                §I{str:label}
+                §O{i32}
+                §R a + b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -242,21 +219,19 @@ public class DocumentSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §PROP{p001:Name:str:pub}
-            §GET
-            §R ""
-            §/GET
-            §/PROP{p001}
-            §PROP{p002:Age:i32:pub}
-            §GET
-            §R 0
-            §/GET
-            §SET
-            §/SET
-            §/PROP{p002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §PROP{p001:Name:str:pub}
+                §GET
+                §R ""
+                §/GET
+                §/PROP{p001}
+                §PROP{p002:Age:i32:pub}
+                §GET
+                §R 0
+                §/GET
+                §SET
+                §/SET
+                §/PROP{p002}
             """;
 
         var ast = LspTestHarness.GetAst(source);

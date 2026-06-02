@@ -15,7 +15,7 @@ public class YieldReturnTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
@@ -62,11 +62,9 @@ public class YieldReturnTests
     {
         var source = """
             §M{m1:TestModule}
-              §F{f1:GetNumbers:pub}
-                §O{i32}
-                §YIELD 42
-              §/F{f1}
-            §/M{m1}
+                §F{f1:GetNumbers:pub}
+                    §O{i32}
+                    §YIELD 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -84,11 +82,9 @@ public class YieldReturnTests
     {
         var source = """
             §M{m1:TestModule}
-              §F{f1:GetNumbers:pub}
-                §O{i32}
-                §YBRK
-              §/F{f1}
-            §/M{m1}
+                §F{f1:GetNumbers:pub}
+                    §O{i32}
+                    §YBRK
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -103,12 +99,10 @@ public class YieldReturnTests
     {
         var source = """
             §M{m1:TestModule}
-              §F{f1:GetItems:pub}
-                §I{i32:x}
-                §O{i32}
-                §YIELD x
-              §/F{f1}
-            §/M{m1}
+                §F{f1:GetItems:pub}
+                    §I{i32:x}
+                    §O{i32}
+                    §YIELD x
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -167,13 +161,11 @@ public class YieldReturnTests
     {
         var source = """
             §M{m1:TestModule}
-              §F{f1:GetNumbers:pub}
-                §O{i32}
-                §YIELD 1
-                §YIELD 2
-                §YIELD 3
-              §/F{f1}
-            §/M{m1}
+                §F{f1:GetNumbers:pub}
+                    §O{i32}
+                    §YIELD 1
+                    §YIELD 2
+                    §YIELD 3
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -464,13 +456,11 @@ public class YieldReturnTests
     {
         var calorSource = """
             §M{m1:TestModule}
-              §F{f1:GetNumbers:pub}
-                §O{i32}
-                §YIELD 1
-                §YIELD 2
-                §YIELD 3
-              §/F{f1}
-            §/M{m1}
+                §F{f1:GetNumbers:pub}
+                    §O{i32}
+                    §YIELD 1
+                    §YIELD 2
+                    §YIELD 3
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -486,12 +476,10 @@ public class YieldReturnTests
     {
         var calorSource = """
             §M{m1:TestModule}
-              §F{f1:GetNumbers:pub}
-                §O{i32}
-                §YIELD 1
-                §YBRK
-              §/F{f1}
-            §/M{m1}
+                §F{f1:GetNumbers:pub}
+                    §O{i32}
+                    §YIELD 1
+                    §YBRK
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -511,15 +499,12 @@ public class YieldReturnTests
     {
         var calorSource = """
             §M{m1:TestModule}
-              §CL{c1:NumberGenerator}
-                §MT{m1:GetNumbers:pub}
-                  §O{i32}
-                  §YIELD 1
-                  §YIELD 2
-                  §YIELD 3
-                §/MT{m1}
-              §/CL{c1}
-            §/M{m1}
+                §CL{c1:NumberGenerator}
+                    §MT{m1:GetNumbers:pub}
+                        §O{i32}
+                        §YIELD 1
+                        §YIELD 2
+                        §YIELD 3
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -535,14 +520,11 @@ public class YieldReturnTests
     {
         var calorSource = """
             §M{m1:TestModule}
-              §CL{c1:Service}
-                §MT{m1:GetItems:pub}
-                  §O{string}
-                  §YIELD "hello"
-                  §YBRK
-                §/MT{m1}
-              §/CL{c1}
-            §/M{m1}
+                §CL{c1:Service}
+                    §MT{m1:GetItems:pub}
+                        §O{string}
+                        §YIELD "hello"
+                        §YBRK
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -759,11 +741,9 @@ public class YieldReturnTests
     {
         var source = """
             §M{m1:TestModule}
-              §F{f1:Process:pub}
-                §I{i32:value:ref}
-                §O{void}
-              §/F{f1}
-            §/M{m1}
+                §F{f1:Process:pub}
+                    §I{i32:value:ref}
+                    §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -779,11 +759,9 @@ public class YieldReturnTests
     {
         var source = """
             §M{m1:TestModule}
-              §F{f1:Process:pub}
-                §I{i32:value:out}
-                §O{void}
-              §/F{f1}
-            §/M{m1}
+                §F{f1:Process:pub}
+                    §I{i32:value:out}
+                    §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -799,11 +777,9 @@ public class YieldReturnTests
     {
         var source = """
             §M{m1:TestModule}
-              §F{f1:Process:pub}
-                §I{string:values:params}
-                §O{void}
-              §/F{f1}
-            §/M{m1}
+                §F{f1:Process:pub}
+                    §I{string:values:params}
+                    §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);

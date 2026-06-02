@@ -13,7 +13,6 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §/M{m001}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -31,10 +30,8 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:TestFunction:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:TestFunction:pub}
+                  §O{void}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -50,9 +47,7 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:TestClass}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:TestClass}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -67,12 +62,9 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:TestClass}
-            §MT{mt001:TestMethod:pub}
-              §O{void}
-            §/MT{mt001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:TestClass}
+                §MT{mt001:TestMethod:pub}
+                    §O{void}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -87,13 +79,11 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:TestClass}
-            §PROP{p001:TestProperty:i32:pub}
-              §GET
-              §SET
-            §/PROP{p001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:TestClass}
+                §PROP{p001:TestProperty:i32:pub}
+                  §GET
+                  §SET
+                §/PROP{p001}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -108,11 +98,9 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:TestClass}
-            §CTOR{ctor001:pub}
-            §/CTOR{ctor001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:TestClass}
+                §CTOR{ctor001:pub}
+                §/CTOR{ctor001}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -127,9 +115,7 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §IFACE{i001:ITestInterface}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:ITestInterface}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -148,7 +134,6 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §/M{m001}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -163,25 +148,20 @@ public class IdScannerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Func1:pub}
-              §O{void}
-            §/F{f001}
-            §CL{c001:Class1}
-            §MT{mt001:Method1:pub}
-              §O{void}
-            §/MT{mt001}
-            §PROP{p001:Prop1:i32:pub}
-              §GET
-            §/PROP{p001}
-            §CTOR{ctor001:pub}
-            §/CTOR{ctor001}
-            §/CL{c001}
-            §IFACE{i001:ITest}
-            §/IFACE{i001}
-            §EN{e001:Status}
-            Active
-            §/EN{e001}
-            §/M{m001}
+              §F{f001:Func1:pub}
+                  §O{void}
+              §CL{c001:Class1}
+                §MT{mt001:Method1:pub}
+                    §O{void}
+                §PROP{p001:Prop1:i32:pub}
+                  §GET
+                §/PROP{p001}
+                §CTOR{ctor001:pub}
+                §/CTOR{ctor001}
+              §IFACE{i001:ITest}
+              §EN{e001:Status}
+              Active
+              §/EN{e001}
             """;
         var module = Parse(source);
         var scanner = new IdScanner();
@@ -207,7 +187,7 @@ public class IdScannerTests
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }

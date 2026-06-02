@@ -261,9 +261,7 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:st}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:Helper:st}";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.True(cls.IsStatic);
@@ -274,11 +272,8 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper}
-§MT{m1:Greet:pub:st}
-§/MT{m1}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:Helper}
+    §MT{m1:Greet:pub:st}";
         var module = ParseModule(source);
         var method = module.Classes[0].Methods[0];
         Assert.True(method.Modifiers.HasFlag(Calor.Compiler.Ast.MethodModifiers.Static));
@@ -289,9 +284,7 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:st}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:Helper:st}";
         var csharp = ParseAndEmit(source);
         Assert.Contains("static class Helper", csharp);
     }
@@ -414,13 +407,10 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Calc}
-§MT{m1:GetPrice:pub}
-  §O{dec}
-  §R 0
-§/MT{m1}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:Calc}
+    §MT{m1:GetPrice:pub}
+        §O{dec}
+        §R 0";
         var csharp = ParseAndEmit(source);
         Assert.Contains("decimal", csharp);
     }
@@ -434,12 +424,9 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyClass}
-§MT{m1:Create:pub}
-  §R §NEW{MyClass}()§/NEW
-§/MT{m1}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:MyClass}
+    §MT{m1:Create:pub}
+        §R §NEW{MyClass}()§/NEW";
         var module = ParseModule(source);
         Assert.NotNull(module);
     }
@@ -449,20 +436,14 @@ public class Test
     {
         var sourceWithParens = @"
 §M{m1:Test}
-§CL{c1:MyClass}
-§MT{m1:Create:pub}
-  §R §NEW{MyClass}()§/NEW
-§/MT{m1}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:MyClass}
+    §MT{m1:Create:pub}
+        §R §NEW{MyClass}()§/NEW";
         var sourceWithout = @"
 §M{m1:Test}
-§CL{c1:MyClass}
-§MT{m1:Create:pub}
-  §R §NEW{MyClass}§/NEW
-§/MT{m1}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:MyClass}
+    §MT{m1:Create:pub}
+        §R §NEW{MyClass}§/NEW";
         var csharp1 = ParseAndEmit(sourceWithParens);
         var csharp2 = ParseAndEmit(sourceWithout);
 
@@ -479,9 +460,7 @@ public class Test
         // "st struct" should parse as static struct, not double-stat
         var source = @"
 §M{m1:Test}
-§CL{c1:Point:st struct}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:Point:st struct}";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.True(cls.IsStatic, "Should be static");
@@ -493,9 +472,7 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Point:struct}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:Point:struct}";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.False(cls.IsStatic, "struct alone should not be static");
@@ -511,12 +488,9 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyClass}
-§MT{m1:GetName:pub}
-  §R §NEW{MyClass}()§/NEW.ToString
-§/MT{m1}
-§/CL{c1}
-§/M{m1}";
+  §CL{c1:MyClass}
+    §MT{m1:GetName:pub}
+        §R §NEW{MyClass}()§/NEW.ToString";
         var csharp = ParseAndEmit(source);
         // Should produce new MyClass().ToString() in the output
         Assert.Contains("new MyClass()", csharp);
@@ -874,16 +848,13 @@ public class Test
         // §K Status.OK in Calor source should parse correctly and emit Status.OK in C#
         var source = @"
 §M{m1:Test}
-§F{f001:Describe:pub}
-  §I{i32:status}
-  §O{str}
-  §R §W{m1} status
-    §K Status.OK → ""ok""
-    §K Status.Error → ""error""
-    §K _ → ""unknown""
-  §/W{m1}
-§/F{f001}
-§/M{m1}
+  §F{f001:Describe:pub}
+      §I{i32:status}
+      §O{str}
+      §R §W{m1} status
+          §K Status.OK → ""ok""
+          §K Status.Error → ""error""
+          §K _ → ""unknown""
 ";
         var result = ParseAndEmit(source);
 
@@ -927,11 +898,9 @@ public class Test
     {
         var source = @"
 §M{m1:Test}
-§F{f001:Main:pub}
-  §O{void}
-  §B{~result:str} §IDX{words} 0
-§/F{f001}
-§/M{m1}
+  §F{f001:Main:pub}
+      §O{void}
+      §B{~result:str} §IDX{words} 0
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("words[0]", result);
@@ -1150,15 +1119,12 @@ public class Test
     {
         var calor = """
             §M{m001:TestModule}
-              §CL{c001:Test}
-                §MT{m001:Max:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (? (> a b) a b)
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test}
+                    §MT{m001:Max:pub}
+                        §I{i32:a}
+                        §I{i32:b}
+                        §O{i32}
+                        §R (? (> a b) a b)
             """;
 
         var diagnostics = new DiagnosticBag();

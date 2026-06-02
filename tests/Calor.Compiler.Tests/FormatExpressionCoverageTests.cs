@@ -36,11 +36,9 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{i32}
-            §R (? true 1 0)
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{i32}
+                §R (? true 1 0)
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ConditionalExpressionNode */", result);
@@ -52,11 +50,9 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{void}
-            §B{x} DEC:3.14
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{void}
+                §B{x} DEC:3.14
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* DecimalLiteralNode */", result);
@@ -72,12 +68,10 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{str}
-            §B{name} "World"
-            §R §INTERP "Hello, " §EXP name "!" §/INTERP
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{str}
+                §B{name} "World"
+                §R §INTERP "Hello, " §EXP name "!" §/INTERP
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* InterpolatedStringNode */", result);
@@ -92,11 +86,9 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{void}
-            §B{r} §RANGE 1 5
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{void}
+                §B{r} §RANGE 1 5
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* RangeExpressionNode */", result);
@@ -139,15 +131,13 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{void}
-            §LIST{l1:i32}
-              1
-              2
-              3
-            §/LIST{l1}
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{void}
+                §LIST{l1:i32}
+                  1
+                  2
+                  3
+                §/LIST{l1}
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ListCreationNode */", result);
@@ -159,14 +149,12 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{void}
-            §DICT{d1:str:i32}
-              §KV "one" 1
-              §KV "two" 2
-            §/DICT{d1}
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{void}
+                §DICT{d1:str:i32}
+                  §KV "one" 1
+                  §KV "two" 2
+                §/DICT{d1}
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* DictionaryCreationNode */", result);
@@ -178,14 +166,12 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{void}
-            §HSET{s1:str}
-              "apple"
-              "banana"
-            §/HSET{s1}
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{void}
+                §HSET{s1:str}
+                  "apple"
+                  "banana"
+                §/HSET{s1}
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* SetCreationNode */", result);
@@ -197,14 +183,12 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{i32}
-            §LIST{l1:i32}
-              1
-            §/LIST{l1}
-            §R §CNT l1
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{i32}
+                §LIST{l1:i32}
+                  1
+                §/LIST{l1}
+                §R §CNT l1
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* CollectionCountNode */", result);
@@ -216,14 +200,12 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{bool}
-            §LIST{l1:i32}
-              1
-            §/LIST{l1}
-            §R §HAS{l1} 1
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{bool}
+                §LIST{l1:i32}
+                  1
+                §/LIST{l1}
+                §R §HAS{l1} 1
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* CollectionContainsNode */", result);
@@ -239,12 +221,10 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{i32}
-            §B{arr} §ARR{arr:i32} 1 2 3 §/ARR{arr}
-            §R §LEN arr
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{i32}
+                §B{arr} §ARR{arr:i32} 1 2 3 §/ARR{arr}
+                §R §LEN arr
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ArrayLengthNode */", result);
@@ -259,12 +239,10 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{str}
-            §B{s} "hello"
-            §R (upper s)
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{str}
+                §B{s} "hello"
+                §R (upper s)
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* StringOperationNode */", result);
@@ -276,12 +254,10 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{bool}
-            §B{c} (char-lit "A")
-            §R (is-letter c)
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{bool}
+                §B{c} (char-lit "A")
+                §R (is-letter c)
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* CharOperationNode */", result);
@@ -293,12 +269,10 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{str}
-            §B{sb} (sb-new)
-            §R (sb-tostring sb)
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{str}
+                §B{sb} (sb-new)
+                §R (sb-tostring sb)
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* StringBuilderOperationNode */", result);
@@ -314,13 +288,11 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §I{i32:x}
-            §O{i32}
-            §Q (forall ((n i32)) (>= n 0))
-            §R x
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §I{i32:x}
+                §O{i32}
+                §Q (forall ((n i32)) (>= n 0))
+                §R x
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ForallExpressionNode */", result);
@@ -332,13 +304,11 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §I{i32:x}
-            §O{i32}
-            §Q (exists ((n i32)) (> n 0))
-            §R x
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §I{i32:x}
+                §O{i32}
+                §Q (exists ((n i32)) (> n 0))
+                §R x
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ExistsExpressionNode */", result);
@@ -350,13 +320,11 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §I{i32:x}
-            §O{i32}
-            §Q (-> (> x 0) (>= x 1))
-            §R x
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §I{i32:x}
+                §O{i32}
+                §Q (-> (> x 0) (>= x 1))
+                §R x
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ImplicationExpressionNode */", result);
@@ -372,14 +340,12 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{void}
-            §B{p} §NEW{Person} §/NEW
-            §B{p2} §WITH p
-              §SET{Name} "Alice"
-            §/WITH
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{void}
+                §B{p} §NEW{Person} §/NEW
+                §B{p2} §WITH p
+                  §SET{Name} "Alice"
+                §/WITH
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* WithExpressionNode */", result);
@@ -432,14 +398,12 @@ public class FormatExpressionCoverageTests
     {
         var source = """
             §M{m1:Test}
-            §F{f1:Foo:pub}
-            §O{void}
-            §B{obj} §ANON
-              Name = "Alice"
-              Age = 30
-            §/ANON
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Foo:pub}
+                §O{void}
+                §B{obj} §ANON
+                  Name = "Alice"
+                  Age = 30
+                §/ANON
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* AnonymousObjectCreationNode */", result);
@@ -456,15 +420,13 @@ public class FormatExpressionCoverageTests
         // A function using multiple expression types that were previously unhandled
         var source = """
             §M{m1:Test}
-            §F{f1:Complex:pub}
-            §I{str:input}
-            §O{i32}
-            §B{upper} (upper input)
-            §B{length} (len upper)
-            §B{result} (? (> length 5) 1 0)
-            §R result
-            §/F{f1}
-            §/M{m1}
+              §F{f1:Complex:pub}
+                §I{str:input}
+                §O{i32}
+                §B{upper} (upper input)
+                §B{length} (len upper)
+                §B{result} (? (> length 5) 1 0)
+                §R result
             """;
         var result = FormatModule(source);
 

@@ -11,13 +11,11 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Add}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R a + b
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §R a + b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -34,10 +32,8 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -54,12 +50,9 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §IFACE{i001:IShape}
-            §MT{m001:GetArea}
-            §O{f64}
-            §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IShape}
+                §MT{m001:GetArea}
+                  §O{f64}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -76,11 +69,10 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:Color}
-            §EM{Red}
-            §EM{Green}
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Color}
+              §EM{Red}
+              §EM{Green}
+              §/EN{e001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -97,11 +89,10 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §DEL{d001:Callback}
-            §I{i32:value}
-            §O{void}
-            §/DEL{d001}
-            §/M{m001}
+              §DEL{d001:Callback}
+              §I{i32:value}
+              §O{void}
+              §/DEL{d001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -118,10 +109,8 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §R 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -137,13 +126,11 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Calculate}
-            §I{i32:x}
-            §I{i32:y}
-            §O{i32}
-            §R x + y
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Calculate}
+                §I{i32:x}
+                §I{i32:y}
+                §O{i32}
+                §R x + y
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -161,15 +148,12 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Calculator}
-            §MT{m001:Add}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R a + b
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Calculator}
+                §MT{m001:Add}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R a + b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -190,16 +174,12 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:First}
-            §R 1
-            §/F{f001}
-            §F{f002:Second}
-            §R 2
-            §/F{f002}
-            §F{f003:Third}
-            §R 3
-            §/F{f003}
-            §/M{m001}
+              §F{f001:First}
+                §R 1
+              §F{f002:Second}
+                §R 2
+              §F{f003:Third}
+                §R 3
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -218,13 +198,10 @@ public class DefinitionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Outer}
-            §FLD{i32:x}
-            §/CL{c001}
-            §CL{c002:Inner}
-            §FLD{str:name}
-            §/CL{c002}
-            §/M{m001}
+              §CL{c001:Outer}
+                §FLD{i32:x}
+              §CL{c002:Inner}
+                §FLD{str:name}
             """;
 
         var ast = LspTestHarness.GetAst(source);

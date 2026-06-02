@@ -21,7 +21,6 @@ public class ParserTests
     {
         var source = """
             §M{m001:Test}
-            §/M{m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -37,10 +36,8 @@ public class ParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:MyFunc:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:MyFunc:pub}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -59,12 +56,10 @@ public class ParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -82,14 +77,12 @@ public class ParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A "Hello"
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §C{Console.WriteLine}
+                    §A "Hello"
+                  §/C
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -114,11 +107,9 @@ public class ParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -169,7 +160,6 @@ public class ParserTests
     {
         var source = """
             §M{m001}
-            §/M{m001}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -183,11 +173,9 @@ public class ParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetValue:pub}
-              §O{i32}
-              §R 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetValue:pub}
+                  §O{i32}
+                  §R 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -210,14 +198,12 @@ public class ParserTests
     {
         var source = """
             §M{m001:Hello}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A "Hello from Calor!"
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §C{Console.WriteLine}
+                    §A "Hello from Calor!"
+                  §/C
             """;
 
         var module = Parse(source, out var diagnostics);

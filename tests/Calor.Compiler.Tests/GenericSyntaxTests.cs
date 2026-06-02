@@ -30,12 +30,10 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Identity:pub}<T>
-              §I{T:value}
-              §O{T}
-              §R value
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Identity:pub}<T>
+                  §I{T:value}
+                  §O{T}
+                  §R value
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -54,12 +52,10 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Map:pub}<T, U>
-              §I{T:input}
-              §I{Func<T, U>:mapper}
-              §O{U}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Map:pub}<T, U>
+                  §I{T:input}
+                  §I{Func<T, U>:mapper}
+                  §O{U}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -79,11 +75,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §CL{c001:Repository:pub}<T>
-              §WHERE T : class
-              §FLD{T:_item:pri}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Repository:pub}<T>
+                  §WHERE T : class
+                  §FLD{T:_item:pri}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -104,11 +98,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetItems:pub}
-              §I{List<i32>:items}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetItems:pub}
+                  §I{List<i32>:items}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -124,11 +116,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetLookup:pub}<T>
-              §I{Dictionary<str, List<T>>:lookup}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetLookup:pub}<T>
+                  §I{Dictionary<str, List<T>>:lookup}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -144,12 +134,10 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Sort:pub}<T>
-              §WHERE T : class, IComparable<T>
-              §I{List<T>:items}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sort:pub}<T>
+                  §WHERE T : class, IComparable<T>
+                  §I{List<T>:items}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -168,14 +156,11 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §IFACE{i001:IRepository:pub}<T>
-              §WHERE T : class
-              §MT{m001:Get}
-                §I{i32:id}
-                §O{T}
-              §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IRepository:pub}<T>
+                  §WHERE T : class
+                  §MT{m001:Get}
+                      §I{i32:id}
+                      §O{T}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -196,12 +181,10 @@ public class GenericSyntaxTests
         // Old §WR{T:class} syntax should still work during transition
         var source = """
             §M{m001:Test}
-            §F{f001:Identity:pub}<T>
-              §WR{T:class}
-              §I{T:value}
-              §O{T}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Identity:pub}<T>
+                  §WR{T:class}
+                  §I{T:value}
+                  §O{T}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -220,12 +203,10 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §F{f001:Identity:pub}<T>
-              §I{T:value}
-              §O{T}
-              §R value
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Identity:pub}<T>
+                  §I{T:value}
+                  §O{T}
+                  §R value
             """;
 
         var csharp = CompileToCS(calor);
@@ -239,11 +220,9 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §CL{c001:Repository:pub}<T>
-              §WHERE T : class
-              §FLD{List<T>:_items:pri}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Repository:pub}<T>
+                  §WHERE T : class
+                  §FLD{List<T>:_items:pri}
             """;
 
         var csharp = CompileToCS(calor);
@@ -258,18 +237,14 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §IFACE{i001:IRepository:pub}<T>
-              §WHERE T : class
-              §MT{m001:GetById}
-                §I{i32:id}
-                §O{T}
-              §/MT{m001}
-              §MT{m002:Save}
-                §I{T:entity}
-                §O{void}
-              §/MT{m002}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IRepository:pub}<T>
+                  §WHERE T : class
+                  §MT{m001:GetById}
+                      §I{i32:id}
+                      §O{T}
+                  §MT{m002:Save}
+                      §I{T:entity}
+                      §O{void}
             """;
 
         var csharp = CompileToCS(calor);
@@ -285,12 +260,10 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §F{f001:GetLookup:pub}<T>
-              §I{Dictionary<str, List<T>>:lookup}
-              §O{Dictionary<str, List<T>>}
-              §R lookup
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetLookup:pub}<T>
+                  §I{Dictionary<str, List<T>>:lookup}
+                  §O{Dictionary<str, List<T>>}
+                  §R lookup
             """;
 
         var csharp = CompileToCS(calor);
@@ -304,15 +277,12 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §CL{c001:Container:pub}
-              §MT{m001:Convert:pub}<T, U>
-                §I{T:input}
-                §I{Func<T, U>:converter}
-                §O{U}
-                §R §C{converter} §A input §/C
-              §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Container:pub}
+                  §MT{m001:Convert:pub}<T, U>
+                      §I{T:input}
+                      §I{Func<T, U>:converter}
+                      §O{U}
+                      §R §C{converter} §A input §/C
             """;
 
         var csharp = CompileToCS(calor);
@@ -326,12 +296,10 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §F{f001:GetDefault:pub}<T>
-              §WHERE T : struct
-              §O{T}
-              §R default
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetDefault:pub}<T>
+                  §WHERE T : struct
+                  §O{T}
+                  §R default
             """;
 
         var csharp = CompileToCS(calor);
@@ -345,13 +313,11 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §F{f001:Create:pub}<T>
-              §WHERE T : new
-              §O{T}
-              §B{result} §NEW{T}
-              §R result
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Create:pub}<T>
+                  §WHERE T : new
+                  §O{T}
+                  §B{result} §NEW{T}
+                  §R result
             """;
 
         var csharp = CompileToCS(calor);
@@ -365,11 +331,9 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §CL{c001:Pair:pub}<TKey, TValue>
-              §FLD{TKey:Key:pub}
-              §FLD{TValue:Value:pub}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Pair:pub}<TKey, TValue>
+                  §FLD{TKey:Key:pub}
+                  §FLD{TValue:Value:pub}
             """;
 
         var csharp = CompileToCS(calor);
@@ -388,11 +352,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Transform:pub}<T, U>
-              §I{T:input}
-              §O{U}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Transform:pub}<T, U>
+                  §I{T:input}
+                  §O{U}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -410,12 +372,10 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Sort:pub}<T>
-              §WHERE T : class, IComparable<T>
-              §I{List<T>:items}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sort:pub}<T>
+                  §WHERE T : class, IComparable<T>
+                  §I{List<T>:items}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -432,11 +392,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §CL{c001:Cache:pub}<TKey, TValue>
-              §WHERE TKey : class
-              §FLD{Dictionary<TKey, TValue>:_data:pri}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Cache:pub}<TKey, TValue>
+                  §WHERE TKey : class
+                  §FLD{Dictionary<TKey, TValue>:_data:pri}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -455,13 +413,10 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §IFACE{i001:IFactory:pub}<T>
-              §WHERE T : new
-              §MT{m001:Create}
-                §O{T}
-              §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IFactory:pub}<T>
+                  §WHERE T : new
+                  §MT{m001:Create}
+                      §O{T}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -480,14 +435,11 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §CL{c001:Mapper:pub}
-              §MT{m001:Map:pub}<TSource, TDest>
-                §WHERE TDest : new
-                §I{TSource:source}
-                §O{TDest}
-              §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Mapper:pub}
+                  §MT{m001:Map:pub}<TSource, TDest>
+                      §WHERE TDest : new
+                      §I{TSource:source}
+                      §O{TDest}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -509,12 +461,10 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Identity:pub}<T>
-              §I{T:value}
-              §O{T}
-              §R value
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Identity:pub}<T>
+                  §I{T:value}
+                  §O{T}
+                  §R value
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -533,11 +483,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §CL{c001:Repository:pub}<T>
-              §WHERE T : class
-              §FLD{T:_item:pri}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Repository:pub}<T>
+                  §WHERE T : class
+                  §FLD{T:_item:pri}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -555,12 +503,10 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Sort:pub}<T>
-              §WHERE T : class, IComparable<T>
-              §I{List<T>:items}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sort:pub}<T>
+                  §WHERE T : class, IComparable<T>
+                  §I{List<T>:items}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -696,12 +642,10 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Identity:pub}<T>
-              §I{T:value}
-              §O{T}
-              §R value
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Identity:pub}<T>
+                  §I{T:value}
+                  §O{T}
+                  §R value
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -719,11 +663,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Process:pub}<T>
-              §I{List<T>:items}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Process:pub}<T>
+                  §I{List<T>:items}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -741,11 +683,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetData:pub}<T>
-              §I{Dictionary<str, List<T>>:data}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetData:pub}<T>
+                  §I{Dictionary<str, List<T>>:data}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -763,13 +703,11 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Combine:pub}<T, U>
-              §I{T:first}
-              §I{U:second}
-              §O{T}
-              §R first
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Combine:pub}<T, U>
+                  §I{T:first}
+                  §I{U:second}
+                  §O{T}
+                  §R first
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -791,14 +729,12 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Combine:pub}<T, U>
-              §WHERE T : class
-              §WHERE U : struct
-              §I{T:a}
-              §I{U:b}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Combine:pub}<T, U>
+                  §WHERE T : class
+                  §WHERE U : struct
+                  §I{T:a}
+                  §I{U:b}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -817,11 +753,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Test:pub}<T>
-              §WHERE X : class
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}<T>
+                  §WHERE X : class
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -836,13 +770,10 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §IFACE{i001:IMapper:pub}
-              §MT{m001:Map}<TSource, TDest>
-                §I{TSource:source}
-                §O{TDest}
-              §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IMapper:pub}
+                  §MT{m001:Map}<TSource, TDest>
+                      §I{TSource:source}
+                      §O{TDest}
             """;
 
         var csharp = CompileToCS(calor);
@@ -855,14 +786,11 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-            §IFACE{i001:IConverter:pub}<T>
-              §WHERE T : class
-              §MT{m001:Convert}<U>
-                §I{T:input}
-                §O{U}
-              §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IConverter:pub}<T>
+                  §WHERE T : class
+                  §MT{m001:Convert}<U>
+                      §I{T:input}
+                      §O{U}
             """;
 
         var csharp = CompileToCS(calor);
@@ -877,11 +805,9 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-            §CL{c001:Container:pub}<T>
-              §FLD{List<T>:_items:pri}
-              §FLD{Dictionary<str, T>:_lookup:pri}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Container:pub}<T>
+                  §FLD{List<T>:_items:pri}
+                  §FLD{Dictionary<str, T>:_lookup:pri}
             """;
 
         var module = Parse(source, out var diagnostics);
