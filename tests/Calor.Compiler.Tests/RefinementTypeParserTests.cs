@@ -26,7 +26,7 @@ public sealed class RefinementTypeParserTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -35,7 +35,7 @@ public sealed class RefinementTypeParserTests
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -50,7 +50,7 @@ public sealed class RefinementTypeParserTests
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 

@@ -72,6 +72,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void Dedent() => _indentLevel--;
 
     /// <summary>
+    /// Phase 3 — indent-form block terminator. The CalorEmitter no longer
+    /// emits structural `§/X{...}` closing tags; block ends are conveyed by
+    /// dedentation at the parent indent column, which the indent-aware lexer
+    /// converts to <see cref="Calor.Compiler.Parsing.TokenKind.Dedent"/>.
+    /// This is a documented no-op (kept as an explicit call so the diff
+    /// reviewing the Phase 3 transition shows clearly which sites stopped
+    /// emitting closers and which still do — see do-while, switch case
+    /// bodies, and preprocessor blocks for the remaining exceptions, which
+    /// carry trailing payload on the closer and need Phase 4 design work).
+    /// </summary>
+    private static void EmitBlockEnd(string legacyCloser)
+    {
+        _ = legacyCloser;
+    }
+
+    /// <summary>
     /// Emits doc comment lines (if present) as Calor line comments before a construct.
     /// </summary>
     private void EmitDocComment(AstNode node)
@@ -197,7 +213,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/M{{{node.Id}}}");
+        EmitBlockEnd($"§/M{{{node.Id}}}");
 
         return _builder.ToString();
     }
@@ -251,7 +267,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/IFACE{{{node.Id}}}");
+        EmitBlockEnd($"§/IFACE{{{node.Id}}}");
 
         return "";
     }
@@ -313,7 +329,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitOutputLine(node.Output);
             Dedent();
         }
-        AppendLine($"§/MT{{{node.Id}}}");
+        EmitBlockEnd($"§/MT{{{node.Id}}}");
 
         return "";
     }
@@ -447,7 +463,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/CL{{{node.Id}}}");
+        EmitBlockEnd($"§/CL{{{node.Id}}}");
 
         return "";
     }
@@ -539,7 +555,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/PROP{{{node.Id}}}");
+        EmitBlockEnd($"§/PROP{{{node.Id}}}");
 
         return "";
     }
@@ -596,7 +612,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Initer != null) Visit(node.Initer);
 
         Dedent();
-        AppendLine($"§/IXER{{{node.Id}}}");
+        EmitBlockEnd($"§/IXER{{{node.Id}}}");
 
         return "";
     }
@@ -631,7 +647,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
             _memberBodyDepth--;
             Dedent();
-            AppendLine($"§/{keyword}");
+            EmitBlockEnd($"§/{keyword}");
         }
 
         return "";
@@ -691,7 +707,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        AppendLine($"§/CTOR{{{node.Id}}}");
+        EmitBlockEnd($"§/CTOR{{{node.Id}}}");
 
         return "";
     }
@@ -739,7 +755,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        AppendLine($"§/OP{{{node.Id}}}");
+        EmitBlockEnd($"§/OP{{{node.Id}}}");
 
         return "";
     }
@@ -832,7 +848,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/{methodTag}{{{node.Id}}}");
+        EmitBlockEnd($"§/{methodTag}{{{node.Id}}}");
 
         return "";
     }
@@ -898,7 +914,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        AppendLine($"§/{funcTag}{{{node.Id}}}");
+        EmitBlockEnd($"§/{funcTag}{{{node.Id}}}");
 
         return "";
     }
@@ -996,7 +1012,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/W{{{id}}}");
+        EmitBlockEnd($"§/W{{{id}}}");
     }
 
     public string Visit(CallStatementNode node)
@@ -1174,7 +1190,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/LIST{{{variableName}}}");
+        EmitBlockEnd($"§/LIST{{{variableName}}}");
         if (originalTarget != variableName)
             AppendLine($"§ASSIGN {originalTarget} {variableName}");
     }
@@ -1212,7 +1228,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/DICT{{{variableName}}}");
+        EmitBlockEnd($"§/DICT{{{variableName}}}");
     }
 
     private void EmitSetCreationWithName(SetCreationNode node, string variableName)
@@ -1228,7 +1244,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/HSET{{{variableName}}}");
+        EmitBlockEnd($"§/HSET{{{variableName}}}");
     }
 
     private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName)
@@ -1262,7 +1278,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 AppendLine(val);
             }
             Dedent();
-            AppendLine($"§/ARR{{{variableName}}}");
+            EmitBlockEnd($"§/ARR{{{variableName}}}");
             // If we sanitized the name, assign the result to the original target
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
@@ -1321,7 +1337,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 AppendLine($"§ROW {elements}");
             }
             Dedent();
-            AppendLine($"§/ARR2D{{{node.Id}}}");
+            EmitBlockEnd($"§/ARR2D{{{node.Id}}}");
         }
         else
         {
@@ -1415,7 +1431,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/USE{{{id}}}");
+        EmitBlockEnd($"§/USE{{{id}}}");
         return "";
     }
     private int _usingCounter = 0;
@@ -1463,7 +1479,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Dedent();
         }
 
-        AppendLine($"§/I{{{node.Id}}}");
+        EmitBlockEnd($"§/I{{{node.Id}}}");
         return "";
     }
 
@@ -1491,7 +1507,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/L{{{node.Id}}}");
+        EmitBlockEnd($"§/L{{{node.Id}}}");
         return "";
     }
 
@@ -1508,7 +1524,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/WH{{{node.Id}}}");
+        EmitBlockEnd($"§/WH{{{node.Id}}}");
         return "";
     }
 
@@ -1545,7 +1561,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/EACH{{{node.Id}}}");
+        EmitBlockEnd($"§/EACH{{{node.Id}}}");
         return "";
     }
 
@@ -1585,7 +1601,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/LIST{{{node.Id}}}");
+        EmitBlockEnd($"§/LIST{{{node.Id}}}");
         return "";
     }
 
@@ -1624,7 +1640,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/DICT{{{node.Id}}}");
+        EmitBlockEnd($"§/DICT{{{node.Id}}}");
         return "";
     }
 
@@ -1668,7 +1684,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/HSET{{{node.Id}}}");
+        EmitBlockEnd($"§/HSET{{{node.Id}}}");
         return "";
     }
 
@@ -1741,7 +1757,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/EACHKV{{{node.Id}}}");
+        EmitBlockEnd($"§/EACHKV{{{node.Id}}}");
         return "";
     }
 
@@ -1781,7 +1797,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Dedent();
         }
 
-        AppendLine($"§/TR{{{node.Id}}}");
+        EmitBlockEnd($"§/TR{{{node.Id}}}");
         return "";
     }
 
@@ -1843,7 +1859,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/W{{{id}}}");
+        EmitBlockEnd($"§/W{{{id}}}");
         return "";
     }
     private int _switchCounter = 0;
@@ -2754,7 +2770,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/EN{{{node.Id}}}");
+        EmitBlockEnd($"§/EN{{{node.Id}}}");
         return "";
     }
 
@@ -2806,7 +2822,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/EEXT{{{node.Id}}}");
+        EmitBlockEnd($"§/EEXT{{{node.Id}}}");
         return "";
     }
 
@@ -2888,7 +2904,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/DEL{{{node.Id}}}");
+        EmitBlockEnd($"§/DEL{{{node.Id}}}");
         return "";
     }
 
@@ -2911,7 +2927,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     stmt.Accept(this);
                 }
                 Dedent();
-                AppendLine("§/EADD");
+                EmitBlockEnd("§/EADD");
             }
 
             if (node.RemoveBody != null)
@@ -2923,11 +2939,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     stmt.Accept(this);
                 }
                 Dedent();
-                AppendLine("§/EREM");
+                EmitBlockEnd("§/EREM");
             }
 
             Dedent();
-            AppendLine($"§/EVT{{{node.Id}}}");
+            EmitBlockEnd($"§/EVT{{{node.Id}}}");
         }
         else
         {
@@ -3084,7 +3100,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine($"reason: {reason}");
         }
         Dedent();
-        AppendLine("§/DECISION");
+        EmitBlockEnd("§/DECISION");
         return "";
     }
 
@@ -3647,7 +3663,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var stmt in node.Body)
             stmt.Accept(this);
         Dedent();
-        AppendLine($"§/UNSAFE{{{node.Id}}}");
+        EmitBlockEnd($"§/UNSAFE{{{node.Id}}}");
         return "";
     }
 
@@ -3659,7 +3675,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var stmt in node.Body)
             stmt.Accept(this);
         Dedent();
-        AppendLine($"§/SYNC{{{node.Id}}}");
+        EmitBlockEnd($"§/SYNC{{{node.Id}}}");
         return "";
     }
 
@@ -3675,7 +3691,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var stmt in node.Body)
             stmt.Accept(this);
         Dedent();
-        AppendLine($"§/FIXED{{{node.Id}}}");
+        EmitBlockEnd($"§/FIXED{{{node.Id}}}");
         return "";
     }
 
@@ -3724,7 +3740,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 AppendLine($"§ROW {elements}");
             }
             Dedent();
-            AppendLine($"§/ARR2D{{{node.Id}}}");
+            EmitBlockEnd($"§/ARR2D{{{node.Id}}}");
             return "";
         }
         else

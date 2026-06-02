@@ -606,7 +606,7 @@ public class Test
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -621,7 +621,7 @@ public class Test
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -796,7 +796,7 @@ public class Test
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorCode, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -1163,7 +1163,7 @@ public class Test
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calor, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -1198,10 +1198,9 @@ public class Test
         // Lock is now converted to §SYNC block with body inside
         var syncIdx = calor.IndexOf("§SYNC{");
         var bindIdx = calor.IndexOf("§B{", syncIdx > 0 ? syncIdx : 0);
-        var endSyncIdx = calor.IndexOf("§/SYNC{", bindIdx > 0 ? bindIdx : 0);
         Assert.True(syncIdx >= 0, "§SYNC block not found");
         Assert.True(bindIdx > syncIdx, "Body statement should appear inside §SYNC block");
-        Assert.True(endSyncIdx > bindIdx, "§/SYNC should close after body statements");
+        Assert.DoesNotContain("§/SYNC{", calor);
     }
 
     [Fact]

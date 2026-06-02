@@ -2,8 +2,5 @@
   §CL{c001:NullDemo:pub}
     §MT{m002:GetValue:pub} (?str:input) -> str
       §R (?? input "default")
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

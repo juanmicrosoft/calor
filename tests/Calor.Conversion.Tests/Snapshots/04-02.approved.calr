@@ -3,8 +3,5 @@
     §MT{m002:Identity<T>:pub} (T:value) -> T
       §WHERE T : class
       §R value
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

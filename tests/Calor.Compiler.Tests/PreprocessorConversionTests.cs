@@ -26,7 +26,7 @@ public class PreprocessorConversionTests
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));

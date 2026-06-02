@@ -88,7 +88,7 @@ public class EventAccessorTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -124,7 +124,7 @@ public class EventAccessorTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -159,7 +159,7 @@ public class EventAccessorTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -356,10 +356,10 @@ public class EventAccessorTests
 
         var calor = result.CalorSource;
         Assert.Contains("§EADD", calor);
-        Assert.Contains("§/EADD", calor);
+        Assert.DoesNotContain("§/EADD", calor);
         Assert.Contains("§EREM", calor);
-        Assert.Contains("§/EREM", calor);
-        Assert.Contains("§/EVT", calor);
+        Assert.DoesNotContain("§/EREM", calor);
+        Assert.DoesNotContain("§/EVT", calor);
     }
 
     #endregion
@@ -379,7 +379,7 @@ public class EventAccessorTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
@@ -411,7 +411,7 @@ public class EventAccessorTests
 
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 

@@ -12,7 +12,7 @@ public class ControlFlowTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -635,7 +635,7 @@ public class ControlFlowTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -698,7 +698,7 @@ public class ControlFlowTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);

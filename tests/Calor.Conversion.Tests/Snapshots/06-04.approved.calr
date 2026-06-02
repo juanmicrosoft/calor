@@ -3,10 +3,6 @@
     §MT{m002:Check:pub} (any:obj) -> str
       §IF{if003} (!= obj null)
         §R "has value"
-      §/I{if003}
       §R "null"
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

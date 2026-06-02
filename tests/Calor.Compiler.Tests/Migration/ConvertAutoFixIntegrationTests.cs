@@ -127,11 +127,8 @@ public class ConvertAutoFixIntegrationTests
         var cleanParse = CalorSourceHelper.Parse(calor, "test.calr");
         Assert.True(cleanParse.IsSuccess, "Baseline should parse");
 
-        // Inject an orphaned §/NEW tag at the end (before §/M) — a known fixer-handled defect
-        var moduleEnd = calor.LastIndexOf("§/M{", StringComparison.Ordinal);
-        Assert.True(moduleEnd > 0, "Should find §/M in converter output");
-
-        var broken = calor.Insert(moduleEnd, "§/NEW{n1}\n");
+        // Inject an orphaned §/NEW tag at the end — a known fixer-handled defect
+        var broken = calor + "\n§/NEW{n1}\n";
 
         // Verify it's now broken
         var brokenParse = CalorSourceHelper.Parse(broken, "test.calr");

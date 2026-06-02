@@ -24,7 +24,7 @@ public class ImprovementPlanTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -39,7 +39,7 @@ public class ImprovementPlanTests
     {
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         Assert.Empty(diag.Errors);
         var parser = new Parser(tokens, diag);
         var ast = parser.Parse();
@@ -55,7 +55,7 @@ public class ImprovementPlanTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         if (diagnostics.HasErrors) return null;
 
         var parser = new Parser(tokens, diagnostics);

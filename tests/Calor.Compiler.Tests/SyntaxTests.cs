@@ -378,7 +378,7 @@ public class SyntaxTests
         var diagnostics = new DiagnosticBag();
         var source = "§M{m001:Hello} §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -401,7 +401,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -426,7 +426,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -451,7 +451,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -476,7 +476,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -502,7 +502,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -530,7 +530,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -900,7 +900,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -928,7 +928,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -960,7 +960,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -988,7 +988,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -1013,7 +1013,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -1044,7 +1044,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -1097,7 +1097,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -1124,7 +1124,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -1154,7 +1154,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -1221,7 +1221,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();
@@ -1248,7 +1248,7 @@ public class SyntaxTests
 §/F{f001}
 §/M{m001}";
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
 
         var module = parser.Parse();

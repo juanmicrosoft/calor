@@ -6,12 +6,8 @@
     §CTOR{ctor002:pub} (str:id, dec:initialBalance)
       §ASSIGN _id id
       §ASSIGN _balance initialBalance
-    §/CTOR{ctor002}
 
     §MT{m003:GetBalance:pub} () -> dec
       §R _balance
-    §/MT{m003}
 
-  §/CL{c001}
 
-§/M{m001}

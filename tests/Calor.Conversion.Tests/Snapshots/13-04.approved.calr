@@ -1,6 +1,5 @@
 §M{m001:Test_13_04}
   §CL{c001:Result<T>:pub:abs}
-  §/CL{c001}
 
   §CL{c002:Ok<T>:pub}
     §EXT{Result<T>}
@@ -9,9 +8,7 @@
 
     §CTOR{ctor004:pub} (T:value)
       §ASSIGN Value value
-    §/CTOR{ctor004}
 
-  §/CL{c002}
 
   §CL{c005:Error<T>:pub}
     §EXT{Result<T>}
@@ -20,9 +17,7 @@
 
     §CTOR{ctor007:pub} (str:message)
       §ASSIGN Message message
-    §/CTOR{ctor007}
 
-  §/CL{c005}
 
   §CL{c008:ResultExtensions:pub:stat}
     §MT{m009:Describe<T>:pub:stat} (Result<T>:result) -> str
@@ -30,9 +25,5 @@
         §K §VAR{ok} → "Success: ${ok.Value}"
         §K §VAR{err} → "Error: ${err.Message}"
         §K _ → "Unknown"
-      §/W{match010}
-    §/MT{m009}
 
-  §/CL{c008}
 
-§/M{m001}

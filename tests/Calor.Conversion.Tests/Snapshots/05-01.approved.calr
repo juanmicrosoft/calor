@@ -5,8 +5,5 @@
     §AMT{m002:FetchDataAsync:pub} () -> str
       §B{_} §AWAIT §C{Task.Delay} §A 100 §/C
       §R "data"
-    §/AMT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

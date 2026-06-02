@@ -4,6 +4,4 @@
   §CL{c001:Container:pub}
     §PROP{p002:Items:List<str>:pub:get,set} = §C{Array.Empty<str>} §/C
 
-  §/CL{c001}
 
-§/M{m001}

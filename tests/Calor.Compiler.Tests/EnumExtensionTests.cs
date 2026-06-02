@@ -20,7 +20,7 @@ public class EnumExtensionTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -314,7 +314,7 @@ public class EnumExtensionTests
         var code = emitter.Emit(module);
 
         Assert.Contains("§EN{e001:Color:pub}", code);
-        Assert.Contains("§/EN{e001}", code);
+        Assert.DoesNotContain("§/EN{e001}", code);
         // Should NOT contain old ENUM syntax
         Assert.DoesNotContain("§ENUM", code);
     }
@@ -340,7 +340,7 @@ public class EnumExtensionTests
         var code = emitter.Emit(module);
 
         Assert.Contains("§EEXT{ext001:Color}", code);
-        Assert.Contains("§/EEXT{ext001}", code);
+        Assert.DoesNotContain("§/EEXT{ext001}", code);
     }
 
     #endregion

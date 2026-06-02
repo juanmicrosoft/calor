@@ -374,7 +374,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -404,7 +404,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -436,7 +436,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -494,7 +494,7 @@ public class AttributeConversionTests
         // Parse the Calor text
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorCode, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var parsedModule = parser.Parse();
 
@@ -526,7 +526,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -557,7 +557,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -584,7 +584,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -608,7 +608,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -635,7 +635,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -680,7 +680,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorCode, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var parsedModule = parser.Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -702,7 +702,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         parser.Parse();
 
@@ -724,7 +724,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -747,7 +747,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -770,7 +770,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -794,7 +794,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -819,7 +819,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -847,7 +847,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -875,7 +875,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -900,7 +900,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -924,7 +924,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -962,7 +962,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorCode, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var parsedModule = parser.Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -1012,7 +1012,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -1038,7 +1038,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -1117,7 +1117,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorCode, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var parsedModule = parser.Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -1157,7 +1157,7 @@ public class AttributeConversionTests
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorCode, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var parsedModule = parser.Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));

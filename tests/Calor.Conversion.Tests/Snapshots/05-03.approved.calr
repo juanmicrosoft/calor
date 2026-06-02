@@ -11,8 +11,5 @@
       §B{_chainSelect010} §C{_chainWhere009.Select} §A _lamSelect006 §/C
       §B{_chainOrderBy011} §C{_chainSelect010.OrderBy} §A _lamOrderBy004 §/C
       §R §C{_chainOrderBy011.ToList} §/C
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

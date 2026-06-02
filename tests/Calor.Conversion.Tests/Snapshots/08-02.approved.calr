@@ -2,8 +2,5 @@
   §CL{c001:TupleDemo:pub}
     §MT{m002:GetPair:pub} () -> (i32, str)
       §R (42, "hello")
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

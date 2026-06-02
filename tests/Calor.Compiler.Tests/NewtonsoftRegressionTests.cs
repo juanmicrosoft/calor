@@ -196,7 +196,7 @@ namespace Test
 }";
         var calor = ConvertToCalor(csharp);
         Assert.Contains("§SYNC", calor);
-        Assert.Contains("§/SYNC", calor);
+        Assert.DoesNotContain("§/SYNC", calor);
 
         var generated = RoundTrip(csharp);
         Assert.Contains("lock", generated);

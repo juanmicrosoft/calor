@@ -2,8 +2,5 @@
   §CL{c001:IndexDemo:pub}
     §MT{m002:GetLast:pub} (i32[]:items) -> i32
       §R §IDX{items} §^ 1
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

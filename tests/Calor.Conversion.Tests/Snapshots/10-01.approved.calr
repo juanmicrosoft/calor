@@ -2,8 +2,5 @@
   §CL{c001:SizeTest:pub:stat}
     §MT{m002:GetSizeOfInt:pub:stat} () -> i32
       §R §SIZEOF{i32}
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

@@ -1060,7 +1060,7 @@ public class Foo
         Assert.Contains("default", result.CalorSource);
         // Should compile without Calor0104 errors
         var diag = new DiagnosticBag();
-        var tokens = new Lexer(result.CalorSource!, diag).TokenizeAll();
+        var tokens = new Lexer(result.CalorSource!, diag).TokenizeAllForParser();
         new Parser(tokens, diag).Parse();
         Assert.False(diag.HasErrors, "Should parse without errors");
     }
