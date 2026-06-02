@@ -24,9 +24,11 @@ public class ComprehensionCalculator : IMetricCalculator
     private static readonly Regex RxEffectOpen = new(@"§E\{", RegexOptions.Compiled);
     private static readonly Regex RxRequires = new(@"§Q ", RegexOptions.Compiled);
     private static readonly Regex RxEnsures = new(@"§S ", RegexOptions.Compiled);
-    private static readonly Regex RxFuncClose = new(@"§/F\{", RegexOptions.Compiled);
-    private static readonly Regex RxModuleClose = new(@"§/M\{", RegexOptions.Compiled);
-    private static readonly Regex RxClosingTag = new(@"§/", RegexOptions.Compiled);
+    // Indent form (Phase 4) — block boundaries are signalled by indentation
+    // alone. The previous scorer awarded a small bonus for §/F{ / §/M{
+    // closer presence; now we count any line that begins with 2+ spaces
+    // (a structural body line) as the equivalent "completed block" signal.
+    private static readonly Regex RxIndentedBodyLine = new(@"^[ \t]+\S", RegexOptions.Compiled | RegexOptions.Multiline);
     private static readonly Regex RxEffectBody = new(@"§E\{([^}]+)\}", RegexOptions.Compiled);
 
     // Pre-compiled regexes for C# patterns
@@ -152,9 +154,10 @@ public class ComprehensionCalculator : IMetricCalculator
         score += ProportionalScore(source, RxRequires, 0.15);     // Requires contracts (preconditions)
         score += ProportionalScore(source, RxEnsures, 0.10);      // Ensures contracts (postconditions)
 
-        // Closing tags — proportional
-        score += ProportionalScore(source, RxFuncClose, 0.05);
-        score += ProportionalScore(source, RxModuleClose, 0.05);
+        // Closing tags — REMOVED in Phase 4 (indent form). The opener
+        // counts above + the indented-body bonus below are the modern
+        // equivalent of "the block is structurally complete".
+        score += ProportionalScore(source, RxIndentedBodyLine, 0.10);
 
         // Strategy 5: Contract-depth and effect-specificity dimensions
 
@@ -172,10 +175,13 @@ public class ComprehensionCalculator : IMetricCalculator
             score += Math.Min(0.02 * maxEffectCount, 0.10);
         }
 
-        // ID consistency: matched open/close pairs aid navigation
+        // Indent-form structural completeness: every §F{ opener is
+        // followed by at least one indented body line (the indent form
+        // equivalent of "block has a body and is closed"). Reward when
+        // we have functions AND we see indented body lines.
         var openCount = RxFuncOpen.Matches(source).Count;
-        var closeCount = RxFuncClose.Matches(source).Count;
-        if (openCount > 0 && openCount == closeCount)
+        var indentedBodyCount = RxIndentedBodyLine.Matches(source).Count;
+        if (openCount > 0 && indentedBodyCount >= openCount)
             score += 0.05;
 
         // Cap at 1.5 to accommodate depth dimensions while keeping scores comparable.
@@ -231,7 +237,7 @@ public class ComprehensionCalculator : IMetricCalculator
     {
         var source = context.CalorSource;
         var funcOpen = RxFuncOpen.Matches(source).Count;
-        var funcClose = RxFuncClose.Matches(source).Count;
+        var indentedBodyLines = RxIndentedBodyLine.Matches(source).Count;
         return new Dictionary<string, object>
         {
             ["moduleCount"] = RxModuleOpen.Matches(source).Count,
@@ -241,9 +247,9 @@ public class ComprehensionCalculator : IMetricCalculator
             ["effectCount"] = RxEffectOpen.Matches(source).Count,
             ["requiresCount"] = RxRequires.Matches(source).Count,
             ["ensuresCount"] = RxEnsures.Matches(source).Count,
-            ["closingTagCount"] = RxClosingTag.Matches(source).Count,
+            ["indentedBodyLineCount"] = indentedBodyLines,
             ["hasContractCompleteness"] = source.Contains("§Q ") && source.Contains("§S "),
-            ["hasMatchedPairs"] = funcOpen == funcClose && funcOpen > 0
+            ["hasIndentedFunctionBody"] = funcOpen > 0 && indentedBodyLines >= funcOpen
         };
     }
 

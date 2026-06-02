@@ -178,9 +178,11 @@ Effects are tracked through refactorings, preventing silent side-effect changes.
 
 ### 4. Structural Markers
 ```
-§F{...}§/F{...}           # Clear function boundaries
+§F{id:name:vis}           # Opener + indented body (terminates at dedent)
+  §I{type:param}
+  …body…
 ```
-Agents can identify extraction boundaries precisely.
+Agents can identify extraction boundaries precisely from the opener / indented-body pair.
 
 ---
 

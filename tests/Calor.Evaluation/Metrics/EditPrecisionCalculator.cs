@@ -338,9 +338,15 @@ public class EditPrecisionCalculator : IMetricCalculator
         if (isCalor)
         {
             // Calor: IDs reduce collateral risk significantly
-            // Risk mainly from incorrect boundary detection
-            var hasClosingTags = source.Contains("§/F{") || source.Contains("§/M{");
-            return hasClosingTags ? 0.1 : 0.25;
+            // Risk mainly from incorrect boundary detection. In indent
+            // form the boundary signal is "the opener is followed by
+            // at least one indented body line"; that gives the editor
+            // a localizable scope just as well as the legacy §/F{ /
+            // §/M{ closers used to.
+            var hasFunctionOpener = source.Contains("§F{") || source.Contains("§M{");
+            var hasIndentedBody = Regex.IsMatch(source, @"^[ \t]+\S", RegexOptions.Multiline);
+            var hasLocalizableScope = hasFunctionOpener && hasIndentedBody;
+            return hasLocalizableScope ? 0.1 : 0.25;
         }
         else
         {
@@ -434,9 +440,11 @@ public class EditPrecisionCalculator : IMetricCalculator
         if (functionIds > 0) score += 0.20;
         if (variableIds > 0) score += 0.10;
 
-        // Closing tags enable safe modifications
-        if (source.Contains("§/F{")) score += 0.05;
-        if (source.Contains("§/M{")) score += 0.05;
+        // Indent form (Phase 4) signals safe-modification scope by
+        // pairing each opener with an indented body — the equivalent
+        // of the legacy §/F{ / §/M{ closer-presence bonus.
+        if (Regex.IsMatch(source, @"^[ \t]+\S", RegexOptions.Multiline))
+            score += 0.10;
 
         return Math.Min(score, 1.0);
     }
