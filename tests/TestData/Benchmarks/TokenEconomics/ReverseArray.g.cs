@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ReverseArray
 {
@@ -16,20 +14,20 @@ namespace ReverseArray
     {
         public static int SwapIndex(int length, int i)
         {
-            if (!((i >= 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (i >= 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 86, length: 11, sourceFile: null, line: 6, column: 3, condition: "(i >= 0)");
-            if (!((i < length))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (i < length)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 100, length: 15, sourceFile: null, line: 7, column: 3, condition: "(i < length)");
-            return ((length - 1) - i);
+            if (!(i >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: i >= 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 80, length: 11, sourceFile: null, line: 3, column: 5, condition: "i >= 0");
+            if (!(i < length)) throw new Calor.Runtime.ContractViolationException("Precondition failed: i < length", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 97, length: 15, sourceFile: null, line: 4, column: 5, condition: "i < length");
+            return length - 1 - i;
         }
 
         public static bool ShouldSwap(int left, int right)
         {
-            return (left < right);
+            return left < right;
         }
 
         public static int MidPoint(int length)
         {
-            if (!((length > 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (length > 0)", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 297, length: 15, sourceFile: null, line: 19, column: 3, condition: "(length > 0)");
-            return (length / 2);
+            if (!(length > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: length > 0", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 274, length: 15, sourceFile: null, line: 11, column: 5, condition: "length > 0");
+            return length / 2;
         }
 
     }

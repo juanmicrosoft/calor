@@ -7,32 +7,30 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Hypotenuse
 {
     public static class HypotenuseModule
     {
-        public static double HypotenuseSquared(double a, double b)
+        public static float HypotenuseSquared(float a, float b)
         {
-            if (!((a > 0.0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (a > 0.0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 87, length: 12, sourceFile: null, line: 6, column: 3, condition: "(a > 0.0)");
-            if (!((b > 0.0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (b > 0.0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 102, length: 12, sourceFile: null, line: 7, column: 3, condition: "(b > 0.0)");
-            double __result__ = default;
+            if (!(a > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: a > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 81, length: 10, sourceFile: null, line: 3, column: 5, condition: "a > 0");
+            if (!(b > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: b > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 97, length: 10, sourceFile: null, line: 4, column: 5, condition: "b > 0");
+            float __result__ = default;
 
-            __result__ = ((a * a) + (b * b));
+            __result__ = a * a + b * b;
 
-            if (!((__result__ > 0.0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ > 0.0)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 117, length: 17, sourceFile: null, line: 8, column: 3, condition: "(__result__ > 0.0)");
+            if (!(__result__ > 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ > 0", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 113, length: 15, sourceFile: null, line: 5, column: 5, condition: "__result__ > 0");
             return __result__;
         }
 
-        public static double SumOfSquares(double x, double y)
+        public static float SumOfSquares(float x, float y)
         {
-            double __result__ = default;
+            float __result__ = default;
 
-            __result__ = ((x * x) + (y * y));
+            __result__ = x * x + y * y;
 
-            if (!((__result__ >= 0.0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0.0)", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 232, length: 18, sourceFile: null, line: 15, column: 3, condition: "(__result__ >= 0.0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 215, length: 16, sourceFile: null, line: 9, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 

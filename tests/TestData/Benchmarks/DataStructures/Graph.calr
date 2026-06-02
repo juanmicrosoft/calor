@@ -1,30 +1,19 @@
 §M{m001:Graph}
-§F{f001:IsConnected:pub}
-  §I{i32:edgeCount}
-  §O{bool}
-  §R (> edgeCount 0)
-§/F{f001}
-§F{f002:Degree:pub}
-  §I{i32:neighborCount}
-  §O{i32}
-  §S (>= result 0)
-  §R neighborCount
-§/F{f002}
-§F{f003:HasEdge:pub}
-  §I{i32:from}
-  §I{i32:to}
-  §I{i32:nodeCount}
-  §O{bool}
-  §Q (>= from 0)
-  §Q (>= to 0)
-  §Q (< from nodeCount)
-  §Q (< to nodeCount)
-  §R (!= from to)
-§/F{f003}
-§F{f004:NodeCount:pub}
-  §I{i32:count}
-  §O{i32}
-  §S (>= result 0)
-  §R count
-§/F{f004}
-§/M{m001}
+  §F{f001:IsConnected:pub} (i32:edgeCount) -> bool
+    §R (> edgeCount 0)
+
+  §F{f002:Degree:pub} (i32:neighborCount) -> i32
+    §S (>= result 0)
+    §R neighborCount
+
+  §F{f003:HasEdge:pub} (i32:from, i32:to, i32:nodeCount) -> bool
+    §Q (>= from 0)
+    §Q (>= to 0)
+    §Q (< from nodeCount)
+    §Q (< to nodeCount)
+    §R (!= from to)
+
+  §F{f004:NodeCount:pub} (i32:count) -> i32
+    §S (>= result 0)
+    §R count
+

@@ -1,23 +1,13 @@
 §M{m001:UnsafeService}
-§F{f001:SilentLog:pub}
-  §I{str:message}
-  §O{void}
-  §E{cw}
-  §P message
-§/F{f001}
+  §F{f001:SilentLog:pub} (str:message) -> void
+    §E{cw}
+    §P message
 
-§F{f002:UndeclaredWrite:pub}
-  §I{str:path}
-  §I{str:content}
-  §O{void}
-  §E{cw}
-  §P path
-  §P content
-§/F{f002}
+  §F{f002:UndeclaredWrite:pub} (str:path, str:content) -> void
+    §E{cw}
+    §P path
+    §P content
 
-§F{f003:HiddenNetwork:pub}
-  §I{str:url}
-  §O{str}
-  §R url
-§/F{f003}
-§/M{m001}
+  §F{f003:HiddenNetwork:pub} (str:url) -> str
+    §R url
+

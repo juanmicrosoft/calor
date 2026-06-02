@@ -1,34 +1,18 @@
 §M{m001:ExtractExamples}
-
-  §F{f001:Distance:pub}
-    §I{i32:x}
-    §I{i32:y}
-    §O{i32}
+  §F{f001:Distance:pub} (i32:x, i32:y) -> i32
     §R (+ (* x x) (* y y))
 
-  §F{f002:ProcessArray:pub}
-    §I{i32:index}
-    §I{i32:length}
-    §O{i32}
+  §F{f002:ProcessArray:pub} (i32:index, i32:length) -> i32
     §Q (>= index 0)
     §Q (< index length)
     §S (>= result 0)
-    §R (? (and (>= index 0) (< index length)) index (- 0 1))
+    §R (? (&& (>= index 0) (< index length)) index (- 0 1))
 
-  §F{f003:LogAndCompute:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
+  §F{f003:LogAndCompute:pub} (i32:a, i32:b) -> i32
     §E{cw}
-    §C{Console.WriteLine}
-    §A "Computing sum"
-    §/C
+    §C{Console.WriteLine} §A "Computing sum" §/C
     §R (+ a b)
 
-  §F{f004:ComputeNested:pub}
-    §I{i32:x}
-    §I{i32:y}
-    §I{i32:z}
-    §O{i32}
+  §F{f004:ComputeNested:pub} (i32:x, i32:y, i32:z) -> i32
     §R (+ (* x x) (+ (* y y) (* z z)))
 

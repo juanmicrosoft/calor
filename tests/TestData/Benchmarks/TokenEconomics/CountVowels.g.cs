@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace StringAnalysis
 {
@@ -16,23 +13,23 @@ namespace StringAnalysis
     {
         public static bool IsVowel(string ch)
         {
-            if ((ch == "a"))
+            if (ch == "a")
             {
                 return true;
             }
-            else if ((ch == "e"))
+            else if (ch == "e")
             {
                 return true;
             }
-            else if ((ch == "i"))
+            else if (ch == "i")
             {
                 return true;
             }
-            else if ((ch == "o"))
+            else if (ch == "o")
             {
                 return true;
             }
-            else if ((ch == "u"))
+            else if (ch == "u")
             {
                 return true;
             }

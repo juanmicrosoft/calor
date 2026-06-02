@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace TruncateString
 {
@@ -16,14 +14,14 @@ namespace TruncateString
     {
         public static bool NeedsTruncation(int strLen, int maxLen)
         {
-            if (!((maxLen > 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (maxLen > 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 100, length: 15, sourceFile: null, line: 6, column: 3, condition: "(maxLen > 0)");
-            return (strLen > maxLen);
+            if (!(maxLen > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: maxLen > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 94, length: 15, sourceFile: null, line: 3, column: 5, condition: "maxLen > 0");
+            return strLen > maxLen;
         }
 
         public static int TruncatedLength(int strLen, int maxLen)
         {
-            if (!((maxLen > 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (maxLen > 0)", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 224, length: 15, sourceFile: null, line: 13, column: 3, condition: "(maxLen > 0)");
-            if ((strLen > maxLen))
+            if (!(maxLen > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: maxLen > 0", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 207, length: 15, sourceFile: null, line: 7, column: 5, condition: "maxLen > 0");
+            if (strLen > maxLen)
             {
                 return maxLen;
             }

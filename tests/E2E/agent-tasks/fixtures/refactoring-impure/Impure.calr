@@ -1,27 +1,14 @@
 §M{m001:Impure}
-
-  §F{f001:LogAndDouble:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f001:LogAndDouble:pub} (i32:x) -> i32
     §E{cw}
-    §C{Console.WriteLine}
-    §A x
-    §/C
+    §C{Console.WriteLine} §A x §/C
     §R (* x 2)
 
-  §F{f002:ComputeWithLogging:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
+  §F{f002:ComputeWithLogging:pub} (i32:a, i32:b) -> i32
     §E{cw}
-    §C{Console.WriteLine}
-    §A "Computing..."
-    §/C
+    §C{Console.WriteLine} §A "Computing..." §/C
     §R (+ a b)
 
-  §F{f003:NoContractAdd:pub}
-    §I{i32:x}
-    §I{i32:y}
-    §O{i32}
+  §F{f003:NoContractAdd:pub} (i32:x, i32:y) -> i32
     §R (+ x y)
 

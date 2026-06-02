@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace PrimeCheck
 {
@@ -16,30 +14,30 @@ namespace PrimeCheck
     {
         public static bool IsPrime(int n)
         {
-            if (!((n > 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (n > 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 66, length: 10, sourceFile: null, line: 5, column: 3, condition: "(n > 0)");
-            if ((n <= 1))
+            if (!(n > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: n > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 65, length: 10, sourceFile: null, line: 3, column: 5, condition: "n > 0");
+            if (n <= 1)
             {
                 return false;
             }
 
-            if ((n <= 3))
+            if (n <= 3)
             {
                 return true;
             }
 
-            if (((n % 2) == 0))
+            if (n % 2 == 0)
             {
                 return false;
             }
 
             for (var i = 3; i <= 1000; i += 2)
             {
-                if (((i * i) > n))
+                if (i * i > n)
                 {
                     return true;
                 }
 
-                if (((n % i) == 0))
+                if (n % i == 0)
                 {
                     return false;
                 }

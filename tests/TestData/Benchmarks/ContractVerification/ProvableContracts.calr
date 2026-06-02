@@ -1,46 +1,35 @@
 §M{m001:VerifiableMath}
-§F{f001:Abs:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (>= result 0)
-  §IF{if1} (>= x 0) → §R x
-  §EL → §R (- 0 x)
-  §/I{if1}
-§/F{f001}
+  §F{f001:Abs:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §IF{if1} (>= x 0)
+      §R x
+    §EL
+      §R (- 0 x)
 
-§F{f002:Max:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §S (>= result a)
-  §S (>= result b)
-  §IF{if1} (> a b) → §R a
-  §EL → §R b
-  §/I{if1}
-§/F{f002}
+  §F{f002:Max:pub} (i32:a, i32:b) -> i32
+    §S (>= result a)
+    §S (>= result b)
+    §IF{if1} (> a b)
+      §R a
+    §EL
+      §R b
 
-§F{f003:Min:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §S (<= result a)
-  §S (<= result b)
-  §IF{if1} (< a b) → §R a
-  §EL → §R b
-  §/I{if1}
-§/F{f003}
+  §F{f003:Min:pub} (i32:a, i32:b) -> i32
+    §S (<= result a)
+    §S (<= result b)
+    §IF{if1} (< a b)
+      §R a
+    §EL
+      §R b
 
-§F{f004:Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
-  §Q (<= min max)
-  §S (>= result min)
-  §S (<= result max)
-  §IF{if1} (< value min) → §R min
-  §EI (> value max) → §R max
-  §EL → §R value
-  §/I{if1}
-§/F{f004}
-§/M{m001}
+  §F{f004:Clamp:pub} (i32:value, i32:min, i32:max) -> i32
+    §Q (<= min max)
+    §S (>= result min)
+    §S (<= result max)
+    §IF{if1} (< value min)
+      §R min
+    §EI (> value max)
+      §R max
+    §EL
+      §R value
+

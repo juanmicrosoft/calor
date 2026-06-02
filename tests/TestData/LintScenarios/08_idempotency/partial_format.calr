@@ -1,7 +1,5 @@
 §M{m1:Partial}
-§F{f001:Main:pub}
-§O{void}
-§E{cw}
-§P "Hello"
-§/F{f001}
-§/M{m1}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §P "Hello"
+

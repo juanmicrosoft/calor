@@ -1,8 +1,5 @@
 §M{m002:Order}
-
-  §F{f003:OrderTotal:pub}
-    §I{i32:price}
-    §O{i32}
+  §F{f003:OrderTotal:pub} (i32:price) -> i32
     §B{t1} §C{ComputeTaxWrapper} §A price §/C
     §B{t2} §C{ComputeTaxWrapper} §A price §/C
     §R (+ price (+ t1 t2))

@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace SumRange
 {
@@ -16,11 +14,11 @@ namespace SumRange
     {
         public static int SumRange(int n)
         {
-            if (!((n > 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (n > 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 64, length: 10, sourceFile: null, line: 5, column: 3, condition: "(n > 0)");
+            if (!(n > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: n > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 63, length: 10, sourceFile: null, line: 3, column: 5, condition: "n > 0");
             var sum = 0;
             for (var i = 1; i <= n; i++)
             {
-                sum = (sum + i);
+                sum = sum + i;
             }
 
             return sum;

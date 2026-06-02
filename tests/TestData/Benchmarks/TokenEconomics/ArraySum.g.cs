@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ArrayOps
 {
@@ -16,12 +13,12 @@ namespace ArrayOps
     {
         public static int Sum(int a, int b, int c)
         {
-            return ((a + b) + c);
+            return a + b + c;
         }
 
         public static int SumTwo(int a, int b)
         {
-            return (a + b);
+            return a + b;
         }
 
     }

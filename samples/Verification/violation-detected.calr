@@ -1,21 +1,13 @@
 §M{m001:ViolationDetected}
-
-  §F{f001:BadPostcondition:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f001:BadPostcondition:pub} (i32:x) -> i32
     §S (> result x)
     §R x
 
-  §F{f002:ImpossibleContract:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f002:ImpossibleContract:pub} (i32:x) -> i32
     §S (> (+ x 1) (+ x 2))
     §R (+ x 1)
 
-  §F{f003:DivisionBug:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
+  §F{f003:DivisionBug:pub} (i32:a, i32:b) -> i32
     §Q (!= b 0)
     §S (> (/ a b) a)
     §R (/ a b)

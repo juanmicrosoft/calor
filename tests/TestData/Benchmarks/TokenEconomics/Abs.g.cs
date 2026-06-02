@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace AbsModule
 {
@@ -18,17 +16,17 @@ namespace AbsModule
         {
             int __result__ = default;
 
-            if ((x >= 0))
+            if (x >= 0)
             {
                 return x;
             }
             else
             {
-                return (0 - x);
+                return 0 - x;
             }
 
 
-            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 60, length: 16, sourceFile: null, line: 5, column: 3, condition: "(__result__ >= 0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 59, length: 16, sourceFile: null, line: 3, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 

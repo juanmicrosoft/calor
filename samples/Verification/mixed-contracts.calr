@@ -1,28 +1,18 @@
 §M{m001:MixedContracts}
-
-  §F{f001:SafeDivide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
+  §F{f001:SafeDivide:pub} (i32:a, i32:b) -> i32
     §Q (!= b 0)
     §S (!= b 0)
     §R (/ a b)
 
-  §F{f002:SumArray:pub}
-    §I{i32:n}
-    §O{i32}
+  §F{f002:SumArray:pub} (i32:n) -> i32
     §Q (>= n 0)
     §R 0
 
-  §F{f003:Increment:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f003:Increment:pub} (i32:x) -> i32
     §S (== result (+ x 1))
     §R (+ x 1)
 
-  §F{f004:ClampPositive:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f004:ClampPositive:pub} (i32:x) -> i32
     §S (>= result 0)
     §IF{if001} (< x 0)
       §R 0

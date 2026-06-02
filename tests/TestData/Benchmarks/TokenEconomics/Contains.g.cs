@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Contains
 {
@@ -16,12 +13,12 @@ namespace Contains
     {
         public static bool Matches(int value, int target)
         {
-            return (value == target);
+            return value == target;
         }
 
         public static bool IsInRange(int index, int length)
         {
-            return ((index >= 0) && (index < length));
+            return index >= 0 && index < length;
         }
 
     }

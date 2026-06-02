@@ -1,27 +1,15 @@
 §M{m001:VotingSystem}
-§F{f001:AddVote:pub}
-  §I{i32:currentVotes}
-  §O{i32}
-  §R (+ currentVotes 1)
-§/F{f001}
-§F{f002:HasMajority:pub}
-  §I{i32:votes}
-  §I{i32:totalVotes}
-  §O{bool}
-  §Q (> totalVotes 0)
-  §R (> (* votes 2) totalVotes)
-§/F{f002}
-§F{f003:Percentage:pub}
-  §I{i32:votes}
-  §I{i32:totalVotes}
-  §O{f64}
-  §Q (> totalVotes 0)
-  §R (* (/ (cast f64 votes) (cast f64 totalVotes)) 100.0)
-§/F{f003}
-§F{f004:IsValid:pub}
-  §I{i32:totalVotes}
-  §I{i32:eligibleVoters}
-  §O{bool}
-  §R (<= totalVotes eligibleVoters)
-§/F{f004}
-§/M{m001}
+  §F{f001:AddVote:pub} (i32:currentVotes) -> i32
+    §R (+ currentVotes 1)
+
+  §F{f002:HasMajority:pub} (i32:votes, i32:totalVotes) -> bool
+    §Q (> totalVotes 0)
+    §R (> (* votes 2) totalVotes)
+
+  §F{f003:Percentage:pub} (i32:votes, i32:totalVotes) -> f32
+    §Q (> totalVotes 0)
+    §R (* (/ (cast f64 votes) (cast f64 totalVotes)) 100)
+
+  §F{f004:IsValid:pub} (i32:totalVotes, i32:eligibleVoters) -> bool
+    §R (<= totalVotes eligibleVoters)
+

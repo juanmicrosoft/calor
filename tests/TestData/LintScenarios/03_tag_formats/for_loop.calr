@@ -1,9 +1,6 @@
 §M{m1:ForTest}
-§F{f1:Main:pub}
-§O{void}
-§E{cw}
-§L{for1:i:1:10:1}
-§P i
-§/L{for1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Main:pub} () -> void
+    §E{cw}
+    §L{for1:i:1:10:1}
+      §P i
+

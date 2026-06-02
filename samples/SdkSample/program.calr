@@ -1,7 +1,5 @@
 §M{m001:SdkSample}
-
-  §F{f001:Main:pub}
-    §O{void}
+  §F{f001:Main:pub} () -> void
     §E{cw}
     §P "=== Calor SDK Sample ==="
     §P ""

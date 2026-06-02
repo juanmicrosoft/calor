@@ -1,30 +1,17 @@
 §M{m001:CircularBuffer}
-§F{f001:NextIndex:pub}
-  §I{i32:current}
-  §I{i32:capacity}
-  §O{i32}
-  §Q (> capacity 0)
-  §S (>= result 0)
-  §S (< result capacity)
-  §R (% (+ current 1) capacity)
-§/F{f001}
-§F{f002:IsFull:pub}
-  §I{i32:count}
-  §I{i32:capacity}
-  §O{bool}
-  §R (== count capacity)
-§/F{f002}
-§F{f003:IsEmpty:pub}
-  §I{i32:count}
-  §O{bool}
-  §R (== count 0)
-§/F{f003}
-§F{f004:WriteIndex:pub}
-  §I{i32:head}
-  §I{i32:count}
-  §I{i32:capacity}
-  §O{i32}
-  §Q (> capacity 0)
-  §R (% (+ head count) capacity)
-§/F{f004}
-§/M{m001}
+  §F{f001:NextIndex:pub} (i32:current, i32:capacity) -> i32
+    §Q (> capacity 0)
+    §S (>= result 0)
+    §S (< result capacity)
+    §R (% (+ current 1) capacity)
+
+  §F{f002:IsFull:pub} (i32:count, i32:capacity) -> bool
+    §R (== count capacity)
+
+  §F{f003:IsEmpty:pub} (i32:count) -> bool
+    §R (== count 0)
+
+  §F{f004:WriteIndex:pub} (i32:head, i32:count, i32:capacity) -> i32
+    §Q (> capacity 0)
+    §R (% (+ head count) capacity)
+

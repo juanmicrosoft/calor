@@ -1,23 +1,13 @@
 §M{m001:StringUtils}
-§F{f001:GetLength:pub}
-  §I{str:s}
-  §O{i32}
-  §R (len s)
-§/F{f001}
-§F{f002:ToUpper:pub}
-  §I{str:s}
-  §O{str}
-  §R (upper s)
-§/F{f002}
-§F{f003:ToLower:pub}
-  §I{str:s}
-  §O{str}
-  §R (lower s)
-§/F{f003}
-§F{f004:Concat:pub}
-  §I{str:a}
-  §I{str:b}
-  §O{str}
-  §R (concat a b)
-§/F{f004}
-§/M{m001}
+  §F{f001:GetLength:pub} (str:s) -> i32
+    §R (len s)
+
+  §F{f002:ToUpper:pub} (str:s) -> str
+    §R (upper s)
+
+  §F{f003:ToLower:pub} (str:s) -> str
+    §R (lower s)
+
+  §F{f004:Concat:pub} (str:a, str:b) -> str
+    §R (concat a b)
+

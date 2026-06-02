@@ -7,31 +7,29 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace CompoundInterest
 {
     public static class CompoundInterestModule
     {
-        public static double SimpleInterest(double principal, double rate, int years)
+        public static float SimpleInterest(float principal, float rate, int years)
         {
-            if (!((principal > 0.0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (principal > 0.0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 117, length: 20, sourceFile: null, line: 7, column: 3, condition: "(principal > 0.0)");
-            if (!((rate >= 0.0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (rate >= 0.0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 140, length: 16, sourceFile: null, line: 8, column: 3, condition: "(rate >= 0.0)");
-            if (!((years > 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (years > 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 159, length: 14, sourceFile: null, line: 9, column: 3, condition: "(years > 0)");
-            double __result__ = default;
+            if (!(principal > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: principal > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 106, length: 18, sourceFile: null, line: 3, column: 5, condition: "principal > 0");
+            if (!(rate >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: rate >= 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 130, length: 14, sourceFile: null, line: 4, column: 5, condition: "rate >= 0");
+            if (!(years > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: years > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 150, length: 14, sourceFile: null, line: 5, column: 5, condition: "years > 0");
+            float __result__ = default;
 
-            __result__ = (principal * (1.0 + (rate * (double)years)));
+            __result__ = principal * (1 + rate * (double)years);
 
-            if (!((__result__ >= principal))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= principal)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 176, length: 24, sourceFile: null, line: 10, column: 3, condition: "(__result__ >= principal)");
+            if (!(__result__ >= principal)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= principal", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 170, length: 24, sourceFile: null, line: 6, column: 5, condition: "__result__ >= principal");
             return __result__;
         }
 
-        public static double YearlyGrowth(double amount, double rate)
+        public static float YearlyGrowth(float amount, float rate)
         {
-            if (!((amount > 0.0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (amount > 0.0)", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 334, length: 17, sourceFile: null, line: 17, column: 3, condition: "(amount > 0.0)");
-            if (!((rate >= 0.0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (rate >= 0.0)", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 354, length: 16, sourceFile: null, line: 18, column: 3, condition: "(rate >= 0.0)");
-            return (amount * (1.0 + rate));
+            if (!(amount > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: amount > 0", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 315, length: 15, sourceFile: null, line: 10, column: 5, condition: "amount > 0");
+            if (!(rate >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: rate >= 0", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 336, length: 14, sourceFile: null, line: 11, column: 5, condition: "rate >= 0");
+            return amount * (1 + rate);
         }
 
     }

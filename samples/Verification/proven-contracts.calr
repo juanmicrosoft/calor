@@ -1,25 +1,17 @@
 §M{m001:ProvenContracts}
-
-  §F{f001:Square:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f001:Square:pub} (i32:x) -> i32
     §Q (>= x 0)
     §S (>= result 0)
     §R (* x x)
 
-  §F{f002:AbsoluteValue:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f002:AbsoluteValue:pub} (i32:x) -> i32
     §S (>= result 0)
     §IF{if001} (< x 0)
       §R (- 0 x)
     §EL
       §R x
 
-  §F{f003:Max:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
+  §F{f003:Max:pub} (i32:a, i32:b) -> i32
     §S (>= result a)
     §S (>= result b)
     §IF{if001} (>= a b)
@@ -27,19 +19,14 @@
     §EL
       §R b
 
-  §F{f004:AddPositive:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
+  §F{f004:AddPositive:pub} (i32:a, i32:b) -> i32
     §Q (> a 0)
     §Q (> b 0)
     §S (> result a)
     §S (> result b)
     §R (+ a b)
 
-  §F{f005:Identity:pub}
-    §I{i32:x}
-    §O{i32}
+  §F{f005:Identity:pub} (i32:x) -> i32
     §S (== result x)
     §R x
 
