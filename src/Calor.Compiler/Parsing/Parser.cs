@@ -15,11 +15,10 @@ public sealed class Parser
     private bool _insideRefinementPredicate;
 
     /// <summary>
-    /// Phase 4c — TokenKinds whose textual form is a legacy structural
+    /// Phase 4d — TokenKinds whose textual form is a legacy structural
     /// closing tag (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …) that indent
-    /// form has replaced. Encountering any of these in the token stream
-    /// produces a <c>Calor0830 LegacyCloserForm</c> error rather than
-    /// silently consuming them.
+    /// form has fully replaced. Encountering any of these in the token
+    /// stream produces a <c>Calor0830 LegacyCloserForm</c> error.
     ///
     /// Closers that still carry payload — <see cref="TokenKind.EndDo"/>
     /// (carries the do-while condition), <see cref="TokenKind.EndCase"/>
@@ -158,7 +157,7 @@ public sealed class Parser
     {
         if (Check(explicitCloser))
         {
-            ReportLegacyCloserIfStrict(Current);
+            ReportLegacyCloser(Current);
             return Advance();
         }
         if (Check(TokenKind.Dedent))
@@ -170,7 +169,7 @@ public sealed class Parser
             {
                 // Closer-form: consume all dedents, then the closer.
                 while (Check(TokenKind.Dedent)) Advance();
-                ReportLegacyCloserIfStrict(Current);
+                ReportLegacyCloser(Current);
                 return Advance();
             }
             // Indent-only: consume the single Dedent that ends this block.
@@ -187,14 +186,16 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Phase 4c — emit a <c>Calor0830</c> error whenever the parser is
-    /// about to consume a structural legacy closer token. The
-    /// diagnostic is reported once per occurrence; the parser still
-    /// consumes the token so downstream productions see the structure
-    /// they expect (parsing recovers, then the bag reports the error
-    /// to the caller).
+    /// Phase 4d — emit <c>Calor0830</c> unconditionally whenever the
+    /// parser is about to consume a structural legacy closer token.
+    /// Closer form was removed from the language in Phase 4d, so any
+    /// occurrence of one of the <see cref="StructuralLegacyClosers"/>
+    /// tokens is an error. The parser still consumes the token (the
+    /// closer-form code paths above remain in place so downstream
+    /// productions see the structure they expect) and reports the
+    /// diagnostic via the bag.
     /// </summary>
-    private void ReportLegacyCloserIfStrict(Token closerToken)
+    private void ReportLegacyCloser(Token closerToken)
     {
         if (!StructuralLegacyClosers.Contains(closerToken.Kind)) return;
 

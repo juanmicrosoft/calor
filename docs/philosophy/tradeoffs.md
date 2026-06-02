@@ -156,7 +156,7 @@ Calor's syntax is optimized for machine parsing:
 if (x > 0) return x;
 
 // Less familiar
-§IF{if1} (> x 0) → §R x §/I{if1}
+§IF{if1} (> x 0) → §R x
 ```
 
 ### 3. You Need Library Ecosystem

@@ -20,7 +20,7 @@ original file contents byte-for-byte.
 
 | Flag | What it does |
 |:-----|:-------------|
-| `--drop-structural-ids` | Strip the `{id}` block from structural closing tags (`§/M{…}` → `§/M`, etc.). |
+| `--drop-structural-ids` | Legacy pre-Phase-4d migration: strip `{id}` from structural closing tags (removed in Phase 4d). |
 | `--revert` | Reverse a prior `--drop-structural-ids` operation using `--log`. |
 | `--log <file>` | Write (without `--revert`) or read (with `--revert`) the migration log. |
 | `--dry-run`, `-n` | Report what would change without writing files. |
@@ -29,10 +29,10 @@ original file contents byte-for-byte.
 
 ## `--drop-structural-ids`
 
-Structural closing-tag IDs (`§/M{m001}`, `§/F{f001}`, `§/L{for1}`,
-`§/I{if1}`, …) have been **optional** since v6+. Source written before
-that release still carries them. This subcommand removes them in bulk,
-leaving the openers (where IDs continue to live) untouched.
+Legacy structural closing-tag IDs (`§/M{m001}`, `§/F{f001}`, `§/L{for1}`,
+`§/I{if1}`, …) were an intermediate pre-Phase-4d form (removed in Phase 4d).
+This subcommand removes those IDs in older source as a historical migration
+step; modern Calor uses indentation and has no structural closing tags.
 
 ```bash
 calor fix --drop-structural-ids src/                # rewrite in place
@@ -46,8 +46,8 @@ calor fix --drop-structural-ids src/ \
 The migrator targets only the recognized closing-tag shape and only
 when the contents inside `{…}` are an ID-shaped token (ULID-style,
 short test ID like `f001`, or compact). It leaves everything else
-alone — closing tags without an ID block are skipped (idempotent), and
-opening tags are never touched.
+alone — legacy closing tags without an ID block are skipped (idempotent),
+and opening tags are never touched.
 
 ### Output
 
@@ -76,12 +76,12 @@ exactly this property on every change.
 
 ## Why use it
 
-The closing-tag ID was redundant: the parser already knows which
-opener the closer is paired with via structural nesting. Dropping it
-shrinks files, removes a class of "I changed the opener ID but forgot
-the closer" bugs, and makes diffs smaller when IDs do change.
+Before Phase 4d, the legacy closing-tag ID was redundant: the parser
+already knew which opener it paired with via structural nesting. Dropping
+it shrank files, removed a class of "I changed the opener ID but forgot
+the closer" bugs, and made diffs smaller when IDs changed.
 
-If a closing-tag ID is left in source, the opt-in lint
+In legacy source, if a closing-tag ID is left behind, the opt-in lint
 [`Calor0820 LegacyStructuralId`](/calor/ids/#9-diagnostics) flags it
 and emits a `fix` patch that points back at this command.
 

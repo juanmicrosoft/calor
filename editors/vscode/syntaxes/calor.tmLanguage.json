@@ -32,59 +32,19 @@
     "closing-tags": {
       "patterns": [
         {
-          "comment": "Module/Function closing tags",
+          "comment": "Valid do-while, preprocessor, and match-case closing delimiters",
           "name": "keyword.control.close.calor",
-          "match": "§/(M|F|AF)\\{[^}]*\\}"
+          "match": "§/(?:(?:DO|PP)(?:\\{[^}]*\\})?|K)(?![a-zA-Z0-9_])"
         },
         {
-          "comment": "Class/Interface/Enum closing tags",
-          "name": "storage.type.close.calor",
-          "match": "§/(CL|IFACE|EN|ENUM|EXT)\\{[^}]*\\}"
+          "comment": "Valid inline expression closing tags",
+          "name": "keyword.control.inline.close.calor",
+          "match": "§/(C|T|NEW|A|LIST|DICT|HSET|ARR|LAM|THIS|BASE|INIT)(?![a-zA-Z0-9_])"
         },
         {
-          "comment": "Method/Property/Constructor closing tags",
-          "name": "entity.name.function.close.calor",
-          "match": "§/(MT|AMT|PROP|CTOR|GET|SET)\\{[^}]*\\}"
-        },
-        {
-          "comment": "Control flow closing tags",
-          "name": "keyword.control.close.calor",
-          "match": "§/(I|L|WH|DO|W|K|TR|WITH)\\{[^}]*\\}"
-        },
-        {
-          "comment": "Collection closing tags",
-          "name": "storage.type.collection.close.calor",
-          "match": "§/(ARR|LIST|DICT|HSET|EACH|EACHKV)\\{[^}]*\\}"
-        },
-        {
-          "comment": "Type/Record closing tags",
-          "name": "storage.type.close.calor",
-          "match": "§/(T|D)\\{[^}]*\\}"
-        },
-        {
-          "comment": "Lambda/Delegate closing tags",
-          "name": "entity.name.function.close.calor",
-          "match": "§/(LAM|DEL)\\{[^}]*\\}"
-        },
-        {
-          "comment": "Metadata closing tags",
-          "name": "comment.block.documentation.close.calor",
-          "match": "§/(US|UB|DC|CT|VS|HD)\\{[^}]*\\}"
-        },
-        {
-          "comment": "Interpolation closing tag",
-          "name": "string.interpolated.close.calor",
-          "match": "§/INTERP\\{[^}]*\\}"
-        },
-        {
-          "comment": "Call closing tag (no braces)",
-          "name": "keyword.control.call.close.calor",
-          "match": "§/C(?![a-zA-Z0-9_])"
-        },
-        {
-          "comment": "This/Base closing tags (no braces)",
-          "name": "variable.language.close.calor",
-          "match": "§/(THIS|BASE)(?![a-zA-Z0-9_])"
+          "comment": "Removed structural closing tags (invalid in indent-only Calor)",
+          "name": "invalid.deprecated.structural-close.calor",
+          "match": "§/(F|M|I|L|CL|IFACE|MT|CTOR|PROP|EN|AF|AMT|IXER|OP|TR|EACH|EACHKV|UNSAFE|SYNC|FIXED|EVT|EADD|EREM|EEXT|DEL|USE|W|WH|SW)(?:\\{[^}]*\\})?(?![a-zA-Z0-9_])"
         }
       ]
     },

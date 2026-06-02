@@ -179,7 +179,7 @@ public static int Divide(int a, int b)
 | Effect declaration | 3-5 | 0 (implicit) |
 | Contract | 4-6 | 5-10 |
 | Return statement | 4+ | 3+ |
-| Closing tags | 2-4 | 1 |
+| Block indentation | 0 lexical tokens | 0 lexical tokens |
 
 ---
 
@@ -202,13 +202,14 @@ namespace Name   // Just keyword + name
 // C#: No equivalent - effects are implicit
 ```
 
-### 3. Closing Tags
+### 3. Block Indentation
 
-Every structure requires explicit closing:
+Nested structures use indentation instead of structural closers:
 ```
-§F{f001}...§/F{f001}
-  §L{for1}...§/L{for1}
-    §IF{if1}...§/I{if1}
+§F{f001}
+  §L{for1}
+    §IF{if1}
+      §P i
 ```
 
 ### 4. Contract Syntax
