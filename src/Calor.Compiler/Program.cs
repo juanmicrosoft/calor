@@ -106,6 +106,11 @@ public class Program
             description: "Enable an experimental feature flag (repeatable). Flag names are defined in docs/experiments/registry.json. Unknown flags are accepted silently.")
         { Arity = ArgumentArity.ZeroOrMore };
 
+        var allowLegacyClosersOption = new Option<bool>(
+            aliases: ["--allow-legacy-closers"],
+            description: "Phase 4c escape hatch: accept legacy structural closing tags (§/M, §/F, §/CL, …) instead of rejecting them. By default the parser requires indent form and emits Calor0830 for any closer it encounters. Use this only while migrating legacy code; run `calor format` to migrate.",
+            getDefaultValue: () => false);
+
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
             inputOption,
@@ -124,7 +129,8 @@ public class Program
             noTelemetryOption,
             analyzeOption,
             allFindingsOption,
-            experimentalOption
+            experimentalOption,
+            allowLegacyClosersOption
         };
 
         // Legacy compile handler (when --input is provided)
@@ -157,6 +163,7 @@ public class Program
             var analyze = ctx.ParseResult.GetValueForOption(analyzeOption);
             var allFindings = ctx.ParseResult.GetValueForOption(allFindingsOption);
             var experimental = ctx.ParseResult.GetValueForOption(experimentalOption) ?? Array.Empty<string>();
+            var allowLegacyClosers = ctx.ParseResult.GetValueForOption(allowLegacyClosersOption);
 
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
             {
@@ -175,7 +182,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, allowLegacyClosers);
             }
             catch (Exception ex)
             {
@@ -243,7 +250,7 @@ public class Program
         return result;
     }
 
-    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null)
+    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool allowLegacyClosers = false)
     {
         try
         {
@@ -348,7 +355,8 @@ public class Program
                     } : null,
                     ExperimentalFlags = experimentalFlags != null && experimentalFlags.Length > 0
                         ? new ExperimentalFlags(experimentalFlags)
-                        : ExperimentalFlags.None
+                        : ExperimentalFlags.None,
+                    RejectLegacyClosers = !allowLegacyClosers
                 };
                 var result = Compile(source, file.FullName, options);
 
@@ -484,7 +492,7 @@ public class Program
 
         // Parsing
         phaseSw.Restart();
-        var parser = new Parser(tokens, diagnostics);
+        var parser = new Parser(tokens, diagnostics, options.RejectLegacyClosers);
         var ast = parser.Parse();
         phaseSw.Stop();
         telemetry?.TrackPhase("Parser", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
@@ -971,6 +979,22 @@ public sealed class CompilationOptions
     /// before acting.
     /// </summary>
     public ExperimentalFlags ExperimentalFlags { get; init; } = ExperimentalFlags.None;
+
+    /// <summary>
+    /// Phase 4c — when true, the parser rejects legacy structural
+    /// closing tags (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …) and emits
+    /// <c>Calor0830 LegacyCloserForm</c> errors. Indent form is the
+    /// canonical surface; closer-form sources from before Phase 4 must
+    /// be migrated (run <c>calor format</c>).
+    ///
+    /// The CLI <c>--input … --output …</c> compile path sets this to
+    /// <c>true</c> by default and exposes <c>--allow-legacy-closers</c>
+    /// as a temporary escape hatch. Other API consumers (MSBuild task,
+    /// MCP tools, LSP, internal tests) opt in explicitly so existing
+    /// callers see no behavior change. The default below stays
+    /// <c>false</c> until the cross-surface migration is complete.
+    /// </summary>
+    public bool RejectLegacyClosers { get; init; } = false;
 }
 
 /// <summary>
