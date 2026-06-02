@@ -949,7 +949,7 @@ public class Wrapper
         Assert.Contains("§OP{", formatted);
         Assert.Contains("§Q", formatted);
         Assert.Contains("§S", formatted);
-        Assert.Contains("§/OP{", formatted);
+        // Phase 4b: indent form — the operator block ends by dedent, not §/OP.
     }
 
     [Fact]

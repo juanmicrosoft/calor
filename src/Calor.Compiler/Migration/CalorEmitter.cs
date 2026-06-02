@@ -1842,7 +1842,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var exType = node.ExceptionType ?? "Exception";
         var varPart = node.VariableName != null ? $":{node.VariableName}" : "";
-        var filterPart = node.Filter != null ? $" WHEN {node.Filter.Accept(this)}" : "";
+        var filterPart = node.Filter != null ? $" §WHEN {node.Filter.Accept(this)}" : "";
 
         AppendLine($"§CA{{{exType}{varPart}}}{filterPart}");
         Indent();
