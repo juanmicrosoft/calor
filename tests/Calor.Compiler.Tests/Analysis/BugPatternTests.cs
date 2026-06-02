@@ -58,12 +58,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:0)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Divide:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (/ x INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -81,12 +79,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:2)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Divide:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (/ x INT:2)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -103,13 +99,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Divide:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (/ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -127,16 +121,13 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeDivide:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF{if1} (!= y INT:0)
-    §R (/ x y)
-  §/I{if1}
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeDivide:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §IF{if1} (!= y INT:0)
+          §R (/ x y)
+      §R INT:0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -163,14 +154,12 @@ public class BugPatternTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:SafeDivide:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §Q (!= y INT:0)
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeDivide:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §Q (!= y INT:0)
+      §R (/ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -190,13 +179,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Nested:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ INT:1 (/ x y))
-§/F{f001}
-§/M{m001}";
+  §F{f001:Nested:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ INT:1 (/ x y))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -213,13 +200,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Modulo:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (% x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Modulo:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (% x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -241,13 +226,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Add:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -266,13 +249,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Multiply:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (* x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Multiply:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (* x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -292,15 +273,13 @@ public class BugPatternTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:SafeAdd:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §Q (AND (>= x INT:0) (<= x INT:100))
-  §Q (AND (>= y INT:0) (<= y INT:100))
-  §R (+ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeAdd:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §Q (AND (>= x INT:0) (<= x INT:100))
+      §Q (AND (>= y INT:0) (<= y INT:100))
+      §R (+ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -323,12 +302,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Unwrap:pub}
-  §I{Option<i32>:opt}
-  §O{i32}
-  §R (CALL opt.unwrap)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Unwrap:pub}
+      §I{Option<i32>:opt}
+      §O{i32}
+      §R (CALL opt.unwrap)";
 
         var func = GetFunction(source, out var parseDiag);
         // May have parse errors if Option<i32> isn't recognized
@@ -349,12 +326,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Safe:pub}
-  §I{Option<i32>:opt}
-  §O{i32}
-  §R (CALL opt.unwrap_or INT:0)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Safe:pub}
+      §I{Option<i32>:opt}
+      §O{i32}
+      §R (CALL opt.unwrap_or INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -377,12 +352,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Access:pub}
-  §I{Array<i32>:arr}
-  §O{i32}
-  §R (CALL arr.get INT:-1)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Access:pub}
+      §I{Array<i32>:arr}
+      §O{i32}
+      §R (CALL arr.get INT:-1)";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -402,13 +375,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Access:pub}
-  §I{Array<i32>:arr}
-  §I{i32:idx}
-  §O{i32}
-  §R (CALL arr.get idx)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Access:pub}
+      §I{Array<i32>:arr}
+      §I{i32:idx}
+      §O{i32}
+      §R (CALL arr.get idx)";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -430,13 +401,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Risky:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ (/ x y) (* x y))
-§/F{f001}
-§/M{m001}";
+  §F{f001:Risky:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ (/ x y) (* x y))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -454,12 +423,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Safe:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (+ x INT:1)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Safe:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (+ x INT:1)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -482,14 +449,12 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:NestedDiv:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §I{i32:c}
-  §O{i32}
-  §R (/ a (/ b c))
-§/F{f001}
-§/M{m001}";
+  §F{f001:NestedDiv:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §I{i32:c}
+      §O{i32}
+      §R (/ a (/ b c))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -510,13 +475,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ExprDiv:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ INT:10 (/ x y))
-§/F{f001}
-§/M{m001}";
+  §F{f001:ExprDiv:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ INT:10 (/ x y))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -534,12 +497,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeDiv:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:5)
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeDiv:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (/ x INT:5)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -560,12 +521,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:NegDiv:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:-3)
-§/F{f001}
-§/M{m001}";
+  §F{f001:NegDiv:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (/ x INT:-3)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -586,16 +545,14 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:MultiOp:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §I{i32:c}
-  §O{i32}
-  §B{x:i32} (/ a b)
-  §B{y:i32} (/ x c)
-  §R y
-§/F{f001}
-§/M{m001}";
+  §F{f001:MultiOp:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §I{i32:c}
+      §O{i32}
+      §B{x:i32} (/ a b)
+      §B{y:i32} (/ x c)
+      §R y";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -620,12 +577,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:LargeAdd:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (+ x INT:2147483647)
-§/F{f001}
-§/M{m001}";
+  §F{f001:LargeAdd:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (+ x INT:2147483647)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -644,12 +599,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SmallAdd:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (+ x INT:1)
-§/F{f001}
-§/M{m001}";
+  §F{f001:SmallAdd:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (+ x INT:1)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -667,13 +620,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Sub:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (- x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Sub:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (- x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -695,13 +646,11 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:OnlyAdd:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:OnlyAdd:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -722,11 +671,9 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Const:pub}
-  §O{i32}
-  §R INT:42
-§/F{f001}
-§/M{m001}";
+  §F{f001:Const:pub}
+      §O{i32}
+      §R INT:42";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -747,15 +694,13 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Arith:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §B{sum:i32} (+ a b)
-  §B{diff:i32} (- a b)
-  §R (+ sum diff)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Arith:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §B{sum:i32} (+ a b)
+      §B{diff:i32} (- a b)
+      §R (+ sum diff)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -777,16 +722,13 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GuardGT:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF{if1} (> y INT:0)
-    §R (/ x y)
-  §/I{if1}
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:GuardGT:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §IF{if1} (> y INT:0)
+          §R (/ x y)
+      §R INT:0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -807,16 +749,13 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GuardLT:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF{if1} (< y INT:0)
-    §R (/ x y)
-  §/I{if1}
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:GuardLT:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §IF{if1} (< y INT:0)
+          §R (/ x y)
+      §R INT:0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -838,12 +777,10 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DivByParam:pub}
-  §I{i32:divisor}
-  §O{i32}
-  §R (/ INT:100 divisor)
-§/F{f001}
-§/M{m001}";
+  §F{f001:DivByParam:pub}
+      §I{i32:divisor}
+      §O{i32}
+      §R (/ INT:100 divisor)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -861,19 +798,16 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:BothBranches:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §I{i32:z}
-  §I{bool:cond}
-  §O{i32}
-  §IF{if1} cond
-    §R (/ x y)
-  §EL
-    §R (/ x z)
-  §/I{if1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:BothBranches:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §I{i32:z}
+      §I{bool:cond}
+      §O{i32}
+      §IF{if1} cond
+          §R (/ x y)
+      §EL
+          §R (/ x z)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -894,11 +828,9 @@ public class BugPatternTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ModZero:pub}
-  §O{i32}
-  §R (% INT:10 INT:0)
-§/F{f001}
-§/M{m001}";
+  §F{f001:ModZero:pub}
+      §O{i32}
+      §R (% INT:10 INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);

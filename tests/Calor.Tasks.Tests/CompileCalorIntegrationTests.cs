@@ -38,25 +38,21 @@ public class CompileCalorIntegrationTests : IDisposable
     private const string ValidCalorSource = """
         §M{m001:TestModule}
 
-        §F{f001:Add:pub}
-          §I{i32:a}
-          §I{i32:b}
-          §O{i32}
-          §R (+ a b)
-        §/F{f001}
+          §F{f001:Add:pub}
+              §I{i32:a}
+              §I{i32:b}
+              §O{i32}
+              §R (+ a b)
 
-        §/M{m001}
         """;
 
     // Source that will cause a compile error (unclosed paren)
     private const string InvalidCalorSource = """
         §M{m001:TestModule}
-        §F{f001:Broken:pub}
-          §I{i32:a}
-          §O{i32}
-          §R (+ a b
-        §/F{f001}
-        §/M{m001}
+          §F{f001:Broken:pub}
+              §I{i32:a}
+              §O{i32}
+              §R (+ a b
         """;
 
     public CompileCalorIntegrationTests()
@@ -392,20 +388,16 @@ public class CompileCalorIntegrationTests : IDisposable
     {
         var callee = """
             §M{m001:OrderService}
-            §F{f001:SaveOrder:pub}
-              §O{void}
-              §E{db:w}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:SaveOrder:pub}
+                  §O{void}
+                  §E{db:w}
             """;
         var caller = """
             §M{m002:Handler}
-            §F{f001:HandleRequest:pub}
-              §O{void}
-              §C{SaveOrder}
-              §/C
-            §/F{f001}
-            §/M{m002}
+              §F{f001:HandleRequest:pub}
+                  §O{void}
+                  §C{SaveOrder}
+                  §/C
             """;
 
         var src1 = CreateSourceFile("Callee.calr", callee);
@@ -427,21 +419,17 @@ public class CompileCalorIntegrationTests : IDisposable
     {
         var callee = """
             §M{m001:OrderService}
-            §F{f001:SaveOrder:pub}
-              §O{void}
-              §E{db:w}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:SaveOrder:pub}
+                  §O{void}
+                  §E{db:w}
             """;
         var caller = """
             §M{m002:Handler}
-            §F{f001:HandleRequest:pub}
-              §O{void}
-              §E{db:w}
-              §C{SaveOrder}
-              §/C
-            §/F{f001}
-            §/M{m002}
+              §F{f001:HandleRequest:pub}
+                  §O{void}
+                  §E{db:w}
+                  §C{SaveOrder}
+                  §/C
             """;
 
         var src1 = CreateSourceFile("Callee.calr", callee);
@@ -463,21 +451,17 @@ public class CompileCalorIntegrationTests : IDisposable
     {
         var calleeOriginal = """
             §M{m001:Repo}
-            §F{f001:Save:pub}
-              §O{void}
-              §E{db:w}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Save:pub}
+                  §O{void}
+                  §E{db:w}
             """;
         var caller = """
             §M{m002:App}
-            §F{f001:Run:pub}
-              §O{void}
-              §E{db:w}
-              §C{Save}
-              §/C
-            §/F{f001}
-            §/M{m002}
+              §F{f001:Run:pub}
+                  §O{void}
+                  §E{db:w}
+                  §C{Save}
+                  §/C
             """;
 
         var src1 = CreateSourceFile("Repo.calr", calleeOriginal);
@@ -508,21 +492,17 @@ public class CompileCalorIntegrationTests : IDisposable
     {
         var callee = """
             §M{m001:Repo}
-            §F{f001:Save:pub}
-              §O{void}
-              §E{db:w}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Save:pub}
+                  §O{void}
+                  §E{db:w}
             """;
         var caller = """
             §M{m002:App}
-            §F{f001:Run:pub}
-              §O{void}
-              §E{db:w}
-              §C{Save}
-              §/C
-            §/F{f001}
-            §/M{m002}
+              §F{f001:Run:pub}
+                  §O{void}
+                  §E{db:w}
+                  §C{Save}
+                  §/C
             """;
 
         var src1 = CreateSourceFile("Repo.calr", callee);

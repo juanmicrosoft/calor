@@ -22,13 +22,11 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §F{f001:/*cursor*/Add}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R a + b
-            §/F{f001}
-            §/M{m001}
+              §F{f001:/*cursor*/Add}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §R a + b
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -43,12 +41,10 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §F{f001:Test}
-            §I{i32:/*cursor*/value}
-            §O{i32}
-            §R value
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §I{i32:/*cursor*/value}
+                §O{i32}
+                §R value
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -64,11 +60,9 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §CL{c001:/*cursor*/Person}
-            §FLD{str:name}
-            §FLD{i32:age}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:/*cursor*/Person}
+                §FLD{str:name}
+                §FLD{i32:age}
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -83,10 +77,8 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:/*cursor*/name}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:/*cursor*/name}
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -101,15 +93,12 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §CL{c001:Calculator}
-            §MT{m001:/*cursor*/Add}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R a + b
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Calculator}
+                §MT{m001:/*cursor*/Add}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R a + b
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -124,12 +113,9 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §IFACE{i001:/*cursor*/IShape}
-            §MT{m001:GetArea}
-            §O{f64}
-            §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:/*cursor*/IShape}
+                §MT{m001:GetArea}
+                  §O{f64}
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -144,12 +130,11 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §EN{e001:/*cursor*/Color}
-            §EM{Red}
-            §EM{Green}
-            §EM{Blue}
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:/*cursor*/Color}
+              §EM{Red}
+              §EM{Green}
+              §EM{Blue}
+              §/EN{e001}
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -164,10 +149,9 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §EN{e001:Color}
-            §EM{/*cursor*/Red}
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Color}
+              §EM{/*cursor*/Red}
+              §/EN{e001}
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -182,11 +166,9 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:TestModule}
-            §F{f001:Test}
-            §B{/*cursor*/x:i32} 42
-            §R x
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §B{/*cursor*/x:i32} 42
+                §R x
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);
@@ -201,10 +183,8 @@ public class HoverHandlerTests
     {
         var (source, line, column) = LspTestHarness.FindMarker("""
             §M{m001:/*cursor*/TestModule}
-            §F{f001:Test}
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §R 0
             """);
 
         var result = LspTestHarness.FindSymbol(source, line, column);

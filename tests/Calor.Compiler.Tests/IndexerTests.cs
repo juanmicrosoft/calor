@@ -17,7 +17,7 @@ public class IndexerTests
         var source = "§IXER{ix1:int:pub}";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Empty(diag);
         Assert.Contains(tokens, t => t.Kind == TokenKind.Indexer);
@@ -29,7 +29,7 @@ public class IndexerTests
         var source = "§/IXER{ix1}";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Empty(diag);
         Assert.Contains(tokens, t => t.Kind == TokenKind.EndIndexer);
@@ -44,17 +44,15 @@ public class IndexerTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §IXER{ix1:int:pub}
-            §I{int:index}
-            §GET
-            §R INT:0
-            §/GET
-            §SET
-            §/SET
-            §/IXER{ix1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §IXER{ix1:int:pub}
+                §I{int:index}
+                §GET
+                §R INT:0
+                §/GET
+                §SET
+                §/SET
+                §/IXER{ix1}
             """;
 
         var diag = new DiagnosticBag();
@@ -81,10 +79,8 @@ public class IndexerTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §IXER{ix1:int:pub:get,set} (int:index)
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §IXER{ix1:int:pub:get,set} (int:index)
             """;
 
         var diag = new DiagnosticBag();
@@ -111,10 +107,8 @@ public class IndexerTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §IXER{ix1:int:pub:get,set} (int:row, int:col)
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §IXER{ix1:int:pub:get,set} (int:row, int:col)
             """;
 
         var diag = new DiagnosticBag();
@@ -136,10 +130,8 @@ public class IndexerTests
     {
         var source = """
             §M{m1:Test}
-            §IFACE{i1:IMyCollection}
-            §IXER{ix1:int:pub:get,set} (int:index)
-            §/IFACE{i1}
-            §/M{m1}
+              §IFACE{i1:IMyCollection}
+                §IXER{ix1:int:pub:get,set} (int:index)
             """;
 
         var diag = new DiagnosticBag();
@@ -160,10 +152,8 @@ public class IndexerTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §IXER{ix1:int:pub:virt:get,set} (int:index)
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §IXER{ix1:int:pub:virt:get,set} (int:index)
             """;
 
         var diag = new DiagnosticBag();
@@ -182,10 +172,8 @@ public class IndexerTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyDict:pub}
-            §IXER{ix1:List<str>:pub:get,set} (Dictionary<str,i32>:lookup)
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyDict:pub}
+                §IXER{ix1:List<str>:pub:get,set} (Dictionary<str,i32>:lookup)
             """;
 
         var diag = new DiagnosticBag();
@@ -490,10 +478,8 @@ public class IndexerTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §IXER{ix1:int:pub:get,set} (int:index)
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §IXER{ix1:int:pub:get,set} (int:index)
             """;
 
         // Parse

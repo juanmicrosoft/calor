@@ -19,7 +19,7 @@ public sealed class RefinementTypeParserTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
@@ -108,11 +108,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §F{f001:Main:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §F{f001:Main:pub}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -133,8 +131,7 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-            §/M{m001}
+              §RTYPE{r1:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -154,8 +151,7 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-            §/M{m001}
+              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -174,9 +170,8 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §RTYPE{r2:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §RTYPE{r2:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -195,8 +190,7 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -214,11 +208,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §R #
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §R #
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -234,12 +226,10 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:positive} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:positive} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -261,12 +251,10 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -287,11 +275,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:age} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:age} | (>= # INT:0)
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -313,11 +299,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -335,11 +319,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §F{f001:Main:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §F{f001:Main:pub}
+                  §O{void}
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -356,12 +338,10 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:positive} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:positive} (>= x INT:0)
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -374,12 +354,10 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1} (>= x INT:0)
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -394,8 +372,7 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -409,12 +386,10 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:positive} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:positive} (>= x INT:0)
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -429,11 +404,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §F{f001:Main:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §F{f001:Main:pub}
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -515,8 +488,7 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -533,12 +505,10 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:test} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:test} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -557,9 +527,8 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §RTYPE{r2:NatInt:i32} (> # INT:0)
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §RTYPE{r2:NatInt:i32} (> # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -577,8 +546,7 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:MyType:nonexistent_type_xyz} (>= # INT:0)
-            §/M{m001}
+              §RTYPE{r1:MyType:nonexistent_type_xyz} (>= # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -599,11 +567,9 @@ public sealed class RefinementTypeParserTests
         // in a context where it can be parsed (e.g., inside a function return)
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{i32}
-              §R #
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{i32}
+                  §R #
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -617,13 +583,11 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §C{Console.WriteLine}
-                §A #
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §C{Console.WriteLine}
+                    §A #
+                  §/C
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -638,8 +602,7 @@ public sealed class RefinementTypeParserTests
         // Verify that # inside a refinement predicate does NOT report an error
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -656,11 +619,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:age} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:age} | (>= # INT:0)
+                  §O{void}
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -676,11 +637,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -696,11 +655,9 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:age} | (>= # INT:0) = INT:18
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:age} | (>= # INT:0) = INT:18
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -724,13 +681,11 @@ public sealed class RefinementTypeParserTests
         // | inside a Lisp expression should still be bitwise OR, not refinement
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §I{i32:y}
-              §O{i32}
-              §R (| x y)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §I{i32:y}
+                  §O{i32}
+                  §R (| x y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -752,15 +707,13 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §PROOF{p1:result} (>= (+ a b) INT:0)
-              §R (+ a b)
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §PROOF{p1:result} (>= (+ a b) INT:0)
+                  §R (+ a b)
             """;
 
         var csharp = ParseAndEmitCSharp(source);
@@ -782,12 +735,10 @@ public sealed class RefinementTypeParserTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Clamp:pub}
-              §I{i32:value} | (>= # INT:0)
-              §O{i32}
-              §R value
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Clamp:pub}
+                  §I{i32:value} | (>= # INT:0)
+                  §O{i32}
+                  §R value
             """;
 
         var csharp = ParseAndEmitCSharp(source);

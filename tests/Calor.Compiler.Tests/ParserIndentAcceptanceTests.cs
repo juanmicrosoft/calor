@@ -89,9 +89,12 @@ public class ParserIndentAcceptanceTests
     }
 
     [Fact]
-    public void CloserMode_ExistingFixture_StillParses()
+    public void CloserMode_ExistingFixture_NowRejected_Phase4d()
     {
-        // Regression guard: closer form continues to parse unchanged.
+        // Phase 4d: closer form is no longer accepted. Source with §/F / §/M
+        // emits Calor0830 diagnostics. (Previously accepted additively in
+        // Phase 1 — see ParserLegacyCloserRejectionTests for the full
+        // rejection contract.)
         var src = "§M{m1:Test}\n" +
                   "§F{f1:Add:pub}\n" +
                   "§I{i32:a}\n" +
@@ -100,19 +103,16 @@ public class ParserIndentAcceptanceTests
                   "§R (+ a b)\n" +
                   "§/F{f1}\n" +
                   "§/M{m1}\n";
-        var module = ParseCloserForm(src, out var diag);
+        _ = ParseCloserForm(src, out var diag);
 
-        Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
-        Assert.Equal("Test", module.Name);
-        Assert.Single(module.Functions);
+        Assert.True(diag.HasErrors, "Phase 4d: legacy structural closers must be rejected.");
     }
 
     [Fact]
-    public void IndentMode_ClosersStillAccepted_AdditiveBehavior()
+    public void IndentMode_ClosersRejected_Phase4d()
     {
-        // Closer-form source parsed through TokenizeWithIndent should still
-        // work. The lexer emits Dedent before §/F, then §/F, then Dedent
-        // before §/M, then §/M. ExpectBlockEnd consumes both forms.
+        // Phase 4d: even when fed through indent-aware tokenization, the
+        // parser rejects legacy §/F / §/M closers.
         var src = "§M{m1:Test}\n" +
                   "  §F{f1:Add:pub}\n" +
                   "    §I{i32:a}\n" +
@@ -121,11 +121,9 @@ public class ParserIndentAcceptanceTests
                   "    §R (+ a b)\n" +
                   "  §/F{f1}\n" +
                   "§/M{m1}\n";
-        var module = ParseIndentForm(src, out var diag);
+        _ = ParseIndentForm(src, out var diag);
 
-        Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
-        Assert.Equal("Test", module.Name);
-        Assert.Single(module.Functions);
+        Assert.True(diag.HasErrors, "Phase 4d: legacy structural closers must be rejected.");
     }
 
     [Fact]
@@ -179,26 +177,19 @@ public class ParserIndentAcceptanceTests
     }
 
     [Fact]
-    public void CloserMode_FixtureParsesViaTokenizeAllForParser()
+    public void IndentForm_FizzBuzz_ParsesViaTokenizeAllForParser()
     {
-        // Phase 1b regression guard: real-world closer-form fixture parses
-        // correctly when fed through the new indent-aware production entry
-        // point (TokenizeAllForParser). This proves we can flip all 16 CLI
-        // callers from TokenizeAll → TokenizeAllForParser without breaking
-        // existing closer-only source.
+        // Phase 4d regression guard: real-world indent-form FizzBuzz parses
+        // correctly through the new strict-by-default Parser.
         var src = "§M{m001:FizzBuzz}\n" +
-                  "§F{f001:Main:pub}\n" +
-                  "  §O{void}\n" +
-                  "  §E{cw}\n" +
-                  "  §L{for1:i:1:100:1}\n" +
-                  "    §IF{if1} (== (% i 15) 0) → §P \"FizzBuzz\"\n" +
-                  "    §EI (== (% i 3) 0) → §P \"Fizz\"\n" +
-                  "    §EI (== (% i 5) 0) → §P \"Buzz\"\n" +
-                  "    §EL → §P i\n" +
-                  "    §/I{if1}\n" +
-                  "  §/L{for1}\n" +
-                  "§/F{f001}\n" +
-                  "§/M{m001}\n";
+                  "  §F{f001:Main:pub}\n" +
+                  "    §O{void}\n" +
+                  "    §E{cw}\n" +
+                  "    §L{for1:i:1:100:1}\n" +
+                  "      §IF{if1} (== (% i 15) 0) → §P \"FizzBuzz\"\n" +
+                  "      §EI (== (% i 3) 0) → §P \"Fizz\"\n" +
+                  "      §EI (== (% i 5) 0) → §P \"Buzz\"\n" +
+                  "      §EL → §P i\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(src, diagnostics);

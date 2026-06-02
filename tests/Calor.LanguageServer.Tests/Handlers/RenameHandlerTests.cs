@@ -11,13 +11,11 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{counter} 0
-            §ASSIGN counter (+ counter 1)
-            §R counter
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{counter} 0
+                §ASSIGN counter (+ counter 1)
+                §R counter
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -35,15 +33,12 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Helper:pub}
-            §O{i32}
-            §R 42
-            §/F{f001}
-            §F{f002:Main:pub}
-            §O{i32}
-            §R §C{Helper} §/C
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Helper:pub}
+                §O{i32}
+                §R 42
+              §F{f002:Main:pub}
+                §O{i32}
+                §R §C{Helper} §/C
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -61,12 +56,10 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Square:pub}
-            §I{i32:num}
-            §O{i32}
-            §R (* num num)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Square:pub}
+                §I{i32:num}
+                §O{i32}
+                §R (* num num)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -84,14 +77,11 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Widget}
-            §FLD{str:name}
-            §/CL{c001}
-            §F{f001:Create:pub}
-            §O{Widget}
-            §R §NEW{Widget} §/NEW
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Widget}
+                §FLD{str:name}
+              §F{f001:Create:pub}
+                §O{Widget}
+                §R §NEW{Widget} §/NEW
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -109,19 +99,15 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Counter}
-            §FLD{i32:value:priv}
-            §MT{m001:Get:pub}
-            §O{i32}
-            §R value
-            §/MT{m001}
-            §MT{m002:Set:pub}
-            §I{i32:newValue}
-            §O{void}
-            §ASSIGN value newValue
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Counter}
+                §FLD{i32:value:priv}
+                §MT{m001:Get:pub}
+                  §O{i32}
+                  §R value
+                §MT{m002:Set:pub}
+                  §I{i32:newValue}
+                  §O{void}
+                  §ASSIGN value newValue
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -139,15 +125,12 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Sum:pub}
-            §O{i32}
-            §B{result} 0
-            §L{for1:index:0:10:1}
-            §ASSIGN result (+ result index)
-            §/L{for1}
-            §R result
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sum:pub}
+                §O{i32}
+                §B{result} 0
+                §L{for1:index:0:10:1}
+                  §ASSIGN result (+ result index)
+                §R result
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -165,14 +148,11 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Print:pub}
-            §I{[str]:items}
-            §O{void}
-            §EACH{e1:item:str} items
-            §P item
-            §/EACH{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Print:pub}
+                §I{[str]:items}
+                §O{void}
+                §EACH{e1:item:str} items
+                  §P item
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -190,15 +170,12 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Math}
-            §MT{m001:Add:pub}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R (+ a b)
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Math}
+                §MT{m001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -216,11 +193,10 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:Status}
-            Active
-            Inactive
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Status}
+              Active
+              Inactive
+              §/EN{e001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -238,12 +214,9 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §IFACE{i001:IService}
-            §MT{m001:Execute}
-            §O{void}
-            §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IService}
+                §MT{m001:Execute}
+                  §O{void}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -261,11 +234,9 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §R 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -282,15 +253,13 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{doubler} §LAM
-            §I{i32:val}
-            §R (* val 2)
-            §/LAM
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{doubler} §LAM
+                §I{i32:val}
+                §R (* val 2)
+                §/LAM
+                §R 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -308,17 +277,15 @@ public class RenameHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Safe:pub}
-            §O{i32}
-            §TRY{t1}
-            §R (/ 10 0)
-            §CATCH{Exception:ex}
-            §P ex
-            §R 0
-            §/CATCH
-            §/TRY{t1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Safe:pub}
+                §O{i32}
+                §TRY{t1}
+                §R (/ 10 0)
+                §CATCH{Exception:ex}
+                §P ex
+                §R 0
+                §/CATCH
+                §/TRY{t1}
             """;
 
         var ast = LspTestHarness.GetAst(source);

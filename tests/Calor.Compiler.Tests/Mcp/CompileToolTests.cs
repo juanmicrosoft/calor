@@ -38,7 +38,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
             }
             """).RootElement;
 
@@ -111,7 +111,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n§/F{f001}\n§/M{m001}",
+                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n",
                 "options": {
                     "contractMode": "off"
                 }
@@ -130,7 +130,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n§/F{f001}\n§/M{m001}",
+                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n",
                 "options": {
                     "contractMode": "release"
                 }

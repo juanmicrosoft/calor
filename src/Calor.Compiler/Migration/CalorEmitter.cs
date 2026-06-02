@@ -2046,7 +2046,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             || whenTrue.Contains(',') || whenFalse.Contains(','))
         {
             var id = $"tern{_ternaryCounter++:D3}";
-            return $"§IF{{{id}}} {condition} → {whenTrue} §EL → {whenFalse} §/I{{{id}}}";
+            // Phase 4d: omit the legacy §/I{id} closer — ParseIfExpression
+            // treats the closer as optional and recognizes the inline form
+            // from §IF{id} … §EL … alone.
+            return $"§IF{{{id}}} {condition} → {whenTrue} §EL → {whenFalse}";
         }
 
         return $"(? {condition} {whenTrue} {whenFalse})";

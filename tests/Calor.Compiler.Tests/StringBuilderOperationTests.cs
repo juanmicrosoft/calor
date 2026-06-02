@@ -22,12 +22,10 @@ public class StringBuilderOperationTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{object:sb}
-              §O{object}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{object:sb}
+                  §O{object}
+                  {{body}}
             """;
     }
 

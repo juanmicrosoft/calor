@@ -11,7 +11,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_InClass_ParsesSuccessfully()
     {
-        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler:pub}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n§/CL{c001}\n§/M{m001}";
+        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler:pub}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -32,7 +32,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_EmitsCSharp()
     {
-        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n§/CL{c001}\n§/M{m001}";
+        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -51,7 +51,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_EmitsCalor()
     {
-        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n§/CL{c001}\n§/M{m001}";
+        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);

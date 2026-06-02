@@ -241,10 +241,8 @@ public class LspE2ETests : IDisposable
                 languageId = "calor",
                 version = 1,
                 text = @"§M{m001:TestModule}
-§F{f001:Test}
-§R 0
-§/F{f001}
-§/M{m001}"
+  §F{f001:Test}
+    §R 0"
             }
         });
 
@@ -280,12 +278,10 @@ public class LspE2ETests : IDisposable
                 languageId = "calor",
                 version = 1,
                 text = @"§M{m001:TestModule}
-§F{f001:Add}
-§I{i32:a}
-§O{i32}
-§R a
-§/F{f001}
-§/M{m001}"
+  §F{f001:Add}
+    §I{i32:a}
+    §O{i32}
+    §R a"
             }
         });
 

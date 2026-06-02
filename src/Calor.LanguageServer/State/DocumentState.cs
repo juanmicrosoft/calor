@@ -90,8 +90,10 @@ public sealed class DocumentState
             var lexer = new Lexer(Source, Diagnostics);
             Tokens = lexer.TokenizeAll();
 
-            // Phase 2: Parsing
-            var parser = new Parser(Tokens, Diagnostics);
+            // Phase 2: Parsing (uses indent-aware token stream)
+            var parserLexer = new Lexer(Source, new DiagnosticBag());
+            var parserTokens = parserLexer.TokenizeAllForParser();
+            var parser = new Parser(parserTokens, Diagnostics);
             Ast = parser.Parse();
 
             // Phase 3: Binding (only if parsing succeeded without critical errors)

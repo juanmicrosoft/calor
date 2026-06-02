@@ -209,13 +209,11 @@ public static class Test
     {
         using var executor = new CodeExecutor();
         var result = executor.CompileCalor(@"§M{m001:Math}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}");
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)");
 
         Assert.True(result.Success);
         Assert.NotNull(result.GeneratedCSharp);
@@ -237,13 +235,11 @@ public static class Test
     {
         using var executor = new CodeExecutor();
         var result = executor.CompileAndExecuteCalor(@"§M{m001:Math}
-§F{f001:Multiply:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Multiply:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (* a b)",
             "Multiply",
             new object[] { 6, 7 });
 
@@ -719,7 +715,10 @@ public static class Math
             }
         };
 
-        var result = await runner.RunTaskAsync(task);
+        // Use a clean cache so the test doesn't depend on cached responses
+        // from previous runs (the cache lives in temp and can outlive
+        // language changes — e.g. Phase 4d closer-form deprecation).
+        var result = await runner.RunTaskAsync(task, new LlmTaskRunnerOptions { UseCache = false });
 
         // Both should compile
         Assert.True(result.CalorResult.CompilationSuccess);

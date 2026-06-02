@@ -367,9 +367,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:TestController:ControllerBase}[@Route("api/test")][@ApiController]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:TestController:ControllerBase}[@Route("api/test")][@ApiController]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -394,12 +392,9 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:TestController:ControllerBase}
-                §MT{m001:Post:pub}[@HttpPost]
-                  §O{void}
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:TestController:ControllerBase}
+                    §MT{m001:Post:pub}[@HttpPost]
+                        §O{void}
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -425,13 +420,11 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:TestModel}
-                §PROP{p001:Value:int:pub}[@Range(1, 100, ErrorMessage="Invalid")]
-                  §GET
-                  §SET
-                §/PROP{p001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:TestModel}
+                    §PROP{p001:Value:int:pub}[@Range(1, 100, ErrorMessage="Invalid")]
+                      §GET
+                      §SET
+                    §/PROP{p001}
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -519,9 +512,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyAttribute}[@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyAttribute}[@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -550,9 +541,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyAttribute}[@Flags][@AttributeUsage(A.X | A.Y | A.Z)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyAttribute}[@Flags][@AttributeUsage(A.X | A.Y | A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -577,9 +566,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyAttribute}[@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyAttribute}[@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -601,9 +588,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyAttribute}[@AttributeUsage(ValidOn = AttributeTargets.Class | AttributeTargets.Struct)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyAttribute}[@AttributeUsage(ValidOn = AttributeTargets.Class | AttributeTargets.Struct)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -628,9 +613,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:TestClass}[@SomeAttr("text", Flags = A.X | A.Y)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:TestClass}[@SomeAttr("text", Flags = A.X | A.Y)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -695,9 +678,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr(A.X | )]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr(A.X | )]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -717,9 +698,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr(A.All & A.Mask)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr(A.All & A.Mask)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -740,9 +719,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr(A.X ^ A.Y)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr(A.X ^ A.Y)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -763,9 +740,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr(~A.X)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr(~A.X)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -787,9 +762,7 @@ public class AttributeConversionTests
         // Common pattern: AttributeTargets.All & ~AttributeTargets.Delegate
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr(A.All & ~A.Delegate)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr(A.All & ~A.Delegate)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -812,9 +785,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr((A.X | A.Y) & A.Z)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr((A.X | A.Y) & A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -840,9 +811,7 @@ public class AttributeConversionTests
         // A | B & C should parse as A | (B & C) per C# precedence
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr(A.X | A.Y & A.Z)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr(A.X | A.Y & A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -868,9 +837,7 @@ public class AttributeConversionTests
         // (A | B) & C must keep parens because | is lower precedence than &
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr((A.X | A.Y) & A.Z)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr((A.X | A.Y) & A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -893,9 +860,7 @@ public class AttributeConversionTests
         // A | B & C — no parens needed, & binds tighter naturally
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr(A.X | A.Y & A.Z)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr(A.X | A.Y & A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -917,9 +882,7 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-              §CL{c001:MyClass}[@SomeAttr(A.All & ~A.Delegate)]
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:MyClass}[@SomeAttr(A.All & ~A.Delegate)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1003,11 +966,9 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-            §F{f001:Fn:pub}
-            §O{str}
-            §R (nameof value)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Fn:pub}
+                §O{str}
+                §R (nameof value)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1029,11 +990,9 @@ public class AttributeConversionTests
     {
         var calorSource = """
             §M{m001:TestModule}
-            §F{f001:Fn:pub}
-            §O{str}
-            §R (nameof obj.Property)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Fn:pub}
+                §O{str}
+                §R (nameof obj.Property)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1056,11 +1015,9 @@ public class AttributeConversionTests
         // Calor keywords used as nameof arguments should still work
         var calorSource = """
             §M{m1:Test}
-            §F{f1:GetName}
-              §O{str}
-              §R (nameof value)
-            §/F{f1}
-            §/M{m1}
+              §F{f1:GetName}
+                  §O{str}
+                  §R (nameof value)
             """;
 
         var compilationResult = Program.Compile(calorSource);

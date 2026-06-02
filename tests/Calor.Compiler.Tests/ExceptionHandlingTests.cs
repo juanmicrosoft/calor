@@ -17,17 +17,15 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:SafeDivide:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§TR{t1}
-§R (/ a b)
-§CA{DivideByZeroException:ex}
-§R 0
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:SafeDivide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §TR{t1}
+    §R (/ a b)
+    §CA{DivideByZeroException:ex}
+    §R 0
+    §/TR{t1}
 ";
 
         var result = ParseAndEmit(source);
@@ -43,18 +41,16 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:WithFinally:pub}
-§O{void}
-§E{cw}
-§TR{t1}
-§P ""try""
-§CA{Exception:e}
-§P ""catch""
-§FI
-§P ""finally""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:WithFinally:pub}
+    §O{void}
+    §E{cw}
+    §TR{t1}
+    §P ""try""
+    §CA{Exception:e}
+    §P ""catch""
+    §FI
+    §P ""finally""
+    §/TR{t1}
 ";
 
         var result = ParseAndEmit(source);
@@ -69,20 +65,18 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Nested:pub}
-§I{i32:x}
-§O{i32}
-§TR{t1}
-§TR{t2}
-§R (/ 100 x)
-§CA{DivideByZeroException:inner}
-§R -1
-§/TR{t2}
-§CA{Exception:outer}
-§R -2
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Nested:pub}
+    §I{i32:x}
+    §O{i32}
+    §TR{t1}
+    §TR{t2}
+    §R (/ 100 x)
+    §CA{DivideByZeroException:inner}
+    §R -1
+    §/TR{t2}
+    §CA{Exception:outer}
+    §R -2
+    §/TR{t1}
 ";
 
         var result = ParseAndEmit(source);
@@ -101,20 +95,18 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:MultiCatch:pub}
-§I{i32:x}
-§O{str}
-§TR{t1}
-§R (/ 100 x)
-§CA{DivideByZeroException:e1}
-§R ""divide by zero""
-§CA{ArithmeticException:e2}
-§R ""arithmetic error""
-§CA{Exception:e3}
-§R ""general error""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:MultiCatch:pub}
+    §I{i32:x}
+    §O{str}
+    §TR{t1}
+    §R (/ 100 x)
+    §CA{DivideByZeroException:e1}
+    §R ""divide by zero""
+    §CA{ArithmeticException:e2}
+    §R ""arithmetic error""
+    §CA{Exception:e3}
+    §R ""general error""
+    §/TR{t1}
 ";
 
         var result = ParseAndEmit(source);
@@ -129,16 +121,14 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:CatchAll:pub}
-§O{void}
-§E{cw}
-§TR{t1}
-§P ""try""
-§CA
-§P ""caught""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:CatchAll:pub}
+    §O{void}
+    §E{cw}
+    §TR{t1}
+    §P ""try""
+    §CA
+    §P ""caught""
+    §/TR{t1}
 ";
 
         var result = ParseAndEmit(source);
@@ -153,18 +143,16 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Filtered:pub}
-§I{i32:code}
-§O{str}
-§TR{t1}
-§TH ""Error""
-§CA{Exception:ex} §WHEN (== code 42)
-§R ""special""
-§CA{Exception:ex}
-§R ""general""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Filtered:pub}
+    §I{i32:code}
+    §O{str}
+    §TR{t1}
+    §TH ""Error""
+    §CA{Exception:ex} §WHEN (== code 42)
+    §R ""special""
+    §CA{Exception:ex}
+    §R ""general""
+    §/TR{t1}
 ";
 
         var result = ParseAndEmit(source);
@@ -177,17 +165,15 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Rethrow:pub}
-§O{void}
-§E{cw}
-§TR{t1}
-§TH ""Error""
-§CA{Exception:ex}
-§P ""caught""
-§RT
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Rethrow:pub}
+    §O{void}
+    §E{cw}
+    §TR{t1}
+    §TH ""Error""
+    §CA{Exception:ex}
+    §P ""caught""
+    §RT
+    §/TR{t1}
 ";
 
         var result = ParseAndEmit(source);
@@ -202,11 +188,9 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§O{void}
-§TH ""error message""
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §O{void}
+    §TH ""error message""
 ";
 
         var result = ParseAndEmit(source);
@@ -219,11 +203,9 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§O{void}
-§TH 42
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §O{void}
+    §TH 42
 ";
 
         var result = ParseAndEmit(source);
@@ -236,11 +218,9 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§O{void}
-§TH true
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §O{void}
+    §TH true
 ";
 
         var result = ParseAndEmit(source);
@@ -253,11 +233,9 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§O{void}
-§TH §NEW{ArgumentException} §A ""bad arg"" §/NEW
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §O{void}
+    §TH §NEW{ArgumentException} §A ""bad arg"" §/NEW
 ";
 
         var result = ParseAndEmit(source);
@@ -271,12 +249,10 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§O{void}
-§B{~ex} §NEW{InvalidOperationException} §A ""oops"" §/NEW
-§TH ex
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §O{void}
+    §B{~ex} §NEW{InvalidOperationException} §A ""oops"" §/NEW
+    §TH ex
 ";
 
         var result = ParseAndEmit(source);
@@ -290,11 +266,9 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§O{void}
-§TH 3.14
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §O{void}
+    §TH 3.14
 ";
 
         var result = ParseAndEmit(source);
@@ -307,11 +281,9 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§O{void}
-§TH 18.00M
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §O{void}
+    §TH 18.00M
 ";
 
         var result = ParseAndEmit(source);
@@ -324,11 +296,9 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§O{void}
-§TH (char-lit ""x"")
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §O{void}
+    §TH (char-lit ""x"")
 ";
 
         var result = ParseAndEmit(source);
@@ -341,12 +311,10 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Throw:pub}
-§I{str:name}
-§O{void}
-§TH §INTERP ""Hello, "" §EXP name ""!"" §/INTERP
-§/F{f1}
-§/M{m1}
+  §F{f1:Throw:pub}
+    §I{str:name}
+    §O{void}
+    §TH §INTERP ""Hello, "" §EXP name ""!"" §/INTERP
 ";
 
         var result = ParseAndEmit(source);
@@ -359,16 +327,14 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:TryFinally:pub}
-§O{void}
-§E{cw}
-§TR{t1}
-§P ""try""
-§FI
-§P ""finally""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:TryFinally:pub}
+    §O{void}
+    §E{cw}
+    §TR{t1}
+    §P ""try""
+    §FI
+    §P ""finally""
+    §/TR{t1}
 ";
 
         var result = ParseAndEmit(source);
@@ -389,13 +355,11 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Bad:pub}
-§O{void}
-§TR{t1}
-§P ""try""
-§/TR{t2}
-§/F{f1}
-§/M{m1}
+  §F{f1:Bad:pub}
+    §O{void}
+    §TR{t1}
+    §P ""try""
+    §/TR{t2}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -410,13 +374,11 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Bad:pub}
-§O{void}
-§TR
-§P ""try""
-§/TR
-§/F{f1}
-§/M{m1}
+  §F{f1:Bad:pub}
+    §O{void}
+    §TR
+    §P ""try""
+    §/TR
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -432,14 +394,12 @@ public class ExceptionHandlingTests
         // Empty try blocks are syntactically valid (though semantically questionable)
         var source = @"
 §M{m1:Test}
-§F{f1:Empty:pub}
-§O{void}
-§TR{t1}
-§CA{Exception:e}
-§P ""catch""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Empty:pub}
+    §O{void}
+    §TR{t1}
+    §CA{Exception:e}
+    §P ""catch""
+    §/TR{t1}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -453,14 +413,12 @@ public class ExceptionHandlingTests
         // Try without catch or finally - syntactically allowed
         var source = @"
 §M{m1:Test}
-§F{f1:NoHandler:pub}
-§O{void}
-§E{cw}
-§TR{t1}
-§P ""try only""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:NoHandler:pub}
+    §O{void}
+    §E{cw}
+    §TR{t1}
+    §P ""try only""
+    §/TR{t1}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -475,15 +433,13 @@ public class ExceptionHandlingTests
         // Parser accepts any identifier as exception type (type checking is separate)
         var source = @"
 §M{m1:Test}
-§F{f1:Bad:pub}
-§O{void}
-§TR{t1}
-§P ""try""
-§CA{NonExistentException:e}
-§P ""catch""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Bad:pub}
+    §O{void}
+    §TR{t1}
+    §P ""try""
+    §CA{NonExistentException:e}
+    §P ""catch""
+    §/TR{t1}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -499,16 +455,14 @@ public class ExceptionHandlingTests
         // so (invalid.operator x) parses without errors.
         var source = @"
 §M{m1:Test}
-§F{f1:Bad:pub}
-§I{i32:x}
-§O{void}
-§TR{t1}
-§P ""try""
-§CA{Exception:e} §WHEN (invalid.operator x)
-§P ""catch""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Bad:pub}
+    §I{i32:x}
+    §O{void}
+    §TR{t1}
+    §P ""try""
+    §CA{Exception:e} §WHEN (invalid.operator x)
+    §P ""catch""
+    §/TR{t1}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -522,11 +476,9 @@ public class ExceptionHandlingTests
         // Parser allows rethrow anywhere, but it's semantically invalid outside catch
         var source = @"
 §M{m1:Test}
-§F{f1:Bad:pub}
-§O{void}
-§RT
-§/F{f1}
-§/M{m1}
+  §F{f1:Bad:pub}
+    §O{void}
+    §RT
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -544,18 +496,16 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:RoundTrip:pub}
-§O{void}
-§E{cw}
-§TR{t1}
-§P ""try""
-§CA{Exception:e}
-§P ""catch""
-§FI
-§P ""finally""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:RoundTrip:pub}
+    §O{void}
+    §E{cw}
+    §TR{t1}
+    §P ""try""
+    §CA{Exception:e}
+    §P ""catch""
+    §FI
+    §P ""finally""
+    §/TR{t1}
 ";
 
         // Parse original
@@ -576,18 +526,16 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:WhenRoundTrip:pub}
-§I{i32:code}
-§O{str}
-§TR{t1}
-§TH ""Error""
-§CA{Exception:ex} §WHEN (== code 42)
-§R ""special""
-§CA{Exception:ex}
-§R ""general""
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:WhenRoundTrip:pub}
+    §I{i32:code}
+    §O{str}
+    §TR{t1}
+    §TH ""Error""
+    §CA{Exception:ex} §WHEN (== code 42)
+    §R ""special""
+    §CA{Exception:ex}
+    §R ""general""
+    §/TR{t1}
 ";
 
         // Parse original
@@ -611,17 +559,15 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:RethrowRoundTrip:pub}
-§O{void}
-§E{cw}
-§TR{t1}
-§TH ""Error""
-§CA
-§P ""caught""
-§RT
-§/TR{t1}
-§/F{f1}
-§/M{m1}
+  §F{f1:RethrowRoundTrip:pub}
+    §O{void}
+    §E{cw}
+    §TR{t1}
+    §TH ""Error""
+    §CA
+    §P ""caught""
+    §RT
+    §/TR{t1}
 ";
 
         // Parse original
@@ -694,15 +640,13 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:ReadFile:pub}
-§I{str:path}
-§O{void}
-§E{cw}
-§USE{u1:reader:StreamReader} §NEW{StreamReader} §A path
-  §P ""inside using""
-§/USE{u1}
-§/F{f1}
-§/M{m1}
+  §F{f1:ReadFile:pub}
+    §I{str:path}
+    §O{void}
+    §E{cw}
+    §USE{u1:reader:StreamReader} §NEW{StreamReader} §A path
+      §P ""inside using""
+    §/USE{u1}
 ";
 
         var result = ParseAndEmit(source);
@@ -716,15 +660,13 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:ReadFile:pub}
-§I{str:path}
-§O{void}
-§E{cw}
-§USE{u1:reader} §NEW{StreamReader} §A path
-  §P ""inside using""
-§/USE{u1}
-§/F{f1}
-§/M{m1}
+  §F{f1:ReadFile:pub}
+    §I{str:path}
+    §O{void}
+    §E{cw}
+    §USE{u1:reader} §NEW{StreamReader} §A path
+      §P ""inside using""
+    §/USE{u1}
 ";
 
         var result = ParseAndEmit(source);
@@ -737,15 +679,13 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Process:pub}
-§I{str:path}
-§O{void}
-§E{cw}
-§USE{u1:stream:FileStream} §C{File.OpenRead} §A path §/C
-  §P ""reading""
-§/USE{u1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Process:pub}
+    §I{str:path}
+    §O{void}
+    §E{cw}
+    §USE{u1:stream:FileStream} §C{File.OpenRead} §A path §/C
+      §P ""reading""
+    §/USE{u1}
 ";
 
         var result = ParseAndEmit(source);
@@ -759,13 +699,11 @@ public class ExceptionHandlingTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:ReadFile:pub}
-§O{void}
-§USE{u1:reader:StreamReader} §NEW{StreamReader} §A ""test""
-  §P ""inside""
-§/USE{u2}
-§/F{f1}
-§/M{m1}
+  §F{f1:ReadFile:pub}
+    §O{void}
+    §USE{u1:reader:StreamReader} §NEW{StreamReader} §A ""test""
+      §P ""inside""
+    §/USE{u2}
 ";
 
         var diagnostics = new DiagnosticBag();

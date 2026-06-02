@@ -102,14 +102,12 @@ public class EffectDisciplineTests
     {
         var code = @"
 §M{m001:Test}
-§F{f001:Calculate:pub}
-  §E{}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Calculate:pub}
+      §E{}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)";
 
         var score = EffectDisciplineScorer.ScoreCalorBugPrevention(
             code: code,
@@ -339,14 +337,12 @@ public static int Add(int a, int b)
     {
         var code = @"
 §M{m001:Calculator}
-§F{f001:CalculateTotal:pub}
-  §E{}
-  §I{i32:price}
-  §I{i32:quantity}
-  §O{i32}
-  §R (* price quantity)
-§/F{f001}
-§/M{m001}";
+  §F{f001:CalculateTotal:pub}
+      §E{}
+      §I{i32:price}
+      §I{i32:quantity}
+      §O{i32}
+      §R (* price quantity)";
 
         var score = EffectDisciplineScorer.ScoreMaintainability(code, "calor");
 
@@ -425,13 +421,11 @@ public static class Solution
     {
         var calorCode = @"
 §M{m001:Solution}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)";
 
         using var executor = new CodeExecutor(timeoutMs: 5000, contractMode: EmitContractMode.Release);
         var calorResult = executor.CompileCalor(calorCode);
@@ -701,7 +695,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{m001:Solution}\n§F{f001:Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n§/F{f001}\n§/M{m001}",
+                "calor" => "§M{m001:Solution}\n§F{f001:Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\n",
                 _ => "public static class Solution { public static int Add(int a, int b) => a + b; }"
             };
 
@@ -736,7 +730,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{m001:Solution}\n§F{f001:Add:pub}\n  §E{}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n§/F{f001}\n§/M{m001}",
+                "calor" => "§M{m001:Solution}\n§F{f001:Add:pub}\n  §E{}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\n",
                 _ => @"
 public static class Solution
 {
@@ -779,7 +773,7 @@ public static class Solution
         {
             var code = language.ToLowerInvariant() switch
             {
-                "calor" => "§M{m001:Solution}\n§F{f001:GetTime:pub}\n  §O{str}\n  §R \"now\"\n§/F{f001}\n§/M{m001}",
+                "calor" => "§M{m001:Solution}\n§F{f001:GetTime:pub}\n  §O{str}\n  §R \"now\"\n\n",
                 _ => @"
 public static class Solution
 {

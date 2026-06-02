@@ -265,7 +265,7 @@ public class ValidateSnippetToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§F{f001:Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n§/F{f001}",
+                "source": "§F{f001:Add:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n",
                 "context": {
                     "location": "module_body"
                 }
@@ -444,7 +444,7 @@ public class ValidateSnippetToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§IF{_if1} (> x 0)\n  §R x\n§EL\n  §R (- 0 x)\n§/I{_if1}",
+                "source": "§IF{_if1} (> x 0)\n  §R x\n§EL\n  §R (- 0 x)",
                 "context": {
                     "parameters": [
                         { "name": "x", "type": "i32" }
@@ -468,7 +468,7 @@ public class ValidateSnippetToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§W{_w1} value\n  §K §SM x\n    §R x\n  §/K\n  §K §NN\n    §R 0\n  §/K\n§/W{_w1}",
+                "source": "§W{_w1} value\n  §K §SM x\n    §R x\n  §K §NN\n    §R 0",
                 "context": {
                     "parameters": [
                         { "name": "value", "type": "Option<i32>" }
@@ -492,7 +492,7 @@ public class ValidateSnippetToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§B{sum} 0\n§L{l1:i:1:10:1}\n  §B{sum} (+ sum i)\n§/L{l1}\n§R sum",
+                "source": "§B{sum} 0\n§L{l1:i:1:10:1}\n  §B{sum} (+ sum i)\n§R sum",
                 "context": {
                     "returnType": "i32"
                 }
@@ -597,7 +597,7 @@ public class ValidateSnippetToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§F{f001:Test:pub}\n  §O{unit}\n  §R\n§/F{f001}",
+                "source": "§F{f001:Test:pub}\n  §O{unit}\n  §R\n",
                 "context": {
                     "location": "module_body",
                     "parameters": [
@@ -622,7 +622,7 @@ public class ValidateSnippetToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "validate",
-                "source": "§F{f001:Test:pub}\n  §O{unit}\n  §R\n§/F{f001}",
+                "source": "§F{f001:Test:pub}\n  §O{unit}\n  §R\n",
                 "context": {
                     "location": "module_body",
                     "returnType": "i32"

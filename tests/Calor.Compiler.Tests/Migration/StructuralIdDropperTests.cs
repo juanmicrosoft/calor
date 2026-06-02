@@ -23,11 +23,11 @@ public class StructuralIdDropperTests
     [Fact]
     public void T_5_7_a_DropsModuleId()
     {
-        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:Calc}\n§/M{m_01j5x7abcdef01j5x7abcdef01}";
+        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:Calc}\n";
         var (out_, removals) = Sut.Process(src, "a.calr");
 
-        Assert.Equal("§M{Calc}\n§/M", out_);
-        Assert.Equal(2, removals.Count);
+        Assert.Equal("§M{Calc}\n", out_);
+        Assert.Single(removals);
         Assert.All(removals, r => Assert.Equal("a.calr", r.File));
     }
 
@@ -66,7 +66,7 @@ public class StructuralIdDropperTests
     [Fact]
     public void T_5_7_e_RoundTripIsByteEqual()
     {
-        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:Calc}\n§F{f_01j5x7abcdef01j5x7abcdef01:add:i32:public}\n§/F{f_01j5x7abcdef01j5x7abcdef01}\n§/M{m_01j5x7abcdef01j5x7abcdef01}\n";
+        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:Calc}\n§F{f_01j5x7abcdef01j5x7abcdef01:add:i32:public}\n\n\n";
         var (migrated, removals) = Sut.Process(src, "rt.calr");
 
         var originalBytes = Utf8.GetBytes(src);
@@ -115,7 +115,7 @@ public class StructuralIdDropperTests
         // We need to exercise the full drop → reinsert pipeline. The
         // reinsert logic lives in FixCommand.ReinsertRemovals so we
         // re-implement the inverse here using the recorded bytes.
-        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:Calc}\n§/M{m_01j5x7abcdef01j5x7abcdef01}";
+        const string src = "§M{m_01j5x7abcdef01j5x7abcdef01:Calc}\n";
         var (migrated, removals) = Sut.Process(src, "r.calr");
 
         var migratedBytes = Utf8.GetBytes(migrated);

@@ -48,10 +48,8 @@ public class LinqSupportTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f1:Test:pub}
-  §B{~price:decimal} DECIMAL:18.0000
-§/F{f1}
-§/M{m1}
+  §F{f1:Test:pub}
+      §B{~price:decimal} DECIMAL:18.0000
 ";
 
         var result = ParseAndEmit(source);
@@ -64,10 +62,8 @@ public class LinqSupportTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f1:Test:pub}
-  §B{~amount:decimal} 99.95M
-§/F{f1}
-§/M{m1}
+  §F{f1:Test:pub}
+      §B{~amount:decimal} 99.95M
 ";
 
         var result = ParseAndEmit(source);
@@ -80,10 +76,8 @@ public class LinqSupportTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f1:Test:pub}
-  §B{~count:decimal} 42m
-§/F{f1}
-§/M{m1}
+  §F{f1:Test:pub}
+      §B{~count:decimal} 42m
 ";
 
         var result = ParseAndEmit(source);
@@ -116,10 +110,8 @@ public class LinqSupportTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f1:Test:pub}
-  §B{[i32]:nums} §ARR{a1:i32} §A 1 §A 2 §A 3 §/ARR{a1}
-§/F{f1}
-§/M{m1}
+  §F{f1:Test:pub}
+      §B{[i32]:nums} §ARR{a1:i32} §A 1 §A 2 §A 3 §/ARR{a1}
 ";
 
         var result = ParseAndEmit(source);
@@ -134,10 +126,8 @@ public class LinqSupportTests
         // Type-first format: §ARR{type:id:size}
         var source = @"
 §M{m1:TestMod}
-§F{f1:Test:pub}
-  §B{[i32]:nums} §ARR{i32:nums:3}
-§/F{f1}
-§/M{m1}
+  §F{f1:Test:pub}
+      §B{[i32]:nums} §ARR{i32:nums:3}
 ";
 
         var result = ParseAndEmit(source);
@@ -257,13 +247,11 @@ public class LinqSupportTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f1:Test:pub}
-  §B{~p:Person} §NEW{Person}
-    Name = ""John""
-    Age = 30
-  §/NEW
-§/F{f1}
-§/M{m1}
+  §F{f1:Test:pub}
+      §B{~p:Person} §NEW{Person}
+        Name = ""John""
+        Age = 30
+      §/NEW
 ";
 
         var result = ParseAndEmit(source);
@@ -278,13 +266,11 @@ public class LinqSupportTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f1:Test:pub}
-  §B{~cfg:Config} §NEW{Config}
-    Timeout = 30
-    Enabled = true
-  §/NEW
-§/F{f1}
-§/M{m1}
+  §F{f1:Test:pub}
+      §B{~cfg:Config} §NEW{Config}
+        Timeout = 30
+        Enabled = true
+      §/NEW
 ";
 
         var result = ParseAndEmit(source);
@@ -319,13 +305,11 @@ public class LinqSupportTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f1:Test:pub}
-  §B{~obj:var} §ANON
-    Name = ""test""
-    Value = 42
-  §/ANON
-§/F{f1}
-§/M{m1}
+  §F{f1:Test:pub}
+      §B{~obj:var} §ANON
+        Name = ""test""
+        Value = 42
+      §/ANON
 ";
 
         var result = ParseAndEmit(source);

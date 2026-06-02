@@ -89,11 +89,9 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:priv}
-              §I{i32:x} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:priv}
+                  §I{i32:x} | (>= # INT:0)
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -121,12 +119,10 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -167,13 +163,11 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Divide:pub}
-              §I{i32:x}
-              §I{i32:y}
-              §O{i32}
-              §R (/ x y)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Divide:pub}
+                  §I{i32:x}
+                  §I{i32:y}
+                  §O{i32}
+                  §R (/ x y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -193,13 +187,11 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Divide:pub}
-              §I{i32:x}
-              §I{i32:y} | (!= # INT:0)
-              §O{i32}
-              §R (/ x y)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Divide:pub}
+                  §I{i32:x}
+                  §I{i32:y} | (!= # INT:0)
+                  §O{i32}
+                  §R (/ x y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -217,14 +209,12 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Divide:pub}
-              §I{i32:x}
-              §I{i32:y}
-              §O{i32}
-              §Q (!= y INT:0)
-              §R (/ x y)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Divide:pub}
+                  §I{i32:x}
+                  §I{i32:y}
+                  §O{i32}
+                  §Q (!= y INT:0)
+                  §R (/ x y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -242,12 +232,10 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{i32}
-              §R (+ x INT:1)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §R (+ x INT:1)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -288,11 +276,9 @@ public sealed class AgentGuidanceTests
         var tool = new RefineTool();
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x} | (>= # INT:0)
+                  §O{void}
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -312,13 +298,11 @@ public sealed class AgentGuidanceTests
         var tool = new RefineTool();
         var source = """
             §M{m001:Test}
-            §F{f001:Divide:pub}
-              §I{i32:x}
-              §I{i32:y}
-              §O{i32}
-              §R (/ x y)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Divide:pub}
+                  §I{i32:x}
+                  §I{i32:y}
+                  §O{i32}
+                  §R (/ x y)
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -340,14 +324,12 @@ public sealed class AgentGuidanceTests
         var tool = new RefineTool();
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x} | (>= # INT:0)
-              §I{i32:y}
-              §O{i32}
-              §PROOF{p1:positive} (> x INT:0)
-              §R (/ x y)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x} | (>= # INT:0)
+                  §I{i32:y}
+                  §O{i32}
+                  §PROOF{p1:positive} (> x INT:0)
+                  §R (/ x y)
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -370,11 +352,9 @@ public sealed class AgentGuidanceTests
         var tool = new RefineTool();
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -421,11 +401,9 @@ public sealed class AgentGuidanceTests
         // Test that a compound predicate like (&& (>= # INT:0) (<= # INT:100)) formats correctly
         var source = """
             §M{m001:Test}
-            §F{f001:Main:priv}
-              §I{i32:x} | (&& (>= # INT:0) (<= # INT:100))
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:priv}
+                  §I{i32:x} | (&& (>= # INT:0) (<= # INT:100))
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -455,11 +433,9 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:priv}
-              §I{i32:age} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:priv}
+                  §I{i32:age} | (>= # INT:0)
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -490,11 +466,9 @@ public sealed class AgentGuidanceTests
 
         var source = """
             §M{m001:Test}
-            §F{f001:Main:priv}
-              §I{i32:x} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:priv}
+                  §I{i32:x} | (>= # INT:0)
+                  §O{void}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -532,12 +506,10 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Check:priv}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:always-positive} (> x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Check:priv}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:always-positive} (> x INT:0)
             """;
 
         var options = new CompilationOptions
@@ -566,12 +538,10 @@ public sealed class AgentGuidanceTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Check:priv}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:always-positive} (> x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Check:priv}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:always-positive} (> x INT:0)
             """;
 
         var options = new CompilationOptions

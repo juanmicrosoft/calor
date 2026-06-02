@@ -38,7 +38,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
             }
             """).RootElement;
 
@@ -79,7 +79,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n§/F{f001}\n§/M{m001}",
+                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n",
                 "filePath": "test-file.calr"
             }
             """).RootElement;
@@ -97,7 +97,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
             }
             """).RootElement;
 
@@ -135,7 +135,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{counter} 0\n§R undefinedVar\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{counter} 0\n§R undefinedVar\n\n"
             }
             """).RootElement;
 
@@ -175,7 +175,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§WH{wh1} (+ x 1)\n  §B{x} (+ x 1)\n§/WH{wh1}\n§R x\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§WH{wh1} (+ x 1)\n  §B{x} (+ x 1)\n\n§R x\n\n"
             }
             """).RootElement;
 
@@ -212,7 +212,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§WH{wh1} (+ x 1)\n  §B{y} undefinedVar\n§/WH{wh1}\n§R x\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§WH{wh1} (+ x 1)\n  §B{y} undefinedVar\n\n§R x\n\n"
             }
             """).RootElement;
 
@@ -243,7 +243,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§R undefinedVar\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§R undefinedVar\n\n"
             }
             """).RootElement;
 
@@ -271,7 +271,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§I{i32:x}\n§O{i32}\n§IF{if1} (+ x 1)\n  §R 1\n§/I{if1}\n§R 0\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§I{i32:x}\n§O{i32}\n§IF{if1} (+ x 1)\n  §R 1\n\n§R 0\n\n"
             }
             """).RootElement;
 
@@ -291,7 +291,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§L{l1:i:BOOL:true:10:1}\n  §B{x} (+ x i)\n§/L{l1}\n§R x\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Test:pub}\n§O{i32}\n§B{x} 0\n§L{l1:i:BOOL:true:10:1}\n  §B{x} (+ x i)\n\n§R x\n\n"
             }
             """).RootElement;
 
@@ -312,7 +312,7 @@ public class TypeCheckToolTests
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Complex:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§B{result} 0\n§IF{if1} (> a b)\n  §B{result} a\n§EL\n  §B{result} b\n§/I{if1}\n§L{l1:i:0:result:1}\n  §B{result} (+ result i)\n§/L{l1}\n§R result\n§/F{f001}\n§/M{m001}"
+                "source": "§M{m001:Test}\n§F{f001:Complex:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§B{result} 0\n§IF{if1} (> a b)\n  §B{result} a\n§EL\n  §B{result} b\n\n§L{l1:i:0:result:1}\n  §B{result} (+ result i)\n\n§R result\n\n"
             }
             """).RootElement;
 

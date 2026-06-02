@@ -1055,8 +1055,6 @@ internal sealed class SnippetWrapper
                 currentLine++;
             }
 
-            sb.AppendLine("§/M{_}");
-
             return new SnippetWrapper(sb.ToString(), snippetStart, snippetEnd, 0, warnings);
         }
 
@@ -1122,10 +1120,6 @@ internal sealed class SnippetWrapper
             sb.AppendLine();
             currentLine++;
         }
-
-        // Close function and module
-        sb.AppendLine("§/F{_}");
-        sb.AppendLine("§/M{_}");
 
         return new SnippetWrapper(sb.ToString(), snippetStartLine, snippetEndLine, firstLineColumnOffset, warnings);
     }

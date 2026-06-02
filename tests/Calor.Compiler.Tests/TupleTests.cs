@@ -21,15 +21,11 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-            §CL{c001:Tuples:pub:stat}
-            §MT{m002:GetMinMax:pub:stat} (i32:a, i32:b) -> (i32, i32)
-            §IF{if003} (< a b)
-            §R (a, b)
-            §/I{if003}
-            §R (b, a)
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Tuples:pub:stat}
+                §MT{m002:GetMinMax:pub:stat} (i32:a, i32:b) -> (i32, i32)
+                  §IF{if003} (< a b)
+                    §R (a, b)
+                  §R (b, a)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -48,12 +44,9 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-            §CL{c001:Tuples:pub:stat}
-            §MT{m002:GetPerson:pub:stat} () -> (str Name, i32 Age)
-            §R ("Alice", 30)
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Tuples:pub:stat}
+                §MT{m002:GetPerson:pub:stat} () -> (str Name, i32 Age)
+                  §R ("Alice", 30)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -70,12 +63,9 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-            §CL{c001:Tuples:pub:stat}
-            §MT{m002:GetFirst:pub:stat} ((i32, i32):tuple) -> i32
-            §R tuple.Item1
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Tuples:pub:stat}
+                §MT{m002:GetFirst:pub:stat} ((i32, i32):tuple) -> i32
+                  §R tuple.Item1
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -97,12 +87,9 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-            §CL{c001:Tuples:pub:stat}
-            §MT{m002:MakeTuple:pub:stat} (i32:a, i32:b) -> (i32, i32)
-            §R (a, b)
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Tuples:pub:stat}
+                §MT{m002:MakeTuple:pub:stat} (i32:a, i32:b) -> (i32, i32)
+                  §R (a, b)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -126,12 +113,9 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-            §CL{c001:Tuples:pub:stat}
-            §MT{m002:GetPair:pub:stat} () -> (i32, i32)
-            §R (10, 20)
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Tuples:pub:stat}
+                §MT{m002:GetPair:pub:stat} () -> (i32, i32)
+                  §R (10, 20)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -148,12 +132,9 @@ public class TupleTests
     {
         var calor = """
             §M{m001:TupleType}
-            §CL{c001:Tuples:pub:stat}
-            §MT{m002:GetPerson:pub:stat} () -> (str, i32)
-            §R ("Alice", 30)
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Tuples:pub:stat}
+                §MT{m002:GetPerson:pub:stat} () -> (str, i32)
+                  §R ("Alice", 30)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions

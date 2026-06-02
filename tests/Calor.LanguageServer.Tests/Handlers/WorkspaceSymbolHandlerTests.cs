@@ -14,13 +14,10 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Add:pub}
-            §R 0
-            §/F{f001}
-            §F{f002:Subtract:pub}
-            §R 0
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Add:pub}
+                §R 0
+              §F{f002:Subtract:pub}
+                §R 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -37,13 +34,10 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Calculate:pub}
-            §R 0
-            §/F{f001}
-            §F{f002:Process:pub}
-            §R 0
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Calculate:pub}
+                §R 0
+              §F{f002:Process:pub}
+                §R 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -61,11 +55,10 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:PersonService}
-            §/CL{c001}
-            §CL{c002:OrderService}
-            §/CL{c002}
-            §/M{m001}
+              §CL{c001:PersonService}
+                §FLD{i32:dummy:pri}
+              §CL{c002:OrderService}
+                §FLD{i32:dummy:pri}
             """;
 
         var workspace = CreateWorkspace(source);
@@ -84,17 +77,13 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Calculator}
-            §MT{m001:Add:pub}
-            §O{i32}
-            §R 0
-            §/MT{m001}
-            §MT{m002:Multiply:pub}
-            §O{i32}
-            §R 0
-            §/MT{m002}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Calculator}
+                §MT{m001:Add:pub}
+                  §O{i32}
+                  §R 0
+                §MT{m002:Multiply:pub}
+                  §O{i32}
+                  §R 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -112,11 +101,10 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:StatusCode}
-            Ok = 200
-            NotFound = 404
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:StatusCode}
+              Ok = 200
+              NotFound = 404
+              §/EN{e001}
             """;
 
         var workspace = CreateWorkspace(source);
@@ -134,12 +122,11 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:Color}
-            Red
-            Green
-            Blue
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Color}
+              Red
+              Green
+              Blue
+              §/EN{e001}
             """;
 
         var workspace = CreateWorkspace(source);
@@ -157,9 +144,7 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §IFACE{i001:IRepository}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IRepository}
             """;
 
         var workspace = CreateWorkspace(source);
@@ -177,11 +162,9 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:firstName:priv}
-            §FLD{str:lastName:priv}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:firstName:priv}
+                §FLD{str:lastName:priv}
             """;
 
         var workspace = CreateWorkspace(source);
@@ -200,10 +183,8 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §R 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -220,10 +201,8 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:CalculateTotal:pub}
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:CalculateTotal:pub}
+                §R 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -240,13 +219,10 @@ public class WorkspaceSymbolHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Calculator}
-            §MT{m001:Add:pub}
-            §O{i32}
-            §R 0
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Calculator}
+                §MT{m001:Add:pub}
+                  §O{i32}
+                  §R 0
             """;
 
         var workspace = CreateWorkspace(source);

@@ -17,7 +17,7 @@ public class EventAccessorTests
         var source = "§EADD";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Empty(diag);
         Assert.Contains(tokens, t => t.Kind == TokenKind.EventAdd);
@@ -29,7 +29,7 @@ public class EventAccessorTests
         var source = "§/EADD";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Empty(diag);
         Assert.Contains(tokens, t => t.Kind == TokenKind.EndEventAdd);
@@ -41,7 +41,7 @@ public class EventAccessorTests
         var source = "§EREM";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Empty(diag);
         Assert.Contains(tokens, t => t.Kind == TokenKind.EventRemove);
@@ -53,7 +53,7 @@ public class EventAccessorTests
         var source = "§/EREM";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Empty(diag);
         Assert.Contains(tokens, t => t.Kind == TokenKind.EndEventRemove);
@@ -65,7 +65,7 @@ public class EventAccessorTests
         var source = "§/EVT[e001]";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Empty(diag);
         Assert.Contains(tokens, t => t.Kind == TokenKind.EndEvent);
@@ -80,10 +80,8 @@ public class EventAccessorTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §EVT{e001:Click:pub:EventHandler}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §EVT{e001:Click:pub:EventHandler}
             """;
 
         var diag = new DiagnosticBag();
@@ -109,17 +107,15 @@ public class EventAccessorTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §EVT{e001:Click:pub:EventHandler}
-            §EADD
-            §R INT:0
-            §/EADD
-            §EREM
-            §R INT:1
-            §/EREM
-            §/EVT{e001}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §EVT{e001:Click:pub:EventHandler}
+                §EADD
+                §R INT:0
+                §/EADD
+                §EREM
+                §R INT:1
+                §/EREM
+                §/EVT{e001}
             """;
 
         var diag = new DiagnosticBag();
@@ -147,14 +143,12 @@ public class EventAccessorTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §EVT{e001:Click:pub:EventHandler}
-            §EADD
-            §R INT:0
-            §/EADD
-            §/EVT{e001}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §EVT{e001:Click:pub:EventHandler}
+                §EADD
+                §R INT:0
+                §/EADD
+                §/EVT{e001}
             """;
 
         var diag = new DiagnosticBag();
@@ -371,10 +365,8 @@ public class EventAccessorTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §EVT{e001:Click:pub:EventHandler}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §EVT{e001:Click:pub:EventHandler}
             """;
 
         var diag = new DiagnosticBag();
@@ -396,17 +388,15 @@ public class EventAccessorTests
     {
         var source = """
             §M{m1:Test}
-            §CL{c1:MyClass:pub}
-            §EVT{e001:Click:pub:EventHandler}
-            §EADD
-            §R INT:0
-            §/EADD
-            §EREM
-            §R INT:1
-            §/EREM
-            §/EVT{e001}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:MyClass:pub}
+                §EVT{e001:Click:pub:EventHandler}
+                §EADD
+                §R INT:0
+                §/EADD
+                §EREM
+                §R INT:1
+                §/EREM
+                §/EVT{e001}
             """;
 
         var diag = new DiagnosticBag();

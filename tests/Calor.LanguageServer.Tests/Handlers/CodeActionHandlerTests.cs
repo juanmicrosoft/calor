@@ -5,15 +5,13 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class CodeActionHandlerTests
 {
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
     public void MismatchedId_GeneratesFix()
     {
         var source = """
             §M{m001:TestModule}
             §F{f001:Test}
             §R 0
-            §/F{f002}
-            §/M{m001}
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -26,15 +24,13 @@ public class CodeActionHandlerTests
         Assert.Single(fix.Fix.Edits);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
     public void MismatchedModuleId_GeneratesFix()
     {
         var source = """
             §M{m001:TestModule}
             §F{f001:Test}
             §R 0
-            §/F{f001}
-            §/M{m002}
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -43,15 +39,13 @@ public class CodeActionHandlerTests
         Assert.Contains(fixes, f => f.Code == "Calor0101" && f.Fix.Description.Contains("m001"));
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
     public void FixEdit_HasCorrectPosition()
     {
         var source = """
             §M{m001:TestModule}
             §F{f001:Test}
             §R 0
-            §/F{f002}
-            §/M{m001}
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -64,7 +58,7 @@ public class CodeActionHandlerTests
         Assert.Equal("f001", edit.NewText);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
     public void MultipleMismatchedIds_GeneratesMultipleFixes()
     {
         var source = """
@@ -72,10 +66,7 @@ public class CodeActionHandlerTests
             §F{f001:Test}
             §L{l001:i:0:10}
             §P i
-            §/L{l002}
             §R 0
-            §/F{f002}
-            §/M{m001}
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -90,10 +81,8 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §R 0
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -108,8 +97,6 @@ public class CodeActionHandlerTests
             §M{m001:TestModule}
             §F{f001:Test}
             §R 0
-            §/F{f002}
-            §/M{m001}
             """;
 
         // The fix should change f002 to f001
@@ -125,12 +112,10 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{counter} 0
-            §R couner
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{counter} 0
+                §R couner
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -148,12 +133,10 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{counter} 0
-            §R xyz
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{counter} 0
+                §R xyz
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -173,12 +156,10 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Add:pub}
-            §I{i32:value}
-            §O{i32}
-            §R valeu
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                §I{i32:value}
+                §O{i32}
+                §R valeu
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -195,16 +176,13 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Helper:pub}
-            §O{i32}
-            §R 42
-            §/F{f001}
-            §F{f002:Main:pub}
-            §O{i32}
-            §B{x} Helper
-            §R x
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Helper:pub}
+                §O{i32}
+                §R 42
+              §F{f002:Main:pub}
+                §O{i32}
+                §B{x} Helper
+                §R x
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -221,13 +199,11 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Add:pub}
-            §I{i32:x}
-            §I{i32:x}
-            §O{i32}
-            §R x
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                §I{i32:x}
+                §I{i32:x}
+                §O{i32}
+                §R x
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -239,7 +215,7 @@ public class CodeActionHandlerTests
         Assert.Contains("x2", duplicateFix.Fix.Description);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
     public void MismatchedId_FixPositionIsCorrect()
     {
         var source = """
@@ -247,8 +223,6 @@ public class CodeActionHandlerTests
             §F{f001:Test:pub}
             §O{i32}
             §R 0
-            §/F{wrong}
-            §/M{m001}
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -268,13 +242,11 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Calc:pub}
-            §O{i32}
-            §B{counter} 0
-            §B{result} couner
-            §R reslt
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Calc:pub}
+                §O{i32}
+                §B{counter} 0
+                §B{result} couner
+                §R reslt
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -289,7 +261,7 @@ public class CodeActionHandlerTests
         Assert.NotNull(resultFix);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
     public void NestedStructure_FixesWorkCorrectly()
     {
         var source = """
@@ -298,10 +270,7 @@ public class CodeActionHandlerTests
             §O{i32}
             §L{l001:i:0:10:1}
             §P i
-            §/L{l002}
             §R 0
-            §/F{f001}
-            §/M{m001}
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -318,12 +287,10 @@ public class CodeActionHandlerTests
         // Test that applying a typo fix results in valid code
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{counter} 0
-            §R couner
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{counter} 0
+                §R couner
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -344,11 +311,9 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{bool}
-            §R (cotains "hello" "h")
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{bool}
+                §R (cotains "hello" "h")
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -366,11 +331,9 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{bool}
-            §R (cotains "hello" "h")
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{bool}
+                §R (cotains "hello" "h")
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -389,11 +352,9 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{str}
-            §R (nameof x)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{str}
+                §R (nameof x)
             """;
 
         var diagnostics = LspTestHarness.GetDiagnostics(source);
@@ -406,11 +367,9 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §R (xyzqwerty 1 2)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §R (xyzqwerty 1 2)
             """;
 
         var diagnostics = LspTestHarness.GetDiagnostics(source);

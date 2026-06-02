@@ -35,7 +35,7 @@ public class RawPassthroughAndLinqAstTests
         var source = "§RAW\nvar x = items.Where(i => i > 5).ToList();\nConsole.WriteLine(x);\n§/RAW";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         Assert.Equal(TokenKind.RawCSharp, tokens[0].Kind);
@@ -51,7 +51,7 @@ public class RawPassthroughAndLinqAstTests
         var source = "§RAW\nvar x = 1;";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        _ = lexer.TokenizeAll();
+        _ = lexer.TokenizeAllForParser();
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics, d => d.Message.Contains("§/RAW"));
@@ -62,15 +62,13 @@ public class RawPassthroughAndLinqAstTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Main:pub}
-  §O{void}
-  §RAW
-  var query = from x in items
-              where x > 5
-              select x * 2;
-  §/RAW
-§/F{f1}
-§/M{m1}
+  §F{f1:Main:pub}
+      §O{void}
+      §RAW
+      var query = from x in items
+                  where x > 5
+                  select x * 2;
+      §/RAW
 ";
         var module = ParseModule(source);
         var func = Assert.Single(module.Functions);
@@ -84,15 +82,13 @@ public class RawPassthroughAndLinqAstTests
     {
         var source = @"
 §M{m1:Test}
-§F{f1:Main:pub}
-  §O{void}
-  §RAW
-  var query = from x in items
-              where x > 5
-              select x * 2;
-  §/RAW
-§/F{f1}
-§/M{m1}
+  §F{f1:Main:pub}
+      §O{void}
+      §RAW
+      var query = from x in items
+                  where x > 5
+                  select x * 2;
+      §/RAW
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("from x in items", csharp);
@@ -103,7 +99,7 @@ public class RawPassthroughAndLinqAstTests
     public void Parser_RawBlock_PreservesCSharpSyntaxCharacters()
     {
         // Verify that C# syntax characters (braces, semicolons, etc.) pass through
-        var source = "§M{m1:Test}\n§F{f1:Main:pub}\n  §O{void}\n  §RAW\n  if (x > 0) { Console.WriteLine(x); }\n  §/RAW\n§/F{f1}\n§/M{m1}\n";
+        var source = "§M{m1:Test}\n§F{f1:Main:pub}\n  §O{void}\n  §RAW\n  if (x > 0) { Console.WriteLine(x); }\n  §/RAW\n\n\n";
         var csharp = ParseAndEmit(source);
         Assert.Contains("if (x > 0)", csharp);
         Assert.Contains("Console.WriteLine", csharp);

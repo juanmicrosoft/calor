@@ -19,7 +19,7 @@ public class EffectsSuggestTests
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -33,12 +33,10 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DoWork:pub}
-  §O{void}
-  §C{Console.WriteLine} §A STR:""test"" §/C
-  §C{MyService.Process} §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §C{Console.WriteLine} §A STR:""test"" §/C
+      §C{MyService.Process} §/C
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -52,13 +50,11 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DoWork:pub}
-  §O{void}
-  §C{Console.WriteLine} §A STR:""a"" §/C
-  §C{Console.WriteLine} §A STR:""b"" §/C
-  §C{Console.WriteLine} §A STR:""c"" §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §C{Console.WriteLine} §A STR:""a"" §/C
+      §C{Console.WriteLine} §A STR:""b"" §/C
+      §C{Console.WriteLine} §A STR:""c"" §/C
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -71,12 +67,10 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DoWork:pub}
-  §O{void}
-  §C{File.ReadAllText} §A STR:""test.txt"" §/C
-  §C{HttpClient.GetAsync} §A STR:""url"" §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §C{File.ReadAllText} §A STR:""test.txt"" §/C
+      §C{HttpClient.GetAsync} §A STR:""url"" §/C
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -90,13 +84,10 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§CL{c001:MyClass:pub}
-  §MT{mt001:DoWork:pub}
-    §O{void}
-    §C{ExternalService.Call} §/C
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:MyClass:pub}
+      §MT{mt001:DoWork:pub}
+          §O{void}
+          §C{ExternalService.Call} §/C
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -109,12 +100,10 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DoWork:pub}
-  §O{void}
-  §B{r} §NEW{Random} §/NEW
-  §C{r.Next} §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{r} §NEW{Random} §/NEW
+      §C{r.Next} §/C
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -128,11 +117,9 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DoWork:pub}
-  §O{void}
-  §B{x} §NEW{HttpClient} §/NEW
-§/F{f001}
-§/M{m001}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{x} §NEW{HttpClient} §/NEW
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -149,17 +136,14 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Helper:pub}
-  §O{void}
-  §C{Console.WriteLine} §A STR:""internal"" §/C
-§/F{f001}
-§F{f002:Main:pub}
-  §O{void}
-  §C{Helper}
-  §/C
-  §C{ExternalService.DoWork} §/C
-§/F{f002}
-§/M{m001}
+  §F{f001:Helper:pub}
+      §O{void}
+      §C{Console.WriteLine} §A STR:""internal"" §/C
+  §F{f002:Main:pub}
+      §O{void}
+      §C{Helper}
+      §/C
+      §C{ExternalService.DoWork} §/C
 ";
         var module = Parse(source);
         var callGraph = CallGraphAnalysis.Build(module);
@@ -190,12 +174,10 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DoWork:pub}
-  §O{void}
-  §C{Console.WriteLine} §A STR:""test"" §/C
-  §C{Math.Abs} §A INT:42 §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §C{Console.WriteLine} §A STR:""test"" §/C
+      §C{Math.Abs} §A INT:42 §/C
 ";
         var module = Parse(source);
         var allCalls = ExternalCallCollector.Collect(module);
@@ -215,13 +197,11 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -394,13 +374,11 @@ public class EffectsSuggestTests
         // Step 1: Source with an unknown external call
         var source = @"
 §M{m001:Test}
-§F{f001:ProcessOrder:pub}
-  §O{void}
-  §E{cw}
-  §C{Console.WriteLine} §A STR:""Starting"" §/C
-  §C{OrderRepo.Save} §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:ProcessOrder:pub}
+      §O{void}
+      §E{cw}
+      §C{Console.WriteLine} §A STR:""Starting"" §/C
+      §C{OrderRepo.Save} §/C
 ";
         // Step 2: Collect unresolved calls (simulating what suggest does)
         var module = Parse(source);
@@ -447,13 +425,11 @@ public class EffectsSuggestTests
         // Step 6: Full compilation should succeed with correct effect declarations
         var fullSource = @"
 §M{m001:Test}
-§F{f001:ProcessOrder:pub}
-  §O{void}
-  §E{cw,db:w}
-  §C{Console.WriteLine} §A STR:""Starting"" §/C
-  §C{OrderRepo.Save} §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:ProcessOrder:pub}
+      §O{void}
+      §E{cw,db:w}
+      §C{Console.WriteLine} §A STR:""Starting"" §/C
+      §C{OrderRepo.Save} §/C
 ";
         var compileResult = TestHarness.CompileWithEffects(fullSource, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Permissive);
@@ -480,22 +456,18 @@ public class EffectsSuggestTests
         // File A defines a helper function
         var sourceA = @"
 §M{m001:Helpers}
-§F{f001:FormatName:pub}
-  §I{str:name}
-  §O{str}
-  §R name
-§/F{f001}
-§/M{m001}
+  §F{f001:FormatName:pub}
+      §I{str:name}
+      §O{str}
+      §R name
 ";
         // File B calls the helper + an external type
         var sourceB = @"
 §M{m002:App}
-§F{f002:ProcessUser:pub}
-  §O{void}
-  §C{FormatName} §A STR:""test"" §/C
-  §C{ExternalApi.Submit} §/C
-§/F{f002}
-§/M{m002}
+  §F{f002:ProcessUser:pub}
+      §O{void}
+      §C{FormatName} §A STR:""test"" §/C
+      §C{ExternalApi.Submit} §/C
 ";
         var moduleA = Parse(sourceA);
         var moduleB = Parse(sourceB);
@@ -533,12 +505,10 @@ public class EffectsSuggestTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:DoWork:pub}
-  §O{void}
-  §B{svc} §NEW{OrderService} §/NEW
-  §B{client} §NEW{HttpClient} §/NEW
-§/F{f001}
-§/M{m001}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{svc} §NEW{OrderService} §/NEW
+      §B{client} §NEW{HttpClient} §/NEW
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);

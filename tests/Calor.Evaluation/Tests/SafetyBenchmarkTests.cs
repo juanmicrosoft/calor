@@ -13,14 +13,12 @@ public class SafetyBenchmarkTests
 {
     private const string SafeDivideCalor = @"
 §M{m001:Test}
-§F{f001:SafeDivide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:SafeDivide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)
 ";
 
     [Fact]

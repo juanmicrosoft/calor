@@ -92,12 +92,11 @@ public class CSharpInteropBlockTests
     {
         var source = """
             §M{m001:TestModule}
-            §CSHARP{public static void Helper() { Console.WriteLine("hi"); }}§/CSHARP
-            §/M{m001}
+              §CSHARP{public static void Helper() { Console.WriteLine("hi"); }}§/CSHARP
             """;
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var parser = new Parser(lexer.Tokenize(), diag);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diag);
         var module = parser.Parse();
 
         Assert.Empty(diag);
@@ -114,14 +113,12 @@ public class CSharpInteropBlockTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:MyClass:pub}
-            §CSHARP{public T GetAll<T>() where T : class => default!;}§/CSHARP
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:MyClass:pub}
+                §CSHARP{public T GetAll<T>() where T : class => default!;}§/CSHARP
             """;
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var parser = new Parser(lexer.Tokenize(), diag);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diag);
         var module = parser.Parse();
 
         Assert.Empty(diag);
@@ -139,14 +136,12 @@ public class CSharpInteropBlockTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:MyClass:pub}
-            §CSHARP{public T GetAll<T>() => default!;}§/CSHARP
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:MyClass:pub}
+                §CSHARP{public T GetAll<T>() => default!;}§/CSHARP
             """;
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var parser = new Parser(lexer.Tokenize(), diag);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diag);
         var module = parser.Parse();
         Assert.Empty(diag);
 

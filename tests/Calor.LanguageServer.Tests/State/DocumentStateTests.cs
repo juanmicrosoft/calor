@@ -24,10 +24,8 @@ public class DocumentStateTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §R 0
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -40,22 +38,20 @@ public class DocumentStateTests
     [Fact]
     public void Reanalyze_InvalidSource_HasErrors()
     {
-        var source = "§M{m001:Test}"; // Missing END_MODULE
+        var source = "§M{m001:Test} §UNKNOWN_TOKEN_XYZ"; // Invalid section marker
 
         var state = LspTestHarness.CreateDocument(source);
 
         Assert.True(state.Diagnostics.HasErrors);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]
     public void Reanalyze_MismatchedId_HasDiagnosticsWithFixes()
     {
         var source = """
             §M{m001:TestModule}
             §F{f001:Test}
             §R 0
-            §/F{f002}
-            §/M{m001}
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -70,17 +66,13 @@ public class DocumentStateTests
     {
         var source1 = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §R 0
             """;
         var source2 = """
             §M{m001:TestModule}
-            §F{f001:Test2}
-            §R 1
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test2}
+                §R 1
             """;
 
         var state = LspTestHarness.CreateDocument(source1);
@@ -95,10 +87,9 @@ public class DocumentStateTests
     [Fact]
     public void Update_ClearsPreviousDiagnostics()
     {
-        var badSource = "§M{m001:Test}"; // Invalid
+        var badSource = "§M{m001:Test} §UNKNOWN_TOKEN_XYZ"; // Invalid
         var goodSource = """
             §M{m001:TestModule}
-            §/M{m001}
             """;
 
         var state = LspTestHarness.CreateDocument(badSource);
@@ -114,7 +105,6 @@ public class DocumentStateTests
     {
         var source = """
             §M{m001:TestModule}
-            §/M{m001}
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -128,7 +118,6 @@ public class DocumentStateTests
     {
         var source = """
             §M{m001:TestModule}
-            §/M{m001}
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -142,7 +131,6 @@ public class DocumentStateTests
     {
         var source = """
             §M{m001:TestModule}
-            §/M{m001}
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -156,7 +144,6 @@ public class DocumentStateTests
     {
         var source = """
             §M{m001:TestModule}
-            §/M{m001}
             """;
 
         var state = LspTestHarness.CreateDocument(source, "file:///path/to/test.calr");
@@ -171,10 +158,8 @@ public class DocumentStateTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §R undefined_variable
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §R undefined_variable
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -184,15 +169,13 @@ public class DocumentStateTests
         Assert.NotEmpty(state.Ast.Functions);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: source no longer produces fixes under indent-only (mismatched-ID concept gone)")]
     public void DiagnosticsWithFixes_ContainsFixInfo()
     {
         var source = """
             §M{m001:TestModule}
             §F{f001:Test}
             §R 0
-            §/F{f002}
-            §/M{m001}
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -210,12 +193,10 @@ public class DocumentStateTests
         // Uses "valeu" instead of "value" - a typo that should be suggested
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §I{i32:value}
-            §O{i32}
-            §R valeu
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §I{i32:value}
+                §O{i32}
+                §R valeu
             """;
 
         var state = LspTestHarness.CreateDocument(source);
@@ -237,12 +218,10 @@ public class DocumentStateTests
         // Uses "valeu" instead of "value" - should have a quick fix
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
-            §I{i32:value}
-            §O{i32}
-            §R valeu
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §I{i32:value}
+                §O{i32}
+                §R valeu
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);

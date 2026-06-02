@@ -26,10 +26,8 @@ public class HookIdValidationTests : IDisposable
     {
         var content = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
+                  §O{void}
             """;
         var json = CreateToolInput("/src/test.calr", content);
 
@@ -54,10 +52,8 @@ public class HookIdValidationTests : IDisposable
     {
         var content = """
             §M{m001:TestModule}
-            §F{f001:TestFunc:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:TestFunc:pub}
+                  §O{void}
             """;
         var json = CreateToolInput("/tests/test.calr", content);
 
@@ -71,13 +67,10 @@ public class HookIdValidationTests : IDisposable
     {
         var content = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func1:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func2:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func1:pub}
+                  §O{void}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func2:pub}
+                  §O{void}
             """;
         var json = CreateToolInput("/src/test.calr", content);
 
@@ -94,20 +87,16 @@ public class HookIdValidationTests : IDisposable
         var filePath = Path.Combine(_testDirectory, "test.calr");
         var existingContent = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
+                  §O{void}
             """;
         await File.WriteAllTextAsync(filePath, existingContent);
 
         // Try to write content with changed ID
         var newContent = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ9912:TestFunc:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ9912}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ9912:TestFunc:pub}
+                  §O{void}
             """;
         var json = CreateToolInput(filePath, newContent);
 
@@ -124,23 +113,18 @@ public class HookIdValidationTests : IDisposable
         var filePath = Path.Combine(_testDirectory, "test.calr");
         var existingContent = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
+                  §O{void}
             """;
         await File.WriteAllTextAsync(filePath, existingContent);
 
         // Add a new function (this should be allowed)
         var newContent = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:TestModule}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ9912:NewFunc:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ9912}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:TestFunc:pub}
+                  §O{void}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ9912:NewFunc:pub}
+                  §O{void}
             """;
         var json = CreateToolInput(filePath, newContent);
 

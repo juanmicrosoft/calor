@@ -104,15 +104,12 @@ public class Test
         // Verify the Calor parser and C# emitter can round-trip preprocessor blocks
         var calor = @"
 §M{m1:Test}
-  §CL{c1:Test}
-    §MT{mt1:M:pub}
-      §O{void}
-      §PP{DEBUG}
-        §B{x} INT:1
-      §/PP{DEBUG}
-    §/MT{mt1}
-  §/CL{c1}
-§/M{m1}
+    §CL{c1:Test}
+        §MT{mt1:M:pub}
+            §O{void}
+            §PP{DEBUG}
+              §B{x} INT:1
+            §/PP{DEBUG}
 ";
         var csharp = CompileCalorToCSharp(calor);
         Assert.Contains("#if DEBUG", csharp);
@@ -248,21 +245,18 @@ public class Test
         // Verify nested §PP round-trips back to C# #if/#else/#endif
         var calor = @"
 §M{m1:Test}
-  §CL{c1:Test}
-    §MT{mt1:M:pub}
-      §O{i32}
-      §PP{NET8_0_OR_GREATER}
-        §R INT:1
-      §PPE
-        §PP{NET6_0_OR_GREATER}
-          §R INT:2
-        §PPE
-          §R INT:3
-        §/PP{NET6_0_OR_GREATER}
-      §/PP{NET8_0_OR_GREATER}
-    §/MT{mt1}
-  §/CL{c1}
-§/M{m1}
+    §CL{c1:Test}
+        §MT{mt1:M:pub}
+            §O{i32}
+            §PP{NET8_0_OR_GREATER}
+              §R INT:1
+            §PPE
+              §PP{NET6_0_OR_GREATER}
+                §R INT:2
+              §PPE
+                §R INT:3
+              §/PP{NET6_0_OR_GREATER}
+            §/PP{NET8_0_OR_GREATER}
 ";
         var csharp = CompileCalorToCSharp(calor);
         // The C# output should have the nested #if structure
@@ -370,14 +364,11 @@ public class Test
     {
         var calor = @"
 §M{m1:Test}
-  §CL{c1:Test}
-    §PP{DEBUG}
-      §MT{mt1:DebugMethod:pub}
-        §O{void}
-      §/MT{mt1}
-    §/PP{DEBUG}
-  §/CL{c1}
-§/M{m1}
+    §CL{c1:Test}
+        §PP{DEBUG}
+          §MT{mt1:DebugMethod:pub}
+              §O{void}
+        §/PP{DEBUG}
 ";
         var csharp = CompileCalorToCSharp(calor);
         Assert.Contains("#if DEBUG", csharp);

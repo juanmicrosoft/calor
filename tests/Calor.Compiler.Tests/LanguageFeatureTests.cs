@@ -17,7 +17,7 @@ public class LanguageFeatureTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
@@ -61,11 +61,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{string}
-              §R §NEW{object}§/NEW.ToString
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{string}
+                  §R §NEW{object}§/NEW.ToString
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object().ToString;", code);
@@ -76,11 +74,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{string}
-              §R §NEW{object}§/NEW?.ToString
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{string}
+                  §R §NEW{object}§/NEW?.ToString
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object()?.ToString;", code);
@@ -91,11 +87,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{i32}
-              §R §C{GetItems}§/C.Count
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{i32}
+                  §R §C{GetItems}§/C.Count
             """;
         var code = CompileToCode(source);
         Assert.Contains("return GetItems().Count;", code);
@@ -108,12 +102,10 @@ public class LanguageFeatureTests
         // Use separate tokens to ensure proper chaining.
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{string}
-              §B{b001:result:string} §NEW{object}§/NEW.GetType
-              §R result.Name
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{string}
+                  §B{b001:result:string} §NEW{object}§/NEW.GetType
+                  §R result.Name
             """;
         var code = CompileToCode(source);
         Assert.Contains("new object().GetType", code);
@@ -124,11 +116,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{string}
-              §R §NEW{object}§/NEW.ToString
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{string}
+                  §R §NEW{object}§/NEW.ToString
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -146,12 +136,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{string:x}
-              §O{string}
-              §R (?? x "default")
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{string:x}
+                  §O{string}
+                  §R (?? x "default")
             """;
         var code = CompileToCode(source);
         Assert.Contains("return x ?? \"default\";", code);
@@ -162,13 +150,11 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{string:a}
-              §I{string:b}
-              §O{string}
-              §R (?? a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{string:a}
+                  §I{string:b}
+                  §O{string}
+                  §R (?? a b)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return a ?? b;", code);
@@ -179,14 +165,12 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{string:a}
-              §I{string:b}
-              §I{string:c}
-              §O{string}
-              §R (?? a b c)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{string:a}
+                  §I{string:b}
+                  §I{string:c}
+                  §O{string}
+                  §R (?? a b c)
             """;
         var result = Program.Compile(source);
         Assert.True(result.HasErrors);
@@ -198,12 +182,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{string:x}
-              §O{string}
-              §R (?? x "default")
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{string:x}
+                  §O{string}
+                  §R (?? x "default")
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -220,11 +202,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{Type}
-              §R (typeof int)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{Type}
+                  §R (typeof int)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(int);", code);
@@ -235,11 +215,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{Type}
-              §R (typeof string)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{Type}
+                  §R (typeof string)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(string);", code);
@@ -250,11 +228,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{Type}
-              §R (typeof System.String)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{Type}
+                  §R (typeof System.String)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(System.String);", code);
@@ -265,11 +241,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{Type}
-              §R (typeof int)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{Type}
+                  §R (typeof int)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -287,12 +261,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{bool}
-              §R (is x string)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{bool}
+                  §R (is x string)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return x is string;", code);
@@ -303,12 +275,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{bool}
-              §R (is x List<string>)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{bool}
+                  §R (is x List<string>)
             """;
         var code = CompileToCode(source);
         Assert.Contains("x is List<string>", code);
@@ -319,12 +289,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{bool}
-              §R (is x List<string> items)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{bool}
+                  §R (is x List<string> items)
             """;
         // Verify AST structure
         var module = Parse(source, out var diag);
@@ -344,12 +312,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{List<string>}
-              §R (as x List<string>)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{List<string>}
+                  §R (as x List<string>)
             """;
         var code = CompileToCode(source);
         Assert.Contains("x as List<string>", code);
@@ -360,12 +326,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{string}
-              §R (as x string)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{string}
+                  §R (as x string)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return x as string;", code);
@@ -376,12 +340,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{bool}
-              §R (is x string)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{bool}
+                  §R (is x string)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -396,12 +358,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{string}
-              §R (as x string)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{string}
+                  §R (as x string)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -447,11 +407,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{string}
-              §R "line1\nline2"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{string}
+                  §R "line1\nline2"
             """;
         var code = CompileToCode(source);
         // Regular single-line strings with \n escape emit as C# escaped strings
@@ -474,11 +432,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{Type}
-              §R §C §NEW{object}§/NEW.GetType §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{Type}
+                  §R §C §NEW{object}§/NEW.GetType §/C
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object().GetType();", code);
@@ -489,12 +445,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{string:x}
-              §O{bool}
-              §R §C §NEW{object}§/NEW.Equals §A x §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{string:x}
+                  §O{bool}
+                  §R §C §NEW{object}§/NEW.Equals §A x §/C
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object().Equals(x);", code);
@@ -505,11 +459,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{Type}
-              §R §C §NEW{object}§/NEW.GetType §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{Type}
+                  §R §C §NEW{object}§/NEW.GetType §/C
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -527,11 +479,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{string}
-              §R §C{ToString} §A §NEW{object}§/NEW §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{string}
+                  §R §C{ToString} §A §NEW{object}§/NEW §/C
             """;
         var code = CompileToCode(source);
         Assert.Contains("ToString(new object())", code);
@@ -542,11 +492,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{string}
-              §R §C{Process} §A §NEW{StringBuilder}§/NEW.ToString §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{string}
+                  §R §C{Process} §A §NEW{StringBuilder}§/NEW.ToString §/C
             """;
         var code = CompileToCode(source);
         Assert.Contains("Process(new StringBuilder().ToString)", code);
@@ -561,12 +509,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{bool}
-              §R (is x Dictionary<string, List<int>>)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{bool}
+                  §R (is x Dictionary<string, List<int>>)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -583,12 +529,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{object}
-              §R (as x Dictionary<string, List<int>>)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{object}
+                  §R (as x Dictionary<string, List<int>>)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -605,11 +549,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{Type}
-              §R (typeof List<string>)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{Type}
+                  §R (typeof List<string>)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(List<string>);", code);
@@ -620,11 +562,9 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §O{Type}
-              §R (typeof Dictionary<string, List<int>>)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §O{Type}
+                  §R (typeof Dictionary<string, List<int>>)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(Dictionary<string, List<int>>);", code);
@@ -635,12 +575,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{bool}
-              §R (is x int?)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{bool}
+                  §R (is x int?)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -661,13 +599,11 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (?? a (+ b 1))
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (?? a (+ b 1))
             """;
         var code = CompileToCode(source);
         Assert.Contains("return a ?? b + 1;", code);
@@ -678,14 +614,12 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{string:a}
-              §I{string:b}
-              §I{string:c}
-              §O{string}
-              §R (?? a (?? b c))
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{string:a}
+                  §I{string:b}
+                  §I{string:c}
+                  §O{string}
+                  §R (?? a (?? b c))
             """;
         var code = CompileToCode(source);
         Assert.Contains("return a ?? b ?? c;", code);
@@ -700,7 +634,7 @@ public class LanguageFeatureTests
     {
         // Use actual triple-quote multiline syntax in a full compilation
         // Note: The triple-quote must be in the Calor source, not the C# raw string
-        var calorSource = "§M{m001:Test}\n§F{f001:Run:pub}\n§O{string}\n§R \"\"\"hello\nworld\"\"\"\n§/F{f001}\n§/M{m001}";
+        var calorSource = "§M{m001:Test}\n§F{f001:Run:pub}\n§O{string}\n§R \"\"\"hello\nworld\"\"\"\n\n";
         var result = Program.Compile(calorSource, null, new CompilationOptions { EnforceEffects = false });
         Assert.False(result.HasErrors, $"Errors: {string.Join("; ", result.Diagnostics)}");
         // Multiline string should emit as C# verbatim string
@@ -735,13 +669,11 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{string:a}
-              §I{string:b}
-              §O{string}
-              §R §C §NEW{object}§/NEW.ToString §A a §A b §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{string:a}
+                  §I{string:b}
+                  §O{string}
+                  §R §C §NEW{object}§/NEW.ToString §A a §A b §/C
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object().ToString(a, b);", code);
@@ -752,12 +684,10 @@ public class LanguageFeatureTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Run:pub}
-              §I{object:x}
-              §O{string}
-              §R §C x.ToString §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Run:pub}
+                  §I{object:x}
+                  §O{string}
+                  §R §C x.ToString §/C
             """;
         var code = CompileToCode(source);
         Assert.Contains("return x.ToString();", code);

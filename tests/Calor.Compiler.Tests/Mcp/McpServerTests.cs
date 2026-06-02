@@ -145,7 +145,7 @@ public class McpServerTests
                 {
                     "name": "calor_compile",
                     "arguments": {
-                        "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n§/F{f001}\n§/M{m001}"
+                        "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
                     }
                 }
                 """).RootElement
@@ -598,7 +598,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
+                        "source": "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")"
                     }
                 }
                 """).RootElement
@@ -636,7 +636,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x) §/F{f001} §/M{m001}"
+                        "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x)"
                     }
                 }
                 """).RootElement
@@ -655,7 +655,7 @@ public class McpServerTests
         Assert.Contains(":0", json);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]
     public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithMismatchedId_IncludesFix()
     {
         var handler = new McpMessageHandler();
@@ -667,7 +667,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42 §/F{f002} §/M{m001}"
+                        "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42"
                     }
                 }
                 """).RootElement
@@ -692,7 +692,7 @@ public class McpServerTests
     {
         // Test the full MCP server flow with diagnose tool
         // MCP uses newline-delimited JSON (NDJSON)
-        var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R (abss -5) §/F{f001} §/M{m001}";
+        var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R (abss -5)";
         var jsonSource = JsonSerializer.Serialize(source); // Properly escape for JSON
         var inputMessage = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"calor_check\",\"arguments\":{{\"source\":{jsonSource}}}}}}}\n";
 
@@ -755,7 +755,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F{f001} §/M{m001}"
+                        "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
                     }
                 }
                 """).RootElement

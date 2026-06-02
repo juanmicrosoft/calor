@@ -121,7 +121,7 @@ public class FixToolTests
     [Fact]
     public void FixIdConflicts_RenumbersDuplicates()
     {
-        var source = "§F{f1:Foo:pub}\n§R 1\n§/F{f1}\n§F{f1:Bar:pub}\n§R 2\n§/F{f1}";
+        var source = "§F{f1:Foo:pub}\n§R 1\n\n§F{f1:Bar:pub}\n§R 2\n";
         var (result, fixes) = FixTool.FixIdConflicts(source);
 
         // First f1 should remain, second should be renumbered
@@ -135,7 +135,7 @@ public class FixToolTests
     [Fact]
     public void FixIdConflicts_NoConflictsNoChange()
     {
-        var source = "§F{f1:Foo:pub}\n§/F{f1}\n§F{f2:Bar:pub}\n§/F{f2}";
+        var source = "§F{f1:Foo:pub}\n\n§F{f2:Bar:pub}\n";
         var (result, fixes) = FixTool.FixIdConflicts(source);
 
         Assert.Equal(source, result);
@@ -193,7 +193,7 @@ public class FixToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m1:Test}\n§F{f1:Foo:pub}\n§O{void}\n§/F{f1}\n§/M{m1}"
+                "source": "§M{m1:Test}\n§F{f1:Foo:pub}\n§O{void}\n\n"
             }
             """).RootElement;
 

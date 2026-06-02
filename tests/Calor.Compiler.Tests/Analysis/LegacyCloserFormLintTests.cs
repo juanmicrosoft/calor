@@ -1,3 +1,4 @@
+// migrate_inline_calor: skip
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Diagnostics;
 using Xunit;

@@ -17,7 +17,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
+                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")"
             }
             """).RootElement;
 
@@ -39,7 +39,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
+                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")"
             }
             """).RootElement;
 
@@ -69,7 +69,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x) §/F{f001} §/M{m001}"
+                "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x)"
             }
             """).RootElement;
 
@@ -87,7 +87,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b) §/F{f001} §/M{m001}"
+                "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
             }
             """).RootElement;
 
@@ -100,13 +100,13 @@ public class DiagnoseToolFixTests
         Assert.Equal(0, json.GetProperty("errorCount").GetInt32());
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]
     public async Task ExecuteAsync_WithMismatchedId_IncludesFix()
     {
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42 §/F{f002} §/M{m001}"
+                "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42"
             }
             """).RootElement;
 
@@ -164,7 +164,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\") §/F{f001} §/M{m001}"
+                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")"
             }
             """).RootElement;
 

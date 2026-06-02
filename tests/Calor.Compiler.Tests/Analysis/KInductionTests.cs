@@ -414,12 +414,10 @@ public class KInductionTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:NoLoop:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (+ x INT:1)
-§/F{f001}
-§/M{m001}";
+  §F{f001:NoLoop:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (+ x INT:1)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -439,18 +437,15 @@ public class KInductionTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:Sum:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{sum:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A i
-    §/C
-  §/L{l1}
-  §R sum
-§/F{f001}
-§/M{m001}";
+  §F{f001:Sum:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{sum:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A i
+          §/C
+      §R sum";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -471,18 +466,15 @@ public class KInductionTests
         // Use FOR loop which has built-in iteration
         var source = @"
 §M{m001:Test}
-§F{f001:Count:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{count:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A i
-    §/C
-  §/L{l1}
-  §R count
-§/F{f001}
-§/M{m001}";
+  §F{f001:Count:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{count:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A i
+          §/C
+      §R count";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -527,19 +519,16 @@ public class KInductionTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:Sum:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n INT:0)
-  §B{sum:i32} INT:0
-  §L{l1:i:0:10:1}
-    §C{Console.WriteLine}
-      §A i
-    §/C
-  §/L{l1}
-  §R sum
-§/F{f001}
-§/M{m001}";
+  §F{f001:Sum:pub}
+      §I{i32:n}
+      §O{i32}
+      §Q (>= n INT:0)
+      §B{sum:i32} INT:0
+      §L{l1:i:0:10:1}
+          §C{Console.WriteLine}
+            §A i
+          §/C
+      §R sum";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));

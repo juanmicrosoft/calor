@@ -17,15 +17,11 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Shape:pub:abs}
-  §MT{mt1:Area:pub:abs}
-    §O{double}
-  §/MT{mt1}
-  §MT{mt2:Name:pub:abs}
-    §O{str}
-  §/MT{mt2}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Shape:pub:abs}
+      §MT{mt1:Area:pub:abs}
+          §O{double}
+      §MT{mt2:Name:pub:abs}
+          §O{str}
 ";
 
         var result = ParseAndEmit(source);
@@ -40,20 +36,15 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Shape:pub:abs}
-  §MT{mt1:Area:pub:abs}
-    §O{double}
-  §/MT{mt1}
-§/CL{c1}
-§CL{c2:Circle:pub}
-  §EXT{Shape}
-  §FLD{f64:radius:pri}
-  §MT{mt1:Area:pub:over}
-    §O{double}
-    §R (* 3.14159 (* radius radius))
-  §/MT{mt1}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Shape:pub:abs}
+      §MT{mt1:Area:pub:abs}
+          §O{double}
+  §CL{c2:Circle:pub}
+      §EXT{Shape}
+      §FLD{f64:radius:pri}
+      §MT{mt1:Area:pub:over}
+          §O{double}
+          §R (* 3.14159 (* radius radius))
 ";
 
         var result = ParseAndEmit(source);
@@ -68,13 +59,10 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Animal:pub}
-  §MT{mt1:Speak:pub:virt}
-    §O{str}
-    §R ""...""
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Animal:pub}
+      §MT{mt1:Speak:pub:virt}
+          §O{str}
+          §R ""...""
 ";
 
         var result = ParseAndEmit(source);
@@ -88,20 +76,15 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Base:pub}
-  §MT{mt1:Compute:pub:virt}
-    §O{i32}
-    §R 0
-  §/MT{mt1}
-§/CL{c1}
-§CL{c2:Derived:pub}
-  §EXT{Base}
-  §MT{mt1:Compute:pub:seal over}
-    §O{i32}
-    §R 42
-  §/MT{mt1}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Base:pub}
+      §MT{mt1:Compute:pub:virt}
+          §O{i32}
+          §R 0
+  §CL{c2:Derived:pub}
+      §EXT{Base}
+      §MT{mt1:Compute:pub:seal over}
+          §O{i32}
+          §R 42
 ";
 
         var result = ParseAndEmit(source);
@@ -115,20 +98,15 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Base:pub}
-  §MT{mt1:GetValue:pub:virt}
-    §O{i32}
-    §R 10
-  §/MT{mt1}
-§/CL{c1}
-§CL{c2:Derived:pub}
-  §EXT{Base}
-  §MT{mt1:GetValue:pub:over}
-    §O{i32}
-    §R (+ §C{base.GetValue} §/C 5)
-  §/MT{mt1}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Base:pub}
+      §MT{mt1:GetValue:pub:virt}
+          §O{i32}
+          §R 10
+  §CL{c2:Derived:pub}
+      §EXT{Base}
+      §MT{mt1:GetValue:pub:over}
+          §O{i32}
+          §R (+ §C{base.GetValue} §/C 5)
 ";
 
         var result = ParseAndEmit(source);
@@ -143,24 +121,21 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Animal:pub}
-  §FLD{str:_name:pro}
-  §CTOR{ctor1:pub}
-    §I{str:name}
-    §ASSIGN §THIS._name name
-  §/CTOR{ctor1}
-§/CL{c1}
-§CL{c2:Dog:pub}
-  §EXT{Animal}
-  §FLD{str:_breed:pri}
-  §CTOR{ctor1:pub}
-    §I{str:name}
-    §I{str:breed}
-    §BASE §A name §/BASE
-    §ASSIGN §THIS._breed breed
-  §/CTOR{ctor1}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Animal:pub}
+      §FLD{str:_name:pro}
+      §CTOR{ctor1:pub}
+        §I{str:name}
+        §ASSIGN §THIS._name name
+      §/CTOR{ctor1}
+  §CL{c2:Dog:pub}
+      §EXT{Animal}
+      §FLD{str:_breed:pri}
+      §CTOR{ctor1:pub}
+        §I{str:name}
+        §I{str:breed}
+        §BASE §A name §/BASE
+        §ASSIGN §THIS._breed breed
+      §/CTOR{ctor1}
 ";
 
         var result = ParseAndEmit(source);
@@ -175,27 +150,19 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§IFACE{i1:IMovable}
-  §MT{mt1:Move}
-    §O{void}
-  §/MT{mt1}
-§/IFACE{i1}
-§IFACE{i2:IDrawable}
-  §MT{mt1:Draw}
-    §O{void}
-  §/MT{mt1}
-§/IFACE{i2}
-§CL{c1:GameObject:pub}
-  §IMPL{IMovable}
-  §IMPL{IDrawable}
-  §MT{mt1:Move:pub}
-    §O{void}
-  §/MT{mt1}
-  §MT{mt2:Draw:pub}
-    §O{void}
-  §/MT{mt2}
-§/CL{c1}
-§/M{m1}
+  §IFACE{i1:IMovable}
+      §MT{mt1:Move}
+          §O{void}
+  §IFACE{i2:IDrawable}
+      §MT{mt1:Draw}
+          §O{void}
+  §CL{c1:GameObject:pub}
+      §IMPL{IMovable}
+      §IMPL{IDrawable}
+      §MT{mt1:Move:pub}
+          §O{void}
+      §MT{mt2:Draw:pub}
+          §O{void}
 ";
 
         var result = ParseAndEmit(source);
@@ -209,14 +176,11 @@ public class InheritanceTests
         // This test verifies static methods in a non-static class (class uses :pub, not :static)
         var source = @"
 §M{m1:Test}
-§CL{c1:MathUtils:pub}
-  §MT{mt1:Square:pub:stat}
-    §I{i32:x}
-    §O{i32}
-    §R (* x x)
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MathUtils:pub}
+      §MT{mt1:Square:pub:stat}
+          §I{i32:x}
+          §O{i32}
+          §R (* x x)
 ";
 
         var result = ParseAndEmit(source);
@@ -230,13 +194,10 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:DataService:pub:partial}
-  §MT{mt1:GetData:pub}
-    §O{str}
-    §R ""data""
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:DataService:pub:partial}
+      §MT{mt1:GetData:pub}
+          §O{str}
+          §R ""data""
 ";
 
         var result = ParseAndEmit(source);
@@ -249,12 +210,9 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:FinalClass:pub:seal}
-  §MT{mt1:DoWork:pub}
-    §O{void}
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:FinalClass:pub:seal}
+      §MT{mt1:DoWork:pub}
+          §O{void}
 ";
 
         var result = ParseAndEmit(source);
@@ -267,10 +225,8 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyOption:pub}<T>
-  §IMPL{IEquatable<MyOption<T>>}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyOption:pub}<T>
+      §IMPL{IEquatable<MyOption<T>>}
 ";
 
         var result = ParseAndEmit(source);
@@ -283,10 +239,8 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:StringList:pub}
-  §EXT{List<string>}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:StringList:pub}
+      §EXT{List<string>}
 ";
 
         var result = ParseAndEmit(source);
@@ -299,10 +253,8 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§IFACE{i1:IMyCollection}<T>
-  §EXT{IEnumerable<T>}
-§/IFACE{i1}
-§/M{m1}
+  §IFACE{i1:IMyCollection}<T>
+      §EXT{IEnumerable<T>}
 ";
 
         var result = ParseAndEmit(source);
@@ -315,10 +267,8 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyMapper:pub}<TKey,TValue>
-  §IMPL{IEquatable<Dictionary<TKey,List<TValue>>>}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyMapper:pub}<TKey,TValue>
+      §IMPL{IEquatable<Dictionary<TKey,List<TValue>>>}
 ";
 
         var result = ParseAndEmit(source);
@@ -331,9 +281,7 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Foo:pub}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Foo:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -346,9 +294,7 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Foo:pub}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Foo:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -369,12 +315,9 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:AbstractBase:abs}
-  §MT{mt1:Method:abs}
-    §O{void}
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:AbstractBase:abs}
+      §MT{mt1:Method:abs}
+          §O{void}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -390,9 +333,7 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:SealedClass:seal}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:SealedClass:seal}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -408,12 +349,10 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Parent:pub}
-§/CL{c1}
-§CL{c2:Child:pub}
-  §EXT{Parent}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Parent:pub}
+    §FLD{i32:Dummy:pri}
+  §CL{c2:Child:pub}
+      §EXT{Parent}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -429,12 +368,9 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Base:pub}
-  §MT{mt1:VirtualMethod:pub:virt}
-    §O{void}
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Base:pub}
+      §MT{mt1:VirtualMethod:pub:virt}
+          §O{void}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -452,12 +388,9 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Derived:pub}
-  §MT{mt1:Method:pub:over}
-    §O{void}
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Derived:pub}
+      §MT{mt1:Method:pub:over}
+          §O{void}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -475,12 +408,9 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Abstract:abs}
-  §MT{mt1:Method:pub:abs}
-    §O{void}
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Abstract:abs}
+      §MT{mt1:Method:pub:abs}
+          §O{void}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -500,12 +430,9 @@ public class InheritanceTests
         // Method modifiers: space-separated in 4th position
         var source = @"
 §M{m1:Test}
-§CL{c1:Base:abs seal}
-  §MT{mt1:Method:pub:stat virt}
-    §O{void}
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Base:abs seal}
+      §MT{mt1:Method:pub:stat virt}
+          §O{void}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -531,12 +458,9 @@ public class InheritanceTests
         // Parser accepts this; semantic analysis would catch the error
         var source = @"
 §M{m1:Test}
-§CL{c1:NonAbstract:pub}
-  §MT{mt1:AbstractMethod:abs}
-    §O{void}
-  §/MT{mt1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:NonAbstract:pub}
+      §MT{mt1:AbstractMethod:abs}
+          §O{void}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -567,9 +491,7 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyClass:invalid}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyClass:invalid}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -587,15 +509,11 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Shape:abs}
-  §MT{mt1:Area:pub:abs}
-    §O{double}
-  §/MT{mt1}
-  §MT{mt2:Perimeter:pub:abs}
-    §O{double}
-  §/MT{mt2}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Shape:abs}
+      §MT{mt1:Area:pub:abs}
+          §O{double}
+      §MT{mt2:Perimeter:pub:abs}
+          §O{double}
 ";
 
         // Parse original
@@ -627,20 +545,15 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Animal:pub}
-  §MT{mt1:Speak:pub:virt}
-    §O{str}
-    §R ""...""
-  §/MT{mt1}
-§/CL{c1}
-§CL{c2:Dog:pub}
-  §EXT{Animal}
-  §MT{mt1:Speak:pub:over}
-    §O{str}
-    §R ""Woof!""
-  §/MT{mt1}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Animal:pub}
+      §MT{mt1:Speak:pub:virt}
+          §O{str}
+          §R ""...""
+  §CL{c2:Dog:pub}
+      §EXT{Animal}
+      §MT{mt1:Speak:pub:over}
+          §O{str}
+          §R ""Woof!""
 ";
 
         // Parse original
@@ -704,20 +617,15 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Base:pub}
-  §MT{mt1:GetValue:pub:virt}
-    §O{i32}
-    §R 10
-  §/MT{mt1}
-§/CL{c1}
-§CL{c2:Derived:pub}
-  §EXT{Base}
-  §MT{mt1:GetValue:pub:over}
-    §O{i32}
-    §R (+ §C{base.GetValue} §/C 5)
-  §/MT{mt1}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Base:pub}
+      §MT{mt1:GetValue:pub:virt}
+          §O{i32}
+          §R 10
+  §CL{c2:Derived:pub}
+      §EXT{Base}
+      §MT{mt1:GetValue:pub:over}
+          §O{i32}
+          §R (+ §C{base.GetValue} §/C 5)
 ";
 
         var result = ParseAndEmit(source);
@@ -733,17 +641,13 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Service:pub}
-  §MT{mt1:Helper:pri}
-    §O{str}
-    §R ""done""
-  §/MT{mt1}
-  §MT{mt2:Process:pub}
-    §O{str}
-    §R §C{this.Helper} §/C
-  §/MT{mt2}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Service:pub}
+      §MT{mt1:Helper:pri}
+          §O{str}
+          §R ""done""
+      §MT{mt2:Process:pub}
+          §O{str}
+          §R §C{this.Helper} §/C
 ";
 
         var result = ParseAndEmit(source);
@@ -759,20 +663,15 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Base:pub}
-  §MT{mt1:Compute:pub:virt}
-    §O{i32}
-    §R 0
-  §/MT{mt1}
-§/CL{c1}
-§CL{c2:Final:pub}
-  §EXT{Base}
-  §MT{mt1:Compute:pub:seal over}
-    §O{i32}
-    §R 42
-  §/MT{mt1}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Base:pub}
+      §MT{mt1:Compute:pub:virt}
+          §O{i32}
+          §R 0
+  §CL{c2:Final:pub}
+      §EXT{Base}
+      §MT{mt1:Compute:pub:seal over}
+          §O{i32}
+          §R 42
 ";
 
         var result = ParseAndEmit(source);
@@ -789,14 +688,10 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyAbstract:abs}
-  §MT{mt1:DoWork:pub:abs}
-    §O{void}
-  §/MT{mt1}
-§/CL{c1}
-§CL{c2:MySealed:seal}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:MyAbstract:abs}
+      §MT{mt1:DoWork:pub:abs}
+          §O{void}
+  §CL{c2:MySealed:seal}
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -818,18 +713,13 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Test:pub}
-  §MT{mt1:VirtualMethod:pub:virt}
-    §O{void}
-  §/MT{mt1}
-  §MT{mt2:StaticMethod:pub:stat}
-    §O{void}
-  §/MT{mt2}
-  §MT{mt3:PrivateMethod:pri}
-    §O{void}
-  §/MT{mt3}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Test:pub}
+      §MT{mt1:VirtualMethod:pub:virt}
+          §O{void}
+      §MT{mt2:StaticMethod:pub:stat}
+          §O{void}
+      §MT{mt3:PrivateMethod:pri}
+          §O{void}
 ";
 
         var result = ParseAndEmit(source);
@@ -846,18 +736,14 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Item:pub}
-  §CTOR{ctor1:pub}
-    §I{i32:val}
-  §/CTOR{ctor1}
-§/CL{c1}
-§CL{c2:Factory:pub}
-  §MT{mt1:Create:pub:stat}
-    §O{Item}
-    §R §NEW{Item} §A 42
-  §/MT{mt1}
-§/CL{c2}
-§/M{m1}
+  §CL{c1:Item:pub}
+      §CTOR{ctor1:pub}
+        §I{i32:val}
+      §/CTOR{ctor1}
+  §CL{c2:Factory:pub}
+      §MT{mt1:Create:pub:stat}
+          §O{Item}
+          §R §NEW{Item} §A 42
 ";
 
         var result = ParseAndEmit(source);
@@ -872,14 +758,12 @@ public class InheritanceTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Person:pub}
-  §FLD{str:_name:pri}
-  §CTOR{ctor1:pub}
-    §I{str:name}
-    §ASSIGN §THIS._name name
-  §/CTOR{ctor1}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Person:pub}
+      §FLD{str:_name:pri}
+      §CTOR{ctor1:pub}
+        §I{str:name}
+        §ASSIGN §THIS._name name
+      §/CTOR{ctor1}
 ";
 
         var result = ParseAndEmit(source);

@@ -124,23 +124,20 @@ public sealed class MockProvider : ILlmProvider
         // a simple recursive-style conditional that only works for small n
         WithImplementation("factorial",
             @"§M{m001:Math}
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
-  §IF{if1} (<= n 1) → §R 1
-  §EI (== n 2) → §R 2
-  §EI (== n 3) → §R 6
-  §EI (== n 4) → §R 24
-  §EI (== n 5) → §R 120
-  §EI (== n 6) → §R 720
-  §EI (== n 7) → §R 5040
-  §EI (== n 8) → §R 40320
-  §EI (== n 9) → §R 362880
-  §EI (== n 10) → §R 3628800
-  §EL → §R 0
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Factorial:pub}
+      §I{i32:n}
+      §O{i32}
+      §IF{if1} (<= n 1) → §R 1
+      §EI (== n 2) → §R 2
+      §EI (== n 3) → §R 6
+      §EI (== n 4) → §R 24
+      §EI (== n 5) → §R 120
+      §EI (== n 6) → §R 720
+      §EI (== n 7) → §R 5040
+      §EI (== n 8) → §R 40320
+      §EI (== n 9) → §R 362880
+      §EI (== n 10) → §R 3628800
+      §EL → §R 0",
             @"public static class Math
 {
     public static int Factorial(int n)
@@ -157,29 +154,26 @@ public sealed class MockProvider : ILlmProvider
         // Fibonacci - lookup table approach due to Calor compiler bug
         WithImplementation("fibonacci",
             @"§M{m001:Math}
-§F{f001:Fibonacci:pub}
-  §I{i32:n}
-  §O{i32}
-  §IF{if1} (== n 0) → §R 0
-  §EI (== n 1) → §R 1
-  §EI (== n 2) → §R 1
-  §EI (== n 3) → §R 2
-  §EI (== n 4) → §R 3
-  §EI (== n 5) → §R 5
-  §EI (== n 6) → §R 8
-  §EI (== n 7) → §R 13
-  §EI (== n 8) → §R 21
-  §EI (== n 9) → §R 34
-  §EI (== n 10) → §R 55
-  §EI (== n 11) → §R 89
-  §EI (== n 12) → §R 144
-  §EI (== n 13) → §R 233
-  §EI (== n 14) → §R 377
-  §EI (== n 15) → §R 610
-  §EL → §R 0
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Fibonacci:pub}
+      §I{i32:n}
+      §O{i32}
+      §IF{if1} (== n 0) → §R 0
+      §EI (== n 1) → §R 1
+      §EI (== n 2) → §R 1
+      §EI (== n 3) → §R 2
+      §EI (== n 4) → §R 3
+      §EI (== n 5) → §R 5
+      §EI (== n 6) → §R 8
+      §EI (== n 7) → §R 13
+      §EI (== n 8) → §R 21
+      §EI (== n 9) → §R 34
+      §EI (== n 10) → §R 55
+      §EI (== n 11) → §R 89
+      §EI (== n 12) → §R 144
+      §EI (== n 13) → §R 233
+      §EI (== n 14) → §R 377
+      §EI (== n 15) → §R 610
+      §EL → §R 0",
             @"public static class Math
 {
     public static int Fibonacci(int n)
@@ -200,25 +194,17 @@ public sealed class MockProvider : ILlmProvider
         // IsPrime
         WithImplementation("prime",
             @"§M{m001:Math}
-§F{f001:IsPrime:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (> n 0)
-  §IF{if1} (<= n 1) → §R false
-  §/I{if1}
-  §IF{if2} (<= n 3) → §R true
-  §/I{if2}
-  §IF{if3} (== (% n 2) 0) → §R false
-  §/I{if3}
-  §L{loop1:i:3:1000:2}
-    §IF{if4} (> (* i i) n) → §R true
-    §/I{if4}
-    §IF{if5} (== (% n i) 0) → §R false
-    §/I{if5}
-  §/L{loop1}
-  §R true
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsPrime:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (> n 0)
+      §IF{if1} (<= n 1) → §R false
+      §IF{if2} (<= n 3) → §R true
+      §IF{if3} (== (% n 2) 0) → §R false
+      §L{loop1:i:3:1000:2}
+          §IF{if4} (> (* i i) n) → §R true
+          §IF{if5} (== (% n i) 0) → §R false
+      §R true",
             @"public static class Math
 {
     public static bool IsPrime(int n)
@@ -238,23 +224,20 @@ public sealed class MockProvider : ILlmProvider
         // Test cases: (12,8)->4, (17,13)->1, (100,25)->25, (48,18)->6, (7,7)->7
         WithImplementation("gcd",
             @"§M{m001:Math}
-§F{f001:Gcd:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §IF{if1} (== a b) → §R a
-  §EI (== b 0) → §R a
-  §EI (== a 0) → §R b
-  §EI (== (% a b) 0) → §R b
-  §EI (== (% b a) 0) → §R a
-  §EI (&& (== a 12) (== b 8)) → §R 4
-  §EI (&& (== a 17) (== b 13)) → §R 1
-  §EI (&& (== a 100) (== b 25)) → §R 25
-  §EI (&& (== a 48) (== b 18)) → §R 6
-  §EL → §R 1
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Gcd:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §IF{if1} (== a b) → §R a
+      §EI (== b 0) → §R a
+      §EI (== a 0) → §R b
+      §EI (== (% a b) 0) → §R b
+      §EI (== (% b a) 0) → §R a
+      §EI (&& (== a 12) (== b 8)) → §R 4
+      §EI (&& (== a 17) (== b 13)) → §R 1
+      §EI (&& (== a 100) (== b 25)) → §R 25
+      §EI (&& (== a 48) (== b 18)) → §R 6
+      §EL → §R 1",
             @"public static class Math
 {
     public static int Gcd(int a, int b)
@@ -272,15 +255,12 @@ public sealed class MockProvider : ILlmProvider
         // Abs - using (- 0 n) for negation
         WithImplementation("abs",
             @"§M{m001:Math}
-§F{f001:Abs:pub}
-  §I{i32:n}
-  §O{i32}
-  §S (>= result 0)
-  §IF{if1} (< n 0) → §R (- 0 n)
-  §EL → §R n
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Abs:pub}
+      §I{i32:n}
+      §O{i32}
+      §S (>= result 0)
+      §IF{if1} (< n 0) → §R (- 0 n)
+      §EL → §R n",
             @"public static class Math
 {
     public static int Abs(int n)
@@ -293,14 +273,12 @@ public sealed class MockProvider : ILlmProvider
         // SafeDivide
         WithImplementation("safedivide",
             @"§M{m001:Math}
-§F{f001:SafeDivide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:SafeDivide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)",
             @"public static class Math
 {
     public static int SafeDivide(int a, int b)
@@ -313,20 +291,17 @@ public sealed class MockProvider : ILlmProvider
         // Clamp
         WithImplementation("clamp",
             @"§M{m001:Math}
-§F{f001:Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
-  §Q (<= min max)
-  §S (>= result min)
-  §S (<= result max)
-  §IF{if1} (< value min) → §R min
-  §EI (> value max) → §R max
-  §EL → §R value
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Clamp:pub}
+      §I{i32:value}
+      §I{i32:min}
+      §I{i32:max}
+      §O{i32}
+      §Q (<= min max)
+      §S (>= result min)
+      §S (<= result max)
+      §IF{if1} (< value min) → §R min
+      §EI (> value max) → §R max
+      §EL → §R value",
             @"public static class Math
 {
     public static int Clamp(int value, int min, int max)
@@ -341,13 +316,11 @@ public sealed class MockProvider : ILlmProvider
         // Sum
         WithImplementation("sum",
             @"§M{m001:Math}
-§F{f001:Sum:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Sum:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)",
             @"public static class Math
 {
     public static int Sum(int a, int b)
@@ -359,15 +332,12 @@ public sealed class MockProvider : ILlmProvider
         // Max
         WithImplementation("max",
             @"§M{m001:Math}
-§F{f001:Max:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §IF{if1} (> a b) → §R a
-  §EL → §R b
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Max:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §IF{if1} (> a b) → §R a
+      §EL → §R b",
             @"public static class Math
 {
     public static int Max(int a, int b)
@@ -380,15 +350,12 @@ public sealed class MockProvider : ILlmProvider
         // Min
         WithImplementation("min",
             @"§M{m001:Math}
-§F{f001:Min:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §IF{if1} (< a b) → §R a
-  §EL → §R b
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Min:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §IF{if1} (< a b) → §R a
+      §EL → §R b",
             @"public static class Math
 {
     public static int Min(int a, int b)
@@ -401,19 +368,16 @@ public sealed class MockProvider : ILlmProvider
         // Power - lookup table for common powers
         WithImplementation("power",
             @"§M{m001:Math}
-§F{f001:Power:pub}
-  §I{i32:baseVal}
-  §I{i32:exp}
-  §O{i32}
-  §Q (>= exp 0)
-  §IF{if1} (== exp 0) → §R 1
-  §EI (== exp 1) → §R baseVal
-  §EI (== exp 2) → §R (* baseVal baseVal)
-  §EI (== exp 3) → §R (* baseVal (* baseVal baseVal))
-  §EL → §R 0
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Power:pub}
+      §I{i32:baseVal}
+      §I{i32:exp}
+      §O{i32}
+      §Q (>= exp 0)
+      §IF{if1} (== exp 0) → §R 1
+      §EI (== exp 1) → §R baseVal
+      §EI (== exp 2) → §R (* baseVal baseVal)
+      §EI (== exp 3) → §R (* baseVal (* baseVal baseVal))
+      §EL → §R 0",
             @"public static class Math
 {
     public static int Power(int baseVal, int exp)
@@ -428,12 +392,10 @@ public sealed class MockProvider : ILlmProvider
         // IsEven
         WithImplementation("iseven",
             @"§M{m001:Math}
-§F{f001:IsEven:pub}
-  §I{i32:n}
-  §O{bool}
-  §R (== (% n 2) 0)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsEven:pub}
+      §I{i32:n}
+      §O{bool}
+      §R (== (% n 2) 0)",
             @"public static class Math
 {
     public static bool IsEven(int n) => n % 2 == 0;
@@ -442,12 +404,10 @@ public sealed class MockProvider : ILlmProvider
         // IsOdd
         WithImplementation("isodd",
             @"§M{m001:Math}
-§F{f001:IsOdd:pub}
-  §I{i32:n}
-  §O{bool}
-  §R (!= (% n 2) 0)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsOdd:pub}
+      §I{i32:n}
+      §O{bool}
+      §R (!= (% n 2) 0)",
             @"public static class Math
 {
     public static bool IsOdd(int n) => n % 2 != 0;
@@ -456,15 +416,12 @@ public sealed class MockProvider : ILlmProvider
         // Sign
         WithImplementation("sign",
             @"§M{m001:Math}
-§F{f001:Sign:pub}
-  §I{i32:n}
-  §O{i32}
-  §IF{if1} (< n 0) → §R (- 0 1)
-  §EI (== n 0) → §R 0
-  §EL → §R 1
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Sign:pub}
+      §I{i32:n}
+      §O{i32}
+      §IF{if1} (< n 0) → §R (- 0 1)
+      §EI (== n 0) → §R 0
+      §EL → §R 1",
             @"public static class Math
 {
     public static int Sign(int n)
@@ -478,12 +435,10 @@ public sealed class MockProvider : ILlmProvider
         // Square
         WithImplementation("square",
             @"§M{m001:Math}
-§F{f001:Square:pub}
-  §I{i32:n}
-  §O{i32}
-  §R (* n n)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Square:pub}
+      §I{i32:n}
+      §O{i32}
+      §R (* n n)",
             @"public static class Math
 {
     public static int Square(int n) => n * n;
@@ -492,12 +447,10 @@ public sealed class MockProvider : ILlmProvider
         // Cube
         WithImplementation("cube",
             @"§M{m001:Math}
-§F{f001:Cube:pub}
-  §I{i32:n}
-  §O{i32}
-  §R (* n (* n n))
-§/F{f001}
-§/M{m001}",
+  §F{f001:Cube:pub}
+      §I{i32:n}
+      §O{i32}
+      §R (* n (* n n))",
             @"public static class Math
 {
     public static int Cube(int n) => n * n * n;
@@ -506,12 +459,10 @@ public sealed class MockProvider : ILlmProvider
         // Double
         WithImplementation("double",
             @"§M{m001:Math}
-§F{f001:Double:pub}
-  §I{i32:n}
-  §O{i32}
-  §R (* n 2)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Double:pub}
+      §I{i32:n}
+      §O{i32}
+      §R (* n 2)",
             @"public static class Math
 {
     public static int Double(int n) => n * 2;
@@ -520,12 +471,10 @@ public sealed class MockProvider : ILlmProvider
         // Negate
         WithImplementation("negate",
             @"§M{m001:Math}
-§F{f001:Negate:pub}
-  §I{i32:n}
-  §O{i32}
-  §R (- 0 n)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Negate:pub}
+      §I{i32:n}
+      §O{i32}
+      §R (- 0 n)",
             @"public static class Math
 {
     public static int Negate(int n) => -n;
@@ -534,12 +483,10 @@ public sealed class MockProvider : ILlmProvider
         // IsPositive
         WithImplementation("ispositive",
             @"§M{m001:Math}
-§F{f001:IsPositive:pub}
-  §I{i32:n}
-  §O{bool}
-  §R (> n 0)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsPositive:pub}
+      §I{i32:n}
+      §O{bool}
+      §R (> n 0)",
             @"public static class Math
 {
     public static bool IsPositive(int n) => n > 0;
@@ -548,12 +495,10 @@ public sealed class MockProvider : ILlmProvider
         // IsNegative
         WithImplementation("isnegative",
             @"§M{m001:Math}
-§F{f001:IsNegative:pub}
-  §I{i32:n}
-  §O{bool}
-  §R (< n 0)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsNegative:pub}
+      §I{i32:n}
+      §O{bool}
+      §R (< n 0)",
             @"public static class Math
 {
     public static bool IsNegative(int n) => n < 0;
@@ -562,14 +507,12 @@ public sealed class MockProvider : ILlmProvider
         // SafeModulo
         WithImplementation("safemodulo",
             @"§M{m001:Math}
-§F{f001:SafeModulo:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (% a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:SafeModulo:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (% a b)",
             @"public static class Math
 {
     public static int SafeModulo(int a, int b)
@@ -582,15 +525,13 @@ public sealed class MockProvider : ILlmProvider
         // Percentage
         WithImplementation("percentage",
             @"§M{m001:Math}
-§F{f001:Percentage:pub}
-  §I{i32:value}
-  §I{i32:percent}
-  §O{i32}
-  §Q (>= percent 0)
-  §Q (<= percent 100)
-  §R (/ (* value percent) 100)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Percentage:pub}
+      §I{i32:value}
+      §I{i32:percent}
+      §O{i32}
+      §Q (>= percent 0)
+      §Q (<= percent 100)
+      §R (/ (* value percent) 100)",
             @"public static class Math
 {
     public static int Percentage(int value, int percent)
@@ -602,14 +543,12 @@ public sealed class MockProvider : ILlmProvider
         // ValidIndex
         WithImplementation("validindex",
             @"§M{m001:Math}
-§F{f001:ValidIndex:pub}
-  §I{i32:index}
-  §I{i32:size}
-  §O{bool}
-  §Q (> size 0)
-  §R (&& (>= index 0) (< index size))
-§/F{f001}
-§/M{m001}",
+  §F{f001:ValidIndex:pub}
+      §I{i32:index}
+      §I{i32:size}
+      §O{bool}
+      §Q (> size 0)
+      §R (&& (>= index 0) (< index size))",
             @"public static class Math
 {
     public static bool ValidIndex(int index, int size)
@@ -621,15 +560,13 @@ public sealed class MockProvider : ILlmProvider
         // InRange
         WithImplementation("inrange",
             @"§M{m001:Math}
-§F{f001:InRange:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{bool}
-  §Q (<= min max)
-  §R (&& (>= value min) (<= value max))
-§/F{f001}
-§/M{m001}",
+  §F{f001:InRange:pub}
+      §I{i32:value}
+      §I{i32:min}
+      §I{i32:max}
+      §O{bool}
+      §Q (<= min max)
+      §R (&& (>= value min) (<= value max))",
             @"public static class Math
 {
     public static bool InRange(int value, int min, int max)
@@ -641,16 +578,13 @@ public sealed class MockProvider : ILlmProvider
         // PositiveDiff
         WithImplementation("positivediff",
             @"§M{m001:Math}
-§F{f001:PositiveDiff:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §S (>= result 0)
-  §IF{if1} (> a b) → §R (- a b)
-  §EL → §R (- b a)
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:PositiveDiff:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §S (>= result 0)
+      §IF{if1} (> a b) → §R (- a b)
+      §EL → §R (- b a)",
             @"public static class Math
 {
     public static int PositiveDiff(int a, int b)
@@ -662,13 +596,11 @@ public sealed class MockProvider : ILlmProvider
         // HalfEven
         WithImplementation("halfeven",
             @"§M{m001:Math}
-§F{f001:HalfEven:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (== (% n 2) 0)
-  §R (/ n 2)
-§/F{f001}
-§/M{m001}",
+  §F{f001:HalfEven:pub}
+      §I{i32:n}
+      §O{i32}
+      §Q (== (% n 2) 0)
+      §R (/ n 2)",
             @"public static class Math
 {
     public static int HalfEven(int n)
@@ -681,16 +613,14 @@ public sealed class MockProvider : ILlmProvider
         // NormalizeScore
         WithImplementation("normalizescore",
             @"§M{m001:Math}
-§F{f001:NormalizeScore:pub}
-  §I{i32:score}
-  §I{i32:maxScore}
-  §O{i32}
-  §Q (> maxScore 0)
-  §Q (>= score 0)
-  §Q (<= score maxScore)
-  §R (/ (* score 100) maxScore)
-§/F{f001}
-§/M{m001}",
+  §F{f001:NormalizeScore:pub}
+      §I{i32:score}
+      §I{i32:maxScore}
+      §O{i32}
+      §Q (> maxScore 0)
+      §Q (>= score 0)
+      §Q (<= score maxScore)
+      §R (/ (* score 100) maxScore)",
             @"public static class Math
 {
     public static int NormalizeScore(int score, int maxScore)
@@ -702,14 +632,12 @@ public sealed class MockProvider : ILlmProvider
         // SafeDecrement
         WithImplementation("safedecrement",
             @"§M{m001:Math}
-§F{f001:SafeDecrement:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (> n 0)
-  §S (>= result 0)
-  §R (- n 1)
-§/F{f001}
-§/M{m001}",
+  §F{f001:SafeDecrement:pub}
+      §I{i32:n}
+      §O{i32}
+      §Q (> n 0)
+      §S (>= result 0)
+      §R (- n 1)",
             @"public static class Math
 {
     public static int SafeDecrement(int n)
@@ -722,13 +650,11 @@ public sealed class MockProvider : ILlmProvider
         // Difference
         WithImplementation("difference",
             @"§M{m001:Math}
-§F{f001:Difference:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (- a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Difference:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (- a b)",
             @"public static class Math
 {
     public static int Difference(int a, int b) => a - b;
@@ -737,13 +663,11 @@ public sealed class MockProvider : ILlmProvider
         // Product
         WithImplementation("product",
             @"§M{m001:Math}
-§F{f001:Product:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Product:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (* a b)",
             @"public static class Math
 {
     public static int Product(int a, int b) => a * b;
@@ -752,13 +676,11 @@ public sealed class MockProvider : ILlmProvider
         // Average
         WithImplementation("average",
             @"§M{m001:Math}
-§F{f001:Average:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ (+ a b) 2)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Average:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ (+ a b) 2)",
             @"public static class Math
 {
     public static int Average(int a, int b) => (a + b) / 2;
@@ -767,12 +689,10 @@ public sealed class MockProvider : ILlmProvider
         // IsZero
         WithImplementation("iszero",
             @"§M{m001:Math}
-§F{f001:IsZero:pub}
-  §I{i32:n}
-  §O{bool}
-  §R (== n 0)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsZero:pub}
+      §I{i32:n}
+      §O{bool}
+      §R (== n 0)",
             @"public static class Math
 {
     public static bool IsZero(int n) => n == 0;
@@ -781,12 +701,10 @@ public sealed class MockProvider : ILlmProvider
         // Increment
         WithImplementation("increment",
             @"§M{m001:Math}
-§F{f001:Increment:pub}
-  §I{i32:n}
-  §O{i32}
-  §R (+ n 1)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Increment:pub}
+      §I{i32:n}
+      §O{i32}
+      §R (+ n 1)",
             @"public static class Math
 {
     public static int Increment(int n) => n + 1;
@@ -795,12 +713,10 @@ public sealed class MockProvider : ILlmProvider
         // Decrement
         WithImplementation("decrement",
             @"§M{m001:Math}
-§F{f001:Decrement:pub}
-  §I{i32:n}
-  §O{i32}
-  §R (- n 1)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Decrement:pub}
+      §I{i32:n}
+      §O{i32}
+      §R (- n 1)",
             @"public static class Math
 {
     public static int Decrement(int n) => n - 1;
@@ -809,19 +725,16 @@ public sealed class MockProvider : ILlmProvider
         // Median3
         WithImplementation("median3",
             @"§M{m001:Math}
-§F{f001:Median3:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §I{i32:c}
-  §O{i32}
-  §IF{if1} (&& (>= a b) (<= a c)) → §R a
-  §EI (&& (>= a c) (<= a b)) → §R a
-  §EI (&& (>= b a) (<= b c)) → §R b
-  §EI (&& (>= b c) (<= b a)) → §R b
-  §EL → §R c
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:Median3:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §I{i32:c}
+      §O{i32}
+      §IF{if1} (&& (>= a b) (<= a c)) → §R a
+      §EI (&& (>= a c) (<= a b)) → §R a
+      §EI (&& (>= b a) (<= b c)) → §R b
+      §EI (&& (>= b c) (<= b a)) → §R b
+      §EL → §R c",
             @"public static class Math
 {
     public static int Median3(int a, int b, int c)
@@ -835,14 +748,11 @@ public sealed class MockProvider : ILlmProvider
         // BoolToInt
         WithImplementation("booltoint",
             @"§M{m001:Math}
-§F{f001:BoolToInt:pub}
-  §I{bool:b}
-  §O{i32}
-  §IF{if1} b → §R 1
-  §EL → §R 0
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:BoolToInt:pub}
+      §I{bool:b}
+      §O{i32}
+      §IF{if1} b → §R 1
+      §EL → §R 0",
             @"public static class Math
 {
     public static int BoolToInt(bool b) => b ? 1 : 0;
@@ -851,12 +761,10 @@ public sealed class MockProvider : ILlmProvider
         // IntToBool
         WithImplementation("inttobool",
             @"§M{m001:Math}
-§F{f001:IntToBool:pub}
-  §I{i32:n}
-  §O{bool}
-  §R (!= n 0)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IntToBool:pub}
+      §I{i32:n}
+      §O{bool}
+      §R (!= n 0)",
             @"public static class Math
 {
     public static bool IntToBool(int n) => n != 0;
@@ -865,13 +773,11 @@ public sealed class MockProvider : ILlmProvider
         // And
         WithImplementation(" and ",
             @"§M{m001:Math}
-§F{f001:And:pub}
-  §I{bool:a}
-  §I{bool:b}
-  §O{bool}
-  §R (&& a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:And:pub}
+      §I{bool:a}
+      §I{bool:b}
+      §O{bool}
+      §R (&& a b)",
             @"public static class Math
 {
     public static bool And(bool a, bool b) => a && b;
@@ -880,13 +786,11 @@ public sealed class MockProvider : ILlmProvider
         // Or
         WithImplementation(" or ",
             @"§M{m001:Math}
-§F{f001:Or:pub}
-  §I{bool:a}
-  §I{bool:b}
-  §O{bool}
-  §R (|| a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Or:pub}
+      §I{bool:a}
+      §I{bool:b}
+      §O{bool}
+      §R (|| a b)",
             @"public static class Math
 {
     public static bool Or(bool a, bool b) => a || b;
@@ -895,12 +799,10 @@ public sealed class MockProvider : ILlmProvider
         // Not
         WithImplementation(" not ",
             @"§M{m001:Math}
-§F{f001:Not:pub}
-  §I{bool:b}
-  §O{bool}
-  §R (! b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Not:pub}
+      §I{bool:b}
+      §O{bool}
+      §R (! b)",
             @"public static class Math
 {
     public static bool Not(bool b) => !b;
@@ -909,13 +811,11 @@ public sealed class MockProvider : ILlmProvider
         // Xor
         WithImplementation("xor",
             @"§M{m001:Math}
-§F{f001:Xor:pub}
-  §I{bool:a}
-  §I{bool:b}
-  §O{bool}
-  §R (!= a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Xor:pub}
+      §I{bool:a}
+      §I{bool:b}
+      §O{bool}
+      §R (!= a b)",
             @"public static class Math
 {
     public static bool Xor(bool a, bool b) => a != b;
@@ -924,13 +824,11 @@ public sealed class MockProvider : ILlmProvider
         // AreEqual
         WithImplementation("areequal",
             @"§M{m001:Math}
-§F{f001:AreEqual:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (== a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:AreEqual:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §R (== a b)",
             @"public static class Math
 {
     public static bool AreEqual(int a, int b) => a == b;
@@ -939,13 +837,11 @@ public sealed class MockProvider : ILlmProvider
         // AreNotEqual
         WithImplementation("arenotequal",
             @"§M{m001:Math}
-§F{f001:AreNotEqual:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (!= a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:AreNotEqual:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §R (!= a b)",
             @"public static class Math
 {
     public static bool AreNotEqual(int a, int b) => a != b;
@@ -954,13 +850,11 @@ public sealed class MockProvider : ILlmProvider
         // BothPositive
         WithImplementation("bothpositive",
             @"§M{m001:Math}
-§F{f001:BothPositive:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (&& (> a 0) (> b 0))
-§/F{f001}
-§/M{m001}",
+  §F{f001:BothPositive:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §R (&& (> a 0) (> b 0))",
             @"public static class Math
 {
     public static bool BothPositive(int a, int b) => a > 0 && b > 0;
@@ -969,13 +863,11 @@ public sealed class MockProvider : ILlmProvider
         // EitherPositive
         WithImplementation("eitherpositive",
             @"§M{m001:Math}
-§F{f001:EitherPositive:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (|| (> a 0) (> b 0))
-§/F{f001}
-§/M{m001}",
+  §F{f001:EitherPositive:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §R (|| (> a 0) (> b 0))",
             @"public static class Math
 {
     public static bool EitherPositive(int a, int b) => a > 0 || b > 0;
@@ -984,17 +876,14 @@ public sealed class MockProvider : ILlmProvider
         // SameSign
         WithImplementation("samesign",
             @"§M{m001:Math}
-§F{f001:SameSign:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §IF{if1} (&& (> a 0) (> b 0)) → §R true
-  §EI (&& (< a 0) (< b 0)) → §R true
-  §EI (&& (== a 0) (== b 0)) → §R true
-  §EL → §R false
-  §/I{if1}
-§/F{f001}
-§/M{m001}",
+  §F{f001:SameSign:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §IF{if1} (&& (> a 0) (> b 0)) → §R true
+      §EI (&& (< a 0) (< b 0)) → §R true
+      §EI (&& (== a 0) (== b 0)) → §R true
+      §EL → §R false",
             @"public static class Math
 {
     public static bool SameSign(int a, int b)
@@ -1009,14 +898,12 @@ public sealed class MockProvider : ILlmProvider
         // IsMultipleOf
         WithImplementation("ismultipleof",
             @"§M{m001:Math}
-§F{f001:IsMultipleOf:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §Q (!= b 0)
-  §R (== (% a b) 0)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsMultipleOf:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §Q (!= b 0)
+      §R (== (% a b) 0)",
             @"public static class Math
 {
     public static bool IsMultipleOf(int a, int b) => a % b == 0;
@@ -1025,13 +912,11 @@ public sealed class MockProvider : ILlmProvider
         // IsGreaterThan
         WithImplementation("isgreaterthan",
             @"§M{m001:Math}
-§F{f001:IsGreaterThan:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (> a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsGreaterThan:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §R (> a b)",
             @"public static class Math
 {
     public static bool IsGreaterThan(int a, int b) => a > b;
@@ -1040,13 +925,11 @@ public sealed class MockProvider : ILlmProvider
         // IsLessThan
         WithImplementation("islessthan",
             @"§M{m001:Math}
-§F{f001:IsLessThan:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (< a b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:IsLessThan:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §R (< a b)",
             @"public static class Math
 {
     public static bool IsLessThan(int a, int b) => a < b;
@@ -1055,13 +938,11 @@ public sealed class MockProvider : ILlmProvider
         // Implies
         WithImplementation("implies",
             @"§M{m001:Math}
-§F{f001:Implies:pub}
-  §I{bool:a}
-  §I{bool:b}
-  §O{bool}
-  §R (|| (! a) b)
-§/F{f001}
-§/M{m001}",
+  §F{f001:Implies:pub}
+      §I{bool:a}
+      §I{bool:b}
+      §O{bool}
+      §R (|| (! a) b)",
             @"public static class Math
 {
     public static bool Implies(bool a, bool b) => !a || b;
@@ -1074,12 +955,10 @@ public sealed class MockProvider : ILlmProvider
         var functionName = ExtractFunctionName(prompt);
 
         return $@"§M{{m001:Module}}
-§F{{f001:{functionName}:pub}}
-  §I{{i32:n}}
-  §O{{i32}}
-  §R 0
-§/F{{f001}}
-§/M{{m001}}";
+  §F{{f001:{functionName}:pub}}
+    §I{{i32:n}}
+    §O{{i32}}
+    §R 0";
     }
 
     private static string GenerateCSharpStub(string prompt)

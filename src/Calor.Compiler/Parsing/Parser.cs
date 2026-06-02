@@ -10,7 +10,6 @@ public sealed class Parser
 {
     private readonly List<Token> _tokens;
     private readonly DiagnosticBag _diagnostics;
-    private readonly bool _rejectLegacyClosers;
     private int _position;
     private bool _insideArgContext;
     private bool _insideRefinementPredicate;
@@ -18,10 +17,9 @@ public sealed class Parser
     /// <summary>
     /// Phase 4c — TokenKinds whose textual form is a legacy structural
     /// closing tag (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …) that indent
-    /// form has replaced. When <see cref="_rejectLegacyClosers"/> is
-    /// true, encountering any of these in the token stream produces a
-    /// <c>Calor0830 LegacyCloserForm</c> error rather than silently
-    /// consuming them.
+    /// form has replaced. Encountering any of these in the token stream
+    /// produces a <c>Calor0830 LegacyCloserForm</c> error rather than
+    /// silently consuming them.
     ///
     /// Closers that still carry payload — <see cref="TokenKind.EndDo"/>
     /// (carries the do-while condition), <see cref="TokenKind.EndCase"/>
@@ -51,25 +49,9 @@ public sealed class Parser
     };
 
     public Parser(IEnumerable<Token> tokens, DiagnosticBag diagnostics)
-        : this(tokens, diagnostics, rejectLegacyClosers: false)
-    {
-    }
-
-    /// <summary>
-    /// Phase 4c — strict-mode constructor. When
-    /// <paramref name="rejectLegacyClosers"/> is true the parser emits
-    /// a <c>Calor0830 LegacyCloserForm</c> error every time it would
-    /// otherwise silently consume a structural closing tag
-    /// (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …). Production CLI / MCP
-    /// compile paths opt in so user source must use indent form;
-    /// analytic / formatter / migration tooling stays on the lax
-    /// default so it can still consume legacy code.
-    /// </summary>
-    public Parser(IEnumerable<Token> tokens, DiagnosticBag diagnostics, bool rejectLegacyClosers)
     {
         _tokens = tokens.ToList();
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
-        _rejectLegacyClosers = rejectLegacyClosers;
     }
 
     private Token Current => Peek(0);
@@ -148,14 +130,14 @@ public sealed class Parser
     /// indent-aware mode (TokenizeWithIndent), this accepts either form.
     /// </summary>
     private bool IsBlockEnd(TokenKind explicitCloser)
-        => Check(explicitCloser) || Check(TokenKind.Dedent);
+        => Check(explicitCloser) || Check(TokenKind.Dedent) || Check(TokenKind.Eof);
 
     /// <summary>
     /// Phase 3 (indent-aware) — overload accepting two alternative closers
     /// (used for sites like §F/§AF that share a body parser).
     /// </summary>
     private bool IsBlockEnd(TokenKind closer1, TokenKind closer2)
-        => Check(closer1) || Check(closer2) || Check(TokenKind.Dedent);
+        => Check(closer1) || Check(closer2) || Check(TokenKind.Dedent) || Check(TokenKind.Eof);
 
     /// <summary>
     /// Phase 3 (indent-aware) — consumes the block-end marker and returns
@@ -194,20 +176,26 @@ public sealed class Parser
             // Indent-only: consume the single Dedent that ends this block.
             return Advance();
         }
+        if (Check(TokenKind.Eof))
+        {
+            // Indent-only at EOF: any unclosed block ends implicitly here.
+            // Do NOT consume the Eof — callers and the outer Parse loop
+            // still need it to recognize end-of-input.
+            return Current;
+        }
         return Expect(explicitCloser);
     }
 
     /// <summary>
-    /// Phase 4c — when strict-mode is on, emit a <c>Calor0830</c> error
-    /// whenever the parser is about to consume a structural legacy
-    /// closer token. The diagnostic is reported once per occurrence;
-    /// the parser still consumes the token so downstream productions
-    /// see the structure they expect (parsing recovers, then the bag
-    /// reports the error to the caller).
+    /// Phase 4c — emit a <c>Calor0830</c> error whenever the parser is
+    /// about to consume a structural legacy closer token. The
+    /// diagnostic is reported once per occurrence; the parser still
+    /// consumes the token so downstream productions see the structure
+    /// they expect (parsing recovers, then the bag reports the error
+    /// to the caller).
     /// </summary>
     private void ReportLegacyCloserIfStrict(Token closerToken)
     {
-        if (!_rejectLegacyClosers) return;
         if (!StructuralLegacyClosers.Contains(closerToken.Kind)) return;
 
         _diagnostics.ReportError(
@@ -4255,13 +4243,31 @@ public sealed class Parser
                 }
             }
 
-            var endToken = ExpectBlockEnd(TokenKind.EndIf);
-            var endAttrs = ParseAttributes();
-            var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
-
-            if (ShouldReportMismatchedId(endId, id, endToken))
+            // Phase 4d: under indent-form, an arrow-form §IF that has no
+            // body block (i.e. no §EI/§EL chain present and no explicit
+            // §/I closer following) self-terminates after the inline
+            // statement. Only call ExpectBlockEnd if there is actually a
+            // block-end to consume — otherwise the next token may be a
+            // sibling statement (e.g. another §IF at the same indent).
+            Token endToken;
+            bool hasChain = elseIfClauses.Count > 0 || elseBody != null;
+            if (hasChain || Check(TokenKind.EndIf) || Check(TokenKind.Dedent))
             {
-                _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IF", id, "END_IF", endId);
+                endToken = ExpectBlockEnd(TokenKind.EndIf);
+                var endAttrs = ParseAttributes();
+                var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
+
+                if (ShouldReportMismatchedId(endId, id, endToken))
+                {
+                    _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IF", id, "END_IF", endId);
+                }
+            }
+            else
+            {
+                // Arrow-only IF with no chain — span ends at the inline statement.
+                endToken = singleStmt?.Span is { } stmtSpan
+                    ? new Token(TokenKind.Eof, "", stmtSpan)
+                    : startToken;
             }
 
             var span = startToken.Span.Union(endToken.Span);
@@ -11038,8 +11044,9 @@ public sealed class Parser
     private static bool ShouldReportMismatchedId(string endId, string openId, Token endToken)
     {
         // Phase 3 (indent-aware): if the block was terminated by a Dedent
-        // (not an explicit §/X closer), there is no ID to mismatch against.
-        if (endToken.Kind == TokenKind.Dedent)
+        // or by reaching EOF (no explicit §/X closer), there is no ID to
+        // mismatch against.
+        if (endToken.Kind == TokenKind.Dedent || endToken.Kind == TokenKind.Eof)
             return false;
 
         // If both are the same, no mismatch

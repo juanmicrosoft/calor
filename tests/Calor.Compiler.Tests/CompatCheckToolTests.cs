@@ -37,7 +37,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_CheckCompat_ValidSource_ReturnsCompatible()
     {
         // Arrange: Simple valid Calor source
-        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($"{{\"source\": \"{source}\", \"checkCompat\": true}}").RootElement;
 
         // Act
@@ -57,7 +57,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_CheckCompat_ExpectedNamespace_ChecksNamespacePresence()
     {
         // Arrange
-        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($@"{{
             ""source"": ""{source}"",
             ""checkCompat"": true,
@@ -80,7 +80,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_CheckCompat_WrongExpectedNamespace_ReturnsIncompatible()
     {
         // Arrange
-        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($@"{{
             ""source"": ""{source}"",
             ""checkCompat"": true,
@@ -106,7 +106,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_CheckCompat_ExpectedPattern_FoundInOutput()
     {
         // Arrange
-        var source = "§M{m1:TestNs}\\n§F{f1:TestFunction:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:TestFunction:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($@"{{
             ""source"": ""{source}"",
             ""checkCompat"": true,
@@ -129,7 +129,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_CheckCompat_ExpectedPattern_NotFound_ReturnsIssue()
     {
         // Arrange
-        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($@"{{
             ""source"": ""{source}"",
             ""checkCompat"": true,
@@ -151,7 +151,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_CheckCompat_ForbiddenPattern_Found_ReturnsIssue()
     {
         // Arrange
-        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($@"{{
             ""source"": ""{source}"",
             ""checkCompat"": true,
@@ -178,7 +178,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_CheckCompat_ForbiddenPattern_NotFound_ReturnsCompatible()
     {
         // Arrange
-        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($@"{{
             ""source"": ""{source}"",
             ""checkCompat"": true,
@@ -214,7 +214,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_CheckCompat_IncludesGeneratedCode()
     {
         // Arrange
-        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($"{{\"source\": \"{source}\", \"checkCompat\": true}}").RootElement;
 
         // Act
@@ -233,7 +233,7 @@ public class CompatCheckToolTests
     public async Task ExecuteAsync_WithoutCheckCompat_NoCompatCheckInOutput()
     {
         // Arrange: Compile without checkCompat — output should not include compatCheck
-        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n§/F{f1}\\n§/M{m1}";
+        var source = "§M{m1:TestNs}\\n§F{f1:Test:pub}\\n§O{void}\\n\\n";
         var args = JsonDocument.Parse($"{{\"source\": \"{source}\"}}").RootElement;
 
         // Act
