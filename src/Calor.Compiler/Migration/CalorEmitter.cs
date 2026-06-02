@@ -1041,13 +1041,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CallStatementNode node)
     {
-        // Emit named argument labels as §A[name] value when present
-        // Hoist arguments containing section markers (e.g., §NEW with initializers)
-        // to avoid nested markers or raw '=' breaking the call parser
+        // Emit named argument labels as §A[name] value when present.
+        // Hoist only args that span multiple lines (e.g. §NEW with object
+        // initializers that emit `\n  Prop = val\n§/NEW`); single-line
+        // inline forms like `§NEW{T} §/NEW` and `§NEW{T} §A x §/NEW` are
+        // safe to embed directly — the parser tracks nested §NEW/§/NEW
+        // via HasEndNewBeforeEndCall, and nested §C/§/C balance the same
+        // way. Hoisting those would needlessly introduce §B{~_hoist000}
+        // temps that re-shape the source.
         var args = node.Arguments.Select((a, i) =>
         {
             var argValue = a.Accept(this);
-            if (ContainsSectionMarker(argValue))
+            if (argValue.Contains('\n'))
                 argValue = HoistToTempVar(argValue);
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
                 return $"§A[{node.ArgumentNames[i]!.TrimStart('@')}] {argValue}";
