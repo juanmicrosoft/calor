@@ -1015,6 +1015,30 @@ public sealed class CalorEmitter : IAstVisitor<string>
         EmitBlockEnd($"§/W{{{id}}}");
     }
 
+    /// <summary>
+    /// Emits a MatchExpressionNode as the initializer of a §B binding. The §B header
+    /// and §W{...:expr} target sit on the same line; case arms are emitted via
+    /// AppendLine + Indent so their indentation respects the current binding's
+    /// indent (rather than the multi-line hardcoded indent produced by
+    /// Visit(MatchExpressionNode), which is only correct in pure expression contexts).
+    /// </summary>
+    private void EmitMatchExpressionAsBindingInitializer(string bindHeader, MatchExpressionNode node)
+    {
+        var target = node.Target.Accept(this);
+        var id = string.IsNullOrEmpty(node.Id) ? $"sw{_switchCounter++}" : node.Id;
+
+        AppendLine($"{bindHeader} §W{{{id}:expr}} {target}");
+        Indent();
+
+        foreach (var matchCase in node.Cases)
+        {
+            Visit(matchCase);
+        }
+
+        Dedent();
+        EmitBlockEnd($"§/W{{{id}}}");
+    }
+
     public string Visit(CallStatementNode node)
     {
         // Emit named argument labels as §A[name] value when present
@@ -1127,9 +1151,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return "";
         }
 
-        // Parser expects: §B[type:name] expression (no = sign)
-        var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
-
         // Simplify function pointer types (delegate* unmanaged[...]<...>) that break attribute parsing
         var mappedType = node.TypeName != null ? TypeMapper.CSharpToCalor(node.TypeName) : null;
         if (mappedType != null && mappedType.Contains("delegate*"))
@@ -1139,18 +1160,34 @@ public sealed class CalorEmitter : IAstVisitor<string>
         while (mappedType != null && mappedType.Contains("OPTION["))
             mappedType = System.Text.RegularExpressions.Regex.Replace(mappedType, @"OPTION\[inner=([^\]\)>]+)\]", "?$1");
 
+        // Build the §B{...} header (without trailing initializer) so we can emit it
+        // either inline-with-initializer (default) or inline-with-§W{...:expr} target
+        // (when the initializer is a match expression that must respect block indent).
+        string bindHeader;
         if (node.IsMutable)
         {
-            // Mutable: {~name} or {~name:type}
             var typePostfix = mappedType != null ? $":{mappedType}" : "";
-            AppendLine($"§B{{~{EscapeCalorIdentifier(node.Name)}{typePostfix}}}{initPart}");
+            bindHeader = $"§B{{~{EscapeCalorIdentifier(node.Name)}{typePostfix}}}";
         }
         else
         {
-            // Immutable: {name} or {type:name}
             var typePrefix = mappedType != null ? $"{mappedType}:" : "";
-            AppendLine($"§B{{{typePrefix}{EscapeCalorIdentifier(node.Name)}}}{initPart}");
+            bindHeader = $"§B{{{typePrefix}{EscapeCalorIdentifier(node.Name)}}}";
         }
+
+        // Match expression as initializer must use block form so case arms are emitted
+        // at the correct indent. The naive `Initializer.Accept(this)` returns a
+        // multi-line string with hardcoded 2/4-space indents that get jammed onto
+        // the §B line and end up dedented below the enclosing scope.
+        if (node.Initializer is MatchExpressionNode matchExpr)
+        {
+            EmitMatchExpressionAsBindingInitializer(bindHeader, matchExpr);
+            return "";
+        }
+
+        // Parser expects: §B[type:name] expression (no = sign)
+        var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
+        AppendLine($"{bindHeader}{initPart}");
         return "";
     }
 

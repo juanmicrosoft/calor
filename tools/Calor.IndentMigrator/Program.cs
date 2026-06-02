@@ -19,23 +19,85 @@ public static class Program
 {
     public static int Main(string[] args)
     {
-        var root = args.Length > 0 ? args[0] : Directory.GetCurrentDirectory();
-        var dryRun = args.Contains("--dry-run");
-        var verbose = args.Contains("--verbose") || args.Contains("-v");
+        // Parse args: first positional is root (file or dir).
+        // Flags: --dry-run, --verbose|-v, --exclude <relative-path> (repeatable).
+        string? rootArg = null;
+        var dryRun = false;
+        var verbose = false;
+        var excludes = new List<string>();
 
-        if (!Directory.Exists(root))
+        for (int i = 0; i < args.Length; i++)
         {
-            Console.Error.WriteLine($"error: directory not found: {root}");
+            var a = args[i];
+            switch (a)
+            {
+                case "--dry-run":
+                    dryRun = true; break;
+                case "--verbose":
+                case "-v":
+                    verbose = true; break;
+                case "--exclude":
+                    if (i + 1 >= args.Length)
+                    {
+                        Console.Error.WriteLine("error: --exclude requires a path argument");
+                        return 2;
+                    }
+                    excludes.Add(args[++i]);
+                    break;
+                default:
+                    if (a.StartsWith('-'))
+                    {
+                        Console.Error.WriteLine($"error: unknown flag '{a}'");
+                        return 2;
+                    }
+                    rootArg ??= a;
+                    break;
+            }
+        }
+
+        var root = rootArg ?? Directory.GetCurrentDirectory();
+        var rootIsFile = File.Exists(root);
+
+        if (!rootIsFile && !Directory.Exists(root))
+        {
+            Console.Error.WriteLine($"error: path not found: {root}");
             return 2;
         }
 
-        var files = Directory.EnumerateFiles(root, "*.calr", SearchOption.AllDirectories)
-            .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
-                     && !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
-            .OrderBy(p => p, StringComparer.Ordinal)
-            .ToArray();
+        string[] files;
+        string scanRoot;
+        if (rootIsFile)
+        {
+            files = new[] { Path.GetFullPath(root) };
+            scanRoot = Path.GetDirectoryName(files[0]) ?? Directory.GetCurrentDirectory();
+        }
+        else
+        {
+            scanRoot = root;
+            files = Directory.EnumerateFiles(root, "*.calr", SearchOption.AllDirectories)
+                .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
+                         && !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+                .OrderBy(p => p, StringComparer.Ordinal)
+                .ToArray();
+        }
 
-        Console.WriteLine($"Scanning {files.Length} .calr file(s) under {root}");
+        // Apply --exclude filter: normalize separators on both sides and match by
+        // suffix to allow either fully-qualified relative paths or trailing fragments.
+        if (excludes.Count > 0)
+        {
+            var normExcludes = excludes
+                .Select(e => e.Replace('/', Path.DirectorySeparatorChar)
+                              .Replace('\\', Path.DirectorySeparatorChar))
+                .ToArray();
+            files = files
+                .Where(f => !normExcludes.Any(e =>
+                    f.EndsWith(e, StringComparison.OrdinalIgnoreCase)))
+                .ToArray();
+        }
+
+        Console.WriteLine($"Scanning {files.Length} .calr file(s) under {scanRoot}");
+        if (excludes.Count > 0)
+            Console.WriteLine($"Excluded patterns: {string.Join(", ", excludes)}");
         if (dryRun) Console.WriteLine("[dry-run] no files will be written");
 
         var rewritten = 0;
@@ -97,7 +159,7 @@ public static class Program
             if (originalNorm == emittedNorm)
             {
                 unchanged++;
-                if (verbose) Console.WriteLine($"  unchanged: {Relative(root, file)}");
+                if (verbose) Console.WriteLine($"  unchanged: {Relative(scanRoot, file)}");
                 continue;
             }
 
@@ -112,7 +174,7 @@ public static class Program
             }
 
             rewritten++;
-            if (verbose) Console.WriteLine($"  rewrote: {Relative(root, file)}");
+            if (verbose) Console.WriteLine($"  rewrote: {Relative(scanRoot, file)}");
         }
 
         Console.WriteLine();
@@ -123,7 +185,7 @@ public static class Program
             Console.WriteLine("Skipped files:");
             foreach (var (path, reason) in skipped.Take(50))
             {
-                Console.WriteLine($"  {Relative(root, path)}: {reason}");
+                Console.WriteLine($"  {Relative(scanRoot, path)}: {reason}");
             }
             if (skipped.Count > 50) Console.WriteLine($"  ... and {skipped.Count - 50} more");
         }
