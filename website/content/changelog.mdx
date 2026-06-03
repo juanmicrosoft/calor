@@ -8,6 +8,27 @@ All notable changes to Calor, organized by release.
 
 ---
 
+## [0.5.1] - 2026-06-03
+
+### Added
+- **Indent-only Calor source** — Calor source is now indent-delimited end to end. The parser, migration emitter (`Migration/CalorEmitter`), and `calor format` all produce/accept indent form as canonical. Closer-form structural tags (`§/F{id}`, `§/M{id}`, `§/I{id}`, `§/L{id}`, …) have been removed from the emitter and rejected by the strict CLI compile path. The `09_codegen_bugfixes` self-test fixture was migrated alongside; round-trip emission stays byte-identical.
+- **`calor --input … --output … --allow-legacy-closers`** — Escape hatch on the CLI compile path for users mid-migration. Default is strict (legacy closer form produces `Calor0830`); `calor format` rewrites a file in canonical indent form.
+- **`CompilationOptions.RejectLegacyClosers`** — Opt-in compilation flag; the CLI sets it to `true` by default, other API surfaces (MSBuild `<CompileCalor>`, MCP tools, LSP) keep the lax default for now.
+- **`calor fix --drop-structural-ids <root>`** — Bulk, mechanical, byte-reversible source rewriter that strips `{id}` from structural closing tags. Records every removal in a `migration.log.json` and supports `--revert --log <file>` to restore the original bytes exactly. See [`docs/cli/fix.md`](/docs/cli/fix/).
+- **`Calor0820 LegacyStructuralId` / `Calor0830 LegacyCloserForm`** — Opt-in lints flagging legacy IDs on closing tags and legacy closer-form structural tags, with `fix` patches pointing at `calor fix` and `calor format` respectively.
+- **Optional closing-tag IDs everywhere** — Structural closing tags (`§/M`, `§/F`, `§/AF`, `§/L`, `§/I`, `§/TR`, `§/CL`, `§/IN`, `§/PR`, `§/MT`) may omit the trailing `{id}` block. Both forms continue to parse; the parser pairs closers with their nearest matching opener by structural nesting.
+- **Phase 5 — Product docs migrated to indent-only syntax.** README, `docs/`, and `website/content/` now teach indent-form Calor as the canonical surface; closer-form is mentioned only in legacy callouts that point at `calor fix` for migration.
+
+### Changed
+- **Lint no longer flags leading indentation or blank lines.** With indent form now canonical, the two formatting lint rules introduced for the closer-form "agent-optimized" surface (leading whitespace, blank lines) have been removed from both `calor lint` and the `check` MCP tool. Indentation and blank lines are first-class.
+- **Benchmark metric calculators score indent form, not closer tags.** The four heuristic calculators under `tests/Calor.Evaluation/Metrics/` used to award credit for the presence of paired structural closing tags as a proxy for "scope boundaries are explicit". With indent form canonical, the dedent IS the scope-boundary signal, so those bonuses now reward indented body lines per structural opener. Net score magnitude is preserved.
+
+### Fixed
+- **`Migration/CalorEmitter.Visit(CatchClauseNode)`** — Catch filters now emit `§WHEN` (matching the token form the parser produces and the `§WHEN` already emitted by match-arm guards). Previously emitted a bare lowercase `WHEN` that did not round-trip cleanly.
+- **`MatchExpressionNode` as a `§B` binding initializer** — match expressions used as binding initializers now emit indented `§K` arms relative to the enclosing block. Previously hardcoded 2/4-space indents could trigger `Calor0099` dedent errors when the binding lived inside a deeper function body.
+
+---
+
 ## [0.5.0] - 2026-04-22
 
 ### Added
