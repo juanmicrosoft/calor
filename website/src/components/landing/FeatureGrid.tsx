@@ -31,11 +31,11 @@ const features = [
     href: '/docs/philosophy/stable-identifiers/',
   },
   {
-    name: 'No More Missing Braces',
+    name: 'Structure AI Can Navigate',
     description:
-      'Explicit start/end tags mean AI can\'t generate malformed code. No more "unexpected token" from bad indentation.',
+      'Every block opens with a §-prefixed tag. AI tools find any function, module, or loop at a glance—indentation defines scope, just like Python.',
     icon: Layers,
-    code: '§M{m_01J5X7K9M2:App}\n  ...\n§/M{m_01J5X7K9M2}',
+    code: '§M{m_01J5X7K9M2:App}\n  §F{f1:Main:pub} () -> void\n    §P "hello"',
     href: '/docs/syntax-reference/',
   },
 ];

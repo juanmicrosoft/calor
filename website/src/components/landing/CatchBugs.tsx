@@ -7,14 +7,11 @@ export function CatchBugs() {
   const codeRef = useScrollReveal<HTMLDivElement>({ direction: 'left' });
   const errorRef = useScrollReveal<HTMLDivElement>({ direction: 'right' });
 
-  const calorCode = `§F[f_01A8X:ProcessOrder:pub]
-  §I[Order:order]
-  §O[bool]
-  §E[db]
-
-  §C[SaveOrder] order
-  §C[NotifyCustomer] order
-§/F[f_01A8X]`;
+  const calorCode = `§M{m1:Orders}
+  §F{f_01A8X:ProcessOrder:pub} (Order:order) -> bool
+    §E{db}
+    §C{SaveOrder} §A order §/C
+    §C{NotifyCustomer} §A order §/C`;
 
   const errorOutput = `error CALOR0410: Function 'ProcessOrder' uses effect 'net'
                    but does not declare it
@@ -22,11 +19,11 @@ export function CatchBugs() {
   Call chain: ProcessOrder → NotifyCustomer → SendEmail
               → HttpClient.PostAsync
 
-  Declared effects: §E[db]
-  Required effects: §E[db,net]
+  Declared effects: §E{db}
+  Required effects: §E{db,net}
 
   Fix: Add 'net' to the effect declaration:
-       §E[db,net]`;
+       §E{db,net}`;
 
   return (
     <section className="relative py-24 overflow-hidden">
