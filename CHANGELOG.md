@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-03
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.29x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.85x (Calor wins, large effect d=1.84)
+  - ErrorDetection: 1.52x (Calor wins, large effect d=1.26)
+  - RefactoringStability: 1.38x (Calor wins, large effect d=7.10)
+  - EditPrecision: 1.36x (Calor wins, large effect d=4.83)
+  - Correctness: 1.31x (Calor wins, large effect d=1.40)
+- **Programs Tested**: 207
+
 ### Added
 - **Phase 4c PR-4 — Parser strict-mode rejection of legacy structural closers.** A new opt-in `Parser` constructor (`new Parser(tokens, diagnostics, rejectLegacyClosers: true)`) escalates the previous opt-in lint `Calor0830 LegacyCloserForm` to a parser-level error at every site that would otherwise silently consume a legacy structural closing tag (`§/M`, `§/F`, `§/AF`, `§/MT`, `§/SW`/`§/W`, `§/L`, `§/WH`, `§/I`, `§/EACH`, `§/EACHKV`, `§/IFACE`, `§/CL`). Closers that still carry payload (`§/DO` condition, `§/PP` condition, `§/K` case delimiter) and inline expression closers (`§/C`, `§/T`, `§/NEW`, `§/A`, `§/THIS`, `§/BASE`, `§/INIT`, `§/LIST`, `§/DICT`, `§/HSET`, `§/ARR`, `§/LAM`, …) are intentionally NOT rejected.
 - **`calor --input … --output … --allow-legacy-closers`** — Escape hatch on the CLI compile path for users mid-migration. By default the CLI compile path is now strict (`RejectLegacyClosers = true` on the options the CLI builds) and any closer-form input source produces `Calor0830` errors. `calor format` rewrites a file in canonical indent form. Other API surfaces (`Program.Compile(source, path, options)` callers, the MSBuild `<CompileCalor>` task, MCP tools, LSP, lint/format/convert/migration tooling) keep the lax default (`RejectLegacyClosers = false`) so existing callers see no behavior change while the cross-surface migration completes.
