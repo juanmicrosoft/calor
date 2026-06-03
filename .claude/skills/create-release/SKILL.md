@@ -1,3 +1,15 @@
+---
+name: create-release
+description: >-
+    Automate the Calor release process end-to-end: bump version across Directory.Build.props,
+    VSCode extension, website, and changelog files; run the statistical benchmark suite
+    (30 runs); open and merge a release PR; create the GitHub release with proper pre-release
+    tagging; and trigger the website deploy. Use when the user asks to "cut a release",
+    "create a release", "ship a version", "release vX.Y.Z", or "do a release".
+allowed-tools: Bash, Read, Write, Edit
+user-invocable: true
+---
+
 # /create-release - Create a New Calor Release
 
 This skill automates the release process: bump versions across all components, run benchmarks, create a PR, merge it, and create a GitHub release with proper tagging.
