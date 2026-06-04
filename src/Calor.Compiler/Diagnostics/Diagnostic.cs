@@ -58,6 +58,16 @@ public static class DiagnosticCode
     /// </summary>
     public const string MissingExtensionSelf = "Calor0204";
 
+    // Bind inference diagnostics (Calor0250-0259) — RFC v0.6 bind-inference-formalization
+
+    /// <summary>
+    /// Error: <c>§B{name}</c> requires either a <c>:type</c> annotation or
+    /// an initializer expression. Previously the binder silently defaulted
+    /// to <c>INT</c> in this case; that was a latent bug because misuse
+    /// produced wrong-typed code with no diagnostic.
+    /// </summary>
+    public const string BindRequiresTypeOrInitializer = "Calor0250";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";
