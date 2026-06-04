@@ -2253,7 +2253,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var fullTarget = escapedTarget + typeArgsSuffix;
 
         if (node.Arguments.Count == 0)
-            return $"§C{{{fullTarget}}} §/C";
+        {
+            // Phase 2 (RFC v0.6 call-closer-elision): zero-arg form may drop §/C.
+            // Safe in every context — the parser's zero-arg implicit-close path
+            // does not look at the following token. Flag defaults to false in
+            // v0.6.0; planned to flip to true in v0.6.1 once snapshots churn.
+            return _context?.UseImplicitCallCloser == true
+                ? $"§C{{{fullTarget}}}"
+                : $"§C{{{fullTarget}}} §/C";
+        }
 
         // Emit named argument labels as §A[name] value when present
         var args = node.Arguments.Select((a, i) =>

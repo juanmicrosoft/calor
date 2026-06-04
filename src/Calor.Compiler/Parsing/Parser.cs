@@ -15,6 +15,16 @@ public sealed class Parser
     private bool _insideRefinementPredicate;
 
     /// <summary>
+    /// Phase 1 of v0.6 call-closer-elision RFC: tracks the number of
+    /// pending outer-call <c>§A</c> argument contexts that the inner
+    /// expression is being parsed inside. Used by
+    /// <see cref="ParseCallExpression"/>'s implicit-close branch to
+    /// decide whether a trailing <c>§/C</c> belongs to itself or to a
+    /// pending ancestor call. See RFC v0.6 call-closer-elision §3.2.
+    /// </summary>
+    private int _inOuterCallArgDepth;
+
+    /// <summary>
     /// Phase 4d — TokenKinds whose textual form is a legacy structural
     /// closing tag (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …) that indent
     /// form has fully replaced. Encountering any of these in the token
@@ -1387,8 +1397,16 @@ public sealed class Parser
         {
             if (Check(TokenKind.Arg))
             {
-                arguments.Add(ParseArgument(out var argName));
-                argumentNames.Add(argName);
+                _inOuterCallArgDepth++;
+                try
+                {
+                    arguments.Add(ParseArgument(out var argName));
+                    argumentNames.Add(argName);
+                }
+                finally
+                {
+                    _inOuterCallArgDepth--;
+                }
             }
             else
             {
@@ -7825,7 +7843,11 @@ public sealed class Parser
 
     /// <summary>
     /// Parses a call expression.
-    /// §C[target] §A arg1 §A arg2 §/C
+    /// Canonical form: <c>§C{target} §A arg1 §A arg2 §/C</c>.
+    /// Phase 1 of v0.6 call-closer-elision RFC also accepts:
+    ///   <c>§C{target}</c>             — zero-arg, no <c>§/C</c>
+    ///   <c>§C{target} primary_expr</c> — one inline-arg, no <c>§/C</c>
+    /// See <c>docs/plans/v0.6-call-closer-elision.md</c>.
     /// </summary>
     private ExpressionNode ParseCallExpression()
     {
@@ -7846,7 +7868,15 @@ public sealed class Parser
             {
                 if (Check(TokenKind.Arg))
                 {
-                    exprArgs.Add(ParseArgument());
+                    _inOuterCallArgDepth++;
+                    try
+                    {
+                        exprArgs.Add(ParseArgument());
+                    }
+                    finally
+                    {
+                        _inOuterCallArgDepth--;
+                    }
                 }
                 else if (IsExpressionStart())
                 {
@@ -7866,29 +7896,123 @@ public sealed class Parser
 
         var arguments = new List<ExpressionNode>();
         var argumentNames = new List<string?>();
+        TextSpan finalSpan;
 
-        // Parse arguments until we hit EndCall
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
+        // Phase 1 (v0.6 call-closer-elision): try implicit-close forms first.
+        // Skip the implicit path only when the next token is §A or §/C
+        // (canonical forms still apply).
+        bool tryImplicit = !Check(TokenKind.Arg) && !IsBlockEnd(TokenKind.EndCall);
+
+        // Trailing-member-access markers (.member, ?.member) after
+        // §C{target} attach to the zero-arg call result. Take the implicit
+        // zero-arg path so that ParseTrailingMemberAccess at the end of the
+        // method picks them up.
+        //
+        // Note: trailing {index} indexer after §C is currently unreachable
+        // because ParseAttributes greedily consumes adjacent {...} as more
+        // attribute groups; we therefore do not list OpenBrace here.
+        bool isTrailingMember = Check(TokenKind.Dot)
+                             || Check(TokenKind.NullConditional);
+
+        if (tryImplicit && !isTrailingMember && IsExpressionStart())
         {
-            if (Check(TokenKind.Arg))
+            // §C{target} primary_expr — one inline argument, implicit close.
+            var argExpr = ParseExpression();
+            arguments.Add(argExpr);
+            argumentNames.Add(null);
+
+            // Decide whether to consume a trailing §/C. The §/C may belong to
+            // this call (top-level) or to a pending outer call's §A. The rule:
+            //   - top-level (_inOuterCallArgDepth == 0): always consume; otherwise the §/C dangles.
+            //   - nested: consume only if the run of consecutive §/C tokens
+            //     exceeds the number of pending outer-call ancestors that
+            //     each need one. RFC v0.6 call-closer-elision §3.2 case C.
+            if (Check(TokenKind.EndCall))
             {
-                arguments.Add(ParseArgument(out var argName));
-                argumentNames.Add(argName);
+                int consecutiveClosers = 0;
+                for (int p = _position; p < _tokens.Count && _tokens[p].Kind == TokenKind.EndCall; p++)
+                {
+                    consecutiveClosers++;
+                }
+
+                bool consumeClose = _inOuterCallArgDepth == 0
+                                 || consecutiveClosers > _inOuterCallArgDepth;
+                if (consumeClose)
+                {
+                    var endTok = ExpectBlockEnd(TokenKind.EndCall);
+                    finalSpan = startToken.Span.Union(endTok.Span);
+                }
+                else
+                {
+                    finalSpan = startToken.Span.Union(argExpr.Span);
+                }
             }
             else if (IsExpressionStart())
             {
-                // Single expression argument without §A prefix
-                arguments.Add(ParseExpression());
-                argumentNames.Add(null);
+                // Two consecutive expression-start tokens in inline-arg form:
+                // Calor0150 (RFC v0.6 call-closer-elision §3.2 case B).
+                // Recovery: stop here without consuming the second expression
+                // — let the caller see and recover from it.
+                _diagnostics.ReportAmbiguousCallContinuation(Current.Span, target);
+                finalSpan = startToken.Span.Union(argExpr.Span);
+            }
+            else if (Check(TokenKind.Arg))
+            {
+                // User started the inline form (one positional arg, no §A) and
+                // then continued with §A — they likely intended the explicit
+                // form. Calor0150 also covers this confusion: the inline form
+                // has consumed one arg and cannot accept a second one.
+                _diagnostics.ReportAmbiguousCallContinuation(Current.Span, target);
+                finalSpan = startToken.Span.Union(argExpr.Span);
             }
             else
             {
-                break;
+                // Implicit close: no §/C, no continuation.
+                finalSpan = startToken.Span.Union(argExpr.Span);
             }
         }
+        else if (tryImplicit)
+        {
+            // §C{target} <terminator> — zero arguments, implicit close.
+            // The } of §C{target} was already consumed inside ParseAttributes;
+            // anchor the span end at the token just before _position.
+            var lastConsumed = _position > 0 ? _tokens[_position - 1] : startToken;
+            finalSpan = startToken.Span.Union(lastConsumed.Span);
+        }
+        else
+        {
+            // Standard form: §A args (optional) and explicit §/C.
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
+            {
+                if (Check(TokenKind.Arg))
+                {
+                    _inOuterCallArgDepth++;
+                    try
+                    {
+                        arguments.Add(ParseArgument(out var argName));
+                        argumentNames.Add(argName);
+                    }
+                    finally
+                    {
+                        _inOuterCallArgDepth--;
+                    }
+                }
+                else if (IsExpressionStart())
+                {
+                    // Legacy: single inline arg followed by explicit §/C.
+                    // Preserved for backward compatibility (§C{f} x §/C).
+                    arguments.Add(ParseExpression());
+                    argumentNames.Add(null);
+                }
+                else
+                {
+                    break;
+                }
+            }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndCall);
-        var span = startToken.Span.Union(endToken.Span);
+            var endToken = ExpectBlockEnd(TokenKind.EndCall);
+            finalSpan = startToken.Span.Union(endToken.Span);
+        }
 
         // Extract trailing generic type arguments from call target.
         // e.g., "items.Cast<i32>" → target = "items.Cast", typeArgs = ["i32"]
@@ -7917,7 +8041,7 @@ public sealed class Parser
 
         // Only pass argument names if any are non-null
         var hasNames = argumentNames.Any(n => n != null);
-        ExpressionNode expr = new CallExpressionNode(span, target, arguments, hasNames ? argumentNames : null, null, typeArguments);
+        ExpressionNode expr = new CallExpressionNode(finalSpan, target, arguments, hasNames ? argumentNames : null, null, typeArguments);
 
         // Handle trailing member access (e.g., §C[Method]§/C.Property)
         return ParseTrailingMemberAccess(expr);

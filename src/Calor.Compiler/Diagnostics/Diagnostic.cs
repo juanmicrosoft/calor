@@ -47,6 +47,19 @@ public static class DiagnosticCode
     public const string InvalidLispExpression = "Calor0114";
     public const string TypeParameterNotFound = "Calor0115";
 
+    // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
+
+    /// <summary>
+    /// Error: A closer-less <c>§C{target}</c> call expression consumed one
+    /// inline primary expression as its argument and then encountered a
+    /// second expression-start token on the same call. The form
+    /// <c>§C{f} a b</c> is ambiguous: <c>b</c> might be a second positional
+    /// argument (needs <c>§A</c>) or an unrelated token. Use the explicit
+    /// form <c>§C{f} §A a §A b §/C</c>. Per RFC v0.6 call-closer-elision §3.2
+    /// case B.
+    /// </summary>
+    public const string AmbiguousCallContinuation = "Calor0150";
+
     // Semantic errors (Calor0200-0299)
     public const string UndefinedReference = "Calor0200";
     public const string DuplicateDefinition = "Calor0201";

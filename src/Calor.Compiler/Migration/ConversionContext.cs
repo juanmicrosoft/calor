@@ -218,6 +218,14 @@ public sealed class ConversionContext
     public bool PassthroughOnError { get; set; }
 
     /// <summary>
+    /// When true, the emitter elides the trailing <c>§/C</c> on zero-arg and
+    /// one-arg expression-context <c>§C</c> calls. RFC <c>v0.6-call-closer-elision</c>
+    /// Phase 2. Default <c>false</c> in v0.6.0 (no snapshot churn); flipped
+    /// to <c>true</c> in v0.6.1. The parser accepts both forms regardless.
+    /// </summary>
+    public bool UseImplicitCallCloser { get; set; }
+
+    /// <summary>
     /// Whether unsupported constructs should be preserved as C# passthrough blocks.
     /// True when Mode is Interop or PassthroughOnError is enabled.
     /// </summary>
