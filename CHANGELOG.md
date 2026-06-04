@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **v6 compact stable identifiers (default).** `IdGenerator.Generate(IdKind)` now mints 12-char Crockford-lowercase compact IDs (`f_7k9m2npqrstv`) per [v6 implementation plan](docs/plans/path-2-drop-ids-v6-implementation.md) and v5 RFC §16.F. The legacy 26-char Crockford-uppercase ULID form (`f_01J5X7K9M2NPQRSTABWXYZ12`) remains accepted by the parser, validator, and migration tooling, and is still produced by the new `IdGenerator.GenerateUlid(IdKind)` / `GenerateUlidWithPrefix` entry points. Saves ~9.7 tokens per ID in agent-facing serialisations.
+- **`calor fix --compact-ids <root>`** — bulk repo-wide migrator from legacy ULID payloads to v6 compact payloads. Two-pass design with deterministic compact derivation (last 12 chars of the ULID payload lowercased), within-file and cross-file collision detection (re-mints fresh compact IDs on collision), and byte-exact revert via `--revert --log <file>`. Only rewrites payloads inside whitelisted ID-bearing section markers (`§M`, `§F`, `§AF`, `§L`, `§IF`, `§TR`, `§CL`, `§IFACE`, `§MT`, `§CTOR`, `§EN`, `§EXT`, `§RTYPE`, `§PROOF`, `§ITYPE`, `§IXER`, `§OP`, and their closers); ULID-shaped strings in comments, prose, or string literals are left untouched. Idempotent on already-migrated source.
+- **`src/Calor.Compiler/Ids/CompactIdGenerator.cs`** — public generator for v6 compact IDs. Exposes `Alphabet` constant (`0123456789abcdefghjkmnpqrstvwxyz` — Crockford lowercase, excludes `i/l/o/u`), `PayloadLength = 12`, `GeneratePayload()`, `Generate(IdKind)`, `GenerateWithPrefix(string)`, `DeriveFromUlid(string)`, and `IsValidPayload(string)`. Uses `RandomNumberGenerator.Fill` + `byte & 0x1F` (no modulo bias).
+- **`IdValidator` accepts both compact and legacy ULID forms.** New predicates `IsCompactId`, `IsLegacyUlidId`, and `IsCanonicalId` (union of the two for back-compat). New constant `IdValidator.CompactLength = 12`. New `Calor0821 LegacyUlidPayload` diagnostic code reserved for the opt-in lint that flags ULID payloads (the lint emits a fix-it patch pointing at `calor fix --compact-ids`).
+- **`IdGenerator` prefix coverage extended to all 14 `IdKind` values.** Adds constants `EnumExtensionPrefix = "ext_"`, `RefinementTypePrefix = "rt_"`, `ProofObligationPrefix = "po_"`, `IndexedTypePrefix = "it_"`, `IndexerPrefix = "ix_"`. `GetPrefix` and `GetKindFromId` switches now exhaustively cover `EnumExtension`, `RefinementType`, `ProofObligation`, `IndexedType`, and `Indexer` — previously `IdAssigner.Generate(IdKind.EnumExtension)` would have thrown `ArgumentOutOfRangeException` at runtime. New `IdGenerator.ExtractPayload(string)` is format-aware (returns the payload regardless of whether it's a 12-char compact or 26-char ULID); `IdGenerator.ExtractUlid(string)` is retained but now returns `null` for compact payloads.
+- **23 new tests.** `tests/Calor.Compiler.Tests/Migration/CompactIdMigratorTests.cs` covers single-ID rewrite, extra positionals preserved, closing-tag rewrite, untouched-compact, untouched-name, per-file collision (`T-CIM-f`), cross-file collision (`T-CIM-g`), existing-compact collision (`T-CIM-h`), byte-exact round-trip (`T-CIM-i`), idempotency (`T-CIM-j`), no-rewrite-outside-section-markers (`T-CIM-k`), determinism, and a parser-validation check (`T-CIM-l`) that re-tokenizes + re-parses migrated output through `Lexer.TokenizeAllForParser` + `Parser` with zero diagnostics. `tests/Calor.Ids.Tests/IdGeneratorTests.cs` expands prefix coverage to all 14 `IdKind` values, adds `Generate_ReturnsCompactLength` / `GenerateUlid_ReturnsLegacyUlidLength`, plus canonical/compact/legacy predicate tests and `ExtractPayload_*` tests.
+- **`docs/ids.md` §3.1 / §3.3 / §8.3 / §10.2** and **`docs/philosophy/stable-identifiers.md`** updated to document the dual format, the new CLI command, and the compact-form properties.
+
+### Benchmark Results (Statistical: 30 runs)
+Verified no metric regression vs. v0.5.1 baseline (the benchmark corpus uses test IDs, not production payloads, so compact-ID rollout has no per-program impact):
+- **Overall Advantage**: 1.29x (Calor leads, unchanged)
+- **Metrics**: Calor wins 7, C# wins 1 (unchanged)
+- **Programs Tested**: 207
+
 ## [0.5.1] - 2026-06-03
 
 ### Benchmark Results (Statistical: 30 runs)

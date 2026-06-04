@@ -13,8 +13,12 @@ namespace Calor.Compiler.Commands;
 ///   <item><description><c>--drop-structural-ids</c>: strips the leading
 ///   <c>{id…}</c> blocks from structural closing tags
 ///   (<c>§/M{id}</c> → <c>§/M</c>, etc.). Closing-tag IDs are optional
-///   since v0.5.x — the lexer accepts both forms. Run repeatedly: each
-///   invocation drops only IDs that match the recognized shape.</description></item>
+///   since v0.5.x — the lexer accepts both forms.</description></item>
+///   <item><description><c>--compact-ids</c>: rewrites legacy
+///   26-character Crockford-uppercase ULID payloads to the v6 12-character
+///   Crockford-lowercase compact form (saves ~9.7 tokens per ID).
+///   The mapping is collision-detected across all files in
+///   <c>root</c>.</description></item>
 /// </list>
 /// </summary>
 public static class FixCommand
@@ -32,6 +36,10 @@ public static class FixCommand
             aliases: ["--drop-structural-ids"],
             description: "Drop {id...} blocks from structural closing tags");
 
+        var compactIdsOption = new Option<bool>(
+            aliases: ["--compact-ids"],
+            description: "Rewrite legacy ULID payloads to v6 12-char compact form");
+
         var revertOption = new Option<bool>(
             aliases: ["--revert"],
             description: "Reverse the operation using --log");
@@ -48,6 +56,7 @@ public static class FixCommand
         {
             rootArgument,
             dropStructuralIdsOption,
+            compactIdsOption,
             revertOption,
             logOption,
             dryRunOption,
@@ -55,7 +64,7 @@ public static class FixCommand
 
         command.SetHandler(
             ExecuteAsync,
-            rootArgument, dropStructuralIdsOption,
+            rootArgument, dropStructuralIdsOption, compactIdsOption,
             revertOption, logOption, dryRunOption);
 
         return command;
@@ -64,6 +73,7 @@ public static class FixCommand
     private static async Task<int> ExecuteAsync(
         DirectoryInfo root,
         bool dropStructuralIds,
+        bool compactIds,
         bool revert,
         FileInfo? log,
         bool dryRun)
@@ -73,17 +83,27 @@ public static class FixCommand
             Console.Error.WriteLine($"root directory not found: {root.FullName}");
             return 2;
         }
-        if (!dropStructuralIds)
+        if (!dropStructuralIds && !compactIds)
         {
-            Console.Error.WriteLine("specify --drop-structural-ids");
+            Console.Error.WriteLine("specify --drop-structural-ids or --compact-ids");
+            return 2;
+        }
+        if (dropStructuralIds && compactIds)
+        {
+            Console.Error.WriteLine("--drop-structural-ids and --compact-ids are mutually exclusive; run them separately");
             return 2;
         }
 
-        if (revert)
+        if (dropStructuralIds)
         {
-            return await RevertStructuralIdsAsync(root, log, dryRun);
+            return revert
+                ? await RevertStructuralIdsAsync(root, log, dryRun)
+                : await DropStructuralIdsAsync(root, log, dryRun);
         }
-        return await DropStructuralIdsAsync(root, log, dryRun);
+        // compactIds
+        return revert
+            ? await RevertCompactIdsAsync(root, log, dryRun)
+            : await DoCompactIdsAsync(root, log, dryRun);
     }
 
     private static async Task<int> DropStructuralIdsAsync(
@@ -151,6 +171,93 @@ public static class FixCommand
             if (!dryRun)
             {
                 await File.WriteAllBytesAsync(migPath, restored);
+            }
+            filesRestored++;
+        }
+        Console.WriteLine(
+            $"revert: {(dryRun ? "[dry-run] " : "")}files_restored={filesRestored}");
+        return 0;
+    }
+
+    private static async Task<int> DoCompactIdsAsync(
+        DirectoryInfo root, FileInfo? logFile, bool dryRun)
+    {
+        // Load every .calr file into memory so the migrator can detect
+        // cross-file collisions in a single pass.
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal);
+        var pathByRel = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var path in EnumerateCalrFiles(root))
+        {
+            var rel = MakeRelativePosix(root, path);
+            sources[rel] = await File.ReadAllTextAsync(path, Encoding.UTF8);
+            pathByRel[rel] = path;
+        }
+
+        var migrator = new CompactIdMigrator();
+        var (migrated, log) = migrator.Migrate(sources);
+
+        int filesChanged = 0;
+        foreach (var (rel, newText) in migrated)
+        {
+            if (newText == sources[rel])
+            {
+                continue;
+            }
+            filesChanged++;
+            if (!dryRun)
+            {
+                await File.WriteAllTextAsync(pathByRel[rel], newText, new UTF8Encoding(false));
+            }
+        }
+
+        Console.WriteLine(
+            $"compact-ids: {(dryRun ? "[dry-run] " : "")}files_changed={filesChanged} replacements={log.Entries.Count}");
+
+        if (logFile != null)
+        {
+            var json = CompactIdMigrator.SerializeLog(log);
+            await File.WriteAllTextAsync(logFile.FullName, json, new UTF8Encoding(false));
+            Console.WriteLine($"wrote {logFile.FullName}");
+        }
+
+        return 0;
+    }
+
+    private static async Task<int> RevertCompactIdsAsync(
+        DirectoryInfo root, FileInfo? logFile, bool dryRun)
+    {
+        if (logFile == null || !logFile.Exists)
+        {
+            Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
+            return 2;
+        }
+        var json = await File.ReadAllTextAsync(logFile.FullName, Encoding.UTF8);
+        var log = CompactIdMigrator.DeserializeLog(json);
+
+        // Read every file that the log references.
+        var migrated = new Dictionary<string, string>(StringComparer.Ordinal);
+        var pathByRel = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var rel in log.Entries.Select(e => e.File).Distinct(StringComparer.Ordinal))
+        {
+            var migPath = Path.Combine(root.FullName, rel.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(migPath))
+            {
+                Console.Error.WriteLine($"skip missing file: {migPath}");
+                continue;
+            }
+            migrated[rel] = await File.ReadAllTextAsync(migPath, Encoding.UTF8);
+            pathByRel[rel] = migPath;
+        }
+
+        var migrator = new CompactIdMigrator();
+        var restored = migrator.Revert(migrated, log);
+
+        int filesRestored = 0;
+        foreach (var (rel, restoredText) in restored)
+        {
+            if (!dryRun)
+            {
+                await File.WriteAllTextAsync(pathByRel[rel], restoredText, new UTF8Encoding(false));
             }
             filesRestored++;
         }
