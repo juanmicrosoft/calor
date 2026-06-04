@@ -601,4 +601,66 @@ public class CompilerBugFixTests
     }
 
     #endregion
+
+    #region BindValidationPass: Calor0250 fires through the full CLI pipeline
+
+    [Fact]
+    public void BindValidation_BareBinding_ReportsCalor0250_ThroughCli()
+    {
+        // §B{x} with no type and no initializer must fail compilation
+        // through the production CLI path. PR #642 implemented the diagnostic
+        // in the Binder, but the Binder is not invoked from Program.Compile;
+        // BindValidationPass wires this check into the main pipeline.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.True(result.HasErrors,
+            "Calor0250 must fire for §B{x} with no type and no initializer.");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
+    }
+
+    [Fact]
+    public void BindValidation_TypedBinding_NoInitializer_Compiles()
+    {
+        // §B{x:i32} (typed, no initializer) is valid — default-initializes.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x:i32}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors,
+            "Typed binding with no initializer must compile cleanly: " +
+            string.Join("; ", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
+    }
+
+    [Fact]
+    public void BindValidation_UntypedBinding_WithInitializer_Compiles()
+    {
+        // §B{x} INT:42 (untyped, with initializer) is valid — type is inferred.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} INT:42
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors,
+            "Untyped binding with initializer must compile cleanly: " +
+            string.Join("; ", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
+    }
+
+    #endregion
 }
