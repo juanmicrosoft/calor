@@ -171,20 +171,29 @@ case, producing wrong-typed code with no diagnostic. The diagnostic
 was added in v0.6 and is enforced through the main `calor compile`
 pipeline by `BindValidationPass`.
 
-### Reserved (future)
+### Strict-mode diagnostics (`--strict-bind-inference`)
 
-These codes are reserved in the `Calor0250-0259` range for the
-optional strict-mode inference checks described in the RFC. They are
-not yet active.
+The following diagnostics are reserved in the `Calor0250-0259` range
+and are enforced **only** when the `--strict-bind-inference` flag is
+passed to `calor compile`. They are scheduled to become default-on in
+v0.7 (see RFC §6).
 
 | Code | Title | Fires on |
 |:-----|:------|:---------|
-| `Calor0251` | `BindCannotInferNullLiteral` | `§B{x} none` |
-| `Calor0252` | `BindCannotInferGenericReturn` | `§B{x} §C{Vec.empty}` (generic return) |
-| `Calor0253` | `BindAmbiguousNumeric` | `§B{x} (+ INT:0 FLOAT:0.0)` |
+| `Calor0251` | `BindCannotInferNullLiteral` | `§B{x} §NN` (untyped None) or `§B{x} null` |
+| `Calor0252` | `BindCannotInferGenericReturn` | `§B{x} §C{Vec.empty} §/C` and other well-known generic factory targets (`Vec.empty`, `List.empty`, `Array.empty`, `Set.empty`, `Map.empty`, …) |
+| `Calor0253` | `BindAmbiguousNumeric` | `§B{x} (+ INT:0 FLOAT:0.0)` — a binary op mixing integer and floating-point literal operands |
 
-Each will ship with an LSP quick-fix that inserts the recommended
-explicit annotation. Tracked in
+Each fires only when the binding lacks an explicit `:type` annotation;
+adding the annotation always silences the diagnostic.
+
+```
+§B{x:Option<i32>} §NN              // silences Calor0251
+§B{x:Vec<i32>} §C{Vec.empty} §/C   // silences Calor0252
+§B{x:f64} (+ INT:0 FLOAT:0.0)      // silences Calor0253
+```
+
+LSP quick-fixes that insert the recommended annotation are tracked in
 [#644](https://github.com/juanmicrosoft/calor/issues/644).
 
 ---

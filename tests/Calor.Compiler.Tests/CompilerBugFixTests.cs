@@ -702,5 +702,148 @@ public class CompilerBugFixTests
             d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
     }
 
+    [Fact]
+    public void StrictBindInference_NoneInitializer_ReportsCalor0251()
+    {
+        // §B{x} §NN with --strict-bind-inference must fail with Calor0251.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} §NN
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindCannotInferNullLiteral);
+    }
+
+    [Fact]
+    public void StrictBindInference_NoneInitializer_NoStrict_Compiles()
+    {
+        // Without --strict-bind-inference, §B{x} §NN must compile cleanly.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} §NN
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors,
+            "Without --strict-bind-inference, §B{x} §NN must not fire Calor0251.");
+    }
+
+    [Fact]
+    public void StrictBindInference_TypedNone_DoesNotReportCalor0251()
+    {
+        // §B{x:Option<i32>} §NN bypasses the inference path entirely.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x:Option<i32>} §NN
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindCannotInferNullLiteral);
+    }
+
+    [Fact]
+    public void StrictBindInference_GenericFactoryCall_ReportsCalor0252()
+    {
+        // §B{x} §C{Vec.empty} §/C is a known generic factory; strict mode flags it.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} §C{Vec.empty} §/C
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindCannotInferGenericReturn);
+    }
+
+    [Fact]
+    public void StrictBindInference_GenericFactoryCall_NoStrict_Compiles()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} §C{Vec.empty} §/C
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { EnforceEffects = false });
+
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindCannotInferGenericReturn);
+    }
+
+    [Fact]
+    public void StrictBindInference_AmbiguousNumeric_ReportsCalor0253()
+    {
+        // (+ INT:0 FLOAT:0.0) mixes integer and float literals: ambiguous widening.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} (+ INT:0 FLOAT:0.0)
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindAmbiguousNumeric);
+    }
+
+    [Fact]
+    public void StrictBindInference_AmbiguousNumeric_NoStrict_Compiles()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} (+ INT:0 FLOAT:0.0)
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors,
+            "Without --strict-bind-inference, mixed INT+FLOAT must not fire Calor0253.");
+    }
+
+    [Fact]
+    public void StrictBindInference_HomogeneousNumeric_DoesNotReportCalor0253()
+    {
+        // Same-type operands: no ambiguity, no diagnostic.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} (+ INT:1 INT:2)
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindAmbiguousNumeric);
+    }
+
     #endregion
 }

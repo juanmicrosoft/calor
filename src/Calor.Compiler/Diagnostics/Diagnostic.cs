@@ -68,6 +68,36 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindRequiresTypeOrInitializer = "Calor0250";
 
+    /// <summary>
+    /// Error: <c>§B{name} none</c> / <c>§B{name} null</c> cannot infer a
+    /// type — the right-hand side carries no concrete element type. The
+    /// fix is to give the binding an explicit option type, e.g.
+    /// <c>§B{name:Option&lt;T&gt;} none</c>.
+    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
+    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// </summary>
+    public const string BindCannotInferNullLiteral = "Calor0251";
+
+    /// <summary>
+    /// Error: <c>§B{name} §C{Foo.bar}</c> cannot infer a type when
+    /// <c>Foo.bar</c> returns a generic with an unresolved type
+    /// parameter (e.g. <c>Vec&lt;T&gt;.empty</c>). The fix is to give
+    /// the binding an explicit type argument.
+    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
+    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// </summary>
+    public const string BindCannotInferGenericReturn = "Calor0252";
+
+    /// <summary>
+    /// Error: <c>§B{name} (+ INT:0 FLOAT:0.0)</c> — the initializer mixes
+    /// numeric types and widening could pick more than one bound type.
+    /// The fix is to give the binding an explicit numeric annotation
+    /// (<c>:i32</c>, <c>:f64</c>, …).
+    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
+    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// </summary>
+    public const string BindAmbiguousNumeric = "Calor0253";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";
