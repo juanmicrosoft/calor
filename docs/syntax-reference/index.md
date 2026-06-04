@@ -154,6 +154,7 @@ compatibility but should not be used in new code — see
 - [Structure Tags](/calor/syntax-reference/structure-tags/) - Modules, functions, block structure
 - [Types](/calor/syntax-reference/types/) - Type system, Option, Result
 - [Bindings](/calor/syntax-reference/binding/) - `§B` declarations and type inference
+- [Calls](/calor/syntax-reference/calls/) - `§C` calls in statement and expression context
 - [Expressions](/calor/syntax-reference/expressions/) - Lisp-style operators
 - [Control Flow](/calor/syntax-reference/control-flow/) - Loops, conditionals
 - [Contracts](/calor/syntax-reference/contracts/) - Requires, ensures

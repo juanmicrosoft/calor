@@ -97,6 +97,19 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         => ReportError(span, DiagnosticCode.ExpectedClosingTag,
             $"Expected '{expectedCloseTag}' to close '{openTag}'");
 
+    /// <summary>
+    /// Calor0150 — A closer-less <c>§C{target}</c> call took one inline
+    /// primary expression as its argument and then encountered a second
+    /// expression-start token on the same call. Per RFC v0.6 call-closer-
+    /// elision §3.2 case B this is ambiguous; the user should switch to
+    /// the explicit form <c>§C{target} §A arg1 §A arg2 §/C</c>.
+    /// </summary>
+    public void ReportAmbiguousCallContinuation(TextSpan span, string target)
+        => ReportError(span, DiagnosticCode.AmbiguousCallContinuation,
+            $"Closer-less call '§C{{{target}}}' already took one inline argument; " +
+            "a second positional argument is ambiguous. " +
+            $"Use the explicit form '§C{{{target}}} §A arg1 §A arg2 §/C' instead.");
+
     // Semantic diagnostics
     public void ReportMissingExtensionSelf(TextSpan span, string methodName, string enumName)
         => ReportError(span, DiagnosticCode.MissingExtensionSelf,
