@@ -662,5 +662,45 @@ public class CompilerBugFixTests
             string.Join("; ", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
     }
 
+    [Fact]
+    public void BindValidation_BareBinding_InsideIfBody_ReportsCalor0250()
+    {
+        // The validator must recurse into nested statement bodies.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §I{i32:n}
+                  §O{void}
+                  §IF{if1} (> n INT:0)
+                      §B{tmp}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.True(result.HasErrors,
+            "Calor0250 must fire for bare §B inside a nested if body.");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
+    }
+
+    [Fact]
+    public void BindValidation_BareBinding_InsideForBody_ReportsCalor0250()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §L{l1:i:INT:0:INT:10:INT:1}
+                      §B{tmp}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.True(result.HasErrors,
+            "Calor0250 must fire for bare §B inside a nested for loop body.");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
+    }
+
     #endregion
 }

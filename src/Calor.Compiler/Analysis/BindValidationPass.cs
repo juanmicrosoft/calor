@@ -53,6 +53,39 @@ public sealed class BindValidationPass
                     CheckStatement(stmt);
                 }
             }
+
+            foreach (var prop in cls.Properties)
+            {
+                if (prop.Getter != null)
+                {
+                    foreach (var stmt in prop.Getter.Body)
+                    {
+                        CheckStatement(stmt);
+                    }
+                }
+                if (prop.Setter != null)
+                {
+                    foreach (var stmt in prop.Setter.Body)
+                    {
+                        CheckStatement(stmt);
+                    }
+                }
+                if (prop.Initer != null)
+                {
+                    foreach (var stmt in prop.Initer.Body)
+                    {
+                        CheckStatement(stmt);
+                    }
+                }
+            }
+
+            foreach (var op in cls.OperatorOverloads)
+            {
+                foreach (var stmt in op.Body)
+                {
+                    CheckStatement(stmt);
+                }
+            }
         }
     }
 
