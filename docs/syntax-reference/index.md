@@ -41,7 +41,7 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
 | Print | `§P expr` | `§P "Hello"` |
 | Return | `§R expr` | `§R (+ a b)` |
-| Binding | `§B{name} expr` | `§B{x} (+ 1 2)` |
+| Binding | `§B{name} expr` | `§B{x} (+ 1 2)` (see [Bindings](/calor/syntax-reference/binding/)) |
 | Operations | `(op args...)` | `(+ a b)`, `(== x 0)` |
 | Block end | _dedent_ (Python-style) | _(no `§/X` needed)_ |
 | List | `§LIST{id:type}` | `§LIST{nums:i32}` |
@@ -153,6 +153,7 @@ compatibility but should not be used in new code — see
 
 - [Structure Tags](/calor/syntax-reference/structure-tags/) - Modules, functions, block structure
 - [Types](/calor/syntax-reference/types/) - Type system, Option, Result
+- [Bindings](/calor/syntax-reference/binding/) - `§B` declarations and type inference
 - [Expressions](/calor/syntax-reference/expressions/) - Lisp-style operators
 - [Control Flow](/calor/syntax-reference/control-flow/) - Loops, conditionals
 - [Contracts](/calor/syntax-reference/contracts/) - Requires, ensures
