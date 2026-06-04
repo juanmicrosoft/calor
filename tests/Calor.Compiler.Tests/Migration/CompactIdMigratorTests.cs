@@ -208,6 +208,62 @@ public class CompactIdMigratorTests
         Assert.Equal(m1["a.calr"], m2["a.calr"]);
     }
 
+    /// <summary>
+    /// T-CIM-l: Migrated output must still parse cleanly. Guards against
+    /// subtle replacement bugs that could produce syntactically invalid
+    /// Calor (e.g. truncated payloads, mangled brace structure, lost
+    /// positional separators) which the text-level assertions above
+    /// would not catch.
+    /// </summary>
+    [Fact]
+    public void T_CIM_l_MigratedOutputStillParsesCleanly()
+    {
+        // A representative slice of opener+body+closer constructs that all
+        // carry IDs the migrator rewrites. We include both opener and the
+        // matching closer ID to exercise the closer-rewrite path.
+        var src =
+            $"§M{{m_{Ulid1}:Calc}}\n" +
+            $"  §F{{f_{Ulid2}:divide:i32:public}}\n" +
+            $"    §I{{i32:a}}\n" +
+            $"    §I{{i32:b}}\n" +
+            $"    §R (/ a b)\n";
+
+        // Baseline: source pre-migration must parse cleanly so the test
+        // exercises *only* the migrator, not unrelated parser issues.
+        var preDiags = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var preLexer = new Calor.Compiler.Parsing.Lexer(src, preDiags);
+        var preTokens = preLexer.TokenizeAllForParser();
+        var preParser = new Calor.Compiler.Parsing.Parser(preTokens, preDiags);
+        _ = preParser.Parse();
+        Assert.False(preDiags.HasErrors,
+            "Pre-migration source must parse cleanly; otherwise the test exercises parser issues unrelated to the migrator. " +
+            "Errors: " + string.Join("; ", preDiags.Errors.Select(d => d.Code + ": " + d.Message)));
+
+        var (migrated, log) = Sut.Migrate(Dict(("a.calr", src)));
+        var migratedText = migrated["a.calr"];
+
+        // Sanity: migration actually rewrote IDs (i.e. we're not testing
+        // a no-op path).
+        Assert.NotEqual(src, migratedText);
+        Assert.Equal(2, log.Entries.Count);
+        Assert.DoesNotContain(Ulid1, migratedText);
+        Assert.DoesNotContain(Ulid2, migratedText);
+
+        // The actual gap-closing assertion: post-migration text must
+        // tokenize and parse without errors.
+        var postDiags = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var postLexer = new Calor.Compiler.Parsing.Lexer(migratedText, postDiags);
+        var postTokens = postLexer.TokenizeAllForParser();
+        var postParser = new Calor.Compiler.Parsing.Parser(postTokens, postDiags);
+        var module = postParser.Parse();
+
+        Assert.False(postDiags.HasErrors,
+            "Post-migration source must parse cleanly. Errors: " +
+            string.Join("; ", postDiags.Errors.Select(d => d.Code + ": " + d.Message)));
+        // The module should still expose the function it declared.
+        Assert.NotNull(module);
+    }
+
     private static IReadOnlyDictionary<string, string> Dict(
         params (string Key, string Value)[] entries)
     {

@@ -167,6 +167,12 @@ calor ids assign .
 
 # Preview what would be assigned
 calor ids assign . --dry-run
+
+# Migrate existing legacy ULIDs to the v6 compact form
+calor fix --compact-ids .
+
+# Revert a compact migration byte-exactly
+calor fix --compact-ids --revert --log compact.log.json .
 ```
 
 ### Challenge 2: ID Churn
@@ -267,18 +273,28 @@ The tooling handles the complexity; developers just write code.
 
 ### ID Format
 
-Production IDs use ULID with kind prefix:
+Production IDs use a kind prefix plus a 12-char Crockford-lowercase
+**compact** payload (default since v0.6) or — for back-compat with
+existing repositories — a 26-char Crockford-uppercase **ULID** payload.
+Both forms are accepted by the parser, validator, and migration
+tooling; the compiler detects and reports duplicate IDs via
+`Calor0803` regardless of payload form.
 
-| Kind | Prefix | Example |
-|:-----|:-------|:--------|
-| Module | `m_` | `m_01J5X7K9M2NPQRSTABWXYZ12` |
-| Function | `f_` | `f_01J5X7K9M2NPQRSTABWXYZ12` |
-| Class | `c_` | `c_01J5X7K9M2NPQRSTABWXYZ12` |
-| Interface | `i_` | `i_01J5X7K9M2NPQRSTABWXYZ12` |
-| Method | `mt_` | `mt_01J5X7K9M2NPQRSTABWXYZ12` |
-| Property | `p_` | `p_01J5X7K9M2NPQRSTABWXYZ12` |
-| Constructor | `ctor_` | `ctor_01J5X7K9M2NPQRSTABWXYZ12` |
-| Enum | `e_` | `e_01J5X7K9M2NPQRSTABWXYZ12` |
+| Kind | Prefix | Compact example (v6+) | Legacy ULID example |
+|:-----|:-------|:----------------------|:--------------------|
+| Module | `m_` | `m_3hj8x2bw9pkq` | `m_01J5X7K9M2NPQRSTABWXYZ12` |
+| Function | `f_` | `f_7k9m2npqrstv` | `f_01J5X7K9M2NPQRSTABWXYZ12` |
+| Class | `c_` | `c_z4w7n5q2gxht` | `c_01J5X7K9M2NPQRSTABWXYZ12` |
+| Interface | `i_` | `i_9p3hxq7m4nbk` | `i_01J5X7K9M2NPQRSTABWXYZ12` |
+| Method | `mt_` | `mt_5v8b3kxq2nhp` | `mt_01J5X7K9M2NPQRSTABWXYZ12` |
+| Property | `p_` | `p_4z8jhk2nbpqr` | `p_01J5X7K9M2NPQRSTABWXYZ12` |
+| Constructor | `ctor_` | `ctor_9m4z7x2qhwjt` | `ctor_01J5X7K9M2NPQRSTABWXYZ12` |
+| Enum | `e_` | `e_2k7nbxw3hpqj` | `e_01J5X7K9M2NPQRSTABWXYZ12` |
+
+The compact form saves ~9.7 tokens per ID in agent-facing
+serialisations (RFC §16.F, N=100, 95% CI 9.30–10.04) while preserving
+semantic identity. Existing files can migrate mechanically with
+`calor fix --compact-ids` (reversible with `--revert --log`).
 
 ### CLI Commands
 
