@@ -101,6 +101,11 @@ public class Program
             aliases: ["--all-findings"],
             description: "Report all analysis findings including inconclusive and low-confidence results (default: only report verified findings)");
 
+        var strictBindInferenceOption = new Option<bool>(
+            aliases: ["--strict-bind-inference"],
+            description: "Enable strict bind-inference diagnostics Calor0251-0253 (null/none, generic factory, ambiguous-numeric). Default-on in v0.7.",
+            getDefaultValue: () => false);
+
         var experimentalOption = new Option<string[]>(
             aliases: ["--experimental"],
             description: "Enable an experimental feature flag (repeatable). Flag names are defined in docs/experiments/registry.json. Unknown flags are accepted silently.")
@@ -124,6 +129,7 @@ public class Program
             noTelemetryOption,
             analyzeOption,
             allFindingsOption,
+            strictBindInferenceOption,
             experimentalOption
         };
 
@@ -156,6 +162,7 @@ public class Program
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
             var analyze = ctx.ParseResult.GetValueForOption(analyzeOption);
             var allFindings = ctx.ParseResult.GetValueForOption(allFindingsOption);
+            var strictBindInference = ctx.ParseResult.GetValueForOption(strictBindInferenceOption);
             var experimental = ctx.ParseResult.GetValueForOption(experimentalOption) ?? Array.Empty<string>();
 
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
@@ -170,12 +177,13 @@ public class Program
                 ["noCache"] = noCache.ToString(),
                 ["verificationTimeout"] = verificationTimeout.ToString(),
                 ["analyze"] = analyze.ToString(),
+                ["strictBindInference"] = strictBindInference.ToString(),
                 ["experimentalFlagCount"] = experimental.Length.ToString()
             });
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference);
             }
             catch (Exception ex)
             {
@@ -243,7 +251,7 @@ public class Program
         return result;
     }
 
-    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null)
+    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = false)
     {
         try
         {
@@ -348,7 +356,8 @@ public class Program
                     } : null,
                     ExperimentalFlags = experimentalFlags != null && experimentalFlags.Length > 0
                         ? new ExperimentalFlags(experimentalFlags)
-                        : ExperimentalFlags.None
+                        : ExperimentalFlags.None,
+                    StrictBindInference = strictBindInference
                 };
                 var result = Compile(source, file.FullName, options);
 
@@ -530,7 +539,7 @@ public class Program
 
         // Bind validation (Calor0250: §B requires type or initializer)
         phaseSw.Restart();
-        var bindValidator = new BindValidationPass(diagnostics);
+        var bindValidator = new BindValidationPass(diagnostics, options.StrictBindInference);
         bindValidator.Check(ast);
         phaseSw.Stop();
         telemetry?.TrackPhase("BindValidation", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
@@ -954,6 +963,14 @@ public sealed class CompilationOptions
     /// Enable type checking phase.
     /// </summary>
     public bool EnableTypeChecking { get; init; }
+
+    /// <summary>
+    /// Enable strict bind-inference diagnostics (Calor0251-0253). When false,
+    /// only Calor0250 (BindRequiresTypeOrInitializer) is enforced. Designed
+    /// to ship behind a flag for one release per RFC v0.6 bind-inference-formalization §6.
+    /// Default-on in v0.7.
+    /// </summary>
+    public bool StrictBindInference { get; init; }
 
     /// <summary>
     /// Cancellation token for aborting long-running operations (e.g., Z3 verification).
