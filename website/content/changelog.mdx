@@ -8,6 +8,31 @@ All notable changes to Calor, organized by release.
 
 ---
 
+## [0.6.0] - 2026-06-04
+
+### Added
+- **`§C` call-closer elision (RFC `v0.6-call-closer-elision`).** Expression-context `§C{target}` calls may now omit the trailing `§/C` in two cases: (1) zero arguments — `§B{n} §C{items.Count}` is equivalent to `§B{n} §C{items.Count} §/C`; (2) exactly one inline argument (no `§A`) — `§B{y} §C{Math.Abs} x` is equivalent to `§B{y} §C{Math.Abs} §A x §/C`. The parser disambiguates nested elided calls (e.g., `§C{Foo.bar} §C{Baz.qux} y` ≡ `Foo.bar(Baz.qux(y))`) by counting consecutive `§/C` closers relative to enclosing `§A` depth. Trailing member access on inline arguments binds to the argument (`§C{Identity} obj?.Length` ≡ `Identity(obj?.Length)`); trailing member access on zero-arg calls binds to the call result (`§C{Maybe}?.Length` ≡ `Maybe()?.Length`). The explicit `§A` / `§/C` form continues to parse unchanged. See [Calls reference](/syntax-reference/calls/).
+- **`Calor0150 AmbiguousCallContinuation`** — New diagnostic in the reserved `Calor0150-0159` range. Fires when an elided `§C` already consumed one inline argument and is followed by either a second expression-start token or a `§A` token. The fix message recommends the explicit form.
+- **`ConversionContext.UseImplicitCallCloser` emitter flag.** Opt-in property on `Migration/ConversionContext`. When `true`, `CalorEmitter` elides `§/C` for zero-argument calls. Default `false` for backward compatibility. One-argument elision is intentionally deferred to v0.6.1 pending context-aware tracking inside Lisp argument lists.
+- **`§B` bind-inference formalization (RFC `v0.6-bind-inference-formalization`).** The four supported `§B` forms — `§B{name}` (requires initializer), `§B{name} initializer` (inferred), `§B{name:type}` (explicit, no initializer), `§B{name:type} initializer` (explicit wins) — and the binder's shallow inference rule are now documented at [Bindings](/syntax-reference/binding/).
+- **`Calor0250 BindRequiresTypeOrInitializer`** — `§B{name}` with no `:type` and no initializer is now a hard error reported through `BindValidationPass`. Replaces the pre-v0.6 silent fallback that bound `x` as `INT` and produced wrong-typed C# with no diagnostic.
+- **`Calor0251` / `Calor0252` / `Calor0253` strict-mode bind-inference diagnostics (opt-in via `--strict-bind-inference`).** Three new diagnostics in the `Calor0250-0259` range, each silenced by an explicit `:type` annotation, scheduled to become default-on in v0.7:
+  - **`Calor0251 BindCannotInferNullLiteral`** — fires on `§B{x} §NN` or `§B{x} null`.
+  - **`Calor0252 BindCannotInferGenericReturn`** — fires on `§B{x} §C{Vec.empty} §/C` and other well-known generic factory targets.
+  - **`Calor0253 BindAmbiguousNumeric`** — fires on `§B{x} (+ INT:0 FLOAT:0.0)` — a binary op mixing integer and floating-point literal operands.
+- **Two new syntax-reference pages** — [Bindings](/syntax-reference/binding/) and [Calls](/syntax-reference/calls/), with full disambiguation tables, examples, and diagnostic catalogues.
+- **v6 compact stable identifiers (default).** `IdGenerator.Generate(IdKind)` now mints 12-char Crockford-lowercase compact IDs (`f_7k9m2npqrstv`). The legacy 26-char Crockford-uppercase ULID form (`f_01J5X7K9M2NPQRSTABWXYZ12`) remains accepted by the parser, validator, and migration tooling. Saves ~9.7 tokens per ID in agent-facing serialisations.
+- **`calor fix --compact-ids <root>`** — bulk repo-wide migrator from legacy ULID payloads to v6 compact payloads. Two-pass design with deterministic compact derivation, within-file and cross-file collision detection, and byte-exact revert via `--revert --log <file>`. Idempotent on already-migrated source.
+- **`IdValidator` accepts both compact and legacy ULID forms.** New predicates `IsCompactId`, `IsLegacyUlidId`, and `IsCanonicalId`. New `Calor0821 LegacyUlidPayload` diagnostic code reserved for the opt-in lint that flags ULID payloads.
+
+### Changed
+- **`Migration/CalorEmitter.Visit(CallExpressionNode)`** — Zero-argument calls in expression context now conditionally elide `§/C` when `ConversionContext.UseImplicitCallCloser` is `true`. Multi-argument and one-argument paths are unchanged in v0.6.0 (zero-arg-only elision) pending the v0.6.1 context-aware enablement.
+
+### Fixed
+- **Binder no longer silently defaults `§B{x}` to `INT`.** A `§B{name}` with neither a `:type` annotation nor an initializer was silently treated as `INT` by the pre-v0.6 binder, producing wrong-typed C# with no diagnostic. v0.6 surfaces this as `Calor0250`.
+
+---
+
 ## [0.5.1] - 2026-06-03
 
 ### Added
