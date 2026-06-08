@@ -441,13 +441,53 @@ public class CallExpressionImplicitCloseTests
     // ----- Phase 2: CalorEmitter.UseImplicitCallCloser flag -----
 
     [Fact]
-    public void Emitter_ZeroArgCall_DefaultFlag_EmitsExplicitCloser()
+    public void Emitter_ZeroArgCall_DefaultFlag_EmitsImplicitCloser()
     {
-        // Default behavior unchanged in v0.6.0: zero-arg call still emits §/C.
+        // v0.6.1 flipped the default: zero-arg calls now elide §/C by default.
+        // RFC v0.6 §6 / docs/plans/v0.6-call-closer-elision.md.
         var call = new CallExpressionNode(default, "Foo", new List<ExpressionNode>());
         var emitter = new Migration.CalorEmitter();
         var output = call.Accept<string>(emitter);
+        Assert.Equal("§C{Foo}", output);
+    }
+
+    [Fact]
+    public void Emitter_ZeroArgCall_ImplicitCloserFlagFalse_PinsExplicitCloser()
+    {
+        // Opt-out path: setting the flag to false restores explicit §/C.
+        // Test pins this so the opt-out doesn't silently disappear.
+        var call = new CallExpressionNode(default, "Foo", new List<ExpressionNode>());
+        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = false };
+        var emitter = new Migration.CalorEmitter(ctx);
+        var output = call.Accept<string>(emitter);
         Assert.Equal("§C{Foo} §/C", output);
+    }
+
+    [Fact]
+    public void Emitter_ZeroArgCall_FollowedBySiblingOpener_RoundTripsCorrectly()
+    {
+        // v0.6.1 regression test: a zero-arg implicit-close call followed by
+        // a sibling statement that starts with an expression-starter token
+        // (§IF here — IsExpressionStart returns true because expression-IF
+        // is valid). Without the same-line guard in ParseCallExpression, the
+        // parser would treat the §IF as the call's inline argument and emit
+        // Calor0104. RFC v0.6 §3.2 / v0.6.1.
+        var source = @"§M{Demo}
+  §F{run:bool:pub}
+    §B{x} §C{items.Any}
+    §IF{cond} x → §R x §EL → §R false
+";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+
+        var fn = module.Functions.First();
+        var bind = Assert.IsType<BindStatementNode>(fn.Body[0]);
+        var call = Assert.IsType<CallExpressionNode>(bind.Initializer);
+        Assert.Equal("items.Any", call.Target);
+        Assert.Empty(call.Arguments);
+        // The §IF must parse as a sibling statement, not as the call's argument.
+        Assert.IsType<IfStatementNode>(fn.Body[1]);
     }
 
     [Fact]

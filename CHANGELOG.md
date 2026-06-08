@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **`ConversionContext.UseImplicitCallCloser` now defaults to `true`** (was `false` in v0.6.0). The C# → Calor converter (`CalorEmitter.Visit(CallExpressionNode)`) now elides `§/C` for zero-argument calls by default, producing more idiomatic Calor output. The opt-out (`UseImplicitCallCloser = false`) is preserved and tested (`CallExpressionImplicitCloseTests.Emitter_ZeroArgCall_ImplicitCloserFlagFalse_PinsExplicitCloser`). One-argument elision remains intentionally opt-out — see RFC `v0.6-call-closer-elision` §6.2.
+
+### Fixed
+- **Parser: `§C` standard form no longer swallows trailing `Dedent`.** `Parser.ParseCallExpression` previously routed zero-arg calls (followed by `Dedent`) into the standard-form branch (which calls `ExpectBlockEnd(EndCall)`), and `ExpectBlockEnd` consumed the `Dedent` thinking it was an indent-only block terminator. Because `§C` is an inline expression (not an indent-aware block), this corrupted the structural parse of the enclosing method/if body. Fixed by changing the implicit-close gating predicate from `!IsBlockEnd(EndCall)` (which is `true` on Dedent/Eof) to `!Check(EndCall)`.
+- **Parser: `§C` no longer absorbs a same-column sibling structural opener on the next line.** Because `IsExpressionStart()` returns `true` for `§IF`/`§MATCH`/`§NEW`/etc., a sibling opener immediately following a zero-arg `§C` (same column) was being absorbed as the call's inline argument. Fixed by gating the inline-arg branch on `Current.Span.Line == startToken.Span.Line` — the inline-arg form only triggers when the candidate argument is on the same source line as `§C{target}`. New regression test `Emitter_ZeroArgCall_FollowedBySiblingOpener_RoundTripsCorrectly`.
+
 ## [0.6.0] - 2026-06-04
 
 ### Benchmark Results (Statistical: 30 runs)

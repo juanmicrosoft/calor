@@ -2256,9 +2256,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             // Phase 2 (RFC v0.6 call-closer-elision): zero-arg form may drop §/C.
             // Safe in every context — the parser's zero-arg implicit-close path
-            // does not look at the following token. Flag defaults to false in
-            // v0.6.0; planned to flip to true in v0.6.1 once snapshots churn.
-            return _context?.UseImplicitCallCloser == true
+            // does not look at the following token. Flag defaults to true as of
+            // v0.6.1 (was false in v0.6.0). Set
+            // ConversionContext.UseImplicitCallCloser = false to restore the
+            // explicit closer form.
+            return _context?.UseImplicitCallCloser != false
                 ? $"§C{{{fullTarget}}}"
                 : $"§C{{{fullTarget}}} §/C";
         }
