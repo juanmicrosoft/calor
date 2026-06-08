@@ -919,6 +919,11 @@ public class CallExpressionImplicitCloseTests
         // an expression sequence with raw .Accept (no AcceptInInlineSibling).
         var joinRegex = new System.Text.RegularExpressions.Regex(
             @"string\.Join\("" ""[^)]*=>\s*\w+\.Accept\(this\)");
+        // Pattern 3: `var X = node.Y.Accept(this);` followed within ~50 lines
+        // by an interpolation `{X} {<other>}` / `{X} STR:` / `{X} "..."` /
+        // `{X} §...` (the post-loop-4 catch from devil's-advocate finding #2).
+        var localAccRegex = new System.Text.RegularExpressions.Regex(
+            @"^\s*var (\w+) = (?:node|entry|field|arg)[\w.]*\.Accept\(this\);");
 
         // Whitelisted lines (file-relative 1-based). Each entry must carry a
         // justification comment in the surrounding source.
@@ -928,6 +933,19 @@ public class CallExpressionImplicitCloseTests
             // patterns (e.g. `x:i32`), not as expressions; they cannot
             // contain a zero-arg §C call.
             // (See CalorEmitter.Visit(ForallExpressionNode) / ExistsExpressionNode)
+
+            // Lambda expression-body emits `§LAM{header} {body} §/LAM{id}`.
+            // The token after `{body}` is `§/LAM` (LambdaEnd) which is NOT
+            // in Parser.IsExpressionStart(), so an elided zero-arg §C body
+            // cannot absorb it as an inline arg. Loop-5 verified.
+            2610,
+
+            // With-expression emits `§WITH {target} {assignments} §/WITH`.
+            // The token after `{target}` is `{assignments}` which begins
+            // with `§SET` (not in IsExpressionStart), and the closer is
+            // `§/WITH`. An elided zero-arg §C target cannot absorb §SET
+            // as an inline arg. Loop-5 verified.
+            3157,
         };
 
         var violations = new List<string>();
@@ -946,6 +964,46 @@ public class CallExpressionImplicitCloseTests
                 // binding/pattern (BoundVariables in forall/exists).
                 if (!line.Contains("BoundVariables"))
                     violations.Add($"Pattern2 line {i + 1}: {trimmed}");
+            }
+
+            // Pattern 3: scan forward up to 50 lines for an interpolation
+            // `{X} {other}` / `{X} STR:` / `{X} "..."` / `{X} §...`. Bail
+            // out at any line that starts a new Visit method.
+            var localMatch = localAccRegex.Match(line);
+            if (localMatch.Success)
+            {
+                var localName = localMatch.Groups[1].Value;
+                var marker = "{" + localName + "}";
+                for (int j = i + 1; j < Math.Min(i + 50, lines.Length); j++)
+                {
+                    var u = lines[j];
+                    if (System.Text.RegularExpressions.Regex.IsMatch(u,
+                            @"^\s*(public|private|internal)\s+\S.*\bVisit\b"))
+                        break;
+                    var idx = u.IndexOf(marker, StringComparison.Ordinal);
+                    if (idx < 0) continue;
+                    var after = u.Substring(idx + marker.Length);
+                    if (after.Length == 0) continue;
+                    if (after[0] != ' ' && after[0] != '\t') continue;
+                    var afterTrim = after.TrimStart();
+                    // Risky next character: another interpolation `{`,
+                    // typed-literal prefix (STR:/INT:/...), string literal `"`
+                    // (incl. escaped `\"`), or a section marker `§` / `\u00A7`.
+                    bool risky =
+                        afterTrim.StartsWith("{", StringComparison.Ordinal) ||
+                        System.Text.RegularExpressions.Regex.IsMatch(
+                            afterTrim, @"^(STR|INT|FLOAT|BOOL|CHAR|BYTE):") ||
+                        afterTrim.StartsWith("\"", StringComparison.Ordinal) ||
+                        afterTrim.StartsWith("\\\"", StringComparison.Ordinal) ||
+                        afterTrim.StartsWith("\u00A7", StringComparison.Ordinal);
+                    if (risky && !whitelistedLines.Contains(j + 1))
+                    {
+                        violations.Add(
+                            $"Pattern3 (local-then-interpolate-sibling) line {i + 1} → used at {j + 1}: " +
+                            $"var {localName} = ...Accept(this); ... {u.TrimStart()}");
+                    }
+                    break;
+                }
             }
         }
 
@@ -1060,6 +1118,43 @@ public class CallExpressionImplicitCloseTests
         // as inline arg.
         Assert.Contains("§C{A} §/C", emitted);
         Assert.Contains("§C{B} §/C", emitted);
+    }
+
+    [Fact]
+    public void RoundTrip_NullConditional_ZeroArgCallTarget_KeepsExplicitCloser()
+    {
+        // BLOCKER from loop-5 devil's-advocate finding.
+        // (?. §C{Get} "Length") would re-parse as Get("Length") because
+        // string literals are in IsExpressionStart and the call's inline-arg
+        // branch absorbs the member name.
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:i32}
+      §O{i32}
+      §B{x} (?. §C{Get} §/C "Length")
+      §R x.unwrap
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+
+        var fullEmitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = true });
+        var emitted = module.Accept<string>(fullEmitter);
+        // Emitted form must keep §/C on the call target — otherwise the
+        // member name string literal would be absorbed as inline arg.
+        Assert.Contains("(?. §C{Get} §/C \"Length\")", emitted);
+
+        // Re-parse to confirm the round-trip is structurally stable.
+        var module2 = Parse(emitted, out var diags2);
+        Assert.False(diags2.HasErrors,
+            $"Re-parse errors: {string.Join("; ", diags2.Errors.Select(e => e.Message))}");
+        var bind = module2.Functions[0].Body.OfType<BindStatementNode>().First();
+        var nc = Assert.IsType<NullConditionalNode>(bind.Initializer);
+        var targetCall = Assert.IsType<CallExpressionNode>(nc.Target);
+        Assert.Equal("Get", targetCall.Target);
+        Assert.Empty(targetCall.Arguments);
+        Assert.Equal("Length", nc.MemberName);
     }
 
     private static string LocateEmitterSourceFile()

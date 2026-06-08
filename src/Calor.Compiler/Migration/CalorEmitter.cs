@@ -1422,7 +1422,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(AssignmentStatementNode node)
     {
-        var target = node.Target.Accept(this);
+        // AcceptInInlineSibling: §ASSIGN target value emits two space-separated
+        // expressions. In practice target is an lvalue (ref/member/index) — never
+        // a call — but if a future converter path produces a call-shaped target,
+        // a naked zero-arg §C{...} would absorb value as its inline arg. Defensive
+        // wrap; cheap and aligned with the inline-sibling discipline used elsewhere.
+        var target = AcceptInInlineSibling(node.Target);
 
         // Handle collection initializers specially - emit as collection block with target name
         if (node.Value is ListCreationNode listNode)
@@ -2747,7 +2752,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(NullConditionalNode node)
     {
-        var target = node.Target.Accept(this);
+        // AcceptInInlineSibling: in Lisp (?. target "member") form, target is space-separated
+        // from the member string literal. A naked zero-arg §C{Get} target would absorb the
+        // string literal as its inline argument on re-parse (Parser.IsExpressionStart accepts
+        // StrLiteral). Defect: v0.6.1 loop-5 devil's-advocate finding.
+        var target = AcceptInInlineSibling(node.Target);
         // Sanitize member name: collapse whitespace/newlines to single space
         // (multi-line C# chains from converter can produce newlines in member names)
         var memberName = System.Text.RegularExpressions.Regex.Replace(node.MemberName, @"\s+", " ").Trim();

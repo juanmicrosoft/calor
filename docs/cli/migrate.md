@@ -66,6 +66,7 @@ calor migrate ./src --direction calor-to-cs
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). Use when regenerating `.calr` files intended to parse on v0.6.0 toolchains. By default v0.6.1 elides `§/C` for zero-arg calls. |
 
 ### Direction Values
 

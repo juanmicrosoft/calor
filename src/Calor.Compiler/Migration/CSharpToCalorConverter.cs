@@ -422,12 +422,19 @@ public static class Converter
     /// Converts a file in the detected direction.
     /// </summary>
     public static async Task<object> ConvertFileAsync(string filePath, string? outputPath = null)
+        => await ConvertFileAsync(filePath, outputPath, options: null);
+
+    /// <summary>
+    /// Converts a file in the detected direction with optional <see cref="ConversionOptions"/>
+    /// applied to the C#→Calor path (ignored for Calor→C#).
+    /// </summary>
+    public static async Task<object> ConvertFileAsync(string filePath, string? outputPath, ConversionOptions? options)
     {
         var direction = CSharpToCalorConverter.DetectDirection(filePath);
 
         return direction switch
         {
-            ConversionDirection.CSharpToCalor => await ConvertCSharpToCalorAsync(filePath, outputPath),
+            ConversionDirection.CSharpToCalor => await ConvertCSharpToCalorAsync(filePath, outputPath, options),
             ConversionDirection.CalorToCSharp => await ConvertCalorToCSharpAsync(filePath, outputPath),
             _ => throw new ArgumentException($"Unknown file type: {filePath}")
         };
@@ -436,9 +443,16 @@ public static class Converter
     /// <summary>
     /// Converts C# to Calor.
     /// </summary>
-    public static async Task<ConversionResult> ConvertCSharpToCalorAsync(string csharpPath, string? outputPath = null)
+    public static Task<ConversionResult> ConvertCSharpToCalorAsync(string csharpPath, string? outputPath = null)
+        => ConvertCSharpToCalorAsync(csharpPath, outputPath, options: null);
+
+    /// <summary>
+    /// Converts C# to Calor with optional <see cref="ConversionOptions"/> (e.g.
+    /// <c>UseImplicitCallCloser = false</c> for v0.6.0-compatible output).
+    /// </summary>
+    public static async Task<ConversionResult> ConvertCSharpToCalorAsync(string csharpPath, string? outputPath, ConversionOptions? options)
     {
-        var converter = new CSharpToCalorConverter();
+        var converter = options != null ? new CSharpToCalorConverter(options) : new CSharpToCalorConverter();
         var result = await converter.ConvertFileAsync(csharpPath);
 
         if (result.Success && result.CalorSource != null)
