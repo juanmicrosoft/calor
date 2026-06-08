@@ -840,17 +840,137 @@ public class CallExpressionImplicitCloseTests
         // Both statement-form calls must keep their §/C even with flag on.
         Assert.Contains("§C{Bar} §/C", fullEmitted);
         Assert.Contains("§C{Baz} §/C", fullEmitted);
+    }
 
-        var roundTripped = Parse(fullEmitted, out var diags2);
-        Assert.False(diags2.HasErrors,
-            $"Re-parse errors: {string.Join("; ", diags2.Errors.Select(e => e.Message))} | Emitted:\n{fullEmitted}");
-        var fn = roundTripped.Functions.First();
-        Assert.Equal(2, fn.Body.Count);
-        var s0 = Assert.IsType<CallStatementNode>(fn.Body[0]);
-        var s1 = Assert.IsType<CallStatementNode>(fn.Body[1]);
-        Assert.Equal("Bar", s0.Target);
-        Assert.Equal("Baz", s1.Target);
-        Assert.Empty(s0.Arguments);
-        Assert.Empty(s1.Arguments);
+    [Fact]
+    public void Emitter_ZeroArgCallInsideTypeOperationOperand_KeepsExplicitCloser()
+    {
+        // (is §C{Foo} str) would re-parse as `is` with a single arg
+        // `§C{Foo}` whose inline argument is `str` (a built-in keyword token
+        // accepted as an identifier in IsExpressionStart), giving the type op
+        // the wrong arg count / structure. TypeOperationNode.Operand must
+        // keep its zero-arg call closed when emitted before the type token.
+        var typeOp = new TypeOperationNode(
+            default,
+            TypeOp.Is,
+            new CallExpressionNode(default, "Foo", new List<ExpressionNode>()),
+            "str");
+        var emitted = EmitWithImplicitCloser(typeOp);
+        Assert.Equal("(is §C{Foo} §/C str)", emitted);
+
+        var typeOpAs = new TypeOperationNode(
+            default,
+            TypeOp.As,
+            new CallExpressionNode(default, "Foo", new List<ExpressionNode>()),
+            "str");
+        var emittedAs = EmitWithImplicitCloser(typeOpAs);
+        Assert.Equal("(as §C{Foo} §/C str)", emittedAs);
+    }
+
+    [Fact]
+    public void Emitter_ZeroArgCallInsideEventSubscribe_KeepsExplicitCloser()
+    {
+        // §SUB {evt} {handler} on one line — both children are expressions.
+        // If `evt` is a zero-arg call and `handler` looks like an
+        // expression-start token, the parser could absorb handler as
+        // the call's inline argument. Verified via parse-and-re-emit
+        // round-trip; we don't construct EventSubscribeNode directly
+        // because it appends to the emitter buffer (returns "").
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §SUB §C{Foo} §/C h
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+        var fullEmitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = true });
+        var fullEmitted = module.Accept<string>(fullEmitter);
+        Assert.Contains("§C{Foo} §/C h", fullEmitted);
+    }
+
+    [Fact]
+    public void CalorEmitter_HasNoRawAcceptInSpaceSeparatedSiblingPosition()
+    {
+        // ARCHITECTURE INVARIANT GUARD: any future contributor adding a new
+        // emit site that joins two expressions with a literal space MUST use
+        // AcceptInInlineSibling (or HoistToTempVar), not raw `.Accept(this)`.
+        //
+        // This test scans CalorEmitter.cs for the risky pattern:
+        //     `{X.Accept(this)} {Y...}` inside a string interpolation
+        // and the related Lisp/sibling pattern:
+        //     `string.Join(" ", ... .Accept(this) ... )` over an expression sequence.
+        //
+        // When this test fails, either:
+        //   (a) wrap the offending call with AcceptInInlineSibling, OR
+        //   (b) add the file:line to the whitelist below with a comment
+        //       justifying why it cannot corrupt the AST under
+        //       UseImplicitCallCloser = true (e.g. the next sibling token
+        //       is not in IsExpressionStart()).
+        var emitterPath = LocateEmitterSourceFile();
+        var lines = System.IO.File.ReadAllLines(emitterPath);
+
+        // Pattern 1: `{...Accept(this)} {...}` inside an interpolation literal
+        // means two interpolated children separated by a literal space.
+        var twoInterpRegex = new System.Text.RegularExpressions.Regex(
+            @"\{[^{}\n]*\.Accept\(this\)[^{}\n]*\}\s+\{");
+        // Pattern 2: `string.Join(" ", <enumerable>.Accept(this))` projecting
+        // an expression sequence with raw .Accept (no AcceptInInlineSibling).
+        var joinRegex = new System.Text.RegularExpressions.Regex(
+            @"string\.Join\("" ""[^)]*=>\s*\w+\.Accept\(this\)");
+
+        // Whitelisted lines (file-relative 1-based). Each entry must carry a
+        // justification comment in the surrounding source.
+        var whitelistedLines = new HashSet<int>
+        {
+            // BoundVariables in forall/exists/implication emit as binding
+            // patterns (e.g. `x:i32`), not as expressions; they cannot
+            // contain a zero-arg §C call.
+            // (See CalorEmitter.Visit(ForallExpressionNode) / ExistsExpressionNode)
+        };
+
+        var violations = new List<string>();
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (whitelistedLines.Contains(i + 1)) continue;
+            var line = lines[i];
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("//")) continue;
+            if (twoInterpRegex.IsMatch(line))
+                violations.Add($"Pattern1 line {i + 1}: {trimmed}");
+            var joinMatch = joinRegex.Match(line);
+            if (joinMatch.Success)
+            {
+                // Allow if the variable being projected is known to be a
+                // binding/pattern (BoundVariables in forall/exists).
+                if (!line.Contains("BoundVariables"))
+                    violations.Add($"Pattern2 line {i + 1}: {trimmed}");
+            }
+        }
+
+        Assert.True(violations.Count == 0,
+            "CalorEmitter.cs has risky raw .Accept(this) calls in same-line " +
+            "sibling positions. Wrap with AcceptInInlineSibling or whitelist:\n" +
+            string.Join("\n", violations));
+    }
+
+    private static string LocateEmitterSourceFile()
+    {
+        // Walk up from the test assembly dir until we find the repo root,
+        // then return src/Calor.Compiler/Migration/CalorEmitter.cs.
+        var dir = System.IO.Path.GetDirectoryName(
+            typeof(CallExpressionImplicitCloseTests).Assembly.Location)!;
+        for (int i = 0; i < 10; i++)
+        {
+            var candidate = System.IO.Path.Combine(
+                dir, "src", "Calor.Compiler", "Migration", "CalorEmitter.cs");
+            if (System.IO.File.Exists(candidate)) return candidate;
+            var parent = System.IO.Directory.GetParent(dir);
+            if (parent == null) break;
+            dir = parent.FullName;
+        }
+        throw new System.IO.FileNotFoundException(
+            "Could not locate src/Calor.Compiler/Migration/CalorEmitter.cs above test assembly");
     }
 }

@@ -3078,16 +3078,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EventSubscribeNode node)
     {
-        var evt = node.Event.Accept(this);
-        var handler = node.Handler.Accept(this);
+        var evt = AcceptInInlineSibling(node.Event);
+        var handler = AcceptInInlineSibling(node.Handler);
         AppendLine($"§SUB {evt} {handler}");
         return "";
     }
 
     public string Visit(EventUnsubscribeNode node)
     {
-        var evt = node.Event.Accept(this);
-        var handler = node.Handler.Accept(this);
+        var evt = AcceptInInlineSibling(node.Event);
+        var handler = AcceptInInlineSibling(node.Handler);
         AppendLine($"§UNSUB {evt} {handler}");
         return "";
     }
@@ -3125,7 +3125,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(WithExpressionNode node)
     {
         var target = node.Target.Accept(this);
-        var assignments = string.Join(" ", node.Assignments.Select(a => a.Accept(this)));
+        var assignments = string.Join(" ", node.Assignments.Select(a => AcceptInInlineSibling(a)));
         if (assignments.Length > 0)
             return $"§WITH {target} {assignments} §/WITH";
         return $"§WITH {target} §/WITH";
@@ -3133,7 +3133,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(WithPropertyAssignmentNode node)
     {
-        var value = node.Value.Accept(this);
+        var value = AcceptInInlineSibling(node.Value);
         return $"§SET{{{node.PropertyName}}} {value}";
     }
 
@@ -3556,7 +3556,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(TypeOperationNode node)
     {
-        var operand = node.Operand.Accept(this);
+        var operand = AcceptInInlineSibling(node.Operand);
         return node.Operation switch
         {
             TypeOp.Cast => $"(cast {StripNullableAnnotation(node.TargetType)} {operand})",

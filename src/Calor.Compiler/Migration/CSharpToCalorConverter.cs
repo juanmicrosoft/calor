@@ -97,6 +97,13 @@ public sealed class ConversionOptions
 
     /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
     public bool PassthroughOnError { get; set; } = false;
+
+    /// <summary>
+    /// Whether the emitter should elide `§/C` for zero-argument calls (v0.6.1 default behaviour).
+    /// Set to <c>false</c> to produce v0.6.0-compatible output that always emits explicit `§/C` closers.
+    /// Default is <c>true</c> (matches <see cref="ConversionContext.UseImplicitCallCloser"/>).
+    /// </summary>
+    public bool UseImplicitCallCloser { get; set; } = true;
 }
 
 /// <summary>
@@ -324,7 +331,8 @@ public sealed class CSharpToCalorConverter
             ModuleName = _options.ModuleName,
             GracefulFallback = _options.GracefulFallback,
             Mode = _options.Mode,
-            PassthroughOnError = _options.PassthroughOnError
+            PassthroughOnError = _options.PassthroughOnError,
+            UseImplicitCallCloser = _options.UseImplicitCallCloser
         };
     }
 
