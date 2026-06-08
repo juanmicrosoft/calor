@@ -7925,7 +7925,17 @@ public sealed class Parser
         // not an indent-aware block — Dedent/Eof must NOT terminate the
         // implicit path (they signal that we're at the call's end and the
         // zero-arg implicit close should be taken). RFC v0.6 §3.2 / v0.6.1.
-        bool tryImplicit = !Check(TokenKind.Arg) && !Check(TokenKind.EndCall);
+        //
+        // CRITICAL (v0.6.1): A §A on a *different* line than §C{target}
+        // belongs to an outer call's argument list (e.g. §BASE / §THIS / §NEW
+        // emit each §A on its own indented line), not to this call. Without
+        // this guard, the standard-form branch would greedily consume the
+        // outer's §A as if it were this call's argument — silent corruption
+        // when emitter elides §/C by default.
+        bool nextArgIsOnSameLine = Check(TokenKind.Arg)
+                                && Current.Span.Line == startToken.Span.Line;
+        bool tryImplicit = !Check(TokenKind.EndCall)
+                        && (!Check(TokenKind.Arg) || !nextArgIsOnSameLine);
 
         // Trailing-member-access markers (.member, ?.member) after
         // §C{target} attach to the zero-arg call result. Take the implicit

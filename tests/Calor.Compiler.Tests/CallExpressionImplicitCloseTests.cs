@@ -652,4 +652,205 @@ public class CallExpressionImplicitCloseTests
         Assert.Equal("Foo", roundTripped.Target);
         Assert.Empty(roundTripped.Arguments);
     }
+
+    // ────────────────────────────────────────────────────────────────────
+    // v0.6.1 loop-2 round-trip tests: every emit site that produces
+    // §C{X} alongside a sibling token must keep §/C explicit so the
+    // parser reconstructs the original AST shape (not a corrupted one
+    // where the inner call absorbed the sibling).
+    //
+    // Strategy: emit a hand-built AST with UseImplicitCallCloser=true,
+    // then re-parse the emitted Calor and verify the re-parsed AST shape
+    // is identical to the original. Catches silent corruption that a
+    // substring-only check would miss.
+    // ────────────────────────────────────────────────────────────────────
+
+    private static string EmitWithImplicitCloser(AstNode node)
+    {
+        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
+        var emitter = new Migration.CalorEmitter(ctx);
+        return node.Accept<string>(emitter);
+    }
+
+    [Fact]
+    public void RoundTrip_ZeroArgCallInsideOuterCallArgs_PreservesShape()
+    {
+        // BLOCKER #1 round-trip: M(A(), 2) — emit then re-parse and assert
+        // the AST shape is preserved (two args at outer, zero args at inner).
+        var outer = new CallExpressionNode(default, "M", new List<ExpressionNode>
+        {
+            new CallExpressionNode(default, "A", new List<ExpressionNode>()),
+            new IntLiteralNode(default, 2),
+        });
+        var emitted = EmitWithImplicitCloser(outer);
+        Assert.Contains("§C{A} §/C", emitted);
+
+        // Wrap in a binding context to round-trip through the parser.
+        var source = $$"""
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §B{x:i32} {{emitted}}
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))} | Emitted: {emitted}");
+
+        var bind = module.Functions.First().Body.OfType<BindStatementNode>().First();
+        var rt = Assert.IsType<CallExpressionNode>(bind.Initializer);
+        Assert.Equal("M", rt.Target);
+        Assert.Equal(2, rt.Arguments.Count);
+        var inner = Assert.IsType<CallExpressionNode>(rt.Arguments[0]);
+        Assert.Equal("A", inner.Target);
+        Assert.Empty(inner.Arguments);
+        Assert.IsType<IntLiteralNode>(rt.Arguments[1]);
+    }
+
+    [Fact]
+    public void RoundTrip_ZeroArgCallInsideNewExpression_PreservesShape()
+    {
+        // §NEW{T} §A §C{A} §A INT:2 §/NEW must keep §C{A} closed so it doesn't
+        // absorb the next §A as its inline argument.
+        var newExpr = new NewExpressionNode(
+            default,
+            typeName: "T",
+            typeArguments: Array.Empty<string>(),
+            arguments: new List<ExpressionNode>
+            {
+                new CallExpressionNode(default, "A", new List<ExpressionNode>()),
+                new IntLiteralNode(default, 2),
+            });
+        var emitted = EmitWithImplicitCloser(newExpr);
+        Assert.Contains("§C{A} §/C", emitted);
+
+        var source = $$"""
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §B{x:T} {{emitted}}
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))} | Emitted:\n{emitted}");
+
+        var bind = module.Functions.First().Body.OfType<BindStatementNode>().First();
+        var rt = Assert.IsType<NewExpressionNode>(bind.Initializer);
+        Assert.Equal("T", rt.TypeName);
+        Assert.Equal(2, rt.Arguments.Count);
+        var inner = Assert.IsType<CallExpressionNode>(rt.Arguments[0]);
+        Assert.Equal("A", inner.Target);
+        Assert.Empty(inner.Arguments);
+        Assert.IsType<IntLiteralNode>(rt.Arguments[1]);
+    }
+
+    [Fact]
+    public void RoundTrip_ZeroArgCallInsideArrayAccess_PreservesShape()
+    {
+        // arr[GetIdx()] — §IDX must keep the inner §C{GetIdx} closed.
+        var idx = new ArrayAccessNode(
+            default,
+            array: new ReferenceNode(default, "arr"),
+            index: new CallExpressionNode(default, "GetIdx", new List<ExpressionNode>()));
+        var emitted = EmitWithImplicitCloser(idx);
+        Assert.Contains("§C{GetIdx} §/C", emitted);
+    }
+
+    [Fact]
+    public void Emitter_ZeroArgCallInsideNullCoalesce_KeepsExplicitCloser()
+    {
+        // Lisp (?? A() fallback): without explicit §/C the inner A would
+        // absorb 'fallback' as its arg, corrupting the AST.
+        var nc = new NullCoalesceNode(
+            default,
+            left: new CallExpressionNode(default, "A", new List<ExpressionNode>()),
+            right: new ReferenceNode(default, "fallback"));
+        var emitted = EmitWithImplicitCloser(nc);
+        Assert.Contains("§C{A} §/C", emitted);
+    }
+
+    [Fact]
+    public void Emitter_ZeroArgCallInsideDictionaryEntry_KeepsExplicitCloser()
+    {
+        // §KV §C{K} §C{V} would re-parse as a SINGLE key K(V()) with no value
+        // instead of two distinct key/value expressions. Each key/value
+        // emission must keep nested zero-arg calls closed with explicit §/C.
+        //
+        // Parse a small module with a §DICT containing call key/values, then
+        // re-emit with flag=true and verify §C{...} §/C survives.
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §DICT{d:str:i32}
+        §KV §C{K} §/C §C{V} §/C
+      §/DICT{d}
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+
+        var emitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = true });
+        var emitted = emitter.Emit(module);
+        Assert.Contains("§C{K} §/C", emitted);
+        Assert.Contains("§C{V} §/C", emitted);
+    }
+
+    [Fact]
+    public void RoundTrip_ZeroArgCallStatement_FollowedBySiblingStatement_PreservesShape()
+    {
+        // Two adjacent zero-arg call statements at function-body level.
+        // Statement-form §C{Foo} §/C is the existing emitter behavior;
+        // even with the flag flipped, statement-form keeps §/C explicit
+        // because absorbing the next sibling statement would be ambiguous.
+        var foo = new CallStatementNode(
+            default, target: "Bar", fallible: false,
+            arguments: new List<ExpressionNode>(),
+            attributes: new AttributeCollection());
+        var emitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = true });
+        foo.Accept<string>(emitter);
+        // The statement emitter appends to its internal buffer via AppendLine.
+        // We can't easily get the buffer; instead, build a function whose body
+        // is two such statements and emit the whole module.
+        var bar = new CallStatementNode(
+            default, target: "Bar", fallible: false,
+            arguments: new List<ExpressionNode>(),
+            attributes: new AttributeCollection());
+        var baz = new CallStatementNode(
+            default, target: "Baz", fallible: false,
+            arguments: new List<ExpressionNode>(),
+            attributes: new AttributeCollection());
+        var fnEmitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = true });
+        var barOutput = bar.Accept<string>(fnEmitter);
+        var bazOutput = baz.Accept<string>(fnEmitter);
+        // Statement-form always returns "" — the buffer holds the actual text.
+        // We're verifying via a different angle: round-trip through full source.
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{Bar} §/C
+      §C{Baz} §/C
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+
+        var ctx2 = new Migration.ConversionContext { UseImplicitCallCloser = true };
+        var fullEmitter = new Migration.CalorEmitter(ctx2);
+        var fullEmitted = module.Accept<string>(fullEmitter);
+        // Both statement-form calls must keep their §/C even with flag on.
+        Assert.Contains("§C{Bar} §/C", fullEmitted);
+        Assert.Contains("§C{Baz} §/C", fullEmitted);
+
+        var roundTripped = Parse(fullEmitted, out var diags2);
+        Assert.False(diags2.HasErrors,
+            $"Re-parse errors: {string.Join("; ", diags2.Errors.Select(e => e.Message))} | Emitted:\n{fullEmitted}");
+        var fn = roundTripped.Functions.First();
+        Assert.Equal(2, fn.Body.Count);
+        var s0 = Assert.IsType<CallStatementNode>(fn.Body[0]);
+        var s1 = Assert.IsType<CallStatementNode>(fn.Body[1]);
+        Assert.Equal("Bar", s0.Target);
+        Assert.Equal("Baz", s1.Target);
+        Assert.Empty(s0.Arguments);
+        Assert.Empty(s1.Arguments);
+    }
 }

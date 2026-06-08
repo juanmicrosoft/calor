@@ -700,11 +700,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Emit constructor initializer (base/this call)
         if (node.Initializer != null)
         {
-            // Pre-evaluate args to collect any hoisted bindings BEFORE the §THIS/§BASE block
+            // Pre-evaluate args to collect any hoisted bindings BEFORE the §THIS/§BASE block.
+            // Use AcceptInInlineSibling so nested zero-arg calls keep their explicit §/C
+            // (the §A tokens of base/this are on separate lines and the v0.6.1 parser
+            // line-based guard already separates them, but explicit closers eliminate
+            // any ambiguity for older parsers / mixed-form sources).
             var evalArgs = new List<string>();
             foreach (var arg in node.Initializer.Arguments)
             {
-                var argExpr = arg.Accept(this);
+                var argExpr = AcceptInInlineSibling(arg);
                 // Flush any hoisted lines before the block
                 FlushHoistedLines();
                 evalArgs.Add(argExpr);
@@ -1273,8 +1277,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var allHoisted = new List<string>();
         foreach (var entry in node.Entries)
         {
-            var key = entry.Key.Accept(this);
-            var value = entry.Value.Accept(this);
+            // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C —
+            // otherwise the parser would absorb the value (or next §KV) as the call's arg.
+            var key = AcceptInInlineSibling(entry.Key);
+            var value = AcceptInInlineSibling(entry.Value);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -1683,8 +1689,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var allHoisted = new List<string>();
         foreach (var entry in node.Entries)
         {
-            var key = entry.Key.Accept(this);
-            var value = entry.Value.Accept(this);
+            // See sibling DictionaryNode visitor: AcceptInInlineSibling protects nested zero-arg calls.
+            var key = AcceptInInlineSibling(entry.Key);
+            var value = AcceptInInlineSibling(entry.Value);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -1714,8 +1721,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(KeyValuePairNode node)
     {
-        var key = node.Key.Accept(this);
-        var value = node.Value.Accept(this);
+        // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C
+        // so the parser doesn't absorb the value as the call's inline argument.
+        var key = AcceptInInlineSibling(node.Key);
+        var value = AcceptInInlineSibling(node.Value);
         AppendLine($"§KV {key} {value}");
         return "";
     }
@@ -1765,8 +1774,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(DictionaryPutNode node)
     {
-        var key = node.Key.Accept(this);
-        var value = node.Value.Accept(this);
+        // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C
+        // or the parser would absorb the value as the call's inline arg.
+        var key = AcceptInInlineSibling(node.Key);
+        var value = AcceptInInlineSibling(node.Value);
         AppendLine($"§PUT{{{node.DictionaryName}}} {key} {value}");
         return "";
     }
@@ -1780,8 +1791,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CollectionSetIndexNode node)
     {
-        var index = node.Index.Accept(this);
-        var value = node.Value.Accept(this);
+        // AcceptInInlineSibling: see DictionaryPutNode.
+        var index = AcceptInInlineSibling(node.Index);
+        var value = AcceptInInlineSibling(node.Value);
         AppendLine($"§SETIDX{{{node.CollectionName}}} {index} {value}");
         return "";
     }
@@ -1794,8 +1806,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CollectionInsertNode node)
     {
-        var index = node.Index.Accept(this);
-        var value = node.Value.Accept(this);
+        // AcceptInInlineSibling: see DictionaryPutNode.
+        var index = AcceptInInlineSibling(node.Index);
+        var value = AcceptInInlineSibling(node.Value);
         AppendLine($"§INS{{{node.CollectionName}}} {index} {value}");
         return "";
     }
@@ -2060,9 +2073,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ConditionalExpressionNode node)
     {
-        var condition = node.Condition.Accept(this);
-        var whenTrue = node.WhenTrue.Accept(this);
-        var whenFalse = node.WhenFalse.Accept(this);
+        // AcceptInInlineSibling: condition/branches in Lisp (? c t f) form are space-separated,
+        // so a nested zero-arg call without explicit §/C would absorb the next operand.
+        // For the §IF expression form we keep it too — the condition slot is followed by
+        // " → whenTrue", and a bare §C{X} could absorb the → as a primary token.
+        var condition = AcceptInInlineSibling(node.Condition);
+        var whenTrue = AcceptInInlineSibling(node.WhenTrue);
+        var whenFalse = AcceptInInlineSibling(node.WhenFalse);
 
         // If either branch contains section markers (§C, §NEW, §LAM, etc.) or commas
         // (tuple literals), decompose into §IF/§EL/§/I expression form.
@@ -2074,7 +2091,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var id = $"tern{_ternaryCounter++:D3}";
             // Phase 4d: omit the legacy §/I{id} closer — ParseIfExpression
             // treats the closer as optional and recognizes the inline form
-            // from §IF{id} … §EL … alone.
+            // from §IF{id} … §EL → alone.
             return $"§IF{{{id}}} {condition} → {whenTrue} §EL → {whenFalse}";
         }
 
@@ -2116,8 +2133,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(BinaryOperationNode node)
     {
-        var left = node.Left.Accept(this);
-        var right = node.Right.Accept(this);
+        // AcceptInInlineSibling: operands in Lisp (op a b) form are space-separated,
+        // so a nested zero-arg call without explicit §/C would absorb the next operand.
+        // After AcceptInInlineSibling the inner §/C is kept, then hoisting moves the
+        // §-bearing operand to a temp var (within method bodies). At class/module scope
+        // where HoistToTempVar is a no-op, the explicit §/C is what keeps parsing safe.
+        var left = AcceptInInlineSibling(node.Left);
+        var right = AcceptInInlineSibling(node.Right);
         var opSymbol = GetCalorOperatorSymbol(node.Operator);
 
         // Hoist operands containing section markers or commas (tuples) out of Lisp expression.
@@ -2176,10 +2198,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Arguments need §A prefix for parser to recognize them
-        // Hoist arguments containing section markers (e.g., §C calls) to avoid nested §A conflicts
+        // Hoist arguments containing section markers (e.g., §C calls) to avoid nested §A conflicts.
+        // Use AcceptInInlineSibling so nested zero-arg §C{...} keeps explicit §/C —
+        // the v0.6.1 emitter default would otherwise let the next §A be absorbed
+        // as the nested call's inline argument (silent AST corruption).
         var args = node.Arguments.Select(a =>
         {
-            var val = a.Accept(this);
+            var val = AcceptInInlineSibling(a);
             if (ContainsSectionMarker(val))
                 val = HoistToTempVar(val);
             return $"§A {val}";
@@ -2536,8 +2561,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ArrayAccessNode node)
     {
-        var array = node.Array.Accept(this);
-        var index = node.Index.Accept(this);
+        // AcceptInInlineSibling: nested zero-arg calls in array or index expressions
+        // must keep §/C or the parser would absorb the following token (the index,
+        // or for the index, the next outer §A) as the call's inline argument.
+        var array = AcceptInInlineSibling(node.Array);
+        var index = AcceptInInlineSibling(node.Index);
         if (_inInterpolation)
             return $"{array}[{index}]";
         if (node.Array is ReferenceNode)
@@ -2695,8 +2723,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(NullCoalesceNode node)
     {
-        var left = node.Left.Accept(this);
-        var right = node.Right.Accept(this);
+        // AcceptInInlineSibling: operands in Lisp (?? a b) form are space-separated,
+        // so a nested zero-arg call without explicit §/C would absorb b as its inline arg.
+        var left = AcceptInInlineSibling(node.Left);
+        var right = AcceptInInlineSibling(node.Right);
         return $"(?? {left} {right})";
     }
 
@@ -3453,22 +3483,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ForallExpressionNode node)
     {
+        // AcceptInInlineSibling: body in Lisp (forall (vars) body) is space-separated
+        // from the var list; a nested zero-arg call without §/C would absorb the trailing ')'.
         var vars = string.Join(" ", node.BoundVariables.Select(v => v.Accept(this)));
-        var body = node.Body.Accept(this);
+        var body = AcceptInInlineSibling(node.Body);
         return $"(forall ({vars}) {body})";
     }
 
     public string Visit(ExistsExpressionNode node)
     {
+        // See ForallExpressionNode.
         var vars = string.Join(" ", node.BoundVariables.Select(v => v.Accept(this)));
-        var body = node.Body.Accept(this);
+        var body = AcceptInInlineSibling(node.Body);
         return $"(exists ({vars}) {body})";
     }
 
     public string Visit(ImplicationExpressionNode node)
     {
-        var ante = node.Antecedent.Accept(this);
-        var cons = node.Consequent.Accept(this);
+        // AcceptInInlineSibling: operands in Lisp (-> a b) form are space-separated,
+        // so a nested zero-arg antecedent without §/C would absorb the consequent.
+        var ante = AcceptInInlineSibling(node.Antecedent);
+        var cons = AcceptInInlineSibling(node.Consequent);
         return $"(-> {ante} {cons})";
     }
 
@@ -3479,7 +3514,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var opName = node.Operation.ToCalorName();
         var args = node.Arguments.Select(a =>
         {
-            var val = a.Accept(this);
+            // AcceptInInlineSibling: args in Lisp (op a b ...) form are space-separated,
+            // so a nested zero-arg call without §/C would absorb the next arg.
+            var val = AcceptInInlineSibling(a);
             // Hoist values with section markers or unquoted commas (tuples)
             if (ContainsSectionMarker(val))
                 val = HoistToTempVar(val);
@@ -3501,15 +3538,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CharOperationNode node)
     {
+        // AcceptInInlineSibling: args in Lisp (op a b) form are space-separated,
+        // so a nested zero-arg call without §/C would absorb the next arg.
         var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a => a.Accept(this));
+        var args = node.Arguments.Select(a => AcceptInInlineSibling(a));
         return $"({opName} {string.Join(" ", args)})";
     }
 
     public string Visit(StringBuilderOperationNode node)
     {
+        // See CharOperationNode.
         var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a => a.Accept(this));
+        var args = node.Arguments.Select(a => AcceptInInlineSibling(a));
         var argsStr = string.Join(" ", args);
         return args.Any() ? $"({opName} {argsStr})" : $"({opName})";
     }
